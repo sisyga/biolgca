@@ -122,6 +122,8 @@ class LGCA_1D:
                 else:
                     self.theta = 0.75
                     print 'switch threshold set to theta = ', self.theta
+                if self.restchannels < 2:
+                    print 'WARNING: not enough rest channels - system will die out!!!'
 
             elif kwargs['interaction'] is 'go_and_grow':
                 self.birth_death = self.birth
@@ -391,14 +393,17 @@ class LGCA_1D:
             if showprogress:
                 update_progress(1.0 * t / timesteps)
 
-    def plot_timeevo(self, density_t, figindex=0, figsize=None, cmap='hot_r'):
+    def plot_density(self, density_t=None, figindex=0, figsize=None, cmap='hot_r'):
         import seaborn as sns
         sns.set_style('white')
+        if density_t is None:
+            density_t = self.dens_t
         if figsize is None:
             tmax, l = density_t.shape
             x = 10.
             y = min([x * tmax / l, 15.])
             figsize = (x, y)
+
         fig = plt.figure(num=figindex, figsize=figsize)
         ax = fig.add_subplot(111)
         cmap = cmap_discretize(cmap, 3 + self.restchannels)
@@ -411,12 +416,48 @@ class LGCA_1D:
         plt.tight_layout()
         return plot
 
+    def plot_flux(self, nodes_t=None, figindex=0, figsize=None):
+        import seaborn as sns
+        sns.set_style('white')
+        if nodes_t is None:
+            nodes_t = self.nodes_t
+
+        dens_t = nodes_t.sum(-1) / nodes_t.shape[-1]
+        flux_t = nodes_t[..., 0].astype(float) - nodes_t[..., 1].astype(float)
+        if figsize is None:
+            tmax, l = dens_t.shape
+            x = 10.
+            y = min([x * tmax / l, 15.])
+            figsize = (x, y)
+
+        rgb = np.ones((nodes_t.shape[0], nodes_t.shape[1], 3))
+        red = flux_t.copy()
+        red[flux_t < 0] = 0
+        blue = flux_t.copy()
+        blue[flux_t > 0] = 0
+        blue *= -1
+        rgb[..., 0] -= blue
+        rgb[..., 0] *= 1 - dens_t
+        rgb[..., 1] -= red
+        rgb[..., 1] *= 1 - dens_t
+        rgb[..., 2] = rgb[..., 1]
+        fig = plt.figure(num=figindex, figsize=figsize)
+        ax = fig.add_subplot(111)
+        plot = ax.imshow(rgb, interpolation='None', origin='upper')
+        plt.xlabel(r'Lattice node $r \, [\varepsilon]$', )
+        plt.ylabel(r'Time step $k \, [\tau]$')
+        ax.xaxis.set_label_position('top')
+        ax.xaxis.set_ticks_position('top')
+        plt.tight_layout()
+        return plot
+
 
 if __name__ == '__main__':
-    l = 10
-    nodes = np.zeros((l, 3), dtype=np.bool)
-    nodes[0, 0] = 1
-    system = LGCA_1D(nodes=nodes, bc='reflect', interaction='parameter_diffusion', beta=.4)
-    system.timeevo(timesteps=100, recorddens=True)
-    system.plot_timeevo(system.dens_t, cmap='viridis')
+    l = 100
+    nodes = np.zeros((l, 4), dtype=np.bool)
+    nodes[0, :] = 1
+    system = LGCA_1D(nodes=nodes, bc='reflect', interaction='go_or_grow', kappa=3.)
+    system.timeevo(timesteps=200, record=True)
+    system.plot_density()
+    # system.plot_flux(figindex=1)
     plt.show()
