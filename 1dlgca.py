@@ -15,7 +15,7 @@ class LGCA_1D:
     1D version of an LGCA. Mainly used to compare simulations with analytic results.
     """
 
-    def __init__(self, nodes=None, l=101, restchannels=2, density=0.1, bc='periodic', r_int=1, **kwargs):
+    def __init__(self, nodes=None, l=100, restchannels=2, density=0.1, bc='periodic', r_int=1, **kwargs):
         """
         Initialize class instance.
         :param nodes:
@@ -26,7 +26,8 @@ class LGCA_1D:
         :param r_int:
         :param kwargs:
         """
-        self.dens_t, self.nodes_t, self.n_t = np.empty(3)  # placeholders for record of dynamics
+        self.dens_t, self.nodes_t, self.n_t = np.empty(3)  # placeholders to record dynamics
+        assert r_int > 0
         self.r_int = r_int  # interaction range; must be at least 1 to handle propagation.
         if nodes is None:
             self.l = l
@@ -39,7 +40,7 @@ class LGCA_1D:
             self.nodes = np.zeros((self.l + 2 * self.r_int, self.restchannels), dtype=np.bool)
             self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.bool)
             self.restchannels -= 2
-        self.x = np.arange(self.l)
+        self.x = np.arange(self.l) + self.r_int
         self.K = 2 + self.restchannels
 
         if bc in ['absorbing', 'absorb', 'abs']:
@@ -48,6 +49,7 @@ class LGCA_1D:
             self.apply_boundaries = self.apply_rbc
         else:
             self.apply_boundaries = self.apply_pbc
+            self.apply_boundaries()
 
         # set phenotypic change function
         if 'phen_change' in kwargs:
@@ -69,6 +71,7 @@ class LGCA_1D:
                 pass
 
             self.phen_change = phen_change
+
         # set birth_death process
         if 'birthdeath' in kwargs:
             if kwargs['birthdeath'] is 'birth':
@@ -77,6 +80,7 @@ class LGCA_1D:
                     self.r_b = kwargs['r_b']
                 else:
                     self.r_b = 0.2
+                    print 'birth rate set to r_b = ', self.r_b
             elif kwargs['birthdeath'] is 'none':
                 def birth_death():
                     pass
@@ -84,6 +88,11 @@ class LGCA_1D:
                 self.birth_death = birth_death
             else:
                 print 'keyword', kwargs['birthdeath'], 'is not defined!'
+
+                def birth_death():
+                    pass
+
+                self.birth_death = birth_death
         else:
             def birth_death():
                 pass
@@ -97,18 +106,22 @@ class LGCA_1D:
                     self.r_d = kwargs['r_d']
                 else:
                     self.r_d = 0.01
+                    print 'death rate set to r_d = ', self.r_d
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
                 else:
                     self.r_b = 0.2
+                    print 'birth rate set to r_b = ', self.r_b
                 if 'kappa' in kwargs:
                     self.kappa = kwargs['kappa']
                 else:
                     self.kappa = 5.
+                    print 'switch rate set to kappa = ', self.kappa
                 if 'theta' in kwargs:
                     self.theta = kwargs['theta']
                 else:
                     self.theta = 0.75
+                    print 'switch threshold set to theta = ', self.theta
 
             elif kwargs['interaction'] is 'go_and_grow':
                 self.birth_death = self.birth
@@ -117,23 +130,44 @@ class LGCA_1D:
                     self.r_b = kwargs['r_b']
                 else:
                     self.r_b = 0.2
+                    print 'birth rate set to r_b = ', self.r_b
+
+            elif kwargs['interaction'] is 'alignment':
+                self.interaction = self.alignment
+                if 'beta' in kwargs:
+                    self.beta = kwargs['beta']
+                else:
+                    self.beta = 2.
+                    print 'sensitivity set to beta = ', self.beta
+
+            elif kwargs['interaction'] is 'aggregation':
+                self.interaction = self.aggregation
+                if 'beta' in kwargs:
+                    self.beta = kwargs['beta']
+                else:
+                    self.beta = 2.
+                    print 'sensitivity set to beta = ', self.beta
+
+            elif kwargs['interaction'] is 'parameter_diffusion':
+                self.interaction = self.parameter_diffusion
+                if 'beta' in kwargs:
+                    self.beta = kwargs['beta']
+                else:
+                    self.beta = 2.
+                    print 'sensitivity set to beta = ', self.beta
 
             elif kwargs['interaction'] is 'random_walk':
                 self.interaction = self.random_walk
+
             else:
-                print 'keyword', kwargs['interaction'], 'is not defined!'
+                print 'keyword', kwargs['interaction'], 'is not defined! Random walk used instead.'
+                self.interaction = self.random_walk
+
         else:
-            self.interaction = self.rearrange
+            self.interaction = self.random_walk
 
-        # add same procedure for config_energy
-
-        # set rearrangement energy function
-        self.config_energy = lambda p, x: 1.  # constant weight == random walk
-
-        # self.occupiedchannels = self.nodes > 0
         self.cell_density = self.nodes[self.r_int:-self.r_int].sum(-1)
-        # self.occupiednodes = self.cell_density > 0
-        # self.nbs = self.calc_nbs(self.cell_density)
+
 
     def propagation(self):
         """
@@ -141,7 +175,8 @@ class LGCA_1D:
         :param nodes:
         :return:
         """
-        newnodes = np.empty(self.nodes.shape, dtype=nodes.dtype)
+        newnodes = np.zeros(self.nodes.shape, dtype=nodes.dtype)
+        # self.clean_boundaries(newnodes)
         # resting particles stay
         newnodes[:, 2:] = self.nodes[:, 2:]
 
@@ -151,25 +186,20 @@ class LGCA_1D:
         # prop. to the left
         newnodes[:-1, 1] = self.nodes[1:, 1]
 
-        self.apply_boundaries(newnodes)
-        self.reset_boundaries(newnodes)
         self.nodes = newnodes
 
-    def reset_boundaries(self, newnodes):
-        newnodes[0, :] = 0
-        newnodes[-1, :] = 0
+    def apply_pbc(self):
+        self.nodes[:self.r_int, :] = self.nodes[-2 * self.r_int:-self.r_int, :]
+        self.nodes[-self.r_int:, :] = self.nodes[self.r_int:2 * self.r_int, :]
 
-    def apply_pbc(self, newnodes):
-        newnodes[1, 0] = newnodes[-1, 0]
-        newnodes[-2, 1] = newnodes[0, 1]
+    def apply_rbc(self):
+        self.nodes[self.r_int, 0] += self.nodes[self.r_int - 1, 1]
+        self.nodes[-self.r_int - 1, 1] += self.nodes[-self.r_int, 0]
+        self.apply_abc()
 
-    def apply_rbc(self, newnodes):
-        newnodes[1, 0] = newnodes[0, 1]
-        newnodes[-2, 1] = newnodes[-1, 0]
-
-    def apply_abc(self, newnodes):
-        newnodes[0, :] = 0
-        newnodes[-1:, :] = 0
+    def apply_abc(self):
+        self.nodes[:self.r_int, :] = 0
+        self.nodes[-self.r_int:, :] = 0
 
     def reset_config(self, density):
         """
@@ -179,26 +209,6 @@ class LGCA_1D:
         """
         self.nodes = npr.random(self.nodes.shape) < density
         self.update_dynamic_fields()
-
-    def calc_nbs(self, cell_density):
-        """
-
-        :param density:
-        :return:
-        """
-        nbs = np.zeros(self.l)
-
-        # right neighbor
-        nbs[:-1] += cell_density[1:]
-        nbs[-1] += cell_density[0]
-
-        # left neighbor
-        nbs[1:] += cell_density[:-1]
-        nbs[0] += cell_density[-1]
-
-        nbs += cell_density - 1
-        nbs[cell_density == 0] = 0
-        return nbs
 
     def update_dynamic_fields(self):
         """Update "fields" that store important variables to compute other dynamic steps
@@ -218,7 +228,7 @@ class LGCA_1D:
         n_r = self.nodes[:, 2:].sum(-1)
         M1 = np.minimum(n_m, self.restchannels - n_r)
         M2 = np.minimum(n_r, 2 - n_m)
-        for x in 1 + self.x:
+        for x in self.x:
             node = self.nodes[x, :]
             n = node.sum()
             if n == 0:
@@ -249,7 +259,7 @@ class LGCA_1D:
         # newnodes = np.empty(self.nodes.shape,
         #                     dtype=self.nodes.dtype)  # this is faster, if the interaction is applied to all nodes
         inds = np.arange(self.K)
-        for x in 1 + self.x:
+        for x in self.x:
             node = self.nodes[x, :]
             n = node.sum()
             if n == 0 or n == self.K:  # no growth on full or empty nodes
@@ -273,33 +283,77 @@ class LGCA_1D:
 
     def random_walk(self):
         """
-        Perform a random walk. Giant speed-up by use of numpy function shuffle.
+        Perform a random walk. Giant speed-up by use of numpy function shuffle, which performs a permutation along
+        the first axis (therefore we need the .T on the nodes)
         :return:
         """
         self.nodes = self.nodes.T
         npr.shuffle(self.nodes)
         self.nodes = self.nodes.T
 
-    def rearrange(self):
-        """ Rearrangement step, depends on the "configuration energy"
+    def alignment(self):
+        """
+        Rearrangement step for alignment interaction
         :return:
         """
-        # newnodes = self.nodes.copy()
         newnodes = np.zeros(self.nodes.shape,
                             dtype=self.nodes.dtype)  # this is faster, if the interaction is applied to all nodes
-        for x in self.r_int + self.x:
+        for x in self.x:
             node = self.nodes[x, :]
             n = node.sum()
             if n == 0 or n == 2 + self.restchannels:  # full or empty nodes cannot be rearranged!
                 newnodes[x, :] = node
                 continue
 
-            weights = []
-            permutations = list(multiset_permutations(node))
-            for p in permutations:  # this can sped up by vectorizing the function config_energy()
-                weights.append(self.config_energy(p, x))
+            G = int(self.nodes[x + 1, 0]) + int(self.nodes[x - 1, 0]) - int(self.nodes[x + 1, 1]) - int(
+                self.nodes[x - 1, 1])
+            permutations = np.array(list(multiset_permutations(node)), dtype=int)
+            Js = permutations[:, 0] - permutations[:, 1]
+            weights = np.exp(self.beta * G * Js)
+            ind = npr.choice(len(weights), p=weights / weights.sum())
+            newnodes[x, :] = permutations[ind]
 
-            weights = np.asarray(weights)
+        self.nodes = newnodes
+
+    def aggregation(self):
+        """
+        Rearrangement step for alignment interaction
+        :return:
+        """
+        newnodes = np.zeros(self.nodes.shape,
+                            dtype=self.nodes.dtype)  # this is faster, if the interaction is applied to all nodes
+        for x in self.x:
+            node = self.nodes[x, :]
+            n = node.sum()
+            if n == 0 or n == 2 + self.restchannels:  # full or empty nodes cannot be rearranged!
+                newnodes[x, :] = node
+                continue
+
+            G = self.nodes[x + 1].sum() - self.nodes[x - 1].sum()
+            permutations = np.array(list(multiset_permutations(node)), dtype=int)
+            Js = permutations[:, 0] - permutations[:, 1]
+            weights = np.exp(self.beta * G * Js)
+            ind = npr.choice(len(weights), p=weights / weights.sum())
+            newnodes[x, :] = permutations[ind]
+
+        self.nodes = newnodes
+
+    def parameter_diffusion(self):
+        """
+        Rearrangement step for alignment interaction
+        :return:
+        """
+        newnodes = np.zeros(self.nodes.shape,
+                            dtype=self.nodes.dtype)  # this is faster, if the interaction is applied to all nodes
+        for x in self.x:
+            node = self.nodes[x, :]
+            n = node.sum()
+            if n == 0 or n == 2 + self.restchannels:  # full or empty nodes cannot be rearranged!
+                newnodes[x, :] = node
+                continue
+
+            permutations = np.array(list(multiset_permutations(node)), dtype=int)
+            weights = np.exp(self.beta * permutations[:, 2:].sum(-1))
             ind = npr.choice(len(weights), p=weights / weights.sum())
             newnodes[x, :] = permutations[ind]
 
@@ -307,9 +361,12 @@ class LGCA_1D:
 
     def timestep(self):
         self.birth_death()
-        self.phen_change()
+        self.apply_boundaries()
+        # self.phen_change()
         self.interaction()
+        self.apply_boundaries()
         self.propagation()
+        self.apply_boundaries()
         self.update_dynamic_fields()
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
@@ -356,10 +413,10 @@ class LGCA_1D:
 
 
 if __name__ == '__main__':
-    l = 100
-    nodes = np.zeros((l, 4), dtype=np.bool)
-    nodes[0, :] = 1
-    system = LGCA_1D(bc='reflect', interaction='go_or_grow')
-    system.timeevo(timesteps=200, recorddens=True)
-    system.plot_timeevo(system.dens_t)
+    l = 10
+    nodes = np.zeros((l, 3), dtype=np.bool)
+    nodes[0, 0] = 1
+    system = LGCA_1D(nodes=nodes, bc='reflect', interaction='parameter_diffusion', beta=.4)
+    system.timeevo(timesteps=100, recorddens=True)
+    system.plot_timeevo(system.dens_t, cmap='viridis')
     plt.show()
