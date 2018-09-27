@@ -74,3 +74,7 @@ def cmap_discretize(cmap, N):
         cdict[key] = [(indices[i], colors_rgba[i - 1, ki], colors_rgba[i, ki]) for i in range(N + 1)]
 
     return plt.matplotlib.colors.LinearSegmentedColormap(cmap.name + "_%d" % N, cdict, 1024)
+
+
+def tanh_switch(rho, kappa=5., theta=0.8):
+    return 0.5 * (1 + np.tanh(kappa * (rho - theta)))
