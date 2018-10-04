@@ -44,7 +44,7 @@ if __name__ == '__main__':
     ax.xaxis.set_label_position('top')
     plt.xticks([], [])
     plt.yticks([], [])
-    plot = ax.matshow(config, cmap='viridis', vmin=0, vmax=1, interpolation='None')
+    plot = ax.matshow(config, cmap='cividis', vmin=0, vmax=1, interpolation='None')
     plt.tight_layout(pad=1.)
     animation = FuncAnimation(fig, update, blit=True, init_func=init_func)
     plt.show()

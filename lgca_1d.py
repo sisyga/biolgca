@@ -397,11 +397,11 @@ class LGCA_1D:
             density_t = self.dens_t
         if figsize is None:
             tmax, l = density_t.shape
-            x = 10.
+            x = 8.
             y = min([x * tmax / l, 15.])
             figsize = (x, y)
 
-        fig = plt.figure(num=figindex, figsize=figsize)
+        fig = plt.figure(num=figindex, figsize=figsize, tight_layout=True)
         ax = fig.add_subplot(111)
         cmap = cmap_discretize(cmap, 3 + self.restchannels)
         plot = ax.matshow(density_t, interpolation='None', vmin=0, vmax=2 + self.restchannels, cmap=cmap)
@@ -410,7 +410,6 @@ class LGCA_1D:
         plt.xlabel(r'Lattice node $r \, [\varepsilon]$', )
         plt.ylabel(r'Time step $k \, [\tau]$')
         ax.xaxis.set_label_position('top')
-        plt.tight_layout()
         return plot
 
     def plot_flux(self, nodes_t=None, figindex=0, figsize=None):
@@ -420,27 +419,21 @@ class LGCA_1D:
             nodes_t = self.nodes_t
 
         dens_t = nodes_t.sum(-1) / nodes_t.shape[-1]
-        flux_t = nodes_t[..., 0].astype(float) - nodes_t[..., 1].astype(float)
+        flux_t = nodes_t[..., 0].astype(int) - nodes_t[..., 1].astype(int)
         if figsize is None:
             tmax, l = dens_t.shape
-            x = 10.
+            x = 9.
             y = min([x * tmax / l, 15.])
             figsize = (x, y)
 
-        rgb = np.ones((nodes_t.shape[0], nodes_t.shape[1], 3))
-        red = flux_t.copy()
-        red[flux_t < 0] = 0
-        blue = flux_t.copy()
-        blue[flux_t > 0] = 0
-        blue *= -1
-        rgb[..., 0] -= blue
-        rgb[..., 0] *= 1 - dens_t
-        rgb[..., 1] -= red
-        rgb[..., 1] *= 1 - dens_t
-        rgb[..., 2] = rgb[..., 1]
+        rgba = np.zeros((tmax, l, 4))
+        rgba[dens_t > 0, -1] = 1.
+        rgba[flux_t == 1, 0] = 1.
+        rgba[flux_t == -1, 2] = 1.
+        rgba[flux_t == 0, :-1] = 0.
         fig = plt.figure(num=figindex, figsize=figsize)
         ax = fig.add_subplot(111)
-        plot = ax.imshow(rgb, interpolation='None', origin='upper')
+        plot = ax.imshow(rgba, interpolation='None', origin='upper')
         plt.xlabel(r'Lattice node $r \, [\varepsilon]$', )
         plt.ylabel(r'Time step $k \, [\tau]$')
         ax.xaxis.set_label_position('top')
@@ -585,6 +578,7 @@ class IBLGCA_1D(LGCA_1D):
                 else:
                     self.kappa = 5.
                     print 'switch rate set to kappa = ', self.kappa
+                self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
                 if 'theta' in kwargs:
                     self.theta = kwargs['theta']
                 else:
@@ -740,38 +734,56 @@ class IBLGCA_1D(LGCA_1D):
         self.update_dynamic_fields()
         n_m = self.occupied[:, :2].sum(-1)
         n_r = self.occupied[:, 2:].sum(-1)
-        for x in self.x[self.cell_density > 0]:
+        for x in self.x:
             node = self.nodes[x]
+            vel = node[:2]
+            rest = node[2:]
             n = self.cell_density[x]
+            if n == 0:
+                continue
+
             rho = n / self.K
             # determine cells to switch to rest channels and cells that switch to moving state
-            kappas = np.array([self.props['kappa'][i] for i in node])
-            r_s = tanh_switch(rho, kappa=kappas, theta=self.theta)
-            swap_to_rest = npr.random(2) < r_s[:2]
+            # kappas = np.array([self.props['kappa'][i] for i in node])
+            # r_s = tanh_switch(rho, kappa=kappas, theta=self.theta)
 
-            swap_to_mov = npr.random(self.restchannels) < 1 - r_s[2:]
-            j_1 = swap_to_rest.sum()
-            j_2 = swap_to_mov.sum()
-            n_m[x] += j_2 - j_1
-            n_r[x] += j_1 - j_2
-            n_m[x] -= npr.binomial(n_m[x] * np.heaviside(n_m[x], 0), self.r_d)
-            n_r[x] -= npr.binomial(n_r[x] * np.heaviside(n_r[x], 0), self.r_d)
-            M = min([n_r[x], self.restchannels - n_r[x]])
-            n_r[x] += npr.binomial(M * np.heaviside(M, 0), self.r_b)
+            free_rest = self.restchannels - n_r[x]
+            free_vel = 2 - n_m[x]
+            # choose a number of cells that try to switch. the cell number must fit to the number of free channels
+            can_switch_to_rest = npr.permutation(vel[vel > 0])[:free_rest]
+            can_switch_to_vel = npr.permutation(rest[rest > 0])[:free_vel]
 
-            v_channels = [1] * n_m[x] + [0] * (2 - n_m[x])
-            r_channels = np.zeros(self.restchannels)
-            r_channels[:n_r[x]] = 1
+            for cell in can_switch_to_rest:
+                if npr.random() < tanh_switch(rho, kappa=self.props['kappa'][cell], theta=self.theta):
+                    # print 'switch to rest', cell
+                    rest[np.where(rest == 0)[0][0]] = cell
+                    vel[np.where(vel == cell)[0][0]] = 0
+
+            for cell in can_switch_to_vel:
+                if npr.random() < 1 - tanh_switch(rho, kappa=self.props['kappa'][cell], theta=self.theta):
+                    # print 'switch to vel', cell
+                    vel[np.where(vel == 0)[0][0]] = cell
+                    rest[np.where(rest == cell)[0][0]] = 0
+
+            # cells in rest channels can proliferate
+            can_proliferate = npr.permutation(rest[rest > 0])[:(rest == 0).sum()]
+            for cell in can_proliferate:
+                if npr.random() < self.r_b:
+                    self.maxlabel += 1
+                    rest[np.where(rest == 0)[0][0]] = self.maxlabel
+                    kappa = self.props['kappa'][cell]
+                    self.props['kappa'].append(npr.normal(loc=kappa))
+
+            v_channels = npr.permutation(vel)
+            r_channels = npr.permutation(rest)
             node = np.hstack((v_channels, r_channels))
             self.nodes[x, :] = node
 
-    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, recordprops=False,
-                showprogress=True):
+    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
         self.update_dynamic_fields()
         if record:
             self.nodes_t = np.zeros((timesteps + 1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
             self.nodes_t[0, ...] = self.nodes[self.r_int:-self.r_int, ...]
-        if recordprops:
             self.props_t = [self.props]
         if recordN:
             self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
@@ -783,7 +795,6 @@ class IBLGCA_1D(LGCA_1D):
             self.timestep()
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.r_int:-self.r_int]
-            if recordprops:
                 self.props_t.append(self.props)
             if recordN:
                 self.n_t[t] = self.cell_density.sum()
@@ -792,15 +803,15 @@ class IBLGCA_1D(LGCA_1D):
             if showprogress:
                 update_progress(1.0 * t / timesteps)
 
-    def plot_prop(self, nodes_t=None, props_t=None, figindex=0, figsize=None, prop=None, vmax=1, vmin=0,
-                  cmap='viridis'):
+    def plot_prop(self, nodes_t=None, props_t=None, figindex=0, figsize=None, prop=None, cmap='cividis'):
         import seaborn as sns
         sns.set_style('white')
+        import matplotlib.ticker as mticker
         if nodes_t is None:
             nodes_t = self.nodes_t
         if figsize is None:
             tmax, l = nodes_t.shape[0], nodes_t.shape[1]
-            x = 10.
+            x = 8.
             y = min([x * tmax / l, 15.])
             figsize = (x, y)
 
@@ -810,34 +821,54 @@ class IBLGCA_1D(LGCA_1D):
         if prop is None:
             prop = props_t[0].keys()[0]
 
-        mean_prop = np.empty((tmax, l))
+        mean_prop = np.zeros((tmax, l))
         for t in range(tmax):
             for x in range(l):
                 node = nodes_t[t, x]
-                mean_prop[t, x] = np.mean(np.array(props_t[t][prop])[node])
+                occ = node.astype(np.bool)
+                if occ.sum() == 0:
+                    continue
 
-        fig = plt.figure(num=figindex, figsize=figsize)
+                mean_prop[t, x] = np.mean(np.array(props_t[t][prop])[node[node > 0]])
+
+        dens_t = nodes_t.astype(bool).sum(-1)
+        vmax = np.max(mean_prop)
+        vmin = np.min(mean_prop)
+        rgba = plt.get_cmap(cmap)
+        rgba = rgba((mean_prop - vmin) / (vmax - vmin))
+        rgba[dens_t == 0, :] = 0.
+        fig = plt.figure(num=figindex, figsize=figsize, tight_layout=True)
         ax = fig.add_subplot(111)
-        plot = ax.matshow(mean_prop, interpolation='None', vmin=vmin, vmax=vmax, cmap=cmap)
-        cbar = plt.colorbar(plot)
-        cbar.set_label('Property {}'.format(prop))
-        plt.xlabel(r'Lattice node $r \, [\varepsilon]$', )
+        plot = ax.imshow(rgba, interpolation='none', aspect='equal')
+        sm = plt.cm.ScalarMappable(cmap=cmap)
+        sm.set_array([vmin, vmax])
+        cbar = plt.colorbar(sm, use_gridspec=True)
+        cbar.set_label(r'Property ${}$'.format(prop))
+
+        plt.xlabel(r'Lattice node $r \, [\varepsilon]$')
         plt.ylabel(r'Time step $k \, [\tau]$')
+        # matshow style
         ax.xaxis.set_label_position('top')
-        plt.tight_layout()
+        ax.title.set_y(1.05)
+        ax.xaxis.tick_top()
+        ax.xaxis.set_ticks_position('both')
+        ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
+        ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         return plot
 
 
 if __name__ == '__main__':
-    l = 100
-    restchannels = 1
+    l = 10
+    restchannels = 2
     n_channels = restchannels + 2
     nodes = 1 + np.arange(l * n_channels, dtype=np.uint).reshape((l, n_channels))
-    nodes[2:, :] = 0
+    nodes[1:, :] = 0
+    nodes[0, 1:] = 0
 
-    system = IBLGCA_1D(nodes=nodes, bc='reflect', birthdeath='birthdeath')
-    system.timeevo(timesteps=300, recordprops=True, record=True)
+    system = IBLGCA_1D(nodes=nodes, bc='reflect', interaction='go_or_grow', kappa=0., r_d=0.01, r_b=.2, theta=0.75)
+    system.timeevo(timesteps=50, record=True)
     system.plot_prop()
     system.plot_density(figindex=1)
-    # system.plot_flux(figindex=1)
+    props = np.array(system.props['kappa'])[system.nodes[system.nodes > 0]]
+    print np.mean(props)
     plt.show()
