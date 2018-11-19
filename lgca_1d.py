@@ -8,8 +8,11 @@ from tools import *
 
 class LGCA_1D:
     """
-    1D version of an LGCA. Mainly used to compare simulations with analytic results.
+    1D version of an LGCA.
     """
+    interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation', 'parameter_controlled_diffusion',
+                    'random_walk']
+    velocitychannels = 2
 
     def __init__(self, nodes=None, l=100, restchannels=2, density=0.1, bc='periodic', r_int=1, **kwargs):
         """
@@ -23,7 +26,6 @@ class LGCA_1D:
         :param kwargs:
         """
         self.dens_t, self.nodes_t, self.n_t = np.empty(3)  # placeholders to record dynamics
-        self.props_t = []
         assert r_int > 0
         self.r_int = r_int  # interaction range; must be at least 1 to handle propagation.
         if nodes is None:
@@ -47,27 +49,6 @@ class LGCA_1D:
         else:
             self.apply_boundaries = self.apply_pbc
             self.apply_boundaries()
-
-        # set phenotypic change function
-        if 'phen_change' in kwargs:
-            if kwargs['phen_change'] is 'none':
-                def phen_change():
-                    pass
-
-                self.phen_change = phen_change
-            else:
-                print 'keyword', kwargs['phen_change'], 'is not defined!'
-
-                def phen_change():
-                    pass
-
-                self.phen_change = phen_change
-
-        else:
-            def phen_change():
-                pass
-
-            self.phen_change = phen_change
 
         # set birth_death process
         if 'birthdeath' in kwargs:
@@ -95,6 +76,7 @@ class LGCA_1D:
                 pass
 
             self.birth_death = birth_death
+
 
         if 'interaction' in kwargs:
             if kwargs['interaction'] is 'go_or_grow':
@@ -147,7 +129,7 @@ class LGCA_1D:
                     self.beta = 2.
                     print 'sensitivity set to beta = ', self.beta
 
-            elif kwargs['interaction'] is 'parameter_diffusion':
+            elif kwargs['interaction'] is 'parameter_controlled_diffusion':
                 self.interaction = self.parameter_diffusion
                 if 'beta' in kwargs:
                     self.beta = kwargs['beta']
@@ -166,6 +148,9 @@ class LGCA_1D:
             self.interaction = self.random_walk
 
         self.cell_density = self.nodes[self.r_int:-self.r_int].sum(-1)
+
+    def get_interactions(self):
+        print self.interactions
 
     def propagation(self):
         """
@@ -361,7 +346,6 @@ class LGCA_1D:
     def timestep(self):
         self.birth_death()
         self.apply_boundaries()
-        # self.phen_change()
         self.interaction()
         self.apply_boundaries()
         self.propagation()
@@ -391,8 +375,8 @@ class LGCA_1D:
                 update_progress(1.0 * t / timesteps)
 
     def plot_density(self, density_t=None, figindex=0, figsize=None, cmap='hot_r'):
-        import seaborn as sns
-        sns.set_style('white')
+        # import seaborn as sns
+        # sns.set_style('white')
         if density_t is None:
             density_t = self.dens_t
         if figsize is None:
@@ -401,7 +385,7 @@ class LGCA_1D:
             y = min([x * tmax / l, 15.])
             figsize = (x, y)
 
-        fig = plt.figure(num=figindex, figsize=figsize, tight_layout=True)
+        fig = plt.figure(num=figindex, figsize=figsize)
         ax = fig.add_subplot(111)
         cmap = cmap_discretize(cmap, 3 + self.restchannels)
         plot = ax.matshow(density_t, interpolation='None', vmin=0, vmax=2 + self.restchannels, cmap=cmap)
@@ -413,18 +397,15 @@ class LGCA_1D:
         return plot
 
     def plot_flux(self, nodes_t=None, figindex=0, figsize=None):
-        import seaborn as sns
-        sns.set_style('white')
+        # import seaborn as sns
+        #sns.set_style('white')
         if nodes_t is None:
             nodes_t = self.nodes_t
 
         dens_t = nodes_t.sum(-1) / nodes_t.shape[-1]
         flux_t = nodes_t[..., 0].astype(int) - nodes_t[..., 1].astype(int)
         if figsize is None:
-            tmax, l = dens_t.shape
-            x = 9.
-            y = min([x * tmax / l, 15.])
-            figsize = (x, y)
+            figsize = estimate_figsize(nodes_t)
 
         rgba = np.zeros((tmax, l, 4))
         rgba[dens_t > 0, -1] = 1.
@@ -496,27 +477,6 @@ class IBLGCA_1D(LGCA_1D):
             self.apply_boundaries = self.apply_pbc
             self.apply_boundaries()
 
-        # set phenotypic change function
-        if 'phen_change' in kwargs:
-            if kwargs['phen_change'] is 'none':
-                def phen_change():
-                    pass
-
-                self.phen_change = phen_change
-            else:
-                print 'keyword', kwargs['phen_change'], 'is not defined!'
-
-                def phen_change():
-                    pass
-
-                self.phen_change = phen_change
-
-        else:
-            def phen_change():
-                pass
-
-            self.phen_change = phen_change
-
         # set birth_death process
         if 'birthdeath' in kwargs:
             if kwargs['birthdeath'] is 'birth':
@@ -560,6 +520,7 @@ class IBLGCA_1D(LGCA_1D):
 
             self.birth_death = birth_death
 
+        self.interactions = ['go_or_grow', 'go_and_grow', 'random_walk']
         if 'interaction' in kwargs:
             if kwargs['interaction'] is 'go_or_grow':
                 self.interaction = self.go_or_grow_interaction
@@ -597,22 +558,6 @@ class IBLGCA_1D(LGCA_1D):
                     print 'birth rate set to r_b = ', self.r_b
 
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
-
-            elif kwargs['interaction'] is 'aggregation':
-                self.interaction = self.aggregation
-                if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
-                else:
-                    self.beta = 2.
-                    print 'sensitivity set to beta = ', self.beta
-
-            elif kwargs['interaction'] is 'parameter_diffusion':
-                self.interaction = self.parameter_diffusion
-                if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
-                else:
-                    self.beta = 2.
-                    print 'sensitivity set to beta = ', self.beta
 
             elif kwargs['interaction'] is 'random_walk':
                 self.interaction = self.random_walk
@@ -690,7 +635,7 @@ class IBLGCA_1D(LGCA_1D):
         for x in self.x:
             n = self.cell_density[x]
             node = self.nodes[x]
-            if n == 0:  # no growth on full or empty nodes
+            if n == 0:  # no growth on empty nodes
                 continue
 
             # choose cells that proliferate
@@ -739,7 +684,7 @@ class IBLGCA_1D(LGCA_1D):
             vel = node[:2]
             rest = node[2:]
             n = self.cell_density[x]
-            if n == 0:
+            if n == 0 or n == self.K:
                 continue
 
             rho = n / self.K
@@ -803,17 +748,14 @@ class IBLGCA_1D(LGCA_1D):
             if showprogress:
                 update_progress(1.0 * t / timesteps)
 
-    def plot_prop(self, nodes_t=None, props_t=None, figindex=0, figsize=None, prop=None, cmap='cividis'):
+    def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=0, figsize=None, prop=None, cmap='cividis'):
         import seaborn as sns
         sns.set_style('white')
         import matplotlib.ticker as mticker
         if nodes_t is None:
             nodes_t = self.nodes_t
         if figsize is None:
-            tmax, l = nodes_t.shape[0], nodes_t.shape[1]
-            x = 8.
-            y = min([x * tmax / l, 15.])
-            figsize = (x, y)
+            figsize = estimate_figsize(nodes_t)
 
         if props_t is None:
             props_t = self.props_t
@@ -821,6 +763,7 @@ class IBLGCA_1D(LGCA_1D):
         if prop is None:
             prop = props_t[0].keys()[0]
 
+        tmax = nodes_t.shape[0]
         mean_prop = np.zeros((tmax, l))
         for t in range(tmax):
             for x in range(l):
@@ -856,19 +799,57 @@ class IBLGCA_1D(LGCA_1D):
         ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         return plot
 
+    def plot_prop_timecourse(self, nodes_t=None, props_t=None, propname=None):
+        import seaborn as sns
+        sns.set_style('white')
+        if nodes_t is None:
+            nodes_t = self.nodes_t
+
+        if props_t is None:
+            props_t = self.props_t
+
+        if propname is None:
+            propname = props_t[0].keys()[0]
+
+        tmax = len(props_t)
+        fig = plt.figure()
+        mean_prop = np.zeros(tmax)
+        std_mean_prop = np.zeros(mean_prop.shape)
+        for t in range(tmax):
+            props = props_t[t]
+            nodes = nodes_t[t]
+            prop = np.array(props[propname])[nodes[nodes > 0]]
+            mean_prop[t] = np.mean(prop)
+            std_mean_prop[t] = np.std(prop, ddof=1) / np.sqrt(len(prop))
+
+        yerr = std_mean_prop
+        x = np.arange(tmax)
+        y = mean_prop
+
+        plt.xlabel('$t$')
+        plt.ylabel('${}$'.format(propname))
+        plt.title('Time course of the cell property')
+        plt.plot(x, y)
+        plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True)
+        sns.despine()
+        return
+
+
 
 if __name__ == '__main__':
-    l = 10
+    l = 100
     restchannels = 2
     n_channels = restchannels + 2
     nodes = 1 + np.arange(l * n_channels, dtype=np.uint).reshape((l, n_channels))
-    nodes[1:, :] = 0
-    nodes[0, 1:] = 0
+    # nodes[1:, :] = 0
+    # nodes[0, 1:] = 0
 
-    system = IBLGCA_1D(nodes=nodes, bc='reflect', interaction='go_or_grow', kappa=0., r_d=0.01, r_b=.2, theta=0.75)
-    system.timeevo(timesteps=50, record=True)
-    system.plot_prop()
+    system = IBLGCA_1D(nodes=nodes, bc='reflect', interaction='go_or_grow', kappa=4., r_d=0.01, r_b=.2, theta=0.5)
+    system.timeevo(timesteps=10000, record=True)
+    #system.plot_prop()
     system.plot_density(figindex=1)
     props = np.array(system.props['kappa'])[system.nodes[system.nodes > 0]]
     print np.mean(props)
+    system.plot_prop_timecourse()
+    plt.ylabel('$\kappa$')
     plt.show()
