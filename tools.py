@@ -15,7 +15,7 @@ def update_progress(progress):
     :param progress: float. Fraction of the work done, to update bar.
     :return:
     """
-    barLength = 10  # Modify this to change the length of the progress bar
+    barLength = 20  # Modify this to change the length of the progress bar
     status = ""
     if isinstance(progress, int):
         progress = float(progress)
@@ -78,3 +78,10 @@ def cmap_discretize(cmap, N):
 
 def tanh_switch(rho, kappa=5., theta=0.8):
     return 0.5 * (1 + np.tanh(kappa * (rho - theta)))
+
+
+def estimate_figsize(array, x=8.):
+    lx, ly = array.shape
+    y = min([x * ly / lx, 15.])
+    figsize = (x, y)
+    return figsize
