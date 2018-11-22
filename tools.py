@@ -80,8 +80,27 @@ def tanh_switch(rho, kappa=5., theta=0.8):
     return 0.5 * (1 + np.tanh(kappa * (rho - theta)))
 
 
-def estimate_figsize(array, x=8.):
+def estimate_figsize(array, x=8., cbar=False):
     lx, ly = array.shape
-    y = min([x * ly / lx, 15.])
+    if cbar:
+        y = min([x * ly / lx - 1, 15.])
+    else:
+        y = min([x * ly / lx, 15.])
     figsize = (x, y)
     return figsize
+
+
+def disarrange(a, axis=-1):
+    """
+    Shuffle `a` in-place along the given axis.
+
+    Apply numpy.random.shuffle to the given axis of `a`.
+    Each one-dimensional slice is shuffled independently.
+    """
+    b = a.swapaxes(axis, -1)
+    # Shuffle `b` in-place along the last axis.  `b` is a view of `a`,
+    # so `a` is shuffled in place, too.
+    shp = b.shape[:-1]
+    for ndx in np.ndindex(shp):
+        np.random.shuffle(b[ndx])
+    return
