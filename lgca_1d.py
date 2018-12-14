@@ -1,18 +1,16 @@
 from __future__ import division
 
-import numpy.random as npr
-from sympy.utilities.iterables import multiset_permutations
-
 from tools import *
 
 
-class LGCA_1D:
+class LGCA_1D(LGCA):
     """
     1D version of an LGCA.
     """
     interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation', 'parameter_controlled_diffusion',
                     'random_walk']
     velocitychannels = 2
+    c = np.array([1., -1.])
 
     def __init__(self, nodes=None, l=100, restchannels=2, density=0.1, bc='periodic', r_int=1, **kwargs):
         """
@@ -149,9 +147,6 @@ class LGCA_1D:
 
         self.cell_density = self.nodes[self.r_int:-self.r_int].sum(-1)
 
-    def get_interactions(self):
-        print self.interactions
-
     def propagation(self):
         """
 
@@ -183,24 +178,6 @@ class LGCA_1D:
     def apply_abc(self):
         self.nodes[:self.r_int, :] = 0
         self.nodes[-self.r_int:, :] = 0
-
-    def reset_config(self, density):
-        """
-
-        :param density:
-        :return:
-        """
-        self.nodes = npr.random(self.nodes.shape) < density
-        self.update_dynamic_fields()
-
-    def update_dynamic_fields(self):
-        """Update "fields" that store important variables to compute other dynamic steps
-
-        :return:
-        """
-        self.cell_density = self.nodes.sum(-1)
-        # self.occupiednodes = self.cell_density > 0
-        # self.nbs = self.calc_nbs(self.cell_density)
 
     def go_or_grow_interaction(self):
         """
@@ -264,16 +241,6 @@ class LGCA_1D:
                 dn -= 1
 
             self.nodes[x, :] = node
-
-    def random_walk(self):
-        """
-        Perform a random walk. Giant speed-up by use of numpy function shuffle, which performs a permutation along
-        the first axis (therefore we need the .T on the nodes)
-        :return:
-        """
-        self.nodes = self.nodes.T
-        npr.shuffle(self.nodes)
-        self.nodes = self.nodes.T
 
     def alignment(self):
         """
@@ -343,15 +310,6 @@ class LGCA_1D:
 
         self.nodes = newnodes
 
-    def timestep(self):
-        self.birth_death()
-        self.apply_boundaries()
-        self.interaction()
-        self.apply_boundaries()
-        self.propagation()
-        self.apply_boundaries()
-        self.update_dynamic_fields()
-
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
         self.update_dynamic_fields()
         if record:
@@ -403,6 +361,7 @@ class LGCA_1D:
             nodes_t = self.nodes_t
 
         dens_t = nodes_t.sum(-1) / nodes_t.shape[-1]
+        tmax, l = dens_t.shape
         flux_t = nodes_t[..., 0].astype(int) - nodes_t[..., 1].astype(int)
         if figsize is None:
             figsize = estimate_figsize(nodes_t)
@@ -755,7 +714,7 @@ class IBLGCA_1D(LGCA_1D):
         if nodes_t is None:
             nodes_t = self.nodes_t
         if figsize is None:
-            figsize = estimate_figsize(nodes_t)
+            figsize = estimate_figsize(nodes_t.sum(-1))
 
         if props_t is None:
             props_t = self.props_t
@@ -763,7 +722,7 @@ class IBLGCA_1D(LGCA_1D):
         if prop is None:
             prop = props_t[0].keys()[0]
 
-        tmax = nodes_t.shape[0]
+        tmax, l, _ = nodes_t.shape
         mean_prop = np.zeros((tmax, l))
         for t in range(tmax):
             for x in range(l):
@@ -845,7 +804,7 @@ if __name__ == '__main__':
     # nodes[0, 1:] = 0
 
     system = IBLGCA_1D(nodes=nodes, bc='reflect', interaction='go_or_grow', kappa=4., r_d=0.01, r_b=.2, theta=0.5)
-    system.timeevo(timesteps=10000, record=True)
+    system.timeevo(timesteps=100, record=True)
     #system.plot_prop()
     system.plot_density(figindex=1)
     props = np.array(system.props['kappa'])[system.nodes[system.nodes > 0]]
