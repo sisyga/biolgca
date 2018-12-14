@@ -5,8 +5,10 @@ import sys
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import numpy as np
+import numpy.random as npr
 from matplotlib import pylab as plt
 from matplotlib import pyplot as plt
+from sympy.utilities.iterables import multiset_permutations
 
 
 def update_progress(progress):
@@ -104,3 +106,78 @@ def disarrange(a, axis=-1):
     for ndx in np.ndindex(shp):
         np.random.shuffle(b[ndx])
     return
+
+
+def blank_fct():
+    pass
+
+
+def hex_nb_sum(qty):
+    sum = np.zeros(qty.shape)
+    sum[:-1, ...] += qty[1:, ...]
+    sum[1:, ...] += qty[:-1, ...]
+    sum[:, 1::2, 1] += qty[:, :-1:2, 1]
+    sum[1:, 2::2, 1] += qty[:-1, 1:-1:2, 1]
+    sum[:-1, 1::2, 2] += qty[1:, :-1:2, 2]
+    sum[:, 2::2, 2] += qty[:, 1:-1:2, 2]
+    sum[:, :-1:2, 4] += qty[:, 1::2, 4]
+    sum[:-1, 1:-1:2, 4] += qty[1:, 2::2, 4]
+    sum[1:, :-1:2, 5] += qty[:-1, 1::2, 5]
+    sum[:, 1:-1:2, 5] += qty[:, 2::2, 5]
+    return sum
+
+
+class LGCA():
+    """
+    Base class for a lattice-gas. Not meant to be used alone!
+    """
+    interactions = [
+        'This is only a helper class, it cannot simulate! Use one the following classes: \n LGCA_1D, LGCA_SQUARE, LGCA_HEX']
+
+    def __init__(self):
+        return
+
+    def get_interactions(self):
+        print self.interactions
+
+    def random_reset(self, density):
+        """
+
+        :param density:
+        :return:
+        """
+        self.nodes = npr.random(self.nodes.shape) < density
+        self.update_dynamic_fields()
+
+    def update_dynamic_fields(self):
+        """Update "fields" that store important variables to compute other dynamic steps
+
+        :return:
+        """
+        self.cell_density = self.nodes.sum(-1)
+        # self.nbs = self.calc_nbs(self.cell_density)
+
+    def random_walk(self):
+        """
+        Shuffle config in the last axis, modeling a random walk.
+        :return:
+        """
+        disarrange(self.nodes, axis=-1)
+
+    def timestep(self):
+        """
+        Update the state of the LGCA from time k to k+1.
+        :return:
+        """
+        self.birth_death()
+        self.apply_boundaries()
+        self.interaction()
+        self.apply_boundaries()
+        self.propagation()
+        self.apply_boundaries()
+        self.update_dynamic_fields()
+
+    def calc_permutations(self):
+        self.permutations = [np.array(list(multiset_permutations([1] * n + [0] * (self.K - n))), dtype=np.int8)
+                             for n in range(self.K + 1)]
+        self.j = [np.dot(self.c, self.permutations[n][:, :self.velocitychannels].T) for n in range(self.K + 1)]
