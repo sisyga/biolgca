@@ -333,20 +333,17 @@ class LGCA_1D(LGCA):
                 update_progress(1.0 * t / timesteps)
 
     def plot_density(self, density_t=None, figindex=0, figsize=None, cmap='hot_r'):
-        # import seaborn as sns
-        # sns.set_style('white')
+        import seaborn as sns
+        sns.set_style('white')
         if density_t is None:
             density_t = self.dens_t
         if figsize is None:
-            tmax, l = density_t.shape
-            x = 8.
-            y = min([x * tmax / l, 15.])
-            figsize = (x, y)
+            figsize = estimate_figsize(density_t.T, cbar=True)
 
         fig = plt.figure(num=figindex, figsize=figsize)
         ax = fig.add_subplot(111)
         cmap = cmap_discretize(cmap, 3 + self.restchannels)
-        plot = ax.matshow(density_t, interpolation='None', vmin=0, vmax=2 + self.restchannels, cmap=cmap)
+        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=2 + self.restchannels, cmap=cmap)
         cbar = colorbar_index(ncolors=3 + self.restchannels, cmap=cmap, use_gridspec=True)
         cbar.set_label(r'Particle number $n$')
         plt.xlabel(r'Lattice node $r \, [\varepsilon]$', )
@@ -364,7 +361,7 @@ class LGCA_1D(LGCA):
         tmax, l = dens_t.shape
         flux_t = nodes_t[..., 0].astype(int) - nodes_t[..., 1].astype(int)
         if figsize is None:
-            figsize = estimate_figsize(nodes_t)
+            figsize = estimate_figsize(dens_t.T)
 
         rgba = np.zeros((tmax, l, 4))
         rgba[dens_t > 0, -1] = 1.
@@ -456,10 +453,17 @@ class IBLGCA_1D(LGCA_1D):
                     print 'birth rate set to r_b = ', self.r_b
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
                 if 'r_d' in kwargs:
-                    self.r_d = kwargs['r_b']
+                    self.r_d = kwargs['r_d']
                 else:
                     self.r_d = 0.02
                     print 'death rate set to r_d = ', self.r_d
+
+                if 'std' in kwargs:
+                    self.std = kwargs['std']
+                else:
+                    self.std = 0.1
+                    print 'standard deviation set to = ', self.std
+
 
             elif kwargs['birthdeath'] is 'none':
                 def birth_death():
@@ -600,29 +604,15 @@ class IBLGCA_1D(LGCA_1D):
             # choose cells that proliferate
             r_bs = [self.props['r_b'][i] for i in node]
             proliferating = npr.random(self.K) < r_bs
-            dn = proliferating.sum()
-            n += dn
-            # assure that there are not too many cells. if there are, randomly kick enough of them
-            while n > self.K:
-                p = proliferating.astype(float)
-                Z = p.sum()
-                p /= Z
-                ind = npr.choice(inds, p=p)
-                proliferating[ind] = 0
-                n -= 1
 
-            # distribute daughter cells randomly in channels
-            dn = proliferating.sum()
+            # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
             for label in node[proliferating]:
-                p = 1. - self.occupied[x]
-                Z = p.sum()
-                p /= Z
-                ind = npr.choice(inds, p=p)
-                self.maxlabel += 1
-                node[ind] = self.maxlabel
-                r_b = self.props['r_b'][label]
-                self.props['r_b'].append(npr.normal(loc=r_b, scale=0.2 * r_b))
-                dn -= 1
+                ind = npr.choice(self.K)
+                if self.occupied[x, ind] == 0:
+                    self.maxlabel += 1
+                    node[ind] = self.maxlabel
+                    r_b = self.props['r_b'][label]
+                    self.props['r_b'].append(np.clip(npr.normal(loc=r_b, scale=self.std), 0, 1))
 
             self.nodes[x, :] = node
 
@@ -714,7 +704,7 @@ class IBLGCA_1D(LGCA_1D):
         if nodes_t is None:
             nodes_t = self.nodes_t
         if figsize is None:
-            figsize = estimate_figsize(nodes_t.sum(-1))
+            figsize = estimate_figsize(nodes_t.sum(-1).T, cbar=True)
 
         if props_t is None:
             props_t = self.props_t
@@ -739,7 +729,7 @@ class IBLGCA_1D(LGCA_1D):
         rgba = plt.get_cmap(cmap)
         rgba = rgba((mean_prop - vmin) / (vmax - vmin))
         rgba[dens_t == 0, :] = 0.
-        fig = plt.figure(num=figindex, figsize=figsize, tight_layout=True)
+        fig = plt.figure(num=figindex, figsize=figsize)
         ax = fig.add_subplot(111)
         plot = ax.imshow(rgba, interpolation='none', aspect='equal')
         sm = plt.cm.ScalarMappable(cmap=cmap)
