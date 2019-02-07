@@ -10,6 +10,7 @@ from matplotlib import pylab as plt
 from matplotlib import pyplot as plt
 from sympy.utilities.iterables import multiset_permutations
 
+pi2 = 2 * np.pi
 
 def update_progress(progress):
     """
@@ -82,12 +83,13 @@ def tanh_switch(rho, kappa=5., theta=0.8):
     return 0.5 * (1 + np.tanh(kappa * (rho - theta)))
 
 
-def estimate_figsize(array, x=8., cbar=False):
+def estimate_figsize(array, x=8., cbar=False, dy=1.):
     lx, ly = array.shape
     if cbar:
         y = min([x * ly / lx - 1, 15.])
     else:
-        y = min([x * ly / lx, 15.])
+        y = min([x * ly / lx, 15.])  #
+    y *= dy
     figsize = (x, y)
     return figsize
 
@@ -110,21 +112,6 @@ def disarrange(a, axis=-1):
 
 def blank_fct():
     pass
-
-
-def hex_nb_sum(qty):
-    sum = np.zeros(qty.shape)
-    sum[:-1, ...] += qty[1:, ...]
-    sum[1:, ...] += qty[:-1, ...]
-    sum[:, 1::2, 1] += qty[:, :-1:2, 1]
-    sum[1:, 2::2, 1] += qty[:-1, 1:-1:2, 1]
-    sum[:-1, 1::2, 2] += qty[1:, :-1:2, 2]
-    sum[:, 2::2, 2] += qty[:, 1:-1:2, 2]
-    sum[:, :-1:2, 4] += qty[:, 1::2, 4]
-    sum[:-1, 1:-1:2, 4] += qty[1:, 2::2, 4]
-    sum[1:, :-1:2, 5] += qty[:-1, 1::2, 5]
-    sum[:, 1:-1:2, 5] += qty[:, 2::2, 5]
-    return sum
 
 
 class LGCA():
@@ -155,7 +142,6 @@ class LGCA():
         :return:
         """
         self.cell_density = self.nodes.sum(-1)
-        # self.nbs = self.calc_nbs(self.cell_density)
 
     def random_walk(self):
         """
@@ -169,8 +155,6 @@ class LGCA():
         Update the state of the LGCA from time k to k+1.
         :return:
         """
-        self.birth_death()
-        self.apply_boundaries()
         self.interaction()
         self.apply_boundaries()
         self.propagation()
@@ -181,3 +165,6 @@ class LGCA():
         self.permutations = [np.array(list(multiset_permutations([1] * n + [0] * (self.K - n))), dtype=np.int8)
                              for n in range(self.K + 1)]
         self.j = [np.dot(self.c, self.permutations[n][:, :self.velocitychannels].T) for n in range(self.K + 1)]
+        self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(2))[None, ...]
+        self.si = [np.einsum('ij,jkl', self.permutations[n][:, :self.velocitychannels], self.cij) for n in
+                   range(self.K + 1)]

@@ -1,5 +1,7 @@
 from __future__ import division
 
+import matplotlib.ticker as mticker
+
 from tools import *
 
 
@@ -333,8 +335,6 @@ class LGCA_1D(LGCA):
                 update_progress(1.0 * t / timesteps)
 
     def plot_density(self, density_t=None, figindex=0, figsize=None, cmap='hot_r'):
-        import seaborn as sns
-        sns.set_style('white')
         if density_t is None:
             density_t = self.dens_t
         if figsize is None:
@@ -352,8 +352,6 @@ class LGCA_1D(LGCA):
         return plot
 
     def plot_flux(self, nodes_t=None, figindex=0, figsize=None):
-        # import seaborn as sns
-        #sns.set_style('white')
         if nodes_t is None:
             nodes_t = self.nodes_t
 
@@ -698,9 +696,6 @@ class IBLGCA_1D(LGCA_1D):
                 update_progress(1.0 * t / timesteps)
 
     def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=0, figsize=None, prop=None, cmap='cividis'):
-        import seaborn as sns
-        sns.set_style('white')
-        import matplotlib.ticker as mticker
         if nodes_t is None:
             nodes_t = self.nodes_t
         if figsize is None:
@@ -749,8 +744,6 @@ class IBLGCA_1D(LGCA_1D):
         return plot
 
     def plot_prop_timecourse(self, nodes_t=None, props_t=None, propname=None):
-        import seaborn as sns
-        sns.set_style('white')
         if nodes_t is None:
             nodes_t = self.nodes_t
 
@@ -780,7 +773,6 @@ class IBLGCA_1D(LGCA_1D):
         plt.title('Time course of the cell property')
         plt.plot(x, y)
         plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True)
-        sns.despine()
         return
 
 
