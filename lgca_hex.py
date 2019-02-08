@@ -1,8 +1,6 @@
 from __future__ import division
 
-import numpy.random as npr
-
-from lgca_square import LGCA_SQUARE
+from lgca_square import *
 from tools import *
 
 
@@ -64,7 +62,6 @@ class LGCA_HEX(LGCA_SQUARE):
 
         self.set_bc(bc)
         self.interaction = self.random_walk
-        self.birth_death = blank_fct
 
         if 'interaction' in kwargs:
             self.set_interaction(**kwargs)
@@ -174,7 +171,8 @@ class LGCA_HEX(LGCA_SQUARE):
         gy[:-1, 1::2, ...] += self.ciy[5] * qty[1:, :-1:2, ...]
         gy[:, 2::2, ...] += self.ciy[5] * qty[:, 1:-1:2, ...]
 
-        return gx, gy
+        g = np.moveaxis(np.array([gx, gy]), 0, -1)
+        return g
 
     def nb_sum(self, qty):
         sum = np.zeros(qty.shape)
@@ -192,30 +190,37 @@ class LGCA_HEX(LGCA_SQUARE):
 
 
 if __name__ == '__main__':
-    lx = 20
+    lx = 10
     ly = lx
-    restchannels = 0
+    restchannels = 1
     nodes = np.zeros((lx, ly, 6 + restchannels))
-    nodes[2, 1, 0] = 1
+    nodes[0, 0, 0] = 1
     # nodes[...] = 1
-    # nodes[:lx//2, :, :6] = 1
+    # nodes[:lx//2, :, :] = 1
     # nodes[:, ly//2:, 6:] = 1
     # nodes[0, :, :4] = 1
-    lgca = LGCA_HEX(restchannels=restchannels, lx=lx, ly=ly, density=0.1, bc='pbc')  # , nodes=nodes)
+    lgca = LGCA_HEX(restchannels=restchannels, lx=lx, ly=ly, density=0.1, bc='pbc', nodes=nodes)
     # lgca.plot_vectorfield(lgca.xcoords, lgca.ycoords, gx, gy, figindex=fig.number)
-    lgca.set_interaction(interaction='nematic')
-    # lgca.timeevo(timesteps=300, record=True)
+    lgca.set_interaction('contact_guidance', beta=2)
+    # lgca.interaction = turing
+    # lgca.alpha = 0.5
+    #lgca.timeevo(timesteps=300, record=True)
     # ani = lgca.animate_flow(interval=500)
     # ani = lgca.animate_flux(interval=50)
     # ani = lgca.animate_density(interval=100)
     # ani = lgca.animate_density(density_t=refr, interval=50, vmax=lgca.restchannels)
     # ani2 = lgca.animate_density(density_t=exc, interval=50, vmax=lgca.velocitychannels)
-    # lgca.plot_flux(edgecolor='k')
-    # ani = lgca.live_animate_density(interval=100)
+    # ani = lgca.animate_config(interval=10, grid=False)
+
+    # ani = lgca.live_animate_density(interval=100, vmax=lgca.restchannels, channels=range(6, lgca.K))
+    #ani2 = lgca.live_animate_density(interval=100, vmax=lgca.velocitychannels, channels=range(6))
     # ani = lgca.live_animate_flux()
     # ani = lgca.live_animate_flow()
-    ani = lgca.live_animate_config(interval=200, grid=False)
-    # ani = lgca.animate_config(interval=10, grid=False)
+
+    ani = lgca.live_animate_density()
+    plt.streamplot(lgca.xcoords[:, 0], lgca.ycoords[-1], lgca.g[1:-1, 1:-1, 0], lgca.g[1:-1, 1:-1, 1], density=0.5,
+                   arrowstyle='-')
+    #ani = lgca.live_animate_density()
     # lgca.plot_config(grid=False)
     # lgca.plot_density(edgecolor='k')
     plt.show()
