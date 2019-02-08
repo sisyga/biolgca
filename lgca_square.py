@@ -6,19 +6,36 @@ from random import random
 import matplotlib.animation as animation
 import matplotlib.colors as colors
 import matplotlib.ticker as mticker
-import numpy.random as npr
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
 
 from tools import *
 
 
+def turing(lgca):
+    a = lgca.nodes[..., :lgca.velocitychannels]
+    b = lgca.nodes[..., lgca.velocitychannels:]
+    na = a.sum(-1) / lgca.velocitychannels
+    nb = b.sum(-1) / lgca.restchannels
+    a_birth = npr.random(a.shape) < lgca.alpha
+    a_death = npr.random(a.shape) < (nb ** 2)[..., None]
+
+    b_birth = npr.random(b.shape) < (nb ** 2 * na + lgca.alpha)[..., None]
+    b_death = npr.random(b.shape) < 1
+    np.add(a, (1 - a) * a_birth - a * a_death, out=a, casting='unsafe')
+    np.add(b, (1 - b) * b_birth - b * b_death, out=b, casting='unsafe')
+    disarrange(a, axis=-1)
+    lgca.nodes[..., :lgca.velocitychannels] = a
+    lgca.nodes[..., lgca.velocitychannels:] = b
+    return lgca.nodes
+
+
 class LGCA_SQUARE(LGCA):
     """
     2D version of an LGCA on the square lattice.
     """
-    interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation', 'parameter_controlled_diffusion',
-                    'random_walk', 'excitable_medium']
+    interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation',
+                    'random_walk', 'excitable_medium', 'nematic']
     velocitychannels = 4
     cix = np.array([1, 0, -1, 0], dtype=float)
     ciy = np.array([0, 1, 0, -1], dtype=float)
@@ -67,7 +84,6 @@ class LGCA_SQUARE(LGCA):
 
         self.set_bc(bc)
         self.interaction = self.random_walk
-        self.birth_death = blank_fct
 
         if 'interaction' in kwargs:
             self.set_interaction(**kwargs)
@@ -87,9 +103,8 @@ class LGCA_SQUARE(LGCA):
 
         self.apply_boundaries()
 
-    def set_interaction(self, **kwargs):
-        interaction = kwargs['interaction']
-
+    def set_interaction(self, interaction, **kwargs):
+        assert isinstance(interaction, str)
         if interaction == 'go_or_grow':
             self.interaction = self.go_or_grow_interaction
             if 'r_d' in kwargs:
@@ -116,8 +131,7 @@ class LGCA_SQUARE(LGCA):
                 print 'WARNING: not enough rest channels - system will die out!!!'
 
         elif interaction == 'go_and_grow':
-            self.birth_death = self.birth
-            self.interaction = self.random_walk
+            self.interaction = self.birth
             if 'r_b' in kwargs:
                 self.r_b = kwargs['r_b']
             else:
@@ -133,6 +147,54 @@ class LGCA_SQUARE(LGCA):
             else:
                 self.beta = 2.
                 print 'sensitivity set to beta = ', self.beta
+
+        elif interaction == 'persistent_walk':
+            self.interaction = self.persistent_walk
+            self.calc_permutations()
+
+            if 'beta' in kwargs:
+                self.beta = kwargs['beta']
+            else:
+                self.beta = 2.
+                print 'sensitivity set to beta = ', self.beta
+
+        elif interaction == 'chemotaxis':
+            self.interaction = self.chemotaxis
+            self.calc_permutations()
+
+            if 'beta' in kwargs:
+                self.beta = kwargs['beta']
+            else:
+                self.beta = 2.
+                print 'sensitivity set to beta = ', self.beta
+
+            if 'gradient' in kwargs:
+                self.g = kwargs['gradient']
+            else:
+                x_source = npr.normal(self.xcoords.mean(), 1)
+                y_source = npr.normal(self.ycoords.mean(), 1)
+                rx = self.xcoords - x_source
+                ry = self.ycoords - y_source
+                r = np.sqrt(rx ** 2 + ry ** 2)
+                self.concentration = np.exp(-r / self.ycoords.var())
+                self.g = self.gradient(np.pad(self.concentration, 1, 'reflect'))
+
+        elif interaction == 'contact_guidance':
+            self.interaction = self.contact_guidance
+            self.calc_permutations()
+
+            if 'beta' in kwargs:
+                self.beta = kwargs['beta']
+            else:
+                self.beta = 2.
+                print 'sensitivity set to beta = ', self.beta
+
+            if 'director' in kwargs:
+                self.g = kwargs['director']
+            else:
+                self.g = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, 2))
+                self.g[..., 0] = 1
+                self.guiding_tensor = calc_nematic_tensor(self.g)
 
         elif interaction == 'nematic':
             self.interaction = self.nematic
@@ -154,42 +216,30 @@ class LGCA_SQUARE(LGCA):
                 self.beta = 2.
                 print 'sensitivity set to beta = ', self.beta
 
-        elif interaction == 'parameter_diffusion':
-            self.interaction = self.parameter_diffusion
-            self.calc_permutations()
-
-            if 'beta' in kwargs:
-                self.beta = kwargs['beta']
-            else:
-                self.beta = 2.
-                print 'sensitivity set to beta = ', self.beta
-
         elif interaction == 'random_walk':
             self.interaction = self.random_walk
 
         elif interaction == 'birth':
-            self.birth_death = self.birth
+            self.interaction = self.birth
             if 'r_b' in kwargs:
                 self.r_b = kwargs['r_b']
             else:
                 self.r_b = 0.2
                 print 'birth rate set to r_b = ', self.r_b
 
-        elif interaction == 'swarming':
-            self.calc_permutations()
-            self.interaction = self.swarming
-            if 'beta' in kwargs:
-                self.beta = kwargs['beta']
-
+        elif interaction == 'birth_death':
+            self.interaction = self.birth_death
+            if 'r_b' in kwargs:
+                self.r_b = kwargs['r_b']
             else:
-                self.beta = 2.
-                print 'alignment sensitivity set to beta = ', self.beta
+                self.r_b = 0.2
+                print 'birth rate set to r_b = ', self.r_b
 
-            if 'alpha' in kwargs:
-                self.alpha = kwargs['alpha']
+            if 'r_d' in kwargs:
+                self.r_d = kwargs['r_d']
             else:
-                self.alpha = 2.
-                print 'aggregation sensitivity set to alpha = ', self.alpha
+                self.r_d = 0.05
+                print 'death rate set to r_d = ', self.r_d
 
         elif interaction == 'excitable_medium':
             self.interaction = self.excitable_medium
@@ -269,41 +319,89 @@ class LGCA_SQUARE(LGCA):
         return sum
 
     def gradient(self, qty):
-        return np.gradient(qty, 2)
+        return np.moveaxis(np.asarray(np.gradient(qty, 2)), 0, -1)
 
     def birth(self):
         """
-        Simple birth process
+        Simple birth process coupled to a random walk
         :return:
         """
-        # newnodes = np.empty(self.nodes.shape,
-        #                     dtype=self.nodes.dtype)  # this is faster, if the interaction is applied to all nodes
-        inds = np.arange(self.K)
-        for x, y in self.coord_pairs:
-            node = self.nodes[x, y, :]
-            n = self.cell_density[x, y]
-            if n == 0 or n == self.K:  # no growth on full or empty nodes
-                continue
+        birth = npr.random(self.nodes.shape) < self.r_b * self.cell_density[..., None] / self.K
+        np.add(self.nodes, (1 - self.nodes) * birth, out=self.nodes, casting='unsafe')
+        self.random_walk()
 
-            N = min([n, self.K - n])
-            dn = npr.binomial(N, self.r_b)
-            n += dn
-            if n == self.K:
-                self.nodes[x, :] = 1
-                continue
-
-            while dn > 0:
-                p = 1. - node
-                Z = p.sum()
-                p /= Z
-                ind = npr.choice(inds, p=p)
-                node[ind] = 1
-                dn -= 1
-
-            self.nodes[x, y, :] = node
+    def birth_death(self):
+        """
+        Simple birth-death process coupled to a random walk
+        :return:
+        """
+        birth = npr.random(self.nodes.shape) < self.r_b * self.cell_density[..., None] / self.K
+        death = npr.random(self.nodes.shape) < self.r_d
+        ds = (1 - self.nodes) * birth - self.nodes * death
+        np.add(self.nodes, ds, out=self.nodes, casting='unsafe')
+        self.random_walk()
 
     def calc_flux(self, nodes):
-        return np.einsum('ij,klj', self.c, nodes[..., :self.velocitychannels])
+        return np.einsum('ij,...j', self.c, nodes[..., :self.velocitychannels])
+
+    def persistent_walk(self):
+        """
+        Rearrangement step for persistent motion (alignment with yourself)
+        :return:
+        """
+        newnodes = self.nodes.copy()
+        g = self.calc_flux(self.nodes)
+        for coord in self.coord_pairs:
+            n = self.cell_density[coord]
+            if n == 0 or n == self.K:  # full or empty nodes cannot be rearranged!
+                continue
+
+            permutations = self.permutations[n]
+            j = self.j[n]
+            weights = np.exp(self.beta * np.einsum('i,ij', g[coord], j)).cumsum()
+            ind = bisect_left(weights, random() * weights[-1])
+            newnodes[coord] = permutations[ind]
+
+        self.nodes = newnodes
+
+    def chemotaxis(self):
+        """
+        Rearrangement step for chemotaxis to external gradient field
+        :return:
+        """
+        newnodes = self.nodes.copy()
+        for coord in self.coord_pairs:
+            n = self.cell_density[coord]
+            if n == 0 or n == self.K:  # full or empty nodes cannot be rearranged!
+                continue
+
+            permutations = self.permutations[n]
+            j = self.j[n]
+            weights = np.exp(self.beta * np.einsum('i,ij', self.g[coord], j)).cumsum()
+            ind = bisect_left(weights, random() * weights[-1])
+            newnodes[coord] = permutations[ind]
+
+        self.nodes = newnodes
+
+    def contact_guidance(self):
+        """
+        Rearrangement step for contact guidance interaction. Cells are guided by an external axis
+        :return:
+        """
+        newnodes = self.nodes.copy()
+        for coord in self.coord_pairs:
+            n = self.cell_density[coord]
+            if n == 0 or n == self.K:  # full or empty nodes cannot be rearranged!
+                continue
+
+            sni = self.guiding_tensor[coord]
+            permutations = self.permutations[n]
+            si = self.si[n]
+            weights = np.exp(self.beta * np.einsum('ijk,jk', si, sni)).cumsum()
+            ind = bisect_left(weights, random() * weights[-1])
+            newnodes[coord] = permutations[ind]
+
+        self.nodes = newnodes
 
     def alignment(self):
         """
@@ -312,10 +410,8 @@ class LGCA_SQUARE(LGCA):
         """
         newnodes = self.nodes.copy()
 
-        gx, gy = self.calc_flux(self.nodes)
-        gx = self.nb_sum(gx)
-        gy = self.nb_sum(gy)
-        g = np.asarray([gx, gy])
+        g = self.calc_flux(self.nodes)
+        g = self.nb_sum(g)
         for coord in self.coord_pairs:
             n = self.cell_density[coord]
             if n == 0 or n == self.K:  # full or empty nodes cannot be rearranged!
@@ -323,7 +419,7 @@ class LGCA_SQUARE(LGCA):
 
             permutations = self.permutations[n]
             j = self.j[n]
-            weights = np.exp(self.beta * (g[(slice(None),) + coord][..., None] * j).sum(0)).cumsum()
+            weights = np.exp(self.beta * np.einsum('i,ij', g[coord], j)).cumsum()
             ind = bisect_left(weights, random() * weights[-1])
             newnodes[coord] = permutations[ind]
 
@@ -331,7 +427,7 @@ class LGCA_SQUARE(LGCA):
 
     def nematic(self):
         """
-        Rearrangement step for alignment interaction
+        Rearrangement step for nematic interaction
         :return:
         """
         newnodes = self.nodes.copy()
@@ -388,7 +484,7 @@ class LGCA_SQUARE(LGCA):
         p_ym = rho_y
         dn_y = (npr.random(n_y.shape) < p_yp).astype(np.int8)
         dn_y -= npr.random(n_y.shape) < p_ym
-        for _ in xrange(self.N):
+        for _ in range(self.N):
             dn_x = (npr.random(n_x.shape) < p_xp).astype(np.int8)
             dn_x -= npr.random(n_x.shape) < p_xm
             n_x += dn_x
@@ -396,13 +492,12 @@ class LGCA_SQUARE(LGCA):
             p_xp = rho_x ** 2 * (1 + (rho_y + self.beta) / self.alpha)
             p_xm = rho_x ** 3 + rho_x * (rho_y + self.beta) / self.alpha
 
-        # n_x = np.clip(n_x, 0, self.velocitychannels)
         n_y += dn_y
 
         newnodes = np.zeros(self.nodes.shape, dtype=self.nodes.dtype)
-        for x, y in self.coord_pairs:
-            newnodes[x, y, :n_x[x, y]] = 1
-            newnodes[x, y, self.velocitychannels:self.velocitychannels + n_y[x, y]] = 1
+        for coord in self.coord_pairs:
+            newnodes[coord + (slice(0, n_x[coord]),)] = 1
+            newnodes[coord + (slice(self.velocitychannels, self.velocitychannels + n_y[coord]),)] = 1
 
         newv = newnodes[..., :self.velocitychannels]
         disarrange(newv, axis=-1)
@@ -411,25 +506,25 @@ class LGCA_SQUARE(LGCA):
 
     def go_or_grow_interaction(self):
         """
-        interactions of the go-or-grow model. formulation too complex for 1d, but to be generalized.
+        interactions of the go-or-grow model.
         :return:
         """
-        n_m = self.nodes[..., :4].sum(-1)
-        n_r = self.nodes[..., 4:].sum(-1)
+        n_m = self.nodes[..., :self.velocitychannels].sum(-1)
+        n_r = self.nodes[..., self.velocitychannels:].sum(-1)
         M1 = np.minimum(n_m, self.restchannels - n_r)
-        M2 = np.minimum(n_r, 4 - n_m)
-        for x, y in self.coord_pairs:
-            node = self.nodes[x, y, :]
+        M2 = np.minimum(n_r, self.velocitychannels - n_m)
+        for coord in self.coord_pairs:
+            node = self.nodes[coord]
             n = node.sum()
             if n == 0:
                 continue
 
-            n_mxy = n_m[x, y]
-            n_rxy = n_r[x, y]
+            n_mxy = n_m[coord]
+            n_rxy = n_r[coord]
 
             rho = n / self.K
-            j_1 = npr.binomial(M1[x, y], tanh_switch(rho, kappa=self.kappa, theta=self.theta))
-            j_2 = npr.binomial(M2[x, y], 1 - tanh_switch(rho, kappa=self.kappa, theta=self.theta))
+            j_1 = npr.binomial(M1[coord], tanh_switch(rho, kappa=self.kappa, theta=self.theta))
+            j_2 = npr.binomial(M2[coord], 1 - tanh_switch(rho, kappa=self.kappa, theta=self.theta))
             n_mxy += j_2 - j_1
             n_rxy += j_1 - j_2
             n_mxy -= npr.binomial(n_mxy * np.heaviside(n_mxy, 0), self.r_d)
@@ -437,12 +532,12 @@ class LGCA_SQUARE(LGCA):
             M = min([n_rxy, self.restchannels - n_rxy])
             n_rxy += npr.binomial(M * np.heaviside(M, 0), self.r_b)
 
-            v_channels = [1] * n_mxy + [0] * (4 - n_mxy)
+            v_channels = [1] * n_mxy + [0] * (self.velocitychannels - n_mxy)
             v_channels = npr.permutation(v_channels)
             r_channels = np.zeros(self.restchannels)
             r_channels[:n_rxy] = 1
             node = np.hstack((v_channels, r_channels))
-            self.nodes[x, y, :] = node
+            self.nodes[coord] = node
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
         self.update_dynamic_fields()
@@ -517,12 +612,11 @@ class LGCA_SQUARE(LGCA):
         ax.add_collection(arrows)
 
         if self.restchannels > 0:
-            circles = [Circle(xy=(x, y), radius=r_circle, fc='white', ec='k', lw=lw_circle, alpha=occ)
+            circles = [Circle(xy=(x, y), radius=r_circle, fc='none', ec='k', lw=lw_circle, alpha=occ)
                        for x, y, occ in
                        zip(xx.ravel(), yy.ravel(), nodes[..., self.velocitychannels:].any(axis=-1).ravel())]
             texts = [ax.text(x, y - 0.5 * r_circle, str(n), ha='center', va='baseline', fontsize=fontsize,
-                             fontname='sans-serif',
-                             fontweight='bold', bbox=bbox_props, alpha=bool(n))
+                             fontname='sans-serif', fontweight='bold', bbox=bbox_props, alpha=bool(n))
                      for x, y, n in zip(xx.ravel(), yy.ravel(), nodes[..., self.velocitychannels:].sum(-1).ravel())]
             circles = PatchCollection(circles, match_original=True)
             ax.add_collection(circles)
@@ -615,6 +709,7 @@ class LGCA_SQUARE(LGCA):
             return ani
 
     def live_animate_density(self, figindex=None, figsize=None, cmap='viridis', interval=100, vmax=None,
+                             channels=slice(None),
                              tight_layout=True, edgecolor='None'):
 
         fig, pc, cmap = self.plot_density(figindex=figindex, figsize=figsize, cmap=cmap, vmax=vmax,
@@ -624,7 +719,8 @@ class LGCA_SQUARE(LGCA):
         def update(n):
             self.timestep()
             title.set_text('Time $k =${}'.format(n))
-            pc.set(facecolor=cmap.to_rgba(self.cell_density[self.r_int:-self.r_int, self.r_int:-self.r_int].ravel()))
+            pc.set(facecolor=cmap.to_rgba(
+                self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, channels].sum(-1).ravel()))
             return pc, title
 
         ani = animation.FuncAnimation(fig, update, interval=interval)
@@ -707,7 +803,7 @@ class LGCA_SQUARE(LGCA):
             density = self.cell_density[self.r_int:-self.r_int, self.r_int:-self.r_int]
 
         if figsize is None:
-            figsize = estimate_figsize(density, cbar=True)
+            figsize = estimate_figsize(density, cbar=True, dy=self.dy)
 
         if vmax is None:
             K = self.K
@@ -789,22 +885,6 @@ class LGCA_SQUARE(LGCA):
             return pc, title
 
         ani = animation.FuncAnimation(fig, update, interval=interval, frames=density_t.shape[0])
-        return ani
-
-    def live_animate_density(self, figindex=None, figsize=None, cmap='viridis', interval=100, vmax=None,
-                             tight_layout=True, edgecolor='None'):
-
-        fig, pc, cmap = self.plot_density(figindex=figindex, figsize=figsize, cmap=cmap, vmax=vmax,
-                                          tight_layout=tight_layout, edgecolor=edgecolor)
-        title = plt.title('Time $k =$0')
-
-        def update(n):
-            self.timestep()
-            title.set_text('Time $k =${}'.format(n))
-            pc.set(facecolor=cmap.to_rgba(self.cell_density[self.r_int:-self.r_int, self.r_int:-self.r_int].ravel()))
-            return pc, title
-
-        ani = animation.FuncAnimation(fig, update, interval=interval)
         return ani
 
     def animate_flux(self, nodes_t=None, figindex=None, figsize=None, interval=200, tight_layout=True,

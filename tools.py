@@ -114,6 +114,9 @@ def blank_fct():
     pass
 
 
+def calc_nematic_tensor(v):
+    return np.einsum('...i,...j->...ij', v, v) - 0.5 * np.diag(np.ones(2))[None, ...]
+
 class LGCA():
     """
     Base class for a lattice-gas. Not meant to be used alone!
@@ -149,6 +152,13 @@ class LGCA():
         :return:
         """
         disarrange(self.nodes, axis=-1)
+        for coord in self.coord_pairs:
+            n = self.cell_density[coord]
+            if n == 0 or n == self.K:
+                continue
+
+            npr.shuffle(self.nodes[coord])
+
 
     def timestep(self):
         """
