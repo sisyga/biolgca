@@ -1,4 +1,4 @@
-from __future__ import division
+
 
 import sys
 
@@ -52,7 +52,7 @@ def colorbar_index(ncolors, cmap, use_gridspec=False):
     mappable.set_clim(-0.5, ncolors + 0.5)
     colorbar = plt.colorbar(mappable, use_gridspec=use_gridspec)
     colorbar.set_ticks(np.linspace(-0.5, ncolors + 0.5, 2 * ncolors + 1)[1::2])
-    colorbar.set_ticklabels(range(ncolors))
+    colorbar.set_ticklabels(list(range(ncolors)))
     return colorbar
 
 
@@ -117,7 +117,8 @@ def blank_fct():
 def calc_nematic_tensor(v):
     return np.einsum('...i,...j->...ij', v, v) - 0.5 * np.diag(np.ones(2))[None, ...]
 
-class LGCA():
+
+class LGCA_base():
     """
     Base class for a lattice-gas. Not meant to be used alone!
     """
@@ -128,7 +129,7 @@ class LGCA():
         return
 
     def get_interactions(self):
-        print self.interactions
+        print(self.interactions)
 
     def random_reset(self, density):
         """
@@ -146,26 +147,12 @@ class LGCA():
         """
         self.cell_density = self.nodes.sum(-1)
 
-    def random_walk(self):
-        """
-        Shuffle config in the last axis, modeling a random walk.
-        :return:
-        """
-        disarrange(self.nodes, axis=-1)
-        for coord in self.coord_pairs:
-            n = self.cell_density[coord]
-            if n == 0 or n == self.K:
-                continue
-
-            npr.shuffle(self.nodes[coord])
-
-
     def timestep(self):
         """
         Update the state of the LGCA from time k to k+1.
         :return:
         """
-        self.interaction()
+        self.interaction(self)
         self.apply_boundaries()
         self.propagation()
         self.apply_boundaries()

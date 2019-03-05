@@ -1,10 +1,8 @@
-from __future__ import division
-
 from lgca_square import *
 from tools import *
 
 
-class LGCA_HEX(LGCA_SQUARE):
+class LGCA_Hex(LGCA_Square):
     """
     2d lattice-gas cellular automaton on a hexagonal lattice.
     """
@@ -16,39 +14,12 @@ class LGCA_HEX(LGCA_SQUARE):
     dy = np.sin(2 * np.pi / velocitychannels)
     orientation = 0.
 
-    def __init__(self, nodes=None, lx=50, ly=50, restchannels=1, density=0.1, bc='periodic', r_int=1, **kwargs):
-        """
-        Initialize class instance.
-        :param nodes:
-        :param l:
-        :param restchannels:
-        :param density:
-        :param bc:
-        :param r_int:
-        :param kwargs:
-        """
-        self.dens_t, self.nodes_t, self.n_t = np.empty(3)  # placeholders to record dynamics
-        assert r_int > 0
-        self.r_int = r_int  # interaction range; must be at least 1 to handle propagation.
-        if nodes is None:
-            self.lx = lx
-            self.ly = ly
-            self.restchannels = restchannels
-            self.K = self.velocitychannels + self.restchannels
-            self.nodes = np.zeros((lx + 2 * self.r_int, ly + 2 * self.r_int, self.K), dtype=np.bool)
-            self.nodes = npr.random(self.nodes.shape) < density
-        if nodes is not None:
-            assert len(nodes.shape) == 3
-            self.lx, self.ly, self.K = nodes.shape
-            self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K),
-                                  dtype=np.bool)
-            self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(np.bool)
-            self.restchannels = self.K - self.velocitychannels
-
+    def init_coords(self):
+        assert self.ly % 2 == 0
         self.x = np.arange(self.lx) + self.r_int
         self.y = np.arange(self.ly) + self.r_int
-        self.xx, self.yy = np.meshgrid(self.x, self.y)
-        self.coord_pairs = zip(self.xx.flat, self.yy.flat)
+        self.xx, self.yy = np.meshgrid(self.x, self.y, indexing='ij')
+        self.coord_pairs = list(zip(self.xx.flat, self.yy.flat))
 
         self.xcoords, self.ycoords = np.meshgrid(np.arange(self.lx + 2 * self.r_int) - self.r_int,
                                                  np.arange(self.ly + 2 * self.r_int) - self.r_int, indexing='ij')
@@ -60,13 +31,6 @@ class LGCA_HEX(LGCA_SQUARE):
         self.xcoords = self.xcoords[self.r_int:-self.r_int, self.r_int:-self.r_int]
         self.ycoords = self.ycoords[self.r_int:-self.r_int, self.r_int:-self.r_int]
 
-        self.set_bc(bc)
-        self.interaction = self.random_walk
-
-        if 'interaction' in kwargs:
-            self.set_interaction(**kwargs)
-
-        self.cell_density = self.nodes.sum(-1)
 
     def propagation(self):
         newcellnodes = np.zeros(self.nodes.shape, dtype=self.nodes.dtype)
@@ -156,9 +120,6 @@ class LGCA_HEX(LGCA_SQUARE):
         gx[:, 2::2, ...] += self.cix[5] * qty[:, 1:-1:2, ...]
 
         # y-component
-        # gy[:-1, ...] += self.ciy[0] * qty[1:, ...]  # should be 0
-        # gy[1:, ...] += self.ciy[3] * qty[:-1, ...]  # should be 0
-
         gy[:, :-1:2, ...] += self.ciy[1] * qty[:, 1::2, ...]
         gy[:-1, 1:-1:2, ...] += self.ciy[1] * qty[1:, 2::2, ...]
 
@@ -190,37 +151,35 @@ class LGCA_HEX(LGCA_SQUARE):
 
 
 if __name__ == '__main__':
-    lx = 10
+    lx = 50
     ly = lx
     restchannels = 1
     nodes = np.zeros((lx, ly, 6 + restchannels))
-    nodes[0, 0, 0] = 1
+    nodes[2, 0, 0] = 1
     # nodes[...] = 1
     # nodes[:lx//2, :, :] = 1
     # nodes[:, ly//2:, 6:] = 1
     # nodes[0, :, :4] = 1
-    lgca = LGCA_HEX(restchannels=restchannels, lx=lx, ly=ly, density=0.1, bc='pbc', nodes=nodes)
-    # lgca.plot_vectorfield(lgca.xcoords, lgca.ycoords, gx, gy, figindex=fig.number)
-    lgca.set_interaction('contact_guidance', beta=2)
-    # lgca.interaction = turing
-    # lgca.alpha = 0.5
-    #lgca.timeevo(timesteps=300, record=True)
+    lgca = LGCA_Hex(restchannels=restchannels, lx=lx, ly=ly, density=0.2, bc='refl', interaction='nematic')
+    # lgca.set_interaction('contact_guidance', beta=2)
+    # cProfile.run('lgca.timeevo(timesteps=1000)')
+    # lgca.timeevo(timesteps=200)
     # ani = lgca.animate_flow(interval=500)
     # ani = lgca.animate_flux(interval=50)
-    # ani = lgca.animate_density(interval=100)
+    #ani = lgca.animate_density(interval=50)
     # ani = lgca.animate_density(density_t=refr, interval=50, vmax=lgca.restchannels)
     # ani2 = lgca.animate_density(density_t=exc, interval=50, vmax=lgca.velocitychannels)
     # ani = lgca.animate_config(interval=10, grid=False)
 
     # ani = lgca.live_animate_density(interval=100, vmax=lgca.restchannels, channels=range(6, lgca.K))
-    #ani2 = lgca.live_animate_density(interval=100, vmax=lgca.velocitychannels, channels=range(6))
+    # ani2 = lgca.live_animate_density(interval=100, vmax=lgca.velocitychannels, channels=range(6))
     # ani = lgca.live_animate_flux()
-    # ani = lgca.live_animate_flow()
+    ani = lgca.live_animate_flow()
 
-    ani = lgca.live_animate_density()
-    plt.streamplot(lgca.xcoords[:, 0], lgca.ycoords[-1], lgca.g[1:-1, 1:-1, 0], lgca.g[1:-1, 1:-1, 1], density=0.5,
-                   arrowstyle='-')
     #ani = lgca.live_animate_density()
+    # plt.streamplot(lgca.xcoords[:, 0], lgca.ycoords[-1], lgca.g[1:-1, 1:-1, 0].T, lgca.g[1:-1, 1:-1, 1].T, density=.5,
+    #               arrowstyle='->', color='orange', linewidth=2.)
+    # ani = lgca.live_animate_density()
     # lgca.plot_config(grid=False)
     # lgca.plot_density(edgecolor='k')
     plt.show()
