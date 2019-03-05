@@ -1,4 +1,4 @@
-from __future__ import division
+
 
 import matplotlib.ticker as mticker
 
@@ -58,14 +58,14 @@ class LGCA_1D(LGCA):
                     self.r_b = kwargs['r_b']
                 else:
                     self.r_b = 0.2
-                    print 'birth rate set to r_b = ', self.r_b
+                    print('birth rate set to r_b = ', self.r_b)
             elif kwargs['birthdeath'] is 'none':
                 def birth_death():
                     pass
 
                 self.birth_death = birth_death
             else:
-                print 'keyword', kwargs['birthdeath'], 'is not defined!'
+                print('keyword', kwargs['birthdeath'], 'is not defined!')
 
                 def birth_death():
                     pass
@@ -85,24 +85,24 @@ class LGCA_1D(LGCA):
                     self.r_d = kwargs['r_d']
                 else:
                     self.r_d = 0.01
-                    print 'death rate set to r_d = ', self.r_d
+                    print('death rate set to r_d = ', self.r_d)
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
                 else:
                     self.r_b = 0.2
-                    print 'birth rate set to r_b = ', self.r_b
+                    print('birth rate set to r_b = ', self.r_b)
                 if 'kappa' in kwargs:
                     self.kappa = kwargs['kappa']
                 else:
                     self.kappa = 5.
-                    print 'switch rate set to kappa = ', self.kappa
+                    print('switch rate set to kappa = ', self.kappa)
                 if 'theta' in kwargs:
                     self.theta = kwargs['theta']
                 else:
                     self.theta = 0.75
-                    print 'switch threshold set to theta = ', self.theta
+                    print('switch threshold set to theta = ', self.theta)
                 if self.restchannels < 2:
-                    print 'WARNING: not enough rest channels - system will die out!!!'
+                    print('WARNING: not enough rest channels - system will die out!!!')
 
             elif kwargs['interaction'] is 'go_and_grow':
                 self.birth_death = self.birth
@@ -111,7 +111,7 @@ class LGCA_1D(LGCA):
                     self.r_b = kwargs['r_b']
                 else:
                     self.r_b = 0.2
-                    print 'birth rate set to r_b = ', self.r_b
+                    print('birth rate set to r_b = ', self.r_b)
 
             elif kwargs['interaction'] is 'alignment':
                 self.interaction = self.alignment
@@ -119,7 +119,7 @@ class LGCA_1D(LGCA):
                     self.beta = kwargs['beta']
                 else:
                     self.beta = 2.
-                    print 'sensitivity set to beta = ', self.beta
+                    print('sensitivity set to beta = ', self.beta)
 
             elif kwargs['interaction'] is 'aggregation':
                 self.interaction = self.aggregation
@@ -127,7 +127,7 @@ class LGCA_1D(LGCA):
                     self.beta = kwargs['beta']
                 else:
                     self.beta = 2.
-                    print 'sensitivity set to beta = ', self.beta
+                    print('sensitivity set to beta = ', self.beta)
 
             elif kwargs['interaction'] is 'parameter_controlled_diffusion':
                 self.interaction = self.parameter_diffusion
@@ -135,13 +135,13 @@ class LGCA_1D(LGCA):
                     self.beta = kwargs['beta']
                 else:
                     self.beta = 2.
-                    print 'sensitivity set to beta = ', self.beta
+                    print('sensitivity set to beta = ', self.beta)
 
             elif kwargs['interaction'] is 'random_walk':
                 self.interaction = self.random_walk
 
             else:
-                print 'keyword', kwargs['interaction'], 'is not defined! Random walk used instead.'
+                print('keyword', kwargs['interaction'], 'is not defined! Random walk used instead.')
                 self.interaction = self.random_walk
 
         else:
@@ -439,7 +439,7 @@ class IBLGCA_1D(LGCA_1D):
                     self.r_b = kwargs['r_b']
                 else:
                     self.r_b = 0.2
-                    print 'birth rate set to r_b = ', self.r_b
+                    print('birth rate set to r_b = ', self.r_b)
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
 
             if kwargs['birthdeath'] is 'birthdeath':
@@ -448,19 +448,19 @@ class IBLGCA_1D(LGCA_1D):
                     self.r_b = kwargs['r_b']
                 else:
                     self.r_b = 0.2
-                    print 'birth rate set to r_b = ', self.r_b
+                    print('birth rate set to r_b = ', self.r_b)
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']
                 else:
                     self.r_d = 0.02
-                    print 'death rate set to r_d = ', self.r_d
+                    print('death rate set to r_d = ', self.r_d)
 
                 if 'std' in kwargs:
                     self.std = kwargs['std']
                 else:
                     self.std = 0.1
-                    print 'standard deviation set to = ', self.std
+                    print('standard deviation set to = ', self.std)
 
 
             elif kwargs['birthdeath'] is 'none':
@@ -469,7 +469,7 @@ class IBLGCA_1D(LGCA_1D):
 
                 self.birth_death = birth_death
             else:
-                print 'keyword', kwargs['birthdeath'], 'is not defined!'
+                print('keyword', kwargs['birthdeath'], 'is not defined!')
 
                 def birth_death():
                     pass
@@ -489,25 +489,25 @@ class IBLGCA_1D(LGCA_1D):
                     self.r_d = kwargs['r_d']
                 else:
                     self.r_d = 0.01
-                    print 'death rate set to r_d = ', self.r_d
+                    print('death rate set to r_d = ', self.r_d)
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
                 else:
                     self.r_b = 0.2
-                    print 'birth rate set to r_b = ', self.r_b
+                    print('birth rate set to r_b = ', self.r_b)
                 if 'kappa' in kwargs:
                     self.kappa = kwargs['kappa']
                 else:
                     self.kappa = 5.
-                    print 'switch rate set to kappa = ', self.kappa
+                    print('switch rate set to kappa = ', self.kappa)
                 self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
                 if 'theta' in kwargs:
                     self.theta = kwargs['theta']
                 else:
                     self.theta = 0.75
-                    print 'switch threshold set to theta = ', self.theta
+                    print('switch threshold set to theta = ', self.theta)
                 if self.restchannels < 2:
-                    print 'WARNING: not enough rest channels - system will die out!!!'
+                    print('WARNING: not enough rest channels - system will die out!!!')
 
             elif kwargs['interaction'] is 'go_and_grow':
                 self.birth_death = self.birth
@@ -516,7 +516,7 @@ class IBLGCA_1D(LGCA_1D):
                     self.r_b = kwargs['r_b']
                 else:
                     self.r_b = 0.2
-                    print 'birth rate set to r_b = ', self.r_b
+                    print('birth rate set to r_b = ', self.r_b)
 
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
 
@@ -524,7 +524,7 @@ class IBLGCA_1D(LGCA_1D):
                 self.interaction = self.random_walk
 
             else:
-                print 'keyword', kwargs['interaction'], 'is not defined! Random walk used instead.'
+                print('keyword', kwargs['interaction'], 'is not defined! Random walk used instead.')
                 self.interaction = self.random_walk
 
         else:
@@ -705,7 +705,7 @@ class IBLGCA_1D(LGCA_1D):
             props_t = self.props_t
 
         if prop is None:
-            prop = props_t[0].keys()[0]
+            prop = list(props_t[0].keys())[0]
 
         tmax, l, _ = nodes_t.shape
         mean_prop = np.zeros((tmax, l))
@@ -751,7 +751,7 @@ class IBLGCA_1D(LGCA_1D):
             props_t = self.props_t
 
         if propname is None:
-            propname = props_t[0].keys()[0]
+            propname = list(props_t[0].keys())[0]
 
         tmax = len(props_t)
         fig = plt.figure()
@@ -790,7 +790,7 @@ if __name__ == '__main__':
     #system.plot_prop()
     system.plot_density(figindex=1)
     props = np.array(system.props['kappa'])[system.nodes[system.nodes > 0]]
-    print np.mean(props)
+    print(np.mean(props))
     system.plot_prop_timecourse()
     plt.ylabel('$\kappa$')
     plt.show()
