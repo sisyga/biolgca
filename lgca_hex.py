@@ -1,5 +1,4 @@
 from lgca_square import *
-from tools import *
 
 
 class LGCA_Hex(LGCA_Square):
@@ -30,7 +29,6 @@ class LGCA_Hex(LGCA_Square):
         self.ycoords *= self.dy
         self.xcoords = self.xcoords[self.r_int:-self.r_int, self.r_int:-self.r_int]
         self.ycoords = self.ycoords[self.r_int:-self.r_int, self.r_int:-self.r_int]
-
 
     def propagation(self):
         newcellnodes = np.zeros(self.nodes.shape, dtype=self.nodes.dtype)
@@ -99,8 +97,8 @@ class LGCA_Hex(LGCA_Square):
         self.nodes[:, -self.r_int:, :] = 0
 
     def gradient(self, qty):
-        gx = np.zeros(qty.shape)
-        gy = np.zeros(qty.shape)
+        gx = np.zeros_like(qty, dtype=float)
+        gy = np.zeros_like(qty, dtype=float)
 
         # x-component
         gx[:-1, ...] += self.cix[0] * qty[1:, ...]
@@ -135,6 +133,25 @@ class LGCA_Hex(LGCA_Square):
         g = np.moveaxis(np.array([gx, gy]), 0, -1)
         return g
 
+    def channel_weight(self, qty):
+        weights = np.zeros(qty.shape + (self.velocitychannels,))
+        weights[:-1, :, 0] = qty[1:, ...]
+        weights[1:, :, 3] = qty[:-1, ...]
+
+        weights[:, :-1:2, 1] = qty[:, 1::2, ...]
+        weights[:-1, 1:-1:2, 1] = qty[1:, 2::2, ...]
+
+        weights[1:, :-1:2, 2] = qty[:-1, 1::2, ...]
+        weights[:, 1:-1:2, 2] = qty[:, 2::2, ...]
+
+        weights[:, 1::2, 4] = qty[:, :-1:2, ...]
+        weights[1:, 2::2, 4] = qty[:-1, 1:-1:2, ...]
+
+        weights[:-1, 1::2, 5] = qty[1:, :-1:2, ...]
+        weights[:, 2::2, 5] = qty[:, 1:-1:2, ...]
+
+        return weights
+
     def nb_sum(self, qty):
         sum = np.zeros(qty.shape)
         sum[:-1, ...] += qty[1:, ...]
@@ -153,20 +170,22 @@ class LGCA_Hex(LGCA_Square):
 if __name__ == '__main__':
     lx = 50
     ly = lx
-    restchannels = 1
+    restchannels = 6
     nodes = np.zeros((lx, ly, 6 + restchannels))
-    nodes[2, 0, 0] = 1
+    # nodes[2, 0, 0] = 1
     # nodes[...] = 1
-    # nodes[:lx//2, :, :] = 1
+    nodes[:lx // 2, :, -2:] = 1
+    # nodes[..., -1] = 1
     # nodes[:, ly//2:, 6:] = 1
     # nodes[0, :, :4] = 1
-    lgca = LGCA_Hex(restchannels=restchannels, lx=lx, ly=ly, density=0.2, bc='refl', interaction='nematic')
+    lgca = LGCA_Hex(nodes=nodes, restchannels=restchannels, lx=lx, ly=ly, density=0.5 / (6 + restchannels), bc='refl',
+                    interaction='wetting', beta=2., alpha=2, gamma=1)
     # lgca.set_interaction('contact_guidance', beta=2)
     # cProfile.run('lgca.timeevo(timesteps=1000)')
-    # lgca.timeevo(timesteps=200)
+    # lgca.timeevo(timesteps=100)
     # ani = lgca.animate_flow(interval=500)
     # ani = lgca.animate_flux(interval=50)
-    #ani = lgca.animate_density(interval=50)
+    # ani = lgca.animate_density(interval=50)
     # ani = lgca.animate_density(density_t=refr, interval=50, vmax=lgca.restchannels)
     # ani2 = lgca.animate_density(density_t=exc, interval=50, vmax=lgca.velocitychannels)
     # ani = lgca.animate_config(interval=10, grid=False)
@@ -174,9 +193,8 @@ if __name__ == '__main__':
     # ani = lgca.live_animate_density(interval=100, vmax=lgca.restchannels, channels=range(6, lgca.K))
     # ani2 = lgca.live_animate_density(interval=100, vmax=lgca.velocitychannels, channels=range(6))
     # ani = lgca.live_animate_flux()
-    ani = lgca.live_animate_flow()
-
-    #ani = lgca.live_animate_density()
+    # ani = lgca.live_animate_flow()
+    ani = lgca.live_animate_density()
     # plt.streamplot(lgca.xcoords[:, 0], lgca.ycoords[-1], lgca.g[1:-1, 1:-1, 0].T, lgca.g[1:-1, 1:-1, 1].T, density=.5,
     #               arrowstyle='->', color='orange', linewidth=2.)
     # ani = lgca.live_animate_density()

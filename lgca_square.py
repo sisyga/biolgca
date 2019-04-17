@@ -195,6 +195,29 @@ class LGCA_Square(LGCA_base):
                     self.beta = 2.
                     print('sensitivity set to beta = ', self.beta)
 
+            elif interaction == 'wetting':
+                self.interaction = wetting
+                self.calc_permutations()
+                self.r_int = 2
+
+                if 'beta' in kwargs:
+                    self.beta = kwargs['beta']
+                else:
+                    self.beta = 2.
+                    print('adhesion sensitivity set to beta = ', self.beta)
+
+                if 'gamma' in kwargs:
+                    self.gamma = kwargs['gamma']
+                else:
+                    self.gamma = 2.
+                    print('alignment sensitivity set to gamma = ', self.gamma)
+
+                if 'alpha' in kwargs:
+                    self.alpha = kwargs['alpha']
+                else:
+                    self.alpha = 2.
+                    print('substrate sensitivity set to alpha = ', self.alpha)
+
             elif interaction == 'random_walk':
                 self.interaction = random_walk
 
@@ -304,8 +327,29 @@ class LGCA_Square(LGCA_base):
     def gradient(self, qty):
         return np.moveaxis(np.asarray(np.gradient(qty, 2)), 0, -1)
 
+    def channel_weight(self, qty):
+        weights = np.zeros(qty.shape + (self.velocitychannels,))
+        weights[:-1, :, 0] = qty[1:, ...]
+        weights[1:, :, 2] = qty[:-1, ...]
+        weights[:, :-1, 1] = qty[:, 1:, ...]
+        weights[:, 1:, 3] = qty[:, :-1, ...]
+
+        return weights
+
     def calc_flux(self, nodes):
         return np.einsum('ij,...j', self.c, nodes[..., :self.velocitychannels])
+
+    def calc_vorticity(self, nodes):
+        flux = self.calc_flux(nodes)
+        dens = nodes.sum(-1)
+        flux = np.divide(flux, dens[..., None], where=dens > 0, out=np.zeros_like(flux))
+        fx, fy = flux[..., 0], flux[..., 1]
+        dfx = self.gradient(fx)
+        dfy = self.gradient(fy)
+        dfxdy = dfx[..., 1]
+        dfydx = dfy[..., 0]
+        vorticity = dfydx - dfxdy
+        return vorticity
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
         self.update_dynamic_fields()
@@ -728,5 +772,5 @@ if __name__ == '__main__':
     ani = lgca.live_animate_flux()
     # lgca.plot_flux()
     # lgca.plot_density()
-    #lgca.plot_config(grid=True)
+    # lgca.plot_config(grid=True)
     plt.show()

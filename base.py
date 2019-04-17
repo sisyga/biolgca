@@ -1,16 +1,14 @@
-
-
 import sys
 
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import numpy as np
 import numpy.random as npr
-from matplotlib import pylab as plt
 from matplotlib import pyplot as plt
 from sympy.utilities.iterables import multiset_permutations
 
 pi2 = 2 * np.pi
+
 
 def update_progress(progress):
     """
