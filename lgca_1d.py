@@ -1,11 +1,9 @@
-
-
 import matplotlib.ticker as mticker
 
-from tools import *
+from base import *
 
 
-class LGCA_1D(LGCA):
+class LGCA_1D(LGCA_base):
     """
     1D version of an LGCA.
     """
@@ -76,7 +74,6 @@ class LGCA_1D(LGCA):
                 pass
 
             self.birth_death = birth_death
-
 
         if 'interaction' in kwargs:
             if kwargs['interaction'] is 'go_or_grow':
@@ -776,7 +773,6 @@ class IBLGCA_1D(LGCA_1D):
         return
 
 
-
 if __name__ == '__main__':
     l = 100
     restchannels = 2
@@ -787,7 +783,7 @@ if __name__ == '__main__':
 
     system = IBLGCA_1D(nodes=nodes, bc='reflect', interaction='go_or_grow', kappa=4., r_d=0.01, r_b=.2, theta=0.5)
     system.timeevo(timesteps=100, record=True)
-    #system.plot_prop()
+    # system.plot_prop()
     system.plot_density(figindex=1)
     props = np.array(system.props['kappa'])[system.nodes[system.nodes > 0]]
     print(np.mean(props))
