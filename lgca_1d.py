@@ -8,151 +8,47 @@ class LGCA_1D(LGCA_base):
     1D version of an LGCA.
     """
     interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation', 'parameter_controlled_diffusion',
-                    'random_walk']
+                    'random_walk', 'persistent_motion']
     velocitychannels = 2
-    c = np.array([1., -1.])
+    c = np.array([1., -1.])[None, ...]
 
-    def __init__(self, nodes=None, l=100, restchannels=2, density=0.1, bc='periodic', r_int=1, **kwargs):
-        """
-        Initialize class instance.
-        :param nodes:
-        :param l:
-        :param restchannels:
-        :param density:
-        :param bc:
-        :param r_int:
-        :param kwargs:
-        """
-        self.dens_t, self.nodes_t, self.n_t = np.empty(3)  # placeholders to record dynamics
-        assert r_int > 0
-        self.r_int = r_int  # interaction range; must be at least 1 to handle propagation.
-        if nodes is None:
-            self.l = l
-            self.restchannels = restchannels
-            self.nodes = np.zeros((l + 2 * self.r_int, 2 + self.restchannels), dtype=np.bool)
-            self.nodes = npr.random(self.nodes.shape) < density
+    def set_dims(self, dims=None, nodes=None, restchannels=0):
         if nodes is not None:
-            assert len(nodes.shape) == 2
-            self.l, self.restchannels = nodes.shape
-            self.nodes = np.zeros((self.l + 2 * self.r_int, self.restchannels), dtype=np.bool)
+            self.l, self.K = nodes.shape
+            self.restchannels = self.K - self.velocitychannels
+            return
+
+        elif dims is None:
+            dims = 100
+
+        if isinstance(dims, int):
+            self.l = dims
+
+        else:
+            self.l = dims[0]
+
+        self.restchannels = restchannels
+        self.K = self.velocitychannels + self.restchannels
+
+    def init_nodes(self, density, nodes=None):
+        self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.bool)
+        if nodes is None:
+            self.random_reset(density)
+
+        else:
             self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.bool)
-            self.restchannels -= 2
-        self.x = np.arange(self.l) + self.r_int
-        self.K = 2 + self.restchannels
 
-        if bc in ['absorbing', 'absorb', 'abs']:
-            self.apply_boundaries = self.apply_abc
-        elif bc in ['reflecting', 'reflect', 'refl']:
-            self.apply_boundaries = self.apply_rbc
-        else:
-            self.apply_boundaries = self.apply_pbc
-            self.apply_boundaries()
+    def init_coords(self):
+        self.nonborder = (np.arange(self.l) + self.r_int,)
+        self.xcoords = np.arange(self.l + 2 * self.r_int) - self.r_int
 
-        # set birth_death process
-        if 'birthdeath' in kwargs:
-            if kwargs['birthdeath'] is 'birth':
-                self.birth_death = self.birth
-                if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
-                else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
-            elif kwargs['birthdeath'] is 'none':
-                def birth_death():
-                    pass
-
-                self.birth_death = birth_death
-            else:
-                print('keyword', kwargs['birthdeath'], 'is not defined!')
-
-                def birth_death():
-                    pass
-
-                self.birth_death = birth_death
-        else:
-            def birth_death():
-                pass
-
-            self.birth_death = birth_death
-
-        if 'interaction' in kwargs:
-            if kwargs['interaction'] is 'go_or_grow':
-                self.interaction = self.go_or_grow_interaction
-                if 'r_d' in kwargs:
-                    self.r_d = kwargs['r_d']
-                else:
-                    self.r_d = 0.01
-                    print('death rate set to r_d = ', self.r_d)
-                if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
-                else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
-                if 'kappa' in kwargs:
-                    self.kappa = kwargs['kappa']
-                else:
-                    self.kappa = 5.
-                    print('switch rate set to kappa = ', self.kappa)
-                if 'theta' in kwargs:
-                    self.theta = kwargs['theta']
-                else:
-                    self.theta = 0.75
-                    print('switch threshold set to theta = ', self.theta)
-                if self.restchannels < 2:
-                    print('WARNING: not enough rest channels - system will die out!!!')
-
-            elif kwargs['interaction'] is 'go_and_grow':
-                self.birth_death = self.birth
-                self.interaction = self.random_walk
-                if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
-                else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
-
-            elif kwargs['interaction'] is 'alignment':
-                self.interaction = self.alignment
-                if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
-                else:
-                    self.beta = 2.
-                    print('sensitivity set to beta = ', self.beta)
-
-            elif kwargs['interaction'] is 'aggregation':
-                self.interaction = self.aggregation
-                if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
-                else:
-                    self.beta = 2.
-                    print('sensitivity set to beta = ', self.beta)
-
-            elif kwargs['interaction'] is 'parameter_controlled_diffusion':
-                self.interaction = self.parameter_diffusion
-                if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
-                else:
-                    self.beta = 2.
-                    print('sensitivity set to beta = ', self.beta)
-
-            elif kwargs['interaction'] is 'random_walk':
-                self.interaction = self.random_walk
-
-            else:
-                print('keyword', kwargs['interaction'], 'is not defined! Random walk used instead.')
-                self.interaction = self.random_walk
-
-        else:
-            self.interaction = self.random_walk
-
-        self.cell_density = self.nodes[self.r_int:-self.r_int].sum(-1)
 
     def propagation(self):
         """
-
         :param nodes:
         :return:
         """
-        newnodes = np.zeros(self.nodes.shape, dtype=self.nodes.dtype)
+        newnodes = np.zeros_like(self.nodes)
         # self.clean_boundaries(newnodes)
         # resting particles stay
         newnodes[:, 2:] = self.nodes[:, 2:]
@@ -178,136 +74,21 @@ class LGCA_1D(LGCA_base):
         self.nodes[:self.r_int, :] = 0
         self.nodes[-self.r_int:, :] = 0
 
-    def go_or_grow_interaction(self):
-        """
-        interactions of the go-or-grow model. formulation too complex for 1d, but to be generalized.
-        :return:
-        """
-        n_m = self.nodes[:, :2].sum(-1)
-        n_r = self.nodes[:, 2:].sum(-1)
-        M1 = np.minimum(n_m, self.restchannels - n_r)
-        M2 = np.minimum(n_r, 2 - n_m)
-        for x in self.x:
-            node = self.nodes[x, :]
-            n = node.sum()
-            if n == 0:
-                continue
+    def nb_sum(self, qty):
+        sum = np.zeros(qty.shape)
+        sum[:-1, ...] += qty[1:, ...]
+        sum[1:, ...] += qty[:-1, ...]
+        return sum
 
-            rho = n / self.K
-            j_1 = npr.binomial(M1[x], tanh_switch(rho, kappa=self.kappa, theta=self.theta))
-            j_2 = npr.binomial(M2[x], 1 - tanh_switch(rho, kappa=self.kappa, theta=self.theta))
-            n_m[x] += j_2 - j_1
-            n_r[x] += j_1 - j_2
-            n_m[x] -= npr.binomial(n_m[x] * np.heaviside(n_m[x], 0), self.r_d)
-            n_r[x] -= npr.binomial(n_r[x] * np.heaviside(n_r[x], 0), self.r_d)
-            M = min([n_r[x], self.restchannels - n_r[x]])
-            n_r[x] += npr.binomial(M * np.heaviside(M, 0), self.r_b)
+    def gradient(self, qty):
+        return np.gradient(qty, 2)[..., None]
 
-            v_channels = [1] * n_m[x] + [0] * (2 - n_m[x])
-            v_channels = npr.permutation(v_channels)
-            r_channels = np.zeros(self.restchannels)
-            r_channels[:n_r[x]] = 1
-            node = np.hstack((v_channels, r_channels))
-            self.nodes[x, :] = node
+    def channel_weight(self, qty):
+        weights = np.zeros(qty.shape + (self.velocitychannels,))
+        weights[:-1, :, 0] = qty[1:, ...]
+        weights[1:, :, 2] = qty[:-1, ...]
+        return weights
 
-    def birth(self):
-        """
-        Simple birth process
-        :return:
-        """
-        # newnodes = np.empty(self.nodes.shape,
-        #                     dtype=self.nodes.dtype)  # this is faster, if the interaction is applied to all nodes
-        inds = np.arange(self.K)
-        for x in self.x:
-            node = self.nodes[x, :]
-            n = self.cell_density[x]
-            if n == 0 or n == self.K:  # no growth on full or empty nodes
-                continue
-
-            N = min([n, self.K - n])
-            dn = npr.binomial(N, self.r_b)
-            n += dn
-            if n == self.K:
-                self.nodes[x, :] = 1
-                continue
-
-            while dn > 0:
-                p = 1. - node
-                Z = p.sum()
-                p /= Z
-                ind = npr.choice(inds, p=p)
-                node[ind] = 1
-                dn -= 1
-
-            self.nodes[x, :] = node
-
-    def alignment(self):
-        """
-        Rearrangement step for alignment interaction
-        :return:
-        """
-        newnodes = np.zeros(self.nodes.shape,
-                            dtype=self.nodes.dtype)  # this is faster, if the interaction is applied to all nodes
-        for x in self.x:
-            node = self.nodes[x, :]
-            n = node.sum()
-            if n == 0 or n == 2 + self.restchannels:  # full or empty nodes cannot be rearranged!
-                newnodes[x, :] = node
-                continue
-
-            G = int(self.nodes[x + 1, 0]) + int(self.nodes[x - 1, 0]) - int(self.nodes[x + 1, 1]) - int(
-                self.nodes[x - 1, 1])
-            permutations = np.array(list(multiset_permutations(node)), dtype=int)
-            Js = permutations[:, 0] - permutations[:, 1]
-            weights = np.exp(self.beta * G * Js)
-            ind = npr.choice(len(weights), p=weights / weights.sum())
-            newnodes[x, :] = permutations[ind]
-
-        self.nodes = newnodes
-
-    def aggregation(self):
-        """
-        Rearrangement step for alignment interaction
-        :return:
-        """
-        newnodes = np.zeros(self.nodes.shape,
-                            dtype=self.nodes.dtype)  # this is faster, if the interaction is applied to all nodes
-        for x in self.x:
-            node = self.nodes[x, :]
-            n = self.cell_density[x]
-            if n == 0 or n == 2 + self.restchannels:  # full or empty nodes cannot be rearranged!
-                newnodes[x, :] = node
-                continue
-
-            G = self.nodes[x + 1].sum() - self.nodes[x - 1].sum()
-            permutations = np.array(list(multiset_permutations(node)), dtype=int)
-            Js = permutations[:, 0] - permutations[:, 1]
-            weights = np.exp(self.beta * G * Js)
-            ind = npr.choice(len(weights), p=weights / weights.sum())
-            newnodes[x, :] = permutations[ind]
-
-        self.nodes = newnodes
-
-    def parameter_diffusion(self):
-        """
-        Rearrangement step for alignment interaction
-        :return:
-        """
-        newnodes = np.zeros(self.nodes.shape,
-                            dtype=self.nodes.dtype)  # this is faster, if the interaction is applied to all nodes
-        for x in self.x:
-            node = self.nodes[x, :]
-            n = self.cell_density[x]
-            if n == 0 or n == 2 + self.restchannels:  # full or empty nodes cannot be rearranged!
-                newnodes[x, :] = node
-                continue
-
-            permutations = np.array(list(multiset_permutations(node)), dtype=int)
-            weights = np.exp(self.beta * (permutations[:, 2:] > 0).sum(-1))
-            ind = npr.choice(len(weights), p=weights / weights.sum())
-            newnodes[x, :] = permutations[ind]
-
-        self.nodes = newnodes
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
         self.update_dynamic_fields()
@@ -346,6 +127,8 @@ class LGCA_1D(LGCA_base):
         plt.xlabel(r'Lattice node $r \, [\varepsilon]$', )
         plt.ylabel(r'Time step $k \, [\tau]$')
         ax.xaxis.set_label_position('top')
+        ax.xaxis.tick_top()
+        plt.tight_layout()
         return plot
 
     def plot_flux(self, nodes_t=None, figindex=0, figsize=None):
@@ -370,6 +153,7 @@ class LGCA_1D(LGCA_base):
         plt.ylabel(r'Time step $k \, [\tau]$')
         ax.xaxis.set_label_position('top')
         ax.xaxis.set_ticks_position('top')
+        ax.xaxis.tick_top()
         plt.tight_layout()
         return plot
 
@@ -400,8 +184,8 @@ class IBLGCA_1D(LGCA_1D):
             self.restchannels = restchannels
             self.nodes = np.zeros((l + 2 * self.r_int, 2 + self.restchannels), dtype=np.uint)
             occupied = npr.random(self.nodes.shape) < density
-            self.nodes[occupied] = 1 + np.arange(len(occupied.flat))
-            self.maxlabel = np.amax(self.nodes)
+            self.nodes[occupied] = 1 + np.arange(len(occupied.flatten()))
+            self.maxlabel = self.nodes.max()
         else:
             assert len(nodes.shape) == 2
             self.l, self.restchannels = nodes.shape
@@ -478,8 +262,37 @@ class IBLGCA_1D(LGCA_1D):
 
             self.birth_death = birth_death
 
-        self.interactions = ['go_or_grow', 'go_and_grow', 'random_walk']
+        self.interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath']
         if 'interaction' in kwargs:
+            if kwargs['interaction'] is 'birth':
+                self.interaction = self.birth
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                else:
+                    self.r_b = 0.2
+                    print('birth rate set to r_b = ', self.r_b)
+                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+
+            if kwargs['interaction'] is 'birthdeath':
+                self.interaction = self.birthdeath
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                else:
+                    self.r_b = 0.2
+                    print('birth rate set to r_b = ', self.r_b)
+                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+                if 'r_d' in kwargs:
+                    self.r_d = kwargs['r_d']
+                else:
+                    self.r_d = 0.02
+                    print('death rate set to r_d = ', self.r_d)
+
+                if 'std' in kwargs:
+                    self.std = kwargs['std']
+                else:
+                    self.std = 0.1
+                    print('standard deviation set to = ', self.std)
+
             if kwargs['interaction'] is 'go_or_grow':
                 self.interaction = self.go_or_grow_interaction
                 if 'r_d' in kwargs:
@@ -781,12 +594,13 @@ if __name__ == '__main__':
     # nodes[1:, :] = 0
     # nodes[0, 1:] = 0
 
-    system = IBLGCA_1D(nodes=nodes, bc='reflect', interaction='go_or_grow', kappa=4., r_d=0.01, r_b=.2, theta=0.5)
+    system = LGCA_1D(bc='reflect', dims=l, interaction='go_or_grow', density=0.2, restchannels=restchannels)
     system.timeevo(timesteps=100, record=True)
     # system.plot_prop()
-    system.plot_density(figindex=1)
-    props = np.array(system.props['kappa'])[system.nodes[system.nodes > 0]]
-    print(np.mean(props))
-    system.plot_prop_timecourse()
-    plt.ylabel('$\kappa$')
+    # system.plot_density(figindex=1)
+    # props = np.array(system.props['kappa'])[system.nodes[system.nodes > 0]]
+    # print(np.mean(props))
+    # system.plot_prop_timecourse()
+    # plt.ylabel('$\kappa$')
+    system.plot_density()
     plt.show()
