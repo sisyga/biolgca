@@ -4,7 +4,7 @@ import matplotlib.ticker as mticker
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
 
-from interactions import *
+from base import *
 
 
 class LGCA_Square(LGCA_base):
@@ -21,36 +21,20 @@ class LGCA_Square(LGCA_base):
     dy = np.sin(2 * np.pi / velocitychannels)
     orientation = np.pi / velocitychannels
 
-    def __init__(self, nodes=None, lx=50, ly=50, restchannels=1, density=0.1, bc='periodic', **kwargs):
-        """
-        Initialize class instance.
-        :param nodes:
-        :param l:
-        :param restchannels:
-        :param density:
-        :param bc:
-        :param r_int:
-        :param kwargs:
-        """
-        self.dens_t, self.nodes_t, self.n_t = np.empty(3)  # placeholders to record dynamics
-        self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
-        if nodes is None:
-            self.lx = lx
-            self.ly = ly
-            self.restchannels = restchannels
-            self.K = self.velocitychannels + self.restchannels
-
+    def set_dims(self, dims=None, nodes=None, restchannels=0):
         if nodes is not None:
             self.lx, self.ly, self.K = nodes.shape
             self.restchannels = self.K - self.velocitychannels
+            return
 
-        self.set_interaction(**kwargs)
-        self.init_nodes(density, nodes=nodes)
-        self.set_bc(bc)
-        self.init_coords()
-        self.cell_density = self.nodes.sum(-1)
+        elif dims is None:
+            dims = (50, 50)
 
-    def init_nodes(self, density, nodes=None):
+        self.lx, self.ly = dims
+        self.restchannels = restchannels
+        self.K = self.velocitychannels + self.restchannels
+
+    def init_nodes(self, density=0.1, nodes=None):
         self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.bool)
         if nodes is None:
             self.random_reset(density)
@@ -67,211 +51,7 @@ class LGCA_Square(LGCA_base):
                                                  np.arange(self.ly + 2 * self.r_int) - self.r_int, indexing='ij')
         self.xcoords = self.xcoords[self.r_int:-self.r_int, self.r_int:-self.r_int].astype(float)
         self.ycoords = self.ycoords[self.r_int:-self.r_int, self.r_int:-self.r_int].astype(float)
-
-    def set_bc(self, bc):
-        if bc in ['absorbing', 'absorb', 'abs']:
-            self.apply_boundaries = self.apply_abc
-        elif bc in ['reflecting', 'reflect', 'refl']:
-            self.apply_boundaries = self.apply_rbc
-        elif bc in ['periodic', 'pbc']:
-            self.apply_boundaries = self.apply_pbc
-        else:
-            print(bc, 'not defined, using periodic boundaries')
-            self.apply_boundaries = self.apply_pbc
-
-        self.apply_boundaries()
-
-    def set_interaction(self, **kwargs):
-        if 'interaction' in kwargs:
-            interaction = kwargs['interaction']
-            if interaction == 'go_or_grow':
-                self.interaction = go_or_grow_interaction
-                if 'r_d' in kwargs:
-                    self.r_d = kwargs['r_d']
-                else:
-                    self.r_d = 0.01
-                    print('death rate set to r_d = ', self.r_d)
-                if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
-                else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
-                if 'kappa' in kwargs:
-                    self.kappa = kwargs['kappa']
-                else:
-                    self.kappa = 5.
-                    print('switch rate set to kappa = ', self.kappa)
-                if 'theta' in kwargs:
-                    self.theta = kwargs['theta']
-                else:
-                    self.theta = 0.75
-                    print('switch threshold set to theta = ', self.theta)
-                if self.restchannels < 2:
-                    print('WARNING: not enough rest channels - system will die out!!!')
-
-            elif interaction == 'go_and_grow':
-                self.interaction = birth
-                if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
-                else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
-
-            elif interaction == 'alignment':
-                self.interaction = alignment
-                self.calc_permutations()
-
-                if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
-                else:
-                    self.beta = 2.
-                    print('sensitivity set to beta = ', self.beta)
-
-            elif interaction == 'persistent_motion':
-                self.interaction = persistent_walk
-                self.calc_permutations()
-
-                if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
-                else:
-                    self.beta = 2.
-                    print('sensitivity set to beta = ', self.beta)
-
-            elif interaction == 'chemotaxis':
-                self.interaction = chemotaxis
-                self.calc_permutations()
-
-                if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
-                else:
-                    self.beta = 5.
-                    print('sensitivity set to beta = ', self.beta)
-
-                if 'gradient' in kwargs:
-                    self.g = kwargs['gradient']
-                else:
-                    x_source = npr.normal(self.xcoords.mean(), 1)
-                    y_source = npr.normal(self.ycoords.mean(), 1)
-                    rx = self.xcoords - x_source
-                    ry = self.ycoords - y_source
-                    r = np.sqrt(rx ** 2 + ry ** 2)
-                    self.concentration = np.exp(-r / self.ycoords.var())
-                    self.g = self.gradient(np.pad(self.concentration, 1, 'constant'))
-
-            elif interaction == 'contact_guidance':
-                self.interaction = contact_guidance
-                self.calc_permutations()
-
-                if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
-                else:
-                    self.beta = 2.
-                    print('sensitivity set to beta = ', self.beta)
-
-                if 'director' in kwargs:
-                    self.g = kwargs['director']
-                else:
-                    self.g = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, 2))
-                    self.g[..., 0] = 1
-                    self.guiding_tensor = calc_nematic_tensor(self.g)
-
-            elif interaction == 'nematic':
-                self.interaction = nematic
-                self.calc_permutations()
-
-                if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
-                else:
-                    self.beta = 2.
-                    print('sensitivity set to beta = ', self.beta)
-
-            elif interaction == 'aggregation':
-                self.interaction = aggregation
-                self.calc_permutations()
-
-                if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
-                else:
-                    self.beta = 2.
-                    print('sensitivity set to beta = ', self.beta)
-
-            elif interaction == 'wetting':
-                self.interaction = wetting
-                self.calc_permutations()
-                self.r_int = 2
-
-                if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
-                else:
-                    self.beta = 2.
-                    print('adhesion sensitivity set to beta = ', self.beta)
-
-                if 'gamma' in kwargs:
-                    self.gamma = kwargs['gamma']
-                else:
-                    self.gamma = 2.
-                    print('alignment sensitivity set to gamma = ', self.gamma)
-
-                if 'alpha' in kwargs:
-                    self.alpha = kwargs['alpha']
-                else:
-                    self.alpha = 2.
-                    print('substrate sensitivity set to alpha = ', self.alpha)
-
-            elif interaction == 'random_walk':
-                self.interaction = random_walk
-
-            elif interaction == 'birth':
-                self.interaction = birth
-                if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
-                else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
-
-            elif interaction == 'birth_death':
-                self.interaction = birth_death
-                if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
-                else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
-
-                if 'r_d' in kwargs:
-                    self.r_d = kwargs['r_d']
-                else:
-                    self.r_d = 0.05
-                    print('death rate set to r_d = ', self.r_d)
-
-            elif interaction == 'excitable_medium':
-                self.interaction = excitable_medium
-                if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
-
-                else:
-                    self.beta = .05
-                    print('alignment sensitivity set to beta = ', self.beta)
-
-                if 'alpha' in kwargs:
-                    self.alpha = kwargs['alpha']
-                else:
-                    self.alpha = 1.
-                    print('aggregation sensitivity set to alpha = ', self.alpha)
-
-                if 'N' in kwargs:
-                    self.N = kwargs['N']
-                else:
-                    self.N = 50
-                    print('repetition of fast reaction set to N = ', self.N)
-
-            else:
-                print('interaction', kwargs['interaction'], 'is not defined! Random walk used instead.')
-                print('Implemented interactions:', self.interactions)
-                self.interaction = random_walk
-
-        else:
-            print('Random walk interaction is used.')
-            self.interaction = random_walk
+        self.nonborder = (self.xx, self.yy)
 
     def propagation(self):
         """
@@ -335,9 +115,6 @@ class LGCA_Square(LGCA_base):
         weights[:, 1:, 3] = qty[:, :-1, ...]
 
         return weights
-
-    def calc_flux(self, nodes):
-        return np.einsum('ij,...j', self.c, nodes[..., :self.velocitychannels])
 
     def calc_vorticity(self, nodes):
         flux = self.calc_flux(nodes)
@@ -522,8 +299,7 @@ class LGCA_Square(LGCA_base):
             return ani
 
     def live_animate_density(self, figindex=None, figsize=None, cmap='viridis', interval=100, vmax=None,
-                             channels=slice(None),
-                             tight_layout=True, edgecolor='None'):
+                             channels=slice(None), tight_layout=True, edgecolor='None'):
 
         fig, pc, cmap = self.plot_density(figindex=figindex, figsize=figsize, cmap=cmap, vmax=vmax,
                                           tight_layout=tight_layout, edgecolor=edgecolor)
@@ -707,16 +483,15 @@ class LGCA_Square(LGCA_base):
 
         nodes = nodes_t.astype(float)
         density = nodes.sum(-1) / self.K
-        jx, jy = self.calc_flux(nodes)
+        jx, jy = np.moveaxis(self.calc_flux(nodes), -1, 0)
 
         angle = np.zeros(density.shape, dtype=complex)
         angle.real = jx
         angle.imag = jy
         angle = np.angle(angle, deg=True) % 360.
-
         fig, pc, cmap = self.plot_flux(nodes=nodes[0], figindex=figindex, figsize=figsize, tight_layout=tight_layout,
                                        edgecolor=edgecolor)
-        angle = cmap.to_rgba(angle)
+        angle = cmap.to_rgba(angle[None, ...])[0]
         angle[..., -1] = np.sqrt(density)
         angle[(jx ** 2 + jy ** 2) < 1e-6, :3] = 0.
         title = plt.title('Time $k =$ 0')
@@ -732,7 +507,6 @@ class LGCA_Square(LGCA_base):
     def live_animate_flux(self, figindex=None, figsize=None, cmap='viridis', interval=100, tight_layout=True,
                           edgecolor='None'):
 
-        cmap = plt.cm.get_cmap('hsv')
         fig, pc, cmap = self.plot_flux(figindex=figindex, figsize=figsize, tight_layout=tight_layout,
                                        edgecolor=edgecolor)
         title = plt.title('Time $k =$0')
@@ -760,16 +534,16 @@ class LGCA_Square(LGCA_base):
 if __name__ == '__main__':
     lx = 50
     ly = lx
-    restchannels = 0
+    restchannels = 2
     nodes = np.zeros((lx, ly, 4 + restchannels))
     nodes[..., (0, 1)] = 1
-    lgca = LGCA_Square(restchannels=restchannels, lx=lx, ly=ly, density=0.1)  # , nodes=nodes)
-
-    lgca.set_interaction(interaction='alignment', beta=3)
+    lgca = LGCA_Square(restchannels=restchannels, lx=lx, ly=ly, density=0.4, bc='refl')  # , nodes=nodes)
+    lgca.set_interaction(interaction='aggregation', beta=10)
     # ani = lgca.animate_flow(interval=50)
     # ani = lgca.animate_flux(interval=100)
     # ani = lgca.animate_density(interval=100)
-    ani = lgca.live_animate_flux()
+    # ani = lgca.live_animate_flux()
+    ani = lgca.live_animate_density()
     # lgca.plot_flux()
     # lgca.plot_density()
     # lgca.plot_config(grid=True)
