@@ -1,23 +1,36 @@
-import matplotlib.colors as mcolors
+import sys
 
-from interactions import *
+import matplotlib.colors as mcolors
+import numpy as np
+from matplotlib import pyplot as plt
+from matplotlib.cm import ScalarMappable
+from numpy import random as npr
+from sympy.utilities.iterables import multiset_permutations
 
 pi2 = 2 * np.pi
 plt.style.use('default')
 
 
-def get_lgca(geometry='hex', **kwargs):
-    if geometry in ['1d', 'lin', 'linear']:
-        from lgca_1d import LGCA_1D
-        return LGCA_1D(**kwargs)
-
-    elif geometry in ['square', 'sq', 'rect', 'rectangular']:
-        from lgca_square import LGCA_Square
-        return LGCA_Square(**kwargs)
+def get_lgca(geometry='hex', ib=False, **kwargs):
+    if ib:
+        if geometry in ['1d', 'lin', 'linear']:
+            from lgca_1d import IBLGCA_1D
+            return IBLGCA_1D(**kwargs)
+        else:
+            print('Not implemented yet!')
 
     else:
-        from lgca_hex import LGCA_Hex
-        return LGCA_Hex(**kwargs)
+        if geometry in ['1d', 'lin', 'linear']:
+            from lgca_1d import LGCA_1D
+            return LGCA_1D(**kwargs)
+
+        elif geometry in ['square', 'sq', 'rect', 'rectangular']:
+            from lgca_square import LGCA_Square
+            return LGCA_Square(**kwargs)
+
+        else:
+            from lgca_hex import LGCA_Hex
+            return LGCA_Hex(**kwargs)
 
 
 def update_progress(progress):
@@ -55,7 +68,7 @@ def colorbar_index(ncolors, cmap, use_gridspec=False):
     :return: colormap instance
     """
     cmap = cmap_discretize(cmap, ncolors)
-    mappable = cm.ScalarMappable(cmap=cmap)
+    mappable = ScalarMappable(cmap=cmap)
     mappable.set_array([])
     mappable.set_clim(-0.5, ncolors + 0.5)
     colorbar = plt.colorbar(mappable, use_gridspec=use_gridspec)
@@ -98,26 +111,6 @@ def estimate_figsize(array, x=8., cbar=False, dy=1.):
     return figsize
 
 
-def disarrange(a, axis=-1):
-    """
-    Shuffle `a` in-place along the given axis.
-
-    Apply numpy.random.shuffle to the given axis of `a`.
-    Each one-dimensional slice is shuffled independently.
-    """
-    b = a.swapaxes(axis, -1)
-    # Shuffle `b` in-place along the last axis.  `b` is a view of `a`,
-    # so `a` is shuffled in place, too.
-    shp = b.shape[:-1]
-    for ndx in np.ndindex(shp):
-        np.random.shuffle(b[ndx])
-    return
-
-
-def blank_fct():
-    pass
-
-
 def calc_nematic_tensor(v):
     return np.einsum('...i,...j->...ij', v, v) - 0.5 * np.diag(np.ones(2))[None, ...]
 
@@ -150,8 +143,15 @@ class LGCA_base():
         self.cell_density = self.nodes.sum(-1)
         self.apply_boundaries()
 
+    def set_r_int(self, r):
+        self.r_int = r
+        self.init_nodes(nodes=self.nodes[self.nonborder])
+        self.init_coords()
+
+
     def set_interaction(self, **kwargs):
-        r_old = self.r_int
+        from interactions import go_or_grow_interaction, birth, alignment, persistent_walk, chemotaxis, \
+            contact_guidance, nematic, aggregation, wetting, random_walk, birth_death, excitable_medium
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
             if interaction == 'go_or_grow':
@@ -277,7 +277,7 @@ class LGCA_base():
             elif interaction == 'wetting':
                 self.interaction = wetting
                 self.calc_permutations()
-                self.r_int = 2
+                self.set_r_int(2)
 
                 if 'beta' in kwargs:
                     self.beta = kwargs['beta']
@@ -352,10 +352,6 @@ class LGCA_base():
             print('Random walk interaction is used.')
             self.interaction = random_walk
 
-        if r_old != self.r_int:
-            self.init_nodes(nodes=self.nodes[self.nonborder])
-            self.init_coords()
-
     def set_bc(self, bc):
         if bc in ['absorbing', 'absorb', 'abs']:
             self.apply_boundaries = self.apply_abc
@@ -407,3 +403,114 @@ class LGCA_base():
         self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(2))[None, ...]
         self.si = [np.einsum('ij,jkl', self.permutations[n][:, :self.velocitychannels], self.cij) for n in
                    range(self.K + 1)]
+
+
+class IBLGCA_base(LGCA_base):
+    """
+    Base class for identity-based LGCA.
+    """
+    props = {}
+
+    def set_interaction(self, **kwargs):
+        from ib_interactions import birth, birthdeath, go_or_grow_interaction, random_walk
+        if 'interaction' in kwargs:
+            interaction = kwargs['interaction']
+            if interaction is 'birth':
+                self.interaction = birth
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                else:
+                    self.r_b = 0.2
+                    print('birth rate set to r_b = ', self.r_b)
+                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+
+            if interaction is 'birthdeath':
+                self.interaction = birthdeath
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                else:
+                    self.r_b = 0.2
+                    print('birth rate set to r_b = ', self.r_b)
+                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+                if 'r_d' in kwargs:
+                    self.r_d = kwargs['r_d']
+                else:
+                    self.r_d = 0.02
+                    print('death rate set to r_d = ', self.r_d)
+
+                if 'std' in kwargs:
+                    self.std = kwargs['std']
+                else:
+                    self.std = 0.1
+                    print('standard deviation set to = ', self.std)
+
+            if interaction is 'go_or_grow':
+                self.interaction = go_or_grow_interaction
+                if 'r_d' in kwargs:
+                    self.r_d = kwargs['r_d']
+                else:
+                    self.r_d = 0.01
+                    print('death rate set to r_d = ', self.r_d)
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                else:
+                    self.r_b = 0.2
+                    print('birth rate set to r_b = ', self.r_b)
+                if 'kappa' in kwargs:
+                    self.kappa = kwargs['kappa']
+                else:
+                    self.kappa = 5.
+                    print('switch rate set to kappa = ', self.kappa)
+                self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
+                if 'theta' in kwargs:
+                    self.theta = kwargs['theta']
+                else:
+                    self.theta = 0.75
+                    print('switch threshold set to theta = ', self.theta)
+                if self.restchannels < 2:
+                    print('WARNING: not enough rest channels - system will die out!!!')
+
+            elif interaction is 'go_and_grow':
+                self.interaction = birth
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                else:
+                    self.r_b = 0.2
+                    print('birth rate set to r_b = ', self.r_b)
+
+                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+
+            elif interaction is 'random_walk':
+                self.interaction = random_walk
+
+            else:
+                print('keyword', interaction, 'is not defined! Random walk used instead.')
+                self.interaction = random_walk
+
+        else:
+            self.interaction = random_walk
+
+    def update_dynamic_fields(self):
+        """Update "fields" that store important variables to compute other dynamic steps
+
+        :return:
+        """
+        self.occupied = self.nodes > 0
+        self.cell_density = self.occupied.sum(-1)
+
+    def convert_bool_to_ib(self, occ):
+        occ = occ.astype(np.uint)
+        occ[occ > 0] = 1 + np.arange((occ.sum()), dtype=np.uint)
+        return occ
+
+    def random_reset(self, density):
+        """
+
+        :param density:
+        :return:
+        """
+        occupied = npr.random(self.nonborder.shape) < density
+        self.nodes[self.nonborder] = self.convert_bool_to_ib(occupied)
+        self.apply_boundaries()
+        self.maxlabel = self.nodes.max()
+        self.update_dynamic_fields()
