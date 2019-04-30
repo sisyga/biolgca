@@ -49,7 +49,6 @@ class LGCA_1D(LGCA_base):
         :return:
         """
         newnodes = np.zeros_like(self.nodes)
-        # self.clean_boundaries(newnodes)
         # resting particles stay
         newnodes[:, 2:] = self.nodes[:, 2:]
 
@@ -112,7 +111,7 @@ class LGCA_1D(LGCA_base):
             if showprogress:
                 update_progress(1.0 * t / timesteps)
 
-    def plot_density(self, density_t=None, figindex=0, figsize=None, cmap='hot_r'):
+    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='hot_r'):
         if density_t is None:
             density_t = self.dens_t
         if figsize is None:
@@ -131,7 +130,7 @@ class LGCA_1D(LGCA_base):
         plt.tight_layout()
         return plot
 
-    def plot_flux(self, nodes_t=None, figindex=0, figsize=None):
+    def plot_flux(self, nodes_t=None, figindex=None, figsize=None):
         if nodes_t is None:
             nodes_t = self.nodes_t
 
@@ -158,328 +157,26 @@ class LGCA_1D(LGCA_base):
         return plot
 
 
-class IBLGCA_1D(LGCA_1D):
+class IBLGCA_1D(IBLGCA_base, LGCA_1D):
     """
     1D version of an identity-based LGCA.
     """
+    interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath']
 
-    def __init__(self, nodes=None, properties=None, l=100, restchannels=2, density=0.1, bc='periodic', r_int=1,
-                 **kwargs):
-        """
-        Initialize class instance.
-        :param nodes:
-        :param l:
-        :param restchannels:
-        :param density:
-        :param bc:
-        :param r_int:
-        :param kwargs:
-        """
-        self.dens_t, self.nodes_t, self.n_t = np.empty(3)  # placeholders to record dynamics
-        assert r_int > 0
-        self.r_int = r_int  # interaction range; must be at least 1 to handle propagation.
-        self.maxlabel = 0  # maximum cell label
+    def init_nodes(self, density, nodes=None):
+        self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.uint)
         if nodes is None:
-            self.l = l
-            self.restchannels = restchannels
-            self.nodes = np.zeros((l + 2 * self.r_int, 2 + self.restchannels), dtype=np.uint)
-            occupied = npr.random(self.nodes.shape) < density
-            self.nodes[occupied] = 1 + np.arange(len(occupied.flatten()))
-            self.maxlabel = self.nodes.max()
-        else:
-            assert len(nodes.shape) == 2
-            self.l, self.restchannels = nodes.shape
-            self.nodes = np.zeros((self.l + 2 * self.r_int, self.restchannels), dtype=np.uint)
-            self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.uint)
-            self.restchannels -= 2
-            self.maxlabel = np.amax(self.nodes)
-
-        # "properties is a dict of cell properties, e.g. props['r_b'] returns a list of all birth rates
-        if properties is None:
-            self.props = {}
-
-        else:
-            self.props = properties
-
-        self.x = np.arange(self.l) + self.r_int
-        self.K = 2 + self.restchannels
-
-        if bc in ['absorbing', 'absorb', 'abs']:
-            self.apply_boundaries = self.apply_abc
-        elif bc in ['reflecting', 'reflect', 'refl']:
-            self.apply_boundaries = self.apply_rbc
-        else:
-            self.apply_boundaries = self.apply_pbc
+            occupied = npr.random((self.l, self.K)) < density
+            self.nodes[self.r_int:-self.r_int] = self.convert_bool_to_ib(occupied)
             self.apply_boundaries()
+            self.maxlabel = self.nodes.max()
 
-        # set birth_death process
-        if 'birthdeath' in kwargs:
-            if kwargs['birthdeath'] is 'birth':
-                self.birth_death = self.birth
-                if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
-                else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
-                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
-
-            if kwargs['birthdeath'] is 'birthdeath':
-                self.birth_death = self.birthdeath
-                if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
-                else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
-                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
-                if 'r_d' in kwargs:
-                    self.r_d = kwargs['r_d']
-                else:
-                    self.r_d = 0.02
-                    print('death rate set to r_d = ', self.r_d)
-
-                if 'std' in kwargs:
-                    self.std = kwargs['std']
-                else:
-                    self.std = 0.1
-                    print('standard deviation set to = ', self.std)
-
-
-            elif kwargs['birthdeath'] is 'none':
-                def birth_death():
-                    pass
-
-                self.birth_death = birth_death
-            else:
-                print('keyword', kwargs['birthdeath'], 'is not defined!')
-
-                def birth_death():
-                    pass
-
-                self.birth_death = birth_death
-        else:
-            def birth_death():
-                pass
-
-            self.birth_death = birth_death
-
-        self.interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath']
-        if 'interaction' in kwargs:
-            if kwargs['interaction'] is 'birth':
-                self.interaction = self.birth
-                if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
-                else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
-                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
-
-            if kwargs['interaction'] is 'birthdeath':
-                self.interaction = self.birthdeath
-                if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
-                else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
-                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
-                if 'r_d' in kwargs:
-                    self.r_d = kwargs['r_d']
-                else:
-                    self.r_d = 0.02
-                    print('death rate set to r_d = ', self.r_d)
-
-                if 'std' in kwargs:
-                    self.std = kwargs['std']
-                else:
-                    self.std = 0.1
-                    print('standard deviation set to = ', self.std)
-
-            if kwargs['interaction'] is 'go_or_grow':
-                self.interaction = self.go_or_grow_interaction
-                if 'r_d' in kwargs:
-                    self.r_d = kwargs['r_d']
-                else:
-                    self.r_d = 0.01
-                    print('death rate set to r_d = ', self.r_d)
-                if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
-                else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
-                if 'kappa' in kwargs:
-                    self.kappa = kwargs['kappa']
-                else:
-                    self.kappa = 5.
-                    print('switch rate set to kappa = ', self.kappa)
-                self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
-                if 'theta' in kwargs:
-                    self.theta = kwargs['theta']
-                else:
-                    self.theta = 0.75
-                    print('switch threshold set to theta = ', self.theta)
-                if self.restchannels < 2:
-                    print('WARNING: not enough rest channels - system will die out!!!')
-
-            elif kwargs['interaction'] is 'go_and_grow':
-                self.birth_death = self.birth
-                self.interaction = self.random_walk
-                if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
-                else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
-
-                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
-
-            elif kwargs['interaction'] is 'random_walk':
-                self.interaction = self.random_walk
-
-            else:
-                print('keyword', kwargs['interaction'], 'is not defined! Random walk used instead.')
-                self.interaction = self.random_walk
 
         else:
-            self.interaction = self.random_walk
+            occ = nodes > 0
+            self.nodes[self.r_int:-self.r_int] = self.convert_bool_to_ib(occ)
+            self.maxlabel = self.nodes.max()
 
-        self.occupied = self.nodes.astype(np.bool)
-        self.cell_density = self.occupied.sum(-1)
-
-    def update_dynamic_fields(self):
-        """Update "fields" that store important variables to compute other dynamic steps
-
-        :return:
-        """
-        self.occupied = self.nodes.astype(np.bool)
-        self.cell_density = self.occupied.sum(-1)
-
-    def birth(self):
-        """
-        Simple birth process
-        :return:
-        """
-        inds = np.arange(self.K)
-        for x in self.x:
-            n = self.cell_density[x]
-            node = self.nodes[x]
-            if n == 0 or n == self.K:  # no growth on full or empty nodes
-                continue
-
-            # choose cells that proliferate
-            r_bs = [self.props['r_b'][i] for i in node]
-            proliferating = npr.random(self.K) < r_bs
-            dn = proliferating.sum()
-            n += dn
-            # assure that there are not too many cells. if there are, randomly kick enough of them
-            while n > self.K:
-                p = proliferating.astype(float)
-                Z = p.sum()
-                p /= Z
-                ind = npr.choice(inds, p=p)
-                proliferating[ind] = 0
-                n -= 1
-
-            # distribute daughter cells randomly in channels
-            dn = proliferating.sum()
-            for label in node[proliferating]:
-                p = 1. - self.occupied[x]
-                Z = p.sum()
-                p /= Z
-                ind = npr.choice(inds, p=p)
-                self.maxlabel += 1
-                node[ind] = self.maxlabel
-                r_b = self.props['r_b'][label]
-                self.props['r_b'].append(npr.normal(loc=r_b, scale=0.2 * r_b))
-                dn -= 1
-
-            self.nodes[x, :] = node
-
-    def birthdeath(self):
-        """
-        Simple birth-death process with evolutionary dynamics towards a higher proliferation rate
-        :return:
-        """
-        inds = np.arange(self.K)
-        # death process
-        dying = npr.random(self.nodes.shape) < self.r_d
-        self.nodes[dying] = 0
-        # birth
-        self.update_dynamic_fields()
-        for x in self.x:
-            n = self.cell_density[x]
-            node = self.nodes[x]
-            if n == 0:  # no growth on empty nodes
-                continue
-
-            # choose cells that proliferate
-            r_bs = [self.props['r_b'][i] for i in node]
-            proliferating = npr.random(self.K) < r_bs
-
-            # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
-            for label in node[proliferating]:
-                ind = npr.choice(self.K)
-                if self.occupied[x, ind] == 0:
-                    self.maxlabel += 1
-                    node[ind] = self.maxlabel
-                    r_b = self.props['r_b'][label]
-                    self.props['r_b'].append(np.clip(npr.normal(loc=r_b, scale=self.std), 0, 1))
-
-            self.nodes[x, :] = node
-
-    def go_or_grow_interaction(self):
-        """
-        interactions of the go-or-grow model. formulation too complex for 1d, but to be generalized.
-        :return:
-        """
-        # death
-        dying = npr.random(self.nodes.shape) < self.r_d
-        self.nodes[dying] = 0
-        # birth
-        self.update_dynamic_fields()
-        n_m = self.occupied[:, :2].sum(-1)
-        n_r = self.occupied[:, 2:].sum(-1)
-        for x in self.x:
-            node = self.nodes[x]
-            vel = node[:2]
-            rest = node[2:]
-            n = self.cell_density[x]
-            if n == 0 or n == self.K:
-                continue
-
-            rho = n / self.K
-            # determine cells to switch to rest channels and cells that switch to moving state
-            # kappas = np.array([self.props['kappa'][i] for i in node])
-            # r_s = tanh_switch(rho, kappa=kappas, theta=self.theta)
-
-            free_rest = self.restchannels - n_r[x]
-            free_vel = 2 - n_m[x]
-            # choose a number of cells that try to switch. the cell number must fit to the number of free channels
-            can_switch_to_rest = npr.permutation(vel[vel > 0])[:free_rest]
-            can_switch_to_vel = npr.permutation(rest[rest > 0])[:free_vel]
-
-            for cell in can_switch_to_rest:
-                if npr.random() < tanh_switch(rho, kappa=self.props['kappa'][cell], theta=self.theta):
-                    # print 'switch to rest', cell
-                    rest[np.where(rest == 0)[0][0]] = cell
-                    vel[np.where(vel == cell)[0][0]] = 0
-
-            for cell in can_switch_to_vel:
-                if npr.random() < 1 - tanh_switch(rho, kappa=self.props['kappa'][cell], theta=self.theta):
-                    # print 'switch to vel', cell
-                    vel[np.where(vel == 0)[0][0]] = cell
-                    rest[np.where(rest == cell)[0][0]] = 0
-
-            # cells in rest channels can proliferate
-            can_proliferate = npr.permutation(rest[rest > 0])[:(rest == 0).sum()]
-            for cell in can_proliferate:
-                if npr.random() < self.r_b:
-                    self.maxlabel += 1
-                    rest[np.where(rest == 0)[0][0]] = self.maxlabel
-                    kappa = self.props['kappa'][cell]
-                    self.props['kappa'].append(npr.normal(loc=kappa))
-
-            v_channels = npr.permutation(vel)
-            r_channels = npr.permutation(rest)
-            node = np.hstack((v_channels, r_channels))
-            self.nodes[x, :] = node
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
         self.update_dynamic_fields()
@@ -505,7 +202,7 @@ class IBLGCA_1D(LGCA_1D):
             if showprogress:
                 update_progress(1.0 * t / timesteps)
 
-    def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=0, figsize=None, prop=None, cmap='cividis'):
+    def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop=None, cmap='cividis'):
         if nodes_t is None:
             nodes_t = self.nodes_t
         if figsize is None:
@@ -594,13 +291,15 @@ if __name__ == '__main__':
     # nodes[1:, :] = 0
     # nodes[0, 1:] = 0
 
-    system = LGCA_1D(bc='reflect', dims=l, interaction='go_or_grow', density=0.2, restchannels=restchannels)
-    system.timeevo(timesteps=100, record=True)
+    system = IBLGCA_1D(bc='reflect', dims=l, interaction='go_or_grow', density=1., restchannels=restchannels)
+    system.timeevo(timesteps=4000, record=True)
     # system.plot_prop()
     # system.plot_density(figindex=1)
     # props = np.array(system.props['kappa'])[system.nodes[system.nodes > 0]]
     # print(np.mean(props))
     # system.plot_prop_timecourse()
     # plt.ylabel('$\kappa$')
-    system.plot_density()
+    # system.plot_density()
+    # system.plot_prop_spatial()
+    system.plot_prop_timecourse()
     plt.show()
