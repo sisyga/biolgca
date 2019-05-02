@@ -273,7 +273,7 @@ def excitable_medium(lgca):
     lgca.nodes = newnodes
 
 
-def go_or_grow_interaction(lgca):
+def go_or_grow(lgca):
     """
     interactions of the go-or-grow model.
     :return:
@@ -285,7 +285,7 @@ def go_or_grow_interaction(lgca):
     M1 = np.minimum(n_m, lgca.restchannels - n_r)
     M2 = np.minimum(n_r, lgca.velocitychannels - n_m)
     for coord in zip(*coords):
-        node = lgca.nodes[coord]
+        # node = lgca.nodes[coord]
         n = lgca.cell_density[coord]
 
         n_mxy = n_m[coord]

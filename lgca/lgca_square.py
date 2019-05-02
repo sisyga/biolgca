@@ -12,7 +12,7 @@ class LGCA_Square(LGCA_base):
     2D version of a LGCA on the square lattice.
     """
     interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation',
-                    'random_walk', 'excitable_medium', 'nematic', 'persistant_motion']
+                    'random_walk', 'excitable_medium', 'nematic', 'persistant_motion', 'chemotaxis', 'contact_guidance']
     velocitychannels = 4
     cix = np.array([1, 0, -1, 0], dtype=float)
     ciy = np.array([0, 1, 0, -1], dtype=float)
@@ -464,7 +464,7 @@ class LGCA_Square(LGCA_base):
         pc = PatchCollection(hexagons, match_original=True)
         ax.add_collection(pc)
         cbar = fig.colorbar(cmap, use_gridspec=True)
-        cbar.set_label('Particle flux $\\arg \\left( \\vec{J} \\right)$ $(\degree)$')
+        cbar.set_label('Particle flux $\\arg \\left( \\vec{J} \\right)$ $[\degree]$')
         cbar.set_ticks(np.arange(self.velocitychannels) * 360 / self.velocitychannels)
         return fig, pc, cmap
 
