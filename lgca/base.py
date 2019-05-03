@@ -127,12 +127,12 @@ class LGCA_base():
         self.init_coords()
 
     def set_interaction(self, **kwargs):
-        from .interactions import go_or_grow_interaction, birth, alignment, persistent_walk, chemotaxis, \
+        from .interactions import go_or_grow, birth, alignment, persistent_walk, chemotaxis, \
             contact_guidance, nematic, aggregation, wetting, random_walk, birth_death, excitable_medium
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
             if interaction == 'go_or_grow':
-                self.interaction = go_or_grow_interaction
+                self.interaction = go_or_grow
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']
                 else:
@@ -389,7 +389,8 @@ class IBLGCA_base(LGCA_base):
     props = {}
 
     def set_interaction(self, **kwargs):
-        from ib_interactions import birth, birthdeath, go_or_grow_interaction, random_walk
+        from .ib_interactions import birth, birthdeath, go_or_grow_interaction
+        from .interactions import random_walk
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
             if interaction is 'birth':
