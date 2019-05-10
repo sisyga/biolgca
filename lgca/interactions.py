@@ -211,12 +211,13 @@ def wetting(lgca, n_crit=6):
     subs_dens = 1 / (lgca.cell_density + 1)
     # subs_weight = lgca.channel_weight(subs_dens) - np.divide(1, lgca.cell_density[..., None], where=lgca.cell_density[..., None] > 0, out=np.zeros(lgca.cell_density[..., None].shape))
     g_subs = lgca.gradient(subs_dens)
-    nbs = np.clip(lgca.nb_sum(lgca.cell_density) + lgca.cell_density, a_min=None, a_max=n_crit)
-    adh_weight = lgca.channel_weight(nbs) - nbs[..., None]
+    # nbs = np.clip(lgca.nb_sum(lgca.cell_density) + lgca.cell_density, a_min=None, a_max=n_crit)
+    # adh_weight = lgca.channel_weight(nbs) - nbs[..., None]
     resting = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
     resting = lgca.nb_sum(resting)
-    resting = np.clip(resting, a_min=None, a_max=n_crit)
+    #resting = np.clip(resting, a_min=None, a_max=n_crit)
     g = lgca.calc_flux(lgca.nodes)
+    g = np.divide(g, lgca.cell_density[..., None], where=lgca.cell_density[..., None] > 0, out=np.zeros_like(g))
     g = lgca.nb_sum(g)
     # g = lgca.gradient(np.clip(lgca.cell_density.astype(float), 0, n_crit))
     for coord in zip(*coords):
@@ -225,9 +226,10 @@ def wetting(lgca, n_crit=6):
         # velocityc = permutations[:, :lgca.velocitychannels]
         restc = permutations[:, lgca.velocitychannels:]
         j = lgca.j[n]
-        weights = np.exp(
-            lgca.gamma * np.einsum('i,ij', g[coord], j) + lgca.gamma * resting[coord] * restc.sum(-1) +
-            lgca.beta * np.dot(permutations[:, :lgca.velocitychannels], adh_weight[coord]) +
+        j_nb = g[coord]
+        weights = np.exp(lgca.beta * (j_nb[0] * j[0] + j_nb[1] * j[1] + resting[coord] * restc.sum(-1)) +
+                         # lgca.gamma * np.einsum('i,ij', g[coord], j) + lgca.gamma * resting[coord] * restc.sum(-1) +
+                         #lgca.beta * np.dot(permutations[:, :lgca.velocitychannels], adh_weight[coord]) +
             lgca.alpha * np.einsum('i,ij', g_subs[coord], j)
             # lgca.alpha * np.dot(permutations[:, :lgca.velocitychannels], subs_weight[coord])
         ).cumsum()

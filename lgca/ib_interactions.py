@@ -1,5 +1,5 @@
-from base import *
-from interactions import tanh_switch
+from .base import *
+from .interactions import tanh_switch
 
 
 def birth(lgca):
