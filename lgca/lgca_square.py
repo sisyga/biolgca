@@ -46,12 +46,13 @@ class LGCA_Square(LGCA_base):
         self.x = np.arange(self.lx) + self.r_int
         self.y = np.arange(self.ly) + self.r_int
         self.xx, self.yy = np.meshgrid(self.x, self.y, indexing='ij')
+        self.nonborder = (self.xx, self.yy)
+
         self.coord_pairs = list(zip(self.xx.flat, self.yy.flat))
         self.xcoords, self.ycoords = np.meshgrid(np.arange(self.lx + 2 * self.r_int) - self.r_int,
                                                  np.arange(self.ly + 2 * self.r_int) - self.r_int, indexing='ij')
-        self.xcoords = self.xcoords[self.r_int:-self.r_int, self.r_int:-self.r_int].astype(float)
-        self.ycoords = self.ycoords[self.r_int:-self.r_int, self.r_int:-self.r_int].astype(float)
-        self.nonborder = (self.xx, self.yy)
+        self.xcoords = self.xcoords[self.nonborder].astype(float)
+        self.ycoords = self.ycoords[self.nonborder].astype(float)
 
     def propagation(self):
         """
@@ -398,7 +399,7 @@ class LGCA_Square(LGCA_base):
     def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
                      edgecolor='None'):
         if density is None:
-            density = self.cell_density[self.r_int:-self.r_int, self.r_int:-self.r_int]
+            density = self.cell_density[self.nonborder]
 
         if figsize is None:
             figsize = estimate_figsize(density, cbar=True, dy=self.dy)

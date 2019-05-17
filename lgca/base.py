@@ -125,6 +125,7 @@ class LGCA_base():
         self.r_int = r
         self.init_nodes(nodes=self.nodes[self.nonborder])
         self.init_coords()
+        self.update_dynamic_fields()
 
     def set_interaction(self, **kwargs):
         from .interactions import go_or_grow, birth, alignment, persistent_walk, chemotaxis, \

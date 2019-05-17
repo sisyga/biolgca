@@ -193,7 +193,7 @@ def aggregation(lgca):
     lgca.nodes = newnodes
 
 
-def wetting(lgca, n_crit=6):
+def wetting(lgca):
     """
     Wetting of a surface for different levels of E-cadherin
     :param n_crit:
@@ -205,21 +205,25 @@ def wetting(lgca, n_crit=6):
                (lgca.cell_density[lgca.nonborder] < lgca.K)
     coords = [a[relevant] for a in lgca.nonborder]
 
-    # g = lgca.calc_flux(lgca.nodes)
-    # g = lgca.nb_sum(g)
+
     # subs_dens = lgca.K - lgca.cell_density * 1.
     subs_dens = 1 / (lgca.cell_density + 1)
-    # subs_weight = lgca.channel_weight(subs_dens) - np.divide(1, lgca.cell_density[..., None], where=lgca.cell_density[..., None] > 0, out=np.zeros(lgca.cell_density[..., None].shape))
-    g_subs = lgca.gradient(subs_dens)
-    # nbs = np.clip(lgca.nb_sum(lgca.cell_density) + lgca.cell_density, a_min=None, a_max=n_crit)
-    # adh_weight = lgca.channel_weight(nbs) - nbs[..., None]
+    subs_weight = lgca.channel_weight(subs_dens) - \
+                  np.divide(1., lgca.cell_density[..., None], where=lgca.cell_density[..., None] > 0,
+                            out=np.zeros_like(lgca.cell_density[..., None], dtype=float))
+    # g_subs = lgca.gradient(subs_dens)
+    nbs = np.clip(lgca.nb_sum(lgca.cell_density) + lgca.cell_density, a_min=None, a_max=lgca.n_crit)
+
+    adh_weight = lgca.channel_weight(nbs) - nbs[..., None] - 1
     resting = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
     resting = lgca.nb_sum(resting)
-    #resting = np.clip(resting, a_min=None, a_max=n_crit)
+    # resting = np.clip(resting, a_min=None, a_max=lgca.n_crit)
     g = lgca.calc_flux(lgca.nodes)
-    g = np.divide(g, lgca.cell_density[..., None], where=lgca.cell_density[..., None] > 0, out=np.zeros_like(g))
     g = lgca.nb_sum(g)
-    # g = lgca.gradient(np.clip(lgca.cell_density.astype(float), 0, n_crit))
+    # g = np.divide(g, lgca.cell_density[..., None], where=lgca.cell_density[..., None]>0, out=np.zeros_like(g))
+    # g = np.divide(g, nbs[..., None], where=nbs[..., None]>0, out=np.zeros_like(g))
+
+    # g = lgca.gradient(np.clip(lgca.cell_density.astype(float), 0, lgca.n_crit))
     for coord in zip(*coords):
         n = lgca.cell_density[coord]
         permutations = lgca.permutations[n]
@@ -227,11 +231,13 @@ def wetting(lgca, n_crit=6):
         restc = permutations[:, lgca.velocitychannels:]
         j = lgca.j[n]
         j_nb = g[coord]
-        weights = np.exp(lgca.beta * (j_nb[0] * j[0] + j_nb[1] * j[1] + resting[coord] * restc.sum(-1)) +
-                         # lgca.gamma * np.einsum('i,ij', g[coord], j) + lgca.gamma * resting[coord] * restc.sum(-1) +
-                         #lgca.beta * np.dot(permutations[:, :lgca.velocitychannels], adh_weight[coord]) +
-            lgca.alpha * np.einsum('i,ij', g_subs[coord], j)
-            # lgca.alpha * np.dot(permutations[:, :lgca.velocitychannels], subs_weight[coord])
+        weights = np.exp(  # -lgca.beta * nbs[coord] * np.linalg.norm(j - j_nb[:, None], axis=0) / lgca.n_crit
+            lgca.beta / lgca.velocitychannels / 4 * (
+                        j_nb[0] * j[0] + j_nb[1] * j[1] + resting[coord] * restc.sum(-1) * 4 / lgca.restchannels ** 2)
+            # + lgca.gamma * np.einsum('i,ij', g[coord], j) + lgca.gamma * resting[coord] * restc.sum(-1)
+            + lgca.beta * np.dot(permutations[:, :lgca.velocitychannels], adh_weight[coord]) / lgca.n_crit
+            # + lgca.alpha * np.einsum('i,ij', g_subs[coord], j)
+            + lgca.alpha * np.dot(permutations[:, :lgca.velocitychannels], subs_weight[coord])
         ).cumsum()
         ind = bisect_left(weights, random() * weights[-1])
         newnodes[coord] = permutations[ind]
