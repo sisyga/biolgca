@@ -119,7 +119,7 @@ class LGCA_Square(LGCA_base):
     def calc_vorticity(self, nodes):
         flux = self.calc_flux(nodes)
         dens = nodes.sum(-1)
-        flux = np.divide(flux, dens[..., None], where=dens > 0, out=np.zeros_like(flux))
+        flux = np.divide(flux, dens[..., None], where=dens[..., None] > 0, out=np.zeros_like(flux))
         fx, fy = flux[..., 0], flux[..., 1]
         dfx = self.gradient(fx)
         dfy = self.gradient(fy)
