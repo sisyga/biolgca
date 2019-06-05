@@ -76,20 +76,20 @@ class LGCA_Square(LGCA_base):
 
         self.nodes = newnodes
 
-    def apply_pbc(self):
+    def apply_pbc(self):        #periodic bc
         self.nodes[:self.r_int, ...] = self.nodes[-2 * self.r_int:-self.r_int, ...]  # left boundary
         self.nodes[-self.r_int:, ...] = self.nodes[self.r_int:2 * self.r_int, ...]  # right boundary
         self.nodes[:, :self.r_int, :] = self.nodes[:, -2 * self.r_int:-self.r_int, :]  # upper boundary
         self.nodes[:, -self.r_int:, :] = self.nodes[:, self.r_int:2 * self.r_int, :]  # lower boundary
 
-    def apply_rbc(self):
+    def apply_rbc(self):        #refelecting bc
         self.nodes[self.r_int, :, 0] += self.nodes[self.r_int - 1, :, 2]
         self.nodes[-self.r_int - 1, :, 2] += self.nodes[-self.r_int, :, 0]
         self.nodes[:, self.r_int, 1] += self.nodes[:, self.r_int - 1, 3]
         self.nodes[:, -self.r_int - 1, 3] += self.nodes[:, -self.r_int, 1]
         self.apply_abc()
 
-    def apply_abc(self):
+    def apply_abc(self):        #absorbing bc
         self.nodes[:self.r_int, ...] = 0
         self.nodes[-self.r_int:, ...] = 0
         self.nodes[:, :self.r_int, :] = 0

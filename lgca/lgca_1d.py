@@ -31,7 +31,7 @@ class LGCA_1D(LGCA_base):
         self.K = self.velocitychannels + self.restchannels
 
     def init_nodes(self, density, nodes=None):
-        self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.bool)
+
         if nodes is None:
             self.random_reset(density)
 
@@ -39,7 +39,7 @@ class LGCA_1D(LGCA_base):
             self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.bool)
 
     def init_coords(self):
-        self.nonborder = (np.arange(self.l) + self.r_int,)
+        self.nonborder = (np.arange(self.l) + self.r_int,)      #TODO Komma berechtigt?
         self.xcoords = np.arange(self.l + 2 * self.r_int) - self.r_int
 
     def propagation(self):
@@ -203,12 +203,13 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             nodes_t = self.nodes_t
         if figsize is None:
             figsize = estimate_figsize(nodes_t.sum(-1).T, cbar=True)
-
         if props_t is None:
             props_t = self.props_t
-
         if prop is None:
             prop = list(props_t[0].keys())[0]
+        elif prop == 'lab_m':
+            prop = list(props_t[0].keys())[1]
+            cmap = 'nipy_spectral'
 
         tmax, l, _ = nodes_t.shape
         mean_prop = np.zeros((tmax, l))
@@ -218,7 +219,6 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                 occ = node.astype(np.bool)
                 if occ.sum() == 0:
                     continue
-
                 mean_prop[t, x] = np.mean(np.array(props_t[t][prop])[node[node > 0]])
 
         dens_t = nodes_t.astype(bool).sum(-1)
@@ -233,7 +233,10 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         sm = plt.cm.ScalarMappable(cmap=cmap)
         sm.set_array([vmin, vmax])
         cbar = plt.colorbar(sm, use_gridspec=True)
-        cbar.set_label(r'Property ${}$'.format(prop))
+        if prop is 'lab_m':
+            cbar.set_label(r'ancestor')
+        else:
+            cbar.set_label(r'Property ${}$'.format(prop))
 
         plt.xlabel(r'Lattice node $r \, [\varepsilon]$')
         plt.ylabel(r'Time step $k \, [\tau]$')

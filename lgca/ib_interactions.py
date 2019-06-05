@@ -1,5 +1,5 @@
-from base import *
-from interactions import tanh_switch
+from .base import *
+from .interactions import tanh_switch
 
 
 def birth(lgca):
@@ -30,17 +30,18 @@ def birth(lgca):
             n -= 1
 
         # distribute daughter cells randomly in channels
-        dn = proliferating.sum()
+        #dn = proliferating.sum()
         for label in node[proliferating]:
             p = 1. - lgca.occupied[coord]
             Z = p.sum()
             p /= Z
             ind = npr.choice(inds, p=p)
+
             lgca.maxlabel += 1
             node[ind] = lgca.maxlabel
             r_b = lgca.props['r_b'][label]
             lgca.props['r_b'].append(npr.normal(loc=r_b, scale=0.2 * r_b))
-            dn -= 1
+            #dn -= 1
 
         lgca.nodes[coord] = node
         npr.shuffle(lgca.nodes[coord])
@@ -137,3 +138,87 @@ def go_or_grow_interaction(lgca):
         r_channels = npr.permutation(rest)
         node = np.hstack((v_channels, r_channels))
         lgca.nodes[coord] = node
+
+def inheritance_old(lgca):  #TODO: löschen?
+    """label_mother, r_b = const"""
+
+    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
+               (lgca.cell_density[lgca.nonborder] < lgca.K)
+    coords = [a[relevant] for a in lgca.nonborder]
+    inds = np.arange(lgca.K)
+    for coord in zip(*coords):
+        n = lgca.cell_density[coord]
+        node = lgca.nodes[coord]
+
+        # choose cells that proliferate
+        r_bs = [lgca.props['r_b'][i] for i in node]
+        proliferating = npr.random(lgca.K) < r_bs
+        dn = proliferating.sum()
+        n += dn
+        # assure that there are not too many cells. if there are, randomly kick enough of them
+        while n > lgca.K:
+            p = proliferating.astype(float)
+            Z = p.sum()
+            p /= Z
+            ind = npr.choice(inds, p=p)
+            proliferating[ind] = 0
+            n -= 1
+
+        # distribute daughter cells randomly in channels
+        #dn = proliferating.sum()
+        for label in node[proliferating]:
+            p = 1. - lgca.occupied[coord]
+            Z = p.sum()
+            p /= Z
+            ind = npr.choice(inds, p=p)
+
+            lgca.maxlabel += 1
+            node[ind] = lgca.maxlabel
+            r_b = lgca.props['r_b'][label]
+            lgca.props['r_b'].append(npr.normal(loc=r_b, scale=0.2 * r_b))
+            #dn -= 1
+
+        lgca.nodes[coord] = node
+        npr.shuffle(lgca.nodes[coord])
+
+def inheritance(lgca):
+    """
+    r_b = const
+    r_d = const
+    -> label der Zellen zu t = 0 als Ur..urahn
+    """
+    # death process
+    dying = npr.random(lgca.nodes.shape) < lgca.r_d
+    lgca.nodes[dying] = 0
+    # birth
+    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
+               (lgca.cell_density[lgca.nonborder] < lgca.K)
+    coords = [a[relevant] for a in lgca.nonborder]
+    inds = np.arange(lgca.K)
+    for coord in zip(*coords):
+        #n = lgca.cell_density[coord]
+        node = lgca.nodes[coord]
+
+        # choose cells that proliferate
+        r_bs = [lgca.props['r_b'][i] for i in node]
+        proliferating = npr.random(lgca.K) < r_bs
+
+        # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
+        for label in node[proliferating]:
+            ind = npr.choice(lgca.K)
+            if lgca.occupied[coord, ind] == 0:
+                lgca.maxlabel += 1
+                node[ind] = lgca.maxlabel
+                if lgca.props['lab_m'][label] == 0:
+                    lgca.props['lab_m'].append(label)
+                else:
+                    lgca.props['lab_m'].append(lgca.props['lab_m'][label])
+                if lgca.variation:
+                    r_b = lgca.props['r_b'][label]
+                    lgca.props['r_b'].append(np.clip(npr.normal(loc=r_b, scale=lgca.std), 0, 1))
+                else:
+                    lgca.props['r_b'].append(lgca.r_b)
+        lgca.nodes[coord] = node
+        npr.shuffle(lgca.nodes[coord])
+    #print('maxlabel t++', lgca.maxlabel)
+

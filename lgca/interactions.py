@@ -44,6 +44,7 @@ def birth(lgca):
     :return:
     """
     birth = npr.random(lgca.nodes.shape) < lgca.r_b * lgca.cell_density[..., None] / lgca.K
+        # birth = true or false, birth.shape = lgca.nodes.shape
     np.add(lgca.nodes, (1 - lgca.nodes) * birth, out=lgca.nodes, casting='unsafe')
     random_walk(lgca)
 

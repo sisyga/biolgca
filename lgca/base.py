@@ -387,9 +387,10 @@ class IBLGCA_base(LGCA_base):
     Base class for identity-based LGCA.
     """
     props = {}
+    label_mother = {}
 
     def set_interaction(self, **kwargs):
-        from .ib_interactions import birth, birthdeath, go_or_grow_interaction
+        from .ib_interactions import birth, birthdeath, go_or_grow_interaction, inheritance
         from .interactions import random_walk
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
@@ -402,7 +403,7 @@ class IBLGCA_base(LGCA_base):
                     print('birth rate set to r_b = ', self.r_b)
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
 
-            if interaction is 'birthdeath':
+            elif interaction is 'birthdeath':
                 self.interaction = birthdeath
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
@@ -422,7 +423,7 @@ class IBLGCA_base(LGCA_base):
                     self.std = 0.1
                     print('standard deviation set to = ', self.std)
 
-            if interaction is 'go_or_grow':
+            elif interaction is 'go_or_grow':
                 self.interaction = go_or_grow_interaction
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']
@@ -460,6 +461,35 @@ class IBLGCA_base(LGCA_base):
 
             elif interaction is 'random_walk':
                 self.interaction = random_walk
+
+            elif interaction is 'inheritance':
+                self.interaction = inheritance
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                else:
+                    self.r_b = 0.2
+                    print('birth rate set to r_b = ', self.r_b)
+                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+
+                if 'r_d' in kwargs:
+                    self.r_d = kwargs['r_d']
+                else:
+                    self.r_d = 0.02
+                    print('death rate set to r_d = ', self.r_d)
+
+                if 'std' in kwargs:
+                    self.std = kwargs['std']
+                else:
+                    self.std = 0.1
+                    print('standard deviation set to = ', self.std)
+                self.props.update(lab_m=[0] + [0] * self.maxlabel)
+
+                if 'variation' in kwargs:
+                    self.variation = kwargs['variation']
+                else:
+                    self.variation = False
+                    print('set to no variation')
+                self.maxlabel_init = self.maxlabel
 
             else:
                 print('keyword', interaction, 'is not defined! Random walk used instead.')
