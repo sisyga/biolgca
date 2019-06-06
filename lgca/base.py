@@ -387,7 +387,6 @@ class IBLGCA_base(LGCA_base):
     Base class for identity-based LGCA.
     """
     props = {}
-    label_mother = {}
 
     def set_interaction(self, **kwargs):
         from .ib_interactions import birth, birthdeath, go_or_grow_interaction, inheritance
@@ -483,6 +482,7 @@ class IBLGCA_base(LGCA_base):
                     self.std = 0.1
                     print('standard deviation set to = ', self.std)
                 self.props.update(lab_m=[0] + [0] * self.maxlabel)
+                self.props.update(num_off=[0] + [0] * self.maxlabel)
 
                 if 'variation' in kwargs:
                     self.variation = kwargs['variation']

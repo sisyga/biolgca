@@ -158,7 +158,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
     """
     1D version of an identity-based LGCA.
     """
-    interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath']
+    interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath', 'inheritance']
 
     def init_nodes(self, density, nodes=None):
         self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.uint)
@@ -207,9 +207,6 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             props_t = self.props_t
         if prop is None:
             prop = list(props_t[0].keys())[0]
-        elif prop == 'lab_m':
-            prop = list(props_t[0].keys())[1]
-            cmap = 'nipy_spectral'
 
         tmax, l, _ = nodes_t.shape
         mean_prop = np.zeros((tmax, l))
@@ -233,10 +230,10 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         sm = plt.cm.ScalarMappable(cmap=cmap)
         sm.set_array([vmin, vmax])
         cbar = plt.colorbar(sm, use_gridspec=True)
-        if prop is 'lab_m':
-            cbar.set_label(r'ancestor')
-        else:
-            cbar.set_label(r'Property ${}$'.format(prop))
+       # if prop is 'lab_m':
+         #   cbar.set_label(r'ancestor')
+        #else:
+        cbar.set_label(r'Property ${}$'.format(prop))
 
         plt.xlabel(r'Lattice node $r \, [\varepsilon]$')
         plt.ylabel(r'Time step $k \, [\tau]$')

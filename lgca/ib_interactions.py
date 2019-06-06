@@ -183,9 +183,7 @@ def inheritance_old(lgca):  #TODO: löschen?
 
 def inheritance(lgca):
     """
-    r_b = const
     r_d = const
-    -> label der Zellen zu t = 0 als Ur..urahn
     """
     # death process
     dying = npr.random(lgca.nodes.shape) < lgca.r_d
@@ -209,10 +207,17 @@ def inheritance(lgca):
             if lgca.occupied[coord, ind] == 0:
                 lgca.maxlabel += 1
                 node[ind] = lgca.maxlabel
+                #print('{} is born', lgca.maxlabel)
                 if lgca.props['lab_m'][label] == 0:
                     lgca.props['lab_m'].append(label)
+                    #TODO lgca.props['num_off'][label] += 1
+                    #print('with ancestor ', label)
                 else:
                     lgca.props['lab_m'].append(lgca.props['lab_m'][label])
+                   #TODO lgca.props['num_off'][lgca.props['lab_m'][label]] += 1
+
+                    #print('with ancestor ', lgca.props['lab_m'][label])
+                #print('(check?) with ancestor ', lgca.props['lab_m'][lgca.maxlabel.astype(int)])
                 if lgca.variation:
                     r_b = lgca.props['r_b'][label]
                     lgca.props['r_b'].append(np.clip(npr.normal(loc=r_b, scale=lgca.std), 0, 1))
