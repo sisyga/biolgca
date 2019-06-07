@@ -193,6 +193,7 @@ def aggregation(lgca):
     lgca.nodes = newnodes
 
 
+
 def wetting(lgca):
     """
     Wetting of a surface for different levels of E-cadherin
@@ -200,14 +201,15 @@ def wetting(lgca):
     :param lgca:
     :return:
     """
-    k_rest = (lgca.n_crit + 1) / (lgca.velocitychannels + 1)
-    rho = lgca.cell_density[..., None] / lgca.K
-    birth = npr.random(lgca.nodes.shape) < lgca.r_b * rho / (1 - rho)
-    nbs = lgca.nb_sum(lgca.cell_density) + lgca.cell_density - 1
-    nbs /= lgca.n_crit
-    death = npr.random(lgca.nodes.shape) < lgca.r_b * nbs[..., None]
-    ds = (1 - lgca.nodes) * birth - lgca.nodes * death
-    np.add(lgca.nodes, ds, out=lgca.nodes, casting='unsafe')
+    rho0 = (lgca.n_crit + 1) / (lgca.velocitychannels + 1)
+    # birth-death stuff - neglect for now
+    rho = lgca.cell_density[lgca.spheroid, None] / lgca.K
+    birth = npr.random(lgca.nodes[lgca.spheroid].shape) < lgca.r_b / (1 - rho) / lgca.K
+    # nbs = lgca.nb_sum(lgca.cell_density) + lgca.cell_density - 1
+    # nbs /= lgca.n_crit
+    death = npr.random(lgca.nodes[lgca.spheroid].shape) < lgca.r_b / rho0
+    ds = (1 - lgca.nodes[lgca.spheroid]) * birth - lgca.nodes[lgca.spheroid] * death
+    lgca.nodes[lgca.spheroid, :] = np.add(lgca.nodes[lgca.spheroid, :], ds, casting='unsafe')
     lgca.update_dynamic_fields()
     newnodes = lgca.nodes.copy()
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
@@ -215,18 +217,20 @@ def wetting(lgca):
     coords = [a[relevant] for a in lgca.nonborder]
 
     # subs_dens = lgca.K - lgca.cell_density * 1.
-    subs_dens = 1 / (lgca.cell_density + 1)
+    subs_dens = 1 / (lgca.cell_density - rho0 + 1)
     subs_weight = lgca.channel_weight(subs_dens) - \
                   np.divide(1., lgca.cell_density[..., None], where=lgca.cell_density[..., None] > 0,
                             out=np.zeros_like(lgca.cell_density[..., None], dtype=float))
-    # g_subs = lgca.gradient(subs_dens)
+    #g_subs = lgca.gradient(subs_dens)
     # nbs = np.clip(lgca.nb_sum(lgca.cell_density) + lgca.cell_density, a_min=None, a_max=lgca.n_crit)
     nbs = lgca.nb_sum(lgca.cell_density) + lgca.cell_density
-    nbs *= (1 - nbs / lgca.n_crit / 2) * np.heaviside(1 - nbs / lgca.n_crit / 2, 0) / lgca.n_crit
+    nbs *= (1 - nbs / lgca.n_crit / 2) * np.heaviside(1 - nbs / lgca.n_crit / 2, 0) / lgca.n_crit * 2
     adh_weight = lgca.channel_weight(nbs) - nbs[..., None]
+    pressure = np.clip(lgca.cell_density - rho0 + 1, a_min=0, a_max=None)
+    pressure_weight = np.clip(lgca.cell_density[..., None] - rho0, a_min=0, a_max=None) - lgca.channel_weight(pressure)
     resting = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
     resting = lgca.nb_sum(resting)
-    #resting = np.clip(resting, a_min=0, a_max=lgca.n_crit)
+    #resting = np.clip(resting, a_min=0, a_max=lgca.velocitychannels * rho0) / lgca.velocitychannels * rho0
     # resting = np.clip(resting, a_min=None, a_max=lgca.n_crit)
     g = lgca.calc_flux(lgca.nodes)
     g = lgca.nb_sum(g)
@@ -244,10 +248,10 @@ def wetting(lgca):
         j_nb = g[coord]
         weights = np.exp(  # -lgca.beta * nbs[coord] * np.linalg.norm(j - j_nb[:, None], axis=0) / lgca.n_crit
             lgca.beta * (j_nb[0] * j[0] + j_nb[1] * j[1]) / lgca.velocitychannels / 2
-            + lgca.beta * resting[coord] * restc * (1 - restc / k_rest / 2) * 2 / lgca.velocitychannels / k_rest
-            + lgca.beta * np.dot(permutations[:, :lgca.velocitychannels],
-                                 adh_weight[coord])  # * np.heaviside(1 - nbs[coord] / lgca.n_crit, 0)
+            + lgca.beta * resting[coord] * restc / lgca.velocitychannels / rho0 * (1 - restc / rho0 / 2) * 2
+            + lgca.beta * np.dot(permutations[:, :lgca.velocitychannels], adh_weight[coord])
             # + lgca.alpha * np.einsum('i,ij', g_subs[coord], j)
+            + lgca.gamma * np.dot(permutations[:, :lgca.velocitychannels], pressure_weight[coord])
             + lgca.alpha * np.dot(permutations[:, :lgca.velocitychannels], subs_weight[coord])
         ).cumsum()
         # print('Alignment:', (j_nb[0] * j[0] + j_nb[1] * j[1]) / 4 / lgca.velocitychannels)
