@@ -61,28 +61,26 @@ class LGCA_Hex(LGCA_Square):
         self.nodes = newcellnodes
         return self.nodes
 
-    def apply_pbc(self):
-        self.nodes[:self.r_int, ...] = self.nodes[-2 * self.r_int:-self.r_int, ...]  # left boundary
-        self.nodes[-self.r_int:, ...] = self.nodes[self.r_int:2 * self.r_int, ...]  # right boundary
-        self.nodes[:, :self.r_int, :] = self.nodes[:, -2 * self.r_int:-self.r_int, :]  # upper boundary
-        self.nodes[:, -self.r_int:, :] = self.nodes[:, self.r_int:2 * self.r_int, :]  # lower boundary
-
-    def apply_rbc(self):
-        lx, ly, _ = self.nodes.shape
+    def apply_rbcx(self):
         # left boundary
         self.nodes[self.r_int, :, 0] += self.nodes[self.r_int - 1, :, 3]
         self.nodes[self.r_int, 2:-1:2, 1] += self.nodes[self.r_int - 1, 1:-2:2, 4]
         self.nodes[self.r_int, 2:-1:2, 5] += self.nodes[self.r_int - 1, 3::2, 2]
 
-        # lower boundary
-        self.nodes[(1 - (self.r_int % 2)):, self.r_int, 1] += self.nodes[:lx - (1 - (self.r_int % 2)), self.r_int - 1,
-                                                              4]
-        self.nodes[:lx - (self.r_int % 2), self.r_int, 2] += self.nodes[(self.r_int % 2):, self.r_int - 1, 5]
-
         # right boundary
         self.nodes[-self.r_int - 1, :, 3] += self.nodes[-self.r_int, :, 0]
         self.nodes[-self.r_int - 1, 1:-1:2, 4] += self.nodes[-self.r_int, 2::2, 1]
         self.nodes[-self.r_int - 1, 1:-1:2, 2] += self.nodes[-self.r_int, :-2:2, 5]
+
+        self.apply_abcx()
+
+    def apply_rbcy(self):
+        lx, ly, _ = self.nodes.shape
+
+        # lower boundary
+        self.nodes[(1 - (self.r_int % 2)):, self.r_int, 1] += self.nodes[:lx - (1 - (self.r_int % 2)), self.r_int - 1,
+                                                              4]
+        self.nodes[:lx - (self.r_int % 2), self.r_int, 2] += self.nodes[(self.r_int % 2):, self.r_int - 1, 5]
 
         # upper boundary
         self.nodes[:lx - ((ly - 1 - self.r_int) % 2), -self.r_int - 1, 4] += self.nodes[((ly - 1 - self.r_int) % 2):,
@@ -90,13 +88,7 @@ class LGCA_Hex(LGCA_Square):
         self.nodes[(1 - ((ly - 1 - self.r_int) % 2)):, -self.r_int - 1, 5] += self.nodes[
                                                                               :lx - (1 - ((ly - 1 - self.r_int) % 2)),
                                                                               -self.r_int, 2]
-        self.apply_abc()
-
-    def apply_abc(self):
-        self.nodes[:self.r_int, ...] = 0
-        self.nodes[-self.r_int:, ...] = 0
-        self.nodes[:, :self.r_int, :] = 0
-        self.nodes[:, -self.r_int:, :] = 0
+        self.apply_abcy()
 
     def gradient(self, qty):
         gx = np.zeros_like(qty, dtype=float)

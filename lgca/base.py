@@ -269,6 +269,12 @@ class LGCA_base():
                     self.alpha = 2.
                     print('substrate sensitivity set to alpha = ', self.alpha)
 
+                if 'gamma' in kwargs:
+                    self.gamma = kwargs['gamma']
+                else:
+                    self.gamma = 2.
+                    print('pressure sensitivity set to gamma = ', self.gamma)
+
             elif interaction == 'random_walk':
                 self.interaction = random_walk
 
@@ -325,12 +331,14 @@ class LGCA_base():
             self.interaction = random_walk
 
     def set_bc(self, bc):
-        if bc in ['absorbing', 'absorb', 'abs']:
+        if bc in ['absorbing', 'absorb', 'abs', 'abc']:
             self.apply_boundaries = self.apply_abc
-        elif bc in ['reflecting', 'reflect', 'refl']:
+        elif bc in ['reflecting', 'reflect', 'refl', 'rbc']:
             self.apply_boundaries = self.apply_rbc
         elif bc in ['periodic', 'pbc']:
             self.apply_boundaries = self.apply_pbc
+        elif bc in ['inflow']:
+            self.apply_boundaries = self.apply_inflowbc
         else:
             print(bc, 'not defined, using periodic boundaries')
             self.apply_boundaries = self.apply_pbc
