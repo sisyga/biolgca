@@ -4,7 +4,7 @@ import matplotlib.ticker as mticker
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
 
-from .base import *
+from lgca.base import *
 
 
 class LGCA_Square(LGCA_base):
