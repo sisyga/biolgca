@@ -1,5 +1,5 @@
-from base import *
-from interactions import tanh_switch
+from .base import *
+from .interactions import tanh_switch
 
 
 def birth(lgca):
@@ -11,15 +11,23 @@ def birth(lgca):
                (lgca.cell_density[lgca.nonborder] < lgca.K)
     coords = [a[relevant] for a in lgca.nonborder]
     inds = np.arange(lgca.K)
+        # (0 1 ... K)
     for coord in zip(*coords):
+        # for each relevant node
         n = lgca.cell_density[coord]
+            # number of occupied channels
         node = lgca.nodes[coord]
+            # vector of channels filled with zeros or indices /? ones
 
         # choose cells that proliferate
         r_bs = [lgca.props['r_b'][i] for i in node]
+            # i is the identifier of the cell
+            # birth rates of all cells in that node
         proliferating = npr.random(lgca.K) < r_bs
+            # which cells attempt birth, depends on birth rate
         dn = proliferating.sum()
         n += dn
+
         # assure that there are not too many cells. if there are, randomly kick enough of them
         while n > lgca.K:
             p = proliferating.astype(float)
@@ -31,6 +39,7 @@ def birth(lgca):
 
         # distribute daughter cells randomly in channels
         dn = proliferating.sum()
+        # REPEATED
         for label in node[proliferating]:
             p = 1. - lgca.occupied[coord]
             Z = p.sum()
@@ -87,16 +96,20 @@ def go_or_grow_interaction(lgca):
     """
     # death
     dying = npr.random(lgca.nodes.shape) < lgca.r_d
+        # nodes.shape ?
     lgca.nodes[dying] = 0
     # birth
     lgca.update_dynamic_fields()
     n_m = lgca.occupied[:, :2].sum(-1)
+        # array has only 2 dimensions and there are only 2 velo channels because 1 D geometry
     n_r = lgca.occupied[:, 2:].sum(-1)
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
                (lgca.cell_density[lgca.nonborder] < lgca.K)
+        # only relevant if not full or empty
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
         node = lgca.nodes[coord]
+            # unnecessary?
         vel = node[:lgca.velocitychannels]
         rest = node[lgca.velocitychannels:]
         n = lgca.cell_density[coord]
