@@ -1,6 +1,6 @@
 import matplotlib.ticker as mticker
 
-from .base import *
+from lgca.base import *
 
 
 class LGCA_1D(LGCA_base):
@@ -288,7 +288,7 @@ if __name__ == '__main__':
     # nodes[0, 1:] = 0
 
     system = IBLGCA_1D(bc='reflect', dims=l, interaction='go_or_grow', density=1., restchannels=restchannels)
-    system.timeevo(timesteps=4000, record=True)
+    system.timeevo(timesteps=100, record=True)
     # system.plot_prop()
     # system.plot_density(figindex=1)
     # props = np.array(system.props['kappa'])[system.nodes[system.nodes > 0]]
@@ -296,6 +296,6 @@ if __name__ == '__main__':
     # system.plot_prop_timecourse()
     # plt.ylabel('$\kappa$')
     # system.plot_density()
-    # system.plot_prop_spatial()
-    system.plot_prop_timecourse()
+    system.plot_prop_spatial()
+    #system.plot_prop_timecourse()
     plt.show()
