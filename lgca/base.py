@@ -115,7 +115,7 @@ class LGCA_base():
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
         self.set_bc(bc)
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
-        self.init_nodes(density, nodes=nodes)
+        self.init_nodes(density=density, nodes=nodes)
         self.init_coords()
         self.set_interaction(**kwargs)
         self.cell_density = self.nodes.sum(-1)
@@ -125,6 +125,7 @@ class LGCA_base():
         self.r_int = r
         self.init_nodes(nodes=self.nodes[self.nonborder])
         self.init_coords()
+        self.update_dynamic_fields()
 
     def set_interaction(self, **kwargs):
         from .interactions import go_or_grow, birth, alignment, persistent_walk, chemotaxis, \
@@ -261,12 +262,6 @@ class LGCA_base():
                 else:
                     self.beta = 2.
                     print('adhesion sensitivity set to beta = ', self.beta)
-
-                if 'gamma' in kwargs:
-                    self.gamma = kwargs['gamma']
-                else:
-                    self.gamma = 2.
-                    print('alignment sensitivity set to gamma = ', self.gamma)
 
                 if 'alpha' in kwargs:
                     self.alpha = kwargs['alpha']

@@ -172,16 +172,16 @@ class LGCA_Hex(LGCA_Square):
 if __name__ == '__main__':
     lx = 50
     ly = lx
-    restchannels = 3
+    restchannels = 2
     nodes = np.zeros((lx, ly, 6 + restchannels))
     # nodes[2, 0, 0] = 1
     # nodes[...] = 1
-    nodes[:lx // 2, :, -3:] = 1
+    nodes[:lx // 2, :, -2:] = 1
     # nodes[..., -1] = 1
     # nodes[:, ly//2:, 6:] = 1
     # nodes[0, :, :4] = 1
-    lgca = LGCA_Hex(nodes=nodes, restchannels=restchannels, dims=(lx, ly), density=0.5 / (6 + restchannels), bc='pbc',
-                    interaction='go_or_grow', beta=2., alpha=2, gamma=0.5)
+    lgca = LGCA_Hex(restchannels=restchannels, dims=(lx, ly), density=0.5 / (6 + restchannels), bc='pbc',
+                    interaction='wetting', beta=2., alpha=2, gamma=0.5)
     # lgca.set_interaction('contact_guidance', beta=2)
     # cProfile.run('lgca.timeevo(timesteps=1000)')
     # lgca.timeevo(timesteps=100, record=True)
@@ -194,7 +194,7 @@ if __name__ == '__main__':
 
     # ani = lgca.live_animate_density(interval=100, vmax=lgca.restchannels, channels=range(6, lgca.K))
     # ani2 = lgca.live_animate_density(interval=100, vmax=lgca.velocitychannels, channels=range(6))
-    # ani = lgca.live_animate_flux()
+    ani = lgca.live_animate_flux()
     # ani = lgca.live_animate_flow()
     ani = lgca.live_animate_density()
     # plt.streamplot(lgca.xcoords[:, 0], lgca.ycoords[-1], lgca.g[1:-1, 1:-1, 0].T, lgca.g[1:-1, 1:-1, 1].T, density=.5,
