@@ -405,7 +405,7 @@ class IBLGCA_base(LGCA_base):
                     print('birth rate set to r_b = ', self.r_b)
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
 
-            if interaction is 'birthdeath':
+            elif interaction is 'birthdeath':
                 self.interaction = birthdeath
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
@@ -425,7 +425,7 @@ class IBLGCA_base(LGCA_base):
                     self.std = 0.1
                     print('standard deviation set to = ', self.std)
 
-            if interaction is 'go_or_grow':
+            elif interaction is 'go_or_grow':
                 self.interaction = go_or_grow_interaction
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']
