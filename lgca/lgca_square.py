@@ -46,12 +46,13 @@ class LGCA_Square(LGCA_base):
         self.x = np.arange(self.lx) + self.r_int
         self.y = np.arange(self.ly) + self.r_int
         self.xx, self.yy = np.meshgrid(self.x, self.y, indexing='ij')
+        self.nonborder = (self.xx, self.yy)
+
         self.coord_pairs = list(zip(self.xx.flat, self.yy.flat))
         self.xcoords, self.ycoords = np.meshgrid(np.arange(self.lx + 2 * self.r_int) - self.r_int,
                                                  np.arange(self.ly + 2 * self.r_int) - self.r_int, indexing='ij')
-        self.xcoords = self.xcoords[self.r_int:-self.r_int, self.r_int:-self.r_int].astype(float)
-        self.ycoords = self.ycoords[self.r_int:-self.r_int, self.r_int:-self.r_int].astype(float)
-        self.nonborder = (self.xx, self.yy)
+        self.xcoords = self.xcoords[self.nonborder].astype(float)
+        self.ycoords = self.ycoords[self.nonborder].astype(float)
 
     def propagation(self):
         """
@@ -76,24 +77,60 @@ class LGCA_Square(LGCA_base):
 
         self.nodes = newnodes
 
-    def apply_pbc(self):        #periodic bc
+    def apply_pbcx(self):
         self.nodes[:self.r_int, ...] = self.nodes[-2 * self.r_int:-self.r_int, ...]  # left boundary
         self.nodes[-self.r_int:, ...] = self.nodes[self.r_int:2 * self.r_int, ...]  # right boundary
+
+    def apply_pbcy(self):
         self.nodes[:, :self.r_int, :] = self.nodes[:, -2 * self.r_int:-self.r_int, :]  # upper boundary
         self.nodes[:, -self.r_int:, :] = self.nodes[:, self.r_int:2 * self.r_int, :]  # lower boundary
 
-    def apply_rbc(self):        #refelecting bc
+    def apply_pbc(self):
+        self.apply_pbcx()
+        self.apply_pbcy()
+
+    def apply_rbcx(self):
         self.nodes[self.r_int, :, 0] += self.nodes[self.r_int - 1, :, 2]
         self.nodes[-self.r_int - 1, :, 2] += self.nodes[-self.r_int, :, 0]
+        self.apply_abcx()
+
+    def apply_rbcy(self):
         self.nodes[:, self.r_int, 1] += self.nodes[:, self.r_int - 1, 3]
         self.nodes[:, -self.r_int - 1, 3] += self.nodes[:, -self.r_int, 1]
-        self.apply_abc()
+        self.apply_abcy()
 
-    def apply_abc(self):        #absorbing bc
+    def apply_rbc(self):
+        self.apply_rbcx()
+        self.apply_rbcy()
+
+    def apply_abcx(self):
         self.nodes[:self.r_int, ...] = 0
         self.nodes[-self.r_int:, ...] = 0
+
+    def apply_abcy(self):
         self.nodes[:, :self.r_int, :] = 0
         self.nodes[:, -self.r_int:, :] = 0
+
+    def apply_abc(self):
+        self.apply_abcx()
+        self.apply_abcy()
+
+    def apply_inflowbc(self):
+        """
+        Boundary condition for a inflow from x=0, y=:, with reflecting boundary conditions along the y-axis and periodic
+        boundaries along the x-axis. Nodes at (x=0, y) are set to a homogeneous state with a constant average density
+        given by the attribute 0 <= self.inflow <= 1.
+        If there is no such attribute, the nodes are filled with the maximum density.
+        :return:
+        """
+        if hasattr(self, 'inflow'):
+            self.nodes[:, self.r_int, ...] = npr.random(self.nodes[0].shape) < self.inflow
+
+        else:
+            self.nodes[:, self.r_int, ...] = 1
+
+        self.apply_rbc()
+        # self.apply_pbcy()
 
     def nb_sum(self, qty):
         sum = np.zeros(qty.shape)
@@ -118,7 +155,7 @@ class LGCA_Square(LGCA_base):
     def calc_vorticity(self, nodes):
         flux = self.calc_flux(nodes)
         dens = nodes.sum(-1)
-        flux = np.divide(flux, dens[..., None], where=dens > 0, out=np.zeros_like(flux))
+        flux = np.divide(flux, dens[..., None], where=dens[..., None] > 0, out=np.zeros_like(flux))
         fx, fy = flux[..., 0], flux[..., 1]
         dfx = self.gradient(fx)
         dfy = self.gradient(fy)
@@ -398,7 +435,7 @@ class LGCA_Square(LGCA_base):
     def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
                      edgecolor='None'):
         if density is None:
-            density = self.cell_density[self.r_int:-self.r_int, self.r_int:-self.r_int]
+            density = self.cell_density[self.nonborder]
 
         if figsize is None:
             figsize = estimate_figsize(density, cbar=True, dy=self.dy)
