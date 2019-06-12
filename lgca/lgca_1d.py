@@ -39,7 +39,7 @@ class LGCA_1D(LGCA_base):
             self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.bool)
 
     def init_coords(self):
-        self.nonborder = (np.arange(self.l) + self.r_int,)      #TODO Komma berechtigt?
+        self.nonborder = (np.arange(self.l) + self.r_int,)      #TODO Komma?
         self.xcoords = np.arange(self.l + 2 * self.r_int) - self.r_int
 
     def propagation(self):
@@ -209,14 +209,51 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             prop = list(props_t[0].keys())[0]
 
         tmax, l, _ = nodes_t.shape
+        print('tmax=%d, l=%d' %(tmax, l))
         mean_prop = np.zeros((tmax, l))
-        for t in range(tmax):
-            for x in range(l):
-                node = nodes_t[t, x]
-                occ = node.astype(np.bool)
-                if occ.sum() == 0:
-                    continue
-                mean_prop[t, x] = np.mean(np.array(props_t[t][prop])[node[node > 0]])
+
+        if prop == 'num_off':
+            for t in range(tmax):
+                for x in range(l):
+                    node = nodes_t[t, x]
+                    occ = node.astype(np.bool)
+                    if occ.sum() == 0:
+                        continue
+                    labs = np.array(node[node > 0])
+                    print('labs', labs)
+                    if len(labs)==1:
+                        #print('labm zu lab', props_t[t]['lab_m'][labs[0]])
+                        if props_t[t]['lab_m'][labs[0]] == 0:
+                            mean_prop[t, x] = props_t[t]['num_off'][labs[0]]
+                        else:
+                            mean_prop[t, x] = props_t[t]['num_off'][props_t[t]['lab_m'][labs[0]]]
+                    else:
+                        if props_t[t]['lab_m'][labs[0]] != 0 and props_t[t]['lab_m'][labs[1]] != 0:
+                            mean_prop[t, x] = 0.5*(props_t[t]['num_off'][props_t[t]['lab_m'][labs[0]]]\
+                                               +props_t[t]['num_off'][props_t[t]['lab_m'][labs[1]]])
+                        elif props_t[t]['lab_m'][labs[0]] == 0 and props_t[t]['lab_m'][labs[1]] != 0:
+                            mean_prop[t, x] = 0.5 * (props_t[t]['num_off'][labs[0]] \
+                                                     + props_t[t]['num_off'][props_t[t]['lab_m'][labs[1]]])
+                        elif props_t[t]['lab_m'][labs[0]] != 0 and props_t[t]['lab_m'][labs[1]] == 0:
+                            mean_prop[t, x] = 0.5 * (props_t[t]['num_off'][props_t[t]['lab_m'][labs[0]]] \
+                                                     + props_t[t]['num_off'][labs[1]])
+                        elif props_t[t]['lab_m'][labs[0]] == 0 and props_t[t]['lab_m'][labs[1]] == 0:
+                            mean_prop[t, x] = 0.5 * (props_t[t]['num_off'][labs[0]] \
+                                                     + props_t[t]['num_off'][labs[1]])
+
+                        #print('labm zu lab1,2', (props_t[t]['lab_m'][labs[0]], props_t[t]['lab_m'][labs[1]]))
+                print('t=%d nd mean_prop:'% (t))
+                print(mean_prop)
+                    #TODO: stimmen die Inhalte?? ->NEIN
+
+        else:
+            for t in range(tmax):
+                for x in range(l):
+                    node = nodes_t[t, x]
+                    occ = node.astype(np.bool)
+                    if occ.sum() == 0:
+                        continue
+                    mean_prop[t, x] = np.mean(np.array(props_t[t][prop])[node[node > 0]])
 
         dens_t = nodes_t.astype(bool).sum(-1)
         vmax = np.max(mean_prop)
@@ -230,9 +267,6 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         sm = plt.cm.ScalarMappable(cmap=cmap)
         sm.set_array([vmin, vmax])
         cbar = plt.colorbar(sm, use_gridspec=True)
-       # if prop is 'lab_m':
-         #   cbar.set_label(r'ancestor')
-        #else:
         cbar.set_label(r'Property ${}$'.format(prop))
 
         plt.xlabel(r'Lattice node $r \, [\varepsilon]$')
@@ -245,6 +279,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         return plot
+
 
     def plot_prop_timecourse(self, nodes_t=None, props_t=None, propname=None):
         if nodes_t is None:
