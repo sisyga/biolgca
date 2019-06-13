@@ -162,11 +162,11 @@ def inheritance(lgca):
             if lgca.occupied[coord, ind] == 0:
                 lgca.maxlabel += 1
                 node[ind] = lgca.maxlabel
-                #print('{} is born', lgca.maxlabel)
+                print('%d is born' %(lgca.maxlabel))
                 if lgca.props['lab_m'][label] == 0:
                     lgca.props['lab_m'].append(label)
                     lgca.props['num_off'][label] += 1
-                    #print('with ancestor ', label)
+                    print('with ancestor ', label)
                 else:
                     lab = lgca.props['lab_m'][label]
                     lgca.props['lab_m'].append(lab)
