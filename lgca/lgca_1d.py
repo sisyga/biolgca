@@ -212,48 +212,13 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         print('tmax=%d, l=%d' %(tmax, l))
         mean_prop = np.zeros((tmax, l))
 
-        if prop == 'num_off':
-            for t in range(tmax):
-                for x in range(l):
-                    node = nodes_t[t, x]
-                    occ = node.astype(np.bool)
-                    if occ.sum() == 0:
-                        continue
-                    labs = np.array(node[node > 0])
-                    print('labs', labs)
-                    if len(labs)==1:
-                        #print('labm zu lab', props_t[t]['lab_m'][labs[0]])
-                        if props_t[t]['lab_m'][labs[0]] == 0:
-                            mean_prop[t, x] = props_t[t]['num_off'][labs[0]]
-                        else:
-                            mean_prop[t, x] = props_t[t]['num_off'][props_t[t]['lab_m'][labs[0]]]
-                    else:
-                        if props_t[t]['lab_m'][labs[0]] != 0 and props_t[t]['lab_m'][labs[1]] != 0:
-                            mean_prop[t, x] = 0.5*(props_t[t]['num_off'][props_t[t]['lab_m'][labs[0]]]\
-                                               +props_t[t]['num_off'][props_t[t]['lab_m'][labs[1]]])
-                        elif props_t[t]['lab_m'][labs[0]] == 0 and props_t[t]['lab_m'][labs[1]] != 0:
-                            mean_prop[t, x] = 0.5 * (props_t[t]['num_off'][labs[0]] \
-                                                     + props_t[t]['num_off'][props_t[t]['lab_m'][labs[1]]])
-                        elif props_t[t]['lab_m'][labs[0]] != 0 and props_t[t]['lab_m'][labs[1]] == 0:
-                            mean_prop[t, x] = 0.5 * (props_t[t]['num_off'][props_t[t]['lab_m'][labs[0]]] \
-                                                     + props_t[t]['num_off'][labs[1]])
-                        elif props_t[t]['lab_m'][labs[0]] == 0 and props_t[t]['lab_m'][labs[1]] == 0:
-                            mean_prop[t, x] = 0.5 * (props_t[t]['num_off'][labs[0]] \
-                                                     + props_t[t]['num_off'][labs[1]])
-
-                        #print('labm zu lab1,2', (props_t[t]['lab_m'][labs[0]], props_t[t]['lab_m'][labs[1]]))
-                print('t=%d nd mean_prop:'% (t))
-                print(mean_prop)
-                    #TODO: stimmen die Inhalte?? ->NEIN
-
-        else:
-            for t in range(tmax):
-                for x in range(l):
-                    node = nodes_t[t, x]
-                    occ = node.astype(np.bool)
-                    if occ.sum() == 0:
-                        continue
-                    mean_prop[t, x] = np.mean(np.array(props_t[t][prop])[node[node > 0]])
+        for t in range(tmax):
+            for x in range(l):
+                node = nodes_t[t, x]
+                occ = node.astype(np.bool)
+                if occ.sum() == 0:
+                    continue
+                mean_prop[t, x] = np.mean(np.array(props_t[t][prop])[node[node > 0]])
 
         dens_t = nodes_t.astype(bool).sum(-1)
         vmax = np.max(mean_prop)
@@ -280,6 +245,88 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         return plot
 
+    def plot_prop_num_off(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop='num_off', cmap='Dark2'):
+        if nodes_t is None:
+            nodes_t = self.nodes_t
+        if figsize is None:
+            figsize = estimate_figsize(nodes_t.sum(-1).T, cbar=True)
+        if props_t is None:
+            props_t = self.props_t
+        if prop is None:
+            prop = list(props_t[0].keys())[0]
+
+        tmax, l, _ = nodes_t.shape
+        print('tmax=%d, l=%d' %(tmax, l))
+        mean_prop = np.zeros((tmax, l))
+
+        for t in range(tmax):
+            for x in range(l):
+                node = nodes_t[t, x]
+                occ = node.astype(np.bool)
+                if occ.sum() == 0:
+                    continue
+                labs = np.array(node[node > 0])
+                print('labs', labs)
+                if len(labs)==1:
+                        #print('labm zu lab', props_t[t]['lab_m'][labs[0]])
+                     if props_t[t]['lab_m'][labs[0]] == 0:
+                        mean_prop[t, x] = props_t[t]['num_off'][labs[0]]
+                        print('==:', props_t[t]['num_off'][labs[0]])
+
+                     else:
+                        mean_prop[t, x] = props_t[t]['num_off'][props_t[t]['lab_m'][labs[0]]]
+                        print('!=:', props_t[t]['num_off'][props_t[t]['lab_m'][labs[0]]])
+                else:
+                    if props_t[t]['lab_m'][labs[0]] != 0 and props_t[t]['lab_m'][labs[1]] != 0:
+                        mean_prop[t, x] = 0.5*(props_t[t]['num_off'][props_t[t]['lab_m'][labs[0]]]\
+                                              +props_t[t]['num_off'][props_t[t]['lab_m'][labs[1]]])
+                        print('!=, !=:', props_t[t]['num_off'][props_t[t]['lab_m'][labs[0]]], props_t[t]['num_off'][props_t[t]['lab_m'][labs[1]]])
+                    elif props_t[t]['lab_m'][labs[0]] == 0 and props_t[t]['lab_m'][labs[1]] != 0:
+                        mean_prop[t, x] = 0.5 * (props_t[t]['num_off'][labs[0]] \
+                                                     + props_t[t]['num_off'][props_t[t]['lab_m'][labs[1]]])
+                        print('==, !=:', props_t[t]['num_off'][labs[0]], props_t[t]['num_off'][props_t[t]['lab_m'][labs[1]]])
+
+                    elif props_t[t]['lab_m'][labs[0]] != 0 and props_t[t]['lab_m'][labs[1]] == 0:
+                        mean_prop[t, x] = 0.5 * (props_t[t]['num_off'][props_t[t]['lab_m'][labs[0]]] \
+                                                     + props_t[t]['num_off'][labs[1]])
+                        print('!=, ==:', props_t[t]['num_off'][props_t[t]['lab_m'][labs[0]]], props_t[t]['num_off'][labs[1]])
+
+                    elif props_t[t]['lab_m'][labs[0]] == 0 and props_t[t]['lab_m'][labs[1]] == 0:
+                        mean_prop[t, x] = 0.5 * (props_t[t]['num_off'][labs[0]] \
+                                                     + props_t[t]['num_off'][labs[1]])
+                        print('==, ==:', props_t[t]['num_off'][labs[0]], props_t[t]['num_off'][labs[1]])
+
+
+                        #print('labm zu lab1,2', (props_t[t]['lab_m'][labs[0]], props_t[t]['lab_m'][labs[1]]))
+            print('t=%d nd mean_prop:'% (t))
+            print(mean_prop)
+
+                    #TODO: stimmen die Inhalte?? ->NEIN
+
+        dens_t = nodes_t.astype(bool).sum(-1)
+        vmax = np.max(mean_prop)
+        vmin = np.min(mean_prop)
+        rgba = plt.get_cmap(cmap)
+        rgba = rgba((mean_prop - vmin) / (vmax - vmin))
+        rgba[dens_t == 0, :] = 0.
+        fig = plt.figure(num=figindex, figsize=figsize)
+        ax = fig.add_subplot(111)
+        plot = ax.imshow(rgba, interpolation='none', aspect='equal')
+        sm = plt.cm.ScalarMappable(cmap=cmap)
+        sm.set_array([vmin, vmax])
+        cbar = plt.colorbar(sm, use_gridspec=True)
+        cbar.set_label(r'Property ${}$'.format(prop))
+
+        plt.xlabel(r'Lattice node $r \, [\varepsilon]$')
+        plt.ylabel(r'Time step $k \, [\tau]$')
+        # matshow style
+        ax.xaxis.set_label_position('top')
+        ax.title.set_y(1.05)
+        ax.xaxis.tick_top()
+        ax.xaxis.set_ticks_position('both')
+        ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
+        ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
+        return plot
 
     def plot_prop_timecourse(self, nodes_t=None, props_t=None, propname=None):
         if nodes_t is None:

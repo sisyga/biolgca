@@ -488,6 +488,7 @@ class IBLGCA_base(LGCA_base):
                 self.props.update(num_off=[0] + [0] * self.maxlabel)
                 #TODO: nötig?
                 self.props['num_off'][0] = -99
+                #print('num_off', self.props['num_off'])
                 if 'variation' in kwargs:
                     self.variation = kwargs['variation']
                 else:
