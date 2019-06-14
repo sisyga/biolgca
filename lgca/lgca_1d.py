@@ -245,7 +245,8 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         return plot
 
-    def plot_prop_num_off(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop='num_off', cmap='Dark2'):
+    #TODO: löschen oder überarbeiten
+    def OLD_plot_prop_num_off(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop='num_off', cmap='Dark2'):
         if nodes_t is None:
             nodes_t = self.nodes_t
         if figsize is None:
@@ -327,6 +328,43 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         return plot
+
+    def plot_prop_numoff(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop='num_off', cmap='Dark2'):
+        # TODO: next step! idea: x-coord = maxlabel_init, y-coord = timestep, entry = number of offsprings
+        #erste Spalte vom nummoffs ignorieren
+
+        if nodes_t is None:
+            nodes_t = self.nodes_t
+        if figsize is None:
+            figsize = estimate_figsize(nodes_t.sum(-1).T, cbar=True)
+        if props_t is None:
+            props_t = self.props_t
+
+        tmax, l, _ = nodes_t.shape
+        print('tmax=%d, l=%d' %(tmax, l))
+        numoffs = np.zeros((tmax, self.maxlabel_init.astype(int) + 1))   #TODO: 2 durch kapazität ersetzen
+        print('numoffs', numoffs)
+        #print('nodes_t', nodes_t )
+        for t in range(tmax):
+            print('timestep', t)
+            for x in range(l):
+                node = nodes_t[t, x]
+                print('node', node)
+                occ = node.astype(np.bool)
+                if occ.sum() == 0:
+                    continue
+                labs = np.array(node[node > 0]) #unbesetztes fällt weg, übrig bleiben label
+                print('labs', labs)
+                for i in range(len(labs)):
+                    if labs[i] > self.maxlabel_init:
+                        print('labs > init')
+                        numoffs[t, self.props['lab_m'][labs[i]]] = props_t[t]['num_off'][self.props['lab_m'][labs[i]]]
+                    else:
+                        numoffs[t, labs[i]] = props_t[t]['num_off'][labs[i]]
+
+            print('numoffs', numoffs)
+
+        #TODO: plot
 
     def plot_prop_timecourse(self, nodes_t=None, props_t=None, propname=None):
         if nodes_t is None:

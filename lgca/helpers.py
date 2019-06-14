@@ -32,22 +32,5 @@ def count_fam(lgca):
 
     return max(num[1:])
 
-def number_offsprings(lgca, time = 100, figsize = (10,50)):
-    #TODO: next step! idea: x-coord = maxlabel_init, y-coord = timestep, entry = number of offsprings
-    #print(lgca.props['lab_m'])
-    #print(lgca.props_t)
-    #def plot_het(mtx, figsize, maxi):
-    tmax = time
-    mtx =
-    fig = plt.figure(figsize=figsize)
-    plt.xlabel(r'lab_m')
-    plt.ylabel(r'time')
-    ax = fig.add_subplot(111)
-    plot = ax.imshow(mtx, interpolation='None', vmin=0, vmax=count_fam(lgca))
-    ax.xaxis.set_label_position('top')
-    ax.xaxis.tick_top()
-
-    return plot
-
 def aloha(who):
     print('aloha', who)

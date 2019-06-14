@@ -184,4 +184,6 @@ def inheritance(lgca):
                     lgca.props['r_b'].append(lgca.r_b)
         lgca.nodes[coord] = node
         npr.shuffle(lgca.nodes[coord])
+    print('props_t', lgca.props_t)
+    lgca.plot_prop_numoff()
 
