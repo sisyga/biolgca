@@ -155,14 +155,24 @@ def inheritance(lgca):
         # choose cells that proliferate
         r_bs = [lgca.props['r_b'][i] for i in node]
         proliferating = npr.random(lgca.K) < r_bs
-
         # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
         for label in node[proliferating]:
             ind = npr.choice(lgca.K)
-            if lgca.occupied[coord, ind] == 0:
+            foo = lgca.occupied[coord, ind]
+            print(foo)
+            if foo == False:
                 lgca.maxlabel += 1
                 node[ind] = lgca.maxlabel
                 print('%d is born' %(lgca.maxlabel))
+                new_props = {
+                    'r_b': lgca.props['r_b'].copy(),
+                    'lab_m': lgca.props['lab_m'].copy(),
+                    'num_off': lgca.props['num_off'].copy()
+                }
+                oldid = id(lgca.props)
+                newid = id(new_props)
+                lgca.props = new_props
+                nowid = id(lgca.props)
                 if lgca.props['lab_m'][label] == 0:
                     lgca.props['lab_m'].append(label)
                     lgca.props['num_off'][label] += 1
@@ -182,6 +192,8 @@ def inheritance(lgca):
                     lgca.props['r_b'].append(np.clip(npr.normal(loc=r_b, scale=lgca.std), 0, 1))
                 else:
                     lgca.props['r_b'].append(lgca.r_b)
+
+            print('blabliblo')
         lgca.nodes[coord] = node
         npr.shuffle(lgca.nodes[coord])
     print('props_t', lgca.props_t)
