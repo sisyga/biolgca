@@ -1,6 +1,9 @@
 import matplotlib.ticker as mticker
 
-from lgca.base import *
+try:
+    from .base import *
+except ModuleNotFoundError:
+    from base import *
 
 
 class LGCA_1D(LGCA_base):
@@ -237,7 +240,6 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
 
         plt.xlabel(r'Lattice node $r \, [\varepsilon]$')
         plt.ylabel(r'Time step $k \, [\tau]$')
-        # matshow style
         ax.xaxis.set_label_position('top')
         ax.title.set_y(1.05)
         ax.xaxis.tick_top()
@@ -257,7 +259,6 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             propname = list(props_t[0].keys())[0]
 
         tmax = len(props_t)
-        fig = plt.figure()
         mean_prop = np.zeros(tmax)
         std_mean_prop = np.zeros(mean_prop.shape)
         for t in range(tmax):
@@ -287,7 +288,7 @@ if __name__ == '__main__':
     # nodes[1:, :] = 0
     # nodes[0, 1:] = 0
 
-    system = IBLGCA_1D(bc='reflect', dims=l, interaction='go_or_grow', density=1., restchannels=restchannels)
+    system = IBLGCA_1D(bc='reflect', dims=l, interaction='go_or_grow', density=.1, restchannels=restchannels, kappa=0)
     system.timeevo(timesteps=100, record=True)
     # system.plot_prop()
     # system.plot_density(figindex=1)
@@ -297,5 +298,5 @@ if __name__ == '__main__':
     # plt.ylabel('$\kappa$')
     # system.plot_density()
     system.plot_prop_spatial()
-    #system.plot_prop_timecourse()
+    # system.plot_prop_timecourse()
     plt.show()

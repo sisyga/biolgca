@@ -1,5 +1,11 @@
-from .base import *
-from .interactions import tanh_switch
+import numpy as np
+from numpy import random as npr
+
+try:
+    from .interactions import tanh_switch
+except ImportError:
+    from interactions import tanh_switch
+
 
 
 def birth(lgca):

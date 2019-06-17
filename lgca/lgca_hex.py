@@ -1,5 +1,10 @@
-from lgca.base import *
-from lgca.lgca_square import LGCA_Square
+try:
+    from .base import *
+    from .lgca_square import LGCA_Square
+
+except ModuleNotFoundError:
+    from base import *
+    from lgca_square import LGCA_Square
 
 
 class LGCA_Hex(LGCA_Square):
@@ -188,7 +193,7 @@ if __name__ == '__main__':
     # ani2 = lgca.live_animate_density(interval=100, vmax=lgca.velocitychannels, channels=range(6))
     ani = lgca.live_animate_flux()
     # ani = lgca.live_animate_flow()
-    ani = lgca.live_animate_density()
+    # ani = lgca.live_animate_density()
     # plt.streamplot(lgca.xcoords[:, 0], lgca.ycoords[-1], lgca.g[1:-1, 1:-1, 0].T, lgca.g[1:-1, 1:-1, 1].T, density=.5,
     #               arrowstyle='->', color='orange', linewidth=2.)
     # ani = lgca.live_animate_density()
