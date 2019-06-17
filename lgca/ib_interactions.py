@@ -91,23 +91,26 @@ def go_or_grow_interaction(lgca):
     interactions of the go-or-grow model. formulation too complex for 1d, but to be generalized.
     :return:
     """
+
     # death
     dying = npr.random(lgca.nodes.shape) < lgca.r_d
     lgca.nodes[dying] = 0
+
     # birth
-    lgca.update_dynamic_fields()
-    n_m = lgca.occupied[:, :2].sum(-1)
-    n_r = lgca.occupied[:, 2:].sum(-1)
+    lgca.update_dynamic_fields()  # routinely update
+    n_m = lgca.occupied[:, :2].sum(-1)  # number of cells in rest channels for each node
+    #   .sum(-1) ? specifies dimension, -1 -> 1 dimension ?
+    n_r = lgca.occupied[:, 2:].sum(-1)  # -"- velocity -"-
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-               (lgca.cell_density[lgca.nonborder] < lgca.K)
+               (lgca.cell_density[lgca.nonborder] < lgca.K)  # only nodes that are not empty or full
     coords = [a[relevant] for a in lgca.nonborder]
-    for coord in zip(*coords):
+    for coord in zip(*coords):  # loop through all relevant nodes
         node = lgca.nodes[coord]
         vel = node[:lgca.velocitychannels]
         rest = node[lgca.velocitychannels:]
         n = lgca.cell_density[coord]
+        rho = n / lgca.K  # actual density = percentage of occupation
 
-        rho = n / lgca.K
         # determine cells to switch to rest channels and cells that switch to moving state
         # kappas = np.array([lgca.props['kappa'][i] for i in node])
         # r_s = tanh_switch(rho, kappa=kappas, theta=lgca.theta)
