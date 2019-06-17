@@ -1,9 +1,6 @@
 import matplotlib.ticker as mticker
 
-try:
-    from .base import *
-except ModuleNotFoundError:
-    from base import *
+from lgca.base import *
 
 
 class LGCA_1D(LGCA_base):

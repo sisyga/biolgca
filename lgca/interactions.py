@@ -236,7 +236,7 @@ def wetting(lgca):
     resting = lgca.nb_sum(resting)
     resting *= (1 - resting / lgca.rho_0 / lgca.velocitychannels / 2) * np.heaviside(
         1 - nbs / lgca.rho_0 / lgca.velocitychannels / 2, 0) / lgca.velocitychannels / lgca.rho_0 * 2
-    #resting = np.clip(resting, a_min=0, a_max=lgca.velocitychannels * lgca.rho_0) / lgca.velocitychannels / lgca.rho_0
+    # resting = np.clip(resting, a_min=0, a_max=lgca.velocitychannels * lgca.rho_0) / lgca.velocitychannels / lgca.rho_0
     # resting = np.clip(resting, a_min=None, a_max=lgca.n_crit)
     g = lgca.calc_flux(lgca.nodes)
     g = lgca.nb_sum(g)
@@ -260,8 +260,8 @@ def wetting(lgca):
             # + lgca.alpha * np.einsum('i,ij', g_subs[coord], j)
             # + lgca.alpha * restc
             + lgca.gamma * np.einsum('i,ij', g_pressure[coord], j)
-            #+ lgca.gamma * np.dot(permutations[:, :lgca.velocitychannels], pressure_weight[coord])
-            #+ lgca.gamma * np.dot(permutations[:, :lgca.velocitychannels], subs_weight[coord])
+            # + lgca.gamma * np.dot(permutations[:, :lgca.velocitychannels], pressure_weight[coord])
+            # + lgca.gamma * np.dot(permutations[:, :lgca.velocitychannels], subs_weight[coord])
         ).cumsum()
         # print('Alignment:', (j_nb[0] * j[0] + j_nb[1] * j[1]) / 4 / lgca.velocitychannels)
         # print('Resting:', resting[coord] * restc.sum(-1) / lgca.restchannels ** 2 / lgca.velocitychannels)
