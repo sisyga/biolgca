@@ -141,6 +141,8 @@ def go_or_grow_interaction(lgca):
                 rest[np.where(rest == 0)[0][0]] = lgca.maxlabel
                 kappa = lgca.props['kappa'][cell]
                 lgca.props['kappa'].append(npr.normal(loc=kappa))
+                theta = lgca.props['theta'][cell]
+                lgca.props['theta'].append(npr.normal(loc=theta))
 
         v_channels = npr.permutation(vel)
         r_channels = npr.permutation(rest)

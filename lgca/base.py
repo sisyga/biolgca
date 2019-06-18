@@ -463,6 +463,8 @@ class IBLGCA_base(LGCA_base):
                 else:
                     self.theta = 0.75
                     print('switch threshold set to theta = ', self.theta)
+                # MK:
+                self.props.update(theta=[0.] + [self.theta] * self.maxlabel)
                 if self.restchannels < 2:
                     print('WARNING: not enough rest channels - system will die out!!!')
 
