@@ -140,9 +140,22 @@ def inheritance(lgca):
     """
     r_d = const
     """
-    # death process
+    # death process, cell dies -> correct value of prop[num_off]
     dying = npr.random(lgca.nodes.shape) < lgca.r_d
+    for label in lgca.nodes[dying]:
+        if label != 0:
+            print('cell with label %d dies' % label)
+            labmoth = lgca.props['lab_m'][label]
+            if labmoth == 0:
+                #lgca.props['num_off'][label] = lgca.props['num_off'][label] - 1
+                print('was an ancestor cell')
+            else:
+                lgca.props['num_off'][labmoth] = lgca.props['num_off'][labmoth] - 1
+                print('lab_m dazu ist', labmoth)
+        else:
+            print('WHY?')
     lgca.nodes[dying] = 0
+
     # birth
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
                (lgca.cell_density[lgca.nonborder] < lgca.K)
@@ -172,6 +185,7 @@ def inheritance(lgca):
                     lgca.props['num_off'][label] += 1
                     print('with ancestor ', label)
                 else:
+                    print('with ancestor ', lgca.props['lab_m'][label])
                     lab = lgca.props['lab_m'][label]
                     lgca.props['lab_m'].append(lab)
                     for i in range(lgca.maxlabel.astype(int)):

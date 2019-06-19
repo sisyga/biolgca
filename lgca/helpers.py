@@ -27,10 +27,12 @@ def count_fam(lgca):
     else:
         print('---genealogical research---')
         num = lgca.props['num_off']
+        if num[0] != -99:
+            print('Etwas stimmt nicht!')
         print('num', num)
         print('genealogical tree:', num[1:])
-        print('number of ancestors:', lgca.maxlabel_init)
-        print('number of offsprings:', sum(num[1:]))
+        print('number of ancestors at beginning:', lgca.maxlabel_init)
+        print('number of living offsprings:', sum(num[1:]))
         print('max family number is %d with ancestor cell %d' % (
         max(num[1:]), num.index(max(num[1:]))))
 
@@ -38,7 +40,6 @@ def count_fam(lgca):
 
 def bar_stacked(lgca):
     tmax, l, _ = lgca.nodes_t.shape
-    #total_off = sum(lgca.props['num_off'][1:])
     ancs = np.arange(1, lgca.maxlabel_init + 1)
     # if len(ancs) != lgca.maxlabel_init:
     #     print('FEHLER: len(ancs) != maxlabel_init!')
@@ -59,7 +60,8 @@ def bar_stacked(lgca):
         else:
             plt.bar(ind, val[:, c], width, color=['red'])
 
-    plt.ylabel('total number of offsprings')
+    ###plot settings
+    plt.ylabel('total number of living offsprings')
     plt.xlabel('timesteps')
     plt.title('Ratio of offsprings')
     if len(ind) <= 15:

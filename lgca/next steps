@@ -1,10 +1,9 @@
-- plot_prop_numoff muss in inheritance eingegliedert werden
--> schlaue Lösung, damit numoffs sich nicht selber überschreibt?
-
-- plot_prop_numoffs irgendwie auslagern und umbenennen, vllt zu helpers
+- tote Zellen aus Bildchen ausschließen?
 
 - TODOS abarbeiten
 
 - WENN alles andere erledigt:
     -> Bildchen, dazu Mail Simon beachten für Darstellungen
+
+- komische Fehlermeldung beseitigen
 
