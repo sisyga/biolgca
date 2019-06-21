@@ -283,7 +283,7 @@ class LGCA_base():
                     self.rho_0 = kwargs['rho_0']
                 else:
                     self.rho_0 = self.restchannels // 2
-                self.n_crit = (self.velocitychannels + 1) * self.rho_0 - 1
+                self.n_crit = (self.velocitychannels + 1) * self.rho_0
 
 
             elif interaction == 'random_walk':
@@ -428,6 +428,7 @@ class IBLGCA_base(LGCA_base):
                     self.r_b = 0.2
                     print('birth rate set to r_b = ', self.r_b)
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']
                 else:
@@ -439,6 +440,7 @@ class IBLGCA_base(LGCA_base):
                 else:
                     self.std = 0.1
                     print('standard deviation set to = ', self.std)
+
 
             elif interaction is 'go_or_grow':
                 self.interaction = go_or_grow_interaction

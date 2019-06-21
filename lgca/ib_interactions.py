@@ -1,5 +1,6 @@
 import numpy as np
 from numpy import random as npr
+from scipy.stats import truncnorm
 
 try:
     from .interactions import tanh_switch
@@ -7,6 +8,10 @@ except ImportError:
     from interactions import tanh_switch
 
 
+def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
+    a = (lower - mu) / sigma
+    b = (upper - mu) / sigma
+    return truncnorm(a, b, loc=mu, scale=sigma).rvs(size)
 
 def birth(lgca):
     """
@@ -64,11 +69,10 @@ def birthdeath(lgca):
                (lgca.cell_density[lgca.nonborder] < lgca.K)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
-        n = lgca.cell_density[coord]
         node = lgca.nodes[coord]
 
         # choose cells that proliferate
-        r_bs = [lgca.props['r_b'][i] for i in node]
+        r_bs = np.array([lgca.props['r_b'][i] for i in node])
         proliferating = npr.random(lgca.K) < r_bs
 
         # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
@@ -78,7 +82,8 @@ def birthdeath(lgca):
                 lgca.maxlabel += 1
                 node[ind] = lgca.maxlabel
                 r_b = lgca.props['r_b'][label]
-                lgca.props['r_b'].append(np.clip(npr.normal(loc=r_b, scale=lgca.std), 0, 1))
+                # lgca.props['r_b'].append(np.clip(npr.normal(loc=r_b, scale=lgca.std), 0, 1))
+                lgca.props['r_b'].append(float(trunc_gauss(0, 1, r_b, sigma=lgca.std)))
 
         lgca.nodes[coord] = node
         npr.shuffle(lgca.nodes[coord])
@@ -135,7 +140,7 @@ def go_or_grow_interaction(lgca):
                 lgca.maxlabel += 1
                 rest[np.where(rest == 0)[0][0]] = lgca.maxlabel
                 kappa = lgca.props['kappa'][cell]
-                lgca.props['kappa'].append(npr.normal(loc=kappa))
+                lgca.props['kappa'].append(float(npr.normal(loc=kappa)))
 
         v_channels = npr.permutation(vel)
         r_channels = npr.permutation(rest)
