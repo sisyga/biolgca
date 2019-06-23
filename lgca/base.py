@@ -128,8 +128,12 @@ class LGCA_base():
         self.update_dynamic_fields()
 
     def set_interaction(self, **kwargs):
-        from .interactions import go_or_grow, birth, alignment, persistent_walk, chemotaxis, \
-            contact_guidance, nematic, aggregation, wetting, random_walk, birth_death, excitable_medium
+        try:
+            from .interactions import go_or_grow, birth, alignment, persistent_walk, chemotaxis, \
+                contact_guidance, nematic, aggregation, wetting, random_walk, birth_death, excitable_medium
+        except ImportError:
+            from interactions import go_or_grow, birth, alignment, persistent_walk, chemotaxis, \
+                contact_guidance, nematic, aggregation, wetting, random_walk, birth_death, excitable_medium
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
             if interaction == 'go_or_grow':
@@ -275,6 +279,13 @@ class LGCA_base():
                     self.gamma = 2.
                     print('pressure sensitivity set to gamma = ', self.gamma)
 
+                if 'rho_0' in kwargs:
+                    self.rho_0 = kwargs['rho_0']
+                else:
+                    self.rho_0 = self.restchannels // 2
+                self.n_crit = (self.velocitychannels + 1) * self.rho_0
+
+
             elif interaction == 'random_walk':
                 self.interaction = random_walk
 
@@ -392,8 +403,12 @@ class IBLGCA_base(LGCA_base):
     props = {}
 
     def set_interaction(self, **kwargs):
-        from .ib_interactions import birth, birthdeath, go_or_grow_interaction
-        from .interactions import random_walk
+        try:
+            from .ib_interactions import birth, birthdeath, go_or_grow_interaction
+            from .interactions import random_walk
+        except ImportError:
+            from ib_interactions import birth, birthdeath, go_or_grow_interaction
+            from interactions import random_walk
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
             if interaction is 'birth':
@@ -413,6 +428,7 @@ class IBLGCA_base(LGCA_base):
                     self.r_b = 0.2
                     print('birth rate set to r_b = ', self.r_b)
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']
                 else:
@@ -424,6 +440,7 @@ class IBLGCA_base(LGCA_base):
                 else:
                     self.std = 0.1
                     print('standard deviation set to = ', self.std)
+
 
             elif interaction is 'go_or_grow':
                 self.interaction = go_or_grow_interaction

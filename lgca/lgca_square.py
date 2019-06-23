@@ -4,7 +4,10 @@ import matplotlib.ticker as mticker
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
 
-from .base import *
+try:
+    from base import *
+except ModuleNotFoundError:
+    from .base import *
 
 
 class LGCA_Square(LGCA_base):
@@ -30,7 +33,11 @@ class LGCA_Square(LGCA_base):
         elif dims is None:
             dims = (50, 50)
 
-        self.lx, self.ly = dims
+        try:
+            self.lx, self.ly = dims
+        except TypeError:
+            self.lx, self.ly = dims, dims
+
         self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels
 
