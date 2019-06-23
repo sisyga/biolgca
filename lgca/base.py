@@ -115,7 +115,7 @@ class LGCA_base():
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
         self.set_bc(bc)
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
-        self.init_nodes(density, nodes=nodes)
+        self.init_nodes(density=density, nodes=nodes)
         self.init_coords()
         self.set_interaction(**kwargs)
         self.cell_density = self.nodes.sum(-1)
@@ -125,6 +125,7 @@ class LGCA_base():
         self.r_int = r
         self.init_nodes(nodes=self.nodes[self.nonborder])
         self.init_coords()
+        self.update_dynamic_fields()
 
     def set_interaction(self, **kwargs):
         from .interactions import go_or_grow, birth, alignment, persistent_walk, chemotaxis, \
@@ -262,17 +263,17 @@ class LGCA_base():
                     self.beta = 2.
                     print('adhesion sensitivity set to beta = ', self.beta)
 
-                if 'gamma' in kwargs:
-                    self.gamma = kwargs['gamma']
-                else:
-                    self.gamma = 2.
-                    print('alignment sensitivity set to gamma = ', self.gamma)
-
                 if 'alpha' in kwargs:
                     self.alpha = kwargs['alpha']
                 else:
                     self.alpha = 2.
                     print('substrate sensitivity set to alpha = ', self.alpha)
+
+                if 'gamma' in kwargs:
+                    self.gamma = kwargs['gamma']
+                else:
+                    self.gamma = 2.
+                    print('pressure sensitivity set to gamma = ', self.gamma)
 
             elif interaction == 'random_walk':
                 self.interaction = random_walk
@@ -330,12 +331,14 @@ class LGCA_base():
             self.interaction = random_walk
 
     def set_bc(self, bc):
-        if bc in ['absorbing', 'absorb', 'abs']:
+        if bc in ['absorbing', 'absorb', 'abs', 'abc']:
             self.apply_boundaries = self.apply_abc
-        elif bc in ['reflecting', 'reflect', 'refl']:
+        elif bc in ['reflecting', 'reflect', 'refl', 'rbc']:
             self.apply_boundaries = self.apply_rbc
         elif bc in ['periodic', 'pbc']:
             self.apply_boundaries = self.apply_pbc
+        elif bc in ['inflow']:
+            self.apply_boundaries = self.apply_inflowbc
         else:
             print(bc, 'not defined, using periodic boundaries')
             self.apply_boundaries = self.apply_pbc
@@ -402,7 +405,7 @@ class IBLGCA_base(LGCA_base):
                     print('birth rate set to r_b = ', self.r_b)
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
 
-            if interaction is 'birthdeath':
+            elif interaction is 'birthdeath':
                 self.interaction = birthdeath
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
@@ -422,7 +425,7 @@ class IBLGCA_base(LGCA_base):
                     self.std = 0.1
                     print('standard deviation set to = ', self.std)
 
-            if interaction is 'go_or_grow':
+            elif interaction is 'go_or_grow':
                 self.interaction = go_or_grow_interaction
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']

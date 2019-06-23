@@ -1,5 +1,5 @@
-from base import *
-from interactions import tanh_switch
+from .base import *
+from .interactions import tanh_switch
 
 
 def birth(lgca):
@@ -30,7 +30,6 @@ def birth(lgca):
             n -= 1
 
         # distribute daughter cells randomly in channels
-        dn = proliferating.sum()
         for label in node[proliferating]:
             p = 1. - lgca.occupied[coord]
             Z = p.sum()
@@ -40,7 +39,6 @@ def birth(lgca):
             node[ind] = lgca.maxlabel
             r_b = lgca.props['r_b'][label]
             lgca.props['r_b'].append(npr.normal(loc=r_b, scale=0.2 * r_b))
-            dn -= 1
 
         lgca.nodes[coord] = node
         npr.shuffle(lgca.nodes[coord])
@@ -54,11 +52,11 @@ def birthdeath(lgca):
     # death process
     dying = npr.random(lgca.nodes.shape) < lgca.r_d
     lgca.nodes[dying] = 0
+    lgca.update_dynamic_fields()
     # birth
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
                (lgca.cell_density[lgca.nonborder] < lgca.K)
     coords = [a[relevant] for a in lgca.nonborder]
-    inds = np.arange(lgca.K)
     for coord in zip(*coords):
         n = lgca.cell_density[coord]
         node = lgca.nodes[coord]
