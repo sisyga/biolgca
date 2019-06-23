@@ -1,6 +1,9 @@
 import matplotlib.ticker as mticker
 
-from .base import *
+try:
+    from .base import *
+except ModuleNotFoundError:
+    from base import *
 
 
 class LGCA_1D(LGCA_base):
@@ -168,7 +171,6 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.apply_boundaries()
             self.maxlabel = self.nodes.max()
 
-
         else:
             occ = nodes > 0
             self.nodes[self.r_int:-self.r_int] = self.convert_bool_to_ib(occ)
@@ -198,7 +200,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             if showprogress:
                 update_progress(1.0 * t / timesteps)
 
-    def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop=None, cmap='cividis'):
+    def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=None, figsize=None, propname=None, cmap='cividis'):
         if nodes_t is None:
             nodes_t = self.nodes_t
         if figsize is None:
@@ -255,11 +257,11 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
     #         props_t = self.props_t
     #     if prop is None:
     #         prop = list(props_t[0].keys())[0]
-    # 
+    #
     #     tmax, l, _ = nodes_t.shape
     #     print('tmax=%d, l=%d' %(tmax, l))
     #     mean_prop = np.zeros((tmax, l))
-    # 
+    #
     #     for t in range(tmax):
     #         for x in range(l):
     #             node = nodes_t[t, x]
@@ -273,7 +275,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
     #                  if props_t[t]['lab_m'][labs[0]] == 0:
     #                     mean_prop[t, x] = props_t[t]['num_off'][labs[0]]
     #                     print('==:', props_t[t]['num_off'][labs[0]])
-    # 
+    #
     #                  else:
     #                     mean_prop[t, x] = props_t[t]['num_off'][props_t[t]['lab_m'][labs[0]]]
     #                     print('!=:', props_t[t]['num_off'][props_t[t]['lab_m'][labs[0]]])
@@ -286,24 +288,24 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
     #                     mean_prop[t, x] = 0.5 * (props_t[t]['num_off'][labs[0]] \
     #                                                  + props_t[t]['num_off'][props_t[t]['lab_m'][labs[1]]])
     #                     print('==, !=:', props_t[t]['num_off'][labs[0]], props_t[t]['num_off'][props_t[t]['lab_m'][labs[1]]])
-    # 
+    #
     #                 elif props_t[t]['lab_m'][labs[0]] != 0 and props_t[t]['lab_m'][labs[1]] == 0:
     #                     mean_prop[t, x] = 0.5 * (props_t[t]['num_off'][props_t[t]['lab_m'][labs[0]]] \
     #                                                  + props_t[t]['num_off'][labs[1]])
     #                     print('!=, ==:', props_t[t]['num_off'][props_t[t]['lab_m'][labs[0]]], props_t[t]['num_off'][labs[1]])
-    # 
+    #
     #                 elif props_t[t]['lab_m'][labs[0]] == 0 and props_t[t]['lab_m'][labs[1]] == 0:
     #                     mean_prop[t, x] = 0.5 * (props_t[t]['num_off'][labs[0]] \
     #                                                  + props_t[t]['num_off'][labs[1]])
     #                     print('==, ==:', props_t[t]['num_off'][labs[0]], props_t[t]['num_off'][labs[1]])
-    # 
-    # 
+    #
+    #
     #                     #print('labm zu lab1,2', (props_t[t]['lab_m'][labs[0]], props_t[t]['lab_m'][labs[1]]))
     #         print('t=%d nd mean_prop:'% (t))
     #         print(mean_prop)
-    # 
+    #
     #                 #TODO: stimmen die Inhalte?? ->NEIN
-    # 
+    #
     #     dens_t = nodes_t.astype(bool).sum(-1)
     #     vmax = np.max(mean_prop)
     #     vmin = np.min(mean_prop)
@@ -317,7 +319,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
     #     sm.set_array([vmin, vmax])
     #     cbar = plt.colorbar(sm, use_gridspec=True)
     #     cbar.set_label(r'Property ${}$'.format(prop))
-    # 
+    #
     #     plt.xlabel(r'Lattice node $r \, [\varepsilon]$')
     #     plt.ylabel(r'Time step $k \, [\tau]$')
     #     # matshow style
@@ -366,7 +368,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
 
         #TODO: plot
 
-    def plot_prop_timecourse(self, nodes_t=None, props_t=None, propname=None):
+    def plot_prop_timecourse(self, nodes_t=None, props_t=None, propname=None, figindex=None, figsize=None):
         if nodes_t is None:
             nodes_t = self.nodes_t
 
@@ -376,8 +378,8 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         if propname is None:
             propname = list(props_t[0].keys())[0]
 
+        plt.figure(num=figindex, figsize=figsize)
         tmax = len(props_t)
-        fig = plt.figure()
         mean_prop = np.zeros(tmax)
         std_mean_prop = np.zeros(mean_prop.shape)
         for t in range(tmax):
@@ -395,7 +397,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         plt.ylabel('${}$'.format(propname))
         plt.title('Time course of the cell property')
         plt.plot(x, y)
-        plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True)
+        plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True, interpolate=True)
         return
 
 
@@ -407,8 +409,8 @@ if __name__ == '__main__':
     # nodes[1:, :] = 0
     # nodes[0, 1:] = 0
 
-    system = IBLGCA_1D(bc='reflect', dims=l, interaction='go_or_grow', density=1., restchannels=restchannels)
-    system.timeevo(timesteps=4000, record=True)
+    system = IBLGCA_1D(bc='reflect', dims=1, interaction='birthdeath', density=1, restchannels=5000, r_b=0.2)
+    system.timeevo(timesteps=2000, record=True)
     # system.plot_prop()
     # system.plot_density(figindex=1)
     # props = np.array(system.props['kappa'])[system.nodes[system.nodes > 0]]
