@@ -1,9 +1,9 @@
-- tote Zellen aus Bildchen ausschließen?
+
+- negative zahlen in num_offs beseitigen
 
 - TODOS abarbeiten
 
-- WENN alles andere erledigt:
-    -> Bildchen, dazu Mail Simon beachten für Darstellungen
+- komische Fehlermeldung bei bar stacked beseitigen
 
-- komische Fehlermeldung beseitigen
+- mullerplot (settings -> plugins -> marketplace -> R)
 

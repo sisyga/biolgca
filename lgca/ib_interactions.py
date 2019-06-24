@@ -154,17 +154,19 @@ def inheritance(lgca):
     # death process, cell dies -> correct value of prop[num_off]
     dying = npr.random(lgca.nodes.shape) < lgca.r_d
     for label in lgca.nodes[dying]:
-        if label != 0:
+        if label > 0:
             print('cell with label %d dies' % label)
             labmoth = lgca.props['lab_m'][label]
             if labmoth == 0:
-                #lgca.props['num_off'][label] = lgca.props['num_off'][label] - 1
+                lgca.diedancs += 1
                 print('was an ancestor cell')
+
             else:
-                lgca.props['num_off'][labmoth] = lgca.props['num_off'][labmoth] - 1
+                lgca.props['num_off'][labmoth] -= 1
+                lgca.diedcells += 1
                 print('lab_m dazu ist', labmoth)
         else:
-            print('WHY?')
+            print('WHY?')   #TODO: ausschließen
     lgca.nodes[dying] = 0
 
     # birth
@@ -184,6 +186,7 @@ def inheritance(lgca):
             ind = npr.choice(lgca.K)
             if lgca.occupied[coord, ind] == 0:
                 lgca.maxlabel += 1
+                lgca.borncells += 1
                 node[ind] = lgca.maxlabel
                 print('%d is born' %(lgca.maxlabel))
                 lgca.props = {
@@ -199,12 +202,13 @@ def inheritance(lgca):
                     print('with ancestor ', lgca.props['lab_m'][label])
                     lab = lgca.props['lab_m'][label]
                     lgca.props['lab_m'].append(lab)
-                    for i in range(lgca.maxlabel.astype(int)):
-                        if lgca.props['lab_m'][lab] == 0:
-                            lgca.props['num_off'][lab] += 1
-                            break
-                        else:
-                            lab = lgca.props['lab_m'][lab]
+                    lgca.props['num_off'][lab] += 1
+                    # for i in range(lgca.maxlabel.astype(int)):
+                    #     if lgca.props['lab_m'][lab] == 0:
+                    #         lgca.props['num_off'][lab] += 1
+                    #         break
+                    #     else:
+                    #         lab = lgca.props['lab_m'][lab]
 
                 if lgca.variation:
                     r_b = lgca.props['r_b'][label]
@@ -213,6 +217,6 @@ def inheritance(lgca):
                     lgca.props['r_b'].append(lgca.r_b)
         lgca.nodes[coord] = node
         npr.shuffle(lgca.nodes[coord])
-    #print('props_t', lgca.props_t)
+    print('props', lgca.props['num_off'])
     #lgca.plot_prop_numoff()
 

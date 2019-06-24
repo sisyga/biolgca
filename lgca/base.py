@@ -503,15 +503,17 @@ class IBLGCA_base(LGCA_base):
                     print('standard deviation set to = ', self.std)
                 self.props.update(lab_m=[0] + [0] * self.maxlabel)
                 self.props.update(num_off=[0] + [0] * self.maxlabel)
-                #TODO: nötig?
                 self.props['num_off'][0] = -99
-                #print('num_off', self.props['num_off'])
                 if 'variation' in kwargs:
                     self.variation = kwargs['variation']
                 else:
                     self.variation = False
                     print('set to no variation')
                 self.maxlabel_init = self.maxlabel
+                #Parameter zur Kontrolle
+                self.borncells = 0
+                self.diedcells = 0
+                self.diedancs = 0
 
             else:
                 print('keyword', interaction, 'is not defined! Random walk used instead.')

@@ -11,15 +11,24 @@ def errors(lgca):
         else:
             inh_l = False
     if inh_l:
-        print('inheritance label passen')
+        print('---')
     else:
         print('Fehler: inheritance label passen nicht!')
 
     if len(lgca.props['lab_m']) == len(lgca.props['r_b']) and len(lgca.props['r_b']) == lgca.maxlabel + 1:
-        print('len(props) passt')
+        print('---')
     else:
         print('Fehler: len(props) passen nicht!')
 
+    if lgca.borncells - lgca.diedcells == sum(lgca.props['num_off'][1:]):
+        print('---')
+    else:
+        print('Fehler: Anzahl Zellen fehlerhaft!')
+
+    if sum(lgca.props['num_off'][1:]) != lgca.borncells - lgca.diedcells:
+        print('num_off falsch!')
+    else:
+        print('---')
 
 def count_fam(lgca):
     if lgca.maxlabel_init == 0:
@@ -29,29 +38,34 @@ def count_fam(lgca):
         num = lgca.props['num_off']
         if num[0] != -99:
             print('Etwas stimmt nicht!')
-        print('num', num)
+        #print('num', num)
         print('genealogical tree:', num[1:])
+        print('max family number is %d with ancestor cell %d' % (max(num[1:]), num.index(max(num[1:]))))
         print('number of ancestors at beginning:', lgca.maxlabel_init)
+        print('number of living ancestors:', lgca.maxlabel_init.astype(int) - lgca.diedancs)
         print('number of living offsprings:', sum(num[1:]))
-        print('max family number is %d with ancestor cell %d' % (
-        max(num[1:]), num.index(max(num[1:]))))
+
+        print('number of died cells: ', lgca.diedcells)
+        print('number of died ancestors: ', lgca.diedancs)
+        print('total number of died cells: ', lgca.diedcells+lgca.diedancs)
+        print('number of born cells: ', lgca.borncells)
 
         return max(num[1:])
 
 def bar_stacked(lgca):
     tmax, l, _ = lgca.nodes_t.shape
-    ancs = np.arange(1, lgca.maxlabel_init + 1)
+    ancs = np.arange(1, lgca.maxlabel_init.astype(int) + 1)
     # if len(ancs) != lgca.maxlabel_init:
     #     print('FEHLER: len(ancs) != maxlabel_init!')
-    val = np.zeros((tmax, lgca.maxlabel_init + 1))
+    val = np.zeros((tmax, lgca.maxlabel_init.astype(int) + 1))
     for t in range(tmax):
         for c in ancs:
             val[t, c] = lgca.props_t[t]['num_off'][c]
 
     ind = np.arange(0, tmax, 1)
-    width = 0.5  # the width of the bars: can also be len(x) sequence
+    width = 0.75  # the width of the bars: can also be len(x) sequence
     for c in ancs:
-        print('val für c:', val[:,c], c)
+        # print('val für c:', val[:,c], c)
         if c > 1:
             b = np.zeros(tmax)
             for i in range(1,c):
@@ -68,12 +82,15 @@ def bar_stacked(lgca):
         plt.xticks(ind)
     else:
         plt.xticks(np.arange(0, len(ind)-1, 5))
-    ymax = sum(lgca.props['num_off'][1:]) + 1
-    if ymax <= 20:
-        plt.yticks(np.arange(0, ymax))
-    else:
-        plt.yticks(np.arange(0, ymax, 5))
+    # ymax = max(lgca.props['num_off'][1:]) + 10
+    # if ymax <= 20:
+    #     plt.yticks(np.arange(0, ymax))
+    # else:
+    #     plt.yticks(np.arange(0, ymax, 5))
 
+    if tmax >= 100:
+        plt.xticks(np.arange(0, tmax, 50))
+    #TODO: Achseneinteilung anpassen
     ax = plt.subplot(111)
     box = ax.get_position()
     ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
