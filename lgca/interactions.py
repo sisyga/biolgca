@@ -213,7 +213,7 @@ def wetting(lgca):
         lgca.update_dynamic_fields()
     newnodes = lgca.nodes.copy()
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-               (lgca.cell_density[lgca.nonborder] < lgca.K)
+               (lgca.ecm[lgca.nonborder] == 0)
     coords = [a[relevant] for a in lgca.nonborder]
 
 
@@ -261,6 +261,16 @@ def wetting(lgca):
         #print('Adhesion:', np.dot(permutations[:, :lgca.velocitychannels], adh_weight[coord]) / lgca.n_crit)
         ind = bisect_left(weights, random() * weights[-1])
         newnodes[coord] = permutations[ind]
+
+    # reflection at ecm sites
+    relevant = (lgca.cell_density[lgca.nonborder] > 0) & (lgca.ecm[lgca.nonborder] == 1)
+    coords = [a[relevant] for a in lgca.nonborder]
+    for coord in zip(*coords):
+        oldcellnode = lgca.nodes[coord]
+        newcellnode = newnodes[coord]
+        newcellnode[:lgca.velocitychannels // 2] = oldcellnode[lgca.velocitychannels // 2:lgca.velocitychannels]
+        newcellnode[lgca.velocitychannels // 2:lgca.velocitychannels] = oldcellnode[:lgca.velocitychannels // 2]
+        newnodes[coord] = newcellnode
 
     lgca.nodes = newnodes
 
