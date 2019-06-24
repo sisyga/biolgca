@@ -400,9 +400,9 @@ class IBLGCA_base(LGCA_base):
     """
     Base class for identity-based LGCA.
     """
-    props = {}
 
     def set_interaction(self, **kwargs):
+        self.props = {}
         try:
             from .ib_interactions import birth, birthdeath, go_or_grow_interaction
             from .interactions import random_walk
@@ -455,16 +455,17 @@ class IBLGCA_base(LGCA_base):
                 if 'kappa' in kwargs:
                     self.kappa = kwargs['kappa']
                 else:
-                    self.kappa = 5.
+                    self.kappa = [5.] * self.maxlabel
                     print('switch rate set to kappa = ', self.kappa)
-                self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
+                # self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
+                self.props.update(kappa=[0.] + self.kappa)
                 if 'theta' in kwargs:
                     self.theta = kwargs['theta']
                 else:
-                    self.theta = 0.75
+                    self.theta = [0.75] * self.maxlabel
                     print('switch threshold set to theta = ', self.theta)
                 # MK:
-                self.props.update(theta=[0.] + [self.theta] * self.maxlabel)
+                self.props.update(theta=[0.] + self.theta)  # * self.maxlabel)
                 if self.restchannels < 2:
                     print('WARNING: not enough rest channels - system will die out!!!')
 

@@ -122,13 +122,13 @@ def go_or_grow_interaction(lgca):
         can_switch_to_vel = npr.permutation(rest[rest > 0])[:free_vel]
 
         for cell in can_switch_to_rest:
-            if npr.random() < tanh_switch(rho, kappa=lgca.props['kappa'][cell], theta=lgca.theta):
+            if npr.random() < tanh_switch(rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell]):
                 # print 'switch to rest', cell
                 rest[np.where(rest == 0)[0][0]] = cell
                 vel[np.where(vel == cell)[0][0]] = 0
 
         for cell in can_switch_to_vel:
-            if npr.random() < 1 - tanh_switch(rho, kappa=lgca.props['kappa'][cell], theta=lgca.theta):
+            if npr.random() < 1 - tanh_switch(rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell]):
                 # print 'switch to vel', cell
                 vel[np.where(vel == 0)[0][0]] = cell
                 rest[np.where(rest == cell)[0][0]] = 0
