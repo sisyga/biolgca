@@ -213,7 +213,7 @@ def wetting(lgca):
         lgca.update_dynamic_fields()
     newnodes = lgca.nodes.copy()
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-               (lgca.ecm[lgca.nonborder] == 0)
+               (np.invert(lgca.ecm[lgca.nonborder]))
     coords = [a[relevant] for a in lgca.nonborder]
 
 
@@ -222,7 +222,9 @@ def wetting(lgca):
     nbs *= np.clip(1 - nbs / lgca.n_crit, a_min=0, a_max=None) / lgca.n_crit
     # adh_weight = lgca.channel_weight(nbs) - nbs[..., None]
     g_adh = lgca.gradient(nbs)
-    pressure = lgca.cell_density - lgca.rho_0  # , a_min=None, a_max=Non#np.clip()
+    pressure = (lgca.cell_density - lgca.rho_0) / lgca.K  # , a_min=None, a_max=Non#np.clip()
+    if hasattr(lgca, 'ecm'):
+        pressure += lgca.ecm
     g_pressure = -lgca.gradient(pressure)
     # pressure_weight = np.clip(lgca.cell_density[..., None] - 1 - lgca.rho_0, a_min=0, a_max=None) - lgca.channel_weight(pressure)
 
@@ -256,14 +258,11 @@ def wetting(lgca):
             #+ lgca.gamma * np.dot(permutations[:, :lgca.velocitychannels], pressure_weight[coord])
             #+ lgca.gamma * np.dot(permutations[:, :lgca.velocitychannels], subs_weight[coord])
         ).cumsum()
-        # print('Alignment:', (j_nb[0] * j[0] + j_nb[1] * j[1]) / 4 / lgca.velocitychannels)
-        # print('Resting:', resting[coord] * restc.sum(-1) / lgca.restchannels ** 2 / lgca.velocitychannels)
-        #print('Adhesion:', np.dot(permutations[:, :lgca.velocitychannels], adh_weight[coord]) / lgca.n_crit)
         ind = bisect_left(weights, random() * weights[-1])
         newnodes[coord] = permutations[ind]
 
     # reflection at ecm sites
-    relevant = (lgca.cell_density[lgca.nonborder] > 0) & (lgca.ecm[lgca.nonborder] == 1)
+    relevant = (lgca.cell_density[lgca.nonborder] > 0) & (lgca.ecm[lgca.nonborder])
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
         oldcellnode = lgca.nodes[coord]
