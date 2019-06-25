@@ -111,7 +111,6 @@ class LGCA_base():
         :param r_int:
         :param kwargs:
         """
-        self.dens_t, self.nodes_t, self.n_t = np.empty(3)  # placeholders to record dynamics
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
         self.set_bc(bc)
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
@@ -283,7 +282,7 @@ class LGCA_base():
                     self.rho_0 = kwargs['rho_0']
                 else:
                     self.rho_0 = self.restchannels // 2
-                self.n_crit = (self.velocitychannels + 1) * self.rho_0 - 1
+                self.n_crit = (self.velocitychannels + 1) * self.rho_0
 
 
             elif interaction == 'random_walk':
@@ -401,8 +400,28 @@ class IBLGCA_base(LGCA_base):
     Base class for identity-based LGCA.
     """
 
-    def set_interaction(self, **kwargs):
+    def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', **kwargs):
+        """
+        Initialize class instance.
+        :param nodes:
+        :param l:
+        :param restchannels:
+        :param density:
+        :param bc:
+        :param r_int:
+        :param kwargs:
+        """
+        self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
         self.props = {}
+        self.set_bc(bc)
+        self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
+        self.init_nodes(density=density, nodes=nodes)
+        self.init_coords()
+        self.set_interaction(**kwargs)
+        self.cell_density = self.nodes.sum(-1)
+        self.apply_boundaries()
+
+    def set_interaction(self, **kwargs):
         try:
             from .ib_interactions import birth, birthdeath, go_or_grow_interaction
             from .interactions import random_walk

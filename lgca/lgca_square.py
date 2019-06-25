@@ -33,7 +33,11 @@ class LGCA_Square(LGCA_base):
         elif dims is None:
             dims = (50, 50)
 
-        self.lx, self.ly = dims
+        try:
+            self.lx, self.ly = dims
+        except TypeError:
+            self.lx, self.ly = dims, dims
+
         self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels
 
@@ -436,7 +440,7 @@ class LGCA_Square(LGCA_base):
         return ani
 
     def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
-                     edgecolor='None'):
+                     edgecolor='None', cbar=True):
         if density is None:
             density = self.cell_density[self.nonborder]
 
@@ -452,17 +456,21 @@ class LGCA_Square(LGCA_base):
         fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
         cmap = plt.cm.get_cmap(cmap)
         cmap.set_under(alpha=0.0)
-        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
+        if K > 1:
+            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
+        else:
+            cmap = plt.cm.ScalarMappable(cmap=cmap)
         cmap.set_array(density)
         hexagons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
                                    orientation=self.orientation, facecolor=c, edgecolor=edgecolor)
                     for x, y, c in zip(self.xcoords.ravel(), self.ycoords.ravel(), cmap.to_rgba(density.ravel()))]
         pc = PatchCollection(hexagons, match_original=True)
         ax.add_collection(pc)
-        cbar = fig.colorbar(cmap, extend='min', use_gridspec=True)
-        cbar.set_label('Particle number $n$')
-        cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[1::2])
-        cbar.set_ticklabels(1 + np.arange(K))
+        if cbar:
+            cbar = fig.colorbar(cmap, extend='min', use_gridspec=True)
+            cbar.set_label('Particle number $n$')
+            cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[1::2])
+            cbar.set_ticklabels(1 + np.arange(K))
         return fig, pc, cmap
 
     def plot_vectorfield(self, x, y, vfx, vfy, figindex=None, figsize=None, tight_layout=True, cmap='viridis'):
