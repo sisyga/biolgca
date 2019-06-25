@@ -234,9 +234,8 @@ def wetting(lgca):
 
     resting = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
     resting = lgca.nb_sum(resting)
-    resting *= (1 - resting / lgca.rho_0 / lgca.velocitychannels / 2) * np.heaviside(
-        1 - nbs / lgca.rho_0 / lgca.velocitychannels / 2, 0) / lgca.velocitychannels / lgca.rho_0 * 2
-    # resting = np.clip(resting, a_min=0, a_max=lgca.velocitychannels * lgca.rho_0) / lgca.velocitychannels / lgca.rho_0
+    # resting *= np.clip(1 - resting / lgca.rho_0 / lgca.velocitychannels, a_min=0, a_max=None) / lgca.velocitychannels / lgca.rho_0
+    resting = np.clip(resting, a_min=0, a_max=lgca.velocitychannels * lgca.rho_0) / lgca.velocitychannels / lgca.rho_0
     # resting = np.clip(resting, a_min=None, a_max=lgca.n_crit)
     g = lgca.calc_flux(lgca.nodes)
     g = lgca.nb_sum(g)
@@ -260,8 +259,8 @@ def wetting(lgca):
             # + lgca.alpha * np.einsum('i,ij', g_subs[coord], j)
             # + lgca.alpha * restc
             + lgca.gamma * np.einsum('i,ij', g_pressure[coord], j)
-            # + lgca.gamma * np.dot(permutations[:, :lgca.velocitychannels], pressure_weight[coord])
-            # + lgca.gamma * np.dot(permutations[:, :lgca.velocitychannels], subs_weight[coord])
+            #+ lgca.gamma * np.dot(permutations[:, :lgca.velocitychannels], pressure_weight[coord])
+            #+ lgca.gamma * np.dot(permutations[:, :lgca.velocitychannels], subs_weight[coord])
         ).cumsum()
         # print('Alignment:', (j_nb[0] * j[0] + j_nb[1] * j[1]) / 4 / lgca.velocitychannels)
         # print('Resting:', resting[coord] * restc.sum(-1) / lgca.restchannels ** 2 / lgca.velocitychannels)
@@ -314,55 +313,31 @@ def go_or_grow(lgca):
     :return:
     """
     relevant = lgca.cell_density[lgca.nonborder] > 0
-        # cell_density = sum of filled channels for each node
-        # nonborder
     coords = [a[relevant] for a in lgca.nonborder]
-        # coordinates of every node with at least one cell
     n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
-        # density of the velocity channels, which come first in the vector of a node
     n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
-        # -"- rest channels, which come after the velocity channels
     M1 = np.minimum(n_m, lgca.restchannels - n_r)
-        # minimum of filled velocity channels and empty rest channels
     M2 = np.minimum(n_r, lgca.velocitychannels - n_m)
-        # -"- filled rest and empty velo
     for coord in zip(*coords):
-        # unzip coords to get ???
         # node = lgca.nodes[coord]
         n = lgca.cell_density[coord]
-        # number of filled channels
+
         n_mxy = n_m[coord]
-        # number of filled velocity channels
         n_rxy = n_r[coord]
-        # number of filled rest channels
+
         rho = n / lgca.K
-        # ? K = capacity
         j_1 = npr.binomial(M1[coord], tanh_switch(rho, kappa=lgca.kappa, theta=lgca.theta))
-        # random event that cell switches from velocity channel into empty rest channel depending on kappa
-        # tanh_switch return 0.5 * (1 + np.tanh(kappa * (rho - theta)))
-        # ?
         j_2 = npr.binomial(M2[coord], 1 - tanh_switch(rho, kappa=lgca.kappa, theta=lgca.theta))
-        # opposite of above
         n_mxy += j_2 - j_1
-        # update number of filled velocity channels
         n_rxy += j_1 - j_2
-        # -"- rest channels
         n_mxy -= npr.binomial(n_mxy * np.heaviside(n_mxy, 0), lgca.r_d)
-        # death events
-        # heaviside ? to prevent error when n_mxy went below zero
         n_rxy -= npr.binomial(n_rxy * np.heaviside(n_rxy, 0), lgca.r_d)
         M = min([n_rxy, lgca.restchannels - n_rxy])
-        # minimum of filled vs empty rest channels
         n_rxy += npr.binomial(M * np.heaviside(M, 0), lgca.r_b)
-        #
+
         v_channels = [1] * n_mxy + [0] * (lgca.velocitychannels - n_mxy)
-        # create array of velocity channels
         v_channels = npr.permutation(v_channels)
-        # mix cells within velocity channels
         r_channels = np.zeros(lgca.restchannels)
         r_channels[:n_rxy] = 1
-        # create array of rest channels
         node = np.hstack((v_channels, r_channels))
-        # combine to create "node" array
         lgca.nodes[coord] = node
-        # update nodes in the object
