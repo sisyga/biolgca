@@ -152,12 +152,14 @@ def inheritance(lgca):
     r_d = const
     """
     # death process, cell dies -> correct value of prop[num_off]
-    dying = npr.random(lgca.nodes.shape) < lgca.r_d
-    for label in lgca.nodes[dying]:
+    rel_nodes = lgca.nodes[1:-1]
+    # print('rel_nodes', rel_nodes)
+    dying = npr.random(rel_nodes.shape) < lgca.r_d
+    for label in rel_nodes[dying]:
         if label > 0:
             print('cell with label %d dies' % label)
             labmoth = lgca.props['lab_m'][label]
-            if labmoth == 0:
+            if labmoth == 0 and label != 0:
                 lgca.diedancs += 1
                 print('was an ancestor cell')
 
@@ -167,7 +169,10 @@ def inheritance(lgca):
                 print('lab_m dazu ist', labmoth)
         else:
             print('WHY?')   #TODO: ausschließen
-    lgca.nodes[dying] = 0
+    rel_nodes[dying] = 0
+    lgca.nodes[1:-1] = rel_nodes
+    lgca.nodes[0] = rel_nodes[-1]
+    lgca.nodes[-1] = rel_nodes[0]
 
     # birth
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
@@ -185,6 +190,7 @@ def inheritance(lgca):
         for label in node[proliferating]:
             ind = npr.choice(lgca.K)
             if lgca.occupied[coord, ind] == 0:
+                print('es proliferiert Zelle', label)
                 lgca.maxlabel += 1
                 lgca.borncells += 1
                 node[ind] = lgca.maxlabel

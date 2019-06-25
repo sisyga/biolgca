@@ -200,7 +200,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             if showprogress:
                 update_progress(1.0 * t / timesteps)
 
-    def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=None, figsize=None, propname=None, cmap='cividis'):
+    def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop=None, cmap='cividis'):
         if nodes_t is None:
             nodes_t = self.nodes_t
         if figsize is None:
