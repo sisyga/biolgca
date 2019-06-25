@@ -182,6 +182,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.nodes_t = np.zeros((timesteps + 1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
             self.nodes_t[0, ...] = self.nodes[self.r_int:-self.r_int, ...]
             self.props_t = [self.props]
+            print('props_t init', self.props_t)
         if recordN:
             self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
             self.n_t[0] = self.nodes.sum()
@@ -192,6 +193,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.timestep()
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.r_int:-self.r_int]
+                foobarid = id(self.props)
                 self.props_t.append(self.props)
             if recordN:
                 self.n_t[t] = self.cell_density.sum()
@@ -199,6 +201,9 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                 self.dens_t[t, ...] = self.cell_density[self.r_int:-self.r_int]
             if showprogress:
                 update_progress(1.0 * t / timesteps)
+            print('t=', t)
+            print('props in timeevo:', self.props['num_off'])
+            print('props_t in timeevo', self.props_t[t]['num_off'][:])
 
     def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop=None, cmap='cividis'):
         if nodes_t is None:

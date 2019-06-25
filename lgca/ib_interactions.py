@@ -153,14 +153,19 @@ def inheritance(lgca):
     """
     # death process, cell dies -> correct value of prop[num_off]
     rel_nodes = lgca.nodes[1:-1]
-    # print('rel_nodes', rel_nodes)
     dying = npr.random(rel_nodes.shape) < lgca.r_d
     for label in rel_nodes[dying]:
+        lgca.props = {
+            'r_b': lgca.props['r_b'].copy(),
+            'lab_m': lgca.props['lab_m'].copy(),
+            'num_off': lgca.props['num_off'].copy()
+        }
         if label > 0:
             print('cell with label %d dies' % label)
             labmoth = lgca.props['lab_m'][label]
-            if labmoth == 0 and label != 0:
+            if labmoth == 0:
                 lgca.diedancs += 1
+                lgca.props['num_off'][label] -= 1
                 print('was an ancestor cell')
 
             else:
@@ -172,7 +177,7 @@ def inheritance(lgca):
     rel_nodes[dying] = 0
     lgca.nodes[1:-1] = rel_nodes
     lgca.nodes[0] = rel_nodes[-1]
-    lgca.nodes[-1] = rel_nodes[0]
+    lgca.nodes[-1] = rel_nodes[0]   #TODO: bc anwenden, nicht selbst
 
     # birth
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
@@ -223,6 +228,6 @@ def inheritance(lgca):
                     lgca.props['r_b'].append(lgca.r_b)
         lgca.nodes[coord] = node
         npr.shuffle(lgca.nodes[coord])
-    print('props', lgca.props['num_off'])
+    # print('props', lgca.props['num_off'])
     #lgca.plot_prop_numoff()
 

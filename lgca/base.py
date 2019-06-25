@@ -502,8 +502,8 @@ class IBLGCA_base(LGCA_base):
                     self.std = 0.1
                     print('standard deviation set to = ', self.std)
                 self.props.update(lab_m=[0] + [0] * self.maxlabel)
-                self.props.update(num_off=[0] + [0] * self.maxlabel)
-                self.props['num_off'][0] = -99
+                self.props.update(num_off=[-99] + [1] * self.maxlabel)
+                # self.props['num_off'][0] = -99
                 if 'variation' in kwargs:
                     self.variation = kwargs['variation']
                 else:

@@ -20,12 +20,7 @@ def errors(lgca):
     else:
         print('Fehler: len(props) passen nicht!')
 
-    if lgca.borncells - lgca.diedcells == sum(lgca.props['num_off'][1:]):
-        print('---')
-    else:
-        print('Fehler: Anzahl Zellen fehlerhaft!')
-
-    if sum(lgca.props['num_off'][1:]) != lgca.borncells - lgca.diedcells:
+    if sum(lgca.props['num_off'][1:]) != lgca.borncells - lgca.diedcells + lgca.maxlabel_init - lgca.diedancs:
         print('num_off falsch!')
     else:
         print('---')
@@ -58,12 +53,12 @@ def bar_stacked(lgca):
     # if len(ancs) != lgca.maxlabel_init:
     #     print('FEHLER: len(ancs) != maxlabel_init!')
     val = np.zeros((tmax, lgca.maxlabel_init.astype(int) + 1))
-    for t in range(tmax):
+    for t in range(0,tmax):
         for c in ancs:
             val[t, c] = lgca.props_t[t]['num_off'][c]
 
     ind = np.arange(0, tmax, 1)
-    width = 0.75  # the width of the bars: can also be len(x) sequence
+    width = 1  # the width of the bars: can also be len(x) sequence
     for c in ancs:
         # print('val für c:', val[:,c], c)
         if c > 1:
