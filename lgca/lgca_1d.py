@@ -193,7 +193,6 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.timestep()
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.r_int:-self.r_int]
-                foobarid = id(self.props)
                 self.props_t.append(self.props)
             if recordN:
                 self.n_t[t] = self.cell_density.sum()
