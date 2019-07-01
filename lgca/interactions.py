@@ -202,7 +202,7 @@ def wetting(lgca):
     :return:
     """
     if hasattr(lgca, 'spheroid'):
-        rho = lgca.cell_density[lgca.spheroid, None] / lgca.K
+        # rho = lgca.cell_density[lgca.spheroid, None] / lgca.K
         birth = npr.random(lgca.nodes[lgca.spheroid].shape) < lgca.r_b  # / (1 - rho) / lgca.K
         # nbs = lgca.nb_sum(lgca.cell_density) + lgca.cell_density - 1
         # nbs /= lgca.n_crit
@@ -213,24 +213,20 @@ def wetting(lgca):
         lgca.update_dynamic_fields()
     newnodes = lgca.nodes.copy()
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-               (lgca.cell_density[lgca.nonborder] < lgca.K)
+               (np.invert(lgca.ecm[lgca.nonborder]))
     coords = [a[relevant] for a in lgca.nonborder]
 
-    # subs_dens = lgca.K - lgca.cell_density * 1.
-    # subs_dens = -np.clip(lgca.cell_density, a_min=0, a_max=None)
-    # subs_weight = lgca.channel_weight(subs_dens) - \
-    #              np.divide(1., lgca.cell_density[..., None], where=lgca.cell_density[..., None] > 0,
-    #                       out=np.zeros_like(lgca.cell_density[..., None], dtype=float))
-    # g_subs = lgca.gradient(subs_dens)
+
     # nbs = np.clip(lgca.nb_sum(lgca.cell_density) + lgca.cell_density, a_min=None, a_max=lgca.n_crit)
     nbs = lgca.nb_sum(lgca.cell_density) + lgca.cell_density
-    nbs *= (1 - nbs / lgca.n_crit / 2) * np.heaviside(1 - nbs / lgca.n_crit / 2, 0) / lgca.n_crit * 2
-    adh_weight = lgca.channel_weight(nbs) - nbs[..., None]
-    # g_adh = lgca.gradient(nbs)
-    pressure = np.clip(lgca.cell_density - lgca.rho_0 - 1, a_min=0, a_max=None)
+    nbs *= np.clip(1 - nbs / lgca.n_crit, a_min=0, a_max=None) / lgca.n_crit
+    # adh_weight = lgca.channel_weight(nbs) - nbs[..., None]
+    g_adh = lgca.gradient(nbs)
+    pressure = (lgca.cell_density - lgca.rho_0) / lgca.K  # , a_min=None, a_max=Non#np.clip()
+    if hasattr(lgca, 'ecm'):
+        pressure += lgca.ecm
     g_pressure = -lgca.gradient(pressure)
-    # pressure_weight = np.clip(lgca.cell_density[..., None] - 2 - lgca.rho_0, a_min=0, a_max=None) - lgca.channel_weight(
-    #    pressure)
+    # pressure_weight = np.clip(lgca.cell_density[..., None] - 1 - lgca.rho_0, a_min=0, a_max=None) - lgca.channel_weight(pressure)
 
     resting = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
     resting = lgca.nb_sum(resting)
@@ -251,11 +247,11 @@ def wetting(lgca):
         restc = permutations[:, lgca.velocitychannels:].sum(-1)
         j = lgca.j[n]
         j_nb = g[coord]
-        weights = np.exp(  # -lgca.beta * nbs[coord] * np.linalg.norm(j - j_nb[:, None], axis=0) / lgca.n_crit
+        weights = np.exp(
             lgca.beta * (j_nb[0] * j[0] + j_nb[1] * j[1]) / lgca.velocitychannels / 2
             + lgca.beta * resting[coord] * restc * (1 - restc / lgca.rho_0 / 2) * 2
-            + lgca.beta * np.dot(permutations[:, :lgca.velocitychannels], adh_weight[coord])
-            # + lgca.beta * np.einsum('i,ij', g_adh[coord], j)
+            # + lgca.beta * np.dot(permutations[:, :lgca.velocitychannels], adh_weight[coord])
+            + lgca.beta * np.einsum('i,ij', g_adh[coord], j)
             # + lgca.alpha * np.einsum('i,ij', g_subs[coord], j)
             # + lgca.alpha * restc
             + lgca.gamma * np.einsum('i,ij', g_pressure[coord], j)
@@ -267,6 +263,16 @@ def wetting(lgca):
         #print('Adhesion:', np.dot(permutations[:, :lgca.velocitychannels], adh_weight[coord]) / lgca.n_crit)
         ind = bisect_left(weights, random() * weights[-1])
         newnodes[coord] = permutations[ind]
+
+    # reflection at ecm sites
+    relevant = (lgca.cell_density[lgca.nonborder] > 0) & (lgca.ecm[lgca.nonborder])
+    coords = [a[relevant] for a in lgca.nonborder]
+    for coord in zip(*coords):
+        oldcellnode = lgca.nodes[coord]
+        newcellnode = newnodes[coord]
+        newcellnode[:lgca.velocitychannels // 2] = oldcellnode[lgca.velocitychannels // 2:lgca.velocitychannels]
+        newcellnode[lgca.velocitychannels // 2:lgca.velocitychannels] = oldcellnode[:lgca.velocitychannels // 2]
+        newnodes[coord] = newcellnode
 
     lgca.nodes = newnodes
 
