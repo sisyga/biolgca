@@ -74,15 +74,9 @@ def bar_stacked(lgca):
         plt.xticks(ind)
     else:
         plt.xticks(np.arange(0, len(ind)-1, 5))
-    # ymax = max(lgca.props['num_off'][1:]) + 10
-    # if ymax <= 20:
-    #     plt.yticks(np.arange(0, ymax))
-    # else:
-    #     plt.yticks(np.arange(0, ymax, 5))
 
     if tmax >= 100:
         plt.xticks(np.arange(0, tmax, 50))
-    #TODO: Achseneinteilung anpassen
     ax = plt.subplot(111)
     box = ax.get_position()
     ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])

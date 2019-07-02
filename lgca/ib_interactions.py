@@ -151,8 +151,10 @@ def inheritance(lgca):
     """
     r_d = const
     """
+    chronicle = False   #Ausgabe der einzelnen Schritte für chronicle = True
+
     # death process, cell dies -> correct value of prop[num_off]
-    rel_nodes = lgca.nodes[1:-1]
+    rel_nodes = lgca.nodes[lgca.r_int:-lgca.r_int]
     dying = npr.random(rel_nodes.shape) < lgca.r_d
     for label in rel_nodes[dying]:
         lgca.props = {
@@ -161,17 +163,15 @@ def inheritance(lgca):
             'num_off': lgca.props['num_off'].copy()
         }
         if label > 0:
-            print('cell with label %d dies' % label)
+            if chronicle:
+                print('cell with label %d dies' % label)
             labmoth = lgca.props['lab_m'][label]
             lgca.props['num_off'][labmoth] -= 1
             lgca.diedcells += 1
-            print('lab_m dazu ist', labmoth)
-        else:
-            print('WHY?')   #TODO: ausschließen
+            if chronicle:
+                print('lab_m dazu ist', labmoth)
     rel_nodes[dying] = 0
-    lgca.nodes[1:-1] = rel_nodes
-    lgca.nodes[0] = rel_nodes[-1]
-    lgca.nodes[-1] = rel_nodes[0]   #TODO: bc anwenden, nicht selbst
+    lgca.apply_boundaries()
 
     # birth
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
@@ -187,12 +187,14 @@ def inheritance(lgca):
         for label in node[proliferating]:
             ind = npr.choice(lgca.K)
             if lgca.occupied[coord, ind] == 0:
-                print('es proliferiert Zelle', label)
+                if chronicle:
+                    print('es proliferiert Zelle', label)
                 lgca.maxlabel += 1
                 lgca.borncells += 1
                 node[ind] = lgca.maxlabel
-                print('%d is born' %(lgca.maxlabel))
-                print('with ancestor ', lgca.props['lab_m'][label])
+                if chronicle:
+                    print('%d is born' %(lgca.maxlabel))
+                    print('with ancestor ', lgca.props['lab_m'][label])
 
                 lgca.props = {
                     'r_b': lgca.props['r_b'].copy(),

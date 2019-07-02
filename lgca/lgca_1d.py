@@ -182,7 +182,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.nodes_t = np.zeros((timesteps + 1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
             self.nodes_t[0, ...] = self.nodes[self.r_int:-self.r_int, ...]
             self.props_t = [self.props]
-            print('props_t init', self.props_t)
+            # print('props_t init', self.props_t)
         if recordN:
             self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
             self.n_t[0] = self.nodes.sum()
@@ -200,9 +200,9 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                 self.dens_t[t, ...] = self.cell_density[self.r_int:-self.r_int]
             if showprogress:
                 update_progress(1.0 * t / timesteps)
-            print('t=', t)
-            print('props in timeevo:', self.props['num_off'])
-            print('props_t in timeevo', self.props_t[t]['num_off'][:])
+            # print('t=', t)
+            # print('props in timeevo:', self.props['num_off'])
+            # print('props_t in timeevo', self.props_t[t]['num_off'][:])
 
     def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop=None, cmap='cividis'):
         if nodes_t is None:
@@ -251,10 +251,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         return plot
 
-    def plot_prop_numoff(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop='num_off'):
-        # TODO: bar_stacked mit mullerplot hier rein,
-        # TODO: Funktion komplett überarbeiten
-        #erste Spalte vom nummoffs ignorieren
+    def plot_muller(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop='num_off'):
 
         if nodes_t is None:
             nodes_t = self.nodes_t
@@ -262,32 +259,9 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             figsize = estimate_figsize(nodes_t.sum(-1).T, cbar=True)
         if props_t is None:
             props_t = self.props_t
+        #TODO: mullerplot ergänzen
 
-        tmax, l, _ = nodes_t.shape
-        print('tmax=%d, l=%d' %(tmax, l))
-        numoffs = np.zeros((tmax, self.maxlabel_init.astype(int) + 1))   #TODO: 2 durch kapazität ersetzen
-        print('numoffs', numoffs)
-        #print('nodes_t', nodes_t )
-        for t in range(tmax):
-            print('timestep', t)
-            for x in range(l):
-                node = nodes_t[t, x]
-                print('node', node)
-                occ = node.astype(np.bool)
-                if occ.sum() == 0:
-                    continue
-                labs = np.array(node[node > 0]) #unbesetztes fällt weg, übrig bleiben label
-                print('labs', labs)
-                for i in range(len(labs)):
-                    if labs[i] > self.maxlabel_init:
-                        print('labs > init')
-                        numoffs[t, self.props['lab_m'][labs[i]]] = props_t[t]['num_off'][self.props['lab_m'][labs[i]]]
-                    else:
-                        numoffs[t, labs[i]] = props_t[t]['num_off'][labs[i]]
 
-            print('numoffs', numoffs)
-
-        #TODO: plot
 
     def plot_prop_timecourse(self, nodes_t=None, props_t=None, propname=None, figindex=None, figsize=None):
         if nodes_t is None:
