@@ -163,15 +163,9 @@ def inheritance(lgca):
         if label > 0:
             print('cell with label %d dies' % label)
             labmoth = lgca.props['lab_m'][label]
-            if labmoth == 0:
-                lgca.diedancs += 1
-                lgca.props['num_off'][label] -= 1
-                print('was an ancestor cell')
-
-            else:
-                lgca.props['num_off'][labmoth] -= 1
-                lgca.diedcells += 1
-                print('lab_m dazu ist', labmoth)
+            lgca.props['num_off'][labmoth] -= 1
+            lgca.diedcells += 1
+            print('lab_m dazu ist', labmoth)
         else:
             print('WHY?')   #TODO: ausschließen
     rel_nodes[dying] = 0
@@ -183,9 +177,7 @@ def inheritance(lgca):
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
                (lgca.cell_density[lgca.nonborder] < lgca.K)
     coords = [a[relevant] for a in lgca.nonborder]
-    #inds = np.arange(lgca.K)
     for coord in zip(*coords):
-        #n = lgca.cell_density[coord]
         node = lgca.nodes[coord]
 
         # choose cells that proliferate
@@ -200,26 +192,17 @@ def inheritance(lgca):
                 lgca.borncells += 1
                 node[ind] = lgca.maxlabel
                 print('%d is born' %(lgca.maxlabel))
+                print('with ancestor ', lgca.props['lab_m'][label])
+
                 lgca.props = {
                     'r_b': lgca.props['r_b'].copy(),
                     'lab_m': lgca.props['lab_m'].copy(),
                     'num_off': lgca.props['num_off'].copy()
                 }
-                if lgca.props['lab_m'][label] == 0:
-                    lgca.props['lab_m'].append(label)
-                    lgca.props['num_off'][label] += 1
-                    print('with ancestor ', label)
-                else:
-                    print('with ancestor ', lgca.props['lab_m'][label])
-                    lab = lgca.props['lab_m'][label]
-                    lgca.props['lab_m'].append(lab)
-                    lgca.props['num_off'][lab] += 1
-                    # for i in range(lgca.maxlabel.astype(int)):
-                    #     if lgca.props['lab_m'][lab] == 0:
-                    #         lgca.props['num_off'][lab] += 1
-                    #         break
-                    #     else:
-                    #         lab = lgca.props['lab_m'][lab]
+
+                labm = lgca.props['lab_m'][label]
+                lgca.props['lab_m'].append(labm)
+                lgca.props['num_off'][labm] += 1
 
                 if lgca.variation:
                     r_b = lgca.props['r_b'][label]

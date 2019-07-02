@@ -20,7 +20,7 @@ def errors(lgca):
     else:
         print('Fehler: len(props) passen nicht!')
 
-    if sum(lgca.props['num_off'][1:]) != lgca.borncells - lgca.diedcells + lgca.maxlabel_init - lgca.diedancs:
+    if sum(lgca.props['num_off'][1:]) != lgca.borncells - lgca.diedcells + lgca.maxlabel_init:
         print('num_off falsch!')
     else:
         print('---')
@@ -37,12 +37,9 @@ def count_fam(lgca):
         print('genealogical tree:', num[1:])
         print('max family number is %d with ancestor cell %d' % (max(num[1:]), num.index(max(num[1:]))))
         print('number of ancestors at beginning:', lgca.maxlabel_init)
-        print('number of living ancestors:', lgca.maxlabel_init.astype(int) - lgca.diedancs)
         print('number of living offsprings:', sum(num[1:]))
 
         print('number of died cells: ', lgca.diedcells)
-        print('number of died ancestors: ', lgca.diedancs)
-        print('total number of died cells: ', lgca.diedcells+lgca.diedancs)
         print('number of born cells: ', lgca.borncells)
 
         return max(num[1:])
