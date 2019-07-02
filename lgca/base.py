@@ -513,7 +513,7 @@ class IBLGCA_base(LGCA_base):
                 #Parameter zur Kontrolle
                 self.borncells = 0
                 self.diedcells = 0
-                for i in range(1,self.maxlabel_init+1):
+                for i in range(1,self.maxlabel_init.astype(int)+1):
                     self.props['lab_m'][i] = i
 
 
