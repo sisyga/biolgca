@@ -62,11 +62,12 @@ def bar_stacked(lgca):
             b = np.zeros(tmax)
             for i in range(1,c):
                 b = b + val[:,i]
-            plt.bar(ind, val[:, c], width, bottom=b)
+            plt.bar(ind, val[:, c], width, bottom=b, label=c)
         else:
-            plt.bar(ind, val[:, c], width, color=['red'])
+            plt.bar(ind, val[:, c], width, color=['red'], label=c)
 
     ###plot settings
+
     plt.ylabel('total number of living offsprings')
     plt.xlabel('timesteps')
     plt.title('Ratio of offsprings')
@@ -77,11 +78,9 @@ def bar_stacked(lgca):
 
     if tmax >= 100:
         plt.xticks(np.arange(0, tmax, 50))
-    ax = plt.subplot(111)
-    box = ax.get_position()
-    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-    ax.legend(ancs, loc='center left', bbox_to_anchor=(1, 0.5))
 
+    plt.subplots_adjust(right=0.85)
+    plt.legend(bbox_to_anchor=(1.04, 1))
     plt.show()
 
 def simpsonindex(lgca):
