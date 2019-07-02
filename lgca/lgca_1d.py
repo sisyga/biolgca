@@ -1,4 +1,5 @@
 import matplotlib.ticker as mticker
+from datetime import datetime
 
 try:
     from .base import *
@@ -251,16 +252,27 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         return plot
 
-    def plot_muller(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop='num_off'):
-
+    def mullerplot(self, nodes_t=None, props_t=None, figindex=None, figsize=None):
         if nodes_t is None:
             nodes_t = self.nodes_t
-        if figsize is None:
-            figsize = estimate_figsize(nodes_t.sum(-1).T, cbar=True)
+        # if figsize is None:
+        #     figsize = estimate_figsize(nodes_t.sum(-1).T, cbar=True)
         if props_t is None:
             props_t = self.props_t
-        #TODO: mullerplot ergänzen
 
+        #create values
+        tmax, l, _ = nodes_t.shape
+        ancs = np.arange(1, self.maxlabel_init.astype(int) + 1)
+        # if len(ancs) != lgca.maxlabel_init:
+        #     print('FEHLER: len(ancs) != maxlabel_init!')
+        val = np.zeros((tmax, self.maxlabel_init.astype(int) + 1))
+        for t in range(0, tmax):
+            for c in ancs:
+                val[t, c] = props_t[t]['num_off'][c]
+
+        #write in .txt
+        file = str(datetime.now()) + '.txt'
+        np.savetxt(file, val, fmt="%d")
 
 
     def plot_prop_timecourse(self, nodes_t=None, props_t=None, propname=None, figindex=None, figsize=None):

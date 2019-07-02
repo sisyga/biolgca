@@ -30,6 +30,7 @@ def count_fam(lgca):
         print('ERROR: There are no cells in the lattice!')
     else:
         print('---genealogical research---')
+        print('number of ancestors: ', lgca.maxlabel_init)
         num = lgca.props['num_off']
         if num[0] != -99:
             print('Etwas stimmt nicht!')
