@@ -151,7 +151,7 @@ def inheritance(lgca):
     """
     r_d = const
     """
-    chronicle = False   #Ausgabe der einzelnen Schritte für chronicle = True
+    chronicle = True   #Ausgabe der einzelnen Schritte für chronicle = True
 
     # death process, cell dies -> correct value of prop[num_off]
     rel_nodes = lgca.nodes[lgca.r_int:-lgca.r_int]

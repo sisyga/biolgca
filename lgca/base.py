@@ -548,3 +548,16 @@ class IBLGCA_base(LGCA_base):
         self.apply_boundaries()
         self.maxlabel = self.nodes.max()
         self.update_dynamic_fields()
+
+    def simpsonindex(lgca):
+        n = sum(lgca.props['num_off'][1:])
+        if n > 1:
+            s = lgca.maxlabel_init.astype(int)
+            d = 1
+            for i in range(1, s + 1):
+                n_i = lgca.props['num_off'][i]
+                d = d - n_i * (n_i - 1) / (n * (n - 1))
+            return d
+        else:
+            print('Fehler, weil n = ', n)
+        # print('Simpson-Index = ', d)

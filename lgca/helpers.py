@@ -84,15 +84,11 @@ def bar_stacked(lgca):
     plt.legend(bbox_to_anchor=(1.04, 1))
     plt.show()
 
-def simpsonindex(lgca):
-    n = sum(lgca.props['num_off'][1:])
-    s = lgca.maxlabel_init.astype(int)
-    d = 1
-    for i in range(1,s+1):
-        n_i = lgca.props['num_off'][i]
-        d = d - n_i*(n_i-1)/(n*(n-1))
-    print('Simpson-Index = ', d)
-    return d
+def save_data(lgca):
+    #brauche:   rb, rd, dim, restchannel, velocitychannel, dichte
+    #nicht:     time, variation
+    props_t = lgca.props_t
+    print(props_t)
 
 def aloha(who):
     print('aloha', who)

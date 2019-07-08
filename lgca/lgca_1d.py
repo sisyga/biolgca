@@ -33,6 +33,7 @@ class LGCA_1D(LGCA_base):
 
         self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels
+        # print('capacity = ', self.K)
 
     def init_nodes(self, density, nodes=None):
 
@@ -179,6 +180,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
         self.update_dynamic_fields()
+        si = True
         if record:
             self.nodes_t = np.zeros((timesteps + 1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
             self.nodes_t[0, ...] = self.nodes[self.r_int:-self.r_int, ...]
@@ -192,6 +194,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.dens_t[0, ...] = self.cell_density[self.r_int:-self.r_int]
         for t in range(1, timesteps + 1):
             self.timestep()
+
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.r_int:-self.r_int]
                 self.props_t.append(self.props)
@@ -201,6 +204,10 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                 self.dens_t[t, ...] = self.cell_density[self.r_int:-self.r_int]
             if showprogress:
                 update_progress(1.0 * t / timesteps)
+            if si:
+                if self.simpsonindex() == 0:
+                    print('Homogeneity since k = ', t)
+                    si = False
             # print('t=', t)
             # print('props in timeevo:', self.props['num_off'])
             # print('props_t in timeevo', self.props_t[t]['num_off'][:])
