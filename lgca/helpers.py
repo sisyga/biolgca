@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from datetime import datetime
 
 
 def errors(lgca):
@@ -85,10 +86,23 @@ def bar_stacked(lgca):
     plt.show()
 
 def save_data(lgca):
-    #brauche:   rb, rd, dim, restchannel, velocitychannel, dichte
+    #brauche:   rb, rd, dim, restchannel, velocitychannel, dichte, propst
     #nicht:     time, variation
-    props_t = lgca.props_t
-    print(props_t)
+
+    t = len(lgca.props_t)
+    dens = lgca.maxlabel_init/(lgca.K * lgca.l)
+    file = open('test.txt', 'w')
+    # file = open(str(datetime.now()) + '.txt', 'w')
+
+    file.write("gesetzte Parameter:\n")
+    file.write('dimension = {dim:d}, deathrate = {rd:1.5f}, birthrate = {rb:1.5f}, timesteps = {t:d}\n'\
+               .format(dim=lgca.l, rd=lgca.r_d, rb=lgca.r_b, t=t-1))
+    file.write("velocitychannels = {vc:d}, restchannels = {rc:d}, initial density = {dens:f}\n"\
+               .format(vc=lgca.velocitychannels, rc=lgca.restchannels, dens=dens))
+    file.write('props_t:\n')
+    for i in range(0,t):
+        file.write('{i:s}\n'.format(i=str(lgca.props_t[i])))
+    file.close()
 
 def aloha(who):
     print('aloha', who)
