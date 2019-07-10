@@ -51,16 +51,19 @@ class LGCA_1D(LGCA_base):
         """
         :return:
         """
+        #TODO: m einführen -> evt mit r verknüpfen
+        print('nodes', self.nodes)
         newnodes = np.zeros_like(self.nodes)
+        print('new', newnodes)
         # resting particles stay
         newnodes[:, 2:] = self.nodes[:, 2:]
-
+        print('rest', newnodes)
         # prop. to the right
         newnodes[1:, 0] = self.nodes[:-1, 0]
-
+        print('to right', newnodes)
         # prop. to the left
         newnodes[:-1, 1] = self.nodes[1:, 1]
-
+        print('to left', newnodes)
         self.nodes = newnodes
 
     def apply_pbc(self):
