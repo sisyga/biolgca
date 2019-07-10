@@ -516,7 +516,6 @@ class IBLGCA_base(LGCA_base):
                 for i in range(1,self.maxlabel_init.astype(int)+1):
                     self.props['lab_m'][i] = i
 
-
             else:
                 print('keyword', interaction, 'is not defined! Random walk used instead.')
                 self.interaction = random_walk

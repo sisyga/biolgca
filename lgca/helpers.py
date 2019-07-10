@@ -32,10 +32,10 @@ def count_fam(lgca):
     else:
         print('---genealogical research---')
         print('number of ancestors: ', lgca.maxlabel_init)
+        print('initial density: ', lgca.maxlabel_init/(lgca.K * lgca.l))
         num = lgca.props['num_off']
         if num[0] != -99:
             print('Etwas stimmt nicht!')
-        #print('num', num)
         print('genealogical tree:', num[1:])
         print('max family number is %d with ancestor cell %d' % (max(num[1:]), num.index(max(num[1:]))))
         print('number of ancestors at beginning:', lgca.maxlabel_init)
@@ -55,7 +55,7 @@ def bar_stacked(lgca):
     for t in range(0,tmax):
         for c in ancs:
             val[t, c] = lgca.props_t[t]['num_off'][c]
-
+    plt.figure(num=None)
     ind = np.arange(0, tmax, 1)
     width = 1  # the width of the bars: can also be len(x) sequence
     for c in ancs:
@@ -100,9 +100,28 @@ def save_data(lgca):
     file.write("velocitychannels = {vc:d}, restchannels = {rc:d}, initial density = {dens:f}\n"\
                .format(vc=lgca.velocitychannels, rc=lgca.restchannels, dens=dens))
     file.write('props_t:\n')
-    for i in range(0,t):
+    for i in range(0, t):
         file.write('{i:s}\n'.format(i=str(lgca.props_t[i])))
     file.close()
+
+def ana_si(lgca, p = False):
+    t = len(lgca.props_t)   #timesteps + 1
+    for i in range(t):
+        if lgca.sim_ind[i] == 0:
+            print('Homogeneity since k = ', i)
+            break
+    if p == True:
+        plt.figure(num=None)
+        plt.plot(lgca.sim_ind, color='seagreen', linewidth=3)
+        plt.ylabel('Simpson-Index')
+        plt.xlabel('timesteps')
+        plt.yticks(np.arange(0, 1, 0.1))
+        if t >= 100:
+            plt.xticks(np.arange(0, t, 50))
+        plt.tight_layout()
+
+        # return plot
+
 
 def aloha(who):
     print('aloha', who)
