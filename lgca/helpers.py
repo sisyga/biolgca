@@ -112,10 +112,17 @@ def ana_si(lgca, p = False, save = False):
     for i in range(t):
         if lgca.sim_ind[i] == 0:
             print('Homogeneity since k = ', i)
+            zp = i
             break
+        else:       #TODO schlauere Lösung
+            zp = -1
     if p == True:
         plt.figure(num=None)
-        plt.plot(lgca.sim_ind, color='seagreen', linewidth=3)
+        plt.plot(lgca.sim_ind, color='seagreen', linewidth=2)
+        if zp >= 0:
+            # plt.plot([zp, zp], [0, 1], linewidth=1.5, linestyle="--")
+            plt.axvline(x=zp, linewidth=1.5, linestyle='-.', color ='c')
+        plt.grid(True)
         plt.ylabel('Simpson-Index')
         plt.xlabel('timesteps')
         plt.yticks(np.arange(0, 1, 0.1))
@@ -125,6 +132,7 @@ def ana_si(lgca, p = False, save = False):
         if save == True:
             # plt.savefig('sim_ind' + str(datetime.now()) +'.jpg')
             plt.savefig('probe_si.jpg')
+        plt.show()
 
 def aloha(who):
     print('aloha', who)

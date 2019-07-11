@@ -501,10 +501,8 @@ class IBLGCA_base(LGCA_base):
                 else:
                     self.std = 0.1
                     print('standard deviation set to = ', self.std)
-                if 'm' in kwargs:
-                    self.m = kwargs['m']
-                else:
-                    self.m = 1
+                # if 'm' in kwargs: #TODO
+                #     self.r_int = kwargs['m']
                 self.props.update(lab_m=[0] + [0] * self.maxlabel)
                 self.props.update(num_off=[-99] + [1] * self.maxlabel)
                 # self.props['num_off'][0] = -99
@@ -562,5 +560,5 @@ class IBLGCA_base(LGCA_base):
                 d = d - n_i * (n_i - 1) / (n * (n - 1))
             return d
         else:
-            print('Fehler, weil n = ', n)
+            return 0
         # print('Simpson-Index = ', d)
