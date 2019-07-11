@@ -46,7 +46,7 @@ def count_fam(lgca):
 
         return max(num[1:])
 
-def bar_stacked(lgca):
+def bar_stacked(lgca, save = False):
     tmax, l, _ = lgca.nodes_t.shape
     ancs = np.arange(1, lgca.maxlabel_init.astype(int) + 1)
     # if len(ancs) != lgca.maxlabel_init:
@@ -84,6 +84,9 @@ def bar_stacked(lgca):
     plt.subplots_adjust(right=0.85)
     plt.legend(bbox_to_anchor=(1.04, 1))
     plt.show()
+    if save == True:
+        # plt.savefig('frequency' + str(datetime.now()) +'.jpg')
+        plt.savefig('probe_bar.jpg')
 
 def save_data(lgca):
     #brauche:   rb, rd, dim, restchannel, velocitychannel, dichte, propst
@@ -104,7 +107,7 @@ def save_data(lgca):
         file.write('{i:s}\n'.format(i=str(lgca.props_t[i])))
     file.close()
 
-def ana_si(lgca, p = False):
+def ana_si(lgca, p = False, save = False):
     t = len(lgca.props_t)   #timesteps + 1
     for i in range(t):
         if lgca.sim_ind[i] == 0:
@@ -119,9 +122,9 @@ def ana_si(lgca, p = False):
         if t >= 100:
             plt.xticks(np.arange(0, t, 50))
         plt.tight_layout()
-
-        # return plot
-
+        if save == True:
+            # plt.savefig('sim_ind' + str(datetime.now()) +'.jpg')
+            plt.savefig('probe_si.jpg')
 
 def aloha(who):
     print('aloha', who)
