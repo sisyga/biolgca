@@ -213,6 +213,8 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             #         print('Homogeneity since k = ', t)
             #         si = False
             self.sim_ind.append(self.simpsonindex())
+            if self.simpsonindex() == 0:
+                break
             # print('index=', self.sim_ind)
             # print('t=', t)
             # print('props in timeevo:', self.props['num_off'])
