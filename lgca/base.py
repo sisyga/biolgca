@@ -447,7 +447,6 @@ class IBLGCA_base(LGCA_base):
                     self.r_b = 0.2
                     print('birth rate set to r_b = ', self.r_b)
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
-
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']
                 else:
@@ -459,7 +458,11 @@ class IBLGCA_base(LGCA_base):
                 else:
                     self.std = 0.1
                     print('standard deviation set to = ', self.std)
-
+                if 'a_max' in kwargs:
+                    self.a_max = kwargs['a_max']
+                else:
+                    self.a_max = 1.
+                    print('Max. birth rate set to a_max =', self.a_max)
 
             elif interaction is 'go_or_grow':
                 self.interaction = go_or_grow_interaction
@@ -476,14 +479,17 @@ class IBLGCA_base(LGCA_base):
                 if 'kappa' in kwargs:
                     self.kappa = kwargs['kappa']
                 else:
-                    self.kappa = 5.
+                    self.kappa = [5.] * self.maxlabel
                     print('switch rate set to kappa = ', self.kappa)
-                self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
+                # self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
+                self.props.update(kappa=[0.] + self.kappa)
                 if 'theta' in kwargs:
                     self.theta = kwargs['theta']
                 else:
-                    self.theta = 0.75
+                    self.theta = [0.75] * self.maxlabel
                     print('switch threshold set to theta = ', self.theta)
+                # MK:
+                self.props.update(theta=[0.] + self.theta)  # * self.maxlabel)
                 if self.restchannels < 2:
                     print('WARNING: not enough rest channels - system will die out!!!')
 
@@ -496,6 +502,8 @@ class IBLGCA_base(LGCA_base):
                     print('birth rate set to r_b = ', self.r_b)
 
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+
+
 
             elif interaction is 'random_walk':
                 self.interaction = random_walk
