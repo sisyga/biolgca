@@ -2,9 +2,9 @@ import matplotlib.ticker as mticker
 from datetime import datetime
 
 try:
-    from .base import *
-except ModuleNotFoundError:
     from base import *
+except ModuleNotFoundError:
+    from .base import *
 
 
 class LGCA_1D(LGCA_base):
@@ -181,7 +181,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.nodes[self.r_int:-self.r_int] = self.convert_bool_to_ib(occ)
             self.maxlabel = self.nodes.max()
 
-    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
+    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True, recordLast=False):
         self.update_dynamic_fields()
         # si = True
         self.sim_ind = [self.simpsonindex()]
@@ -196,6 +196,8 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         if recorddens:
             self.dens_t = np.zeros((timesteps + 1, self.l))
             self.dens_t[0, ...] = self.cell_density[self.r_int:-self.r_int]
+        if recordLast:
+            self.props_t = [self.props]
         for t in range(1, timesteps + 1):
             self.timestep()
 
@@ -206,6 +208,8 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                 self.n_t[t] = self.cell_density.sum()
             if recorddens:
                 self.dens_t[t, ...] = self.cell_density[self.r_int:-self.r_int]
+            if recordLast and t == (timesteps + 1):
+                self.props_t.append(self.props)
             if showprogress:
                 update_progress(1.0 * t / timesteps)
             # if si:
