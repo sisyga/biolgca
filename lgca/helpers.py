@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from datetime import datetime
+import pathlib
 
 
 def errors(lgca):
@@ -91,8 +92,10 @@ def bar_stacked(lgca, save = False, id = 0):
     plt.tight_layout()
     plt.show()
     if save == True:
-        plt.savefig('pictures/' + str(id) + '  frequency' + str(datetime.now()) +'.jpg')
+        # plt.savefig('pictures/' + str(id) + '  frequency' + str(datetime.now()) +'.jpg')
         # plt.savefig('probe_bar.jpg')
+        filename = str(lgca.r_b) + ', ' + str(id) + ', ' + str(t) + '  frequency' + '.jpg'
+        plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
 
 
@@ -103,7 +106,10 @@ def save_data(lgca, id = 0):
     t = len(lgca.props_t)
     dens = lgca.maxlabel_init/(lgca.K * lgca.l)
     # file = open('test.txt', 'w')
-    file = open('pictures/' + str(id) + '  data' + str(datetime.now()) + '.txt', 'w')
+    # file = open('pictures/' + str(id) + '  data' + str(datetime.now()) + '.txt', 'w')
+    filename = str(lgca.r_b) + ', ' + str(id) + ', ' + str(t) + '  data' + '.txt'
+    # plt.savefig(pathlib.Path('pictures').resolve() / filename)
+    file = open(pathlib.Path('pictures').resolve() / filename, 'w')
 
     file.write("gesetzte Parameter:\n")
     file.write('dimension = {dim:d}, deathrate = {rd:1.5f}, birthrate = {rb:1.5f}, timesteps = {t:d}\n'\
@@ -142,7 +148,8 @@ def ana_si(lgca, p = False, save = False, id = 0):
             plt.xticks(np.arange(0, t, 50))
         plt.tight_layout()
         if save == True:
-            plt.savefig('pictures/' + str(id) + '  sim_ind' + str(datetime.now()) +'.jpg')
+            filename = str(lgca.r_b) + ', ' + str(id) + ', ' + str(t) + '  sim_ind' + '.jpg'
+            plt.savefig(pathlib.Path('pictures').resolve()/filename)
             # plt.savefig('probe_si.jpg')
         plt.show()
 
