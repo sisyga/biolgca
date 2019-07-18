@@ -87,4 +87,4 @@ fabric.properties
 # End of https://www.gitignore.io/api/pycharm,jupyternotebooks
 
 # checkpoints
-*checkpoint.ipynb
+.ipynb_checkpoints/*
