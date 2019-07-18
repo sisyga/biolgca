@@ -501,6 +501,8 @@ class IBLGCA_base(LGCA_base):
                 else:
                     self.std = 0.1
                     print('standard deviation set to = ', self.std)
+                # if 'm' in kwargs: #TODO
+                #     self.r_int = kwargs['m']
                 self.props.update(lab_m=[0] + [0] * self.maxlabel)
                 self.props.update(num_off=[-99] + [1] * self.maxlabel)
                 # self.props['num_off'][0] = -99
@@ -513,9 +515,8 @@ class IBLGCA_base(LGCA_base):
                 #Parameter zur Kontrolle
                 self.borncells = 0
                 self.diedcells = 0
-                for i in range(1,self.maxlabel_init+1):
+                for i in range(1,self.maxlabel_init.astype(int)+1):
                     self.props['lab_m'][i] = i
-
 
             else:
                 print('keyword', interaction, 'is not defined! Random walk used instead.')
@@ -548,3 +549,16 @@ class IBLGCA_base(LGCA_base):
         self.apply_boundaries()
         self.maxlabel = self.nodes.max()
         self.update_dynamic_fields()
+
+    def simpsonindex(lgca):
+        n = sum(lgca.props['num_off'][1:])
+        if n > 1:
+            s = lgca.maxlabel_init.astype(int)
+            d = 1
+            for i in range(1, s + 1):
+                n_i = lgca.props['num_off'][i]
+                d = d - n_i * (n_i - 1) / (n * (n - 1))
+            return d
+        else:
+            return 0
+        # print('Simpson-Index = ', d)

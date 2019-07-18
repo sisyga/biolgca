@@ -1,10 +1,11 @@
 
-- TODOS abarbeiten
-
-- komische Fehlermeldung bei bar stacked beseitigen
-
 - mullerplot (settings -> plugins -> marketplace -> R)
+- muller package evt?
 
-FRAGEN:
-- Parameter speichern, wenn Abbildung behalten -> gibt es da was?
+- speichern der Daten in txt, save_data()
+-> schlauere Lösung?
+
+- Geschwindigkeit der Ausbreitung ändern
+
+- Abbildungen mit Nummern versehen
 
