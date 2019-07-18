@@ -86,14 +86,13 @@ def bar_stacked(lgca, save = False, id = 0):
     elif tmax >= 100:
         plt.xticks(np.arange(0, tmax, 50))
 
-
     plt.subplots_adjust(right=0.85)
     plt.legend(bbox_to_anchor=(1.04, 1))
     plt.tight_layout()
     plt.show()
     if save == True:
-        # plt.savefig('pictures/' + str(id) + '  frequency' + str(datetime.now()) +'.jpg')
-        plt.savefig('pictures/' + str(id) + 'frequency.jpg')
+        plt.savefig('pictures/' + str(id) + '  frequency' + str(datetime.now()) +'.jpg')
+        # plt.savefig('probe_bar.jpg')
 
 
 
@@ -103,8 +102,8 @@ def save_data(lgca, id = 0):
 
     t = len(lgca.props_t)
     dens = lgca.maxlabel_init/(lgca.K * lgca.l)
-    file = open('pictures/' + str(id) + 'data.txt', 'w')
-    # file = open("pictures\" + str(id) + "  data" + str(datetime.now()) + ".txt", "w")
+    # file = open('test.txt', 'w')
+    file = open('pictures/' + str(id) + '  data' + str(datetime.now()) + '.txt', 'w')
 
     file.write("gesetzte Parameter:\n")
     file.write('dimension = {dim:d}, deathrate = {rd:1.5f}, birthrate = {rb:1.5f}, timesteps = {t:d}\n'\
@@ -139,14 +138,12 @@ def ana_si(lgca, p = False, save = False, id = 0):
         plt.ylabel('Simpson-Index')
         plt.xlabel('timesteps')
         plt.yticks(np.arange(0, 1, 0.1))
-        if t >= 700:
-            plt.xticks(np.arange(0, t, 100))
-        elif t >= 100:
+        if t >= 100:
             plt.xticks(np.arange(0, t, 50))
         plt.tight_layout()
         if save == True:
-            # plt.savefig('pictures/' + str(id) + '  sim_ind' + str(datetime.now()) +'.jpg')
-            plt.savefig('pictures/' + str(id) + 'simpson.jpg')
+            plt.savefig('pictures/' + str(id) + '  sim_ind' + str(datetime.now()) +'.jpg')
+            # plt.savefig('probe_si.jpg')
         plt.show()
 
 def aloha(who):
