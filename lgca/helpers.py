@@ -94,7 +94,10 @@ def bar_stacked(lgca, save = False, id = 0):
     if save == True:
         # plt.savefig('pictures/' + str(id) + '  frequency' + str(datetime.now()) +'.jpg')
         # plt.savefig('probe_bar.jpg')
-        filename = str(lgca.r_b) + ', ' + str(id) + ', ' + str(t) + '  frequency' + '.jpg'
+        # filename = str(lgca.r_b) + ', ' + str(id) + ', ' + str(t) + '  frequency' + '.jpg'
+        filename = str(lgca.r_b) + ', dens' + str(lgca.maxlabel_init / (lgca.K * lgca.l)) + ', ' \
+                   + str(id) + ', ' + str(t) + '  frequency' + '.jpg'
+
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
 
@@ -107,7 +110,8 @@ def save_data(lgca, id = 0):
     dens = lgca.maxlabel_init/(lgca.K * lgca.l)
     # file = open('test.txt', 'w')
     # file = open('pictures/' + str(id) + '  data' + str(datetime.now()) + '.txt', 'w')
-    filename = str(lgca.r_b) + ', ' + str(id) + ', ' + str(t) + '  data' + '.txt'
+    filename = str(lgca.r_b) + ', dens' + str(lgca.maxlabel_init / (lgca.K * lgca.l)) + ', ' \
+               + str(id) + ', ' + str(t-1) + '  data' + '.txt'
     # plt.savefig(pathlib.Path('pictures').resolve() / filename)
     file = open(pathlib.Path('pictures').resolve() / filename, 'w')
 
@@ -144,11 +148,14 @@ def ana_si(lgca, p = False, save = False, id = 0):
         plt.ylabel('Simpson-Index')
         plt.xlabel('timesteps')
         plt.yticks(np.arange(0, 1, 0.1))
-        if t >= 100:
+        if t >= 700:
+            plt.xticks(np.arange(0, t, 100))
+        elif t >= 100:
             plt.xticks(np.arange(0, t, 50))
         plt.tight_layout()
         if save == True:
-            filename = str(lgca.r_b) + ', ' + str(id) + ', ' + str(t) + '  sim_ind' + '.jpg'
+            filename = str(lgca.r_b) + ', dens' + str(lgca.maxlabel_init / (lgca.K * lgca.l)) + ', ' \
+                      + str(id) + ', ' + str(t-1) + '  sim_ind' + '.jpg'
             plt.savefig(pathlib.Path('pictures').resolve()/filename)
             # plt.savefig('probe_si.jpg')
         plt.show()
