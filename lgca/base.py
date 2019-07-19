@@ -114,6 +114,7 @@ class LGCA_base():
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
         self.set_bc(bc)
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
+        self.density = density
         self.init_nodes(density=density, nodes=nodes)
         self.init_coords()
         self.set_interaction(**kwargs)
@@ -122,7 +123,7 @@ class LGCA_base():
 
     def set_r_int(self, r):
         self.r_int = r
-        self.init_nodes(nodes=self.nodes[self.nonborder])
+        self.init_nodes(nodes=self.nodes[self.nonborder], density=self.density)
         self.init_coords()
         self.update_dynamic_fields()
 
@@ -384,6 +385,7 @@ class LGCA_base():
         self.apply_boundaries()
         self.propagation()
         self.apply_boundaries()
+        print('bc nodes', self.nodes)
         self.update_dynamic_fields()
 
     def calc_permutations(self):
@@ -415,6 +417,7 @@ class IBLGCA_base(LGCA_base):
         self.props = {}
         self.set_bc(bc)
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
+        self.density = density
         self.init_nodes(density=density, nodes=nodes)
         self.init_coords()
         self.set_interaction(**kwargs)
@@ -503,13 +506,15 @@ class IBLGCA_base(LGCA_base):
 
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
 
-
-
             elif interaction is 'random_walk':
                 self.interaction = random_walk
 
+            #INHERITANCE
             elif interaction is 'inheritance':
                 self.interaction = inheritance
+                if 'r_int' in kwargs:
+                    self.set_r_int(kwargs['r_int'])
+                    # self.r_int = kwargs['r_int']
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
                 else:
