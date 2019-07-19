@@ -226,7 +226,7 @@ def inheritance(lgca):
             # if chronicle:
             #     print('nodes after birth: ', lgca.nodes)
         lgca.nodes[coord] = node
-        npr.shuffle(lgca.nodes[coord])
+       # npr.shuffle(lgca.nodes[coord])
     # print('props', lgca.props['num_off'])
     #lgca.plot_prop_numoff()
 

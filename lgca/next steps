@@ -5,7 +5,12 @@
 - speichern der Daten in txt, save_data()
 -> schlauere Lösung?
 
-- Geschwindigkeit der Ausbreitung ändern
+- Geschwindigkeit der Ausbreitung ändern (check)
+-> irgendwie kontrollieren?!?!?!
+
+- Achsenbeschriftung number offsprings korrigieren (sind nicht nur die Nachkommen!)
+
+- räumliche Darstellung -> Zeitausschnitt ergänzen (zB nur t=300-400)
 
 
 

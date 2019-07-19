@@ -51,21 +51,23 @@ class LGCA_1D(LGCA_base):
         """
         :return:
         """
+        chronicle = False
         m = self.r_int
-        print('nodes', self.nodes)
+        if chronicle:
+            print('nodes', self.nodes)
         newnodes = np.zeros_like(self.nodes)
-        # print('new', newnodes)
         # resting particles stay
         newnodes[:, 2:] = self.nodes[:, 2:]
-        # print('rest', newnodes)
         # prop. to the right
         ###newnodes[1:, 0] = self.nodes[:-1, 0]
         newnodes[m:, 0] = self.nodes[:-m, 0]
-        print('to right', newnodes)
+        if chronicle:
+            print('to right', newnodes)
         # prop. to the left
         ###newnodes[:-1, 1] = self.nodes[1:, 1]
         newnodes[:-m, 1] = self.nodes[m:, 1]
-        print('to left', newnodes)
+        if chronicle:
+            print('to left', newnodes)
         self.nodes = newnodes
 
     def apply_pbc(self):
@@ -237,7 +239,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             prop = list(props_t[0].keys())[0]
 
         tmax, l, _ = nodes_t.shape
-        print('tmax=%d, l=%d' %(tmax, l))
+        # print('tmax=%d, l=%d' %(tmax, l))
         mean_prop = np.zeros((tmax, l))
 
         for t in range(tmax):
@@ -272,6 +274,70 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         return plot
+
+    def spatial_plot(self, nodes_t=None, props_t=None, figindex = None, figsize=None, prop='lab_m', cmap='nipy_spectral'):
+        if nodes_t is None:
+            nodes_t = self.nodes_t
+        # if figsize is None:
+        #     figsize = estimate_figsize(nodes_t.sum(-1).T, cbar=True)
+        # figsize = None
+        if props_t is None:
+            props_t = self.props_t
+
+        # if prop is None:
+        #   prop = list(props_t[0].keys())[0]
+
+        tmax, l, _ = nodes_t.shape
+        k = self.restchannels + self.velocitychannels
+        ltotal = l * k
+        # print('tmax=%d, l=%d, ltot=%d' %(tmax, l, ltotal))
+        val = np.zeros((tmax, ltotal))
+        # test = np.zeros((tmax, ltotal))
+
+        for t in range(0, tmax):
+            for x in range(l):
+                node = nodes_t[t, x]
+                # print('node', node)
+                occ = node.astype(np.bool)
+                # print('occ', occ)
+                if occ.sum() == 0:  #TODO SINN?
+                    continue
+                channel = 0
+                for lab in node:
+                    # print('ch', channel)
+                    # print('lab',lab)
+                    # test[t, x * k + channel] = lab
+                    val[t, x*k+channel] = props_t[t][prop][lab]
+                    channel = channel + 1
+        # print('val', val)
+        # print('test', test)
+
+        fig = plt.figure(num=figindex, figsize=figsize)
+        ax = fig.add_subplot(111)
+        plot = ax.matshow(val, cmap=cmap)
+        fig.colorbar(plot, shrink = 0.5)
+        # plt.subplots_adjust(right=0.85)
+        # plt.legend(bbox_to_anchor=(1.04, 1))
+
+        plt.ylabel('timestep')
+        plt.xlabel('lattice site')
+        # plt.title('spatial order')
+        # nur "Knotenanfang"
+        plt.xticks((np.arange(0, ltotal, k)))
+
+        if tmax > 700:
+            plt.yticks(np.arange(0, tmax, 100))
+        elif tmax > 100:
+            plt.yticks(np.arange(0, tmax, 50))
+        elif tmax <= 100:
+            plt.yticks(np.arange(0, tmax, 10))
+
+        # Farbe für "leer" als Legende
+
+        # plt.tight_layout()
+        plt.show()
+        # if save == True: #TODO
+
 
     def mullerplot(self, nodes_t=None, props_t=None, figindex=None, figsize=None):
         if nodes_t is None:

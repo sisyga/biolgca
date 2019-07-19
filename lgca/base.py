@@ -385,7 +385,7 @@ class LGCA_base():
         self.apply_boundaries()
         self.propagation()
         self.apply_boundaries()
-        print('bc nodes', self.nodes)
+        # print('bc nodes', self.nodes)
         self.update_dynamic_fields()
 
     def calc_permutations(self):
