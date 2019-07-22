@@ -1,5 +1,7 @@
 import matplotlib.ticker as mticker
 from datetime import datetime
+import pathlib
+
 
 try:
     from base import *
@@ -275,7 +277,8 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         return plot
 
-    def spatial_plot(self, nodes_t=None, props_t=None, figindex = None, figsize=None, prop='lab_m', cmap='nipy_spectral', tbeg=None, tend=None):
+    def spatial_plot(self, nodes_t=None, props_t=None, figindex = None, figsize=None, prop='lab_m',\
+                     cmap='nipy_spectral', tbeg=None, tend=None, save=False, id=0):
         if nodes_t is None:
             nodes_t = self.nodes_t
         # if figsize is None:
@@ -341,9 +344,14 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         elif tend - tbeg <= 100:
             plt.yticks(np.arange(tbeg, tend, 10))
 
+        if save == True:
+            filename = str(self.r_b) + ', ' + str(id) + ', ' + ' frequency ' +\
+                       str(tbeg) + ' to ' + str(tend) + '.jpg'
+
+            plt.savefig(pathlib.Path('pictures').resolve() / filename)
+
         # plt.tight_layout()
         plt.show()
-        # if save == True: #TODO
 
 
     def mullerplot(self, nodes_t=None, props_t=None, figindex=None, figsize=None):
