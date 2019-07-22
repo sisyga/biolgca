@@ -162,3 +162,6 @@ def ana_si(lgca, p = False, save = False, id = 0):
 
 def aloha(who):
     print('aloha', who)
+
+# def simpson_overview():
+
