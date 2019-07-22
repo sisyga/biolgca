@@ -74,9 +74,9 @@ def bar_stacked(lgca, save = False, id = 0):
 
     ###plot settings
 
-    plt.ylabel('total number of living offsprings')
+    plt.ylabel('total number of living cells')
     plt.xlabel('timesteps')
-    plt.title('Ratio of offsprings')
+    # plt.title('Ratio of offsprings')
     if len(ind) <= 15:
         plt.xticks(ind)
     else:
@@ -87,8 +87,8 @@ def bar_stacked(lgca, save = False, id = 0):
     elif tmax >= 100:
         plt.xticks(np.arange(0, tmax, 50))
 
-    plt.subplots_adjust(right=0.85)
-    plt.legend(bbox_to_anchor=(1.04, 1))
+    # plt.subplots_adjust(right=0.85)
+    # plt.legend(bbox_to_anchor=(1.04, 1))
     plt.tight_layout()
     plt.show()
     if save == True:

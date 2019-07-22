@@ -328,9 +328,9 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         fig = plt.figure(num=figindex, figsize=figsize)
         ax = fig.add_subplot(111)
         plot = ax.matshow(val, cmap=cmap)
-        fig.colorbar(plot, shrink = 0.5)
+        # fig.colorbar(plot, shrink = 0.5)
 
-        plt.ylabel('timestep')
+        plt.ylabel('timesteps')
         plt.xlabel('lattice site')
         # nur "Knotenanfang"
         plt.xlim(0, ltotal)
