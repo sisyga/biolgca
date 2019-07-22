@@ -275,7 +275,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         return plot
 
-    def spatial_plot(self, nodes_t=None, props_t=None, figindex = None, figsize=None, prop='lab_m', cmap='nipy_spectral'):
+    def spatial_plot(self, nodes_t=None, props_t=None, figindex = None, figsize=None, prop='lab_m', cmap='nipy_spectral', tbeg=None, tend=None):
         if nodes_t is None:
             nodes_t = self.nodes_t
         # if figsize is None:
@@ -283,11 +283,14 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         # figsize = None
         if props_t is None:
             props_t = self.props_t
-
         # if prop is None:
         #   prop = list(props_t[0].keys())[0]
 
         tmax, l, _ = nodes_t.shape
+        if tbeg is None:
+            tbeg = 0
+        if tend is None:
+            tend = tmax
         k = self.restchannels + self.velocitychannels
         ltotal = l * k
         # print('tmax=%d, l=%d, ltot=%d' %(tmax, l, ltotal))
@@ -300,14 +303,21 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                 # print('node', node)
                 occ = node.astype(np.bool)
                 # print('occ', occ)
-                if occ.sum() == 0:  #TODO SINN?
+                if occ.sum() == 0:
+                    i = 0
+                    while i < k:
+                        val[t, x * k + i] = None
+                        i = i + 1
                     continue
                 channel = 0
                 for lab in node:
                     # print('ch', channel)
                     # print('lab',lab)
                     # test[t, x * k + channel] = lab
-                    val[t, x*k+channel] = props_t[t][prop][lab]
+                    if lab == 0:
+                        val[t, x * k + channel] = None
+                    else:
+                        val[t, x*k+channel] = props_t[t][prop][lab]
                     channel = channel + 1
         # print('val', val)
         # print('test', test)
@@ -316,23 +326,20 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         ax = fig.add_subplot(111)
         plot = ax.matshow(val, cmap=cmap)
         fig.colorbar(plot, shrink = 0.5)
-        # plt.subplots_adjust(right=0.85)
-        # plt.legend(bbox_to_anchor=(1.04, 1))
 
         plt.ylabel('timestep')
         plt.xlabel('lattice site')
-        # plt.title('spatial order')
         # nur "Knotenanfang"
+        plt.xlim(0, ltotal)
         plt.xticks((np.arange(0, ltotal, k)))
 
-        if tmax > 700:
-            plt.yticks(np.arange(0, tmax, 100))
-        elif tmax > 100:
-            plt.yticks(np.arange(0, tmax, 50))
-        elif tmax <= 100:
-            plt.yticks(np.arange(0, tmax, 10))
-
-        # Farbe für "leer" als Legende
+        plt.ylim(tend, tbeg)
+        if tend - tbeg > 700:
+            plt.yticks(np.arange(tbeg, tend, 100))
+        elif tend - tbeg > 100:
+            plt.yticks(np.arange(tbeg, tend, 50))
+        elif tend - tbeg <= 100:
+            plt.yticks(np.arange(tbeg, tend, 10))
 
         # plt.tight_layout()
         plt.show()
