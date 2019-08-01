@@ -164,7 +164,7 @@ def inheritance(lgca):
     # if chronicle:
     #     print('rel_nodes ', rel_nodes)
     dying = npr.random(rel_nodes.shape) < lgca.r_d
-    for label in rel_nodes[dying]:
+    for label in rel_nodes[dying]:  #TODO überarbeiten!
         lgca.props = {
             'r_b': lgca.props['r_b'].copy(),
             'lab_m': lgca.props['lab_m'].copy(),
@@ -194,13 +194,14 @@ def inheritance(lgca):
         # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
         for label in node[proliferating]:
             ind = npr.choice(lgca.K)
-            occ = lgca.nodes > 0
-            if occ[coord, ind] == 0:
+            occ = lgca.nodes[coord, ind] > 0    #TODO überarbeiten!, was ist überflüssig?
+            if node[ind] == 0:  #TODO ++
                 # lgca.occupied[coord, ind] wurde nie aktualisiert?!)
                 if chronicle:
                     print('es proliferiert Zelle', label)
                 lgca.maxlabel += 1
                 lgca.borncells += 1
+
                 node[ind] = lgca.maxlabel
                 lgca.apply_boundaries()
 
@@ -226,7 +227,7 @@ def inheritance(lgca):
             # if chronicle:
             #     print('nodes after birth: ', lgca.nodes)
         lgca.nodes[coord] = node
-       # npr.shuffle(lgca.nodes[coord])
+        npr.shuffle(lgca.nodes[coord])
     # print('props', lgca.props['num_off'])
     #lgca.plot_prop_numoff()
 
