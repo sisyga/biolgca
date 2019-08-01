@@ -24,7 +24,6 @@ def disarrange(a, axis=-1):
 def tanh_switch(rho, kappa=5., theta=0.8):
     return 0.5 * (1 + np.tanh(kappa * (rho - theta)))
 
-
 def random_walk(lgca):
     """
     Shuffle config in the last axis, modeling a random walk.

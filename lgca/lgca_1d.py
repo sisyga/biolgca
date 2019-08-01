@@ -1,3 +1,5 @@
+from copy import deepcopy as copy
+
 import matplotlib.ticker as mticker
 
 try:
@@ -181,7 +183,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         if record:
             self.nodes_t = np.zeros((timesteps + 1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
             self.nodes_t[0, ...] = self.nodes[self.r_int:-self.r_int, ...]
-            self.props_t = [self.props]
+            self.props_t = [copy(self.props)]
         if recordN:
             self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
             self.n_t[0] = self.nodes.sum()
@@ -189,18 +191,18 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.dens_t = np.zeros((timesteps + 1, self.l))
             self.dens_t[0, ...] = self.cell_density[self.r_int:-self.r_int]
         if recordLast:
-            self.props_t = [self.props]
+            self.props_t = [copy(self.props)]
         for t in range(1, timesteps + 1):
             self.timestep()
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.r_int:-self.r_int]
-                self.props_t.append(self.props)
+                self.props_t.append(copy(self.props))
             if recordN:
                 self.n_t[t] = self.cell_density.sum()
             if recorddens:
                 self.dens_t[t, ...] = self.cell_density[self.r_int:-self.r_int]
             if recordLast and t == (timesteps + 1):
-                self.props_t.append(self.props)
+                self.props_t.append(copy(self.props))
             if showprogress:
                 update_progress(1.0 * t / timesteps)
 
