@@ -204,8 +204,8 @@ class LGCA_Square(LGCA_base):
         plt.xlim(xmin, xmax)
         plt.ylim(ymin, ymax)
         ax.set_aspect('equal')
-        plt.xlabel('$x \\; [\\varepsilon]$')
-        plt.ylabel('$y \\; [\\varepsilon]$')
+        plt.xlabel('$x \\; (\\varepsilon)$')
+        plt.ylabel('$y \\; (\\varepsilon)$')
         ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         ax.spines['top'].set_visible(True)
@@ -215,7 +215,7 @@ class LGCA_Square(LGCA_base):
         ax.set_autoscale_on(False)
         return fig, ax
 
-    def plot_config(self, nodes=None, figindex=None, figsize=None, tight_layout=True, grid=False):
+    def plot_config(self, nodes=None, figindex=None, figsize=None, tight_layout=True, grid=False, ec='none'):
         r_circle = self.r_poly * 0.25
         # bbox_props = dict(boxstyle="Circle,pad=0.3", fc="white", ec="k", lw=1.5)
         bbox_props = None
@@ -234,22 +234,25 @@ class LGCA_Square(LGCA_base):
         dpx = np.mean([abs(x2 - x1), abs(y2 - y1)])
         fontsize = dpx * 72. / fig.dpi
         lw_circle = fontsize / 5
+        lw_arrow = 0.5 * lw_circle
+
+        colors = ('none', 'k')
         arrows = []
         for i in range(self.velocitychannels):
             cx = self.c[0, i] * 0.5
             cy = self.c[1, i] * 0.5
-            arrows += [FancyArrowPatch((x, y), (x + cx, y + cy), alpha=occ, mutation_scale=.3, fc='k', ec='none')
+            arrows += [FancyArrowPatch((x, y), (x + cx, y + cy), mutation_scale=.3, fc=colors[occ], ec=ec, lw=lw_arrow)
                        for x, y, occ in zip(xx.ravel(), yy.ravel(), nodes[..., i].ravel())]
 
         arrows = PatchCollection(arrows, match_original=True)
         ax.add_collection(arrows)
 
         if self.restchannels > 0:
-            circles = [Circle(xy=(x, y), radius=r_circle, fc='white', ec='k', lw=lw_circle, alpha=occ)
-                       for x, y, occ in
-                       zip(xx.ravel(), yy.ravel(), nodes[..., self.velocitychannels:].any(axis=-1).ravel())]
+            circles = [Circle(xy=(x, y), radius=r_circle, fc='white', ec='k', lw=lw_circle * bool(n), visible=bool(n))
+                       for x, y, n in
+                       zip(xx.ravel(), yy.ravel(), nodes[..., self.velocitychannels:].sum(-1).ravel())]
             texts = [ax.text(x, y - 0.5 * r_circle, str(n), ha='center', va='baseline', fontsize=fontsize,
-                             fontname='sans-serif', fontweight='bold', bbox=bbox_props, alpha=bool(n))
+                             fontname='sans-serif', fontweight='bold', bbox=bbox_props, visible=bool(n))
                      for x, y, n in zip(xx.ravel(), yy.ravel(), nodes[..., self.velocitychannels:].sum(-1).ravel())]
             circles = PatchCollection(circles, match_original=True)
             ax.add_collection(circles)
@@ -259,7 +262,7 @@ class LGCA_Square(LGCA_base):
             texts = []
 
         if grid:
-            hexagons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
+            hexagons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly, lw=lw_arrow,
                                        orientation=self.orientation, facecolor='None', edgecolor='k')
                         for x, y in zip(self.xcoords.ravel(), self.ycoords.ravel())]
             ax.add_collection(PatchCollection(hexagons, match_original=True))
@@ -482,7 +485,7 @@ class LGCA_Square(LGCA_base):
                           width=0.007, norm=colors.Normalize(vmin=0, vmax=1))
         return fig, plot
 
-    def plot_flux(self, nodes=None, figindex=None, figsize=None, tight_layout=True, edgecolor='None'):
+    def plot_flux(self, nodes=None, figindex=None, figsize=None, tight_layout=True, edgecolor='None', cbar=True):
         if nodes is None:
             nodes = self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :]
 
@@ -511,10 +514,12 @@ class LGCA_Square(LGCA_base):
                     for x, y, c in zip(self.xcoords.ravel(), self.ycoords.ravel(), angle.reshape(-1, 4))]
         pc = PatchCollection(hexagons, match_original=True)
         ax.add_collection(pc)
-        cbar = fig.colorbar(cmap, use_gridspec=True)
-        cbar.set_label('Particle flux $\\arg \\left( \\vec{J} \\right)$ $[\degree]$')
-        cbar.set_ticks(np.arange(self.velocitychannels) * 360 / self.velocitychannels)
+        if cbar:
+            cbar = fig.colorbar(cmap, use_gridspec=True)
+            cbar.set_label('Direction of movement $(\degree)$')
+            cbar.set_ticks(np.arange(self.velocitychannels) * 360 / self.velocitychannels)
         return fig, pc, cmap
+
 
     def animate_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis', interval=500, vmax=None,
                         tight_layout=True, edgecolor='None'):
@@ -534,7 +539,7 @@ class LGCA_Square(LGCA_base):
         return ani
 
     def animate_flux(self, nodes_t=None, figindex=None, figsize=None, interval=200, tight_layout=True,
-                     edgecolor='None'):
+                     edgecolor='None', cbar=True):
         if nodes_t is None:
             nodes_t = self.nodes_t
 
@@ -547,7 +552,7 @@ class LGCA_Square(LGCA_base):
         angle.imag = jy
         angle = np.angle(angle, deg=True) % 360.
         fig, pc, cmap = self.plot_flux(nodes=nodes[0], figindex=figindex, figsize=figsize, tight_layout=tight_layout,
-                                       edgecolor=edgecolor)
+                                       edgecolor=edgecolor, cbar=cbar)
         angle = cmap.to_rgba(angle[None, ...])[0]
         angle[..., -1] = np.sqrt(density)
         angle[(jx ** 2 + jy ** 2) < 1e-6, :3] = 0.
