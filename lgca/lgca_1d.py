@@ -1,3 +1,5 @@
+from copy import deepcopy as copy
+
 import matplotlib.ticker as mticker
 from datetime import datetime
 import pathlib
@@ -38,7 +40,7 @@ class LGCA_1D(LGCA_base):
         # print('capacity = ', self.K)
 
     def init_nodes(self, density, nodes=None):
-
+        self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.bool)
         if nodes is None:
             self.random_reset(density)
 
@@ -60,6 +62,7 @@ class LGCA_1D(LGCA_base):
         newnodes = np.zeros_like(self.nodes)
         # resting particles stay
         newnodes[:, 2:] = self.nodes[:, 2:]
+
         # prop. to the right
         ###newnodes[1:, 0] = self.nodes[:-1, 0]
         newnodes[m:, 0] = self.nodes[:-m, 0]
@@ -194,8 +197,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         if record:
             self.nodes_t = np.zeros((timesteps + 1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
             self.nodes_t[0, ...] = self.nodes[self.r_int:-self.r_int, ...]
-            self.props_t = [self.props]
-            # print('props_t init', self.props_t)
+            self.props_t = [copy(self.props)]
         if recordN:
             self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
             self.n_t[0] = self.nodes.sum()
@@ -203,19 +205,19 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.dens_t = np.zeros((timesteps + 1, self.l))
             self.dens_t[0, ...] = self.cell_density[self.r_int:-self.r_int]
         if recordLast:
-            self.props_t = [self.props]
+            self.props_t = [copy(self.props)]
         for t in range(1, timesteps + 1):
             self.timestep()
 
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.r_int:-self.r_int]
-                self.props_t.append(self.props)
+                self.props_t.append(copy(self.props))
             if recordN:
                 self.n_t[t] = self.cell_density.sum()
             if recorddens:
                 self.dens_t[t, ...] = self.cell_density[self.r_int:-self.r_int]
             if recordLast and t == (timesteps + 1):
-                self.props_t.append(self.props)
+                self.props_t.append(copy(self.props))
             if showprogress:
                 update_progress(1.0 * t / timesteps)
             # if si:
@@ -235,6 +237,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             nodes_t = self.nodes_t
         if figsize is None:
             figsize = estimate_figsize(nodes_t.sum(-1).T, cbar=True)
+
         if props_t is None:
             props_t = self.props_t
         if prop is None:

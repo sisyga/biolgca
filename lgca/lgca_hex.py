@@ -20,7 +20,8 @@ class LGCA_Hex(LGCA_Square):
     orientation = 0.
 
     def init_coords(self):
-        assert self.ly % 2 == 0
+        if self.ly % 2 != 0:
+            print('Warning: uneven number of rows; only use for plotting - boundary conditions do not work!')
         self.x = np.arange(self.lx) + self.r_int
         self.y = np.arange(self.ly) + self.r_int
         self.xx, self.yy = np.meshgrid(self.x, self.y, indexing='ij')
