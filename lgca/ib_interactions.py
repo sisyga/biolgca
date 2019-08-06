@@ -165,7 +165,7 @@ def inheritance(lgca):
     #     print('rel_nodes ', rel_nodes)
     dying = npr.random(rel_nodes.shape) < lgca.r_d
     for label in rel_nodes[dying]:  #TODO überarbeiten!
-        lgca.props = {
+        lgca.props = {      #TODO: rausnehmen, weil simon deepcopy
             'r_b': lgca.props['r_b'].copy(),
             'lab_m': lgca.props['lab_m'].copy(),
             'num_off': lgca.props['num_off'].copy()
