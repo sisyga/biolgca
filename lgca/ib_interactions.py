@@ -165,11 +165,11 @@ def inheritance(lgca):
     #     print('rel_nodes ', rel_nodes)
     dying = npr.random(rel_nodes.shape) < lgca.r_d
     for label in rel_nodes[dying]:  #TODO überarbeiten!
-        lgca.props = {      #TODO: rausnehmen, weil simon deepcopy
-            'r_b': lgca.props['r_b'].copy(),
-            'lab_m': lgca.props['lab_m'].copy(),
-            'num_off': lgca.props['num_off'].copy()
-        }
+        # lgca.props = {      #TODO: rausnehmen, weil simon deepcopy
+        #     'r_b': lgca.props['r_b'].copy(),
+        #     'lab_m': lgca.props['lab_m'].copy(),
+        #     'num_off': lgca.props['num_off'].copy()
+        # }
         if label > 0:
             if chronicle:
                 print('cell with label %d dies' % label)
@@ -179,7 +179,7 @@ def inheritance(lgca):
             if chronicle:
                 print('lab_m dazu ist', labmoth)
     rel_nodes[dying] = 0
-    lgca.apply_boundaries()
+    lgca.apply_boundaries() #TODO nötig an der Stelle?
 
     # birth
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
@@ -194,7 +194,7 @@ def inheritance(lgca):
         # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
         for label in node[proliferating]:
             ind = npr.choice(lgca.K)
-            occ = lgca.nodes[coord, ind] > 0    #TODO überarbeiten!, was ist überflüssig?
+            # occ = lgca.nodes[coord, ind] > 0    #TODO überarbeiten!, was ist überflüssig?
             if node[ind] == 0:  #TODO ++
                 # lgca.occupied[coord, ind] wurde nie aktualisiert?!)
                 if chronicle:
@@ -209,11 +209,11 @@ def inheritance(lgca):
                     print('%d is born' %(lgca.maxlabel))
                     print('with ancestor ', lgca.props['lab_m'][label])
 
-                lgca.props = {
-                    'r_b': lgca.props['r_b'].copy(),
-                    'lab_m': lgca.props['lab_m'].copy(),
-                    'num_off': lgca.props['num_off'].copy()
-                }
+                # lgca.props = {
+                #     'r_b': lgca.props['r_b'].copy(),
+                #     'lab_m': lgca.props['lab_m'].copy(),
+                #     'num_off': lgca.props['num_off'].copy()
+                # }
 
                 labm = lgca.props['lab_m'][label]
                 lgca.props['lab_m'].append(labm)
