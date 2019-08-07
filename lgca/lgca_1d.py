@@ -301,7 +301,6 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         ltotal = l * k
         # print('tmax=%d, l=%d, ltot=%d' %(tmax, l, ltotal))
         val = np.zeros((tmax, ltotal))
-        # test = np.zeros((tmax, ltotal))
 
         for t in range(0, tmax):
             for x in range(l):
@@ -315,16 +314,18 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                         val[t, x * k + i] = None
                         i = i + 1
                     continue
-                channel = 0
-                for lab in node:
-                    # print('ch', channel)
-                    # print('lab',lab)
-                    # test[t, x * k + channel] = lab
-                    if lab == 0:
-                        val[t, x * k + channel] = None
+                for pos in range(len(node)):
+                    lab = node[pos]
+                    if pos == 0 or pos == 1:
+                        if lab == 0:
+                            val[t, x*k + pos * (k - 1)] = None
+                        else:
+                            val[t, x*k + pos * (k-1)] = props_t[t][prop][lab]
                     else:
-                        val[t, x*k+channel] = props_t[t][prop][lab]
-                    channel = channel + 1
+                        if lab == 0:
+                            val[t, x*k + pos - 1] = None
+                        else:
+                            val[t, x*k + pos - 1] = props_t[t][prop][lab]
         # print('val', val)
         # print('test', test)
 
