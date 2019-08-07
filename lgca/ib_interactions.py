@@ -195,8 +195,7 @@ def inheritance(lgca):
         for label in node[proliferating]:
             ind = npr.choice(lgca.K)
             # occ = lgca.nodes[coord, ind] > 0    #TODO überarbeiten!, was ist überflüssig?
-            if node[ind] == 0:  #TODO ++
-                # lgca.occupied[coord, ind] wurde nie aktualisiert?!)
+            if node[ind] == 0:
                 if chronicle:
                     print('es proliferiert Zelle', label)
                 lgca.maxlabel += 1
@@ -228,6 +227,4 @@ def inheritance(lgca):
             #     print('nodes after birth: ', lgca.nodes)
         lgca.nodes[coord] = node
         npr.shuffle(lgca.nodes[coord])
-    # print('props', lgca.props['num_off'])
-    #lgca.plot_prop_numoff()
 

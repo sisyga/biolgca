@@ -299,15 +299,12 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             tend = tmax
         k = self.restchannels + self.velocitychannels
         ltotal = l * k
-        # print('tmax=%d, l=%d, ltot=%d' %(tmax, l, ltotal))
         val = np.zeros((tmax, ltotal))
 
         for t in range(0, tmax):
             for x in range(l):
                 node = nodes_t[t, x]
-                # print('node', node)
                 occ = node.astype(np.bool)
-                # print('occ', occ)
                 if occ.sum() == 0:
                     i = 0
                     while i < k:
@@ -327,7 +324,6 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                         else:
                             val[t, x*k + pos - 1] = props_t[t][prop][lab]
         # print('val', val)
-        # print('test', test)
 
         fig = plt.figure(num=figindex, figsize=figsize)
         ax = fig.add_subplot(111)

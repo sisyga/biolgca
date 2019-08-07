@@ -1,5 +1,4 @@
 
-- spatial plot Anordnung ändern
 
 - TODOs abarbeiten
 - unnötiges löschen
@@ -9,6 +8,9 @@
 
 - mullerplot (settings -> plugins -> marketplace -> R)
 - muller package evt?
+
+- Zusatz, plots verschönern:
+    ⁻ spatial plot: x-Achse verschieben, Achsenbeschriftung verbessern
 
 
 
