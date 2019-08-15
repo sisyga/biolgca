@@ -1,5 +1,3 @@
-from copy import deepcopy as copy
-
 import matplotlib.ticker as mticker
 
 try:
@@ -13,7 +11,7 @@ class LGCA_1D(LGCA_base):
     1D version of an LGCA.
     """
     interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation', 'parameter_controlled_diffusion',
-                    'random_walk', 'persistent_motion']
+                    'random_walk', 'persistent_motion', 'birthdeath']
     velocitychannels = 2
     c = np.array([1., -1.])[None, ...]
 
@@ -21,6 +19,7 @@ class LGCA_1D(LGCA_base):
         if nodes is not None:
             self.l, self.K = nodes.shape
             self.restchannels = self.K - self.velocitychannels
+            self.dims = self.l,
             return
 
         elif dims is None:
@@ -32,6 +31,7 @@ class LGCA_1D(LGCA_base):
         else:
             self.l = dims[0]
 
+        self.dims = self.l,
         self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels
 
@@ -91,27 +91,28 @@ class LGCA_1D(LGCA_base):
         weights[1:, :, 2] = qty[:-1, ...]
         return weights
 
-    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
-        self.update_dynamic_fields()
-        if record:
-            self.nodes_t = np.zeros((timesteps + 1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
-            self.nodes_t[0, ...] = self.nodes[self.r_int:-self.r_int, ...]
-        if recordN:
-            self.n_t = np.zeros(timesteps + 1, dtype=np.int)
-            self.n_t[0] = self.nodes.sum()
-        if recorddens:
-            self.dens_t = np.zeros((timesteps + 1, self.l))
-            self.dens_t[0, ...] = self.cell_density[self.r_int:-self.r_int]
-        for t in range(1, timesteps + 1):
-            self.timestep()
-            if record:
-                self.nodes_t[t, ...] = self.nodes[self.r_int:-self.r_int]
-            if recordN:
-                self.n_t[t] = self.cell_density.sum()
-            if recorddens:
-                self.dens_t[t, ...] = self.cell_density[self.r_int:-self.r_int]
-            if showprogress:
-                update_progress(1.0 * t / timesteps)
+    #
+    # def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
+    #     self.update_dynamic_fields()
+    #     if record:
+    #         self.nodes_t = np.zeros((timesteps + 1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
+    #         self.nodes_t[0, ...] = self.nodes[self.r_int:-self.r_int, ...]
+    #     if recordN:
+    #         self.n_t = np.zeros(timesteps + 1, dtype=np.int)
+    #         self.n_t[0] = self.nodes.sum()
+    #     if recorddens:
+    #         self.dens_t = np.zeros((timesteps + 1, self.l))
+    #         self.dens_t[0, ...] = self.cell_density[self.r_int:-self.r_int]
+    #     for t in range(1, timesteps + 1):
+    #         self.timestep()
+    #         if record:
+    #             self.nodes_t[t, ...] = self.nodes[self.r_int:-self.r_int]
+    #         if recordN:
+    #             self.n_t[t] = self.cell_density.sum()
+    #         if recorddens:
+    #             self.dens_t[t, ...] = self.cell_density[self.r_int:-self.r_int]
+    #         if showprogress:
+    #             update_progress(1.0 * t / timesteps)
 
     def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='hot_r'):
         if density_t is None:
@@ -125,8 +126,8 @@ class LGCA_1D(LGCA_base):
         plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=2 + self.restchannels, cmap=cmap)
         cbar = colorbar_index(ncolors=3 + self.restchannels, cmap=cmap, use_gridspec=True)
         cbar.set_label(r'Particle number $n$')
-        plt.xlabel(r'Lattice node $r \, [\varepsilon]$', )
-        plt.ylabel(r'Time step $k \, [\tau]$')
+        plt.xlabel(r'Lattice node $r \, (\varepsilon)$', )
+        plt.ylabel(r'Time step $k \, (\tau)$')
         ax.xaxis.set_label_position('top')
         ax.xaxis.tick_top()
         plt.tight_layout()
@@ -168,43 +169,13 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
     def init_nodes(self, density, nodes=None):
         self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.uint)
         if nodes is None:
-            occupied = npr.random((self.l, self.K)) < density
-            self.nodes[self.r_int:-self.r_int] = self.convert_bool_to_ib(occupied)
-            self.apply_boundaries()
+            self.random_reset(density)
             self.maxlabel = self.nodes.max()
 
         else:
             occ = nodes > 0
             self.nodes[self.r_int:-self.r_int] = self.convert_bool_to_ib(occ)
             self.maxlabel = self.nodes.max()
-
-    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True, recordLast=False):
-        self.update_dynamic_fields()
-        if record:
-            self.nodes_t = np.zeros((timesteps + 1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
-            self.nodes_t[0, ...] = self.nodes[self.r_int:-self.r_int, ...]
-            self.props_t = [copy(self.props)]
-        if recordN:
-            self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
-            self.n_t[0] = self.nodes.sum()
-        if recorddens:
-            self.dens_t = np.zeros((timesteps + 1, self.l))
-            self.dens_t[0, ...] = self.cell_density[self.r_int:-self.r_int]
-        if recordLast:
-            self.props_t = [copy(self.props)]
-        for t in range(1, timesteps + 1):
-            self.timestep()
-            if record:
-                self.nodes_t[t, ...] = self.nodes[self.r_int:-self.r_int]
-                self.props_t.append(copy(self.props))
-            if recordN:
-                self.n_t[t] = self.cell_density.sum()
-            if recorddens:
-                self.dens_t[t, ...] = self.cell_density[self.r_int:-self.r_int]
-            if recordLast and t == (timesteps + 1):
-                self.props_t.append(copy(self.props))
-            if showprogress:
-                update_progress(1.0 * t / timesteps)
 
     def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=None, figsize=None, propname=None, cmap='cividis'):
         if nodes_t is None:
@@ -216,24 +187,19 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             props_t = self.props_t
 
         if propname is None:
-            propname = list(props_t[0].keys())[0]
+            propname = list(props_t[0])[0]
 
         tmax, l, _ = nodes_t.shape
-        mean_prop = np.zeros((tmax, l))
+        mean_prop_t = np.zeros((tmax, l))
         for t in range(tmax):
-            for x in range(l):
-                node = nodes_t[t, x]
-                occ = node.astype(np.bool)
-                if occ.sum() == 0:
-                    continue
-
-                mean_prop[t, x] = np.mean(np.array(props_t[t][propname])[node[node > 0]])
+            meanprop = self.calc_prop_mean(propname=propname, props=props_t[t], nodes=nodes_t[t])
+            mean_prop_t[t] = meanprop
 
         dens_t = nodes_t.astype(bool).sum(-1)
-        vmax = np.max(mean_prop)
-        vmin = np.min(mean_prop)
+        vmax = np.max(mean_prop_t)
+        vmin = np.min(mean_prop_t)
         rgba = plt.get_cmap(cmap)
-        rgba = rgba((mean_prop - vmin) / (vmax - vmin))
+        rgba = rgba((mean_prop_t - vmin) / (vmax - vmin))
         rgba[dens_t == 0, :] = 0.
         fig = plt.figure(num=figindex, figsize=figsize)
         ax = fig.add_subplot(111)
@@ -265,25 +231,25 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
 
         plt.figure(num=figindex, figsize=figsize)
         tmax = len(props_t)
-        mean_prop = np.zeros(tmax)
-        std_mean_prop = np.zeros(mean_prop.shape)
+        mean_prop_t = np.zeros(tmax)
+        std_mean_prop_t = np.zeros(mean_prop_t.shape)
         for t in range(tmax):
             props = props_t[t]
             nodes = nodes_t[t]
             prop = np.array(props[propname])[nodes[nodes > 0]]
-            mean_prop[t] = np.mean(prop)
-            std_mean_prop[t] = np.std(prop, ddof=1) / np.sqrt(len(prop))
+            mean_prop_t[t] = np.mean(prop)
+            std_mean_prop_t[t] = np.std(prop, ddof=1) / np.sqrt(len(prop))
 
-        yerr = std_mean_prop
+        yerr = std_mean_prop_t
         x = np.arange(tmax)
-        y = mean_prop
+        y = mean_prop_t
 
         plt.xlabel('$t$')
         plt.ylabel('${}$'.format(propname))
         plt.title('Time course of the cell property')
-        plt.plot(x, y)
-        plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True, interpolate=True)
-        return
+        line = plt.plot(x, y)
+        errors = plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True, interpolate=True)
+        return line, errors
 
 
 if __name__ == '__main__':
@@ -291,11 +257,11 @@ if __name__ == '__main__':
     restchannels = 2
     n_channels = restchannels + 2
     nodes = 1 + np.arange(l * n_channels, dtype=np.uint).reshape((l, n_channels))
-    # nodes[1:, :] = 0
-    # nodes[0, 1:] = 0
+    nodes[1:, :] = 0
 
-    system = IBLGCA_1D(bc='reflect', dims=1, interaction='birthdeath', density=1, restchannels=5000, r_b=0.2)
-    system.timeevo(timesteps=2000, record=True)
+    system = IBLGCA_1D(bc='reflect', dims=100, interaction='birthdeath', density=0.1, restchannels=2, r_b=0.1, std=0.05,
+                       nodes=nodes)
+    system.timeevo(timesteps=200, record=True)
     # system.plot_prop()
     # system.plot_density(figindex=1)
     # props = np.array(system.props['kappa'])[system.nodes[system.nodes > 0]]
@@ -303,6 +269,6 @@ if __name__ == '__main__':
     # system.plot_prop_timecourse()
     # plt.ylabel('$\kappa$')
     # system.plot_density()
-    # system.plot_prop_spatial()
-    system.plot_prop_timecourse()
+    system.plot_prop_spatial()
+    # system.plot_prop_timecourse()
     plt.show()
