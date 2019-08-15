@@ -167,23 +167,39 @@ class LGCA_Hex(LGCA_Square):
         return sum
 
 
+class IBLGCA_Hex(IBLGCA_base, LGCA_Hex):
+    """
+    Identity-based LGCA simulator class.
+    """
+
+    def init_nodes(self, density=0.1, nodes=None):
+        self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
+        if nodes is None:
+            self.random_reset(density)
+
+        else:
+            self.nodes[self.nonborder] = nodes.astype(np.uint)
+            self.maxlabel = self.nodes.max()
+
+
 if __name__ == '__main__':
-    lx = 50
+    lx = 5
     ly = lx
     restchannels = 6
     nodes = np.zeros((lx, ly, 6 + restchannels))
-    # nodes[2, 0, 0] = 1
+    nodes[lx // 2, ly // 2, -1] = 1
     # nodes[...] = 1
-    nodes[:lx // 2, :, -2:] = 1
+    # nodes[:lx // 2, :, -2:] = 1
     # nodes[..., -1] = 1
     # nodes[:, ly//2:, 6:] = 1
     # nodes[0, :, :4] = 1
-    lgca = LGCA_Hex(restchannels=restchannels, dims=(lx, ly), density=0.5 / (6 + restchannels), bc='pbc',
-                    interaction='wetting', beta=5., gamma=10)
-    lgca.ecm = np.zeros_like(lgca.cell_density)
+    # lgca = LGCA_Hex(restchannels=restchannels, dims=(lx, ly), density=0.5 / (6 + restchannels), bc='pbc',
+    #                 interaction='wetting', beta=20., gamma=10)
+    # lgca.ecm = np.zeros_like(lgca.cell_density, dtype=bool)
+    lgca = IBLGCA_Hex(nodes=nodes, interaction='go_and_grow')
     # lgca.set_interaction('contact_guidance', beta=2)
     # cProfile.run('lgca.timeevo(timesteps=1000)')
-    lgca.timeevo(timesteps=50, record=True)
+    # lgca.timeevo(timesteps=50, record=True)
     # ani = lgca.animate_flow(interval=500)
     # ani = lgca.animate_flux(interval=50)
     # ani = lgca.animate_density(interval=50)
@@ -193,12 +209,12 @@ if __name__ == '__main__':
 
     # ani = lgca.live_animate_density(interval=100, vmax=lgca.restchannels, channels=range(6, lgca.K))
     # ani2 = lgca.live_animate_density(interval=100, vmax=lgca.velocitychannels, channels=range(6))
-    ani = lgca.animate_flux()
     # ani = lgca.live_animate_flow()
     # ani = lgca.live_animate_density()
+    #ani = lgca.live_animate_config()
     # plt.streamplot(lgca.xcoords[:, 0], lgca.ycoords[-1], lgca.g[1:-1, 1:-1, 0].T, lgca.g[1:-1, 1:-1, 1].T, density=.5,
     #               arrowstyle='->', color='orange', linewidth=2.)
     # ani = lgca.live_animate_density()
-    # lgca.plot_config(grid=False)
+    lgca.plot_config()
     # lgca.plot_density(edgecolor='k')
     plt.show()

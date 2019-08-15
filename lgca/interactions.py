@@ -47,7 +47,7 @@ def birth(lgca):
     random_walk(lgca)
 
 
-def birth_death(lgca):
+def birthdeath(lgca):
     """
     Simple birth-death process coupled to a random walk
     :return:
@@ -191,8 +191,6 @@ def aggregation(lgca):
 
     lgca.nodes = newnodes
 
-
-
 def wetting(lgca):
     """
     Wetting of a surface for different levels of E-cadherin
@@ -202,7 +200,7 @@ def wetting(lgca):
     """
     if hasattr(lgca, 'spheroid'):
         rho = lgca.cell_density[lgca.spheroid, None] / lgca.K
-        birth = npr.random(lgca.nodes[lgca.spheroid].shape) < lgca.r_b / (1 - rho)
+        birth = npr.random(lgca.nodes[lgca.spheroid].shape) < lgca.r_b  # / (1 - rho)
         # nbs = lgca.nb_sum(lgca.cell_density) + lgca.cell_density - 1
         # nbs /= lgca.n_crit
         # death = npr.random(lgca.nodes[lgca.spheroid].shape) < lgca.r_b / (lgca.rho_0 + 1)
@@ -214,8 +212,6 @@ def wetting(lgca):
     relevant = (lgca.cell_density[lgca.nonborder] > 0)  # & \
     # (np.invert(lgca.ecm[lgca.nonborder]))
     coords = [a[relevant] for a in lgca.nonborder]
-
-
     # nbs = np.clip(lgca.nb_sum(lgca.cell_density) + lgca.cell_density, a_min=None, a_max=lgca.n_crit)
     nbs = lgca.nb_sum(lgca.cell_density)
     nbs *= np.clip(1 - nbs / lgca.n_crit, a_min=0, a_max=None) / lgca.n_crit * 2
@@ -257,9 +253,9 @@ def wetting(lgca):
             # + lgca.beta * np.dot(permutations[:, :lgca.velocitychannels], adh_weight[coord])
             + lgca.beta * np.einsum('i,ij', g_adh[coord], j)
             # + lgca.alpha * np.einsum('i,ij', g_subs[coord], j)
-            # + lgca.alpha * restc
+            + lgca.alpha * restc
             + lgca.gamma * np.einsum('i,ij', g_pressure[coord], j)
-            + lgca.gamma * np.dot(permutations[:, :lgca.velocitychannels], ecm_weight[coord])
+            #+ lgca.gamma * np.dot(permutations[:, :lgca.velocitychannels], ecm_weight[coord])
             #+ lgca.gamma * np.dot(permutations[:, :lgca.velocitychannels], subs_weight[coord])
         ).cumsum()
         ind = bisect_left(weights, random() * weights[-1])
@@ -274,7 +270,6 @@ def wetting(lgca):
     #     newcellnode[:lgca.velocitychannels // 2] = oldcellnode[lgca.velocitychannels // 2:lgca.velocitychannels]
     #     newcellnode[lgca.velocitychannels // 2:lgca.velocitychannels] = oldcellnode[:lgca.velocitychannels // 2]
     #     newnodes[coord] = newcellnode
-
     lgca.nodes = newnodes
 
 
