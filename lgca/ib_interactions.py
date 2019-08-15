@@ -94,7 +94,15 @@ def go_or_grow_interaction(lgca):
     interactions of the go-or-grow model. formulation too complex for 1d, but to be generalized.
     :return:
     """
-
+    k_scale = 0.2
+    th_scale = 0.05
+    '''
+    if lgca['mut']=='theta':
+        k_scale=0
+    if lgca['mut']=='kappa':
+        th_scale=0
+    '''
+    th_scale = 0
     # death
     dying = npr.random(lgca.nodes.shape) < lgca.r_d
     lgca.nodes[dying] = 0
@@ -144,9 +152,16 @@ def go_or_grow_interaction(lgca):
                 lgca.maxlabel += 1
                 rest[np.where(rest == 0)[0][0]] = lgca.maxlabel
                 kappa = lgca.props['kappa'][cell]
-                lgca.props['kappa'].append(npr.normal(loc=kappa, scale=0.2))
+                if k_scale == 0:
+                    lgca.props['kappa'].append(kappa)
+                else:
+                    lgca.props['kappa'].append(npr.normal(loc=kappa, scale=k_scale))
                 theta = lgca.props['theta'][cell]
-                lgca.props['theta'].append(npr.normal(loc=theta, scale=0.05))
+                if th_scale == 0:
+                    lgca.props['theta'].append(theta)
+                else:
+                    lgca.props['theta'].append(npr.normal(loc=theta, scale=th_scale))
+
 
         v_channels = npr.permutation(vel)
         r_channels = npr.permutation(rest)

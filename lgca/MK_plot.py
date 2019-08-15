@@ -1,11 +1,13 @@
 import pickle
+import statistics as stat
 from lgca.lgca_1d import *
 import pickle
+import statistics as stat
 
 from lgca.lgca_1d import *
 
 
-def plot01(save_file=[], ALL=[], p_start=0.5, p_end=1):
+def plot01(save_file=[], ALL=[], p_start=0.5, p_end=1, img_x=[-1, 2], img_y=[-16, 16]):
     try:
         with open(save_file, 'rb') as config_dictionary_file:
             # Step 3
@@ -13,22 +15,22 @@ def plot01(save_file=[], ALL=[], p_start=0.5, p_end=1):
     except:
         print('no file loaded')
 
-    img_x = [-3, 4]
-    img_y = [-24, 24]
     size_b = len(ALL['b'])
     size_d = len(ALL['bd'])
     size_c = len(ALL['rest'])
+    size_f = len(ALL['fix'])
     size_run = ALL['runs']
 
-
+    m_k = np.zeros((size_c * size_b * size_d))
+    m_t = np.zeros((size_c * size_b * size_d))
     for c in np.arange(0, size_c):
         plt.figure(c)
         for rd in np.arange(0, size_b * size_d):
-
+            i = c * (size_b * size_d) + rd
             KAPPAS = []
             THETAS = []
             for run in range(size_run):
-                i = c * (size_b * size_d) + rd
+
                 K = []
                 T = []
                 try:
@@ -39,9 +41,10 @@ def plot01(save_file=[], ALL=[], p_start=0.5, p_end=1):
                     T = ALL['data'][run][i].props_t[-1]['theta']
 
                 KAPPAS.extend(K[int(len(K) * p_start):int(len(K) * p_end)])
-                print(len(KAPPAS))
+                # print(len(KAPPAS))
                 THETAS.extend(T[int(len(T) * p_start):int(len(K) * p_end)])
-
+            m_k[i] = stat.median(KAPPAS)
+            m_t[i] = stat.median(THETAS)
             plt.subplot(size_b, size_d, rd + 1)
             # plt.hist2d(THETAS[int(-len(THETAS)/2):],KAPPAS[int(-len(KAPPAS)/2):], range=((-1,2),(-16,16)), bins=25)
             plt.hist2d(THETAS, KAPPAS, bins=100, range=(img_x, img_y), )
@@ -52,6 +55,7 @@ def plot01(save_file=[], ALL=[], p_start=0.5, p_end=1):
                 plt.plot([-1, 2], [8, 8], ls='--', c=[0.1, 0, 0])
                 plt.plot([0, 0], [-16, 16], ls='--', c=[0.1, 0, 0])
                 plt.plot([1, 1], [-16, 16], ls='--', c=[0.1, 0, 0])
+                plt.plot(m_t[i], m_k[i], marker='+', c=[1, 0, 0])
                 cb = plt.colorbar()
                 if run != 0:
                     plt.title(
@@ -68,8 +72,15 @@ def plot01(save_file=[], ALL=[], p_start=0.5, p_end=1):
                     plt.yticks([])
 
                 # plt.plot(np.arange(len(lgcalist[i].dens_t)), np.array(lgcalist[i].dens_t).mean(-1))
+    plt.figure(size_c)
+    plt.subplot(1, 2, 1)
+    plt.plot(m_t)
+    plt.subplot(1, 2, 2)
+    plt.plot(m_k)
     plt.show()
 
+
+plot01(save_file='S02_CURRENT.pkl', img_x=[-2, 3])
 
 """
 lgca2.plot_prop_timecourse(propname='kappa')
@@ -117,4 +128,3 @@ for i in np.arange(0,size):
 
 plt.show()
 """
-
