@@ -96,13 +96,12 @@ def go_or_grow_interaction(lgca):
     """
     k_scale = 0.2
     th_scale = 0.05
-    '''
-    if lgca['mut']=='theta':
+
+    if lgca.mut == 'theta':
         k_scale=0
-    if lgca['mut']=='kappa':
+    if lgca.mut == 'kappa':
         th_scale=0
-    '''
-    th_scale = 0
+
     # death
     dying = npr.random(lgca.nodes.shape) < lgca.r_d
     lgca.nodes[dying] = 0
