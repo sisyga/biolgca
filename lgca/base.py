@@ -525,6 +525,11 @@ class IBLGCA_base(LGCA_base):
                     print('switch threshold set to theta = ', self.theta[0])
                 # MK:
                 self.props.update(theta=[0.] + self.theta)  # * self.maxlabel)
+                if 'mut' in kwargs:
+                    self.mut = kwargs['mut']
+                else:
+                    self.mut = 'both'
+                    print('both kappa and theta will be mutated')
                 if self.restchannels < 2:
                     print('WARNING: not enough rest channels - system will die out!!!')
 
