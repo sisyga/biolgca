@@ -24,7 +24,6 @@ def disarrange(a, axis=-1):
 def tanh_switch(rho, kappa=5., theta=0.8):
     return 0.5 * (1 + np.tanh(kappa * (rho - theta)))
 
-
 def random_walk(lgca):
     """
     Shuffle config in the last axis, modeling a random walk.
@@ -48,7 +47,7 @@ def birth(lgca):
     random_walk(lgca)
 
 
-def birth_death(lgca):
+def birthdeath(lgca):
     """
     Simple birth-death process coupled to a random walk
     :return:
@@ -192,8 +191,6 @@ def aggregation(lgca):
 
     lgca.nodes = newnodes
 
-
-
 def wetting(lgca):
     """
     Wetting of a surface for different levels of E-cadherin
@@ -202,8 +199,8 @@ def wetting(lgca):
     :return:
     """
     if hasattr(lgca, 'spheroid'):
-        # rho = lgca.cell_density[lgca.spheroid, None] / lgca.K
-        birth = npr.random(lgca.nodes[lgca.spheroid].shape) < lgca.r_b  # / (1 - rho) / lgca.K
+        rho = lgca.cell_density[lgca.spheroid, None] / lgca.K
+        birth = npr.random(lgca.nodes[lgca.spheroid].shape) < lgca.r_b  # / (1 - rho)
         # nbs = lgca.nb_sum(lgca.cell_density) + lgca.cell_density - 1
         # nbs /= lgca.n_crit
         # death = npr.random(lgca.nodes[lgca.spheroid].shape) < lgca.r_b / (lgca.rho_0 + 1)
@@ -212,26 +209,29 @@ def wetting(lgca):
         lgca.nodes[lgca.spheroid, :] = np.add(lgca.nodes[lgca.spheroid, :], ds, casting='unsafe')
         lgca.update_dynamic_fields()
     newnodes = lgca.nodes.copy()
-    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-               (np.invert(lgca.ecm[lgca.nonborder]))
+    relevant = (lgca.cell_density[lgca.nonborder] > 0)  # & \
+    # (np.invert(lgca.ecm[lgca.nonborder]))
     coords = [a[relevant] for a in lgca.nonborder]
-
-
     # nbs = np.clip(lgca.nb_sum(lgca.cell_density) + lgca.cell_density, a_min=None, a_max=lgca.n_crit)
-    nbs = lgca.nb_sum(lgca.cell_density) + lgca.cell_density
-    nbs *= np.clip(1 - nbs / lgca.n_crit, a_min=0, a_max=None) / lgca.n_crit
+    nbs = lgca.nb_sum(lgca.cell_density)
+    nbs *= np.clip(1 - nbs / lgca.n_crit, a_min=0, a_max=None) / lgca.n_crit * 2
     # adh_weight = lgca.channel_weight(nbs) - nbs[..., None]
     g_adh = lgca.gradient(nbs)
-    pressure = (lgca.cell_density - lgca.rho_0) / lgca.K  # , a_min=None, a_max=Non#np.clip()
-    if hasattr(lgca, 'ecm'):
-        pressure += lgca.ecm
+    pressure = np.clip(lgca.cell_density - lgca.rho_0, a_min=0., a_max=None) / (lgca.K - lgca.rho_0)
     g_pressure = -lgca.gradient(pressure)
     # pressure_weight = np.clip(lgca.cell_density[..., None] - 1 - lgca.rho_0, a_min=0, a_max=None) - lgca.channel_weight(pressure)
 
+    if hasattr(lgca, 'ecm'):
+        ecm_weight = -lgca.channel_weight(lgca.ecm)
+
+    else:
+        ecm_weight = lgca.channel_weight(lgca.cell_density) * 0
+
+
     resting = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
-    resting = lgca.nb_sum(resting)
-    # resting *= np.clip(1 - resting / lgca.rho_0 / lgca.velocitychannels, a_min=0, a_max=None) / lgca.velocitychannels / lgca.rho_0
-    resting = np.clip(resting, a_min=0, a_max=lgca.velocitychannels * lgca.rho_0) / lgca.velocitychannels / lgca.rho_0
+    resting = lgca.nb_sum(resting) / lgca.velocitychannels / lgca.rho_0
+    # resting *= np.clip(1 - resting / lgca.rho_0 / lgca.velocitychannels / 2, a_min=0, a_max=None) / lgca.velocitychannels / lgca.rho_0
+    #resting = np.clip(resting, a_min=0, a_max=lgca.velocitychannels * lgca.rho_0) / lgca.velocitychannels / lgca.rho_0
     # resting = np.clip(resting, a_min=None, a_max=lgca.n_crit)
     g = lgca.calc_flux(lgca.nodes)
     g = lgca.nb_sum(g)
@@ -249,31 +249,27 @@ def wetting(lgca):
         j_nb = g[coord]
         weights = np.exp(
             lgca.beta * (j_nb[0] * j[0] + j_nb[1] * j[1]) / lgca.velocitychannels / 2
-            + lgca.beta * resting[coord] * restc * (1 - restc / lgca.rho_0 / 2) * 2
+            + lgca.beta * resting[coord] * restc  #* np.clip(1 - restc / lgca.rho_0 / 2, a_min=0, a_max=None) * 2
             # + lgca.beta * np.dot(permutations[:, :lgca.velocitychannels], adh_weight[coord])
             + lgca.beta * np.einsum('i,ij', g_adh[coord], j)
             # + lgca.alpha * np.einsum('i,ij', g_subs[coord], j)
-            # + lgca.alpha * restc
+            + lgca.alpha * restc
             + lgca.gamma * np.einsum('i,ij', g_pressure[coord], j)
-            #+ lgca.gamma * np.dot(permutations[:, :lgca.velocitychannels], pressure_weight[coord])
+            #+ lgca.gamma * np.dot(permutations[:, :lgca.velocitychannels], ecm_weight[coord])
             #+ lgca.gamma * np.dot(permutations[:, :lgca.velocitychannels], subs_weight[coord])
         ).cumsum()
-        # print('Alignment:', (j_nb[0] * j[0] + j_nb[1] * j[1]) / 4 / lgca.velocitychannels)
-        # print('Resting:', resting[coord] * restc.sum(-1) / lgca.restchannels ** 2 / lgca.velocitychannels)
-        #print('Adhesion:', np.dot(permutations[:, :lgca.velocitychannels], adh_weight[coord]) / lgca.n_crit)
         ind = bisect_left(weights, random() * weights[-1])
         newnodes[coord] = permutations[ind]
 
     # reflection at ecm sites
-    relevant = (lgca.cell_density[lgca.nonborder] > 0) & (lgca.ecm[lgca.nonborder])
-    coords = [a[relevant] for a in lgca.nonborder]
-    for coord in zip(*coords):
-        oldcellnode = lgca.nodes[coord]
-        newcellnode = newnodes[coord]
-        newcellnode[:lgca.velocitychannels // 2] = oldcellnode[lgca.velocitychannels // 2:lgca.velocitychannels]
-        newcellnode[lgca.velocitychannels // 2:lgca.velocitychannels] = oldcellnode[:lgca.velocitychannels // 2]
-        newnodes[coord] = newcellnode
-
+    # relevant = (lgca.cell_density[lgca.nonborder] > 0) & (lgca.ecm[lgca.nonborder])
+    # coords = [a[relevant] for a in lgca.nonborder]
+    # for coord in zip(*coords):
+    #     oldcellnode = lgca.nodes[coord]
+    #     newcellnode = newnodes[coord]
+    #     newcellnode[:lgca.velocitychannels // 2] = oldcellnode[lgca.velocitychannels // 2:lgca.velocitychannels]
+    #     newcellnode[lgca.velocitychannels // 2:lgca.velocitychannels] = oldcellnode[:lgca.velocitychannels // 2]
+    #     newnodes[coord] = newcellnode
     lgca.nodes = newnodes
 
 

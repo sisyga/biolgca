@@ -18,38 +18,26 @@ def birth(lgca):
     Simple birth process
     :return:
     """
+
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
                (lgca.cell_density[lgca.nonborder] < lgca.K)
     coords = [a[relevant] for a in lgca.nonborder]
-    inds = np.arange(lgca.K)
     for coord in zip(*coords):
-        n = lgca.cell_density[coord]
         node = lgca.nodes[coord]
 
         # choose cells that proliferate
-        r_bs = [lgca.props['r_b'][i] for i in node]
+        r_bs = np.array([lgca.props['r_b'][i] for i in node])
         proliferating = npr.random(lgca.K) < r_bs
-        dn = proliferating.sum()
-        n += dn
-        # assure that there are not too many cells. if there are, randomly kick enough of them
-        while n > lgca.K:
-            p = proliferating.astype(float)
-            Z = p.sum()
-            p /= Z
-            ind = npr.choice(inds, p=p)
-            proliferating[ind] = 0
-            n -= 1
 
-        # distribute daughter cells randomly in channels
+        # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
         for label in node[proliferating]:
-            p = 1. - lgca.occupied[coord]
-            Z = p.sum()
-            p /= Z
-            ind = npr.choice(inds, p=p)
-            lgca.maxlabel += 1
-            node[ind] = lgca.maxlabel
-            r_b = lgca.props['r_b'][label]
-            lgca.props['r_b'].append(npr.normal(loc=r_b, scale=0.2 * r_b))
+            ind = npr.choice(lgca.K)
+            if node[ind] == 0:
+                lgca.maxlabel += 1
+                node[ind] = lgca.maxlabel
+                r_b = lgca.props['r_b'][label]
+                # lgca.props['r_b'].append(np.clip(npr.normal(loc=r_b, scale=lgca.std), 0, 1))
+                lgca.props['r_b'].append(float(trunc_gauss(0, lgca.a_max, r_b, sigma=lgca.std)))
 
         lgca.nodes[coord] = node
         npr.shuffle(lgca.nodes[coord])
@@ -78,18 +66,18 @@ def birthdeath(lgca):
         # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
         for label in node[proliferating]:
             ind = npr.choice(lgca.K)
-            if lgca.occupied[coord, ind] == 0:
+            if node[ind] == 0:
                 lgca.maxlabel += 1
                 node[ind] = lgca.maxlabel
                 r_b = lgca.props['r_b'][label]
                 # lgca.props['r_b'].append(np.clip(npr.normal(loc=r_b, scale=lgca.std), 0, 1))
-                lgca.props['r_b'].append(float(trunc_gauss(0, 1, r_b, sigma=lgca.std)))
+                lgca.props['r_b'].append(float(trunc_gauss(0, lgca.a_max, r_b, sigma=lgca.std)))
 
         lgca.nodes[coord] = node
         npr.shuffle(lgca.nodes[coord])
 
 
-def go_or_grow_interaction(lgca):
+def go_or_grow(lgca):
     """
     interactions of the go-or-grow model. formulation too complex for 1d, but to be generalized.
     :return:
@@ -108,9 +96,9 @@ def go_or_grow_interaction(lgca):
 
     # birth
     lgca.update_dynamic_fields()  # routinely update
-    n_m = lgca.occupied[:, :2].sum(-1)  # number of cells in rest channels for each node
-    #   .sum(-1) ? specifies dimension, -1 -> 1 dimension ?
-    n_r = lgca.occupied[:, 2:].sum(-1)  # -"- velocity -"-
+    n_m = lgca.occupied[..., :lgca.velocitychannels].sum(-1)  # number of cells in rest channels for each node
+    #   .sum(-1) ? specifies dimension, -1 -> 1 dimension ? SIMON: .sum(-1) sums over the last axis (= sum over channels!)
+    n_r = lgca.occupied[..., lgca.velocitychannels:].sum(-1)  # -"- velocity -"-
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
                (lgca.cell_density[lgca.nonborder] < lgca.K)  # only nodes that are not empty or full
     coords = [a[relevant] for a in lgca.nonborder]

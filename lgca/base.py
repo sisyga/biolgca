@@ -1,4 +1,5 @@
 import sys
+from copy import deepcopy as copy
 
 import matplotlib.colors as mcolors
 import numpy as np
@@ -114,8 +115,8 @@ class LGCA_base():
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
         self.set_bc(bc)
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
-        self.init_nodes(density=density, nodes=nodes)
         self.init_coords()
+        self.init_nodes(density=density, nodes=nodes)
         self.set_interaction(**kwargs)
         self.cell_density = self.nodes.sum(-1)
         self.apply_boundaries()
@@ -129,10 +130,10 @@ class LGCA_base():
     def set_interaction(self, **kwargs):
         try:
             from .interactions import go_or_grow, birth, alignment, persistent_walk, chemotaxis, \
-                contact_guidance, nematic, aggregation, wetting, random_walk, birth_death, excitable_medium
-        except ImportError:
+                contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium
+        except:
             from interactions import go_or_grow, birth, alignment, persistent_walk, chemotaxis, \
-                contact_guidance, nematic, aggregation, wetting, random_walk, birth_death, excitable_medium
+                contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
             if interaction == 'go_or_grow':
@@ -296,8 +297,8 @@ class LGCA_base():
                     self.r_b = 0.2
                     print('birth rate set to r_b = ', self.r_b)
 
-            elif interaction == 'birth_death':
-                self.interaction = birth_death
+            elif interaction == 'birthdeath':
+                self.interaction = birthdeath
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
                 else:
@@ -354,6 +355,9 @@ class LGCA_base():
             self.apply_boundaries = self.apply_pbc
 
     def calc_flux(self, nodes):
+        if nodes.dtype != 'bool':
+            nodes = nodes.astype('bool')
+
         return np.einsum('ij,...j', self.c, nodes[..., :self.velocitychannels])
 
     def get_interactions(self):
@@ -366,6 +370,7 @@ class LGCA_base():
         :return:
         """
         self.nodes = npr.random(self.nodes.shape) < density
+        self.apply_boundaries()
         self.update_dynamic_fields()
 
     def update_dynamic_fields(self):
@@ -385,6 +390,28 @@ class LGCA_base():
         self.propagation()
         self.apply_boundaries()
         self.update_dynamic_fields()
+
+    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
+        self.update_dynamic_fields()
+        if record:
+            self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
+            self.nodes_t[0, ...] = self.nodes[self.nonborder]
+        if recordN:
+            self.n_t = np.zeros(timesteps + 1, dtype=np.int)
+            self.n_t[0] = self.cell_density[self.nonborder].sum()
+        if recorddens:
+            self.dens_t = np.zeros((timesteps + 1,) + self.dims)
+            self.dens_t[0, ...] = self.cell_density[self.nonborder]
+        for t in range(1, timesteps + 1):
+            self.timestep()
+            if record:
+                self.nodes_t[t, ...] = self.nodes[self.nonborder]
+            if recordN:
+                self.n_t[t] = self.cell_density[self.nonborder].sum()
+            if recorddens:
+                self.dens_t[t, ...] = self.cell_density[self.nonborder]
+            if showprogress:
+                update_progress(1.0 * t / timesteps)
 
     def calc_permutations(self):
         self.permutations = [np.array(list(multiset_permutations([1] * n + [0] * (self.K - n))), dtype=np.int8)
@@ -415,18 +442,18 @@ class IBLGCA_base(LGCA_base):
         self.props = {}
         self.set_bc(bc)
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
-        self.init_nodes(density=density, nodes=nodes)
         self.init_coords()
+        self.init_nodes(density=density, nodes=nodes)
         self.set_interaction(**kwargs)
         self.cell_density = self.nodes.sum(-1)
         self.apply_boundaries()
 
     def set_interaction(self, **kwargs):
         try:
-            from .ib_interactions import birth, birthdeath, go_or_grow_interaction
+            from .ib_interactions import birth, birthdeath, go_or_grow
             from .interactions import random_walk
         except ImportError:
-            from ib_interactions import birth, birthdeath, go_or_grow_interaction
+            from ib_interactions import birth, birthdeath, go_or_grow
             from interactions import random_walk
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
@@ -456,11 +483,16 @@ class IBLGCA_base(LGCA_base):
                 if 'std' in kwargs:
                     self.std = kwargs['std']
                 else:
-                    self.std = 0.1
+                    self.std = 0.01
                     print('standard deviation set to = ', self.std)
+                if 'a_max' in kwargs:
+                    self.a_max = kwargs['a_max']
+                else:
+                    self.a_max = 1.
+                    print('Max. birth rate set to a_max =', self.a_max)
 
             elif interaction is 'go_or_grow':
-                self.interaction = go_or_grow_interaction
+                self.interaction = go_or_grow
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']
                 else:
@@ -472,17 +504,25 @@ class IBLGCA_base(LGCA_base):
                     self.r_b = 0.2
                     print('birth rate set to r_b = ', self.r_b)
                 if 'kappa' in kwargs:
-                    self.kappa = kwargs['kappa']
+                    kappa = kwargs['kappa']
+                    try:
+                        self.kappa = list(kappa)
+                    except TypeError:
+                        self.kappa = [kappa] * self.maxlabel
                 else:
                     self.kappa = [5.] * self.maxlabel
-                    print('switch rate set to kappa = ', self.kappa)
+                    print('switch rate set to kappa = ', self.kappa[0])
                 # self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
                 self.props.update(kappa=[0.] + self.kappa)
                 if 'theta' in kwargs:
-                    self.theta = kwargs['theta']
+                    theta = kwargs['theta']
+                    try:
+                        self.theta = list(theta)
+                    except TypeError:
+                        self.theta = [theta] * self.maxlabel
                 else:
                     self.theta = [0.75] * self.maxlabel
-                    print('switch threshold set to theta = ', self.theta)
+                    print('switch threshold set to theta = ', self.theta[0])
                 # MK:
                 self.props.update(theta=[0.] + self.theta)  # * self.maxlabel)
                 if self.restchannels < 2:
@@ -496,7 +536,21 @@ class IBLGCA_base(LGCA_base):
                     self.r_b = 0.2
                     print('birth rate set to r_b = ', self.r_b)
 
+                if 'std' in kwargs:
+                    self.std = kwargs['std']
+                else:
+                    self.std = 0.01
+                    print('standard deviation set to = ', self.std)
+
+                if 'a_max' in kwargs:
+                    self.a_max = kwargs['a_max']
+                else:
+                    self.a_max = 1.
+                    print('Max. birth rate set to a_max =', self.a_max)
+
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+
+
 
             elif interaction is 'random_walk':
                 self.interaction = random_walk
@@ -527,8 +581,62 @@ class IBLGCA_base(LGCA_base):
         :param density:
         :return:
         """
-        occupied = npr.random(self.nonborder.shape) < density
+        occupied = npr.random(self.dims + (self.K,)) < density
         self.nodes[self.nonborder] = self.convert_bool_to_ib(occupied)
         self.apply_boundaries()
         self.maxlabel = self.nodes.max()
         self.update_dynamic_fields()
+
+    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True, recordLast=False):
+        self.update_dynamic_fields()
+        if record:
+            self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
+            self.nodes_t[0, ...] = self.nodes[self.nonborder, ...]
+            self.props_t = [copy(self.props)]
+        if recordN:
+            self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
+            self.n_t[0] = self.cell_density[self.nonbroder].sum()
+        if recorddens:
+            self.dens_t = np.zeros((timesteps + 1,) + self.dims)
+            self.dens_t[0, ...] = self.cell_density[self.nonborder]
+        if recordLast:
+            self.props_t = [copy(self.props)]
+        for t in range(1, timesteps + 1):
+            self.timestep()
+            if record:
+                self.nodes_t[t, ...] = self.nodes[self.nonborder]
+                self.props_t.append(copy(self.props))
+            if recordN:
+                self.n_t[t] = self.cell_density[self.nonborder].sum()
+            if recorddens:
+                self.dens_t[t, ...] = self.cell_density[self.nonborder]
+            if recordLast and t == (timesteps + 1):
+                self.props_t.append(copy(self.props))
+            if showprogress:
+                update_progress(1.0 * t / timesteps)
+
+    def calc_prop_mean(self, nodes=None, props=None, propname=None):
+        if nodes is None:
+            nodes = self.nodes[self.nonborder]
+
+        if props is None:
+            props = self.props
+
+        if propname is None:
+            propname = list(self.props)[0]
+
+        dims = nodes.shape
+        nodes = nodes.reshape((-1, dims[-1]))
+        occupied = nodes.astype(bool)
+        cell_density = occupied.sum(-1)
+        mean_prop = np.zeros_like(cell_density, dtype=float)
+        inds = np.arange(nodes.shape[0])
+        relevant = inds[cell_density > 0]
+
+        for i in relevant:
+            node = nodes[i]
+            occ = occupied[i]
+            mean_prop[i] = np.mean(np.asarray(props[propname])[node[occ]])
+
+        mean_prop = mean_prop.reshape(dims[:-1])
+        return mean_prop

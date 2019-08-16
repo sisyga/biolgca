@@ -28,6 +28,7 @@ class LGCA_Square(LGCA_base):
         if nodes is not None:
             self.lx, self.ly, self.K = nodes.shape
             self.restchannels = self.K - self.velocitychannels
+            self.dims = self.lx, self.ly
             return
 
         elif dims is None:
@@ -38,6 +39,7 @@ class LGCA_Square(LGCA_base):
         except TypeError:
             self.lx, self.ly = dims, dims
 
+        self.dims = self.lx, self.ly
         self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels
 
@@ -160,6 +162,9 @@ class LGCA_Square(LGCA_base):
         return weights
 
     def calc_vorticity(self, nodes):
+        if nodes.dtype != 'bool':
+            nodes = nodes.astype('bool')
+
         flux = self.calc_flux(nodes)
         dens = nodes.sum(-1)
         flux = np.divide(flux, dens[..., None], where=dens[..., None] > 0, out=np.zeros_like(flux))
@@ -170,28 +175,6 @@ class LGCA_Square(LGCA_base):
         dfydx = dfy[..., 0]
         vorticity = dfydx - dfxdy
         return vorticity
-
-    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
-        self.update_dynamic_fields()
-        if record:
-            self.nodes_t = np.zeros((timesteps + 1, self.lx, self.ly, self.K), dtype=self.nodes.dtype)
-            self.nodes_t[0, ...] = self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, ...]
-        if recordN:
-            self.n_t = np.zeros(timesteps + 1, dtype=np.int)
-            self.n_t[0] = self.nodes.sum()
-        if recorddens:
-            self.dens_t = np.zeros((timesteps + 1, self.lx, self.ly))
-            self.dens_t[0, ...] = self.cell_density[self.r_int:-self.r_int, self.r_int:-self.r_int]
-        for t in range(1, timesteps + 1):
-            self.timestep()
-            if record:
-                self.nodes_t[t, ...] = self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :]
-            if recordN:
-                self.n_t[t] = self.cell_density.sum()
-            if recorddens:
-                self.dens_t[t, ...] = self.cell_density[self.r_int:-self.r_int, self.r_int:-self.r_int]
-            if showprogress:
-                update_progress(1.0 * t / timesteps)
 
     def setup_figure(self, figindex=None, figsize=None, tight_layout=True):
         dy = self.r_poly * np.cos(self.orientation)
@@ -204,8 +187,8 @@ class LGCA_Square(LGCA_base):
         plt.xlim(xmin, xmax)
         plt.ylim(ymin, ymax)
         ax.set_aspect('equal')
-        plt.xlabel('$x \\; [\\varepsilon]$')
-        plt.ylabel('$y \\; [\\varepsilon]$')
+        plt.xlabel('$x \\; (\\varepsilon)$')
+        plt.ylabel('$y \\; (\\varepsilon)$')
         ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         ax.spines['top'].set_visible(True)
@@ -215,14 +198,15 @@ class LGCA_Square(LGCA_base):
         ax.set_autoscale_on(False)
         return fig, ax
 
-    def plot_config(self, nodes=None, figindex=None, figsize=None, tight_layout=True, grid=False):
+    def plot_config(self, nodes=None, figindex=None, figsize=None, tight_layout=True, grid=False, ec='none'):
         r_circle = self.r_poly * 0.25
         # bbox_props = dict(boxstyle="Circle,pad=0.3", fc="white", ec="k", lw=1.5)
         bbox_props = None
         if nodes is None:
             nodes = self.nodes[self.nonborder]
 
-        density = nodes.sum(-1)
+        occupied = nodes.astype('bool')
+        density = occupied.sum(-1)
         if figsize is None:
             figsize = estimate_figsize(density, cbar=False, dy=self.dy)
 
@@ -234,23 +218,26 @@ class LGCA_Square(LGCA_base):
         dpx = np.mean([abs(x2 - x1), abs(y2 - y1)])
         fontsize = dpx * 72. / fig.dpi
         lw_circle = fontsize / 5
+        lw_arrow = 0.5 * lw_circle
+
+        colors = 'none', 'k'
         arrows = []
         for i in range(self.velocitychannels):
             cx = self.c[0, i] * 0.5
             cy = self.c[1, i] * 0.5
-            arrows += [FancyArrowPatch((x, y), (x + cx, y + cy), alpha=occ, mutation_scale=.3, fc='k', ec='none')
-                       for x, y, occ in zip(xx.ravel(), yy.ravel(), nodes[..., i].ravel())]
+            arrows += [FancyArrowPatch((x, y), (x + cx, y + cy), mutation_scale=.3, fc=colors[occ], ec=ec, lw=lw_arrow)
+                       for x, y, occ in zip(xx.ravel(), yy.ravel(), occupied[..., i].ravel())]
 
         arrows = PatchCollection(arrows, match_original=True)
         ax.add_collection(arrows)
 
         if self.restchannels > 0:
-            circles = [Circle(xy=(x, y), radius=r_circle, fc='white', ec='k', lw=lw_circle, alpha=occ)
-                       for x, y, occ in
-                       zip(xx.ravel(), yy.ravel(), nodes[..., self.velocitychannels:].any(axis=-1).ravel())]
+            circles = [Circle(xy=(x, y), radius=r_circle, fc='white', ec='k', lw=lw_circle * bool(n), visible=bool(n))
+                       for x, y, n in
+                       zip(xx.ravel(), yy.ravel(), nodes[..., self.velocitychannels:].sum(-1).ravel())]
             texts = [ax.text(x, y - 0.5 * r_circle, str(n), ha='center', va='baseline', fontsize=fontsize,
-                             fontname='sans-serif', fontweight='bold', bbox=bbox_props, alpha=bool(n))
-                     for x, y, n in zip(xx.ravel(), yy.ravel(), nodes[..., self.velocitychannels:].sum(-1).ravel())]
+                             fontname='sans-serif', fontweight='bold', bbox=bbox_props, visible=bool(n))
+                     for x, y, n in zip(xx.ravel(), yy.ravel(), occupied[..., self.velocitychannels:].sum(-1).ravel())]
             circles = PatchCollection(circles, match_original=True)
             ax.add_collection(circles)
 
@@ -259,10 +246,10 @@ class LGCA_Square(LGCA_base):
             texts = []
 
         if grid:
-            hexagons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
+            polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly, lw=lw_arrow,
                                        orientation=self.orientation, facecolor='None', edgecolor='k')
                         for x, y in zip(self.xcoords.ravel(), self.ycoords.ravel())]
-            ax.add_collection(PatchCollection(hexagons, match_original=True))
+            ax.add_collection(PatchCollection(polygons, match_original=True))
 
         else:
             ymin = -0.5 * self.c[1, 1]
@@ -361,8 +348,7 @@ class LGCA_Square(LGCA_base):
         def update(n):
             self.timestep()
             title.set_text('Time $k =${}'.format(n))
-            pc.set(facecolor=cmap.to_rgba(
-                self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, channels].sum(-1).ravel()))
+            pc.set(facecolor=cmap.to_rgba(self.cell_density[self.nonborder].ravel()))
             return pc, title
 
         ani = animation.FuncAnimation(fig, update, interval=interval)
@@ -371,7 +357,7 @@ class LGCA_Square(LGCA_base):
     def plot_flow(self, nodes=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None):
 
         if nodes is None:
-            nodes = self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :]
+            nodes = self.nodes[self.nonborder]
 
         if vmax is None:
             K = self.K
@@ -429,11 +415,11 @@ class LGCA_Square(LGCA_base):
 
         def update(n):
             self.timestep()
-            jx, jy = np.moveaxis(self.calc_flux(self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int]), -1, 0)
+            jx, jy = np.moveaxis(self.calc_flux(self.nodes[self.nonborder]), -1, 0)
             title.set_text('Time $k =${}'.format(n))
             plot.set_UVC(jx, jy)
             plot.set(
-                facecolor=cmap.to_rgba(self.cell_density[self.r_int:-self.r_int, self.r_int:-self.r_int].flatten()))
+                facecolor=cmap.to_rgba(self.cell_density[self.nonborder].flatten()))
             return plot, title
 
         ani = animation.FuncAnimation(fig, update, interval=interval)
@@ -482,9 +468,12 @@ class LGCA_Square(LGCA_base):
                           width=0.007, norm=colors.Normalize(vmin=0, vmax=1))
         return fig, plot
 
-    def plot_flux(self, nodes=None, figindex=None, figsize=None, tight_layout=True, edgecolor='None'):
+    def plot_flux(self, nodes=None, figindex=None, figsize=None, tight_layout=True, edgecolor='None', cbar=True):
         if nodes is None:
-            nodes = self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :]
+            nodes = self.nodes[self.nonborder]
+
+        if nodes.dtype != 'bool':
+            nodes = nodes.astype('bool')
 
         nodes = nodes.astype(np.int8)
         density = nodes.sum(-1).astype(float) / self.K
@@ -511,10 +500,12 @@ class LGCA_Square(LGCA_base):
                     for x, y, c in zip(self.xcoords.ravel(), self.ycoords.ravel(), angle.reshape(-1, 4))]
         pc = PatchCollection(hexagons, match_original=True)
         ax.add_collection(pc)
-        cbar = fig.colorbar(cmap, use_gridspec=True)
-        cbar.set_label('Particle flux $\\arg \\left( \\vec{J} \\right)$ $[\degree]$')
-        cbar.set_ticks(np.arange(self.velocitychannels) * 360 / self.velocitychannels)
+        if cbar:
+            cbar = fig.colorbar(cmap, use_gridspec=True)
+            cbar.set_label('Direction of movement $(\degree)$')
+            cbar.set_ticks(np.arange(self.velocitychannels) * 360 / self.velocitychannels)
         return fig, pc, cmap
+
 
     def animate_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis', interval=500, vmax=None,
                         tight_layout=True, edgecolor='None'):
@@ -534,7 +525,7 @@ class LGCA_Square(LGCA_base):
         return ani
 
     def animate_flux(self, nodes_t=None, figindex=None, figsize=None, interval=200, tight_layout=True,
-                     edgecolor='None'):
+                     edgecolor='None', cbar=True):
         if nodes_t is None:
             nodes_t = self.nodes_t
 
@@ -547,7 +538,7 @@ class LGCA_Square(LGCA_base):
         angle.imag = jy
         angle = np.angle(angle, deg=True) % 360.
         fig, pc, cmap = self.plot_flux(nodes=nodes[0], figindex=figindex, figsize=figsize, tight_layout=tight_layout,
-                                       edgecolor=edgecolor)
+                                       edgecolor=edgecolor, cbar=cbar)
         angle = cmap.to_rgba(angle[None, ...])[0]
         angle[..., -1] = np.sqrt(density)
         angle[(jx ** 2 + jy ** 2) < 1e-6, :3] = 0.
@@ -570,8 +561,8 @@ class LGCA_Square(LGCA_base):
 
         def update(n):
             self.timestep()
-            jx, jy = np.moveaxis(self.calc_flux(self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :]), -1, 0)
-            density = self.cell_density[self.r_int:-self.r_int, self.r_int:-self.r_int] / self.K
+            jx, jy = np.moveaxis(self.calc_flux(self.nodes[self.nonborder]), -1, 0)
+            density = self.cell_density[self.nonborder] / self.K
 
             angle = np.empty(density.shape, dtype=complex)
             angle.real = jx
@@ -588,19 +579,37 @@ class LGCA_Square(LGCA_base):
         return ani
 
 
+class IBLGCA_Square(IBLGCA_base, LGCA_Square):
+    """
+    Identity-based LGCA simulator class.
+    """
+
+    def init_nodes(self, density=0.1, nodes=None):
+        self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
+        if nodes is None:
+            self.random_reset(density)
+
+        else:
+            self.nodes[self.nonborder] = nodes.astype(np.uint)
+            self.maxlabel = self.nodes.max()
+
+
 if __name__ == '__main__':
     lx = 50
     ly = lx
-    restchannels = 2
+    restchannels = 4
     nodes = np.zeros((lx, ly, 4 + restchannels))
-    nodes[..., (0, 1)] = 1
-    lgca = LGCA_Square(restchannels=restchannels, lx=lx, ly=ly, density=0.4, bc='refl')  # , nodes=nodes)
-    lgca.set_interaction(interaction='aggregation', beta=10)
+    nodes[lx // 2, ly // 2, -1] = 1
+    lgca = IBLGCA_Square(restchannels=restchannels, lx=lx, ly=ly, density=0.1, bc='refl', nodes=nodes,
+                         interaction='go_or_grow', kappa=0)
+    # lgca.timeevo(100)
+    # print(lgca.cell_density[lgca.nonborder])
+    # lgca.set_interaction(interaction='go_and_grow')
     # ani = lgca.animate_flow(interval=50)
     # ani = lgca.animate_flux(interval=100)
     # ani = lgca.animate_density(interval=100)
     # ani = lgca.live_animate_flux()
-    ani = lgca.live_animate_density()
+    ani = lgca.live_animate_flux()
     # lgca.plot_flux()
     # lgca.plot_density()
     # lgca.plot_config(grid=True)
