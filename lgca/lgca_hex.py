@@ -1,10 +1,10 @@
 try:
     from .base import *
-    from .lgca_square import LGCA_Square
+    from .lgca_square import LGCA_Square, IBLGCA_Square
 
 except ModuleNotFoundError:
     from base import *
-    from lgca_square import LGCA_Square
+    from lgca_square import LGCA_Square, IBLGCA_Square
 
 
 class LGCA_Hex(LGCA_Square):
@@ -167,7 +167,7 @@ class LGCA_Hex(LGCA_Square):
         return sum
 
 
-class IBLGCA_Hex(IBLGCA_base, LGCA_Hex):
+class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
     """
     Identity-based LGCA simulator class.
     """
@@ -183,11 +183,11 @@ class IBLGCA_Hex(IBLGCA_base, LGCA_Hex):
 
 
 if __name__ == '__main__':
-    lx = 5
+    lx = 200
     ly = lx
     restchannels = 6
     nodes = np.zeros((lx, ly, 6 + restchannels))
-    nodes[lx // 2, ly // 2, -1] = 1
+    nodes[lx // 2, ly // 2, :] = 1
     # nodes[...] = 1
     # nodes[:lx // 2, :, -2:] = 1
     # nodes[..., -1] = 1
@@ -196,7 +196,7 @@ if __name__ == '__main__':
     # lgca = LGCA_Hex(restchannels=restchannels, dims=(lx, ly), density=0.5 / (6 + restchannels), bc='pbc',
     #                 interaction='wetting', beta=20., gamma=10)
     # lgca.ecm = np.zeros_like(lgca.cell_density, dtype=bool)
-    lgca = IBLGCA_Hex(nodes=nodes, interaction='go_and_grow')
+    lgca = IBLGCA_Hex(nodes=nodes, interaction='birthdeath', std=0.05, r_b=0.1)
     # lgca.set_interaction('contact_guidance', beta=2)
     # cProfile.run('lgca.timeevo(timesteps=1000)')
     # lgca.timeevo(timesteps=50, record=True)
@@ -217,4 +217,6 @@ if __name__ == '__main__':
     # ani = lgca.live_animate_density()
     # lgca.plot_config()
     # lgca.plot_density(edgecolor='k')
+    lgca.timeevo(100, record=True)
+    lgca.plot_prop_spatial(propname='r_b', cbarlabel='$r_b$', vmin=0, vmax=1)
     plt.show()

@@ -609,14 +609,13 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
         fig, pc, cmap = self.plot_scalarfield(meanprop, mask=mask, **kwargs)
         return fig, pc, cmap
 
-    def plot_scalarfield(self, field, cmap='cividis', cbar=True, edgecolor='none', mask=None,
+    def plot_scalarfield(self, field, cmap='cividis', cbar=True, edgecolor='none', mask=None, vmin=None, vmax=None,
                          cbarlabel='Scalar field', **kwargs):
         fig, ax = self.setup_figure(**kwargs)
         if mask is None:
             mask = np.ones_like(field, dtype=bool)
         cmap = plt.cm.get_cmap(cmap)
-        cmap.set_under(alpha=0.0)
-        cmap = plt.cm.ScalarMappable(cmap=cmap)
+        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=mcolors.Normalize(vmin=vmin, vmax=vmax))
         cmap.set_array(field)
         polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly, alpha=v,
                                    orientation=self.orientation, facecolor=c, edgecolor=edgecolor)
