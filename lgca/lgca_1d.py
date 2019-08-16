@@ -219,38 +219,6 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         return plot
 
-    def plot_prop_timecourse(self, nodes_t=None, props_t=None, propname=None, figindex=None, figsize=None):
-        if nodes_t is None:
-            nodes_t = self.nodes_t
-
-        if props_t is None:
-            props_t = self.props_t
-
-        if propname is None:
-            propname = list(props_t[0].keys())[0]
-
-        plt.figure(num=figindex, figsize=figsize)
-        tmax = len(props_t)
-        mean_prop_t = np.zeros(tmax)
-        std_mean_prop_t = np.zeros(mean_prop_t.shape)
-        for t in range(tmax):
-            props = props_t[t]
-            nodes = nodes_t[t]
-            prop = np.array(props[propname])[nodes[nodes > 0]]
-            mean_prop_t[t] = np.mean(prop)
-            std_mean_prop_t[t] = np.std(prop, ddof=1) / np.sqrt(len(prop))
-
-        yerr = std_mean_prop_t
-        x = np.arange(tmax)
-        y = mean_prop_t
-
-        plt.xlabel('$t$')
-        plt.ylabel('${}$'.format(propname))
-        plt.title('Time course of the cell property')
-        line = plt.plot(x, y)
-        errors = plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True, interpolate=True)
-        return line, errors
-
 
 if __name__ == '__main__':
     l = 100
