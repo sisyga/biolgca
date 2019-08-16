@@ -3,8 +3,13 @@ def get_lgca(geometry='hex', ib=False, **kwargs):
         if geometry in ['1d', 'lin', 'linear']:
             from .lgca_1d import IBLGCA_1D
             return IBLGCA_1D(**kwargs)
+        elif geometry in ['square', 'sq', 'rect', 'rectangular']:
+            from .lgca_square import IBLGCA_Square
+            return IBLGCA_Square(**kwargs)
+
         else:
-            print('Not implemented yet!')
+            from .lgca_hex import IBLGCA_Hex
+            return IBLGCA_Hex(**kwargs)
 
     else:
         if geometry in ['1d', 'lin', 'linear']:

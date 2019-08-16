@@ -215,6 +215,6 @@ if __name__ == '__main__':
     # plt.streamplot(lgca.xcoords[:, 0], lgca.ycoords[-1], lgca.g[1:-1, 1:-1, 0].T, lgca.g[1:-1, 1:-1, 1].T, density=.5,
     #               arrowstyle='->', color='orange', linewidth=2.)
     # ani = lgca.live_animate_density()
-    lgca.plot_config()
+    # lgca.plot_config()
     # lgca.plot_density(edgecolor='k')
     plt.show()
