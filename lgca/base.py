@@ -591,7 +591,7 @@ class IBLGCA_base(LGCA_base):
         self.update_dynamic_fields()
         if record:
             self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
-            self.nodes_t[0, ...] = self.nodes[self.nonborder, ...]
+            self.nodes_t[0, ...] = self.nodes[self.nonborder]
             self.props_t = [copy(self.props)]
         if recordN:
             self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
@@ -640,3 +640,35 @@ class IBLGCA_base(LGCA_base):
 
         mean_prop = mean_prop.reshape(dims[:-1])
         return mean_prop
+
+    def plot_prop_timecourse(self, nodes_t=None, props_t=None, propname=None, figindex=None, figsize=None):
+        if nodes_t is None:
+            nodes_t = self.nodes_t
+
+        if props_t is None:
+            props_t = self.props_t
+
+        if propname is None:
+            propname = list(props_t[0])[0]
+
+        plt.figure(num=figindex, figsize=figsize)
+        tmax = len(props_t)
+        mean_prop_t = np.zeros(tmax)
+        std_mean_prop_t = np.zeros(mean_prop_t.shape)
+        for t in range(tmax):
+            props = props_t[t]
+            nodes = nodes_t[t]
+            prop = np.asarray(props[propname])[nodes[nodes > 0]]
+            mean_prop_t[t] = prop.mean()
+            std_mean_prop_t[t] = np.std(prop, ddof=1) / np.sqrt(len(prop))
+
+        yerr = std_mean_prop_t
+        x = np.arange(tmax)
+        y = mean_prop_t
+
+        plt.xlabel('$t$')
+        plt.ylabel('${}$'.format(propname))
+        plt.title('Time course of the cell property')
+        line = plt.plot(x, y)
+        errors = plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True, interpolate=True)
+        return line, errors

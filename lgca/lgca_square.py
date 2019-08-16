@@ -447,10 +447,10 @@ class LGCA_Square(LGCA_base):
         else:
             cmap = plt.cm.ScalarMappable(cmap=cmap)
         cmap.set_array(density)
-        hexagons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
+        polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
                                    orientation=self.orientation, facecolor=c, edgecolor=edgecolor)
                     for x, y, c in zip(self.xcoords.ravel(), self.ycoords.ravel(), cmap.to_rgba(density.ravel()))]
-        pc = PatchCollection(hexagons, match_original=True)
+        pc = PatchCollection(polygons, match_original=True)
         ax.add_collection(pc)
         if cbar:
             cbar = fig.colorbar(cmap, extend='min', use_gridspec=True)
@@ -494,11 +494,11 @@ class LGCA_Square(LGCA_base):
         angle = cmap.to_rgba(angle)
         angle[..., -1] = np.sqrt(density)
         angle[(jx ** 2 + jy ** 2) < 1e-6, :3] = 0.
-        hexagons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
+        polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
                                    orientation=self.orientation, facecolor=c,
                                    edgecolor=edgecolor)
                     for x, y, c in zip(self.xcoords.ravel(), self.ycoords.ravel(), angle.reshape(-1, 4))]
-        pc = PatchCollection(hexagons, match_original=True)
+        pc = PatchCollection(polygons, match_original=True)
         ax.add_collection(pc)
         if cbar:
             cbar = fig.colorbar(cmap, use_gridspec=True)
@@ -593,23 +593,60 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
             self.nodes[self.nonborder] = nodes.astype(np.uint)
             self.maxlabel = self.nodes.max()
 
+    def plot_prop_spatial(self, nodes=None, props=None, propname=None, **kwargs):
+        if nodes is None:
+            nodes = self.nodes[self.nonborder]
+
+        if props is None:
+            props = self.props
+
+        if propname is None:
+            propname = list(props)[0]
+
+        lx, ly, _ = nodes.shape
+        mask = np.any(nodes, axis=-1)
+        meanprop = self.calc_prop_mean(propname=propname, props=props, nodes=nodes)
+        fig, pc, cmap = self.plot_scalarfield(meanprop, mask=mask, **kwargs)
+        return fig, pc, cmap
+
+    def plot_scalarfield(self, field, cmap='cividis', cbar=True, edgecolor='none', mask=None,
+                         cbarlabel='Scalar field', **kwargs):
+        fig, ax = self.setup_figure(**kwargs)
+        if mask is None:
+            mask = np.ones_like(field, dtype=bool)
+        cmap = plt.cm.get_cmap(cmap)
+        cmap.set_under(alpha=0.0)
+        cmap = plt.cm.ScalarMappable(cmap=cmap)
+        cmap.set_array(field)
+        polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly, alpha=v,
+                                   orientation=self.orientation, facecolor=c, edgecolor=edgecolor)
+                    for x, y, c, v in
+                    zip(self.xcoords.ravel(), self.ycoords.ravel(), cmap.to_rgba(field.ravel()), mask.ravel())]
+        pc = PatchCollection(polygons, match_original=True)
+        ax.add_collection(pc)
+        if cbar:
+            cbar = fig.colorbar(cmap, use_gridspec=True)
+            cbar.set_label(cbarlabel)
+        return fig, pc, cmap
+
 
 if __name__ == '__main__':
-    lx = 50
+    lx = 100
     ly = lx
     restchannels = 4
     nodes = np.zeros((lx, ly, 4 + restchannels))
-    nodes[lx // 2, ly // 2, -1] = 1
-    lgca = IBLGCA_Square(restchannels=restchannels, lx=lx, ly=ly, density=0.1, bc='refl', nodes=nodes,
-                         interaction='go_or_grow', kappa=0)
-    # lgca.timeevo(100)
+    nodes[lx // 2, ly // 2, :] = 1
+    lgca = IBLGCA_Square(restchannels=restchannels, lx=lx, ly=ly, bc='refl', nodes=nodes,
+                         interaction='go_and_grow', r_b=0.1, std=0.1)
+    lgca.timeevo(100, record=True)
+    lgca.plot_prop_spatial(propname='r_b', cbarlabel='$r_b$')
     # print(lgca.cell_density[lgca.nonborder])
     # lgca.set_interaction(interaction='go_and_grow')
     # ani = lgca.animate_flow(interval=50)
     # ani = lgca.animate_flux(interval=100)
     # ani = lgca.animate_density(interval=100)
     # ani = lgca.live_animate_flux()
-    ani = lgca.live_animate_flux()
+    # ani = lgca.live_animate_flux()
     # lgca.plot_flux()
     # lgca.plot_density()
     # lgca.plot_config(grid=True)
