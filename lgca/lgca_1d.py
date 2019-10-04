@@ -87,8 +87,8 @@ class LGCA_1D(LGCA_base):
 
     def channel_weight(self, qty):
         weights = np.zeros(qty.shape + (self.velocitychannels,))
-        weights[:-1, :, 0] = qty[1:, ...]
-        weights[1:, :, 2] = qty[:-1, ...]
+        weights[:-1, ..., 0] = qty[1:, ...]
+        weights[1:, ..., 1] = qty[:-1, ...]
         return weights
 
     #
