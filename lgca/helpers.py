@@ -151,7 +151,7 @@ def bar_stacked_relative(lgca, save = False, id = 0):
         # plt.savefig('probe_bar.jpg')
         # filename = str(lgca.r_b) + ', ' + str(id) + ', ' + str(t) + '  frequency' + '.jpg'
         filename = str(lgca.r_b) + ', dens' + str(lgca.maxlabel_init / (lgca.K * lgca.l)) + ', ' \
-                   + str(id) + ', ' + str(t) + '  frequency' + '.jpg'
+                   + str(id) + ', ' + str(t) + '  rel_frequency' + '.jpg'
 
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
