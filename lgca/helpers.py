@@ -171,12 +171,13 @@ def entropies(lgca, order, plot=False, save=False):
                     if pi != 0:
                         shan_t[t] -= pi * m.log(pi)
             else:
-                print('extinct since t= ', t)
+                # print('extinct since t= ', t)
+                t_ex = t
                 shan_t[t:] = -1
                 break
         shan_max = m.log(lgca.maxlabel_init)
         if plot:
-            plot_entropies(shan_t, save)
+            plot_entropies(time, shan_t, order, save)
         return shan_t, shan_max
 
     if order == 1.5:
@@ -191,11 +192,12 @@ def entropies(lgca, order, plot=False, save=False):
             elif abs == 1:
                 simpson_t[t] = 0
             elif abs == 0:
-                print('extinct since t= ', t)
+                # print('extinct since t= ', t)
+                t_ex = t
                 simpson_t[t:] = -1
                 break
         if plot:
-            plot_entropies(simpson_t, save)
+            plot_entropies(time, simpson_t, order, save)
         return simpson_t
 
     if order == 2:
@@ -207,11 +209,12 @@ def entropies(lgca, order, plot=False, save=False):
                     pi = lgca.props_t[t]['num_off'][lab] / sum(lgca.props_t[t]['num_off'][1:])
                     ginisimpson_t[t] -= pi * pi
             else:
-                print('extinct since t= ', t)
+                # print('extinct since t= ', t)
+                t_ex = t
                 ginisimpson_t[t:] = -1
                 break
         if plot:
-            plot_entropies(ginisimpson_t, save)
+            plot_entropies(time, ginisimpson_t, order, save)
         return ginisimpson_t
 
 def hillnumber(lgca, order, plot = False, save = False):
@@ -224,12 +227,13 @@ def hillnumber(lgca, order, plot = False, save = False):
             if shan_t[t] != -1:
                 hill_lin[t] = np.exp(shan_t[t])
             else:
-                print('extinct since t= ', t)
+                # print('extinct since t= ', t)
+                t_ex = t
                 hill_lin[t:] = -1
                 break
         hill_max = np.exp(shan_max)
         if plot:
-            plot_hill(hill_lin, hill_max, save)
+            plot_hill(time, hill_lin, order, save)
         return hill_lin, hill_max
 
     if order >= 2:
@@ -242,24 +246,121 @@ def hillnumber(lgca, order, plot = False, save = False):
                     hill_quad[t] += pi ** order
                 hill_quad[t] = hill_quad[t] ** (1/(1 - order))
             else:
-                print('extinct since t= ', t)
+                # print('extinct since t= ', t)
+                t_ex = t
                 hill_quad[t:] = -1
                 break
         if plot:
-            plot_hill(hill_quad, save)
+            plot_hill(time, hill_quad, order, save)
         return hill_quad
 
-def plot_hill(ind, save):
-    print('ich plotte')     #TODO: plot erstellen
-    print(ind)
+def plot_hill(timesteps, ind, order, save):
+    time = timesteps
+    x = np.arange(0, time, 1)
+    y = ind[x]
+
+    fig, ax = plt.subplots()
+    ax.plot(x, y)
+
+    ax.set(xlabel='timestep', ylabel='Hillnumber of order {order: d}'.format(order=order))
+
+    if time >= 700:
+        plt.xticks(np.arange(0, time, 100))
+    elif time >= 100:
+        plt.xticks(np.arange(0, time, 50))
+    else:
+        plt.xticks(np.arange(0, time, 2))
+    plt.yticks(np.arange(-0.1, y.max(), 2))
+    ax.grid()
+
+    plt.show()
+
     if save:                #TODO: speichern
         print('jaja, speichern tu ich auch')
 
-def plot_entropies(ind, save):
-    print('ich plotte')     #TODO: plot erstellen
-    print(ind)
+def plot_hill_together(lgca, save=False):
+    time = len(lgca.props_t)
+    x = np.arange(0, time, 1)
+    o1, hillmax = hillnumber(lgca, 1)
+    o2 = hillnumber(lgca, 2)
+    o3 = hillnumber(lgca, 3)
+
+    fig, ax = plt.subplots()
+    plt.plot(x, o1, 'b-', label='order 1')
+    plt.plot(x, o2, 'c--', label='order 2')
+    plt.plot(x, o3, 'm:', label='order 3')
+
+    ax.set(xlabel='timesteps', ylabel='Hillnumbers')
+    ax.legend()
+    if time >= 700:
+        plt.xticks(np.arange(0, time, 100))
+    elif time >= 100:
+        plt.xticks(np.arange(0, time, 50))
+    else:
+        plt.xticks(np.arange(0, time, 2))
+    plt.yticks(np.arange(0, hillmax*1.1, 1))
+    ax.grid()
+
+    plt.show()
+
+    if save:
+        print('speichern')      #TODO: speichern
+
+def plot_entropies(timesteps, ind, order, save):
+    time = timesteps
+    x = np.arange(0, time, 1)
+    y = ind[x]
+
+    fig, ax = plt.subplots()
+    ax.plot(x, y)
+
+    if order == 1:
+        ax.set(xlabel='timestep', ylabel='Shannonindex')
+    elif order == 2:
+        ax.set(xlabel='timestep', ylabel='Ginisimpsonindex')
+    elif order == 1.5:
+        ax.set(xlabel='timestep', ylabel='Simpsonindex')
+    if time >= 700:
+        plt.xticks(np.arange(0, time, 100))
+    elif time >= 100:
+        plt.xticks(np.arange(0, time, 50))
+    else:
+        plt.xticks(np.arange(0, time, 2))
+    plt.yticks(np.arange(-0.1, 1.2, 0.2))
+    ax.grid()
+
+    plt.show()
+
     if save:                #TODO: speichern
         print('jaja, speichern tu ich auch')
+
+def plot_entropies_together(lgca, save=False):
+    time = len(lgca.props_t)
+    x = np.arange(0, time, 1)
+    shan, shanmax = entropies(lgca, 1)
+    simp = entropies(lgca, 1.5)
+    gini = entropies(lgca, 2)
+
+    fig, ax = plt.subplots()
+    plt.plot(x, shan, 'b-', label='Shannonindex')
+    plt.plot(x, simp, 'c--', label='Simpsonindex')
+    plt.plot(x, gini, 'm:', label='GiniSimpsonindex')
+
+    ax.set(xlabel='timesteps', ylabel='Index')
+    ax.legend()
+    if time >= 700:
+        plt.xticks(np.arange(0, time, 100))
+    elif time >= 100:
+        plt.xticks(np.arange(0, time, 50))
+    else:
+        plt.xticks(np.arange(0, time, 2))
+    plt.yticks(np.arange(-0.1, shanmax * 1.1, 0.2))
+    ax.grid()
+
+    plt.show()
+
+    if save:
+        print('jaja')       #TODO: speichern
 
 def plot_popsize(lgca, save=False):
     time = len(lgca.props_t)
@@ -276,7 +377,6 @@ def plot_popsize(lgca, save=False):
     ax.grid()
 
     plt.show()
-
 
     if save:
         print('TODO')       #TODO: Speichern

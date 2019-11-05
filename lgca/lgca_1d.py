@@ -355,7 +355,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
 
     def bar_stacked_relative(self, save=False, id=0):
         tmax, l, _ = self.nodes_t.shape
-        print('tmax', tmax)
+        # print('tmax', tmax)
         ancs = np.arange(1, self.maxlabel_init.astype(int) + 1)
         val = np.zeros((tmax, self.maxlabel_init.astype(int) + 1))
 
@@ -366,7 +366,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                 c_sum = c_sum + self.props_t[t]['num_off'][c]
             if c_sum != 0:
                 val[t] = val[t] / c_sum
-        print('val', val)
+        # print('val', val)
 
         plt.figure(num=None)
         ind = np.arange(0, tmax, 1)
@@ -382,7 +382,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
 
         ###plot settings
 
-        plt.ylabel('relative frequency of family members')
+        plt.ylabel('relative frequency of families')
         plt.xlabel('timesteps')
         # plt.title('Ratio of offsprings')
         if len(ind) <= 15:
