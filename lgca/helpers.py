@@ -159,7 +159,7 @@ def ana_si(lgca, p = False, save = False, id = 0):
             # plt.savefig('probe_si.jpg')
         plt.show()
 
-def entropies(lgca, order):
+def entropies(lgca, order, plot=False, save=False):
     time = len(lgca.props_t)
     if order == 1:
         print('Shannon')
@@ -175,6 +175,8 @@ def entropies(lgca, order):
                 shan_t[t:] = -1
                 break
         shan_max = m.log(lgca.maxlabel_init)
+        if plot:
+            plot_entropies(shan_t, save)
         return shan_t, shan_max
 
     if order == 1.5:
@@ -192,8 +194,9 @@ def entropies(lgca, order):
                 print('extinct since t= ', t)
                 simpson_t[t:] = -1
                 break
+        if plot:
+            plot_entropies(simpson_t, save)
         return simpson_t
-
 
     if order == 2:
         print('ginisimpson')
@@ -207,9 +210,11 @@ def entropies(lgca, order):
                 print('extinct since t= ', t)
                 ginisimpson_t[t:] = -1
                 break
+        if plot:
+            plot_entropies(ginisimpson_t, save)
         return ginisimpson_t
 
-def hillnumber(lgca, order):
+def hillnumber(lgca, order, plot = False, save = False):
     time = len(lgca.props_t)
     if order == 1:
         hill_lin = np.zeros(time)
@@ -223,6 +228,8 @@ def hillnumber(lgca, order):
                 hill_lin[t:] = -1
                 break
         hill_max = np.exp(shan_max)
+        if plot:
+            plot_hill(hill_lin, hill_max, save)
         return hill_lin, hill_max
 
     if order >= 2:
@@ -238,7 +245,21 @@ def hillnumber(lgca, order):
                 print('extinct since t= ', t)
                 hill_quad[t:] = -1
                 break
+        if plot:
+            plot_hill(hill_quad, save)
         return hill_quad
+
+def plot_hill(ind, save):
+    print('ich plotte')     #TODO: plot erstellen
+    print(ind)
+    if save:                #TODO: speichern
+        print('jaja, speichern tu ich auch')
+
+def plot_entropies(ind, save):
+    print('ich plotte')     #TODO: plot erstellen
+    print(ind)
+    if save:                #TODO: speichern
+        print('jaja, speichern tu ich auch')
 
 
 
