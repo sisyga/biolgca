@@ -261,7 +261,25 @@ def plot_entropies(ind, save):
     if save:                #TODO: speichern
         print('jaja, speichern tu ich auch')
 
+def plot_popsize(lgca, save=False):
+    time = len(lgca.props_t)
+    x = np.arange(0, time, 1)
+    size = np.zeros(time)
+    for t in range(time):
+        size[t] = sum(lgca.props_t[t]['num_off'][1:])
+    y = size[x]
 
+    fig, ax = plt.subplots()
+    ax.plot(x, y)
+
+    ax.set(xlabel='timestep', ylabel='number of living cells')
+    ax.grid()
+
+    plt.show()
+
+
+    if save:
+        print('TODO')       #TODO: Speichern
 
 def aloha(who):
     print('aloha', who)
