@@ -1,4 +1,5 @@
 import numpy as np
+import math as m
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from datetime import datetime
@@ -100,123 +101,6 @@ def bar_stacked(lgca, save = False, id = 0):
 
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
-# def bar_stacked_relative(lgca, save = False, id = 0):
-#     tmax, l, _ = lgca.nodes_t.shape
-#     print('tmax', tmax)
-#     ancs = np.arange(1, lgca.maxlabel_init.astype(int) + 1)
-#     val = np.zeros((tmax, lgca.maxlabel_init.astype(int) + 1))
-#
-#     for t in range(0, tmax):
-#         c_sum = 0
-#         for c in ancs:
-#             val[t, c] = lgca.props_t[t]['num_off'][c]
-#             c_sum = c_sum + lgca.props_t[t]['num_off'][c]
-#         if c_sum != 0:
-#             val[t] = val[t] / c_sum
-#     print('val', val)
-#
-#     plt.figure(num=None)
-#     ind = np.arange(0, tmax, 1)
-#     width = 1
-#     for c in ancs:
-#         if c > 1:
-#             b = np.zeros(tmax)
-#             for i in range(1, c):
-#                 b = b + val[:, i]
-#             plt.bar(ind, val[:, c], width, bottom=b, label=c)
-#         else:
-#             plt.bar(ind, val[:, c], width, color=['red'], label=c)
-#
-#     ###plot settings
-#
-#     plt.ylabel('relative frequency of family members')
-#     plt.xlabel('timesteps')
-#     # plt.title('Ratio of offsprings')
-#     if len(ind) <= 15:
-#         plt.xticks(ind)
-#     else:
-#         plt.xticks(np.arange(0, len(ind)-1, 5))
-#
-#     if tmax >= 700:
-#         plt.xticks(np.arange(0, tmax, 100))
-#     elif tmax >= 100:
-#         plt.xticks(np.arange(0, tmax, 50))
-#
-#     # plt.subplots_adjust(right=0.85)
-#     # plt.legend(bbox_to_anchor=(1.04, 1))
-#     plt.tight_layout()
-#     plt.show()
-#     if save == True:
-#         # plt.savefig('pictures/' + str(id) + '  frequency' + str(datetime.now()) +'.jpg')
-#         # plt.savefig('probe_bar.jpg')
-#         # filename = str(lgca.r_b) + ', ' + str(id) + ', ' + str(t) + '  frequency' + '.jpg'
-#         filename = str(lgca.r_b) + ', dens' + str(lgca.maxlabel_init / (lgca.K * lgca.l)) + ', ' \
-#                    + str(id) + ', ' + str(t) + '  rel_frequency' + '.jpg'
-#
-#         plt.savefig(pathlib.Path('pictures').resolve() / filename)
-
-def stackplot(lgca, save = False, id = 0):
-    tmax, l, _ = lgca.nodes_t.shape
-    print('tmax', tmax)
-    ancs = np.arange(1, lgca.maxlabel_init.astype(int) + 1)
-    val = np.zeros((tmax, lgca.maxlabel_init.astype(int) + 1))
-    yc = np.zeros((tmax, lgca.maxlabel_init.astype(int) + 1))
-    for t in range(0, tmax):
-        c_sum = 0
-        for c in ancs:
-            val[t, c] = lgca.props_t[t]['num_off'][c]
-            c_sum = c_sum + lgca.props_t[t]['num_off'][c]
-        if c_sum != 0:
-            val[t] = val[t] / c_sum
-            yc[t] = val[t]
-    print('val', val)
-    print('yc', yc)
-    plt.figure(num=None)
-    fig, ax = plt.subplots()
-    # ax.stackplot(t, y[0], y[1], y[2])
-    ax.stackplot(np.arange(tmax), yc[:])
-
-    plt.show()
-    # ind = np.arange(0, tmax, 1)
-    # width = 1
-    # for c in ancs:
-    #     if c > 1:
-    #         b = np.zeros(tmax)
-    #         for i in range(1, c):
-    #             b = b + val[:, i]
-    #         plt.bar(ind, val[:, c], width, bottom=b, label=c)
-    #     else:
-    #         plt.bar(ind, val[:, c], width, color=['red'], label=c)
-
-    ###plot settings
-
-    # plt.ylabel('relative frequency of family members')
-    # plt.xlabel('timesteps')
-    # # plt.title('Ratio of offsprings')
-    # if len(ind) <= 15:
-    #     plt.xticks(ind)
-    # else:
-    #     plt.xticks(np.arange(0, len(ind)-1, 5))
-    #
-    # if tmax >= 700:
-    #     plt.xticks(np.arange(0, tmax, 100))
-    # elif tmax >= 100:
-    #     plt.xticks(np.arange(0, tmax, 50))
-    #
-    # # plt.subplots_adjust(right=0.85)
-    # # plt.legend(bbox_to_anchor=(1.04, 1))
-    # plt.tight_layout()
-    # plt.show()
-    if save == True:
-        # plt.savefig('pictures/' + str(id) + '  frequency' + str(datetime.now()) +'.jpg')
-        # plt.savefig('probe_bar.jpg')
-        # filename = str(lgca.r_b) + ', ' + str(id) + ', ' + str(t) + '  frequency' + '.jpg'
-        filename = str(lgca.r_b) + ', dens' + str(lgca.maxlabel_init / (lgca.K * lgca.l)) + ', ' \
-                   + str(id) + ', ' + str(t) + '  frequency' + '.jpg'
-
-        plt.savefig(pathlib.Path('pictures').resolve() / filename)
-
-
 def save_data(lgca, id = 0):
     #brauche:   rb, rd, dim, restchannel, velocitychannel, dichte, propst
     #nicht:     time, variation
@@ -274,6 +158,89 @@ def ana_si(lgca, p = False, save = False, id = 0):
             plt.savefig(pathlib.Path('pictures').resolve()/filename)
             # plt.savefig('probe_si.jpg')
         plt.show()
+
+def entropies(lgca, order):
+    time = len(lgca.props_t)
+    if order == 1:
+        print('Shannon')
+        shan_t = np.zeros(time)
+        for t in range(time):
+            if sum(lgca.props_t[t]['num_off'][1:]) != 0:
+                for lab in range(1, lgca.maxlabel_init+1):
+                    pi = lgca.props_t[t]['num_off'][lab] / sum(lgca.props_t[t]['num_off'][1:])
+                    if pi != 0:
+                        shan_t[t] -= pi * m.log(pi)
+            else:
+                print('extinct since t= ', t)
+                shan_t[t:] = -1
+                break
+        shan_max = m.log(lgca.maxlabel_init)
+        return shan_t, shan_max
+
+    if order == 1.5:
+        print('simpson')
+        simpson_t = np.zeros(time) + 1
+        for t in range(time):
+            abs = sum(lgca.props_t[t]['num_off'][1:])
+            if abs > 1:
+                for lab in range(1, lgca.maxlabel_init+1):
+                    pi = lgca.props_t[t]['num_off'][lab]
+                    simpson_t[t] -= (pi * (pi-1)) / (abs * (abs - 1))
+            elif abs == 1:
+                simpson_t[t] = 0
+            elif abs == 0:
+                print('extinct since t= ', t)
+                simpson_t[t:] = -1
+                break
+        return simpson_t
+
+
+    if order == 2:
+        print('ginisimpson')
+        ginisimpson_t = np.zeros(time) + 1
+        for t in range(time):
+            if sum(lgca.props_t[t]['num_off'][1:]) != 0:
+                for lab in range(1, lgca.maxlabel_init+1):
+                    pi = lgca.props_t[t]['num_off'][lab] / sum(lgca.props_t[t]['num_off'][1:])
+                    ginisimpson_t[t] -= pi * pi
+            else:
+                print('extinct since t= ', t)
+                ginisimpson_t[t:] = -1
+                break
+        return ginisimpson_t
+
+def hillnumber(lgca, order):
+    time = len(lgca.props_t)
+    if order == 1:
+        hill_lin = np.zeros(time)
+        print('exp Shannon')
+        shan_t, shan_max = entropies(lgca, 1)
+        for t in range(time):
+            if shan_t[t] != -1:
+                hill_lin[t] = np.exp(shan_t[t])
+            else:
+                print('extinct since t= ', t)
+                hill_lin[t:] = -1
+                break
+        hill_max = np.exp(shan_max)
+        return hill_lin, hill_max
+
+    if order >= 2:
+        print('hillnumber order', order)
+        hill_quad = np.zeros(time)
+        for t in range(time):
+            if sum(lgca.props_t[t]['num_off'][1:]) != 0:
+                for lab in range(1, lgca.maxlabel_init+1):
+                    pi = lgca.props_t[t]['num_off'][lab] / sum(lgca.props_t[t]['num_off'][1:])
+                    hill_quad[t] += pi ** order
+                hill_quad[t] = hill_quad[t] ** (1/(1 - order))
+            else:
+                print('extinct since t= ', t)
+                hill_quad[t:] = -1
+                break
+        return hill_quad
+
+
 
 def aloha(who):
     print('aloha', who)

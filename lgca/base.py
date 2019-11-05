@@ -2,6 +2,7 @@ import sys
 
 import matplotlib.colors as mcolors
 import numpy as np
+import math as m
 from matplotlib import pyplot as plt
 from matplotlib.cm import ScalarMappable
 from numpy import random as npr
@@ -580,15 +581,15 @@ class IBLGCA_base(LGCA_base):
         self.maxlabel = self.nodes.max()
         self.update_dynamic_fields()
 
-    def simpsonindex(lgca):
-        n = sum(lgca.props['num_off'][1:])
+    def simpsonindex(self):
+        n = sum(self.props['num_off'][1:])
         if n > 1:
-            s = lgca.maxlabel_init.astype(int)
+            s = self.maxlabel_init.astype(int)
             d = 1
             for i in range(1, s + 1):
-                n_i = lgca.props['num_off'][i]
+                n_i = self.props['num_off'][i]
                 d = d - n_i * (n_i - 1) / (n * (n - 1))
             return d
         else:
             return 0
-        # print('Simpson-Index = ', d)
+
