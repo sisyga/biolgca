@@ -128,37 +128,6 @@ def save_data(lgca, id = 0):
         file.write('{i:s}\n'.format(i=str(lgca.props_t[i])))
     file.close()
 
-def ana_si(lgca, p = False, save = False, id = 0):
-    t = len(lgca.props_t)   #timesteps + 1
-    for i in range(t):
-        if lgca.sim_ind[i] == 0:
-            print('Homogeneity since k = ', i)
-            zp = i
-            break
-        else:       #TODO schlauere Lösung
-            zp = -1
-    if p == True:
-        plt.figure(num=None)
-        plt.plot(lgca.sim_ind, color='seagreen', linewidth=2)
-        if zp >= 0:
-            # plt.plot([zp, zp], [0, 1], linewidth=1.5, linestyle="--")
-            plt.axvline(x=zp, linewidth=1.5, linestyle='-.', color ='c')
-        plt.grid(True)
-        plt.ylabel('Simpson-Index')
-        plt.xlabel('timesteps')
-        plt.yticks(np.arange(0, 1, 0.1))
-        if t >= 700:
-            plt.xticks(np.arange(0, t, 100))
-        elif t >= 100:
-            plt.xticks(np.arange(0, t, 50))
-        plt.tight_layout()
-        if save == True:
-            filename = str(lgca.r_b) + ', dens' + str(lgca.maxlabel_init / (lgca.K * lgca.l)) + ', ' \
-                      + str(id) + ', ' + str(t-1) + '  sim_ind' + '.jpg'
-            plt.savefig(pathlib.Path('pictures').resolve()/filename)
-            # plt.savefig('probe_si.jpg')
-        plt.show()
-
 def entropies(lgca, order, plot=False, save=False):
     time = len(lgca.props_t)
     if order == 1:

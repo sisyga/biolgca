@@ -193,7 +193,6 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True, recordLast=False):
         self.update_dynamic_fields()
         # si = True
-        self.sim_ind = [self.simpsonindex()]
         if record:
             self.nodes_t = np.zeros((timesteps + 1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
             self.nodes_t[0, ...] = self.nodes[self.r_int:-self.r_int, ...]
@@ -220,14 +219,6 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                 self.props_t.append(copy(self.props))
             if showprogress:
                 update_progress(1.0 * t / timesteps)
-            # if si:
-            #     if self.simpsonindex() == 0:
-            #         print('Homogeneity since k = ', t)
-            #         si = False
-            self.sim_ind.append(self.simpsonindex())
-            # if self.simpsonindex() == 0:
-            #     break
-            # print('index=', self.sim_ind)
             # print('t=', t)
             # print('props in timeevo:', self.props['num_off'])
             # print('props_t in timeevo', self.props_t[t]['num_off'][:])

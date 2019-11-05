@@ -581,15 +581,4 @@ class IBLGCA_base(LGCA_base):
         self.maxlabel = self.nodes.max()
         self.update_dynamic_fields()
 
-    def simpsonindex(self):
-        n = sum(self.props['num_off'][1:])
-        if n > 1:
-            s = self.maxlabel_init.astype(int)
-            d = 1
-            for i in range(1, s + 1):
-                n_i = self.props['num_off'][i]
-                d = d - n_i * (n_i - 1) / (n * (n - 1))
-            return d
-        else:
-            return 0
 
