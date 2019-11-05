@@ -100,60 +100,60 @@ def bar_stacked(lgca, save = False, id = 0):
 
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
-def bar_stacked_relative(lgca, save = False, id = 0):
-    tmax, l, _ = lgca.nodes_t.shape
-    print('tmax', tmax)
-    ancs = np.arange(1, lgca.maxlabel_init.astype(int) + 1)
-    val = np.zeros((tmax, lgca.maxlabel_init.astype(int) + 1))
-
-    for t in range(0, tmax):
-        c_sum = 0
-        for c in ancs:
-            val[t, c] = lgca.props_t[t]['num_off'][c]
-            c_sum = c_sum + lgca.props_t[t]['num_off'][c]
-        if c_sum != 0:
-            val[t] = val[t] / c_sum
-    print('val', val)
-
-    plt.figure(num=None)
-    ind = np.arange(0, tmax, 1)
-    width = 1
-    for c in ancs:
-        if c > 1:
-            b = np.zeros(tmax)
-            for i in range(1, c):
-                b = b + val[:, i]
-            plt.bar(ind, val[:, c], width, bottom=b, label=c)
-        else:
-            plt.bar(ind, val[:, c], width, color=['red'], label=c)
-
-    ###plot settings
-
-    plt.ylabel('relative frequency of family members')
-    plt.xlabel('timesteps')
-    # plt.title('Ratio of offsprings')
-    if len(ind) <= 15:
-        plt.xticks(ind)
-    else:
-        plt.xticks(np.arange(0, len(ind)-1, 5))
-
-    if tmax >= 700:
-        plt.xticks(np.arange(0, tmax, 100))
-    elif tmax >= 100:
-        plt.xticks(np.arange(0, tmax, 50))
-
-    # plt.subplots_adjust(right=0.85)
-    # plt.legend(bbox_to_anchor=(1.04, 1))
-    plt.tight_layout()
-    plt.show()
-    if save == True:
-        # plt.savefig('pictures/' + str(id) + '  frequency' + str(datetime.now()) +'.jpg')
-        # plt.savefig('probe_bar.jpg')
-        # filename = str(lgca.r_b) + ', ' + str(id) + ', ' + str(t) + '  frequency' + '.jpg'
-        filename = str(lgca.r_b) + ', dens' + str(lgca.maxlabel_init / (lgca.K * lgca.l)) + ', ' \
-                   + str(id) + ', ' + str(t) + '  rel_frequency' + '.jpg'
-
-        plt.savefig(pathlib.Path('pictures').resolve() / filename)
+# def bar_stacked_relative(lgca, save = False, id = 0):
+#     tmax, l, _ = lgca.nodes_t.shape
+#     print('tmax', tmax)
+#     ancs = np.arange(1, lgca.maxlabel_init.astype(int) + 1)
+#     val = np.zeros((tmax, lgca.maxlabel_init.astype(int) + 1))
+#
+#     for t in range(0, tmax):
+#         c_sum = 0
+#         for c in ancs:
+#             val[t, c] = lgca.props_t[t]['num_off'][c]
+#             c_sum = c_sum + lgca.props_t[t]['num_off'][c]
+#         if c_sum != 0:
+#             val[t] = val[t] / c_sum
+#     print('val', val)
+#
+#     plt.figure(num=None)
+#     ind = np.arange(0, tmax, 1)
+#     width = 1
+#     for c in ancs:
+#         if c > 1:
+#             b = np.zeros(tmax)
+#             for i in range(1, c):
+#                 b = b + val[:, i]
+#             plt.bar(ind, val[:, c], width, bottom=b, label=c)
+#         else:
+#             plt.bar(ind, val[:, c], width, color=['red'], label=c)
+#
+#     ###plot settings
+#
+#     plt.ylabel('relative frequency of family members')
+#     plt.xlabel('timesteps')
+#     # plt.title('Ratio of offsprings')
+#     if len(ind) <= 15:
+#         plt.xticks(ind)
+#     else:
+#         plt.xticks(np.arange(0, len(ind)-1, 5))
+#
+#     if tmax >= 700:
+#         plt.xticks(np.arange(0, tmax, 100))
+#     elif tmax >= 100:
+#         plt.xticks(np.arange(0, tmax, 50))
+#
+#     # plt.subplots_adjust(right=0.85)
+#     # plt.legend(bbox_to_anchor=(1.04, 1))
+#     plt.tight_layout()
+#     plt.show()
+#     if save == True:
+#         # plt.savefig('pictures/' + str(id) + '  frequency' + str(datetime.now()) +'.jpg')
+#         # plt.savefig('probe_bar.jpg')
+#         # filename = str(lgca.r_b) + ', ' + str(id) + ', ' + str(t) + '  frequency' + '.jpg'
+#         filename = str(lgca.r_b) + ', dens' + str(lgca.maxlabel_init / (lgca.K * lgca.l)) + ', ' \
+#                    + str(id) + ', ' + str(t) + '  rel_frequency' + '.jpg'
+#
+#         plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
 def stackplot(lgca, save = False, id = 0):
     tmax, l, _ = lgca.nodes_t.shape
