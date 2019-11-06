@@ -128,15 +128,16 @@ def save_data(lgca, id = 0):
         file.write('{i:s}\n'.format(i=str(lgca.props_t[i])))
     file.close()
 
-def entropies(lgca, order, plot=False, save_plot=False, id=0):
-    time = len(lgca.props_t)
+def entropies(props, order, plot=False, save_plot=False, id=0):
+    time = len(props)
+    maxlab = len(props[0]['num_off'][1:])
     if order == 1:
         # print('Shannon')
         shan_t = np.zeros(time)
         for t in range(time):
-            if sum(lgca.props_t[t]['num_off'][1:]) != 0:
-                for lab in range(1, lgca.maxlabel_init+1):
-                    pi = lgca.props_t[t]['num_off'][lab] / sum(lgca.props_t[t]['num_off'][1:])
+            if sum(props[t]['num_off'][1:]) != 0:
+                for lab in range(1, maxlab+1):
+                    pi = props[t]['num_off'][lab] / sum(props[t]['num_off'][1:])
                     if pi != 0:
                         shan_t[t] -= pi * m.log(pi)
             else:
@@ -144,7 +145,7 @@ def entropies(lgca, order, plot=False, save_plot=False, id=0):
                 t_ex = t
                 shan_t[t:] = -1
                 break
-        shan_max = m.log(lgca.maxlabel_init)
+        shan_max = m.log(maxlab)
         if plot or save_plot:
             plot_entropies(time, shan_t, order, save_plot, id)
         return shan_t, shan_max
@@ -153,10 +154,10 @@ def entropies(lgca, order, plot=False, save_plot=False, id=0):
         # print('simpson')
         simpson_t = np.zeros(time) + 1
         for t in range(time):
-            abs = sum(lgca.props_t[t]['num_off'][1:])
+            abs = sum(props[t]['num_off'][1:])
             if abs > 1:
-                for lab in range(1, lgca.maxlabel_init+1):
-                    pi = lgca.props_t[t]['num_off'][lab]
+                for lab in range(1, maxlab+1):
+                    pi = props[t]['num_off'][lab]
                     simpson_t[t] -= (pi * (pi-1)) / (abs * (abs - 1))
             elif abs == 1:
                 simpson_t[t] = 0
@@ -173,9 +174,9 @@ def entropies(lgca, order, plot=False, save_plot=False, id=0):
         # print('ginisimpson')
         ginisimpson_t = np.zeros(time) + 1
         for t in range(time):
-            if sum(lgca.props_t[t]['num_off'][1:]) != 0:
-                for lab in range(1, lgca.maxlabel_init+1):
-                    pi = lgca.props_t[t]['num_off'][lab] / sum(lgca.props_t[t]['num_off'][1:])
+            if sum(props[t]['num_off'][1:]) != 0:
+                for lab in range(1, maxlab+1):
+                    pi = props[t]['num_off'][lab] / sum(props[t]['num_off'][1:])
                     ginisimpson_t[t] -= pi * pi
             else:
                 # print('extinct since t= ', t)
@@ -186,12 +187,14 @@ def entropies(lgca, order, plot=False, save_plot=False, id=0):
             plot_entropies(time, ginisimpson_t, order, save_plot, id)
         return ginisimpson_t
 
-def hillnumber(lgca, order, plot = False, save_plot = False, id=0):
-    time = len(lgca.props_t)
+def hillnumber(props, order, plot = False, save_plot = False, id=0):
+    time = len(props)
+    maxlab = len(props[0]['num_off'][1:])
+
     if order == 1:
         hill_lin = np.zeros(time)
         # print('exp Shannon')
-        shan_t, shan_max = entropies(lgca, 1)
+        shan_t, shan_max = entropies(props, 1)
         for t in range(time):
             if shan_t[t] != -1:
                 hill_lin[t] = np.exp(shan_t[t])
@@ -209,9 +212,9 @@ def hillnumber(lgca, order, plot = False, save_plot = False, id=0):
         # print('hillnumber order', order)
         hill_quad = np.zeros(time)
         for t in range(time):
-            if sum(lgca.props_t[t]['num_off'][1:]) != 0:
-                for lab in range(1, lgca.maxlabel_init+1):
-                    pi = lgca.props_t[t]['num_off'][lab] / sum(lgca.props_t[t]['num_off'][1:])
+            if sum(props[t]['num_off'][1:]) != 0:
+                for lab in range(1, maxlab+1):
+                    pi = props[t]['num_off'][lab] / sum(props[t]['num_off'][1:])
                     hill_quad[t] += pi ** order
                 hill_quad[t] = hill_quad[t] ** (1/(1 - order))
             else:
@@ -249,12 +252,12 @@ def plot_hill(timesteps, ind, order, save, id=0):
         filename = str(id) + '_hillnumber order ' + str(order) + '.jpg'
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
-def plot_hill_together(lgca, save=False, id=0):
-    time = len(lgca.props_t)
+def plot_hill_together(props, save=False, id=0):
+    time = len(props)
     x = np.arange(0, time, 1)
-    o1, hillmax = hillnumber(lgca, 1)
-    o2 = hillnumber(lgca, 2)
-    o3 = hillnumber(lgca, 3)
+    o1, hillmax = hillnumber(props, 1)
+    o2 = hillnumber(props, 2)
+    o3 = hillnumber(props, 3)
 
     fig, ax = plt.subplots()
     plt.plot(x, o1, 'b-', label='order 1')
@@ -309,12 +312,12 @@ def plot_entropies(timesteps, ind, order, save_plot, id=0):
         filename = str(id) + '_entropy order ' + str(order) + '.jpg'
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
-def plot_entropies_together(lgca, save=False, id=0):
-    time = len(lgca.props_t)
+def plot_entropies_together(props, save=False, id=0):
+    time = len(props)
     x = np.arange(0, time, 1)
-    shan, shanmax = entropies(lgca, 1)
-    simp = entropies(lgca, 1.5)
-    gini = entropies(lgca, 2)
+    shan, shanmax = entropies(props, 1)
+    simp = entropies(props, 1.5)
+    gini = entropies(props, 2)
 
     fig, ax = plt.subplots()
     plt.plot(x, shan, 'b-', label='Shannonindex')
@@ -339,12 +342,12 @@ def plot_entropies_together(lgca, save=False, id=0):
         filename = str(id) + '_comparing entropies' + '.jpg'
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
-def plot_popsize(lgca, save=False, id=0):
-    time = len(lgca.props_t)
+def plot_popsize(props, save=False, id=0):
+    time = len(props)
     x = np.arange(0, time, 1)
     size = np.zeros(time)
     for t in range(time):
-        size[t] = sum(lgca.props_t[t]['num_off'][1:])
+        size[t] = sum(props[t]['num_off'][1:])
     y = size[x]
 
     fig, ax = plt.subplots()
