@@ -429,8 +429,8 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             # plt.savefig('pictures/' + str(id) + '  frequency' + str(datetime.now()) +'.jpg')
             # plt.savefig('probe_bar.jpg')
             # filename = str(lgca.r_b) + ', ' + str(id) + ', ' + str(t) + '  frequency' + '.jpg'
-            filename = str(self.r_b) + ', dens' + str(self.maxlabel_init / (self.K * self.l)) + ', ' \
-                       + str(id) + ', ' + str(t) + '  rel_frequency' + '.jpg'
+            filename = str(id) + '_' + str(self.r_b) + ', dens' + str(self.maxlabel_init) +\
+                        str(self.K * self.l) + ', ' + str(t) + '  rel_frequency' + '.jpg'
 
             plt.savefig(pathlib.Path('pictures').resolve() / filename)
 

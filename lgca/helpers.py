@@ -101,32 +101,32 @@ def bar_stacked(lgca, save = False, id = 0):
 
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
-def save_data(lgca, id = 0):
-    #brauche:   rb, rd, dim, restchannel, velocitychannel, dichte, propst
-    #nicht:     time, variation
-
-    t = len(lgca.props_t)
-    dens = lgca.maxlabel_init/(lgca.K * lgca.l)
-    # file = open('test.txt', 'w')
-    # file = open('pictures/' + str(id) + '  data' + str(datetime.now()) + '.txt', 'w')
-    filename = str(lgca.r_b) + ', dens' + str(lgca.maxlabel_init / (lgca.K * lgca.l)) + ', ' \
-               + str(id) + ', ' + str(t-1) + '  data' + '.txt'
-    # plt.savefig(pathlib.Path('pictures').resolve() / filename)
-    file = open(pathlib.Path('pictures').resolve() / filename, 'w')
-
-    file.write("gesetzte Parameter:\n")
-    file.write('dimension = {dim:d}, deathrate = {rd:1.5f}, birthrate = {rb:1.5f}, timesteps = {t:d}\n'\
-               .format(dim=lgca.l, rd=lgca.r_d, rb=lgca.r_b, t=t-1))
-    file.write("velocitychannels = {vc:d}, restchannels = {rc:d}, initial density = {dens:f}\n"\
-               .format(vc=lgca.velocitychannels, rc=lgca.restchannels, dens=dens))
-    file.write('props_t:\n')
-    for i in range(0, t):
-        if lgca.sim_ind[i] == 0:
-            file.write('Homogeneity since k = {i:d}\n'.format(i=i))
-            break
-    for i in range(0, t):
-        file.write('{i:s}\n'.format(i=str(lgca.props_t[i])))
-    file.close()
+# def save_data(lgca, id = 0):
+#     #brauche:   rb, rd, dim, restchannel, velocitychannel, dichte, propst
+#     #nicht:     time, variation
+#
+#     t = len(lgca.props_t)
+#     dens = lgca.maxlabel_init/(lgca.K * lgca.l)
+#     # file = open('test.txt', 'w')
+#     # file = open('pictures/' + str(id) + '  data' + str(datetime.now()) + '.txt', 'w')
+#     filename = str(lgca.r_b) + ', dens' + str(lgca.maxlabel_init / (lgca.K * lgca.l)) + ', ' \
+#                + str(id) + ', ' + str(t-1) + '  data' + '.txt'
+#     # plt.savefig(pathlib.Path('pictures').resolve() / filename)
+#     file = open(pathlib.Path('pictures').resolve() / filename, 'w')
+#
+#     file.write("gesetzte Parameter:\n")
+#     file.write('dimension = {dim:d}, deathrate = {rd:1.5f}, birthrate = {rb:1.5f}, timesteps = {t:d}\n'\
+#                .format(dim=lgca.l, rd=lgca.r_d, rb=lgca.r_b, t=t-1))
+#     file.write("velocitychannels = {vc:d}, restchannels = {rc:d}, initial density = {dens:f}\n"\
+#                .format(vc=lgca.velocitychannels, rc=lgca.restchannels, dens=dens))
+#     file.write('props_t:\n')
+#     for i in range(0, t):
+#         if lgca.sim_ind[i] == 0:
+#             file.write('Homogeneity since k = {i:d}\n'.format(i=i))
+#             break
+#     for i in range(0, t):
+#         file.write('{i:s}\n'.format(i=str(lgca.props_t[i])))
+#     file.close()
 
 def entropies(props, order, plot=False, save_plot=False, id=0):
     time = len(props)
@@ -244,7 +244,7 @@ def plot_hill(timesteps, ind, order, save, id=0):
     else:
         plt.xticks(np.arange(0, time, 2))
     plt.yticks(np.arange(0, y.max(), 2))
-    ax.grid()
+    # ax.grid()
 
     plt.show()
 
@@ -272,10 +272,11 @@ def plot_hill_together(props, save=False, id=0):
     elif time >= 100:
         plt.xticks(np.arange(0, time, 50))
     else:
-        plt.xticks(np.arange(0, time, 2))
-    plt.yticks(np.arange(0, hillmax*1.1, 1))
-    ax.grid()
-
+        plt.xticks(np.arange(0, time, 5))
+    plt.ylim(1, hillmax*1.1, 10)
+    # plt.yticks(np.arange(0, hillmax*1.1, 10))
+    # ax.grid()
+    # plt.axhline(y=1)
     plt.show()
 
     if save:
@@ -304,7 +305,7 @@ def plot_entropies(timesteps, ind, order, save_plot, id=0):
     else:
         plt.xticks(np.arange(0, time, 2))
     plt.yticks(np.arange(0, 1.2, 0.2))
-    ax.grid()
+    # ax.grid()
 
     plt.show()
 
@@ -332,10 +333,10 @@ def plot_entropies_together(props, save=False, id=0):
     elif time >= 100:
         plt.xticks(np.arange(0, time, 50))
     else:
-        plt.xticks(np.arange(0, time, 2))
+        plt.xticks(np.arange(0, time, 5))
     plt.ylim(0, shanmax * 1.1, 0.2)
-    ax.grid()
-
+    # ax.grid()
+    # plt.axhline(y=0)
     plt.show()
 
     if save:
@@ -353,14 +354,14 @@ def plot_popsize(props, save=False, id=0):
     fig, ax = plt.subplots()
     ax.plot(x, y)
     plt.xlim(0, time)
-    plt.yticks(np.arange(0, size.max() * 1.1, 2))
+    plt.yticks(np.arange(0, size.max() * 1.1, 10))
     ax.set(xlabel='timestep', ylabel='number of living cells')
-    ax.grid()
+    ax.grid(axis='y')
 
     plt.show()
 
     if save:
-        filename = str(id) + '_population size ' + str(order) + '.jpg'
+        filename = str(id) + '_population size ' + '.jpg'
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
 def aloha(who):
