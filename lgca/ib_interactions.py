@@ -161,15 +161,10 @@ def inheritance(lgca):
 
     # death process, cell dies -> correct value of prop[num_off]
     rel_nodes = lgca.nodes[lgca.r_int:-lgca.r_int]
-    # if chronicle:
-    #     print('rel_nodes ', rel_nodes)
+    if chronicle:
+        print('rel_nodes ', rel_nodes)
     dying = npr.random(rel_nodes.shape) < lgca.r_d
-    for label in rel_nodes[dying]:  #TODO überarbeiten!
-        # lgca.props = {      #TODO: rausnehmen, weil simon deepcopy
-        #     'r_b': lgca.props['r_b'].copy(),
-        #     'lab_m': lgca.props['lab_m'].copy(),
-        #     'num_off': lgca.props['num_off'].copy()
-        # }
+    for label in rel_nodes[dying]:
         if label > 0:
             if chronicle:
                 print('cell with label %d dies' % label)
@@ -179,7 +174,11 @@ def inheritance(lgca):
             if chronicle:
                 print('lab_m dazu ist', labmoth)
     rel_nodes[dying] = 0
-    lgca.apply_boundaries() #TODO nötig an der Stelle?
+    if chronicle:
+        print('vor bc', rel_nodes)
+    # lgca.apply_boundaries() #???
+    # if chronicle:
+    #     print('nach bc', rel_nodes)
 
     # birth
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
@@ -194,7 +193,6 @@ def inheritance(lgca):
         # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
         for label in node[proliferating]:
             ind = npr.choice(lgca.K)
-            # occ = lgca.nodes[coord, ind] > 0    #TODO überarbeiten!, was ist überflüssig?
             if node[ind] == 0:
                 if chronicle:
                     print('es proliferiert Zelle', label)
@@ -208,12 +206,6 @@ def inheritance(lgca):
                     print('%d is born' %(lgca.maxlabel))
                     print('with ancestor ', lgca.props['lab_m'][label])
 
-                # lgca.props = {
-                #     'r_b': lgca.props['r_b'].copy(),
-                #     'lab_m': lgca.props['lab_m'].copy(),
-                #     'num_off': lgca.props['num_off'].copy()
-                # }
-
                 labm = lgca.props['lab_m'][label]
                 lgca.props['lab_m'].append(labm)
                 lgca.props['num_off'][labm] += 1
@@ -223,8 +215,8 @@ def inheritance(lgca):
                     lgca.props['r_b'].append(np.clip(npr.normal(loc=r_b, scale=lgca.std), 0, 1))
                 else:
                     lgca.props['r_b'].append(lgca.r_b)
-            # if chronicle:
-            #     print('nodes after birth: ', lgca.nodes)
+            if chronicle:
+                print('nodes after birth: ', lgca.nodes)
         lgca.nodes[coord] = node
         npr.shuffle(lgca.nodes[coord])
 
