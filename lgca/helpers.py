@@ -128,10 +128,10 @@ def save_data(lgca, id = 0):
         file.write('{i:s}\n'.format(i=str(lgca.props_t[i])))
     file.close()
 
-def entropies(lgca, order, plot=False, save=False):
+def entropies(lgca, order, plot=False, save_plot=False, id=0):
     time = len(lgca.props_t)
     if order == 1:
-        print('Shannon')
+        # print('Shannon')
         shan_t = np.zeros(time)
         for t in range(time):
             if sum(lgca.props_t[t]['num_off'][1:]) != 0:
@@ -145,12 +145,12 @@ def entropies(lgca, order, plot=False, save=False):
                 shan_t[t:] = -1
                 break
         shan_max = m.log(lgca.maxlabel_init)
-        if plot:
-            plot_entropies(time, shan_t, order, save)
+        if plot or save_plot:
+            plot_entropies(time, shan_t, order, save_plot, id)
         return shan_t, shan_max
 
     if order == 1.5:
-        print('simpson')
+        # print('simpson')
         simpson_t = np.zeros(time) + 1
         for t in range(time):
             abs = sum(lgca.props_t[t]['num_off'][1:])
@@ -165,12 +165,12 @@ def entropies(lgca, order, plot=False, save=False):
                 t_ex = t
                 simpson_t[t:] = -1
                 break
-        if plot:
-            plot_entropies(time, simpson_t, order, save)
+        if plot or save_plot:
+            plot_entropies(time, simpson_t, order, save_plot, id)
         return simpson_t
 
     if order == 2:
-        print('ginisimpson')
+        # print('ginisimpson')
         ginisimpson_t = np.zeros(time) + 1
         for t in range(time):
             if sum(lgca.props_t[t]['num_off'][1:]) != 0:
@@ -182,15 +182,15 @@ def entropies(lgca, order, plot=False, save=False):
                 t_ex = t
                 ginisimpson_t[t:] = -1
                 break
-        if plot:
-            plot_entropies(time, ginisimpson_t, order, save)
+        if plot or save_plot:
+            plot_entropies(time, ginisimpson_t, order, save_plot, id)
         return ginisimpson_t
 
-def hillnumber(lgca, order, plot = False, save = False):
+def hillnumber(lgca, order, plot = False, save_plot = False, id=0):
     time = len(lgca.props_t)
     if order == 1:
         hill_lin = np.zeros(time)
-        print('exp Shannon')
+        # print('exp Shannon')
         shan_t, shan_max = entropies(lgca, 1)
         for t in range(time):
             if shan_t[t] != -1:
@@ -201,12 +201,12 @@ def hillnumber(lgca, order, plot = False, save = False):
                 hill_lin[t:] = -1
                 break
         hill_max = np.exp(shan_max)
-        if plot:
-            plot_hill(time, hill_lin, order, save)
+        if plot or save_plot:
+            plot_hill(time, hill_lin, order, save_plot)
         return hill_lin, hill_max
 
     if order >= 2:
-        print('hillnumber order', order)
+        # print('hillnumber order', order)
         hill_quad = np.zeros(time)
         for t in range(time):
             if sum(lgca.props_t[t]['num_off'][1:]) != 0:
@@ -219,11 +219,11 @@ def hillnumber(lgca, order, plot = False, save = False):
                 t_ex = t
                 hill_quad[t:] = -1
                 break
-        if plot:
-            plot_hill(time, hill_quad, order, save)
+        if plot or save_plot:
+            plot_hill(time, hill_quad, order, save_plot)
         return hill_quad
 
-def plot_hill(timesteps, ind, order, save):
+def plot_hill(timesteps, ind, order, save, id=0):
     time = timesteps
     x = np.arange(0, time, 1)
     y = ind[x]
@@ -232,6 +232,7 @@ def plot_hill(timesteps, ind, order, save):
     ax.plot(x, y)
 
     ax.set(xlabel='timestep', ylabel='Hillnumber of order {order: d}'.format(order=order))
+    plt.xlim(0, time)
 
     if time >= 700:
         plt.xticks(np.arange(0, time, 100))
@@ -239,15 +240,16 @@ def plot_hill(timesteps, ind, order, save):
         plt.xticks(np.arange(0, time, 50))
     else:
         plt.xticks(np.arange(0, time, 2))
-    plt.yticks(np.arange(-0.1, y.max(), 2))
+    plt.yticks(np.arange(0, y.max(), 2))
     ax.grid()
 
     plt.show()
 
-    if save:                #TODO: speichern
-        print('jaja, speichern tu ich auch')
+    if save:
+        filename = str(id) + '_hillnumber order ' + str(order) + '.jpg'
+        plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
-def plot_hill_together(lgca, save=False):
+def plot_hill_together(lgca, save=False, id=0):
     time = len(lgca.props_t)
     x = np.arange(0, time, 1)
     o1, hillmax = hillnumber(lgca, 1)
@@ -261,6 +263,7 @@ def plot_hill_together(lgca, save=False):
 
     ax.set(xlabel='timesteps', ylabel='Hillnumbers')
     ax.legend()
+    plt.xlim(0, time)
     if time >= 700:
         plt.xticks(np.arange(0, time, 100))
     elif time >= 100:
@@ -273,9 +276,10 @@ def plot_hill_together(lgca, save=False):
     plt.show()
 
     if save:
-        print('speichern')      #TODO: speichern
+        filename = str(id) + '_comparing hillnumbers' + '.jpg'
+        plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
-def plot_entropies(timesteps, ind, order, save):
+def plot_entropies(timesteps, ind, order, save_plot, id=0):
     time = timesteps
     x = np.arange(0, time, 1)
     y = ind[x]
@@ -289,21 +293,23 @@ def plot_entropies(timesteps, ind, order, save):
         ax.set(xlabel='timestep', ylabel='Ginisimpsonindex')
     elif order == 1.5:
         ax.set(xlabel='timestep', ylabel='Simpsonindex')
+    plt.xlim(0, time)
     if time >= 700:
         plt.xticks(np.arange(0, time, 100))
     elif time >= 100:
         plt.xticks(np.arange(0, time, 50))
     else:
         plt.xticks(np.arange(0, time, 2))
-    plt.yticks(np.arange(-0.1, 1.2, 0.2))
+    plt.yticks(np.arange(0, 1.2, 0.2))
     ax.grid()
 
     plt.show()
 
-    if save:                #TODO: speichern
-        print('jaja, speichern tu ich auch')
+    if save_plot:
+        filename = str(id) + '_entropy order ' + str(order) + '.jpg'
+        plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
-def plot_entropies_together(lgca, save=False):
+def plot_entropies_together(lgca, save=False, id=0):
     time = len(lgca.props_t)
     x = np.arange(0, time, 1)
     shan, shanmax = entropies(lgca, 1)
@@ -317,21 +323,23 @@ def plot_entropies_together(lgca, save=False):
 
     ax.set(xlabel='timesteps', ylabel='Index')
     ax.legend()
+    plt.xlim(0, time)
     if time >= 700:
         plt.xticks(np.arange(0, time, 100))
     elif time >= 100:
         plt.xticks(np.arange(0, time, 50))
     else:
         plt.xticks(np.arange(0, time, 2))
-    plt.yticks(np.arange(-0.1, shanmax * 1.1, 0.2))
+    plt.ylim(0, shanmax * 1.1, 0.2)
     ax.grid()
 
     plt.show()
 
     if save:
-        print('jaja')       #TODO: speichern
+        filename = str(id) + '_comparing entropies' + '.jpg'
+        plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
-def plot_popsize(lgca, save=False):
+def plot_popsize(lgca, save=False, id=0):
     time = len(lgca.props_t)
     x = np.arange(0, time, 1)
     size = np.zeros(time)
@@ -341,14 +349,16 @@ def plot_popsize(lgca, save=False):
 
     fig, ax = plt.subplots()
     ax.plot(x, y)
-
+    plt.xlim(0, time)
+    plt.yticks(np.arange(0, size.max() * 1.1, 2))
     ax.set(xlabel='timestep', ylabel='number of living cells')
     ax.grid()
 
     plt.show()
 
     if save:
-        print('TODO')       #TODO: Speichern
+        filename = str(id) + '_population size ' + str(order) + '.jpg'
+        plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
 def aloha(who):
     print('aloha', who)
