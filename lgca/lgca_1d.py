@@ -191,8 +191,8 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.maxlabel = self.nodes.max()
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True, recordLast=False):
+
         self.update_dynamic_fields()
-        # si = True
         if record:
             self.nodes_t = np.zeros((timesteps + 1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
             self.nodes_t[0, ...] = self.nodes[self.r_int:-self.r_int, ...]
@@ -223,39 +223,28 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             # print('props in timeevo:', self.props['num_off'])
             # print('props_t in timeevo', self.props_t[t]['num_off'][:])
 
-   # def timeevo_infinity(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True, recordLast=False):
-        #TODO: Abbruch bei Homogenität
 
-        # self.update_dynamic_fields()
-        # if record:
-        #     self.nodes_t = np.zeros((timesteps + 1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
-        #     self.nodes_t[0, ...] = self.nodes[self.r_int:-self.r_int, ...]
-        #     self.props_t = [copy(self.props)]
-        # if recordN:
-        #     self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
-        #     self.n_t[0] = self.nodes.sum()
-        # if recorddens:
-        #     self.dens_t = np.zeros((timesteps + 1, self.l))
-        #     self.dens_t[0, ...] = self.cell_density[self.r_int:-self.r_int]
-        # if recordLast:
-        #     self.props_t = [copy(self.props)]
-        # for t in range(1, timesteps + 1):
-        #     self.timestep()
-        #
-        #     if record:
-        #         self.nodes_t[t, ...] = self.nodes[self.r_int:-self.r_int]
-        #         self.props_t.append(copy(self.props))
-        #     if recordN:
-        #         self.n_t[t] = self.cell_density.sum()
-        #     if recorddens:
-        #         self.dens_t[t, ...] = self.cell_density[self.r_int:-self.r_int]
-        #     if recordLast and t == (timesteps + 1):
-        #         self.props_t.append(copy(self.props))
-        #     if showprogress:
-        #         update_progress(1.0 * t / timesteps)
-            # print('t=', t)
-            # print('props in timeevo:', self.props['num_off'])
-            # print('props_t in timeevo', self.props_t[t]['num_off'][:])
+    def timeevo_until_hom(self, record=False):
+        #weitere Paras: recordN=False, recorddens=True, showprogress=True, recordLast=False
+        chronicle = True
+        timestep = 1
+
+        self.timeevo(1, record)
+        if chronicle:
+            print('props_t', self.props_t)
+            print('nodes_t', self.nodes_t)
+        if len(self.nodes_t[-1][(self.nodes_t[-1] > 0)]) > 1: #TODO:aus if mach while
+            print('woop')
+            timestep += 1
+            self.timestep()
+            if record:
+                # self.nodes_t.append(copy(self.nodes[self.r_int:-self.r_int]))
+                #TODO:
+                # self.nodes_t = np.vstack(([self.nodes_t], [self.nodes[self.r_int:-self.r_int]]))
+                self.props_t.append(copy(self.props))
+            if chronicle:
+                print('props_t', self.props_t)
+                print('nodes_t', self.nodes_t)
 
     def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop=None, cmap='cividis'):
         if nodes_t is None:
