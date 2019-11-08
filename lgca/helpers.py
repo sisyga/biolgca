@@ -266,7 +266,7 @@ def plot_hill_together(props, save=False, id=0):
 
     ax.set(xlabel='timesteps', ylabel='Hillnumbers')
     ax.legend()
-    plt.xlim(0, time)
+    plt.xlim(0, time-1)
     if time >= 700:
         plt.xticks(np.arange(0, time, 100))
     elif time >= 100:
@@ -327,7 +327,7 @@ def plot_entropies_together(props, save=False, id=0):
 
     ax.set(xlabel='timesteps', ylabel='Index')
     ax.legend()
-    plt.xlim(0, time)
+    plt.xlim(0, time-1)
     if time >= 700:
         plt.xticks(np.arange(0, time, 100))
     elif time >= 100:
