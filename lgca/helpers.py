@@ -235,7 +235,7 @@ def plot_hill(timesteps, ind, order, save, id=0):
     ax.plot(x, y)
 
     ax.set(xlabel='timestep', ylabel='Hillnumber of order {order: d}'.format(order=order))
-    plt.xlim(0, time)
+    plt.xlim(0, time-1)
 
     if time >= 700:
         plt.xticks(np.arange(0, time, 100))
@@ -297,14 +297,14 @@ def plot_entropies(timesteps, ind, order, save_plot, id=0):
         ax.set(xlabel='timestep', ylabel='Ginisimpsonindex')
     elif order == 1.5:
         ax.set(xlabel='timestep', ylabel='Simpsonindex')
-    plt.xlim(0, time)
+    plt.xlim(0, time-1)
     if time >= 700:
         plt.xticks(np.arange(0, time, 100))
     elif time >= 100:
         plt.xticks(np.arange(0, time, 50))
     else:
         plt.xticks(np.arange(0, time, 2))
-    plt.yticks(np.arange(0, 1.2, 0.2))
+    plt.yticks(np.arange(0, y.max(), 0.2))
     # ax.grid()
 
     plt.show()
