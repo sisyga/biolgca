@@ -304,6 +304,7 @@ def plot_entropies(timesteps, ind, order, save_plot, id=0):
         plt.xticks(np.arange(0, time, 50))
     else:
         plt.xticks(np.arange(0, time, 2))
+    plt.ylim(0, y.max()+0.1)
     plt.yticks(np.arange(0, y.max(), 0.2))
     # ax.grid()
 
@@ -343,6 +344,38 @@ def plot_entropies_together(props, save=False, id=0):
         filename = str(id) + '_comparing entropies' + '.jpg'
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
+def plot_sh_gi_hh(props, save=False, id=0):
+    time = len(props)
+    x = np.arange(0, time, 1)
+    shan, shanmax = entropies(props, 1)
+    hh = hillnumber(props, 2)
+    gini = entropies(props, 2)
+
+    fig, ax = plt.subplots()
+    plt.plot(x, shan, 'b-', label='Shannonindex')
+    plt.plot(x, gini, 'm:', label='GiniSimpsonindex')
+    plt.plot(x, hh, 'c--', label='Hillnumber of order 2')
+
+
+    ax.set(xlabel='timesteps', ylabel='Index')
+    ax.legend()
+    plt.xlim(0, time - 1)
+    if time >= 700:
+        plt.xticks(np.arange(0, time, 100))
+    elif time >= 100:
+        plt.xticks(np.arange(0, time, 50))
+    else:
+        plt.xticks(np.arange(0, time, 5))
+    plt.ylim(0, np.exp(shanmax) * 1.1, 0.5)
+    # ax.grid()
+    # plt.axhline(y=0)
+    plt.show()
+
+    if save:
+        filename = str(id) + '_comparing shannon, gini, hill2' + '.jpg'
+        plt.savefig(pathlib.Path('pictures').resolve() / filename)
+        # print(filename)
+
 def plot_popsize(props, save=False, id=0):
     time = len(props)
     x = np.arange(0, time, 1)
@@ -353,7 +386,7 @@ def plot_popsize(props, save=False, id=0):
 
     fig, ax = plt.subplots()
     ax.plot(x, y)
-    plt.xlim(0, time)
+    plt.xlim(0, time-1)
     plt.yticks(np.arange(0, size.max() * 1.1, 10))
     ax.set(xlabel='timestep', ylabel='number of living cells')
     ax.grid(axis='y')
@@ -367,5 +400,4 @@ def plot_popsize(props, save=False, id=0):
 def aloha(who):
     print('aloha', who)
 
-# def simpson_overview():
 
