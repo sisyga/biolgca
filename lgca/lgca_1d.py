@@ -311,6 +311,8 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             tbeg = 0
         if tend is None:
             tend = tmax
+        else:
+            tend += 1
         k = self.restchannels + self.velocitychannels
         ltotal = l * k
         val = np.zeros((tmax, ltotal))
@@ -347,10 +349,10 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         plt.ylabel('timesteps')
         plt.xlabel('lattice site')
         # nur "Knotenanfang"
-        plt.xlim(0, ltotal)
+        plt.xlim(-0.5, ltotal-0.5)
         plt.xticks((np.arange(0, ltotal, k)))
 
-        plt.ylim(tend, tbeg)
+        plt.ylim(tend-0.5, tbeg-0.5)
         if tend - tbeg > 700:
             plt.yticks(np.arange(tbeg, tend, 100))
         elif tend - tbeg > 100:
@@ -358,12 +360,12 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         elif tend - tbeg <= 100:
             plt.yticks(np.arange(tbeg, tend, 10))
 
-        if save == True:
-            filename = str(self.r_b) + ', ' + str(id) + ', ' + ' frequency ' +\
-                       str(tbeg) + ' to ' + str(tend) + '.jpg'
+        if save:
+            filename = str(id) + ', ' + str(self.r_b) + ', ' + 'spatial plot step ' +\
+                       str(tbeg) + ' to ' + str(tend-1) + '.jpg'
 
             plt.savefig(pathlib.Path('pictures').resolve() / filename)
-
+            # print(filename)
         # plt.tight_layout()
         plt.show()
 
