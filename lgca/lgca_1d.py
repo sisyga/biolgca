@@ -226,21 +226,26 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
 
     def timeevo_until_hom(self, record=False):
         #weitere Paras: recordN=False, recorddens=True, showprogress=True, recordLast=False
-        chronicle = True
+        chronicle = False
         timestep = 1
 
         self.timeevo(1, record)
         if chronicle:
             print('props_t', self.props_t)
             print('nodes_t', self.nodes_t)
-        if len(self.nodes_t[-1][(self.nodes_t[-1] > 0)]) > 1: #TODO:aus if mach while
-            print('woop')
+        # while len(self.nodes_t[-1][(self.nodes_t[-1] > 0)]) > 1:
+        while len(list(filter(lambda x: x > 0, self.props_t[-1]['num_off'][1:]))) > 1:
             timestep += 1
             self.timestep()
             if record:
-                # self.nodes_t.append(copy(self.nodes[self.r_int:-self.r_int]))
-                #TODO:
-                # self.nodes_t = np.vstack(([self.nodes_t], [self.nodes[self.r_int:-self.r_int]]))
+                # print('dim nodest', self.nodes_t.shape)
+                # print('dim nodes', self.nodes[self.r_int:-self.r_int].shape)
+                nodesss = np.zeros((1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
+                # print('nodes', self.nodes[self.r_int:-self.r_int])
+                nodesss[0] = self.nodes[self.r_int:-self.r_int]
+                # print('nodesss', nodesss.shape)
+                # self.nodes_t = np.vstack((self.nodes_t, self.nodes_t[0]))
+                self.nodes_t = np.vstack((self.nodes_t, nodesss))
                 self.props_t.append(copy(self.props))
             if chronicle:
                 print('props_t', self.props_t)
@@ -401,7 +406,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         plt.ylabel('relative frequency of families')
         plt.xlabel('timesteps')
         # plt.title('Ratio of offsprings')
-        plt.xlim(0, tmax)
+        plt.xlim(0, tmax-1)
         if len(ind) <= 15:
             plt.xticks(ind)
         else:
