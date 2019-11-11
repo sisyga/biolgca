@@ -377,50 +377,45 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
     def bar_stacked_relative(self, save=False, id=0):
         tmax, l, _ = self.nodes_t.shape
         # print('tmax', tmax)
-        ancs = np.arange(1, self.maxlabel_init.astype(int) + 1)
-        val = np.zeros((tmax, self.maxlabel_init.astype(int) + 1))
+        ancs = np.arange(0, self.maxlabel_init.astype(int))
+        val = np.zeros((tmax, self.maxlabel_init.astype(int)))
 
         for t in range(0, tmax):
             c_sum = 0
             for c in ancs:
-                val[t, c] = self.props_t[t]['num_off'][c]
-                c_sum = c_sum + self.props_t[t]['num_off'][c]
+                val[t, c] = self.props_t[t]['num_off'][c + 1]
+            c_sum = sum(self.props_t[t]['num_off'][1:])
+            #     print('csum', c_sum)
             if c_sum != 0:
                 val[t] = val[t] / c_sum
         # print('val', val)
 
         plt.figure(num=None)
-        ind = np.arange(0, tmax, 1)
         width = 1
+        # print('val', val)
+        ind = np.arange(0, tmax)
+        # b = np.zeros(tmax)
         for c in ancs:
-            if c > 1:
-                b = np.zeros(tmax)
-                for i in range(1, c):
-                    b = b + val[:, i]
-                plt.bar(ind, val[:, c], width, bottom=b, label=c)
-            else:
-                plt.bar(ind, val[:, c], width, color=['red'], label=c)
-
-        ###plot settings
-
-        plt.ylabel('relative frequency of families')
+            b = np.zeros(tmax)
+            for i in range(0, c):
+                b = b + val[:, i]
+            plt.bar(ind, val[:, c], width, bottom=b, label=c)
+        plt.ylabel(' frequency of families')
         plt.xlabel('timesteps')
         # plt.title('Ratio of offsprings')
-        plt.xlim(0, tmax-1)
-        if len(ind) <= 15:
-            plt.xticks(ind)
-        else:
-            plt.xticks(np.arange(0, len(ind) - 1, 5))
-
-        if tmax >= 700:
+        plt.xlim(0, tmax - 0.5)
+        plt.ylim(0, 1)
+        if tmax <= 15:
+            plt.xticks(np.arange(0, tmax, 1))
+        elif tmax <= 100:
+            plt.xticks(np.arange(0, tmax, 5))
+        elif tmax >= 700:
             plt.xticks(np.arange(0, tmax, 100))
         elif tmax >= 100:
             plt.xticks(np.arange(0, tmax, 50))
-
-        # plt.subplots_adjust(right=0.85)
-        # plt.legend(bbox_to_anchor=(1.04, 1))
         plt.tight_layout()
         plt.show()
+
         if save == True:
             # plt.savefig('pictures/' + str(id) + '  frequency' + str(datetime.now()) +'.jpg')
             # plt.savefig('probe_bar.jpg')
