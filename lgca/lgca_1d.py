@@ -233,19 +233,14 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         if chronicle:
             print('props_t', self.props_t)
             print('nodes_t', self.nodes_t)
-        # while len(self.nodes_t[-1][(self.nodes_t[-1] > 0)]) > 1:
-        while len(list(filter(lambda x: x > 0, self.props_t[-1]['num_off'][1:]))) > 1:
+
+        while len([x for x in self.props_t[-1]['num_off'][1:] if x > 0]) > 1:
             timestep += 1
             self.timestep()
             if record:
-                # print('dim nodest', self.nodes_t.shape)
-                # print('dim nodes', self.nodes[self.r_int:-self.r_int].shape)
-                nodesss = np.zeros((1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
-                # print('nodes', self.nodes[self.r_int:-self.r_int])
-                nodesss[0] = self.nodes[self.r_int:-self.r_int]
-                # print('nodesss', nodesss.shape)
-                # self.nodes_t = np.vstack((self.nodes_t, self.nodes_t[0]))
-                self.nodes_t = np.vstack((self.nodes_t, nodesss))
+                new_nodes = np.zeros((1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
+                new_nodes[0] = self.nodes[self.r_int:-self.r_int]
+                self.nodes_t = np.vstack((self.nodes_t, new_nodes))
                 self.props_t.append(copy(self.props))
             if chronicle:
                 print('props_t', self.props_t)
@@ -379,8 +374,8 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         plt.show()
 
     def bar_stacked_relative(self, save=False, id=0):
+        #TODO umbauen, nur propsT -> dann auch bei save aufpassen!
         tmax, l, _ = self.nodes_t.shape
-        # print('tmax', tmax)
         ancs = np.arange(0, self.maxlabel_init.astype(int))
         val = np.zeros((tmax, self.maxlabel_init.astype(int)))
 
@@ -388,47 +383,35 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             for c in ancs:
                 val[t, c] = self.props_t[t]['num_off'][c + 1]
             c_sum = sum(self.props_t[t]['num_off'][1:])
-            #     print('csum', c_sum)
             if c_sum != 0:
                 val[t] = val[t] / c_sum
-        # print('val', val)
         print('erste Schleife fertig, nun plotbar')
         plt.figure(num=None)
         width = 1
-        # print('val', val)
         ind = np.arange(0, tmax)
         b = np.zeros(tmax)
         for c in ancs:
             print('bin schon bei c= ', c)
             plt.bar(ind, val[:, c], width, bottom=b, label=c)
             b = b + val[:, c]
-        # for c in ancs:
-        #     print('bin schon bei c= ', c)
-        #     b = np.zeros(tmax)
-        #     for i in range(0, c):
-        #         b = b + val[:, i]
-        #     plt.bar(ind, val[:, c], width, bottom=b, label=c)
             #TODO: bessere Lösung?
         plt.ylabel(' frequency of families')
         plt.xlabel('timesteps')
-        # plt.title('Ratio of offsprings')
         plt.xlim(0, tmax - 0.5)
         plt.ylim(0, 1)
         if tmax <= 15:
             plt.xticks(np.arange(0, tmax, 1))
         elif tmax <= 100:
             plt.xticks(np.arange(0, tmax, 5))
-        elif tmax >= 700:
-            plt.xticks(np.arange(0, tmax, 100))
+        elif tmax >= 1000:
+            plt.xticks(np.arange(0, tmax, 500))
         elif tmax >= 100:
             plt.xticks(np.arange(0, tmax, 50))
+
         plt.tight_layout()
         plt.show()
 
         if save == True:
-            # plt.savefig('pictures/' + str(id) + '  frequency' + str(datetime.now()) +'.jpg')
-            # plt.savefig('probe_bar.jpg')
-            # filename = str(lgca.r_b) + ', ' + str(id) + ', ' + str(t) + '  frequency' + '.jpg'
             filename = str(id) + '_' + str(self.r_b) + ', dens' + str(self.maxlabel_init) +\
                         str(self.K * self.l) + ', ' + str(t) + '  rel_frequency' + '.jpg'
 
