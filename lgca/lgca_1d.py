@@ -304,6 +304,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
 
     def spatial_plot(self, nodes_t=None, props_t=None, figindex = None, figsize=None, prop='lab_m',\
                      cmap='nipy_spectral', tbeg=None, tend=None, save=False, id=0):
+        #TODO: nur abhängig von props_t
         if nodes_t is None:
             nodes_t = self.nodes_t
         # if figsize is None:
