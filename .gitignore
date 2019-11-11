@@ -88,3 +88,5 @@ fabric.properties
 
 # checkpoints
 .ipynb_checkpoints/*
+pictures/**/*
+saved_data/**/*
