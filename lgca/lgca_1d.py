@@ -250,6 +250,9 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             if chronicle:
                 print('props_t', self.props_t)
                 print('nodes_t', self.nodes_t)
+            if timestep == 5000:
+                print('WARNING: timestep would be too large!')
+                break
 
     def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop=None, cmap='cividis'):
         if nodes_t is None:
@@ -381,7 +384,6 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         val = np.zeros((tmax, self.maxlabel_init.astype(int)))
 
         for t in range(0, tmax):
-            c_sum = 0
             for c in ancs:
                 val[t, c] = self.props_t[t]['num_off'][c + 1]
             c_sum = sum(self.props_t[t]['num_off'][1:])
@@ -389,17 +391,23 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             if c_sum != 0:
                 val[t] = val[t] / c_sum
         # print('val', val)
-
+        print('erste Schleife fertig, nun plotbar')
         plt.figure(num=None)
         width = 1
         # print('val', val)
         ind = np.arange(0, tmax)
-        # b = np.zeros(tmax)
+        b = np.zeros(tmax)
         for c in ancs:
-            b = np.zeros(tmax)
-            for i in range(0, c):
-                b = b + val[:, i]
+            print('bin schon bei c= ', c)
             plt.bar(ind, val[:, c], width, bottom=b, label=c)
+            b = b + val[:, c]
+        # for c in ancs:
+        #     print('bin schon bei c= ', c)
+        #     b = np.zeros(tmax)
+        #     for i in range(0, c):
+        #         b = b + val[:, i]
+        #     plt.bar(ind, val[:, c], width, bottom=b, label=c)
+            #TODO: bessere Lösung?
         plt.ylabel(' frequency of families')
         plt.xlabel('timesteps')
         # plt.title('Ratio of offsprings')
