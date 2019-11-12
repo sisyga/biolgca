@@ -360,82 +360,11 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             plt.yticks(np.arange(tbeg, tend, 50))
         elif tend - tbeg <= 100:
             plt.yticks(np.arange(tbeg, tend, 10))
-
+        plt.show()
         if save:
             filename = str(id) + ', ' + 'spatial plot step ' +\
                        str(tbeg) + ' to ' + str(tend-1) + '.jpg'
-
             plt.savefig(pathlib.Path('pictures').resolve() / filename)
-            # print(filename)
-        # plt.tight_layout()
-        plt.show()
-
-    def bar_stacked_relative(self, props_t=None, save=False, id=0):
-        if props_t is None:
-            props_t = self.props_t
-        tmax = len(props_t)
-        maxlab = sum(props_t[0]['num_off'][1:])
-        ancs = np.arange(0, maxlab)
-        val = np.zeros((tmax, maxlab))
-
-        for t in range(0, tmax):
-            for c in ancs:
-                val[t, c] = props_t[t]['num_off'][c + 1]
-            c_sum = sum(props_t[t]['num_off'][1:])
-            if c_sum != 0:
-                val[t] = val[t] / c_sum
-        print('erste Schleife fertig, nun plotbar')
-        plt.figure(num=None)
-        width = 1
-        ind = np.arange(0, tmax)
-        b = np.zeros(tmax)
-        for c in ancs:
-            print('bin schon bei c= ', c)
-            plt.bar(ind, val[:, c], width, bottom=b, label=c)
-            b = b + val[:, c]
-            #TODO: bessere Lösung?
-        plt.ylabel(' frequency of families')
-        plt.xlabel('timesteps')
-        plt.xlim(0, tmax - 0.5)
-        plt.ylim(0, 1)
-        if tmax <= 15:
-            plt.xticks(np.arange(0, tmax, 1))
-        elif tmax <= 100:
-            plt.xticks(np.arange(0, tmax, 5))
-        elif tmax >= 1000:
-            plt.xticks(np.arange(0, tmax, 500))
-        elif tmax >= 100:
-            plt.xticks(np.arange(0, tmax, 50))
-
-        plt.tight_layout()
-        plt.show()
-
-        if save == True:
-            filename = str(id) + '_' + ' rel_frequency' + '.jpg'
-            plt.savefig(pathlib.Path('pictures').resolve() / filename)
-
-    def mullerplot(self, nodes_t=None, props_t=None, figindex=None, figsize=None):
-        if nodes_t is None:
-            nodes_t = self.nodes_t
-        # if figsize is None:
-        #     figsize = estimate_figsize(nodes_t.sum(-1).T, cbar=True)
-        if props_t is None:
-            props_t = self.props_t
-
-        #create values
-        tmax, l, _ = nodes_t.shape
-        ancs = np.arange(1, self.maxlabel_init.astype(int) + 1)
-        # if len(ancs) != lgca.maxlabel_init:
-        #     print('FEHLER: len(ancs) != maxlabel_init!')
-        val = np.zeros((tmax, self.maxlabel_init.astype(int) + 1))
-        for t in range(0, tmax):
-            for c in ancs:
-                val[t, c] = props_t[t]['num_off'][c]
-
-        #write in .txt
-        file = str(datetime.now()) + '.txt'
-        np.savetxt(file, val, fmt="%d")
-
 
     def plot_prop_timecourse(self, nodes_t=None, props_t=None, propname=None, figindex=None, figsize=None):
         if nodes_t is None:

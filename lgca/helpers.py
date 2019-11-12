@@ -101,32 +101,70 @@ def bar_stacked(lgca, save = False, id = 0):
 
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
-# def save_data(lgca, id = 0):
-#     #brauche:   rb, rd, dim, restchannel, velocitychannel, dichte, propst
-#     #nicht:     time, variation
+def bar_stacked_relative(props_t, save=False, id=0):
+    tmax = len(props_t)
+    maxlab = sum(props_t[0]['num_off'][1:])
+    ancs = np.arange(0, maxlab)
+    val = np.zeros((tmax, maxlab))
+
+    for t in range(0, tmax):
+        for c in ancs:
+            val[t, c] = props_t[t]['num_off'][c + 1]
+        c_sum = sum(props_t[t]['num_off'][1:])
+        if c_sum != 0:
+            val[t] = val[t] / c_sum
+    print('erste Schleife fertig, nun plotbar')
+    # fig, ax = plt.subplots()
+    fig = plt.figure(num=None)
+    width = 1
+    ind = np.arange(0, tmax)
+    b = np.zeros(tmax)
+    for c in ancs:
+        print('bin schon bei c= ', c)
+        plt.bar(ind, val[:, c], width, bottom=b, label=c)
+        b = b + val[:, c]
+        #TODO: bessere Lösung?
+    plt.ylabel(' frequency of families')
+    plt.xlabel('timesteps')
+    plt.xlim(0, tmax - 0.5)
+    plt.ylim(0, 1)
+    if tmax <= 15:
+        plt.xticks(np.arange(0, tmax, 1))
+    elif tmax <= 100:
+        plt.xticks(np.arange(0, tmax, 5))
+    elif tmax >= 1000:
+        plt.xticks(np.arange(0, tmax, 500))
+    elif tmax >= 100:
+        plt.xticks(np.arange(0, tmax, 50))
+
+    plt.show()
+
+    if save:
+        saving_plot(fig, str(id) + '_' + ' rel_frequency' + '.jpg')
+
+# def mullerplot(self, nodes_t=None, props_t=None, figindex=None, figsize=None):
+#     if nodes_t is None:
+#         nodes_t = self.nodes_t
+#     # if figsize is None:
+#     #     figsize = estimate_figsize(nodes_t.sum(-1).T, cbar=True)
+#     if props_t is None:
+#         props_t = self.props_t
 #
-#     t = len(lgca.props_t)
-#     dens = lgca.maxlabel_init/(lgca.K * lgca.l)
-#     # file = open('test.txt', 'w')
-#     # file = open('pictures/' + str(id) + '  data' + str(datetime.now()) + '.txt', 'w')
-#     filename = str(lgca.r_b) + ', dens' + str(lgca.maxlabel_init / (lgca.K * lgca.l)) + ', ' \
-#                + str(id) + ', ' + str(t-1) + '  data' + '.txt'
-#     # plt.savefig(pathlib.Path('pictures').resolve() / filename)
-#     file = open(pathlib.Path('pictures').resolve() / filename, 'w')
+#     #create values
+#     tmax, l, _ = nodes_t.shape
+#     ancs = np.arange(1, self.maxlabel_init.astype(int) + 1)
+#     # if len(ancs) != lgca.maxlabel_init:
+#     #     print('FEHLER: len(ancs) != maxlabel_init!')
+#     val = np.zeros((tmax, self.maxlabel_init.astype(int) + 1))
+#     for t in range(0, tmax):
+#         for c in ancs:
+#             val[t, c] = props_t[t]['num_off'][c]
 #
-#     file.write("gesetzte Parameter:\n")
-#     file.write('dimension = {dim:d}, deathrate = {rd:1.5f}, birthrate = {rb:1.5f}, timesteps = {t:d}\n'\
-#                .format(dim=lgca.l, rd=lgca.r_d, rb=lgca.r_b, t=t-1))
-#     file.write("velocitychannels = {vc:d}, restchannels = {rc:d}, initial density = {dens:f}\n"\
-#                .format(vc=lgca.velocitychannels, rc=lgca.restchannels, dens=dens))
-#     file.write('props_t:\n')
-#     for i in range(0, t):
-#         if lgca.sim_ind[i] == 0:
-#             file.write('Homogeneity since k = {i:d}\n'.format(i=i))
-#             break
-#     for i in range(0, t):
-#         file.write('{i:s}\n'.format(i=str(lgca.props_t[i])))
-#     file.close()
+#     #write in .txt
+#     file = str(datetime.now()) + '.txt'
+#     np.savetxt(file, val, fmt="%d")
+
+
 
 def entropies(props, order, plot=False, save_plot=False, id=0):
     time = len(props)
