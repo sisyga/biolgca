@@ -413,12 +413,6 @@ class LGCA_base():
             if showprogress:
                 update_progress(1.0 * t / timesteps)
 
-    def get_nodes(self):
-        return self.nodes
-
-    def print_nodes(self):
-        print(self.nodes.astype(int))
-
     def calc_permutations(self):
         self.permutations = [np.array(list(multiset_permutations([1] * n + [0] * (self.K - n))), dtype=np.int8)
                              for n in range(self.K + 1)]
@@ -426,7 +420,6 @@ class LGCA_base():
         self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(2))[None, ...]
         self.si = [np.einsum('ij,jkl', self.permutations[n][:, :self.velocitychannels], self.cij) for n in
                    range(self.K + 1)]
-
 
 
 class IBLGCA_base(LGCA_base):
@@ -457,10 +450,10 @@ class IBLGCA_base(LGCA_base):
 
     def set_interaction(self, **kwargs):
         try:
-            from .ib_interactions import birth, birthdeath, go_or_grow, steric_ia
+            from .ib_interactions import birth, birthdeath, go_or_grow
             from .interactions import random_walk
         except ImportError:
-            from ib_interactions import birth, birthdeath, go_or_grow, steric_ia
+            from ib_interactions import birth, birthdeath, go_or_grow
             from interactions import random_walk
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
@@ -559,22 +552,6 @@ class IBLGCA_base(LGCA_base):
 
             elif interaction is 'random_walk':
                 self.interaction = random_walk
-
-            elif interaction is 'steric':
-                self.interaction = steric_ia
-                self.calc_permutations()
-
-                if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
-                else:
-                    self.beta = 2.
-                    print('steric sensitivity set to beta = ', self.beta)
-
-                if 'alpha' in kwargs:
-                    self.alpha = kwargs['alpha']
-                else:
-                    self.alpha = 2.
-                    print('rest channel weight set to alpha = ', self.alpha)
 
             else:
                 print('keyword', interaction, 'is not defined! Random walk used instead.')

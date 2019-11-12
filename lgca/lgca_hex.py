@@ -183,11 +183,11 @@ class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
 
 
 if __name__ == '__main__':
-    lx = 200
-    ly = lx
-    restchannels = 6
-    nodes = np.zeros((lx, ly, 6 + restchannels))
-    nodes[lx // 2, ly // 2, :] = 1
+    #lx = 5
+    #ly = lx
+    #restchannels = 6
+    #nodes = np.zeros((lx, ly, 6 + restchannels))
+    #nodes[lx // 2, ly // 2, -1] = 1
     # nodes[...] = 1
     # nodes[:lx // 2, :, -2:] = 1
     # nodes[..., -1] = 1
@@ -196,7 +196,7 @@ if __name__ == '__main__':
     # lgca = LGCA_Hex(restchannels=restchannels, dims=(lx, ly), density=0.5 / (6 + restchannels), bc='pbc',
     #                 interaction='wetting', beta=20., gamma=10)
     # lgca.ecm = np.zeros_like(lgca.cell_density, dtype=bool)
-    lgca = IBLGCA_Hex(nodes=nodes, interaction='birthdeath', std=0.05, r_b=0.1)
+    # lgca = IBLGCA_Hex(nodes=nodes, interaction='go_and_grow')
     # lgca.set_interaction('contact_guidance', beta=2)
     # cProfile.run('lgca.timeevo(timesteps=1000)')
     # lgca.timeevo(timesteps=50, record=True)
@@ -217,7 +217,28 @@ if __name__ == '__main__':
     # ani = lgca.live_animate_density()
     # lgca.plot_config()
     # lgca.plot_density(edgecolor='k')
-    lgca.timeevo(10, record=True)
-    print(len(lgca.props_t))
-    # lgca.plot_prop_spatial(propname='r_b', cbarlabel='$r_b$', vmin=0, vmax=1)
     # plt.show()
+    from lgca import get_lgca
+    import numpy as np
+    from matplotlib import pyplot as plt
+
+    l = 50
+    l_spheroid = 2
+    dims = (l, l)
+    tmax = 100
+    restc = 3
+    rho_0 = 3
+    nodes = np.zeros((l, l, restc + 6), dtype=bool)
+    nodes[..., :l_spheroid, -rho_0:] = 1
+    lgca = get_lgca(geometry='hex', interaction='wetting', beta=10., gamma=5., bc='rbc', density=0, restchannels=restc,
+                    nodes=nodes, rho_0=rho_0)
+    lgca.r_b = .05
+    lgca.spheroid = np.zeros_like(lgca.cell_density, dtype=bool)
+    lgca.spheroid[lgca.r_int:-lgca.r_int, :lgca.r_int + l_spheroid] = 1
+    lgca.ecm = 1 - lgca.spheroid.astype(float)
+    lgca.ecm *= 0.
+    # lgca.timestep()
+    lgca.timeevo(12, record=True)
+    # lgca.plot_flow(cbar=False)
+    # ani = lgca.live_animate_flow(cbar=False)
+    plt.show()

@@ -1,6 +1,3 @@
-from bisect import bisect_left
-from random import random
-
 import numpy as np
 from numpy import random as npr
 from scipy.stats import truncnorm
@@ -143,24 +140,3 @@ def go_or_grow(lgca):
         r_channels = npr.permutation(rest)
         node = np.hstack((v_channels, r_channels))
         lgca.nodes[coord] = node
-
-
-def steric_ia(lgca):
-    newnodes = lgca.nodes.copy()
-    relevant = lgca.cell_density[lgca.nonborder] > 0
-    coords = [a[relevant] for a in lgca.nonborder]
-
-    steric_weight = - lgca.channel_weight(lgca.cell_density)
-    for coord in zip(*coords):
-        n = lgca.cell_density[coord]
-        node = lgca.nodes[coord]
-        permutations = lgca.permutations[n]
-        restc = permutations[:, lgca.velocitychannels:].sum(-1)
-        weights = np.exp(lgca.beta * np.dot(permutations[:, :lgca.velocitychannels], steric_weight[coord]) +
-                         restc * lgca.alpha).cumsum()
-        ind = bisect_left(weights, random() * weights[-1])
-        newocc = permutations[ind].astype(lgca.nodes.dtype)
-        np.place(newocc, newocc > 0, npr.permutation(node[node > 0]))
-        newnodes[coord] = newocc
-
-    lgca.nodes = newnodes
