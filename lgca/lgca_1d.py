@@ -298,18 +298,15 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         return plot
 
     def spatial_plot(self, nodes_t=None, props_t=None, figindex = None, figsize=None, prop='lab_m',\
-                     cmap='nipy_spectral', tbeg=None, tend=None, save=False, id=0):
-        #TODO: nur abhängig von props_t
+                     cmap='nipy_spectral', tbeg=None, tend=None, save=False, id=0, restchannels=None, velocitychannels=None):
         if nodes_t is None:
             nodes_t = self.nodes_t
-        # if figsize is None:
-        #     figsize = estimate_figsize(nodes_t.sum(-1).T, cbar=True)
-        # figsize = None
         if props_t is None:
             props_t = self.props_t
-        # if prop is None:
-        #   prop = list(props_t[0].keys())[0]
-
+        if restchannels is None:
+            restchannels = self.restchannels
+        if velocitychannels is None:
+            velocitychannels = self.velocitychannels
         tmax, l, _ = nodes_t.shape
         if tbeg is None:
             tbeg = 0
@@ -317,7 +314,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             tend = tmax
         else:
             tend += 1
-        k = self.restchannels + self.velocitychannels
+        k = restchannels + velocitychannels
         ltotal = l * k
         val = np.zeros((tmax, ltotal))
 
@@ -365,7 +362,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             plt.yticks(np.arange(tbeg, tend, 10))
 
         if save:
-            filename = str(id) + ', ' + str(self.r_b) + ', ' + 'spatial plot step ' +\
+            filename = str(id) + ', ' + 'spatial plot step ' +\
                        str(tbeg) + ' to ' + str(tend-1) + '.jpg'
 
             plt.savefig(pathlib.Path('pictures').resolve() / filename)
@@ -373,16 +370,18 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         # plt.tight_layout()
         plt.show()
 
-    def bar_stacked_relative(self, save=False, id=0):
-        #TODO umbauen, nur propsT -> dann auch bei save aufpassen!
-        tmax, l, _ = self.nodes_t.shape
-        ancs = np.arange(0, self.maxlabel_init.astype(int))
-        val = np.zeros((tmax, self.maxlabel_init.astype(int)))
+    def bar_stacked_relative(self, props_t=None, save=False, id=0):
+        if props_t is None:
+            props_t = self.props_t
+        tmax = len(props_t)
+        maxlab = sum(props_t[0]['num_off'][1:])
+        ancs = np.arange(0, maxlab)
+        val = np.zeros((tmax, maxlab))
 
         for t in range(0, tmax):
             for c in ancs:
-                val[t, c] = self.props_t[t]['num_off'][c + 1]
-            c_sum = sum(self.props_t[t]['num_off'][1:])
+                val[t, c] = props_t[t]['num_off'][c + 1]
+            c_sum = sum(props_t[t]['num_off'][1:])
             if c_sum != 0:
                 val[t] = val[t] / c_sum
         print('erste Schleife fertig, nun plotbar')
@@ -412,9 +411,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         plt.show()
 
         if save == True:
-            filename = str(id) + '_' + str(self.r_b) + ', dens' + str(self.maxlabel_init) +\
-                        str(self.K * self.l) + ', ' + str(t) + '  rel_frequency' + '.jpg'
-
+            filename = str(id) + '_' + ' rel_frequency' + '.jpg'
             plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
     def mullerplot(self, nodes_t=None, props_t=None, figindex=None, figsize=None):

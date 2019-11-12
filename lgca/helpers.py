@@ -205,7 +205,7 @@ def hillnumber(props, order, plot = False, save_plot = False, id=0):
                 break
         hill_max = np.exp(shan_max)
         if plot or save_plot:
-            plot_hill(time, hill_lin, order, save_plot)
+            plot_hill(time, hill_lin, order, save_plot, id)
         return hill_lin, hill_max
 
     if order >= 2:
@@ -223,10 +223,10 @@ def hillnumber(props, order, plot = False, save_plot = False, id=0):
                 hill_quad[t:] = -1
                 break
         if plot or save_plot:
-            plot_hill(time, hill_quad, order, save_plot)
+            plot_hill(time, hill_quad, order, save_plot, id)
         return hill_quad
 
-def plot_hill(timesteps, ind, order, save, id=0):
+def plot_hill(timesteps, ind, order, save, id):
     time = timesteps
     x = np.arange(0, time, 1)
     y = ind[x]
@@ -249,8 +249,7 @@ def plot_hill(timesteps, ind, order, save, id=0):
     plt.show()
 
     if save:
-        filename = str(id) + '_hillnumber order ' + str(order) + '.jpg'
-        plt.savefig(pathlib.Path('pictures').resolve() / filename)
+        saving_plot(fig, str(id) + '_hillnumber order ' + str(order) + '.jpg')
 
 def plot_hill_together(props, save=False, id=0):
     time = len(props)
@@ -274,14 +273,10 @@ def plot_hill_together(props, save=False, id=0):
     else:
         plt.xticks(np.arange(0, time, 5))
     plt.ylim(1, hillmax*1.1, 10)
-    # plt.yticks(np.arange(0, hillmax*1.1, 10))
-    # ax.grid()
-    # plt.axhline(y=1)
     plt.show()
 
     if save:
-        filename = str(id) + '_comparing hillnumbers' + '.jpg'
-        plt.savefig(pathlib.Path('pictures').resolve() / filename)
+        saving_plot(fig, str(id) + '_comparing hillnumbers' + '.jpg')
 
 def plot_entropies(timesteps, ind, order, save_plot, id=0):
     time = timesteps
@@ -311,8 +306,7 @@ def plot_entropies(timesteps, ind, order, save_plot, id=0):
     plt.show()
 
     if save_plot:
-        filename = str(id) + '_entropy order ' + str(order) + '.jpg'
-        plt.savefig(pathlib.Path('pictures').resolve() / filename)
+        saving_plot(fig, str(id) + '_entropy order ' + str(order) + '.jpg')
 
 def plot_entropies_together(props, save=False, id=0):
     time = len(props)
@@ -341,8 +335,7 @@ def plot_entropies_together(props, save=False, id=0):
     plt.show()
 
     if save:
-        filename = str(id) + '_comparing entropies' + '.jpg'
-        plt.savefig(pathlib.Path('pictures').resolve() / filename)
+        saving_plot(fig, str(id) + '_comparing entropies' + '.jpg')
 
 def plot_sh_gi_hh(props, save=False, id=0):
     time = len(props)
@@ -367,14 +360,10 @@ def plot_sh_gi_hh(props, save=False, id=0):
     else:
         plt.xticks(np.arange(0, time, 5))
     plt.ylim(0, np.exp(shanmax) * 1.1, 0.5)
-    # ax.grid()
-    # plt.axhline(y=0)
     plt.show()
 
     if save:
-        filename = str(id) + '_comparing shannon, gini, hill2' + '.jpg'
-        plt.savefig(pathlib.Path('pictures').resolve() / filename)
-        # print(filename)
+        saving_plot(fig, str(id) + '_comparing shannon, gini, hill2' + '.jpg')
 
 def plot_popsize(props, save=False, id=0):
     time = len(props)
@@ -394,8 +383,12 @@ def plot_popsize(props, save=False, id=0):
     plt.show()
 
     if save:
-        filename = str(id) + '_population size ' + '.jpg'
-        plt.savefig(pathlib.Path('pictures').resolve() / filename)
+        saving_plot(fig, str(id) + '_population size ' + '.jpg')
+
+def saving_plot(plot, filename=None):
+    if filename is None:
+        filename = 'no_name'
+    plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
 def aloha(who):
     print('aloha', who)
