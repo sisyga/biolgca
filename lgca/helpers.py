@@ -113,7 +113,7 @@ def bar_stacked_relative(props_t, save=False, id=0):
         c_sum = sum(props_t[t]['num_off'][1:])
         if c_sum != 0:
             val[t] = val[t] / c_sum
-    print('erste Schleife fertig, nun plotbar')
+    # print('erste Schleife fertig, nun plotbar')
     # fig, ax = plt.subplots()
     fig = plt.figure(num=None)
     width = 1
@@ -140,7 +140,7 @@ def bar_stacked_relative(props_t, save=False, id=0):
     plt.show()
 
     if save:
-        saving_plot(fig, str(id) + '_' + ' rel_frequency' + '.jpg')
+        save_plot(fig, str(id) + '_' + ' rel_frequency' + '.jpg')
 
 # def mullerplot(self, nodes_t=None, props_t=None, figindex=None, figsize=None):
 #     if nodes_t is None:
@@ -163,8 +163,6 @@ def bar_stacked_relative(props_t, save=False, id=0):
 #     #write in .txt
 #     file = str(datetime.now()) + '.txt'
 #     np.savetxt(file, val, fmt="%d")
-
-
 
 def entropies(props, order, plot=False, save_plot=False, id=0):
     time = len(props)
@@ -287,7 +285,7 @@ def plot_hill(timesteps, ind, order, save, id):
     plt.show()
 
     if save:
-        saving_plot(fig, str(id) + '_hillnumber order ' + str(order) + '.jpg')
+        save_plot(fig, str(id) + '_hillnumber order ' + str(order) + '.jpg')
 
 def plot_hill_together(props, save=False, id=0):
     time = len(props)
@@ -314,7 +312,7 @@ def plot_hill_together(props, save=False, id=0):
     plt.show()
 
     if save:
-        saving_plot(fig, str(id) + '_comparing hillnumbers' + '.jpg')
+        save_plot(fig, str(id) + '_comparing hillnumbers' + '.jpg')
 
 def plot_entropies(timesteps, ind, order, save_plot, id=0):
     time = timesteps
@@ -344,7 +342,7 @@ def plot_entropies(timesteps, ind, order, save_plot, id=0):
     plt.show()
 
     if save_plot:
-        saving_plot(fig, str(id) + '_entropy order ' + str(order) + '.jpg')
+        save_plot(fig, str(id) + '_entropy order ' + str(order) + '.jpg')
 
 def plot_entropies_together(props, save=False, id=0):
     time = len(props)
@@ -373,7 +371,7 @@ def plot_entropies_together(props, save=False, id=0):
     plt.show()
 
     if save:
-        saving_plot(fig, str(id) + '_comparing entropies' + '.jpg')
+        save_plot(fig, str(id) + '_comparing entropies' + '.jpg')
 
 def plot_sh_gi_hh(props, save=False, id=0):
     time = len(props)
@@ -391,17 +389,19 @@ def plot_sh_gi_hh(props, save=False, id=0):
     ax.set(xlabel='timesteps', ylabel='Index')
     ax.legend()
     plt.xlim(0, time - 1)
-    if time >= 700:
-        plt.xticks(np.arange(0, time, 100))
+    if time <= 15:
+        plt.xticks(np.arange(0, time, 1))
+    elif time <= 100:
+        plt.xticks(np.arange(0, time, 5))
+    elif time >= 1000:
+        plt.xticks(np.arange(0, time, 500))
     elif time >= 100:
         plt.xticks(np.arange(0, time, 50))
-    else:
-        plt.xticks(np.arange(0, time, 5))
     plt.ylim(0, np.exp(shanmax) * 1.1, 0.5)
     plt.show()
 
     if save:
-        saving_plot(fig, str(id) + '_comparing shannon, gini, hill2' + '.jpg')
+        save_plot(fig, str(id) + '_comparing shannon, gini, hill2' + '.jpg')
 
 def plot_popsize(props, save=False, id=0):
     time = len(props)
@@ -421,9 +421,9 @@ def plot_popsize(props, save=False, id=0):
     plt.show()
 
     if save:
-        saving_plot(fig, str(id) + '_population size ' + '.jpg')
+        save_plot(fig, str(id) + '_population size ' + '.jpg')
 
-def saving_plot(plot, filename=None):
+def save_plot(plot, filename=None):
     if filename is None:
         filename = 'no_name'
     plt.savefig(pathlib.Path('pictures').resolve() / filename)
