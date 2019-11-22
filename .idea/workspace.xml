@@ -1,24 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="32213427-7c52-44be-a10f-71fe23dbb93e" name="Default Changelist" comment="new TODOs">
-      <change afterPath="$PROJECT_DIR$/analysis.ipynb" afterDir="false" />
+    <list default="true" id="32213427-7c52-44be-a10f-71fe23dbb93e" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/inheritance testing.ipynb" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lgca/helpers.py" beforeDir="false" afterPath="$PROJECT_DIR$/lgca/helpers.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mullerplot.ipynb" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/number_offsprings.ipynb" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/plot production.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/plot production.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/property mother_label.ipynb" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/simpson_overview.ipynb" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/stackplot test.ipynb" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/t300, d7, dens1, rb1, pseudomuller.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/t=300, d=7, dens=1, rb=07, mit_2.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/t=300, d=7, dens=1, rb=07, ohne.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/t=300, d=7, dens=1, rb=07, ohne_2.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/t=500, d=7, dens=1, rb=05, ohne.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/timeevo_until_hom.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/timeevo_until_hom.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/uniquness labels.ipynb" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/analysis t_hom.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/analysis t_hom.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/analysis.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/analysis.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lgca/next steps" beforeDir="false" afterPath="$PROJECT_DIR$/lgca/next steps" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -65,14 +52,33 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/skript.py">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="37">
               <caret line="7" column="12" selection-start-line="7" selection-start-column="12" selection-end-line="7" selection-end-column="12" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/lgca/helpers.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="38">
+              <caret line="146" column="4" selection-start-line="146" selection-start-column="4" selection-end-line="146" selection-end-column="4" />
               <folding>
-                <element signature="e#4#29#0" expanded="true" />
+                <element signature="e#0#18#0" expanded="true" />
+                <element signature="e#1725#3427#0" />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/lgca/next steps">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="153">
+              <caret line="9" column="20" selection-start-line="9" selection-start-column="20" selection-end-line="9" selection-end-column="20" />
             </state>
           </provider>
         </entry>
@@ -119,7 +125,6 @@
         <option value="$PROJECT_DIR$/lgca/schnubbs.py" />
         <option value="$PROJECT_DIR$/lgca/base.py" />
         <option value="$PROJECT_DIR$/lgca/ib_interactions.py" />
-        <option value="$PROJECT_DIR$/lgca/next steps" />
         <option value="$PROJECT_DIR$/saved_data/placeholder.txt" />
         <option value="$PROJECT_DIR$/.gitignore" />
         <option value="$PROJECT_DIR$/pictures/placeholder.txt" />
@@ -128,6 +133,7 @@
         <option value="$PROJECT_DIR$/try2.py" />
         <option value="$PROJECT_DIR$/lgca/helpers.py" />
         <option value="$PROJECT_DIR$/skript.py" />
+        <option value="$PROJECT_DIR$/lgca/next steps" />
       </list>
     </option>
   </component>
@@ -301,6 +307,8 @@
       <workItem from="1574238021220" duration="5870000" />
       <workItem from="1574262205925" duration="128000" />
       <workItem from="1574262431472" duration="4421000" />
+      <workItem from="1574407414706" duration="717000" />
+      <workItem from="1574414506704" duration="1557000" />
     </task>
     <task id="LOCAL-00001" summary="test">
       <created>1557323295951</created>
@@ -512,11 +520,25 @@
       <option name="project" value="LOCAL" />
       <updated>1574170014219</updated>
     </task>
-    <option name="localTasksCounter" value="31" />
+    <task id="LOCAL-00031" summary="working on analysis things">
+      <created>1574407523608</created>
+      <option name="number" value="00031" />
+      <option name="presentableId" value="LOCAL-00031" />
+      <option name="project" value="LOCAL" />
+      <updated>1574407523608</updated>
+    </task>
+    <task id="LOCAL-00032" summary="work in progress">
+      <created>1574408093246</created>
+      <option name="number" value="00032" />
+      <option name="presentableId" value="LOCAL-00032" />
+      <option name="project" value="LOCAL" />
+      <updated>1574408093247</updated>
+    </task>
+    <option name="localTasksCounter" value="33" />
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="114804000" />
+    <option name="totallyTimeSpent" value="117078000" />
   </component>
   <component name="TodoView">
     <todo-panel id="selected-file">
@@ -529,9 +551,10 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="1382" height="754" extended-state="6" />
+    <editor active="true" />
     <layout>
       <window_info id="Favorites" order="0" side_tool="true" />
-      <window_info content_ui="combo" id="Project" order="1" visible="true" weight="0.2375189" />
+      <window_info active="true" content_ui="combo" id="Project" order="1" visible="true" weight="0.24508321" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" weight="0.32850242" />
       <window_info anchor="bottom" id="Run" order="2" weight="0.8760064" />
@@ -551,7 +574,7 @@
       <window_info anchor="right" id="Commander" internal_type="SLIDING" order="2" type="SLIDING" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="3" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="4" weight="0.25" />
-      <window_info anchor="right" id="Structure" order="5" weight="0.22314675" />
+      <window_info anchor="right" id="Structure" order="5" visible="true" weight="0.22314675" />
     </layout>
     <layout-to-restore>
       <window_info id="Favorites" order="0" side_tool="true" />
@@ -622,7 +645,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="test" />
     <MESSAGE value="debug" />
     <MESSAGE value="merge" />
     <MESSAGE value="simulations" />
@@ -645,9 +667,10 @@
     <MESSAGE value="code clean-up" />
     <MESSAGE value="add saving_plot" />
     <MESSAGE value="replace plot functions to helpers.py" />
-    <MESSAGE value="work in progress" />
     <MESSAGE value="add mullerplot" />
-    <option name="LAST_COMMIT_MESSAGE" value="add mullerplot" />
+    <MESSAGE value="working on analysis things" />
+    <MESSAGE value="work in progress" />
+    <option name="LAST_COMMIT_MESSAGE" value="work in progress" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/biolgca$skript.coverage" NAME="skript Coverage Results" MODIFIED="1574326791300" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
@@ -719,13 +742,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/lgca/next steps">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="85">
-          <caret line="5" selection-start-line="5" selection-end-line="5" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$APPLICATION_CONFIG_DIR$/scratches/scratch.pyx">
       <provider selected="true" editor-type-id="text-editor">
         <state>
@@ -762,19 +778,13 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/lgca/helpers.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="242">
-          <caret line="408" column="18" lean-forward="true" selection-start-line="408" selection-start-column="18" selection-end-line="408" selection-end-column="18" />
-          <folding>
-            <element signature="e#0#18#0" expanded="true" />
-            <element signature="e#1725#3427#0" />
-            <element signature="e#3486#4647#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/BioLGCA.ipynb">
+      <provider selected="true" editor-type-id="jupyter-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Entropien.ipynb">
+      <provider selected="true" editor-type-id="jupyter-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Speicherprobe.ipynb">
       <provider selected="true" editor-type-id="jupyter-editor" />
     </entry>
     <entry file="file://$PROJECT_DIR$/lgca/__init__.py">
@@ -811,19 +821,28 @@
     <entry file="file://$PROJECT_DIR$/timeevo_until_hom.ipynb">
       <provider selected="true" editor-type-id="jupyter-editor" />
     </entry>
-    <entry file="file://$PROJECT_DIR$/Entropien.ipynb">
-      <provider selected="true" editor-type-id="jupyter-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/Speicherprobe.ipynb">
-      <provider selected="true" editor-type-id="jupyter-editor" />
-    </entry>
     <entry file="file://$PROJECT_DIR$/skript.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="37">
           <caret line="7" column="12" selection-start-line="7" selection-start-column="12" selection-end-line="7" selection-end-column="12" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/lgca/helpers.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="38">
+          <caret line="146" column="4" selection-start-line="146" selection-start-column="4" selection-end-line="146" selection-end-column="4" />
           <folding>
-            <element signature="e#4#29#0" expanded="true" />
+            <element signature="e#0#18#0" expanded="true" />
+            <element signature="e#1725#3427#0" />
           </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/lgca/next steps">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="153">
+          <caret line="9" column="20" selection-start-line="9" selection-start-column="20" selection-end-line="9" selection-end-column="20" />
         </state>
       </provider>
     </entry>
