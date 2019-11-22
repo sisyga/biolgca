@@ -103,7 +103,7 @@ def bar_stacked(lgca, save = False, id = 0):
 
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
-def bar_stacked_relative(props_t, save=False, id=0):
+def lobar_stacked_relative(props_t, save=False, id=0):
     tmax = len(props_t)
     maxlab = sum(props_t[0]['num_off'][1:])
     ancs = np.arange(0, maxlab)
@@ -159,7 +159,7 @@ def mullerplot(props, id=0, save=False):
     fig = plt.subplot()
     plt.ylabel(' frequency of families')
     plt.xlabel('timesteps')
-    plt.xlim(0, tend - 0.5)
+    plt.xlim(0, tend - 1)
     plt.ylim(0, 1)
     if tend <= 15:
         plt.xticks(np.arange(0, tend, 1))
@@ -431,9 +431,10 @@ def plot_popsize(props, save=False, id=0):
     fig, ax = plt.subplots()
     ax.plot(x, y)
     plt.xlim(0, time-1)
-    plt.yticks(np.arange(0, size.max() * 1.1, 10))
+    plt.ylim(0, size[0] + 0.5)
+    # plt.yticks(np.arange(0, size.max() * 1.1, 10))
     ax.set(xlabel='timestep', ylabel='number of living cells')
-    ax.grid(axis='y')
+    # ax.grid(axis='y')
 
     plt.show()
 
