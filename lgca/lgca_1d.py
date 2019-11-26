@@ -248,6 +248,8 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             # if timestep == 5000:
             #     print('WARNING: timestep would be too large!')
             #     break
+        
+        return timestep
 
     def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop=None, cmap='cividis'):
         if nodes_t is None:
