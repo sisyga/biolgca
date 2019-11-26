@@ -22,7 +22,7 @@ minutes_since = lambda t: time_since(t) / 60
 
 # - io
 write = lambda msg: print(msg)
-log   = lambda msg: print(f"biolgca: {msg}", file=stderr)
+log   = lambda msg: print(f"biolgca: {msg}")
 
 # run
 log("loading configuration")
@@ -71,7 +71,9 @@ for run_no, lgca in runs:
   lgca.timeevo_until_hom(record=True)
   run_timesteps = len(lgca.props_t)
   thom[run_no - 1] = run_timesteps
-  write(run_timesteps)
+
+  ## write timesteps to stdout - deactivated for now cuz we log to stdout
+  # write(run_timesteps)
   
   run_duration  = "{:5.3f} minutes".format(minutes_since(run_start))
   runlog(f"homogenous after {run_timesteps} timesteps")
