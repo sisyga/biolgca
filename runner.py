@@ -1,6 +1,6 @@
-from lgca import get_lgca
 import numpy as np
 import time
+from lgca import get_lgca
 from os import environ as env
 from sys import stderr
 
