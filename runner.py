@@ -3,7 +3,6 @@ import numpy as np
 import time
 from os import environ as env
 from sys import stderr
-from uuid import uuid4
 
 # util
 # - config
