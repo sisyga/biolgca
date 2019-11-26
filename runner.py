@@ -68,7 +68,7 @@ for run_no, lgca in runs:
   runlog("started")
   run_start = time.time()
 
-  lgca.timeevo_until_hom(record=True)
+  lgca.timeevo_until_hom()
   run_timesteps = len(lgca.props_t)
   thom[run_no - 1] = run_timesteps
 
