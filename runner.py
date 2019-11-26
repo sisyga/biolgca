@@ -56,8 +56,8 @@ new_lgca = lambda: get_lgca(
 
 log("preparing run data")
 num_runs = config["runs"]
-runs = ((i, new_lgca()) for i in range(1, num_runs + 1))
 thom = np.zeros(num_runs)
+runs = ((i, new_lgca()) for i in range(1, num_runs + 1))
 
 log("entering run-loop")
 t0 = time.time()
@@ -68,8 +68,7 @@ for run_no, lgca in runs:
   runlog("started")
   run_start = time.time()
 
-  lgca.timeevo_until_hom()
-  run_timesteps = len(lgca.props_t)
+  run_timesteps = lgca.timeevo_until_hom()
   thom[run_no - 1] = run_timesteps
 
   ## write timesteps to stdout - deactivated for now cuz we log to stdout
