@@ -323,7 +323,7 @@ def leup_test(lgca):
     interactions of the go-or-grow model.
     :return:
     """
-    relevant = (lgca.cell_density[lgca.nonborder] > 0) & (lgca.cell_density[lgca.nonborder] > lgca.K)
+    relevant = (lgca.cell_density[lgca.nonborder] > 0) & (lgca.cell_density[lgca.nonborder] < lgca.K)
     coords = [a[relevant] for a in lgca.nonborder]
     n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
     n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
@@ -339,11 +339,12 @@ def leup_test(lgca):
         # rho = n / lgca.K
         # switch to rest channel
         s = ent_prod(n_rxy) + ent_prod(n_mxy)
-        ds1 = (s - ent_prod(n_rxy-1) - ent_prod(n_mxy+1)) / n
-        p1 = 1 / (1 + exp(-lgca.beta * ds1))
+        ds1 = (s - ent_prod(n_rxy+1) - ent_prod(n_mxy-1)) / n
+        p1 = 1 / (1 + exp(lgca.beta * ds1))
         # switch to velocity channel
-        ds2 = (s - ent_prod(n_rxy+1) - ent_prod(n_mxy-1)) / n
-        p2 = 1 / (1 + exp(-lgca.beta * ds2))
+        ds2 = (s - ent_prod(n_rxy-1) - ent_prod(n_mxy+1)) / n
+        p2 = 1 / (1 + exp(lgca.beta * ds2))
+        # print(p1, p2)
 
 
         j_1 = npr.binomial(M1[coord], p1)
