@@ -179,7 +179,69 @@ def mullerplot(props, id=0, save=False):
     if save:
         save_plot(fig, str(id) + '_' + ' mullerplot' + '.jpg')
 
+def mullerplot_extended(props, id=0, save=False, int_range=1, zusatz=False):
+    tend = len(props)
+    maxlab = len(props[0]['num_off']) - 1
+    fig = plt.subplot()
 
+    val = np.zeros((maxlab, tend))
+    for t in range(0, tend):
+        for lab in range(0, maxlab):
+            val[lab, t] = props[t]['num_off'][lab + 1]
+
+    if int_range == 1:
+        xrange = range(0, tend)
+        pop = val
+        plt.xlabel('timesteps')
+
+    else:
+        int_num = ((tend - 1) // int_range + 1)
+        xrange = range(0, int_num)
+
+        mean_val = np.zeros((maxlab, int_num)) + -999
+        for i in range(0, int_num - 1):
+            #     print(i*li, (i+1)*li-1)
+            for lab in range(0, maxlab):
+                mean_val[lab, i] = np.sum(val[lab, i * int_range:(i + 1) * int_range]) / int_range
+        for lab in range(0, maxlab):
+            mean_val[lab, int_num - 1] =\
+                np.sum(val[lab, (int_num - 1) * int_range:]) / (tend - (int_num - 1) * int_range)
+        plt.xlabel('intervalls')
+        if zusatz:
+            xrange = range(0, int_num+2)
+            pop = np.zeros((maxlab, int_num + 2)) + -777
+            pop[:, 0] = val[:, 0]
+            pop[:, 1:-1] = mean_val
+            pop[:, -1] = val[:, -1]
+        else:
+            pop = mean_val
+
+    popdic = {str(i): pop[i] for i in range(0, maxlab)}
+    data = pd.DataFrame(popdic, index=xrange)
+    data_perc = data.divide(data.sum(axis=1), axis=0)
+
+    plt.ylabel(' frequency of families')
+
+    # plot einstellungen
+    plt.xlim(0, xrange[-1])
+    plt.ylim(0, 1)
+    if xrange[-1] <= 15:
+        plt.xticks(np.arange(0, xrange[-1], 1))
+    elif xrange[-1] <= 100:
+        plt.xticks(np.arange(0, xrange[-1], 5))
+    elif xrange[-1] >= 1000:
+        plt.xticks(np.arange(0, xrange[-1], 500))
+    elif xrange[-1] >= 100:
+        plt.xticks(np.arange(0, xrange[-1], 50))
+
+
+    plt.stackplot(xrange, *[data_perc[str(f)] for f in range(0, maxlab)],\
+                  labels=list(range(0, maxlab)))
+    plt.show()
+
+
+    if save:
+        save_plot(fig, str(id) + '_' + ' mullerplot' + '.jpg')
 
 def entropies(props, order, plot=False, save_plot=False, id=0):
     time = len(props)

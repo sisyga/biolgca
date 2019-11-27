@@ -7,9 +7,9 @@ import time
 
 # Paraliste:
 # timesteps = 2
-dim = 60
+dim = 1
 dens = 1
-rc = 1
+rc = 178
 birthrate = 0.5
 deathrate = 0.02
 rep = 100
