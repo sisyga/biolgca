@@ -1,4 +1,5 @@
 from bisect import bisect_left
+from math import log, exp
 from random import random
 
 import numpy as np
@@ -23,6 +24,13 @@ def disarrange(a, axis=-1):
 
 def tanh_switch(rho, kappa=5., theta=0.8):
     return 0.5 * (1 + np.tanh(kappa * (rho - theta)))
+
+def ent_prod(x):
+    if x <= 0:
+        return 0.
+
+    return x * log(x)
+
 
 def random_walk(lgca):
     """
@@ -295,6 +303,51 @@ def go_or_grow(lgca):
         rho = n / lgca.K
         j_1 = npr.binomial(M1[coord], tanh_switch(rho, kappa=lgca.kappa, theta=lgca.theta))
         j_2 = npr.binomial(M2[coord], 1 - tanh_switch(rho, kappa=lgca.kappa, theta=lgca.theta))
+        n_mxy += j_2 - j_1
+        n_rxy += j_1 - j_2
+        n_mxy -= npr.binomial(n_mxy * np.heaviside(n_mxy, 0), lgca.r_d)
+        n_rxy -= npr.binomial(n_rxy * np.heaviside(n_rxy, 0), lgca.r_d)
+        M = min([n_rxy, lgca.restchannels - n_rxy])
+        n_rxy += npr.binomial(M * np.heaviside(M, 0), lgca.r_b)
+
+        v_channels = [1] * n_mxy + [0] * (lgca.velocitychannels - n_mxy)
+        v_channels = npr.permutation(v_channels)
+        r_channels = np.zeros(lgca.restchannels)
+        r_channels[:n_rxy] = 1
+        node = np.hstack((v_channels, r_channels))
+        lgca.nodes[coord] = node
+
+
+def leup_test(lgca):
+    """
+    interactions of the go-or-grow model.
+    :return:
+    """
+    relevant = (lgca.cell_density[lgca.nonborder] > 0) & (lgca.cell_density[lgca.nonborder] > lgca.K)
+    coords = [a[relevant] for a in lgca.nonborder]
+    n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
+    n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
+    M1 = np.minimum(n_m, lgca.restchannels - n_r)
+    M2 = np.minimum(n_r, lgca.velocitychannels - n_m)
+    for coord in zip(*coords):
+        # node = lgca.nodes[coord]
+        n = lgca.cell_density[coord]
+
+        n_mxy = n_m[coord]
+        n_rxy = n_r[coord]
+
+        # rho = n / lgca.K
+        # switch to rest channel
+        s = ent_prod(n_rxy) + ent_prod(n_mxy)
+        ds1 = (s - ent_prod(n_rxy-1) - ent_prod(n_mxy+1)) / n
+        p1 = 1 / (1 + exp(-lgca.beta * ds1))
+        # switch to velocity channel
+        ds2 = (s - ent_prod(n_rxy+1) - ent_prod(n_mxy-1)) / n
+        p2 = 1 / (1 + exp(-lgca.beta * ds2))
+
+
+        j_1 = npr.binomial(M1[coord], p1)
+        j_2 = npr.binomial(M2[coord], p2)
         n_mxy += j_2 - j_1
         n_rxy += j_1 - j_2
         n_mxy -= npr.binomial(n_mxy * np.heaviside(n_mxy, 0), lgca.r_d)
