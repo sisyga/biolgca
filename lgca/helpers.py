@@ -165,6 +165,8 @@ def mullerplot(props, id=0, save=False):
         plt.xticks(np.arange(0, tend, 1))
     elif tend <= 100:
         plt.xticks(np.arange(0, tend, 5))
+    elif tend >= 5000:
+        plt.xticks(np.arange(0, tend, 1000))
     elif tend >= 1000:
         plt.xticks(np.arange(0, tend, 500))
     elif tend >= 100:
@@ -208,7 +210,11 @@ def mullerplot_extended(props, id=0, save=False, int_range=1, zusatz=False):
                 np.sum(val[lab, (int_num - 1) * int_range:]) / (tend - (int_num - 1) * int_range)
         plt.xlabel('intervalls')
         if zusatz:
-            xrange = range(0, int_num+2)
+            xrange = np.zeros(int_num + 2)
+            for i in range(1, int_num + 1):
+                xrange[i] = i - 0.5
+            xrange[-1] = int_num
+            # print(xrange)
             pop = np.zeros((maxlab, int_num + 2)) + -777
             pop[:, 0] = val[:, 0]
             pop[:, 1:-1] = mean_val
