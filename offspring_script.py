@@ -4,10 +4,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 from os import environ as env
+from uuid import uuid4 as uuid
 
 dim = int(env['DIMS'])
 rc = int(env['RESTCHANNELS'])
 rep = int(env['REPETITIONS'])
+
+
+
 
 dens = 1
 birthrate = 0.5
@@ -22,7 +26,7 @@ for i in range(0, rep):
 
     lgca= get_lgca(ib=True, geometry='lin', interaction='inheritance', bc='reflecting',\
            density = dens, dims = dim, r_b = birthrate, variation = False, restchannels = rc ,r_d = deathrate)
-    id = name + '_'+ str(i)
+    id = name + '_' + str(i) + str(uuid())[0:7]
     lgca.timeevo_until_hom(record=True)
     offsprings = np.zeros((len(lgca.props_t), len(lgca.props_t[0]['num_off'])))
     for t in range(len(lgca.props_t)):
