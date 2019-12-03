@@ -17,7 +17,7 @@ dens = 1
 birthrate = 0.5
 deathrate = 0.02
 
-uu = uuid()[0:7]
+uu = str(uuid())[0:7]
 saving_data = True
 
 for i in range(0, rep):
