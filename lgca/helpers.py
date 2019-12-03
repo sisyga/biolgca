@@ -185,7 +185,7 @@ def mullerplot_extended(props, id=0, save=False, int_range=1, zusatz=False):
     tend = len(props)
     maxlab = len(props[0]['num_off']) - 1
     fig = plt.subplot()
-
+    # xrange = range(0,tend, int_range)
     val = np.zeros((maxlab, tend))
     for t in range(0, tend):
         for lab in range(0, maxlab):
