@@ -1,10 +1,4 @@
 
-Simulation:
-- mehr Daten sammeln für thom (Extremfälle)
-- thom plot-> als hist bzw scatter plot probieren
-- mullerplot: intervallweise...nicht alle Zeitschritte,
- sondern immer das Mittel eines Intervalls
-
 Theorie:
 - Vorhersage zu Laufzeit aus Moranmodell?
 - Kapitel über Entropien

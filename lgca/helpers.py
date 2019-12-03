@@ -181,15 +181,24 @@ def mullerplot(props, id=0, save=False):
     if save:
         save_plot(fig, str(id) + '_' + ' mullerplot' + '.jpg')
 
-def mullerplot_extended(props, id=0, save=False, int_range=1, zusatz=False):
+def mullerplot_extended(props, id=0, save=False, int_range=1, zusatz=False, off=False):
     tend = len(props)
-    maxlab = len(props[0]['num_off']) - 1
+    if off:
+        maxlab = len(props[0]) - 1
+
+    else:
+        maxlab = len(props[0]['num_off']) - 1
     fig = plt.subplot()
     # xrange = range(0,tend, int_range)
     val = np.zeros((maxlab, tend))
-    for t in range(0, tend):
-        for lab in range(0, maxlab):
-            val[lab, t] = props[t]['num_off'][lab + 1]
+    if off:
+        for t in range(0, tend):
+            for lab in range(0, maxlab):
+                val[lab, t] = props[t, lab + 1]
+    else:
+        for t in range(0, tend):
+            for lab in range(0, maxlab):
+                val[lab, t] = props[t]['num_off'][lab + 1]
 
     if int_range == 1:
         xrange = range(0, tend)
