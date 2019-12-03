@@ -17,7 +17,7 @@ dens = 1
 birthrate = 0.5
 deathrate = 0.02
 
-
+uu = uuid()[0:7]
 saving_data = True
 
 for i in range(0, rep):
@@ -26,7 +26,7 @@ for i in range(0, rep):
 
     lgca= get_lgca(ib=True, geometry='lin', interaction='inheritance', bc='reflecting',\
            density = dens, dims = dim, r_b = birthrate, variation = False, restchannels = rc ,r_d = deathrate)
-    id = name + '_' + str(i) + str(uuid())[0:7]
+    id = name + '_' + str(i) + '_'+ str(uu)
     lgca.timeevo_until_hom(record=True)
     offsprings = np.zeros((len(lgca.props_t), len(lgca.props_t[0]['num_off'])))
     for t in range(len(lgca.props_t)):
