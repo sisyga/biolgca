@@ -258,23 +258,41 @@ def mullerplot_extended(props, id=0, save=False, int_range=1, zusatz=False, off=
     if save:
         save_plot(fig, str(id) + '_' + ' mullerplot' + '.jpg')
 
-def entropies(props, order, plot=False, save_plot=False, id=0):
+def entropies(props, order, plot=False, save_plot=False, id=0, off=False):
     time = len(props)
-    maxlab = len(props[0]['num_off'][1:])
+    if off:
+        maxlab = len(props[0][1:])
+
+    else:
+        maxlab = len(props[0]['num_off'][1:])
     if order == 1:
         # print('Shannon')
         shan_t = np.zeros(time)
-        for t in range(time):
-            if sum(props[t]['num_off'][1:]) != 0:
-                for lab in range(1, maxlab+1):
-                    pi = props[t]['num_off'][lab] / sum(props[t]['num_off'][1:])
-                    if pi != 0:
-                        shan_t[t] -= pi * m.log(pi)
-            else:
-                # print('extinct since t= ', t)
-                t_ex = t
-                shan_t[t:] = -1
-                break
+        if off:
+            for t in range(time):
+                if sum(props[t][1:]) != 0:
+                    for lab in range(1, maxlab+1):
+                        pi = props[t][lab] / sum(props[t][1:])
+                        if pi != 0:
+                            shan_t[t] -= pi * m.log(pi)
+                else:
+                    # print('extinct since t= ', t)
+                    t_ex = t
+                    shan_t[t:] = -1
+                    break
+
+        else:
+            for t in range(time):
+                if sum(props[t]['num_off'][1:]) != 0:
+                    for lab in range(1, maxlab+1):
+                        pi = props[t]['num_off'][lab] / sum(props[t]['num_off'][1:])
+                        if pi != 0:
+                            shan_t[t] -= pi * m.log(pi)
+                else:
+                    # print('extinct since t= ', t)
+                    t_ex = t
+                    shan_t[t:] = -1
+                    break
         shan_max = m.log(maxlab)
         if plot or save_plot:
             plot_entropies(time, shan_t, order, save_plot, id)
@@ -283,19 +301,34 @@ def entropies(props, order, plot=False, save_plot=False, id=0):
     if order == 1.5:
         # print('simpson')
         simpson_t = np.zeros(time) + 1
-        for t in range(time):
-            abs = sum(props[t]['num_off'][1:])
-            if abs > 1:
-                for lab in range(1, maxlab+1):
-                    pi = props[t]['num_off'][lab]
-                    simpson_t[t] -= (pi * (pi-1)) / (abs * (abs - 1))
-            elif abs == 1:
-                simpson_t[t] = 0
-            elif abs == 0:
-                # print('extinct since t= ', t)
-                t_ex = t
-                simpson_t[t:] = -1
-                break
+        if off:
+            for t in range(time):
+                abs = sum(props[t][1:])
+                if abs > 1:
+                    for lab in range(1, maxlab + 1):
+                        pi = props[t][lab]
+                        simpson_t[t] -= (pi * (pi - 1)) / (abs * (abs - 1))
+                elif abs == 1:
+                    simpson_t[t] = 0
+                elif abs == 0:
+                    # print('extinct since t= ', t)
+                    t_ex = t
+                    simpson_t[t:] = -1
+                    break
+        else:
+            for t in range(time):
+                abs = sum(props[t]['num_off'][1:])
+                if abs > 1:
+                    for lab in range(1, maxlab+1):
+                        pi = props[t]['num_off'][lab]
+                        simpson_t[t] -= (pi * (pi-1)) / (abs * (abs - 1))
+                elif abs == 1:
+                    simpson_t[t] = 0
+                elif abs == 0:
+                    # print('extinct since t= ', t)
+                    t_ex = t
+                    simpson_t[t:] = -1
+                    break
         if plot or save_plot:
             plot_entropies(time, simpson_t, order, save_plot, id)
         return simpson_t
@@ -303,28 +336,43 @@ def entropies(props, order, plot=False, save_plot=False, id=0):
     if order == 2:
         # print('ginisimpson')
         ginisimpson_t = np.zeros(time) + 1
-        for t in range(time):
-            if sum(props[t]['num_off'][1:]) != 0:
-                for lab in range(1, maxlab+1):
-                    pi = props[t]['num_off'][lab] / sum(props[t]['num_off'][1:])
-                    ginisimpson_t[t] -= pi * pi
-            else:
-                # print('extinct since t= ', t)
-                t_ex = t
-                ginisimpson_t[t:] = -1
-                break
+        if off:
+            for t in range(time):
+                if sum(props[t][1:]) != 0:
+                    for lab in range(1, maxlab + 1):
+                        pi = props[t][lab] / sum(props[t][1:])
+                        ginisimpson_t[t] -= pi * pi
+                else:
+                    # print('extinct since t= ', t)
+                    t_ex = t
+                    ginisimpson_t[t:] = -1
+                    break
+        else:
+            for t in range(time):
+                if sum(props[t]['num_off'][1:]) != 0:
+                    for lab in range(1, maxlab+1):
+                        pi = props[t]['num_off'][lab] / sum(props[t]['num_off'][1:])
+                        ginisimpson_t[t] -= pi * pi
+                else:
+                    # print('extinct since t= ', t)
+                    t_ex = t
+                    ginisimpson_t[t:] = -1
+                    break
         if plot or save_plot:
             plot_entropies(time, ginisimpson_t, order, save_plot, id)
         return ginisimpson_t
 
-def hillnumber(props, order, plot = False, save_plot = False, id=0):
+def hillnumber(props, order, plot = False, save_plot = False, id=0, off=False):
     time = len(props)
-    maxlab = len(props[0]['num_off'][1:])
+    if off:
+        maxlab = len(props[0][1:])
+    else:
+        maxlab = len(props[0]['num_off'][1:])
 
     if order == 1:
         hill_lin = np.zeros(time)
         # print('exp Shannon')
-        shan_t, shan_max = entropies(props, 1)
+        shan_t, shan_max = entropies(props, order=1, off=off)
         for t in range(time):
             if shan_t[t] != -1:
                 hill_lin[t] = np.exp(shan_t[t])
@@ -341,17 +389,30 @@ def hillnumber(props, order, plot = False, save_plot = False, id=0):
     if order >= 2:
         # print('hillnumber order', order)
         hill_quad = np.zeros(time)
-        for t in range(time):
-            if sum(props[t]['num_off'][1:]) != 0:
-                for lab in range(1, maxlab+1):
-                    pi = props[t]['num_off'][lab] / sum(props[t]['num_off'][1:])
-                    hill_quad[t] += pi ** order
-                hill_quad[t] = hill_quad[t] ** (1/(1 - order))
-            else:
-                # print('extinct since t= ', t)
-                t_ex = t
-                hill_quad[t:] = -1
-                break
+        if off:
+            for t in range(time):
+                if sum(props[t][1:]) != 0:
+                    for lab in range(1, maxlab + 1):
+                        pi = props[t][lab] / sum(props[t][1:])
+                        hill_quad[t] += pi ** order
+                    hill_quad[t] = hill_quad[t] ** (1 / (1 - order))
+                else:
+                    # print('extinct since t= ', t)
+                    t_ex = t
+                    hill_quad[t:] = -1
+                    break
+        else:
+            for t in range(time):
+                if sum(props[t]['num_off'][1:]) != 0:
+                    for lab in range(1, maxlab+1):
+                        pi = props[t]['num_off'][lab] / sum(props[t]['num_off'][1:])
+                        hill_quad[t] += pi ** order
+                    hill_quad[t] = hill_quad[t] ** (1/(1 - order))
+                else:
+                    # print('extinct since t= ', t)
+                    t_ex = t
+                    hill_quad[t:] = -1
+                    break
         if plot or save_plot:
             plot_hill(time, hill_quad, order, save_plot, id)
         return hill_quad
@@ -467,12 +528,12 @@ def plot_entropies_together(props, save=False, id=0):
     if save:
         save_plot(fig, str(id) + '_comparing entropies' + '.jpg')
 
-def plot_sh_gi_hh(props, save=False, id=0):
+def plot_sh_gi_hh(props, save=False, id=0, off=False):
     time = len(props)
     x = np.arange(0, time, 1)
-    shan, shanmax = entropies(props, 1)
-    hh = hillnumber(props, 2)
-    gini = entropies(props, 2)
+    shan, shanmax = entropies(props, order=1, off=off)
+    hh = hillnumber(props, order=2, off=off)
+    gini = entropies(props, order=2, off=off)
 
     fig, ax = plt.subplots()
     plt.plot(x, shan, 'b-', label='Shannonindex')
@@ -497,12 +558,16 @@ def plot_sh_gi_hh(props, save=False, id=0):
     if save:
         save_plot(fig, str(id) + '_comparing shannon, gini, hill2' + '.jpg')
 
-def plot_popsize(props, save=False, id=0):
+def plot_popsize(props, save=False, id=0, off=False):
     time = len(props)
     x = np.arange(0, time, 1)
     size = np.zeros(time)
-    for t in range(time):
-        size[t] = sum(props[t]['num_off'][1:])
+    if off:
+        for t in range(time):
+            size[t] = sum(props[t][1:])
+    else:
+        for t in range(time):
+            size[t] = sum(props[t]['num_off'][1:])
     y = size[x]
 
     fig, ax = plt.subplots()
