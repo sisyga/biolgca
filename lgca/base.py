@@ -719,13 +719,22 @@ class LGCA_noVE_base(LGCA_base):
     """
     def set_interaction(self, **kwargs):
         try:
-            from .nove_interactions import alignment
+            from .nove_interactions import dd_alignment, di_alignment
         except:
             from nove_interactions import alignment
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
-            if interaction == 'alignment':
-                self.interaction = alignment
+            if interaction == 'dd_alignment':
+                self.interaction = dd_alignment
+                self.calc_permutations()
+
+                if 'beta' in kwargs:
+                    self.beta = kwargs['beta']
+                else:
+                    self.beta = 2.
+                    print('sensitivity set to beta = ', self.beta)
+            elif interaction == 'di_alignment':
+                self.interaction = di_alignment
                 self.calc_permutations()
 
                 if 'beta' in kwargs:
@@ -734,9 +743,9 @@ class LGCA_noVE_base(LGCA_base):
                     self.beta = 2.
                     print('sensitivity set to beta = ', self.beta)
             else:
-                print('interaction', kwargs['interaction'], 'is not defined! Alignment interaction used instead.')
+                print('interaction', kwargs['interaction'], 'is not defined! Density-dependent alignment interaction used instead.')
                 print('Implemented interactions:', self.interactions)
-                self.interaction = alignment
+                self.interaction = dd_alignment
                 self.calc_permutations()
 
                 if 'beta' in kwargs:
@@ -746,8 +755,8 @@ class LGCA_noVE_base(LGCA_base):
                     print('sensitivity set to beta = ', self.beta)
 
         else:
-            print('Alignment interaction is used.')
-            self.interaction = alignment
+            print('Density-dependent alignment interaction is used.')
+            self.interaction = dd_alignment
             self.calc_permutations()
 
             if 'beta' in kwargs:

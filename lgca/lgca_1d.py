@@ -19,7 +19,8 @@ class LGCA_1D(LGCA_base):
         if nodes is not None:
             self.l, self.K = nodes.shape
             self.restchannels = self.K - self.velocitychannels
-            self.dims = self.l
+            self.dims = self.l,
+            print(type(self.dims))
             return
 
         elif dims is None:
@@ -82,10 +83,12 @@ class LGCA_1D(LGCA_base):
         self.nodes[:self.r_int, :] = 0
         self.nodes[-self.r_int:, :] = 0
 
-    def nb_sum(self, qty): #what do you do? - shift to left without padding and add to shift to the right without padding
+    def nb_sum(self, qty):
         sum = np.zeros(qty.shape)
         sum[:-1, ...] += qty[1:, ...]
         sum[1:, ...] += qty[:-1, ...]
+        # shift to left without padding and add to shift to the right without padding
+        # sums up fluxes (in qty) of neighboring particles
         return sum
 
     def gradient(self, qty):
@@ -241,7 +244,7 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
     """
     interactions = ['alignment']
 
-    c = np.array([1., -1.])[None, ...] #most probably the directions
+    c = np.array([1., -1.])[None, ...] #directions of velocity channels; shape: (1,2)
 
     def set_dims(self, dims=None, nodes=None, restchannels=0): # changed to not allow resting channels
         # works with the current default values in the _init_() method/here
@@ -250,7 +253,7 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
             if self.K - self.velocitychannels != 0:
                 raise Exception('No resting channels allowed, but {} resting channels specified!'.format(self.K - self.velocitychannels))
             self.restchannels = 0
-            self.dims = self.l
+            self.dims = self.l,
             return
 
         elif dims is None:
@@ -309,14 +312,15 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         dens_t = nodes_t.sum(-1) / nodes_t.shape[-1]
         tmax, l = dens_t.shape
         flux_t = nodes_t[..., 0].astype(int) - nodes_t[..., 1].astype(int)
+        print("Flux:")
+        print(flux_t[60:81])
         if figsize is None:
             figsize = estimate_figsize(dens_t.T)
 
         rgba = np.zeros((tmax, l, 4))
-        #TODO:
         rgba[dens_t > 0, -1] = 1.
-        rgba[flux_t == 1, 0] = 1.
-        rgba[flux_t == -1, 2] = 1.
+        rgba[flux_t > 0, 0] = 1.
+        rgba[flux_t < 0, 2] = 1.
         rgba[flux_t == 0, :-1] = 0.
         fig = plt.figure(num=figindex, figsize=figsize)
         ax = fig.add_subplot(111)
@@ -328,8 +332,6 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         ax.xaxis.tick_top()
         plt.tight_layout()
         return plot
-
-
 
 
 if __name__ == '__main__':
