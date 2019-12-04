@@ -1,0 +1,6 @@
+lcga/__pycache__/*
+lgca/__pycache__
+.idea/
+.ipynb_checkpoints/
+lgca/.idea/
+lgca/base.pyc
