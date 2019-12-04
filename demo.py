@@ -1,5 +1,6 @@
 from lgca import get_lgca
 import matplotlib.pyplot as plt
+import numpy as np
 
 """GETTING STARTED"""
 #envoke package and obtain appropriate class instance
@@ -19,8 +20,11 @@ import matplotlib.pyplot as plt
 #lgca.set_interaction(interaction='alignment', beta=3.0)
 #alignment interaction needs beta parameter; default: 2
 
+nodes = np.array([[0,0],[2,0],[0,0],[4,0],[1,0],[0,0],[0,0],[0,0],[0,0],[30,0],[14,0],[0,0]])
+
 """INITIAL STATE"""
-lgca2 = get_lgca(density=0.1, dims=100, geometry='lin', ve=True, bc='refl', interaction='go_and_grow')
+#lgca2 = get_lgca(density=0.1, dims=10, geometry='lin', ve=True, bc='refl', interaction='go_and_grow')
+lgca2 = get_lgca(density=0.1, ve=False, geometry='lin', bc='refl', interaction='go_and_grow', nodes=nodes)
 #default: homogeneous with constant mean density: density=
 #TODO: set random seed to reproduce results?
 #restchannels=
@@ -41,9 +45,9 @@ lgca2 = get_lgca(density=0.1, dims=100, geometry='lin', ve=True, bc='refl', inte
 # recordN=True: record total number of cells
 lgca2.timeevo(timesteps=100, record=True)
 #print("Print nodes")
-#lgca2.print_nodes()
+lgca2.print_nodes()
 #print("plot density")
-#ani = lgca2.plot_density()
+ani = lgca2.plot_density()
 ani2 = lgca2.plot_flux()
 plt.show()
 
