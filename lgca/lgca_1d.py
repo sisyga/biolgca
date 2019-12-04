@@ -19,7 +19,7 @@ class LGCA_1D(LGCA_base):
         if nodes is not None:
             self.l, self.K = nodes.shape
             self.restchannels = self.K - self.velocitychannels
-            self.dims = self.l,
+            self.dims = self.l
             return
 
         elif dims is None:
@@ -41,11 +41,15 @@ class LGCA_1D(LGCA_base):
             self.random_reset(density)
 
         else:
-            self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.bool)
+            self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.bool) #what if that doesn't fit?! it always
+            # does because set_dims has a case for that where it just copies the stuff
 
     def init_coords(self):
-        self.nonborder = (np.arange(self.l) + self.r_int,)
-        self.xcoords = np.arange(self.l + 2 * self.r_int) - self.r_int
+        self.nonborder = (np.arange(self.l) + self.r_int,) #tuple s.t. I can call my lattice sites "nodes[nonborder]" like this
+        # self.nonborder ist ein tuple von indices entlang der dimensionen des Gitters, deswegen das Komma. Im 1D Fall ist das Tuple dann nur von der Länge 1.
+        # Zelldichte aller Nicht-Randzellen celldens = self.cell_density[self.nonborder]
+        # Die "echten Werte" von xcoords sind 0 bis 4, aber die dazugehörigen Indizes, um die Koordinaten abzurufen sind 1 bis 5, dh xcoords[nonborder] gibt dir 0 bis 4 aus.
+        self.xcoords = np.arange(self.l + 2 * self.r_int) - self.r_int #indexing of x-coordinates starting at -r_int to l+r_int?
 
     def propagation(self):
         """
@@ -68,7 +72,9 @@ class LGCA_1D(LGCA_base):
         self.nodes[-self.r_int:, :] = self.nodes[self.r_int:2 * self.r_int, :]
 
     def apply_rbc(self):
+        # left boundary cell inside domain: right channel gets added left channel from the left
         self.nodes[self.r_int, 0] += self.nodes[self.r_int - 1, 1]
+        # right boundary cell inside domain: left channel gets added right channel from the right
         self.nodes[-self.r_int - 1, 1] += self.nodes[-self.r_int, 0]
         self.apply_abc()
 
@@ -76,19 +82,25 @@ class LGCA_1D(LGCA_base):
         self.nodes[:self.r_int, :] = 0
         self.nodes[-self.r_int:, :] = 0
 
-    def nb_sum(self, qty):
+    def nb_sum(self, qty): #what do you do? - shift to left without padding and add to shift to the right without padding
         sum = np.zeros(qty.shape)
         sum[:-1, ...] += qty[1:, ...]
         sum[1:, ...] += qty[:-1, ...]
         return sum
 
     def gradient(self, qty):
+        #qty: array with some function
+        #2: spacing between samples in qty TODO why 2?
         return np.gradient(qty, 2)[..., None]
+        # The ellipsis is used to slice higher-dimensional data structures.
+        # It's designed to mean at this point, insert as many full slices (:) to extend the multi-dimensional slice to all dimensions.
+        # None adds a new axis to the ndarray and keeps the whole rest unchanged
 
-    def channel_weight(self, qty):
-        weights = np.zeros(qty.shape + (self.velocitychannels,))
-        weights[:-1, ..., 0] = qty[1:, ...]
-        weights[1:, ..., 1] = qty[:-1, ...]
+    def channel_weight(self, qty): #whatever this does
+        weights = np.zeros(qty.shape + (self.velocitychannels,)) #velocity channels added as a dimension, ',' to make it a tuple to add it to the shape tuple
+        # adding tuples: a = (0,1) b = (2,3) a+b=(0, 1, 2, 3) -> indexed in the same fashion as arrays
+        weights[:-1, ..., 0] = qty[1:, ...] #shift first dimension of qty left to put in right velocity channel
+        weights[1:, ..., 1] = qty[:-1, ...] #shift second dimension of qty right to put in left velocity channel
         return weights
 
     #
@@ -120,6 +132,9 @@ class LGCA_1D(LGCA_base):
         if figsize is None:
             figsize = estimate_figsize(density_t.T, cbar=True)
 
+        # print("Density:")
+        # print(density_t)
+        # print(density_t.max())
         fig = plt.figure(num=figindex, figsize=figsize)
         ax = fig.add_subplot(111)
         cmap = cmap_discretize(cmap, 3 + self.restchannels)
@@ -143,7 +158,7 @@ class LGCA_1D(LGCA_base):
         if figsize is None:
             figsize = estimate_figsize(dens_t.T)
 
-        rgba = np.zeros((tmax, l, 4))
+        rgba = np.zeros((tmax, l, 4)) #4: RGBA A=alpha: transparency
         rgba[dens_t > 0, -1] = 1.
         rgba[flux_t == 1, 0] = 1.
         rgba[flux_t == -1, 2] = 1.
@@ -218,6 +233,103 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         return plot
+
+
+class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
+    """
+    1D version of an LGCA without volume exclusion.
+    """
+    interactions = ['alignment']
+
+    c = np.array([1., -1.])[None, ...] #most probably the directions
+
+    def set_dims(self, dims=None, nodes=None, restchannels=0): # changed to not allow resting channels
+        # works with the current default values in the _init_() method/here
+        if nodes is not None:
+            self.l, self.K = nodes.shape
+            if self.K - self.velocitychannels != 0:
+                raise Exception('No resting channels allowed, but {} resting channels specified!'.format(self.K - self.velocitychannels))
+            self.restchannels = 0
+            self.dims = self.l
+            return
+
+        elif dims is None:
+            dims = 100
+
+        if restchannels != 0:
+            raise Exception('No resting channels allowed, but {} resting channels specified!'.format(restchannels))
+
+        if isinstance(dims, int):
+            self.l = dims
+
+        else:
+            self.l = dims[0]
+
+        self.dims = self.l,
+        self.restchannels = 0
+        self.K = self.velocitychannels
+
+
+    def init_nodes(self, density, nodes=None):
+        self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.uint)
+        if nodes is None:
+            self.random_reset(density)  # TODO!
+
+        else:
+            self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.uint)
+
+
+    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='hot_r'):
+        if density_t is None:
+            density_t = self.dens_t
+        if figsize is None:
+            figsize = estimate_figsize(density_t.T, cbar=True)
+
+        max_part_per_cell = int(density_t.max()) #alternatively plot using the expected density - number of particles in total / lattice sites
+        print(max_part_per_cell)
+        print(int(max_part_per_cell))
+        fig = plt.figure(num=figindex, figsize=figsize)
+        ax = fig.add_subplot(111)
+        cmap = cmap_discretize(cmap, max_part_per_cell + 1) #todo adjust number of colours
+        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=max_part_per_cell, cmap=cmap) #TODO adjust vmax
+        cbar = colorbar_index(ncolors=max_part_per_cell + 1, cmap=cmap, use_gridspec=True) #todo adjust ncolors
+        cbar.set_label(r'Particle number $n$')
+        plt.xlabel(r'Lattice node $r \, (\varepsilon)$', )
+        plt.ylabel(r'Time step $k \, (\tau)$')
+        ax.xaxis.set_label_position('top')
+        ax.xaxis.tick_top()
+        plt.tight_layout()
+        return plot
+
+
+    def plot_flux(self, nodes_t=None, figindex=None, figsize=None):
+        if nodes_t is None:
+            nodes_t = self.nodes_t
+
+        dens_t = nodes_t.sum(-1) / nodes_t.shape[-1]
+        tmax, l = dens_t.shape
+        flux_t = nodes_t[..., 0].astype(int) - nodes_t[..., 1].astype(int)
+        if figsize is None:
+            figsize = estimate_figsize(dens_t.T)
+
+        rgba = np.zeros((tmax, l, 4))
+        #TODO:
+        rgba[dens_t > 0, -1] = 1.
+        rgba[flux_t == 1, 0] = 1.
+        rgba[flux_t == -1, 2] = 1.
+        rgba[flux_t == 0, :-1] = 0.
+        fig = plt.figure(num=figindex, figsize=figsize)
+        ax = fig.add_subplot(111)
+        plot = ax.imshow(rgba, interpolation='None', origin='upper')
+        plt.xlabel(r'Lattice node $r \, [\varepsilon]$', )
+        plt.ylabel(r'Time step $k \, [\tau]$')
+        ax.xaxis.set_label_position('top')
+        ax.xaxis.set_ticks_position('top')
+        ax.xaxis.tick_top()
+        plt.tight_layout()
+        return plot
+
+
 
 
 if __name__ == '__main__':

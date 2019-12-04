@@ -82,9 +82,9 @@ def cmap_discretize(cmap, N):
 def estimate_figsize(array, x=8., cbar=False, dy=1.):
     lx, ly = array.shape
     if cbar:
-        y = min([x * ly / lx - 1, 15.])
+        y = min([abs(x * ly /lx - 1), 15.])
     else:
-        y = min([x * ly / lx, 15.])  #
+        y = min([x * ly / lx, 15.])
     y *= dy
     figsize = (x, y)
     return figsize
@@ -104,17 +104,18 @@ class LGCA_base():
     def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', **kwargs):
         """
         Initialize class instance.
-        :param nodes:
-        :param l:
+        :param nodes: np.ndarray initial configuration manually
+        :param dims: array determining lattice dimensions
+        :param l: lattice size- how is extra stuff for bc incorporated? set_dims?
         :param restchannels:
         :param density:
         :param bc:
-        :param r_int:
+        :param r_int: interaction range
         :param kwargs:
         """
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
         self.set_bc(bc)
-        self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
+        self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes) #Java abstract method
         self.init_coords()
         self.init_nodes(density=density, nodes=nodes)
         self.set_interaction(**kwargs)
@@ -355,10 +356,13 @@ class LGCA_base():
             self.apply_boundaries = self.apply_pbc
 
     def calc_flux(self, nodes):
-        if nodes.dtype != 'bool':
-            nodes = nodes.astype('bool')
+        #for ib_lgca, kicked out to make no volume exclusion possible:
+        #if nodes.dtype != 'bool':
+        #    nodes = nodes.astype('bool')
 
         return np.einsum('ij,...j', self.c, nodes[..., :self.velocitychannels])
+        #1st dim: lattice sites
+        #2nd dim: dot product between c vectors and actual configuration of site
 
     def get_interactions(self):
         print(self.interactions)
@@ -379,6 +383,7 @@ class LGCA_base():
         :return:
         """
         self.cell_density = self.nodes.sum(-1)
+        #cell_density ist ein array von Werten. Es wird als Summe über die Channel berechnet. (.sum(-1) summiert über die letzte Achse des Arrays).
 
     def timestep(self):
         """
@@ -397,7 +402,7 @@ class LGCA_base():
             self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
             self.nodes_t[0, ...] = self.nodes[self.nonborder]
         if recordN:
-            self.n_t = np.zeros(timesteps + 1, dtype=np.int)
+            self.n_t = np.zeros(timesteps + 1, dtype=np.int) #TODO: make it long - pull through!
             self.n_t[0] = self.cell_density[self.nonborder].sum()
         if recorddens:
             self.dens_t = np.zeros((timesteps + 1,) + self.dims)
@@ -420,13 +425,26 @@ class LGCA_base():
         print(self.nodes.astype(int))
 
     def calc_permutations(self):
+        #he's using a list comprehension; https://blog.teamtreehouse.com/python-single-line-loops
         self.permutations = [np.array(list(multiset_permutations([1] * n + [0] * (self.K - n))), dtype=np.int8)
+                                                                #builds list with all possible amounts of particles in an array of size self.K (velocity + resting)
+                                      # builds nested list with all possible permutations for this array
+                             #first dim: number of particles
+                             #second dim: all permutations for this n
                              for n in range(self.K + 1)]
+        #-> list of all possible configurations for a lattice site
+
         self.j = [np.dot(self.c, self.permutations[n][:, :self.velocitychannels].T) for n in range(self.K + 1)]
+        #dot product between the directions and the particles in the velocity channels for each possible number of particles
+        #array of flux for each permutation for each number of particles
+        #first dim: number of particles
+        #second dim: flux vector for each permutation (directions as specified in c)
+
         self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(2))[None, ...]
+        #I don't need this (I hope)
         self.si = [np.einsum('ij,jkl', self.permutations[n][:, :self.velocitychannels], self.cij) for n in
                    range(self.K + 1)]
-
+        #I don't need this (I hope)
 
 
 class IBLGCA_base(LGCA_base):
@@ -693,3 +711,59 @@ class IBLGCA_base(LGCA_base):
         line = plt.plot(x, y)
         errors = plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True, interpolate=True)
         return line, errors
+
+
+class LGCA_noVE_base(LGCA_base):
+    """
+    Base class for LGCA without volume exclusion.
+    """
+    def set_interaction(self, **kwargs):
+        try:
+            from .nove_interactions import alignment
+        except:
+            from nove_interactions import alignment
+        if 'interaction' in kwargs:
+            interaction = kwargs['interaction']
+            if interaction == 'alignment':
+                self.interaction = alignment
+                self.calc_permutations()
+
+                if 'beta' in kwargs:
+                    self.beta = kwargs['beta']
+                else:
+                    self.beta = 2.
+                    print('sensitivity set to beta = ', self.beta)
+            else:
+                print('interaction', kwargs['interaction'], 'is not defined! Alignment interaction used instead.')
+                print('Implemented interactions:', self.interactions)
+                self.interaction = alignment
+                self.calc_permutations()
+
+                if 'beta' in kwargs:
+                    self.beta = kwargs['beta']
+                else:
+                    self.beta = 2.
+                    print('sensitivity set to beta = ', self.beta)
+
+        else:
+            print('Alignment interaction is used.')
+            self.interaction = alignment
+            self.calc_permutations()
+
+            if 'beta' in kwargs:
+                self.beta = kwargs['beta']
+            else:
+                self.beta = 2.
+                print('sensitivity set to beta = ', self.beta)
+
+
+    def random_reset(self, density):
+        """
+
+        :param density:
+        :return:
+        """
+        print("Sorry, didn't do shit. Random reset not implemented yet.")
+        #self.nodes = npr.random(self.nodes.shape) < density this is the problem: gives back array of self.shape with boolean values
+        #self.apply_boundaries()
+        #self.update_dynamic_fields()
