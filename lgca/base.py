@@ -416,6 +416,7 @@ class IBLGCA_base(LGCA_base):
         """
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
         self.props = {}
+        self.offsprings = []
         self.set_bc(bc)
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
         self.density = density
