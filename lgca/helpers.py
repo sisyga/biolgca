@@ -601,7 +601,9 @@ def plot_sh_gi_hh(props, save=False, id=0, off=False):
     #     plt.ylim(0, np.exp(shanmax) * 1.1, 0.5)
 
     if save:
-        save_plot(fig, str(id) + '_comparing shannon, gini, hill2' + '.jpg')
+        filename = str(id) + '_comparing sh, gi, hh' + '.jpg'
+        plt.savefig(pathlib.Path('pictures').resolve() / filename, bbox_inches='tight')
+
 
 def plot_popsize(props, save=False, id=0, off=False):
     time = len(props)
