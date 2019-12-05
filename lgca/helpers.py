@@ -187,7 +187,7 @@ def mullerplot_extended(props, id=0, save=False, int_range=1, off=False):
         maxlab = len(props[0]) - 1
     else:
         maxlab = len(props[0]['num_off']) - 1
-    fig = plt.subplot()
+    fig, ax = plt.subplots()
     # xrange = range(0,tend, int_range)
     val = np.zeros((maxlab, tend))
     if off:
@@ -206,21 +206,15 @@ def mullerplot_extended(props, id=0, save=False, int_range=1, off=False):
         pop = val
     else:
         int_num = ((tend - 1) // int_range + 1)
-        print('tend', tend)
-        print('int_num', int_num)
         xrange = np.arange(0, tend, int_range) + int_range / 2
         xrange = np.append(np.append(np.zeros(1), xrange), tend)
-        print('range', xrange)
         mean_val = np.zeros((maxlab, int_num)) + -999
         for i in range(0, int_num):
-            print(i)
             for lab in range(0, maxlab):
                 mean_val[lab, i] = np.sum(val[lab, i * int_range:(i + 1) * int_range]) / int_range
-        #             print('meanval', mean_val[:,i])
         for lab in range(0, maxlab):
             mean_val[lab, int_num - 1] = \
                 np.sum(val[lab, (int_num - 1) * int_range:]) / (tend - (int_num - 1) * int_range)
-            print('meanval', mean_val[lab, int_num - 1])
 
         pop = np.zeros((maxlab, int_num + 2)) + -777
         pop[:, 0] = val[:, 0]
