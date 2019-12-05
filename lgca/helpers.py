@@ -181,11 +181,10 @@ def mullerplot(props, id=0, save=False):
     if save:
         save_plot(fig, str(id) + '_' + ' mullerplot' + '.jpg')
 
-def mullerplot_extended(props, id=0, save=False, int_range=1, zusatz=False, off=False):
+def mullerplot_extended(props, id=0, save=False, int_range=1, off=False):
     tend = len(props)
     if off:
         maxlab = len(props[0]) - 1
-
     else:
         maxlab = len(props[0]['num_off']) - 1
     fig = plt.subplot()
@@ -200,36 +199,33 @@ def mullerplot_extended(props, id=0, save=False, int_range=1, zusatz=False, off=
             for lab in range(0, maxlab):
                 val[lab, t] = props[t]['num_off'][lab + 1]
 
+    plt.xlabel('timesteps')
+
     if int_range == 1:
         xrange = range(0, tend)
         pop = val
-        plt.xlabel('timesteps')
-
     else:
         int_num = ((tend - 1) // int_range + 1)
-        xrange = range(0, int_num)
-
+        print('tend', tend)
+        print('int_num', int_num)
+        xrange = np.arange(0, tend, int_range) + int_range / 2
+        xrange = np.append(np.append(np.zeros(1), xrange), tend)
+        print('range', xrange)
         mean_val = np.zeros((maxlab, int_num)) + -999
-        for i in range(0, int_num - 1):
-            #     print(i*li, (i+1)*li-1)
+        for i in range(0, int_num):
+            print(i)
             for lab in range(0, maxlab):
                 mean_val[lab, i] = np.sum(val[lab, i * int_range:(i + 1) * int_range]) / int_range
+        #             print('meanval', mean_val[:,i])
         for lab in range(0, maxlab):
-            mean_val[lab, int_num - 1] =\
+            mean_val[lab, int_num - 1] = \
                 np.sum(val[lab, (int_num - 1) * int_range:]) / (tend - (int_num - 1) * int_range)
-        plt.xlabel('intervalls')
-        if zusatz:
-            xrange = np.zeros(int_num + 2)
-            for i in range(1, int_num + 1):
-                xrange[i] = i - 0.5
-            xrange[-1] = int_num
-            # print(xrange)
-            pop = np.zeros((maxlab, int_num + 2)) + -777
-            pop[:, 0] = val[:, 0]
-            pop[:, 1:-1] = mean_val
-            pop[:, -1] = val[:, -1]
-        else:
-            pop = mean_val
+            print('meanval', mean_val[lab, int_num - 1])
+
+        pop = np.zeros((maxlab, int_num + 2)) + -777
+        pop[:, 0] = val[:, 0]
+        pop[:, 1:-1] = mean_val
+        pop[:, -1] = val[:, -1]
 
     popdic = {str(i): pop[i] for i in range(0, maxlab)}
     data = pd.DataFrame(popdic, index=xrange)
@@ -249,14 +245,12 @@ def mullerplot_extended(props, id=0, save=False, int_range=1, zusatz=False, off=
     elif xrange[-1] >= 100:
         plt.xticks(np.arange(0, xrange[-1], 50))
 
-
-    plt.stackplot(xrange, *[data_perc[str(f)] for f in range(0, maxlab)],\
+    plt.stackplot(xrange, *[data_perc[str(f)] for f in range(0, maxlab)], \
                   labels=list(range(0, maxlab)))
     plt.show()
 
-
     if save:
-        save_plot(fig, str(id) + '_' + ' mullerplot' + '.jpg')
+        save_plot(fig, str(id) + '_' + ' mullerplot with il=' + str(int_range) + '.jpg')
 
 def entropies(props, order, plot=False, save_plot=False, id=0, off=False):
     time = len(props)
