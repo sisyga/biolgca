@@ -528,6 +528,12 @@ def plot_entropies_together(props, save=False, id=0):
     if save:
         save_plot(fig, str(id) + '_comparing entropies' + '.jpg')
 
+def make_patch_spines_invisible(ax):
+    ax.set_frame_on(True)
+    ax.patch.set_visible(False)
+    for sp in ax.spines.values():
+        sp.set_visible(False)
+
 def plot_sh_gi_hh(props, save=False, id=0, off=False):
     time = len(props)
     x = np.arange(0, time, 1)
@@ -535,25 +541,64 @@ def plot_sh_gi_hh(props, save=False, id=0, off=False):
     hh = hillnumber(props, order=2, off=off)
     gini = entropies(props, order=2, off=off)
 
-    fig, ax = plt.subplots()
-    plt.plot(x, shan, 'b-', label='Shannonindex')
-    plt.plot(x, gini, 'm:', label='GiniSimpsonindex')
-    plt.plot(x, hh, 'c--', label='Hillnumber of order 2')
+    fig, host = plt.subplots()
+    par1 = host.twinx()
+    par2 = host.twinx()
+    # Offset the right spine of par2.  The ticks and label have already been
+    # placed on the right by twinx above.
+    par2.spines["right"].set_position(("axes", 1.2))
+    # Having been created by twinx, par2 has its frame off, so the line of its
+    # detached spine is invisible.  First, activate the frame but make the patch
+    # and spines invisible.
+    make_patch_spines_invisible(par2)
+    # Second, show the right spine.
+    par2.spines["right"].set_visible(True)
 
+    p1, = host.plot(x, shan, "m", linewidth=0.7, label="Shannonindex")
+    p2, = par1.plot(x, gini, "b", linewidth=0.7, label="GiniSimpsonindex")
+    p3, = par2.plot(x, hh, "c", linewidth=0.7, label="Hillnumber of order 2")
 
-    ax.set(xlabel='timesteps', ylabel='Index')
-    ax.legend()
-    plt.xlim(0, time - 1)
-    if time <= 15:
-        plt.xticks(np.arange(0, time, 1))
-    elif time <= 100:
-        plt.xticks(np.arange(0, time, 5))
-    elif time >= 1000:
-        plt.xticks(np.arange(0, time, 500))
-    elif time >= 100:
-        plt.xticks(np.arange(0, time, 50))
-    plt.ylim(0, np.exp(shanmax) * 1.1, 0.5)
+    host.set_xlim(0, time - 1)
+    host.set_ylim(bottom=0)
+    par1.set_ylim(bottom=0)
+    par2.set_ylim(bottom=0)
+
+    host.set_xlabel("timesteps")
+    host.set_ylabel("Shannonindex")
+    par1.set_ylabel("GiniSimpsonindex")
+    par2.set_ylabel("Hillnumber of order 2")
+
+    host.yaxis.label.set_color(p1.get_color())
+    par1.yaxis.label.set_color(p2.get_color())
+    par2.yaxis.label.set_color(p3.get_color())
+
+    tkw = dict(size=4, width=1.5)
+    host.tick_params(axis='y', colors=p1.get_color(), **tkw)
+    par1.tick_params(axis='y', colors=p2.get_color(), **tkw)
+    par2.tick_params(axis='y', colors=p3.get_color(), **tkw)
+    host.tick_params(axis='x', **tkw)
+
+    lines = [p1, p2, p3]
+
+    host.legend(lines, [l.get_label() for l in lines])
     plt.show()
+
+    #     plt.plot(x, shan, 'b-', label='Shannonindex')
+    #     plt.plot(x, gini, 'm:', label='GiniSimpsonindex')
+    #     plt.plot(x, hh, 'c--', label='Hillnumber of order 2')
+
+    #     ax.set(xlabel='timesteps', ylabel='Index')
+    #     ax.legend()
+    #     plt.xlim(0, time - 1)
+    #     if time <= 15:
+    #         plt.xticks(np.arange(0, time, 1))
+    #     elif time <= 100:
+    #         plt.xticks(np.arange(0, time, 5))
+    #     elif time >= 1000:
+    #         plt.xticks(np.arange(0, time, 500))
+    #     elif time >= 100:
+    #         plt.xticks(np.arange(0, time, 50))
+    #     plt.ylim(0, np.exp(shanmax) * 1.1, 0.5)
 
     if save:
         save_plot(fig, str(id) + '_comparing shannon, gini, hill2' + '.jpg')
