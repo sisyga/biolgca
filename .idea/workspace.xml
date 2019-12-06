@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="32213427-7c52-44be-a10f-71fe23dbb93e" name="Default Changelist" comment="">
+    <list default="true" id="32213427-7c52-44be-a10f-71fe23dbb93e" name="Default Changelist" comment="work in progress">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/analysis t_hom.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/analysis t_hom.ipynb" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/analysis.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/analysis.ipynb" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lgca/next steps" beforeDir="false" afterPath="$PROJECT_DIR$/lgca/next steps" afterDir="false" />
     </list>
@@ -16,47 +15,22 @@
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/lgca/__init__.py">
+        <entry file="file://$PROJECT_DIR$/Containerfile_offs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="68">
-              <caret line="4" column="21" selection-start-line="4" selection-start-column="21" selection-end-line="4" selection-end-column="21" />
+            <state relative-caret-position="187">
+              <caret line="11" column="6" selection-start-line="11" selection-start-column="6" selection-end-line="11" selection-end-column="6" />
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/lgca/lgca_1d.py">
+        <entry file="file://$PROJECT_DIR$/offspring_script.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="2873">
-              <caret line="173" column="23" selection-start-line="173" selection-start-column="23" selection-end-line="173" selection-end-column="23" />
+            <state relative-caret-position="187">
+              <caret line="17" column="16" selection-start-line="17" selection-start-column="16" selection-end-line="17" selection-end-column="16" />
               <folding>
-                <element signature="e#0#33#0" expanded="true" />
-                <element signature="e#6222#6711#0" />
-                <element signature="e#6843#8233#0" />
-                <element signature="e#8291#9247#0" />
-                <element signature="e#9374#11147#0" />
-                <element signature="e#11384#13752#0" />
-                <element signature="e#13870#14839#0" />
-                <element signature="e#14873#15566#0" />
+                <element signature="e#0#25#0" expanded="true" />
               </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/lgca/ib_interactions.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="2635">
-              <caret line="157" column="15" selection-start-line="157" selection-start-column="15" selection-end-line="157" selection-end-column="15" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/skript.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="37">
-              <caret line="7" column="12" selection-start-line="7" selection-start-column="12" selection-end-line="7" selection-end-column="12" />
             </state>
           </provider>
         </entry>
@@ -64,8 +38,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/lgca/helpers.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="38">
-              <caret line="146" column="4" selection-start-line="146" selection-start-column="4" selection-end-line="146" selection-end-column="4" />
+            <state relative-caret-position="488">
+              <caret line="209" column="43" selection-start-line="209" selection-start-column="43" selection-end-line="209" selection-end-column="43" />
               <folding>
                 <element signature="e#0#18#0" expanded="true" />
                 <element signature="e#1725#3427#0" />
@@ -74,18 +48,60 @@
           </provider>
         </entry>
       </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/lgca/ib_interactions.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="-634">
+              <caret line="155" column="4" selection-start-line="155" selection-start-column="4" selection-end-line="155" selection-end-column="4" />
+            </state>
+          </provider>
+        </entry>
+      </file>
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/lgca/next steps">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="153">
-              <caret line="9" column="20" selection-start-line="9" selection-start-column="20" selection-end-line="9" selection-end-column="20" />
+            <state relative-caret-position="68">
+              <caret line="4" selection-start-line="4" selection-end-line="4" />
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/timeevo_until_hom.ipynb">
-          <provider selected="true" editor-type-id="jupyter-editor" />
+        <entry file="file://$PROJECT_DIR$/runner.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="17">
+              <caret line="29" column="9" selection-start-line="29" selection-start-column="3" selection-end-line="29" selection-end-column="9" />
+              <folding>
+                <element signature="e#0#18#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/lgca/lgca_1d.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="3502">
+              <caret line="248" column="33" selection-start-line="248" selection-start-column="33" selection-end-line="248" selection-end-column="33" />
+              <folding>
+                <element signature="e#0#33#0" expanded="true" />
+                <element signature="e#6222#6711#0" />
+                <element signature="e#6843#8233#0" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/lgca/base.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="6970">
+              <caret line="418" column="28" selection-start-line="418" selection-start-column="28" selection-end-line="418" selection-end-column="28" />
+              <folding>
+                <element signature="e#0#10#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
         </entry>
       </file>
     </leaf>
@@ -123,16 +139,20 @@
       <list>
         <option value="$PROJECT_DIR$/lgca/interactions.py" />
         <option value="$PROJECT_DIR$/lgca/schnubbs.py" />
-        <option value="$PROJECT_DIR$/lgca/base.py" />
         <option value="$PROJECT_DIR$/lgca/ib_interactions.py" />
         <option value="$PROJECT_DIR$/saved_data/placeholder.txt" />
         <option value="$PROJECT_DIR$/.gitignore" />
         <option value="$PROJECT_DIR$/pictures/placeholder.txt" />
         <option value="$APPLICATION_CONFIG_DIR$/scratches/scratch.py" />
-        <option value="$PROJECT_DIR$/lgca/lgca_1d.py" />
         <option value="$PROJECT_DIR$/try2.py" />
-        <option value="$PROJECT_DIR$/lgca/helpers.py" />
         <option value="$PROJECT_DIR$/skript.py" />
+        <option value="$PROJECT_DIR$/offspring_script.txt" />
+        <option value="$PROJECT_DIR$/Containerfile_offs" />
+        <option value="$PROJECT_DIR$/lgca/base.py" />
+        <option value="$PROJECT_DIR$/lgca/lgca_1d.py" />
+        <option value="$PROJECT_DIR$/offspring_script.py" />
+        <option value="$APPLICATION_CONFIG_DIR$/scratches/scratch_1.py" />
+        <option value="$PROJECT_DIR$/lgca/helpers.py" />
         <option value="$PROJECT_DIR$/lgca/next steps" />
       </list>
     </option>
@@ -148,17 +168,6 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="Scope">
-        <subPane subId="Scope 'Project Files'; set:Project Files; class com.intellij.psi.search.scope.ProjectFilesScope">
-          <expand>
-            <path>
-              <item name="biolgca" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\Franzi\PycharmProjects\biolgca" type="442cc68d:ScopeViewTreeModel$RootNode" />
-            </path>
-          </expand>
-          <select />
-        </subPane>
-      </pane>
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -184,6 +193,17 @@
           <select />
         </subPane>
       </pane>
+      <pane id="Scope">
+        <subPane subId="Scope 'Project Files'; set:Project Files; class com.intellij.psi.search.scope.ProjectFilesScope">
+          <expand>
+            <path>
+              <item name="biolgca" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
+              <item name="C:\Users\Franzi\PycharmProjects\biolgca" type="442cc68d:ScopeViewTreeModel$RootNode" />
+            </path>
+          </expand>
+          <select />
+        </subPane>
+      </pane>
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -196,6 +216,9 @@
     <property name="settings.editor.selected.configurable" value="web.server" />
   </component>
   <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\Franzi\PycharmProjects\biolgca" />
+    </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Users\Franzi\PycharmProjects\biolgca" />
     </key>
@@ -212,7 +235,54 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python.skript">
+  <component name="RunManager" selected="Python.scratch_1">
+    <configuration name="offspring_script (dim3, rc2, rep2)" type="PythonConfigurationType" factoryName="Python">
+      <module name="biolgca" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+        <env name="DIMS" value="3" />
+        <env name="RESTCHANNELS" value="2" />
+        <env name="REPETITIONS" value="2" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/offspring_script.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="offspring_script" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="biolgca" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/offspring_script.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <configuration name="scratch" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="biolgca" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -227,6 +297,28 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$APPLICATION_CONFIG_DIR$/scratches/scratch.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="scratch_1" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="biolgca" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$APPLICATION_CONFIG_DIR$/scratches" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$APPLICATION_CONFIG_DIR$/scratches/scratch_1.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -257,8 +349,17 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <list>
+      <item itemvalue="Python.offspring_script (dim3, rc2, rep2)" />
+      <item itemvalue="Python.offspring_script" />
+      <item itemvalue="Python.scratch" />
+      <item itemvalue="Python.skript" />
+      <item itemvalue="Python.scratch_1" />
+    </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.scratch_1" />
+        <item itemvalue="Python.offspring_script" />
         <item itemvalue="Python.skript" />
         <item itemvalue="Python.scratch" />
       </list>
@@ -309,6 +410,13 @@
       <workItem from="1574262431472" duration="4421000" />
       <workItem from="1574407414706" duration="717000" />
       <workItem from="1574414506704" duration="1557000" />
+      <workItem from="1574925483858" duration="2653000" />
+      <workItem from="1575357887718" duration="6813000" />
+      <workItem from="1575384232655" duration="3320000" />
+      <workItem from="1575388309743" duration="1072000" />
+      <workItem from="1575453491126" duration="1974000" />
+      <workItem from="1575475635640" duration="611000" />
+      <workItem from="1575531004430" duration="8683000" />
     </task>
     <task id="LOCAL-00001" summary="test">
       <created>1557323295951</created>
@@ -534,11 +642,116 @@
       <option name="project" value="LOCAL" />
       <updated>1574408093247</updated>
     </task>
-    <option name="localTasksCounter" value="33" />
+    <task id="LOCAL-00033" summary="add mullerplot_extended">
+      <created>1574854900238</created>
+      <option name="number" value="00033" />
+      <option name="presentableId" value="LOCAL-00033" />
+      <option name="project" value="LOCAL" />
+      <updated>1574854900238</updated>
+    </task>
+    <task id="LOCAL-00034" summary="add 'bc' in mullerplot_extended">
+      <created>1574930648180</created>
+      <option name="number" value="00034" />
+      <option name="presentableId" value="LOCAL-00034" />
+      <option name="project" value="LOCAL" />
+      <updated>1574930648180</updated>
+    </task>
+    <task id="LOCAL-00035" summary="add scatter_plot in jupyter">
+      <created>1575362771490</created>
+      <option name="number" value="00035" />
+      <option name="presentableId" value="LOCAL-00035" />
+      <option name="project" value="LOCAL" />
+      <updated>1575362771490</updated>
+    </task>
+    <task id="LOCAL-00036" summary="add offspring option in mullerplot extended">
+      <created>1575367752903</created>
+      <option name="number" value="00036" />
+      <option name="presentableId" value="LOCAL-00036" />
+      <option name="project" value="LOCAL" />
+      <updated>1575367752903</updated>
+    </task>
+    <task id="LOCAL-00037" summary="add offspring option in entropies, hill and popsize">
+      <created>1575372669274</created>
+      <option name="number" value="00037" />
+      <option name="presentableId" value="LOCAL-00037" />
+      <option name="project" value="LOCAL" />
+      <updated>1575372669274</updated>
+    </task>
+    <task id="LOCAL-00038" summary="add offspring_script">
+      <created>1575385058246</created>
+      <option name="number" value="00038" />
+      <option name="presentableId" value="LOCAL-00038" />
+      <option name="project" value="LOCAL" />
+      <updated>1575385058246</updated>
+    </task>
+    <task id="LOCAL-00039" summary="finished offspring_script">
+      <created>1575386249993</created>
+      <option name="number" value="00039" />
+      <option name="presentableId" value="LOCAL-00039" />
+      <option name="project" value="LOCAL" />
+      <updated>1575386249993</updated>
+    </task>
+    <task id="LOCAL-00040" summary="new container file">
+      <created>1575386410268</created>
+      <option name="number" value="00040" />
+      <option name="presentableId" value="LOCAL-00040" />
+      <option name="project" value="LOCAL" />
+      <updated>1575386410268</updated>
+    </task>
+    <task id="LOCAL-00041" summary="fixed script">
+      <created>1575388372260</created>
+      <option name="number" value="00041" />
+      <option name="presentableId" value="LOCAL-00041" />
+      <option name="project" value="LOCAL" />
+      <updated>1575388372260</updated>
+    </task>
+    <task id="LOCAL-00042" summary="fix">
+      <created>1575388779851</created>
+      <option name="number" value="00042" />
+      <option name="presentableId" value="LOCAL-00042" />
+      <option name="project" value="LOCAL" />
+      <updated>1575388779851</updated>
+    </task>
+    <task id="LOCAL-00043" summary="fixed offsprings">
+      <created>1575454495641</created>
+      <option name="number" value="00043" />
+      <option name="presentableId" value="LOCAL-00043" />
+      <option name="project" value="LOCAL" />
+      <updated>1575454495641</updated>
+    </task>
+    <task id="LOCAL-00044" summary="multiple yaxis for sh_gi_hh">
+      <created>1575534173714</created>
+      <option name="number" value="00044" />
+      <option name="presentableId" value="LOCAL-00044" />
+      <option name="project" value="LOCAL" />
+      <updated>1575534173714</updated>
+    </task>
+    <task id="LOCAL-00045" summary="fix saving in sh_gi_hh">
+      <created>1575536203793</created>
+      <option name="number" value="00045" />
+      <option name="presentableId" value="LOCAL-00045" />
+      <option name="project" value="LOCAL" />
+      <updated>1575536203793</updated>
+    </task>
+    <task id="LOCAL-00046" summary="fix xaxis in mull_ext">
+      <created>1575539115901</created>
+      <option name="number" value="00046" />
+      <option name="presentableId" value="LOCAL-00046" />
+      <option name="project" value="LOCAL" />
+      <updated>1575539115901</updated>
+    </task>
+    <task id="LOCAL-00047" summary="worked on option to save plots">
+      <created>1575553199604</created>
+      <option name="number" value="00047" />
+      <option name="presentableId" value="LOCAL-00047" />
+      <option name="project" value="LOCAL" />
+      <updated>1575553199604</updated>
+    </task>
+    <option name="localTasksCounter" value="48" />
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="117078000" />
+    <option name="totallyTimeSpent" value="147098000" />
   </component>
   <component name="TodoView">
     <todo-panel id="selected-file">
@@ -554,10 +767,10 @@
     <editor active="true" />
     <layout>
       <window_info id="Favorites" order="0" side_tool="true" />
-      <window_info active="true" content_ui="combo" id="Project" order="1" visible="true" weight="0.24508321" />
+      <window_info active="true" content_ui="combo" id="Project" order="1" visible="true" weight="0.15279879" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" weight="0.32850242" />
-      <window_info anchor="bottom" id="Run" order="2" weight="0.8760064" />
+      <window_info anchor="bottom" id="Run" order="2" weight="0.37037036" />
       <window_info anchor="bottom" id="Debug" order="3" sideWeight="0.49848714" weight="0.4363929" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
@@ -567,7 +780,7 @@
       <window_info anchor="bottom" id="Version Control" order="9" weight="0.32850242" />
       <window_info anchor="bottom" id="Event Log" order="10" sideWeight="0.5015129" side_tool="true" weight="0.39774558" />
       <window_info anchor="bottom" id="Terminal" order="11" weight="0.32850242" />
-      <window_info anchor="bottom" id="Python Console" order="12" />
+      <window_info anchor="bottom" id="Python Console" order="12" weight="0.32850242" />
       <window_info anchor="bottom" id="Jupyter" order="13" sideWeight="0.49924356" weight="0.32850242" />
       <window_info anchor="right" id="SciView" order="0" weight="0.32980332" />
       <window_info anchor="right" id="Database" order="1" />
@@ -645,21 +858,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="debug" />
-    <MESSAGE value="merge" />
-    <MESSAGE value="simulations" />
-    <MESSAGE value="bar_stacked_relative -&gt; lgca_1d.py" />
-    <MESSAGE value="add hillnumbers, shannon and simpson" />
-    <MESSAGE value="add save+plot option for entropies and hillnumbers" />
-    <MESSAGE value="add plot popsize" />
-    <MESSAGE value="add plots of entropie and hill" />
-    <MESSAGE value="delete old simpsonindex" />
-    <MESSAGE value="add saving options" />
-    <MESSAGE value="update entropies and hillnumbers" />
-    <MESSAGE value="update inheritance" />
-    <MESSAGE value="begin timeevo until homogeneity" />
-    <MESSAGE value="update timeevo until homogeneity" />
-    <MESSAGE value="update bar_stacked" />
     <MESSAGE value="update bar stacked relative" />
     <MESSAGE value="new TODOs" />
     <MESSAGE value="fix gitignore" />
@@ -670,11 +868,29 @@
     <MESSAGE value="add mullerplot" />
     <MESSAGE value="working on analysis things" />
     <MESSAGE value="work in progress" />
-    <option name="LAST_COMMIT_MESSAGE" value="work in progress" />
+    <MESSAGE value="add mullerplot_extended" />
+    <MESSAGE value="add 'bc' in mullerplot_extended" />
+    <MESSAGE value="add scatter_plot in jupyter" />
+    <MESSAGE value="add offspring option in mullerplot extended" />
+    <MESSAGE value="add offspring option in entropies, hill and popsize" />
+    <MESSAGE value="add offspring_script" />
+    <MESSAGE value="finished offspring_script" />
+    <MESSAGE value="new container file" />
+    <MESSAGE value="fixed script" />
+    <MESSAGE value="fix" />
+    <MESSAGE value="fixed offsprings" />
+    <MESSAGE value="multiple yaxis for sh_gi_hh" />
+    <MESSAGE value="fix saving in sh_gi_hh" />
+    <MESSAGE value="fix xaxis in mull_ext" />
+    <MESSAGE value="worked on option to save plots" />
+    <option name="LAST_COMMIT_MESSAGE" value="worked on option to save plots" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/biolgca$skript.coverage" NAME="skript Coverage Results" MODIFIED="1574326791300" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/biolgca$scratch_1.coverage" NAME="scratch_1 Coverage Results" MODIFIED="1575534702404" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
+    <SUITE FILE_PATH="coverage/biolgca$skript.coverage" NAME="skript Coverage Results" MODIFIED="1574777365932" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/biolgca$scratch.coverage" NAME="scratch Coverage Results" MODIFIED="1573504660323" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
+    <SUITE FILE_PATH="coverage/biolgca$offspring_script__mit_env_.coverage" NAME="offspring_script (dim3, rc2, rep2) Coverage Results" MODIFIED="1575454447049" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/biolgca$offspring_script.coverage" NAME="offspring_script Coverage Results" MODIFIED="1575384800620" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
   <component name="editorHistoryManager">
     <entry file="file://$PROJECT_DIR$/lgca/lgca_hex.py">
@@ -714,13 +930,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/saved_data/placeholder.txt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state>
-          <caret column="26" lean-forward="true" selection-start-column="26" selection-end-column="26" />
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/saved_data/placeholder.txt" />
     <entry file="file://$PROJECT_DIR$/.gitignore">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="497">
@@ -758,26 +968,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/lgca/base.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="5678">
-          <caret line="342" column="17" selection-start-line="342" selection-start-column="17" selection-end-line="342" selection-end-column="17" />
-          <folding>
-            <element signature="e#0#10#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/try2.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="153">
-          <caret line="30" selection-start-line="30" selection-end-line="30" />
-          <folding>
-            <element signature="e#0#31#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/BioLGCA.ipynb">
       <provider selected="true" editor-type-id="jupyter-editor" />
     </entry>
@@ -787,6 +977,20 @@
     <entry file="file://$PROJECT_DIR$/Speicherprobe.ipynb">
       <provider selected="true" editor-type-id="jupyter-editor" />
     </entry>
+    <entry file="file://$PROJECT_DIR$/timeevo_until_hom.ipynb">
+      <provider selected="true" editor-type-id="jupyter-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/try2.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="321">
+          <caret line="30" selection-start-line="30" selection-end-line="30" />
+          <folding>
+            <element signature="e#0#31#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Untitled.ipynb" />
     <entry file="file://$PROJECT_DIR$/lgca/__init__.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="68">
@@ -794,44 +998,79 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/lgca/lgca_1d.py">
+    <entry file="file://$PROJECT_DIR$/skript.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="2873">
-          <caret line="173" column="23" selection-start-line="173" selection-start-column="23" selection-end-line="173" selection-end-column="23" />
+        <state relative-caret-position="187">
+          <caret line="15" column="20" selection-start-line="15" selection-start-column="20" selection-end-line="15" selection-end-column="20" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Containerfile">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/Containerfile_offs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="187">
+          <caret line="11" column="6" selection-start-line="11" selection-start-column="6" selection-end-line="11" selection-end-column="6" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/offspring_script.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="187">
+          <caret line="17" column="16" selection-start-line="17" selection-start-column="16" selection-end-line="17" selection-end-column="16" />
           <folding>
-            <element signature="e#0#33#0" expanded="true" />
-            <element signature="e#6222#6711#0" />
-            <element signature="e#6843#8233#0" />
-            <element signature="e#8291#9247#0" />
-            <element signature="e#9374#11147#0" />
-            <element signature="e#11384#13752#0" />
-            <element signature="e#13870#14839#0" />
-            <element signature="e#14873#15566#0" />
+            <element signature="e#0#25#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/lgca/ib_interactions.py">
+    <entry file="file://$PROJECT_DIR$/lgca/lgca_1d.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="2635">
-          <caret line="157" column="15" selection-start-line="157" selection-start-column="15" selection-end-line="157" selection-end-column="15" />
+        <state relative-caret-position="3502">
+          <caret line="248" column="33" selection-start-line="248" selection-start-column="33" selection-end-line="248" selection-end-column="33" />
+          <folding>
+            <element signature="e#0#33#0" expanded="true" />
+            <element signature="e#6222#6711#0" />
+            <element signature="e#6843#8233#0" />
+          </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/timeevo_until_hom.ipynb">
-      <provider selected="true" editor-type-id="jupyter-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/skript.py">
+    <entry file="file://$PROJECT_DIR$/lgca/base.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="37">
-          <caret line="7" column="12" selection-start-line="7" selection-start-column="12" selection-end-line="7" selection-end-column="12" />
+        <state relative-caret-position="6970">
+          <caret line="418" column="28" selection-start-line="418" selection-start-column="28" selection-end-line="418" selection-end-column="28" />
+          <folding>
+            <element signature="e#0#10#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/runner.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="17">
+          <caret line="29" column="9" selection-start-line="29" selection-start-column="3" selection-end-line="29" selection-end-column="9" />
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$APPLICATION_CONFIG_DIR$/scratches/scratch_1.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="357">
+          <caret line="36" column="16" lean-forward="true" selection-start-line="36" selection-start-column="16" selection-end-line="36" selection-end-column="16" />
+          <folding>
+            <element signature="e#0#25#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/lgca/helpers.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="38">
-          <caret line="146" column="4" selection-start-line="146" selection-start-column="4" selection-end-line="146" selection-end-column="4" />
+        <state relative-caret-position="488">
+          <caret line="209" column="43" selection-start-line="209" selection-start-column="43" selection-end-line="209" selection-end-column="43" />
           <folding>
             <element signature="e#0#18#0" expanded="true" />
             <element signature="e#1725#3427#0" />
@@ -839,10 +1078,17 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/lgca/ib_interactions.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-634">
+          <caret line="155" column="4" selection-start-line="155" selection-start-column="4" selection-end-line="155" selection-end-column="4" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/lgca/next steps">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="153">
-          <caret line="9" column="20" selection-start-line="9" selection-start-column="20" selection-end-line="9" selection-end-column="20" />
+        <state relative-caret-position="68">
+          <caret line="4" selection-start-line="4" selection-end-line="4" />
         </state>
       </provider>
     </entry>
