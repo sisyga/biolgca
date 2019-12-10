@@ -13,7 +13,7 @@ class LGCA_1D(LGCA_base):
     interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation', 'parameter_controlled_diffusion',
                     'random_walk', 'persistent_motion', 'birthdeath']
     velocitychannels = 2
-    c = np.array([1., -1.])[None, ...]
+    c = np.array([1., -1.])[None, ...] #directions of velocity channels; shape: (1,2)
 
     def set_dims(self, dims=None, nodes=None, restchannels=0):
         if nodes is not None:
@@ -242,9 +242,7 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
     """
     1D version of an LGCA without volume exclusion.
     """
-    interactions = ['alignment']
-
-    c = np.array([1., -1.])[None, ...] #directions of velocity channels; shape: (1,2)
+    interactions = ['dd_alignment', 'di_alignment']
 
     def set_dims(self, dims=None, nodes=None, restchannels=0): # changed to not allow resting channels
         # works with the current default values in the _init_() method/here
@@ -289,8 +287,6 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
             figsize = estimate_figsize(density_t.T, cbar=True)
 
         max_part_per_cell = int(density_t.max()) #alternatively plot using the expected density - number of particles in total / lattice sites
-        print(max_part_per_cell)
-        print(int(max_part_per_cell))
         fig = plt.figure(num=figindex, figsize=figsize)
         ax = fig.add_subplot(111)
         cmap = cmap_discretize(cmap, max_part_per_cell + 1) #todo adjust number of colours
@@ -312,8 +308,6 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         dens_t = nodes_t.sum(-1) / nodes_t.shape[-1]
         tmax, l = dens_t.shape
         flux_t = nodes_t[..., 0].astype(int) - nodes_t[..., 1].astype(int)
-        print("Flux:")
-        print(flux_t[60:81])
         if figsize is None:
             figsize = estimate_figsize(dens_t.T)
 
