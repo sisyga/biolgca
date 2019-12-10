@@ -20,11 +20,12 @@ import numpy as np
 #lgca.set_interaction(interaction='alignment', beta=3.0)
 #alignment interaction needs beta parameter; default: 2
 
-nodes = np.array([[0,0],[2,0],[0,0],[4,0],[1,0],[0,0],[0,0],[0,0],[0,0],[30,0],[14,0],[0,0]])
+#nodes = np.array([[0,0],[2,0],[0,0],[4,0],[1,0],[0,0],[0,0],[0,0],[0,0],[30,0],[14,0],[0,0]])
+nodes = np.array([[0,0],[0,0],[0,0],[0,0],[0,1],[1,0],[3,0],[0,0]])
 
 """INITIAL STATE"""
 #lgca2 = get_lgca(density=0.1, dims=10, geometry='lin', ve=True, bc='refl', interaction='go_and_grow')
-lgca2 = get_lgca(density=0.1, ve=False, geometry='lin', bc='refl', interaction='go_and_grow', nodes=nodes)
+lgca2 = get_lgca(density=0.1, ve=False, geometry='lin', bc='refl', interaction='di_alignment', nodes=nodes, beta=2.0)
 #default: homogeneous with constant mean density: density=
 #TODO: set random seed to reproduce results?
 #restchannels=
@@ -43,7 +44,8 @@ lgca2 = get_lgca(density=0.1, ve=False, geometry='lin', bc='refl', interaction='
 # record=True: record all configurations
 # recorddens=True: record the density profile; default
 # recordN=True: record total number of cells
-lgca2.timeevo(timesteps=100, record=True)
+lgca2.print_nodes()
+lgca2.timeevo(timesteps=4, record=True)
 #print("Print nodes")
 lgca2.print_nodes()
 #print("plot density")

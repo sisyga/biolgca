@@ -408,6 +408,7 @@ class LGCA_base():
             self.dens_t = np.zeros((timesteps + 1,) + self.dims)
             self.dens_t[0, ...] = self.cell_density[self.nonborder]
         for t in range(1, timesteps + 1):
+            print("\nTimestep: {}".format(t))
             self.timestep()
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.nonborder]
