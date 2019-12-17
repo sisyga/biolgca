@@ -58,15 +58,16 @@ def di_alignment(lgca):
     # # should be included. Returns only the relevant elements and coords is a list here
     g = lgca.calc_flux(lgca.nodes)  # calculates flux for each lattice site
     g = lgca.nb_sum(g)  # calculates sum of flux of neighbors for each lattice site
-    print(g)
+    #print(g)
     # 1st dim: nodes
     # 2nd dim: flux vectors
     nsum = lgca.nb_sum(lgca.cell_density)[None, ...]
-    print(nsum.T)
+    np.maximum(nsum, 1, out=nsum)
+    #print(nsum.T)
     g = g/ nsum.T
-    print(g)
-    print("Before:")
-    lgca.print_nodes()
+    #print(g)
+    #print("Before:")
+    #lgca.print_nodes()
     for coord in zip(*coords): #Todo: can do all at once?
         n = lgca.cell_density[coord]
     #     permutations = lgca.permutations[n]
@@ -74,17 +75,17 @@ def di_alignment(lgca):
         weights = np.exp(lgca.beta * np.einsum('i,ij', g[coord], lgca.c)) #TODO: make it appropriate for >1D
         z = weights.sum()
         weights = (weights / z)
-        print("Coord:")
-        print(coord)
-        print("Weights:")
-        print(weights)
+        #print("Coord:")
+        #print(coord)
+        #print("Weights:")
+        #print(weights)
         sample = npr.choice(lgca.c[0], size=(n,), replace=True, p=weights) #TODO: only works for 1D
-        print("Sample:")
-        print(sample)
+        #print("Sample:")
+        #print(sample)
         #direction, counts = np.unique(sample, return_counts=True)
         newnodes[coord] = np.array([np.count_nonzero(sample == 1), np.count_nonzero(sample == -1)]) #TODO: only works for 1D
         # multiply neighborhood flux with the flux for each possible direction
         # np.exp for probability
     lgca.nodes = newnodes
-    print("After:")
-    lgca.print_nodes()
+    #print("After:")
+    #lgca.print_nodes()

@@ -274,13 +274,13 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
     def init_nodes(self, density, nodes=None):
         self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.uint)
         if nodes is None:
-            self.random_reset(density)  # TODO!
+            self.random_reset(density)
 
         else:
             self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.uint)
 
 
-    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='hot_r'):
+    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis_r'):
         if density_t is None:
             density_t = self.dens_t
         if figsize is None:
@@ -326,7 +326,34 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         ax.xaxis.tick_top()
         plt.tight_layout()
         return plot
-
+    
+    
+    # TODO!!!
+    def plot_flux_fancy(self, nodes_t=None, figindex=None, figsize=None, cmap='bwr'):
+        if nodes_t is None:
+            nodes_t = self.nodes_t
+        if figsize is None:
+            figsize = estimate_figsize(self.dens_t.T, cbar=True)
+            
+        tmax, l = self.dens_t.shape
+        flux_t = self.calc_flux(nodes_t[..., 0].astype(int))
+        max_flux_per_cell = int(flux_t.max())
+        min_flux_per_cell = int(flux_t.min())
+            
+        fig = plt.figure(num=figindex, figsize=figsize)
+        ax = fig.add_subplot(111)
+        cmap = cmap_discretize(cmap, max_flux_per_cell - min_flux_per_cell + 1) #todo adjust number of colours
+        plot = ax.imshow(flux_t, interpolation='None', vmin=min_flux_per_cell, vmax=max_flux_per_cell, cmap=cmap) #TODO adjust vmax
+        cbar = colorbar_index(ncolors=max_flux_per_cell - min_flux_per_cell + 1, cmap=cmap, use_gridspec=True) #todo adjust ncolors
+        
+        plt.xlabel(r'Lattice node $r \, [\varepsilon]$', )
+        plt.ylabel(r'Time step $k \, [\tau]$')
+        ax.xaxis.set_label_position('top')
+        ax.xaxis.set_ticks_position('top')
+        ax.xaxis.tick_top()
+        plt.tight_layout()
+        return plot
+       
 
 if __name__ == '__main__':
     l = 100
