@@ -3,6 +3,7 @@ from copy import deepcopy as copy
 
 import matplotlib.colors as mcolors
 import numpy as np
+import math
 from matplotlib import pyplot as plt
 from matplotlib.cm import ScalarMappable
 from numpy import random as npr
@@ -408,7 +409,7 @@ class LGCA_base():
             self.dens_t = np.zeros((timesteps + 1,) + self.dims)
             self.dens_t[0, ...] = self.cell_density[self.nonborder]
         for t in range(1, timesteps + 1):
-            print("\nTimestep: {}".format(t))
+            #print("\nTimestep: {}".format(t))
             self.timestep()
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.nonborder]
@@ -773,7 +774,28 @@ class LGCA_noVE_base(LGCA_base):
         :param density:
         :return:
         """
-        print("Sorry, didn't do shit. Random reset not implemented yet.")
-        #self.nodes = npr.random(self.nodes.shape) < density this is the problem: gives back array of self.shape with boolean values
-        #self.apply_boundaries()
-        #self.update_dynamic_fields()
+        
+        # if I program this like Josue did, I can only get 1 or 0 new particle per channel in the random step
+        ##################################
+        """
+        density_below_zero, density = math.modf(density)
+        density = abs(int(density))
+        #noparticles = density * self.K * self. l
+        if density == 0:
+            self.nodes = np.zeros(self.nodes.shape, dtype=np.uint)
+        else:
+            self.nodes = np.ones(self.nodes.shape, dtype=np.uint) * density
+        newparts = npr.random(self.nodes.shape) < density
+        self.nodes = self.nodes + newparts
+        """
+        ##################################
+        
+        # I can also sample with a Poisson distribution with parameter density
+        density = abs(density)
+        self.nodes = npr.poisson(lam=density, size=self.nodes.shape)
+        
+        effective_dens = self.nodes.sum()/(self.K * self.l)
+        #print("Required density: {}, Achieved density: {}".format(density, effective_dens))
+        self.eff_dens = effective_dens
+        self.apply_boundaries()
+        self.update_dynamic_fields()
