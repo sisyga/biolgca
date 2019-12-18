@@ -122,6 +122,10 @@ class LGCA_base():
         self.set_interaction(**kwargs)
         self.cell_density = self.nodes.sum(-1)
         self.apply_boundaries()
+        print(kwargs)
+        if 've' in kwargs:
+            print("Yep!")
+            self.ve = kwargs['ve']
 
     def set_r_int(self, r):
         self.r_int = r

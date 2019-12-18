@@ -1,7 +1,7 @@
 def get_lgca(geometry='hex', ib=False, ve=True, **kwargs):
     if not ve:
         from .lgca_1d import LGCA_noVE_1D
-        return LGCA_noVE_1D(**kwargs)
+        return LGCA_noVE_1D(**kwargs, ve=ve)
 
     if ib:
         if geometry in ['1d', 'lin', 'linear']:
