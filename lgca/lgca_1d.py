@@ -129,7 +129,7 @@ class LGCA_1D(LGCA_base):
     #         if showprogress:
     #             update_progress(1.0 * t / timesteps)
 
-    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='hot_r'):
+    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis_r'): #cmap='hot_r')
         if density_t is None:
             density_t = self.dens_t
         if figsize is None:
@@ -148,6 +148,9 @@ class LGCA_1D(LGCA_base):
         plt.ylabel(r'Time step $k \, (\tau)$')
         ax.xaxis.set_label_position('top')
         ax.xaxis.tick_top()
+        plt.title("Density plot.\n VE: True  Align: " + self.interaction.__name__ + "  BC: " + self.apply_boundaries.__name__ + "\n Dims: " + str(
+            self.dims) + "  Dens: " + str(self.nodes.sum()/(self.K * self.l)) + "  Beta: " + str(self.beta))
+
         plt.tight_layout()
         return plot
 
@@ -280,7 +283,7 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
             self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.uint)
 
 
-    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis_r'):
+    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis_r'): #cmap='hot_r'
         if density_t is None:
             density_t = self.dens_t
         if figsize is None:
@@ -297,6 +300,7 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         plt.ylabel(r'Time step $k \, (\tau)$')
         ax.xaxis.set_label_position('top')
         ax.xaxis.tick_top()
+        plt.title("Density plot.\n VE: False  Align: " + self.interaction.__name__ + "  BC: " + self.apply_boundaries.__name__ + "\n Dims: " + str(self.dims) + "  Dens: " + str(self.eff_dens) + "  Beta: " + str(self.beta))
         plt.tight_layout()
         return plot
 
