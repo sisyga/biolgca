@@ -242,8 +242,11 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                 new_nodes[0] = self.nodes[self.r_int:-self.r_int]
                 self.nodes_t = np.vstack((self.nodes_t, new_nodes))
                 self.props_t.append(copy(self.props['num_off']))
+            #TODO: label Verfolgung wieder aktivieren!
+
             if offsprings:
                 self.offsprings.append(copy(self.props)['num_off'])
+
             if chronicle:
                 print('props_t', self.props_t)
                 print('nodes_t', self.nodes_t)
@@ -338,7 +341,8 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                         if lab == 0:
                             val[t, x*k + pos * (k - 1)] = None
                         else:
-                            val[t, x*k + pos * (k-1)] = props_t[t][prop][lab]
+                            val[t, x*k + pos * (k - 1)] = props_t[t][prop][lab]
+
                     else:
                         if lab == 0:
                             val[t, x*k + pos - 1] = None
