@@ -26,10 +26,7 @@ def tanh_switch(rho, kappa=5., theta=0.8):
     return 0.5 * (1 + np.tanh(kappa * (rho - theta)))
 
 def ent_prod(x):
-    if x <= 0:
-        return 0.
-
-    return x * log(x)
+    return x * np.log(x, where=x > 0, out=np.zeros_like(x, dtype=float))
 
 
 def random_walk(lgca):
@@ -305,10 +302,10 @@ def go_or_grow(lgca):
         j_2 = npr.binomial(M2[coord], 1 - tanh_switch(rho, kappa=lgca.kappa, theta=lgca.theta))
         n_mxy += j_2 - j_1
         n_rxy += j_1 - j_2
-        n_mxy -= npr.binomial(n_mxy * np.heaviside(n_mxy, 0), lgca.r_d)
-        n_rxy -= npr.binomial(n_rxy * np.heaviside(n_rxy, 0), lgca.r_d)
+        n_mxy -= npr.binomial(n_mxy, lgca.r_d)
+        n_rxy -= npr.binomial(n_rxy, lgca.r_d)
         M = min([n_rxy, lgca.restchannels - n_rxy])
-        n_rxy += npr.binomial(M * np.heaviside(M, 0), lgca.r_b)
+        n_rxy += npr.binomial(M, lgca.r_b)
 
         v_channels = [1] * n_mxy + [0] * (lgca.velocitychannels - n_mxy)
         v_channels = npr.permutation(v_channels)
@@ -320,45 +317,79 @@ def go_or_grow(lgca):
 
 def leup_test(lgca):
     """
-    interactions of the go-or-grow model.
+    Go-or-grow with least-environmental uncertainty principle. cells try to minimize their entropy with the environment,
+    by changing their state between moving and resting. resting cells can proliferate. all cells die at a constant rate.
     :return:
     """
+    # if lgca.r_b > 0: # or lgca.r_d > 0:
+    #     n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
+    #     n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
+    #     birth = npr.random(n_r.shape + (lgca.restchannels, )) < lgca.r_b * n_r[..., None] / lgca.restchannels
+    #     death = npr.random(n_r.shape + (lgca.restchannels, )) < lgca.r_b * n_m[..., None] / lgca.velocitychannels
+    #     ds = (1 - lgca.nodes[..., lgca.velocitychannels:]) * birth - lgca.nodes[..., lgca.velocitychannels:] * death
+    #     np.add(lgca.nodes[..., lgca.velocitychannels:], ds, out=lgca.nodes[..., lgca.velocitychannels:], casting='unsafe')
+    #     lgca.update_dynamic_fields()
+
+    if lgca.r_b > 0: # or lgca.r_d > 0:
+        n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
+        n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
+        birth = npr.random(lgca.nodes.shape) < lgca.r_b * n_r[..., None] / lgca.restchannels
+        death = npr.random(birth.shape) < lgca.r_d * (n_r[..., None] / lgca.restchannels + n_m[..., None] / lgca.velocitychannels)
+        ds = (1 - lgca.nodes) * birth - lgca.nodes * death
+        np.add(lgca.nodes, ds, out=lgca.nodes, casting='unsafe')
+        lgca.update_dynamic_fields()
+
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & (lgca.cell_density[lgca.nonborder] < lgca.K)
     coords = [a[relevant] for a in lgca.nonborder]
+    n = lgca.cell_density
     n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
     n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
     M1 = np.minimum(n_m, lgca.restchannels - n_r)
     M2 = np.minimum(n_r, lgca.velocitychannels - n_m)
-    for coord in zip(*coords):
-        # node = lgca.nodes[coord]
-        n = lgca.cell_density[coord]
+    s = ent_prod(n_r) + ent_prod(n_m)
+    ds1 = np.divide(s - ent_prod(n_r + 1) - ent_prod(n_m - 1), n, where=n > 0)
+    p1 = 1 / (1 + np.exp(lgca.beta * ds1))
+    ds2 = np.divide(s - ent_prod(n_r - 1) - ent_prod(n_m + 1), n, where=n > 0)
+    p2 = 1 / (1 + np.exp(lgca.beta * ds2))
+    try:
+        j_1 = npr.binomial(M1, p1)
 
+    except:
+        print('Error!')
+        ind = np.isnan(p1) | (p1 > 0) | (p1 > 0)
+        print(M1[ind], p1[ind])
+
+    j_2 = npr.binomial(M2, p2)
+    n_m += j_2 - j_1
+    n_r += j_1 - j_2
+
+    for coord in zip(*coords):
+        # # node = lgca.nodes[coord]
+        # n = lgca.cell_density[coord]
+        #
         n_mxy = n_m[coord]
         n_rxy = n_r[coord]
+        #
+        # s = ent_prod(n_rxy) + ent_prod(n_mxy)
+        # ds1 = (s - ent_prod(n_rxy+1) - ent_prod(n_mxy-1)) / n
+        # p1 = 1 / (1 + exp(lgca.beta * ds1))
+        # # switch to velocity channel
+        # ds2 = (s - ent_prod(n_rxy-1) - ent_prod(n_mxy+1)) / n
+        # p2 = 1 / (1 + exp(lgca.beta * ds2))
+        #
+        # j_1 = npr.binomial(M1[coord], p1)
+        # j_2 = npr.binomial(M2[coord], p2)
+        # n_mxy += j_2 - j_1
+        # n_rxy += j_1 - j_2
+        v_channels = npr.choice(lgca.velocitychannels, n_mxy, replace=False)
 
-        # rho = n / lgca.K
-        # switch to rest channel
-        s = ent_prod(n_rxy) + ent_prod(n_mxy)
-        ds1 = (s - ent_prod(n_rxy+1) - ent_prod(n_mxy-1)) / n
-        p1 = 1 / (1 + exp(lgca.beta * ds1))
-        # switch to velocity channel
-        ds2 = (s - ent_prod(n_rxy-1) - ent_prod(n_mxy+1)) / n
-        p2 = 1 / (1 + exp(lgca.beta * ds2))
-        # print(p1, p2)
-
-
-        j_1 = npr.binomial(M1[coord], p1)
-        j_2 = npr.binomial(M2[coord], p2)
-        n_mxy += j_2 - j_1
-        n_rxy += j_1 - j_2
-        n_mxy -= npr.binomial(n_mxy * np.heaviside(n_mxy, 0), lgca.r_d)
-        n_rxy -= npr.binomial(n_rxy * np.heaviside(n_rxy, 0), lgca.r_d)
-        M = min([n_rxy, lgca.restchannels - n_rxy])
-        n_rxy += npr.binomial(M * np.heaviside(M, 0), lgca.r_b)
-
-        v_channels = [1] * n_mxy + [0] * (lgca.velocitychannels - n_mxy)
-        v_channels = npr.permutation(v_channels)
-        r_channels = np.zeros(lgca.restchannels)
-        r_channels[:n_rxy] = 1
-        node = np.hstack((v_channels, r_channels))
+        # v_channels = [1] * n_mxy + [0] * (lgca.velocitychannels - n_mxy)
+        # v_channels = npr.permutation(v_channels)
+        # r_channels = np.zeros(lgca.restchannels)
+        # r_channels[:n_rxy] = 1
+        node = np.zeros(lgca.K, dtype='bool')
+        node[v_channels] = 1
+        node[lgca.velocitychannels:lgca.velocitychannels + n_rxy] = 1
+        # node = np.hstack((v_channels, r_channels))
         lgca.nodes[coord] = node
+

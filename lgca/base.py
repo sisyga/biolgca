@@ -82,9 +82,9 @@ def cmap_discretize(cmap, N):
 def estimate_figsize(array, x=8., cbar=False, dy=1.):
     lx, ly = array.shape
     if cbar:
-        y = min([x * ly / lx - 1, 15.])
+        y = min([x * ly / lx - 1, 10.])
     else:
-        y = min([x * ly / lx, 15.])  #
+        y = min([x * ly / lx, 10.])  #
     y *= dy
     figsize = (x, y)
     return figsize
@@ -209,12 +209,12 @@ class LGCA_base():
                         ry = self.ycoords - y_source
                         r = np.sqrt(rx ** 2 + ry ** 2)
                         self.concentration = np.exp(-2 * r / self.ly)
-                        self.g = self.gradient(np.pad(self.concentration, 1, 'constant'))
+                        self.g = self.gradient(np.pad(self.concentration, 1, 'reflect'))
                     else:
                         source = npr.normal(self.l / 2, 1)
                         r = abs(self.xcoords - source)
                         self.concentration = np.exp(-2 * r / self.l)
-                        self.g = self.gradient(np.pad(self.concentration, 1, 'constant'))
+                        self.g = self.gradient(np.pad(self.concentration, 1, 'reflect'))
                         self.g /= self.g.max()
 
             elif interaction == 'contact_guidance':
@@ -355,9 +355,6 @@ class LGCA_base():
             self.apply_boundaries = self.apply_pbc
 
     def calc_flux(self, nodes):
-        if nodes.dtype != 'bool':
-            nodes = nodes.astype('bool')
-
         return np.einsum('ij,...j', self.c, nodes[..., :self.velocitychannels])
 
     def get_interactions(self):
