@@ -152,7 +152,7 @@ class LGCA_Square(LGCA_base):
         return sum
 
     def gradient(self, qty):
-        return np.moveaxis(np.asarray(np.gradient(qty, 2)), 0, -1)
+        return np.moveaxis(np.asarray(np.gradient(qty, 0.5)), 0, -1)
 
     def channel_weight(self, qty):
         weights = np.zeros(qty.shape + (self.velocitychannels,))
@@ -260,9 +260,9 @@ class LGCA_Square(LGCA_base):
         ax.add_collection(arrows)
 
         if self.restchannels > 0:
-            circles = [Circle(xy=(x, y), radius=r_circle, fc='white', ec='k', lw=lw_circle * bool(n), visible=bool(n))
-                       for x, y, n in
-                       zip(xx.ravel(), yy.ravel(), nodes[..., self.velocitychannels:].sum(-1).ravel())]
+            circles = [Circle(xy=(x, y), radius=r_circle, fc=colors[occ], ec='k', lw=lw_circle * occ)
+                       for x, y, occ in
+                       zip(xx.ravel(), yy.ravel(), nodes[..., self.velocitychannels:].sum(-1).ravel().astype(bool))]
             texts = [ax.text(x, y - 0.5 * r_circle, str(n), ha='center', va='baseline', fontsize=fontsize,
                              fontname='sans-serif', fontweight='bold', bbox=bbox_props, visible=bool(n))
                      for x, y, n in zip(xx.ravel(), yy.ravel(), occupied[..., self.velocitychannels:].sum(-1).ravel())]
@@ -364,15 +364,18 @@ class LGCA_Square(LGCA_base):
             ani = animation.FuncAnimation(fig, update, interval=interval)
             return ani
 
-    def live_animate_density(self, interval=100, **kwargs):
+    def live_animate_density(self, interval=100, channels=slice(None), **kwargs):
 
-        fig, pc, cmap = self.plot_density(**kwargs)
+        fig, pc, cmap = self.plot_density(channels=channels, **kwargs)
         title = plt.title('Time $k =$0')
 
         def update(n):
             self.timestep()
             title.set_text('Time $k =${}'.format(n))
-            pc.set(facecolor=cmap.to_rgba(self.cell_density[self.nonborder].ravel()))
+            nodes = self.nodes[self.nonborder]
+            print(nodes[..., channels].shape)
+            dens = nodes[..., channels].sum(-1)
+            pc.set(facecolor=cmap.to_rgba(dens.ravel()))
             return pc, title
 
         ani = animation.FuncAnimation(fig, update, interval=interval)
@@ -400,7 +403,8 @@ class LGCA_Square(LGCA_base):
 
         fig, ax = self.setup_figure(**kwargs)
         ax.set_aspect('equal')
-        plot = plt.quiver(xx, yy, jx, jy, density.ravel(), pivot='mid', angles='xy', scale_units='xy', scale=1./self.r_poly)
+        plot = plt.quiver(xx, yy, jx, jy, density.ravel(), pivot='mid', angles='xy', scale_units='xy',
+                          scale=1./self.r_poly, minlength=0.)
 
         if cbar:
             plot.set_cmap(cmap)
@@ -490,10 +494,11 @@ class LGCA_Square(LGCA_base):
 
         return fig, pc, cmap
 
-    def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
-                     edgecolor='None', cbar=True):
+    def plot_density(self, density=None, channels=slice(None), figindex=None, figsize=None, tight_layout=True,
+                     cmap='viridis', vmax=None, edgecolor='None', cbar=True, cbarlabel='Particle number $n$'):
         if density is None:
-            density = self.cell_density[self.nonborder]
+            nodes = self.nodes[self.nonborder]
+            density = nodes[..., channels].sum(-1)
 
         if figsize is None:
             figsize = estimate_figsize(density, cbar=True, dy=self.dy)
@@ -521,7 +526,7 @@ class LGCA_Square(LGCA_base):
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("right", size="5%", pad=0.1)
             cbar = fig.colorbar(cmap, extend='min', use_gridspec=True, cax=cax)
-            cbar.set_label('Particle number $n$')
+            cbar.set_label(cbarlabel)
             cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[1::2])
             cbar.set_ticklabels(1 + np.arange(K))
             plt.sca(ax)
@@ -531,10 +536,13 @@ class LGCA_Square(LGCA_base):
     def plot_vectorfield(self, x, y, vfx, vfy, figindex=None, figsize=None, tight_layout=True, cmap='viridis'):
         l = np.sqrt(vfx ** 2 + vfy ** 2)
 
+        if figsize is None:
+            figsize = estimate_figsize(x, cbar=True)
+
         fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
         ax.set_aspect('equal')
-        plot = plt.quiver(x, y, vfx, vfy, l, cmap=cmap, pivot='mid', angles='xy', scale_units='xy', scale=1,
-                          width=0.007, norm=colors.Normalize(vmin=0, vmax=1))
+        plot = plt.quiver(x, y, vfx, vfy, l, cmap=cmap, pivot='mid', angles='xy', scale_units='xy', scale=1./self.r_poly,
+                          norm=colors.Normalize(vmin=0, vmax=1), minlength=0.)
         return fig, plot
 
     def plot_flux(self, nodes=None, figindex=None, figsize=None, tight_layout=True, edgecolor='None', cbar=True):
@@ -573,15 +581,22 @@ class LGCA_Square(LGCA_base):
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("right", size="5%", pad=0.1)
             cbar = fig.colorbar(cmap, use_gridspec=True, cax=cax)
-            cbar.set_label('Direction of movement $(\degree)$')
+            cbar.set_label('Direction of flux')
             cbar.set_ticks(np.arange(self.velocitychannels) * 360 / self.velocitychannels)
+            cbar.set_ticklabels(['${} \degree$'.format(int(i)) for i in
+                                 np.arange(self.velocitychannels) * 360 / self.velocitychannels])
             plt.sca(ax)
 
         return fig, pc, cmap
 
-    def animate_density(self, density_t=None, interval=100, **kwargs):
+    def animate_density(self, density_t=None, interval=100, channels=slice(None), repeat=True, **kwargs):
         if density_t is None:
-            density_t = self.dens_t
+            if channels == slice(None):
+                density_t = self.dens_t
+
+            else:
+                nodes_t = self.nodes_t[..., channels]
+                density_t = nodes_t.sum(-1)
 
         fig, pc, cmap = self.plot_density(density_t[0], **kwargs)
         title = plt.title('Time $k =$0')
@@ -591,7 +606,7 @@ class LGCA_Square(LGCA_base):
             pc.set(facecolor=cmap.to_rgba(density_t[n, ...].ravel()))
             return pc, title
 
-        ani = animation.FuncAnimation(fig, update, interval=interval, frames=density_t.shape[0])
+        ani = animation.FuncAnimation(fig, update, interval=interval, frames=density_t.shape[0], repeat=repeat)
         return ani
 
     def animate_flux(self, nodes_t=None, interval=100, **kwargs):
