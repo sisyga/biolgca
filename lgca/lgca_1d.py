@@ -224,12 +224,12 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             # print('props_t in timeevo', self.props_t[t]['num_off'][:])
 
 
-    def timeevo_until_hom(self, record=False, offsprings=False):
+    def timeevo_until_hom(self, record=False, offsprings=False, spatial=False):
         #weitere Paras: recordN=False, recorddens=True, showprogress=True, recordLast=False
         chronicle = False
         timestep = 1
 
-        self.timeevo(1, record)
+        self.timeevo(1, record=True)
         if chronicle:
             print('props_t', self.props_t)
             print('nodes_t', self.nodes_t)
@@ -242,13 +242,18 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                 new_nodes = np.zeros((1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
                 new_nodes[0] = self.nodes[self.r_int:-self.r_int]
                 self.nodes_t = np.vstack((self.nodes_t, new_nodes))
-                #funktioniert NICHT self.props_t[1]['num_off'].append(copy(self.props['num_off']))
-                self.props_t.append({'lab_m': copy(self.props['lab_m']),\
-                                    'num_off': copy(self.props['num_off'])})
+                # self.props_t.append({'lab_m': copy(self.props['lab_m']),\
+                #                     'num_off': copy(self.props['num_off'])})
+                # geht auch: self.props_t.append(copy(self.props)['num_off'])
+                self.props_t.append({'num_off': copy(self.props['num_off'])})
 
-
-            if offsprings: #TODO: irgendwo benutzt?
+            if offsprings: #für offspring script
                 self.offsprings.append(copy(self.props)['num_off'])
+
+            if spatial: #für spatial script
+                new_nodes = np.zeros((1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
+                new_nodes[0] = self.nodes[self.r_int:-self.r_int]
+                self.nodes_t = np.vstack((self.nodes_t, new_nodes))
 
             if chronicle:
                 print('props_t', self.props_t)

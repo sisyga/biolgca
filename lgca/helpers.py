@@ -618,6 +618,70 @@ def plot_popsize(props, save=False, id=0, off=False):
     if save:
         save_plot(fig, str(id) + '_population size ' + '.jpg')
 
+def spacetime_plot(nodes_t, labels, figindex = None, figsize=None,\
+                 cmap='nipy_spectral', tbeg=None, tend=None, save=False, id=0):
+    tmax, dim, c = nodes_t.shape
+    vc = 2
+    rc = c - vc
+    print(tmax, dim, rc)
+    if tbeg is None:
+        tbeg = 0
+    if tend is None:
+        tend = tmax
+
+    val = np.zeros((tmax, dim*c))
+
+    for t in range(0, tmax):
+        for x in range(dim):
+            node = nodes_t[t, x]
+            occ = node.astype(np.bool)
+#             print('occ', occ)
+            if occ.sum() == 0:
+                i = 0
+                while i < c:
+                    val[t, x * c + i] = None
+                    i = i + 1
+                continue
+            for pos in range(len(node)):
+                lab = node[pos]
+#                 print('lab', lab)
+                if pos == 0 or pos == 1:
+                    if lab == 0:
+                        val[t, x*c + pos * (c - 1)] = None
+                    else:
+                        val[t, x*c + pos * (c - 1)] = labels[lab]
+#                     print('stückchen val', val[t, x*c + pos * (c - 1)])
+
+                else:
+                    if lab == 0:
+                        val[t, x*c + pos - 1] = None
+                    else:
+                        val[t, x*c + pos - 1] = labels[lab]
+#                     print('stückchen val', val[t, x*c + pos - 1])
+#     print('val', val)
+
+    fig = plt.figure(num=figindex, figsize=figsize)
+    ax = fig.add_subplot(111)
+    plot = ax.matshow(val, cmap=cmap)
+    # fig.colorbar(plot, shrink = 0.5)
+
+    plt.ylabel('timesteps')
+    plt.xlabel('lattice site')
+    # nur "Knotenanfang"
+    plt.xlim(-0.5, dim*c-0.5)
+    plt.xticks((np.arange(0, dim*c, c)))
+
+    plt.ylim(tend-0.5, tbeg-0.5)
+    if tend - tbeg > 700:
+        plt.yticks(np.arange(tbeg, tend, 100))
+    elif tend - tbeg > 100:
+        plt.yticks(np.arange(tbeg, tend, 50))
+    elif tend - tbeg <= 100:
+        plt.yticks(np.arange(tbeg, tend, 10))
+    plt.show()
+    if save:
+        save_plot(fig, str(id) + '_spacetimeplot' + '.jpg')
+
 def save_plot(plot, filename=None):
     if filename is None:
         filename = 'no_name'
