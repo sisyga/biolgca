@@ -357,6 +357,26 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         ax.xaxis.tick_top()
         plt.tight_layout()
         return plot
+    
+    def nb_sum(self, qty):
+        sum = np.zeros(qty.shape)
+        sum[:-1, ...] += qty[1:, ...]
+        sum[1:, ...] += qty[:-1, ...]
+        sum += qty
+       # shift to left without padding and add to shift to the right without padding
+        #sums up fluxes (in qty) of neighboring particles
+        return sum
+        
+    def update_dynamic_fields(self):
+        """Update "fields" that store important variables to compute other dynamic steps
+
+        :return:
+        """
+        self.cell_density = self.nodes.sum(-1)
+        #cell_density ist ein array von Werten. Es wird als Summe über die Channel berechnet. (.sum(-1) summiert über die letzte Achse des Arrays).
+        effective_dens = self.nodes.sum()/(self.K * self.l)
+        #print("Required density: {}, Achieved density: {}".format(density, effective_dens))
+        self.eff_dens = effective_dens
        
 
 if __name__ == '__main__':
