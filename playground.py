@@ -6,8 +6,8 @@ import numpy as np
 #nodes = np.array([[0,0],[0,0],[0,0],[0,0],[0,1],[1,0],[3,0],[0,0]])
 
 """Setup"""
-beta = 5
-density = 0.2
+beta = 0.5
+density = 0.5
 dims = 100
 timesteps = 100
 
@@ -16,9 +16,9 @@ lgca = get_lgca(interaction='dd_alignment', ve=False, bc='periodic', density=den
 
 """TIMESTEPPING"""
 lgca.timeevo(timesteps=timesteps, record=True)
-ani = lgca.plot_density()
+#ani = lgca.plot_density()
 #ani2 = lgca.plot_flux_fancy()
-#ani3 = lgca.plot_flux()
+ani3 = lgca.plot_flux()
 plt.show()
 
 #Todo:

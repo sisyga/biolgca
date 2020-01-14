@@ -797,9 +797,6 @@ class LGCA_noVE_base(LGCA_base):
         # I can also sample with a Poisson distribution with parameter density
         density = abs(density)
         self.nodes = npr.poisson(lam=density, size=self.nodes.shape)
-        
-        effective_dens = self.nodes.sum()/(self.K * self.l)
-        #print("Required density: {}, Achieved density: {}".format(density, effective_dens))
-        self.eff_dens = effective_dens
+		#print("Required density: {}, Achieved density: {}".format(density, effective_dens))
         self.apply_boundaries()
         self.update_dynamic_fields()
