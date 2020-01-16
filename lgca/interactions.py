@@ -4,6 +4,7 @@ from random import random
 
 import numpy as np
 import numpy.random as npr
+from scipy.special import binom as binom_coeff
 
 
 def disarrange(a, axis=-1):
@@ -315,29 +316,42 @@ def go_or_grow(lgca):
         lgca.nodes[coord] = node
 
 
+def p_binom(k, n, p):
+    pb = binom_coeff(n, k) * p**k * (1 - p)**(n-k)
+    pb[n<k] = 0.
+    return pb
+
+def s_binom(n, p0, kmax):
+    n = n[..., None]
+    p0 = p0[..., None]
+    k = np.arange(kmax + 1)
+    p = p_binom(k, n, p0)
+    return -ent_prod(p).sum(-1)
+
 def leup_test(lgca):
     """
     Go-or-grow with least-environmental uncertainty principle. cells try to minimize their entropy with the environment,
     by changing their state between moving and resting. resting cells can proliferate. all cells die at a constant rate.
     :return:
     """
-    # if lgca.r_b > 0: # or lgca.r_d > 0:
-    #     n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
-    #     n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
-    #     birth = npr.random(n_r.shape + (lgca.restchannels, )) < lgca.r_b * n_r[..., None] / lgca.restchannels
-    #     death = npr.random(n_r.shape + (lgca.restchannels, )) < lgca.r_b * n_m[..., None] / lgca.velocitychannels
-    #     ds = (1 - lgca.nodes[..., lgca.velocitychannels:]) * birth - lgca.nodes[..., lgca.velocitychannels:] * death
-    #     np.add(lgca.nodes[..., lgca.velocitychannels:], ds, out=lgca.nodes[..., lgca.velocitychannels:], casting='unsafe')
-    #     lgca.update_dynamic_fields()
-
-    if lgca.r_b > 0: # or lgca.r_d > 0:
+    if lgca.r_b > 0 or lgca.r_d > 0:
         n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
         n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
-        birth = npr.random(lgca.nodes.shape) < lgca.r_b * n_r[..., None] / lgca.restchannels
-        death = npr.random(birth.shape) < lgca.r_d * (n_r[..., None] / lgca.restchannels + n_m[..., None] / lgca.velocitychannels)
+        birth = np.zeros_like(lgca.nodes)
+        birth[..., lgca.velocitychannels:] = npr.random(n_r.shape + (lgca.restchannels, )) < lgca.r_b * n_r[..., None] / lgca.restchannels
+        death = npr.random(birth.shape) < lgca.r_d * (n_m[..., None] / lgca.velocitychannels + n_r[..., None] / lgca.restchannels) / 2
         ds = (1 - lgca.nodes) * birth - lgca.nodes * death
         np.add(lgca.nodes, ds, out=lgca.nodes, casting='unsafe')
         lgca.update_dynamic_fields()
+
+    # if lgca.r_b > 0: # or lgca.r_d > 0:
+    #     n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
+    #     n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
+    #     birth = npr.random(lgca.nodes.shape) < lgca.r_b * n_r[..., None] / lgca.restchannels
+    #     death = npr.random(birth.shape) < lgca.r_d * (n_r[..., None] / lgca.restchannels + n_m[..., None] / lgca.velocitychannels)
+    #     ds = (1 - lgca.nodes) * birth - lgca.nodes * death
+    #     np.add(lgca.nodes, ds, out=lgca.nodes, casting='unsafe')
+    #     lgca.update_dynamic_fields()
 
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & (lgca.cell_density[lgca.nonborder] < lgca.K)
     coords = [a[relevant] for a in lgca.nonborder]
@@ -346,11 +360,25 @@ def leup_test(lgca):
     n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
     M1 = np.minimum(n_m, lgca.restchannels - n_r)
     M2 = np.minimum(n_r, lgca.velocitychannels - n_m)
-    s = ent_prod(n_r) + ent_prod(n_m)
-    ds1 = np.divide(s - ent_prod(n_r + 1) - ent_prod(n_m - 1), n, where=n > 0)
+
+    p0 = np.divide(n_r, n, where=n>0, out=np.zeros_like(n, dtype=float))
+    s = s_binom(n, p0, lgca.velocitychannels)
+    p10 = np.divide(n_r+1, n, where=n>0, out=np.zeros_like(n, dtype=float))
+    s10 = s_binom(n, p10, lgca.velocitychannels)
+    ds1 = s10 - s
+
+    p01 = np.divide(n_r-1, n, where=n>0, out=np.zeros_like(n, dtype=float))
+    s01 = s_binom(n, p01, lgca.velocitychannels)
+    ds2 = s01 - s
+    #
+    #
+    # s = ent_prod(n_r) + ent_prod(n_m)
+    # ds1 = np.divide(s - ent_prod(n_r + 1) - ent_prod(n_m - 1), n, where=n > 0)
     p1 = 1 / (1 + np.exp(lgca.beta * ds1))
-    ds2 = np.divide(s - ent_prod(n_r - 1) - ent_prod(n_m + 1), n, where=n > 0)
+    p1[M1 == 0] = 0.
+    # ds2 = np.divide(s - ent_prod(n_r - 1) - ent_prod(n_m + 1), n, where=n > 0)
     p2 = 1 / (1 + np.exp(lgca.beta * ds2))
+    p2[M2 == 0] = 0.
     try:
         j_1 = npr.binomial(M1, p1)
 
@@ -359,7 +387,14 @@ def leup_test(lgca):
         ind = np.isnan(p1) | (p1 > 0) | (p1 > 0)
         print(M1[ind], p1[ind])
 
-    j_2 = npr.binomial(M2, p2)
+    try:
+        j_2 = npr.binomial(M2, p2)
+
+    except:
+        print('Error!')
+        ind = np.isnan(p2) | (p2 > 0) | (p2 > 0)
+        print(M2[ind], p2[ind])
+
     n_m += j_2 - j_1
     n_r += j_1 - j_2
 

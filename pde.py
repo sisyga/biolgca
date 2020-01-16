@@ -1,8 +1,17 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.integrate import solve_ivp
-from scipy.ndimage import laplace
+from scipy.ndimage import laplace, convolve
 from matplotlib.animation import FuncAnimation as animation
+
+def gradient_pbc(y, dx=1):
+    grad = convolve(y, [1., 0., -1.], mode='wrap') * 0.5 / dx
+    return grad
+
+def lapl_2nd(y, dx=1., mode='wrap'):
+    stencil = (1.0 / (12.0 * dx * dx)) * np.array([-1, 16, -30, 16, -1], dtype=float)
+    lapl = convolve(y, stencil, mode=mode)
+    return lapl
 
 
 def e0(rho0, rho1, a, b):
@@ -15,15 +24,47 @@ def dydt(t, y, dx, b=1., a=0.01, r=0., d=0., D=20):
     r0, r1 = np.hsplit(y, 2)
 
     e = e0(r0, r1, a, b)
+
+    c = r0 + r1
+
     dr0 = e
-    dr0 += r * r0 * (1 - r0 - r1)
-    dr0 += laplace(r0, mode='wrap') / dx**2
+    dr0 += r * r0 * (1 - c)
+    dr0 += lapl_2nd(r0, dx=dx)
     # dr0 -= d * r0
 
 
     dr1 = -e
+    # dr1 += r * r0 * (1 - c)
+    dr1 += lapl_2nd(r1, dx=dx) * D
+    # dr1 -= d * r1
+    dy = np.hstack((dr0, dr1))
+    return dy
+
+
+def dydt_ve(t, y, dx, b=1., a=0.05, r=0., d=0., D=20.):
+    r0, r1 = np.hsplit(y, 2)
+
+    e = e0(r0, r1, a, b)
+
+    c = r0 + r1
+    # laplc = laplace(c, mode='wrap') / dx ** 2
+    # laplr0 = laplace(r0, mode='wrap') / dx ** 2
+    # laplr1 = laplace(r1, mode='wrap') / dx ** 2
+    laplc = lapl_2nd(c, dx=dx)
+    laplr0 = lapl_2nd(r0, dx=dx)
+    laplr1 = lapl_2nd(r1, dx=dx)
+
+
+    dr0 = e
+    growth = r * r0 * (1 - c)
+    # print(e, growth, (1 - c) * laplr0 + r0 * laplc)
+    dr0 += growth
+    dr0 += (1 - c) * laplr0 + r0 * laplc
+    # dr0 -= d * r0
+
+    dr1 = -e
     # dr1 += r * r0 * (1 - 2 * r1) / 2
-    dr1 += laplace(r1, mode='wrap') / dx**2 * D
+    dr1 += D * ((1 - c) * laplr1 + r1 * laplc)
     # dr1 -= d * r1
     dy = np.hstack((dr0, dr1))
     return dy
@@ -34,17 +75,19 @@ def dydt2(t, y, dx, b=1., a=0.01, r=0., d=0., D=20):
     p_to_rest = p_mov_to_rest(r0, r1, a, b)
     p_to_move = p_rest_to_move(r0, r1, a, b)
 
-    dr0 = laplace(r0, mode='wrap') / dx**2
-    dr0 += r * r0 * (1 - r0)
+    # dr0 = laplace(r0, mode='wrap') / dx**2
+    dr0 = lapl_2nd(r0, dx=dx)
+    dr0 += r * r0 * (1 - r0 - r1)
     dr0 += p_to_rest * r1 * (1 - r0)
     dr0 -= p_to_move * r0 * (1 - r1)
-    dr0 -= d * r0 * (r0 + r1)
+    dr0 -= d * r0 * (r0 + r1) / 2
 
-    dr1 = laplace(r1, mode='wrap') / dx**2 * D
-    dr1 += r * r0 * (1 - r1)
+    # dr1 = laplace(r1, mode='wrap') / dx**2 * D
+    dr1 = lapl_2nd(r1, dx=dx) * D
+    dr1 += r * r0 * (1 - r1 - r0)
     dr1 += p_to_move * r0 * (1 - r1)
     dr1 -= p_to_rest * r1 * (1 - r0)
-    dr1 -= d * r1 * (r0 + r1)
+    dr1 -= d * r1 * (r0 + r1) / 2
     dy = np.hstack((dr0, dr1))
     return dy
 
@@ -88,16 +131,17 @@ def update(n):
 
     return lines + [title]
 
-b = 20
-# a = 0.05
-a = 1. / 12
-r = 0.2
-d = 0.2
+
+b = 40
+a = 0.05
+# a = 1. / 12
+r = .05
+d = .0
 D = 20.
-r00 = 0.25
-r10 = 0.25
-xmax = 500.
-tmax = 1000
+r00 = 0.3
+r10 = 0.3
+xmax = 1000.
+tmax = 1000.
 points = 200
 x, dx = np.linspace(0, xmax, points, endpoint=False, retstep=True)
 # initial config
