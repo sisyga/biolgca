@@ -51,99 +51,6 @@ def count_fam(lgca):
 
         return max(num[1:])
 
-def bar_stacked(lgca, save = False, id = 0):
-    tmax, l, _ = lgca.nodes_t.shape
-    # print('tmax', tmax)
-    ancs = np.arange(1, lgca.maxlabel_init.astype(int) + 1)
-
-    val = np.zeros((tmax, lgca.maxlabel_init.astype(int) + 1))
-    # print('size val', val.shape)
-    for t in range(0, tmax):
-        for c in ancs:
-            # print('c ', c)
-            # print('t', t)
-            val[t, c] = lgca.props_t[t]['num_off'][c]
-    plt.figure(num=None)
-    ind = np.arange(0, tmax, 1)
-    width = 1
-    for c in ancs:
-        if c > 1:
-            b = np.zeros(tmax)
-            for i in range(1, c):
-                b = b + val[:, i]
-            plt.bar(ind, val[:, c], width, bottom=b, label=c)
-        else:
-            plt.bar(ind, val[:, c], width, color=['red'], label=c)
-
-    ###plot settings
-
-    plt.ylabel('total number of living cells')
-    plt.xlabel('timesteps')
-    # plt.title('Ratio of offsprings')
-    if len(ind) <= 15:
-        plt.xticks(ind)
-    else:
-        plt.xticks(np.arange(0, len(ind)-1, 5))
-
-    if tmax >= 700:
-        plt.xticks(np.arange(0, tmax, 100))
-    elif tmax >= 100:
-        plt.xticks(np.arange(0, tmax, 50))
-
-    # plt.subplots_adjust(right=0.85)
-    # plt.legend(bbox_to_anchor=(1.04, 1))
-    plt.tight_layout()
-    plt.show()
-    if save == True:
-        # plt.savefig('pictures/' + str(id) + '  frequency' + str(datetime.now()) +'.jpg')
-        # plt.savefig('probe_bar.jpg')
-        # filename = str(lgca.r_b) + ', ' + str(id) + ', ' + str(t) + '  frequency' + '.jpg'
-        filename = str(lgca.r_b) + ', dens' + str(lgca.maxlabel_init / (lgca.K * lgca.l)) + ', ' \
-                   + str(id) + ', ' + str(t) + '  frequency' + '.jpg'
-
-        plt.savefig(pathlib.Path('pictures').resolve() / filename)
-
-def lobar_stacked_relative(props_t, save=False, id=0):
-    tmax = len(props_t)
-    maxlab = sum(props_t[0]['num_off'][1:])
-    ancs = np.arange(0, maxlab)
-    val = np.zeros((tmax, maxlab))
-
-    for t in range(0, tmax):
-        for c in ancs:
-            val[t, c] = props_t[t]['num_off'][c + 1]
-        c_sum = sum(props_t[t]['num_off'][1:])
-        if c_sum != 0:
-            val[t] = val[t] / c_sum
-    # print('erste Schleife fertig, nun plotbar')
-    # fig, ax = plt.subplots()
-    fig = plt.figure(num=None)
-    width = 1
-    ind = np.arange(0, tmax)
-    b = np.zeros(tmax)
-    for c in ancs:
-        print('bin schon bei c= ', c)
-        plt.bar(ind, val[:, c], width, bottom=b, label=c)
-        b = b + val[:, c]
-        #TODO: bessere Lösung?
-    plt.ylabel(' frequency of families')
-    plt.xlabel('timesteps')
-    plt.xlim(0, tmax - 0.5)
-    plt.ylim(0, 1)
-    if tmax <= 15:
-        plt.xticks(np.arange(0, tmax, 1))
-    elif tmax <= 100:
-        plt.xticks(np.arange(0, tmax, 5))
-    elif tmax >= 1000:
-        plt.xticks(np.arange(0, tmax, 500))
-    elif tmax >= 100:
-        plt.xticks(np.arange(0, tmax, 50))
-
-    plt.show()
-
-    if save:
-        save_plot(fig, str(id) + '_' + ' rel_frequency' + '.jpg')
-
 def mullerplot(props, id=0, save=False):
     tend = len(props)
     time = range(0, tend)
@@ -623,7 +530,7 @@ def spacetime_plot(nodes_t, labels, figindex = None, figsize=None,\
     tmax, dim, c = nodes_t.shape
     vc = 2
     rc = c - vc
-    print(tmax, dim, rc)
+    print('tmax, Knoten, rc', tmax, dim, rc)
     if tbeg is None:
         tbeg = 0
     if tend is None:
@@ -635,8 +542,10 @@ def spacetime_plot(nodes_t, labels, figindex = None, figsize=None,\
         for x in range(dim):
             node = nodes_t[t, x]
             occ = node.astype(np.bool)
-#             print('occ', occ)
+            # print('occ', occ)
             if occ.sum() == 0:
+                # TODO: neu
+                # val[t, x * c: x * c + c] = None  ???
                 i = 0
                 while i < c:
                     val[t, x * c + i] = None
@@ -644,21 +553,27 @@ def spacetime_plot(nodes_t, labels, figindex = None, figsize=None,\
                 continue
             for pos in range(len(node)):
                 lab = node[pos]
-#                 print('lab', lab)
+                # print('lab', lab)
                 if pos == 0 or pos == 1:
-                    if lab == 0:
-                        val[t, x*c + pos * (c - 1)] = None
-                    else:
-                        val[t, x*c + pos * (c - 1)] = labels[lab]
-#                     print('stückchen val', val[t, x*c + pos * (c - 1)])
+                    if pos == 0:
+                        if lab == 0:
+                            val[t, (c-1) + x * c] = None
+                        else:
+                            val[t,  (c-1) + x * c] = labels[lab]
 
+                    elif pos == 1:
+                        if lab == 0:
+                            val[t, x * c] = None
+                        else:
+                            val[t, x * c] = labels[lab]
                 else:
                     if lab == 0:
                         val[t, x*c + pos - 1] = None
                     else:
                         val[t, x*c + pos - 1] = labels[lab]
-#                     print('stückchen val', val[t, x*c + pos - 1])
-#     print('val', val)
+                    # print('stückchen val', val[t, x*c + pos - 1])
+        # print('val[t]', val[t])
+    # print('val', val)
 
     fig = plt.figure(num=figindex, figsize=figsize)
     ax = fig.add_subplot(111)

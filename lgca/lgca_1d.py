@@ -312,75 +312,75 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         return plot
 
-    def spatial_plot(self, nodes_t=None, props_t=None, figindex = None, figsize=None, prop='lab_m',\
-                     cmap='nipy_spectral', tbeg=None, tend=None, save=False, id=0, restchannels=None, velocitychannels=None):
-        if nodes_t is None:
-            nodes_t = self.nodes_t
-        if props_t is None:
-            props_t = self.props_t
-        if restchannels is None:
-            restchannels = self.restchannels
-        if velocitychannels is None:
-            velocitychannels = self.velocitychannels
-        tmax, l, _ = nodes_t.shape
-        if tbeg is None:
-            tbeg = 0
-        if tend is None:
-            tend = tmax
-        else:
-            tend += 1
-        k = restchannels + velocitychannels
-        ltotal = l * k
-        val = np.zeros((tmax, ltotal))
-
-        for t in range(0, tmax):
-            for x in range(l):
-                node = nodes_t[t, x]
-                occ = node.astype(np.bool)
-                if occ.sum() == 0:
-                    i = 0
-                    while i < k:
-                        val[t, x * k + i] = None
-                        i = i + 1
-                    continue
-                for pos in range(len(node)):
-                    lab = node[pos]
-                    if pos == 0 or pos == 1:
-                        if lab == 0:
-                            val[t, x*k + pos * (k - 1)] = None
-                        else:
-                            val[t, x*k + pos * (k - 1)] = props_t[t][prop][lab]
-
-                    else:
-                        if lab == 0:
-                            val[t, x*k + pos - 1] = None
-                        else:
-                            val[t, x*k + pos - 1] = props_t[t][prop][lab]
-        # print('val', val)
-
-        fig = plt.figure(num=figindex, figsize=figsize)
-        ax = fig.add_subplot(111)
-        plot = ax.matshow(val, cmap=cmap)
-        # fig.colorbar(plot, shrink = 0.5)
-
-        plt.ylabel('timesteps')
-        plt.xlabel('lattice site')
-        # nur "Knotenanfang"
-        plt.xlim(-0.5, ltotal-0.5)
-        plt.xticks((np.arange(0, ltotal, k)))
-
-        plt.ylim(tend-0.5, tbeg-0.5)
-        if tend - tbeg > 700:
-            plt.yticks(np.arange(tbeg, tend, 100))
-        elif tend - tbeg > 100:
-            plt.yticks(np.arange(tbeg, tend, 50))
-        elif tend - tbeg <= 100:
-            plt.yticks(np.arange(tbeg, tend, 10))
-        plt.show()
-        if save:
-            filename = str(id) + ', ' + 'spatial plot step ' +\
-                       str(tbeg) + ' to ' + str(tend-1) + '.jpg'
-            plt.savefig(pathlib.Path('pictures').resolve() / filename)
+    # def spatial_plot(self, nodes_t=None, props_t=None, figindex = None, figsize=None, prop='lab_m',\
+    #                  cmap='nipy_spectral', tbeg=None, tend=None, save=False, id=0, restchannels=None, velocitychannels=None):
+    #     if nodes_t is None:
+    #         nodes_t = self.nodes_t
+    #     if props_t is None:
+    #         props_t = self.props_t
+    #     if restchannels is None:
+    #         restchannels = self.restchannels
+    #     if velocitychannels is None:
+    #         velocitychannels = self.velocitychannels
+    #     tmax, l, _ = nodes_t.shape
+    #     if tbeg is None:
+    #         tbeg = 0
+    #     if tend is None:
+    #         tend = tmax
+    #     else:
+    #         tend += 1
+    #     k = restchannels + velocitychannels
+    #     ltotal = l * k
+    #     val = np.zeros((tmax, ltotal))
+    #
+    #     for t in range(0, tmax):
+    #         for x in range(l):
+    #             node = nodes_t[t, x]
+    #             occ = node.astype(np.bool)
+    #             if occ.sum() == 0:
+    #                 i = 0
+    #                 while i < k:
+    #                     val[t, x * k + i] = None
+    #                     i = i + 1
+    #                 continue
+    #             for pos in range(len(node)):
+    #                 lab = node[pos]
+    #                 if pos == 0 or pos == 1:
+    #                     if lab == 0:
+    #                         val[t, x*k + pos * (k - 1)] = None
+    #                     else:
+    #                         val[t, x*k + pos * (k - 1)] = props_t[t][prop][lab]
+    #
+    #                 else:
+    #                     if lab == 0:
+    #                         val[t, x*k + pos - 1] = None
+    #                     else:
+    #                         val[t, x*k + pos - 1] = props_t[t][prop][lab]
+    #     # print('val', val)
+    #
+    #     fig = plt.figure(num=figindex, figsize=figsize)
+    #     ax = fig.add_subplot(111)
+    #     plot = ax.matshow(val, cmap=cmap)
+    #     # fig.colorbar(plot, shrink = 0.5)
+    #
+    #     plt.ylabel('timesteps')
+    #     plt.xlabel('lattice site')
+    #     # nur "Knotenanfang"
+    #     plt.xlim(-0.5, ltotal-0.5)
+    #     plt.xticks((np.arange(0, ltotal, k)))
+    #
+    #     plt.ylim(tend-0.5, tbeg-0.5)
+    #     if tend - tbeg > 700:
+    #         plt.yticks(np.arange(tbeg, tend, 100))
+    #     elif tend - tbeg > 100:
+    #         plt.yticks(np.arange(tbeg, tend, 50))
+    #     elif tend - tbeg <= 100:
+    #         plt.yticks(np.arange(tbeg, tend, 10))
+    #     plt.show()
+    #     if save:
+    #         filename = str(id) + ', ' + 'spatial plot step ' +\
+    #                    str(tbeg) + ' to ' + str(tend-1) + '.jpg'
+    #         plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
     def plot_prop_timecourse(self, nodes_t=None, props_t=None, propname=None, figindex=None, figsize=None):
         if nodes_t is None:
