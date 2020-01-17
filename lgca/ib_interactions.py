@@ -157,9 +157,8 @@ def inheritance(lgca):
     """
     r_d = const
     """
-    chronicle = False   #Ausgabe der einzelnen Schritte für chronicle = True
+    chronicle = True   #Ausgabe der einzelnen Schritte für chronicle = True
 
-    # death process, cell dies -> correct value of prop[num_off]
     rel_nodes = lgca.nodes[lgca.r_int:-lgca.r_int]
     if chronicle:
         print('rel_nodes ', rel_nodes)
@@ -174,11 +173,6 @@ def inheritance(lgca):
             if chronicle:
                 print('lab_m dazu ist', labmoth)
     rel_nodes[dying] = 0
-    if chronicle:
-        print('vor bc', rel_nodes)
-    # lgca.apply_boundaries() #???
-    # if chronicle:
-    #     print('nach bc', rel_nodes)
 
     # birth
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
@@ -186,7 +180,7 @@ def inheritance(lgca):
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
         node = lgca.nodes[coord]
-
+        print('node', node)
         # choose cells that proliferate
         r_bs = [lgca.props['r_b'][i] for i in node]
         proliferating = npr.random(lgca.K) < r_bs
@@ -218,5 +212,14 @@ def inheritance(lgca):
             if chronicle:
                 print('nodes after birth: ', lgca.nodes)
         lgca.nodes[coord] = node
-        npr.shuffle(lgca.nodes[coord])
+
+    #reorientation:
+    if chronicle:
+        print('vor shuffle', lgca.nodes[1:-1])
+    for a in lgca.nonborder:
+        for c in a:
+            npr.shuffle(lgca.nodes[c])
+    if chronicle:
+        print('nach shuffle', lgca.nodes[1:-1])
+
 
