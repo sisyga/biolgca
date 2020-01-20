@@ -254,6 +254,9 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                 new_nodes = np.zeros((1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
                 new_nodes[0] = self.nodes[self.r_int:-self.r_int]
                 self.nodes_t = np.vstack((self.nodes_t, new_nodes))
+                #TODO memory ausreichend?, sonst offs weg
+                self.offsprings.append(copy(self.props)['num_off'])
+
 
             if chronicle:
                 print('props_t', self.props_t)

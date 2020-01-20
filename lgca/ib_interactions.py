@@ -157,7 +157,7 @@ def inheritance(lgca):
     """
     r_d = const
     """
-    chronicle = True   #Ausgabe der einzelnen Schritte für chronicle = True
+    chronicle = False   #Ausgabe der einzelnen Schritte für chronicle = True
 
     rel_nodes = lgca.nodes[lgca.r_int:-lgca.r_int]
     if chronicle:
@@ -180,7 +180,7 @@ def inheritance(lgca):
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
         node = lgca.nodes[coord]
-        print('node', node)
+        # print('node', node)
         # choose cells that proliferate
         r_bs = [lgca.props['r_b'][i] for i in node]
         proliferating = npr.random(lgca.K) < r_bs

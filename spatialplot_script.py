@@ -11,8 +11,6 @@ rc = int(env['RESTCHANNELS'])
 rep = int(env['REPETITIONS'])
 
 
-
-
 dens = 1
 birthrate = 0.5
 deathrate = 0.02
@@ -21,6 +19,7 @@ uu = str(uuid())[0:7]
 saving_data = True
 
 for i in range(0, rep):
+    print('bin bei wdh: ', i)
     start = time.time()
     name = str(2*dim + dim*rc) + str(dim)
 
@@ -31,6 +30,7 @@ for i in range(0, rep):
     # print(lgca.offsprings[-1])
 
     if saving_data:
+        np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
         np.save('saved_data/' + str(id) + '_nodest', lgca.nodes_t)
         np.save('saved_data/' + str(id) + '_labels', lgca.props['lab_m'])
         np.savez('saved_data/' + str(id) + '_Parameter', density = lgca.density, restchannels = lgca.restchannels,\

@@ -21,6 +21,7 @@ uu = str(uuid())[0:7]
 saving_data = True
 
 for i in range(0, rep):
+    #TODO print(bei bei wdh: , i)
     start = time.time()
     name = str(2*dim + dim*rc) + str(dim)
 
