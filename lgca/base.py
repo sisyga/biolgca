@@ -83,9 +83,9 @@ def cmap_discretize(cmap, N):
 def estimate_figsize(array, x=8., cbar=False, dy=1.):
     lx, ly = array.shape
     if cbar:
-        y = min([abs(x * ly /lx - 1), 15.])
+        y = min([abs(x * ly /lx - 1), 10.])
     else:
-        y = min([x * ly / lx, 15.])
+        y = min([x * ly / lx, 10.])
     y *= dy
     figsize = (x, y)
     return figsize
@@ -122,9 +122,9 @@ class LGCA_base():
         self.set_interaction(**kwargs)
         self.cell_density = self.nodes.sum(-1)
         self.apply_boundaries()
+        print("Density: " + str(density))
         print(kwargs)
         if 've' in kwargs:
-            print("Yep!")
             self.ve = kwargs['ve']
 
     def set_r_int(self, r):

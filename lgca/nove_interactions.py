@@ -62,7 +62,7 @@ def di_alignment(lgca):
     # 1st dim: nodes
     # 2nd dim: flux vectors
     nsum = lgca.nb_sum(lgca.cell_density)[None, ...] #Todo: hier anders?
-    np.maximum(nsum, 1, out=nsum)
+    np.maximum(nsum, 1, out=nsum) #avoid dividing by zero later
     #print(nsum.T)
     g = g/ nsum.T #todo: T kann vielleicht weg und numpy.divide benutzen
     #print(g)
