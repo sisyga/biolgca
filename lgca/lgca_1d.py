@@ -149,7 +149,7 @@ class LGCA_1D(LGCA_base):
         ax.xaxis.set_label_position('top')
         ax.xaxis.tick_top()
         plt.title("Density plot.\n VE: True  Align: " + self.interaction.__name__ + "  BC: " + self.apply_boundaries.__name__ + "\n Dims: " + str(
-            self.dims) + "  Dens: " + str(self.nodes.sum()/(self.K * self.l)) + "  Beta: " + str(self.beta))
+            self.dims) + "  Dens: " + str(self.nodes[self.nonborder].sum()/(self.K * self.l)) + "  Beta: " + str(self.beta))
 
         plt.tight_layout()
         return plot
@@ -177,6 +177,8 @@ class LGCA_1D(LGCA_base):
         ax.xaxis.set_label_position('top')
         ax.xaxis.set_ticks_position('top')
         ax.xaxis.tick_top()
+        plt.title("Flux plot.\n VE: True  Align: " + self.interaction.__name__ + "  BC: " + self.apply_boundaries.__name__ + "\n Dims: " + str(
+                self.dims) + "  Dens: " + str(self.nodes[self.nonborder].sum() / (self.K * self.l)) + "  Beta: " + str(self.beta))
         plt.tight_layout()
         return plot
 
@@ -300,7 +302,8 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         plt.ylabel(r'Time step $k \, (\tau)$')
         ax.xaxis.set_label_position('top')
         ax.xaxis.tick_top()
-        plt.title("Density plot.\n VE: False  Align: " + self.interaction.__name__ + "  BC: " + self.apply_boundaries.__name__ + "\n Dims: " + str(self.dims) + "  Dens: " + str(self.eff_dens) + "  Beta: " + str(self.beta))
+        plt.title("Density plot.\n VE: False  Align: " + self.interaction.__name__ + "  BC: " + self.apply_boundaries.__name__ \
+                  + "\n Dims: " + str(self.dims) + "  Dens: " + '{0:.3f}'.format(self.eff_dens) + "  Beta: " + str(self.beta), fontsize=10)
         plt.tight_layout()
         return plot
 
@@ -328,6 +331,8 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         ax.xaxis.set_label_position('top')
         ax.xaxis.set_ticks_position('top')
         ax.xaxis.tick_top()
+        plt.title("Flux plot.\n VE: False  Align: " + self.interaction.__name__ + "  BC: " + self.apply_boundaries.__name__ \
+            + "\n Dims: " + str(self.dims) + "  Dens: " + '{0:.3f}'.format(self.eff_dens) + "  Beta: " + str(self.beta), fontsize=10)
         plt.tight_layout()
         return plot
     
@@ -355,18 +360,21 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         ax.xaxis.set_label_position('top')
         ax.xaxis.set_ticks_position('top')
         ax.xaxis.tick_top()
+        plt.title("Flux plot.\n VE: False  Align: " + self.interaction.__name__ + "  BC: " + self.apply_boundaries.__name__ \
+            + "\n Dims: " + str(self.dims) + "  Dens: " + str(self.eff_dens) + "  Beta: " + str(self.beta))
         plt.tight_layout()
-        return plot
-    
+
+
     def nb_sum(self, qty):
-        sum = np.zeros(qty.shape)
-        sum[:-1, ...] += qty[1:, ...]
-        sum[1:, ...] += qty[:-1, ...]
-        sum += qty
-       # shift to left without padding and add to shift to the right without padding
-        #sums up fluxes (in qty) of neighboring particles
-        return sum
-        
+         sum = np.zeros(qty.shape)
+         sum[:-1, ...] += qty[1:, ...]
+         sum[1:, ...] += qty[:-1, ...]
+         sum += qty
+         # shift to left without padding and add to shift to the right without padding
+         #sums up fluxes (in qty) of neighboring particles
+         return sum
+
+
     def update_dynamic_fields(self):
         """Update "fields" that store important variables to compute other dynamic steps
 
@@ -374,9 +382,24 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         """
         self.cell_density = self.nodes.sum(-1)
         #cell_density ist ein array von Werten. Es wird als Summe über die Channel berechnet. (.sum(-1) summiert über die letzte Achse des Arrays).
-        effective_dens = self.nodes.sum()/(self.K * self.l)
-        #print("Required density: {}, Achieved density: {}".format(density, effective_dens))
-        self.eff_dens = effective_dens
+        self.eff_dens = self.nodes[self.nonborder].sum()/(self.K * self.l)
+        #print("Required density: {}, Achieved density: {}".format(density, self.eff_dens))
+
+#TODO section!
+    def calc_entropy(self):
+        rel_freq = self.nodes[self.nonborder].sum(-1)/self.nodes[self.nonborder].sum()
+        a = np.where(rel_freq > 0, np.log(rel_freq), 0)
+        return -np.multiply(rel_freq, a).sum()
+
+    def calc_normalized_entropy(self):
+        smax = np.log(self.l)
+        return 1 - self.calc_entropy()/smax
+
+    def calc_polar_alignment_parameter(self):
+        return np.abs(self.calc_flux(self.nodes)[self.nonborder].sum()/self.nodes[self.nonborder].sum())
+
+    def plot_hist(self):
+        pass
        
 
 if __name__ == '__main__':
