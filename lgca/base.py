@@ -401,7 +401,7 @@ class LGCA_base():
         self.apply_boundaries()
         self.update_dynamic_fields()
 
-    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
+    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True, recordnove=False):
         self.update_dynamic_fields()
         if record:
             self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
@@ -412,6 +412,15 @@ class LGCA_base():
         if recorddens:
             self.dens_t = np.zeros((timesteps + 1,) + self.dims)
             self.dens_t[0, ...] = self.cell_density[self.nonborder]
+        if recordnove:
+            self.ent_t = np.zeros(timesteps + 1, dtype=np.float)
+            self.ent_t[0, ...] = self.calc_entropy()
+            self.normEnt_t = np.zeros(timesteps + 1, dtype=np.float)
+            self.normEnt_t[0, ...] = self.calc_normalized_entropy()
+            self.polAlParam_t = np.zeros(timesteps + 1, dtype=np.float)
+            self.polAlParam_t[0, ...] = self.calc_polar_alignment_parameter()
+            self.meanAlign_t = np.zeros(timesteps + 1, dtype=np.float)
+            self.meanAlign_t[0, ...] = self.calc_mean_alignment()
         for t in range(1, timesteps + 1):
             #print("\nTimestep: {}".format(t))
             self.timestep()
@@ -421,6 +430,11 @@ class LGCA_base():
                 self.n_t[t] = self.cell_density[self.nonborder].sum()
             if recorddens:
                 self.dens_t[t, ...] = self.cell_density[self.nonborder]
+            if recordnove:
+                self.ent_t[t, ...] = self.calc_entropy()
+                self.normEnt_t[t, ...] = self.calc_normalized_entropy()
+                self.polAlParam_t[t, ...] = self.calc_polar_alignment_parameter()
+                self.meanAlign_t[t, ...] = self.calc_mean_alignment()
             if showprogress:
                 update_progress(1.0 * t / timesteps)
 
