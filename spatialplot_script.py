@@ -6,17 +6,20 @@ import time
 from os import environ as env
 from uuid import uuid4 as uuid
 
-dim = int(env['DIMS'])
-rc = int(env['RESTCHANNELS'])
-rep = int(env['REPETITIONS'])
+# dim = int(env['DIMS'])
+# rc = int(env['RESTCHANNELS'])
+# rep = int(env['REPETITIONS'])
 
+dim=1
+rc=1
+rep=1
 
 dens = 1
 birthrate = 0.5
 deathrate = 0.02
 
 uu = str(uuid())[0:7]
-saving_data = True
+saving_data = False
 
 for i in range(0, rep):
     print('bin bei wdh: ', i)
