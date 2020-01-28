@@ -153,7 +153,7 @@ def mullerplot_extended(props, id=0, save=False, int_range=1, off=False):
     if save:
         save_plot(fig, str(id) + '_' + ' mullerplot with il=' + str(int_range) + '.jpg')
 
-def entropies(props, order, plot=False, save_plot=False, id=0, off=False):
+def entropies_alt(props, order, plot=False, save_plot=False, id=0, off=False):
     time = len(props)
     if off:
         maxlab = len(props[0][1:])
@@ -257,7 +257,7 @@ def entropies(props, order, plot=False, save_plot=False, id=0, off=False):
             plot_entropies(time, ginisimpson_t, order, save_plot, id)
         return ginisimpson_t
 
-def hillnumber(props, order, plot = False, save_plot = False, id=0, off=False):
+def hillnumber_alt(props, order, plot = False, save_plot = False, id=0, off=False):
     time = len(props)
     if off:
         maxlab = len(props[0][1:])
