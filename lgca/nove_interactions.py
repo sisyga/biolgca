@@ -17,7 +17,7 @@ def dd_alignment(lgca):
     # # a is an array of numbers, array can be indexed with another array of same size with boolean specification if element
     # # should be included. Returns only the relevant elements and coords is a list here
     g = lgca.calc_flux(lgca.nodes)  # calculates flux for each lattice site
-    g = lgca.nb_sum(g, True)  # calculates sum of flux of neighbors for each lattice site
+    g = lgca.nb_sum(g, False)  # calculates sum of flux of neighbors for each lattice site
     # 1st dim: nodes
     # 2nd dim: flux vectors
     #print("Before:")
@@ -57,11 +57,11 @@ def di_alignment(lgca):
     # # a is an array of numbers, array can be indexed with another array of same size with boolean specification if element
     # # should be included. Returns only the relevant elements and coords is a list here
     g = lgca.calc_flux(lgca.nodes)  # calculates flux for each lattice site
-    g = lgca.nb_sum(g, True)  # calculates sum of flux of neighbors for each lattice site
+    g = lgca.nb_sum(g, False)  # calculates sum of flux of neighbors for each lattice site
     #print(g)
     # 1st dim: nodes
     # 2nd dim: flux vectors
-    nsum = lgca.nb_sum(lgca.cell_density, True)[None, ...] #Todo: hier anders?
+    nsum = lgca.nb_sum(lgca.cell_density, False)[None, ...] #Todo: hier anders?
     np.maximum(nsum, 1, out=nsum) #avoid dividing by zero later
     #print(nsum.T)
     g = g/ nsum.T #todo: T kann vielleicht weg und numpy.divide benutzen
