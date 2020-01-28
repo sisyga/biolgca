@@ -7,50 +7,6 @@ from matplotlib import cm
 from datetime import datetime
 import pathlib
 
-
-def errors(lgca):
-    print('---errors?---')
-    inh_l = False
-    for i in range(lgca.maxlabel.astype(int) + 1):
-        if lgca.props['lab_m'][i] <= lgca.maxlabel_init:
-            inh_l = True
-        else:
-            inh_l = False
-    if inh_l:
-        print('---')
-    else:
-        print('Fehler: inheritance label passen nicht!')
-
-    if len(lgca.props['lab_m']) == len(lgca.props['r_b']) and len(lgca.props['r_b']) == lgca.maxlabel + 1:
-        print('---')
-    else:
-        print('Fehler: len(props) passen nicht!')
-
-    if sum(lgca.props['num_off'][1:]) != lgca.borncells - lgca.diedcells + lgca.maxlabel_init:
-        print('num_off falsch!')
-    else:
-        print('---')
-
-def count_fam(lgca):
-    if lgca.maxlabel_init == 0:
-        print('ERROR: There are no cells in the lattice!')
-    else:
-        print('---genealogical research---')
-        print('number of ancestors: ', lgca.maxlabel_init)
-        print('initial density: ', lgca.maxlabel_init/(lgca.K * lgca.l))
-        num = lgca.props['num_off']
-        if num[0] != -99:
-            print('Etwas stimmt nicht!')
-        print('genealogical tree:', num[1:])
-        print('max family number is %d with ancestor cell %d' % (max(num[1:]), num.index(max(num[1:]))))
-        print('number of ancestors at beginning:', lgca.maxlabel_init)
-        print('number of living offsprings:', sum(num[1:]))
-
-        print('number of died cells: ', lgca.diedcells)
-        print('number of born cells: ', lgca.borncells)
-
-        return max(num[1:])
-
 def mullerplot(props, id=0, save=False):
     tend = len(props)
     time = range(0, tend)
@@ -153,174 +109,15 @@ def mullerplot_extended(props, id=0, save=False, int_range=1, off=False):
     if save:
         save_plot(fig, str(id) + '_' + ' mullerplot with il=' + str(int_range) + '.jpg')
 
-def entropies_alt(props, order, plot=False, save_plot=False, id=0, off=False):
-    time = len(props)
-    if off:
-        maxlab = len(props[0][1:])
-
-    else:
-        maxlab = len(props[0]['num_off'][1:])
-    if order == 1:
-        # print('Shannon')
-        shan_t = np.zeros(time)
-        if off:
-            for t in range(time):
-                if sum(props[t][1:]) != 0:
-                    for lab in range(1, maxlab+1):
-                        pi = props[t][lab] / sum(props[t][1:])
-                        if pi != 0:
-                            shan_t[t] -= pi * m.log(pi)
-                else:
-                    # print('extinct since t= ', t)
-                    t_ex = t
-                    shan_t[t:] = -1
-                    break
-
-        else:
-            for t in range(time):
-                if sum(props[t]['num_off'][1:]) != 0:
-                    for lab in range(1, maxlab+1):
-                        pi = props[t]['num_off'][lab] / sum(props[t]['num_off'][1:])
-                        if pi != 0:
-                            shan_t[t] -= pi * m.log(pi)
-                else:
-                    # print('extinct since t= ', t)
-                    t_ex = t
-                    shan_t[t:] = -1
-                    break
-        shan_max = m.log(maxlab)
-        if plot or save_plot:
-            plot_entropies(time, shan_t, order, save_plot, id)
-        return shan_t, shan_max
-
-    if order == 1.5:
-        # print('simpson')
-        simpson_t = np.zeros(time) + 1
-        if off:
-            for t in range(time):
-                abs = sum(props[t][1:])
-                if abs > 1:
-                    for lab in range(1, maxlab + 1):
-                        pi = props[t][lab]
-                        simpson_t[t] -= (pi * (pi - 1)) / (abs * (abs - 1))
-                elif abs == 1:
-                    simpson_t[t] = 0
-                elif abs == 0:
-                    # print('extinct since t= ', t)
-                    t_ex = t
-                    simpson_t[t:] = -1
-                    break
-        else:
-            for t in range(time):
-                abs = sum(props[t]['num_off'][1:])
-                if abs > 1:
-                    for lab in range(1, maxlab+1):
-                        pi = props[t]['num_off'][lab]
-                        simpson_t[t] -= (pi * (pi-1)) / (abs * (abs - 1))
-                elif abs == 1:
-                    simpson_t[t] = 0
-                elif abs == 0:
-                    # print('extinct since t= ', t)
-                    t_ex = t
-                    simpson_t[t:] = -1
-                    break
-        if plot or save_plot:
-            plot_entropies(time, simpson_t, order, save_plot, id)
-        return simpson_t
-
-    if order == 2:
-        # print('ginisimpson')
-        ginisimpson_t = np.zeros(time) + 1
-        if off:
-            for t in range(time):
-                if sum(props[t][1:]) != 0:
-                    for lab in range(1, maxlab + 1):
-                        pi = props[t][lab] / sum(props[t][1:])
-                        ginisimpson_t[t] -= pi * pi
-                else:
-                    # print('extinct since t= ', t)
-                    t_ex = t
-                    ginisimpson_t[t:] = -1
-                    break
-        else:
-            for t in range(time):
-                if sum(props[t]['num_off'][1:]) != 0:
-                    for lab in range(1, maxlab+1):
-                        pi = props[t]['num_off'][lab] / sum(props[t]['num_off'][1:])
-                        ginisimpson_t[t] -= pi * pi
-                else:
-                    # print('extinct since t= ', t)
-                    t_ex = t
-                    ginisimpson_t[t:] = -1
-                    break
-        if plot or save_plot:
-            plot_entropies(time, ginisimpson_t, order, save_plot, id)
-        return ginisimpson_t
-
-def hillnumber_alt(props, order, plot = False, save_plot = False, id=0, off=False):
-    time = len(props)
-    if off:
-        maxlab = len(props[0][1:])
-    else:
-        maxlab = len(props[0]['num_off'][1:])
-
-    if order == 1:
-        hill_lin = np.zeros(time)
-        # print('exp Shannon')
-        shan_t, shan_max = entropies(props, order=1, off=off)
-        for t in range(time):
-            if shan_t[t] != -1:
-                hill_lin[t] = np.exp(shan_t[t])
-            else:
-                # print('extinct since t= ', t)
-                t_ex = t
-                hill_lin[t:] = -1
-                break
-        hill_max = np.exp(shan_max)
-        if plot or save_plot:
-            plot_hill(time, hill_lin, order, save_plot, id)
-        return hill_lin, hill_max
-
-    if order >= 2:
-        # print('hillnumber order', order)
-        hill_quad = np.zeros(time)
-        if off:
-            for t in range(time):
-                if sum(props[t][1:]) != 0:
-                    for lab in range(1, maxlab + 1):
-                        pi = props[t][lab] / sum(props[t][1:])
-                        hill_quad[t] += pi ** order
-                    hill_quad[t] = hill_quad[t] ** (1 / (1 - order))
-                else:
-                    # print('extinct since t= ', t)
-                    t_ex = t
-                    hill_quad[t:] = -1
-                    break
-        else:
-            for t in range(time):
-                if sum(props[t]['num_off'][1:]) != 0:
-                    for lab in range(1, maxlab+1):
-                        pi = props[t]['num_off'][lab] / sum(props[t]['num_off'][1:])
-                        hill_quad[t] += pi ** order
-                    hill_quad[t] = hill_quad[t] ** (1/(1 - order))
-                else:
-                    # print('extinct since t= ', t)
-                    t_ex = t
-                    hill_quad[t:] = -1
-                    break
-        if plot or save_plot:
-            plot_hill(time, hill_quad, order, save_plot, id)
-        return hill_quad
-
-def plot_hill(timesteps, ind, order, save, id):
-    time = timesteps
+def plot_index(index_data, which, save=False, id=0):
+    time = len(index_data)
     x = np.arange(0, time, 1)
-    y = ind[x]
+    y = index_data[x]
 
     fig, ax = plt.subplots()
     ax.plot(x, y)
 
-    ax.set(xlabel='timestep', ylabel='Hillnumber of order {order: d}'.format(order=order))
+    ax.set(xlabel='timestep', ylabel=str(which))
     plt.xlim(0, time-1)
 
     if time >= 700:
@@ -329,25 +126,22 @@ def plot_hill(timesteps, ind, order, save, id):
         plt.xticks(np.arange(0, time, 50))
     else:
         plt.xticks(np.arange(0, time, 2))
-    plt.yticks(np.arange(0, y.max(), 2))
-    # ax.grid()
-
-    plt.show()
+    plt.ylim(0, max(y))
 
     if save:
-        save_plot(fig, str(id) + '_hillnumber order ' + str(order) + '.jpg')
+        save_plot(fig, str(id) + str(which) + '.jpg')
+    plt.show()
 
-def plot_hill_together(props, save=False, id=0):
-    time = len(props)
+
+
+def plot_hillnumbers_together(hill_1, hill_2, hill_3, save=False, id=0):
+    time = len(hill_1)
     x = np.arange(0, time, 1)
-    o1, hillmax = hillnumber(props, 1)
-    o2 = hillnumber(props, 2)
-    o3 = hillnumber(props, 3)
 
     fig, ax = plt.subplots()
-    plt.plot(x, o1, 'b-', label='order 1')
-    plt.plot(x, o2, 'c--', label='order 2')
-    plt.plot(x, o3, 'm:', label='order 3')
+    plt.plot(x, hill_1, 'b-', label='order 1')
+    plt.plot(x, hill_2, 'c--', label='order 2')
+    plt.plot(x, hill_3, 'm:', label='order 3')
 
     ax.set(xlabel='timesteps', ylabel='Hillnumbers')
     ax.legend()
@@ -356,54 +150,21 @@ def plot_hill_together(props, save=False, id=0):
         plt.xticks(np.arange(0, time, 100))
     elif time >= 100:
         plt.xticks(np.arange(0, time, 50))
-    else:
-        plt.xticks(np.arange(0, time, 5))
-    plt.ylim(1, hillmax*1.1, 10)
-    plt.show()
 
+    plt.ylim(1, max(hill_1)*1.1, 10)
     if save:
-        save_plot(fig, str(id) + '_comparing hillnumbers' + '.jpg')
-
-def plot_entropies(timesteps, ind, order, save_plot, id=0):
-    time = timesteps
-    x = np.arange(0, time, 1)
-    y = ind[x]
-
-    fig, ax = plt.subplots()
-    ax.plot(x, y)
-
-    if order == 1:
-        ax.set(xlabel='timestep', ylabel='Shannonindex')
-    elif order == 2:
-        ax.set(xlabel='timestep', ylabel='Ginisimpsonindex')
-    elif order == 1.5:
-        ax.set(xlabel='timestep', ylabel='Simpsonindex')
-    plt.xlim(0, time-1)
-    if time >= 700:
-        plt.xticks(np.arange(0, time, 100))
-    elif time >= 100:
-        plt.xticks(np.arange(0, time, 50))
-    else:
-        plt.xticks(np.arange(0, time, 2))
-    plt.ylim(0, y.max()+0.1)
-    plt.yticks(np.arange(0, y.max(), 0.2))
-    # ax.grid()
-
+        save_plot(plot=fig, filename= str(id) + '_comparing hillnumbers' + '.jpg')
     plt.show()
 
-    if save_plot:
-        save_plot(fig, str(id) + '_entropy order ' + str(order) + '.jpg')
 
-def plot_entropies_together(props, save=False, id=0):
-    time = len(props)
+
+def plot_entropies_together(simpson, gini, shannon, save=False, id=0):
+    time = len(gini)
     x = np.arange(0, time, 1)
-    shan, shanmax = entropies(props, 1)
-    simp = entropies(props, 1.5)
-    gini = entropies(props, 2)
 
     fig, ax = plt.subplots()
-    plt.plot(x, shan, 'b-', label='Shannonindex')
-    plt.plot(x, simp, 'c--', label='Simpsonindex')
+    plt.plot(x, shannon, 'b-', label='Shannonindex')
+    plt.plot(x, simpson, 'c--', label='Simpsonindex')
     plt.plot(x, gini, 'm:', label='GiniSimpsonindex')
 
     ax.set(xlabel='timesteps', ylabel='Index')
@@ -413,15 +174,13 @@ def plot_entropies_together(props, save=False, id=0):
         plt.xticks(np.arange(0, time, 100))
     elif time >= 100:
         plt.xticks(np.arange(0, time, 50))
-    else:
-        plt.xticks(np.arange(0, time, 5))
-    plt.ylim(0, shanmax * 1.1, 0.2)
-    # ax.grid()
-    # plt.axhline(y=0)
-    plt.show()
 
+    plt.ylim(0, max(shannon) * 1.1)
     if save:
         save_plot(fig, str(id) + '_comparing entropies' + '.jpg')
+    plt.show()
+
+
 
 def make_patch_spines_invisible(ax):
     ax.set_frame_on(True)
@@ -429,29 +188,20 @@ def make_patch_spines_invisible(ax):
     for sp in ax.spines.values():
         sp.set_visible(False)
 
-def plot_sh_gi_hh(props, save=False, id=0, off=False):
-    time = len(props)
+def plot_selected_entropies(shannon, hill2, gini, save=False, id=0):
+    time = len(shannon)
     x = np.arange(0, time, 1)
-    shan, shanmax = entropies(props, order=1, off=off)
-    hh = hillnumber(props, order=2, off=off)
-    gini = entropies(props, order=2, off=off)
 
     fig, host = plt.subplots()
     par1 = host.twinx()
     par2 = host.twinx()
-    # Offset the right spine of par2.  The ticks and label have already been
-    # placed on the right by twinx above.
     par2.spines["right"].set_position(("axes", 1.2))
-    # Having been created by twinx, par2 has its frame off, so the line of its
-    # detached spine is invisible.  First, activate the frame but make the patch
-    # and spines invisible.
     make_patch_spines_invisible(par2)
-    # Second, show the right spine.
     par2.spines["right"].set_visible(True)
 
-    p1, = host.plot(x, shan, "m", linewidth=0.7, label="Shannonindex")
+    p1, = host.plot(x, shannon, "m", linewidth=0.7, label="Shannonindex")
     p2, = par1.plot(x, gini, "b", linewidth=0.7, label="GiniSimpsonindex")
-    p3, = par2.plot(x, hh, "c", linewidth=0.7, label="Hillnumber of order 2")
+    p3, = par2.plot(x, hill2, "c", linewidth=0.7, label="Hillnumber of order 2")
 
     host.set_xlim(0, time - 1)
     host.set_ylim(bottom=0)
@@ -476,6 +226,9 @@ def plot_sh_gi_hh(props, save=False, id=0, off=False):
     lines = [p1, p2, p3]
 
     host.legend(lines, [l.get_label() for l in lines])
+    if save:
+        filename = str(id) + '_comparing sh, gi, hh' + '.jpg'
+        plt.savefig(pathlib.Path('pictures').resolve() / filename, bbox_inches='tight')
     plt.show()
 
     #     plt.plot(x, shan, 'b-', label='Shannonindex')
@@ -495,38 +248,30 @@ def plot_sh_gi_hh(props, save=False, id=0, off=False):
     #         plt.xticks(np.arange(0, time, 50))
     #     plt.ylim(0, np.exp(shanmax) * 1.1, 0.5)
 
-    if save:
-        filename = str(id) + '_comparing sh, gi, hh' + '.jpg'
-        plt.savefig(pathlib.Path('pictures').resolve() / filename, bbox_inches='tight')
 
 
-def plot_popsize(props, save=False, id=0, off=False):
-    time = len(props)
+
+def plot_popsize(data, save=False, id=0):
+    time = len(data)
     x = np.arange(0, time, 1)
     size = np.zeros(time)
-    if off:
-        for t in range(time):
-            size[t] = sum(props[t][1:])
-    else:
-        for t in range(time):
-            size[t] = sum(props[t]['num_off'][1:])
+    for t in range(time):
+        size[t] = sum(data[t][1:])
     y = size[x]
 
     fig, ax = plt.subplots()
     ax.plot(x, y)
-    plt.xlim(0, time-1)
-    plt.ylim(0, size[0] + 0.5)
-    # plt.yticks(np.arange(0, size.max() * 1.1, 10))
-    ax.set(xlabel='timestep', ylabel='number of living cells')
-    # ax.grid(axis='y')
-
-    plt.show()
-
+    plt.xlim(0, time - 1)
+    plt.ylim(0, max(size) * 1.1)
+    ax.set(xlabel='timestep', ylabel='total number of living cells')
     if save:
         save_plot(fig, str(id) + '_population size ' + '.jpg')
 
-def spacetime_plot(nodes_t, labels, figindex = None, figsize=None,\
-                 cmap='nipy_spectral', tbeg=None, tend=None, save=False, id=0):
+    plt.show()
+
+
+
+def spacetime_plot(nodes_t, labels, figsize=None, cmap='nipy_spectral', tbeg=None, tend=None, save=False, id=0):
     tmax, dim, c = nodes_t.shape
     vc = 2
     rc = c - vc
@@ -600,7 +345,9 @@ def spacetime_plot(nodes_t, labels, figindex = None, figsize=None,\
 def save_plot(plot, filename=None):
     if filename is None:
         filename = 'no_name'
+
     plt.savefig(pathlib.Path('pictures').resolve() / filename)
+
 
 def aloha(who):
     print('aloha', who)

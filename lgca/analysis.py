@@ -64,7 +64,7 @@ def create_averaged_entropies(variation, filename, path, rep, save=False, plot=F
 
     result_sh = np.zeros(tmax)
     result_gi = np.zeros(tmax)
-    # result_hill2 = []
+    result_hill = np.zeros(tmax)
 
     counter = np.zeros(tmax + 1)
 
@@ -83,17 +83,17 @@ def create_averaged_entropies(variation, filename, path, rep, save=False, plot=F
         gini = calc_ginisimpson(data)
         gini = np.concatenate((gini, np.zeros(tmax-t)))
         result_gi = result_gi + gini
-    #     # 'hill2':
-    #     hill =  hillnumber(props=data_off, order=2, off=True)
-    #     hill = np.concatenate((hill, np.zeros(tmax-t)))
-    #     result_hill2 = result_hill2 + hill
-    #     print('sh ohne', result_sh[240:246])
+
+        # 'hill order 2':
+        hill = calc_hillnumbers(data)
+        hill = np.concatenate((hill, np.zeros(tmax-t)))
+        result_hill = result_hill + hill
 
     # Mitteln
     for i in range(tmax):
         result_sh[i] = result_sh[i] / counter[i + 1]
         result_gi[i]= result_gi[i] / counter[i+1]
-    #     result_hill2[i] = result_hill2[i] / counter[i+1]
+        result_hill[i] = result_hill[i] / counter[i+1]
     # print('sh mit', result_sh[240:246])
     # print(counter)
 
@@ -101,6 +101,7 @@ def create_averaged_entropies(variation, filename, path, rep, save=False, plot=F
     if save:
         print('shannon', result_sh)
         print('gini', result_gi)
+        print('hill', result_hill)
         # np.save(path + variation + '_' + filename + '_' + 'shannon' + '.npy', result_sh)
         # np.save('saved_data/' + variation + '_' + 'gini' + '.npy', result_gi)
         # np.save('saved_data/' + variation + '_' + 'hill2' + '.npy', result_hill2)
@@ -137,3 +138,39 @@ def calc_ginisimpson(data):
                 ginisimpson[t] -= pi * pi
     return ginisimpson
 
+def calc_simpson(data):
+    time = len(data)
+    # print(time)
+    maxlab = len(data[0][1:])
+    # print(maxlab)
+
+    simpson = np.zeros(time) + 1
+    for t in range(time):
+        n = sum(data[t, 1:])
+        if n == 1:
+            simpson[t] -= 1
+        else:
+            for lab in range(1, maxlab + 1):
+                ni = data[t, lab]
+                simpson[t] -= (ni * (ni - 1))/(n * (n - 1))
+    return simpson
+
+def calc_hillnumbers(data, order=2):
+    time = len(data)
+    maxlab = len(data[0][1:])
+
+    if order ==1:
+        hill_lin = np.zeros(time)
+        shannon = calc_shannon(data)
+        for t in range(time):
+            hill_lin[t] = np.exp(shannon[t])
+        return hill_lin
+
+    else:
+        hill_q = np.zeros(time)
+        for t in range(time):
+            for lab in range(1, maxlab + 1):
+                pi = data[t][lab] / sum(data[t][1:])
+                hill_q[t] += pi ** order
+            hill_q[t] = hill_q[t] ** (1 / (1 - order))
+        return hill_q

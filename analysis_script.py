@@ -19,7 +19,7 @@ intervall = 2
 save_hist = True
 
 #calculate averaged entropies
-entropies = True
+entropies = False
 
 if create:
 #create thom
@@ -32,11 +32,13 @@ if histogram:
 #plot thom histogram
     histogram_thom(thom=thom, int_length=intervall, save=save_hist, id=variation + '_' + filename)
 
-# for i in range(rep):
-#     data = np.load(path + variation + '_' + str(i) + '_' + filename + '_offsprings.npy')
-    # tend, _ = data.shape
-    # print(calc_shannon(data))
-    # print(calc_ginisimpson(data))
-
+for i in range(1):
+    data = np.load(path + variation + '_' + str(i) + '_' + filename + '_offsprings.npy')
+    tend, _ = data.shape
+    plot_index(calc_hillnumbers(data), save=True, id=999, which='hill2')
+    plot_hillnumbers_together(hill_1=calc_hillnumbers(data, order=1), hill_2=calc_hillnumbers(data, order=2),\
+                              hill_3=calc_hillnumbers(data, order=3))
+    plot_entropies_together(simpson=calc_simpson(data), shannon=calc_shannon(data), gini=calc_ginisimpson(data), save=True, id=999)
+    plot_selected_entropies(shannon=calc_shannon(data), gini=calc_ginisimpson(data), hill2=calc_hillnumbers(data), save=True)
 if entropies:
     create_averaged_entropies(filename=filename, variation=variation, path=path, rep=rep, save=True)
