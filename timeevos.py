@@ -8,11 +8,11 @@ mpl.use('Agg')
 """CAREFUL WITH RUNNING! CHANGE FILENAME FIRST!"""
 """Setup"""
 dims = 70
-timesteps = 500
-trials = 10 #50 for talk
+timesteps = 1000
+trials = 1 #50 for talk
 time = range(timesteps + 1)
 mode = 'di'
-mode_num = '110'
+mode_num = 'test_110'
 
 plt.rcParams['figure.figsize'] = (9, 5)
 fig_ent = plt.figure("Entropy")
@@ -34,7 +34,8 @@ plt.rcdefaults()
 #densities = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
 densities = np.arange(0.1, 3.1, 0.5)
 #densities = np.ones(1)*0.8
-betas = np.arange(0, 4, 0.5)
+betas = np.arange(0, 3.75, 0.25) #valid
+#betas=np.array([])
 #betas = [0.01, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.5, 2, 2.5, 3]
 #betas=np.arange(0, 5, 0.1)
 #betas = np.ones(1)*0.00001
@@ -51,16 +52,16 @@ betas = np.arange(0, 4, 0.5)
 #fig, ax = plt.subplots(nrows=1, ncols=1)
 
 for d in range(len(densities)):
-    print("Density: ")
-    print(densities[d])
+    #print("Density: ")
+    #print(densities[d])
     for b in range(len(betas)):
         for i in range(trials):
-            print("Beta:")
-            print(betas[b])
+            #print("Beta:")
+            #print(betas[b])
             lgca1 = get_lgca(interaction=(mode + '_alignment'), ve=False, bc='periodic', density=densities[d], geometry='lin', dims=dims, beta=betas[b]) #density=densities[d]
             #start_entr[i] = lgca1.calc_entropy()
             #start_norm_entr[i] = lgca1.calc_normalized_entropy()
-            lgca1.timeevo(timesteps=timesteps, record=True, recordnove=True)
+            lgca1.timeevo(timesteps=timesteps, record=True, recordnove=True, showprogress=False)
             plt.figure(fig_ent.number)
             plt.plot(time, lgca1.ent_t, linewidth=0.75)
             plt.figure(fig_norment.number)
@@ -80,7 +81,7 @@ for d in range(len(densities)):
             #entropy[d][b][4] = end_norm_entr.sum() / trials
             #entropy[d][b][6] = end_polar_alignment.sum()/trials
         paramstr = "Density: " + str(densities[d]) + ", Beta: " + str(betas[b])
-        savestr = "oldmodel_" + mode_num + "_" + str(dims) + "_" + '{0:.6f}'.format(densities[d]) + "_" + '{0:.6f}'.format(\
+        savestr = mode_num + "_" + str(dims) + "_" + '{0:.6f}'.format(densities[d]) + "_" + '{0:.6f}'.format(\
             betas[b]) + "_" + str(timesteps) + "_" + str(trials)
 
         plt.figure(fig_ent.number)

@@ -738,10 +738,16 @@ class LGCA_noVE_base(LGCA_base):
     Base class for LGCA without volume exclusion.
     """
     def set_interaction(self, **kwargs):
-        try:
-            from .nove_interactions import dd_alignment, di_alignment
-        except:
-            from nove_interactions import alignment
+        if 'no_ext_moore' in kwargs:
+            try:
+                from .nove_interactions import dd_alignment, di_alignment
+            except:
+                from nove_interactions import alignment
+        else:
+            try:
+                from .nove_interactions_extmoore import dd_alignment, di_alignment
+            except:
+                from nove_interactions_extmoore import alignment
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
             if interaction == 'dd_alignment':
