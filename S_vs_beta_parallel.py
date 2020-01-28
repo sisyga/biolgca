@@ -12,21 +12,27 @@ nprocesses = 3
 
 """Setup"""
 dims = 70
-timesteps = 101 #300 dd, >500 di
-trials = 2 #50
+timesteps = 500 #500 dd >300, >500 di: 1000
+trials = 50 #50
 
 # density is outer loop
 # beta to be set
 
 #densities = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
-densities = np.array([0.2, 0.8])
+#densities = np.append(np.arange(0,1,0.05), np.arange(1,3,0.25)) # interesting ranges
+densities = np.array([0.2, 0.5, 1])
 #densities = np.ones(1)*0.2
-betas = np.array([0.1, 0.2, 0.25, 0.3, 0.35])
-mode = "dd"
+betas = np.append(np.arange(0,0.2,0.01), np.arange(0.2,0.4, 0.025)) # interesting ranges
+#betas = np.arange(0, 0.35, 0.01)
+#betas=np.array([4.1, 5.1, 6.1, 7.1, 8.1, 9.1])
 
-savestr = "par_110_" + str(dims) + "_dens_beta_" + str(timesteps) + "_" + str(trials) + "_" + mode + "_BETA"
+#betas = np.append(betas1, np.arange(1, 3, 0.25))
+mode = "dd"
+prefix = "par_100_6_"
+
+savestr = prefix + str(dims) + "_dens_beta_" + str(timesteps) + "_" + str(trials) + "_" + mode + "_BETA"
 pd.to_pickle(betas, "./pickles/" + savestr + ".pkl")
-savestr = "par_110_" + str(dims) + "_dens_beta_" + str(timesteps) + "_" + str(trials) + "_" + mode + "_DENS"
+savestr = prefix + str(dims) + "_dens_beta_" + str(timesteps) + "_" + str(trials) + "_" + mode + "_DENS"
 pd.to_pickle(densities, "./pickles/" + savestr + ".pkl")
 #betas = [0.01, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.5, 2, 2.5, 3]
 #betas=np.arange(0, 5, 0.1)
@@ -81,7 +87,7 @@ def job(d):
         measures_t[b][9] = end_mean_alignment.sum() / trials
         measures_t[b][10] = ratio_mean_alignment.sum() / trials
     #label = "Density: " + str(densities[d])
-    savestr = "par_110_" + str(dims) + "_" + '{0:.6f}'.format(densities[d]) + "_beta_" + str(timesteps) + "_" + str(trials)
+    savestr = prefix + str(dims) + "_" + '{0:.6f}'.format(densities[d]) + "_beta_" + str(timesteps) + "_" + str(trials)
     pd.to_pickle(measures_t, "./pickles/" + savestr + "_" + mode + ".pkl")
     return d, measures_t
 
@@ -95,7 +101,7 @@ if __name__ == '__main__':
     #collecting results from the seperate processes
     for i in range(len(data)):
         measures[data[i][0]] = data[i][1]
-    savestr = "par_110_" + str(dims) + "_dens_beta_" + str(timesteps) + "_" + str(trials)
+    savestr = prefix + str(dims) + "_dens_beta_" + str(timesteps) + "_" + str(trials)
     pd.to_pickle(measures, "./pickles/" + savestr + "_" + mode + ".pkl")
     #ax.plot(betas, entropy[d,:,6], label=label) #4
 
