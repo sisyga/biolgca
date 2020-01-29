@@ -231,26 +231,6 @@ def plot_selected_entropies(shannon, hill2, gini, save=False, id=0):
         plt.savefig(pathlib.Path('pictures').resolve() / filename, bbox_inches='tight')
     plt.show()
 
-    #     plt.plot(x, shan, 'b-', label='Shannonindex')
-    #     plt.plot(x, gini, 'm:', label='GiniSimpsonindex')
-    #     plt.plot(x, hh, 'c--', label='Hillnumber of order 2')
-
-    #     ax.set(xlabel='timesteps', ylabel='Index')
-    #     ax.legend()
-    #     plt.xlim(0, time - 1)
-    #     if time <= 15:
-    #         plt.xticks(np.arange(0, time, 1))
-    #     elif time <= 100:
-    #         plt.xticks(np.arange(0, time, 5))
-    #     elif time >= 1000:
-    #         plt.xticks(np.arange(0, time, 500))
-    #     elif time >= 100:
-    #         plt.xticks(np.arange(0, time, 50))
-    #     plt.ylim(0, np.exp(shanmax) * 1.1, 0.5)
-
-
-
-
 def plot_popsize(data, save=False, id=0):
     time = len(data)
     x = np.arange(0, time, 1)
@@ -268,8 +248,6 @@ def plot_popsize(data, save=False, id=0):
         save_plot(fig, str(id) + '_population size ' + '.jpg')
 
     plt.show()
-
-
 
 def spacetime_plot(nodes_t, labels, figsize=None, cmap='nipy_spectral', tbeg=None, tend=None, save=False, id=0):
     tmax, dim, c = nodes_t.shape
@@ -338,9 +316,51 @@ def spacetime_plot(nodes_t, labels, figsize=None, cmap='nipy_spectral', tbeg=Non
         plt.yticks(np.arange(tbeg, tend, 50))
     elif tend - tbeg <= 100:
         plt.yticks(np.arange(tbeg, tend, 10))
-    plt.show()
     if save:
         save_plot(fig, str(id) + '_spacetimeplot' + '.jpg')
+    plt.show()
+
+
+def thom_all_plot(time_arrays, xrange, save, id):
+    colors = ['seagreen', 'magenta', 'cyan', 'blue']
+    fig, ax = plt.subplots()
+    data = pd.DataFrame({**{'range': xrange}, **time_arrays})
+    for index, (name, thom) in enumerate(time_arrays.items()):
+        plt.plot('range', name, data=data, marker='', color=colors[index], linewidth=0.7, label=name)
+    plt.legend()
+    plt.xlim(0, xrange.max() + xrange[0])
+    plt.ylim(bottom=0)
+    ax.set(xlabel='timesteps', ylabel='absolut frequencies')
+
+    if save:
+        filename = str(id) + '_compared distribution' + '.jpg'
+        plt.savefig(pathlib.Path('pictures').resolve() / filename)
+
+    plt.show()
+
+def create_count(int_length, thom):
+    max = thom.max().astype(int)
+    l = len(thom)
+    # anz intervalle
+    ni = (max / int_length + 1).astype(int)  #
+    count = np.zeros(ni + 1)
+
+    for entry in thom:
+        c = (entry / int_length).astype(int)
+        count[c] += 1
+    if count.sum() != l:
+        print('FEHLER!')
+
+    return count
+
+def thom_all(time_array, int_length, save=False, id=0):
+    maxx = max([x.max() for x in time_array.values()])
+    x = np.arange(0, maxx + int_length, int_length) + int_length / 2
+    smoothie = {}
+    for name, entry in time_array.items():
+        c = create_count(int_length, entry)
+        smoothie[name] = np.append(c, np.zeros(len(x) - len(c)))
+    thom_all_plot(smoothie, x, save, id)
 
 def save_plot(plot, filename=None):
     if filename is None:

@@ -23,7 +23,7 @@ def create_thom(variation, filename, path, rep, save=False):
         np.save(path + variation + '_thom', thom)
     print('Max: %d, Min: %d, Mean: %f' %(max(thom), min(thom), thom.mean()))
 
-def histogram_thom(thom, int_length, save=False, id=0):
+def plot_histogram_thom(thom, int_length, save=False, id=0):
     max = thom.max().astype(int)
     l = len(thom)
 
@@ -56,11 +56,11 @@ def histogram_thom(thom, int_length, save=False, id=0):
 
 #TODO: thom_plt_all
 
-def create_averaged_entropies(variation, filename, path, rep, save=False, plot=False):
+def create_averaged_entropies(variation, filename, path, rep, save=False, plot=False, saveplot=False):
     # thom einlesen
     thom = np.load(path + variation + '_thom.npy')
     tmax = int(max(thom))
-    print('tmax', tmax)
+    # print('tmax', tmax)
 
     result_sh = np.zeros(tmax)
     result_gi = np.zeros(tmax)
@@ -71,7 +71,7 @@ def create_averaged_entropies(variation, filename, path, rep, save=False, plot=F
     for i in range(rep):
         data = np.load(path + variation + '_' + str(i) + '_' + filename + '_offsprings.npy')
         t = int(thom[i])
-        print('t', t)
+        # print('t', t)
         counter[1:t + 1] += 1
 
         # 'shannon':
@@ -92,23 +92,19 @@ def create_averaged_entropies(variation, filename, path, rep, save=False, plot=F
     # Mitteln
     for i in range(tmax):
         result_sh[i] = result_sh[i] / counter[i + 1]
-        result_gi[i]= result_gi[i] / counter[i+1]
+        result_gi[i] = result_gi[i] / counter[i+1]
         result_hill[i] = result_hill[i] / counter[i+1]
-    # print('sh mit', result_sh[240:246])
-    # print(counter)
 
     # speichern
     if save:
-        print('shannon', result_sh)
-        print('gini', result_gi)
-        print('hill', result_hill)
-        # np.save(path + variation + '_' + filename + '_' + 'shannon' + '.npy', result_sh)
-        # np.save('saved_data/' + variation + '_' + 'gini' + '.npy', result_gi)
-        # np.save('saved_data/' + variation + '_' + 'hill2' + '.npy', result_hill2)
+        np.save(path + variation + '_' + filename + '_' + 'shannon' + '.npy', result_sh)
+        np.save(path + variation + '_' + filename + '_' + 'gini' + '.npy', result_gi)
+        np.save(path + variation + '_' + filename + '_' + 'hill2' + '.npy', result_hill)
 
     # plot
-    # if plot:
-    # plot_averaged_entropies(sh=result_sh, gi=result_gi, hh=result_hill2, save=False)
+    if plot:
+        plot_selected_entropies(shannon=result_sh, hill2=result_hill, gini=result_gi,\
+                                save=saveplot, id=variation+'_averaged')
 
 def calc_shannon(data):
     time = len(data)
