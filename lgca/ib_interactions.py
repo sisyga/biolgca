@@ -169,7 +169,7 @@ def inheritance(lgca):
                 print('cell with label %d dies' % label)
             labmoth = lgca.props['lab_m'][label]
             lgca.props['num_off'][labmoth] -= 1
-            lgca.diedcells += 1
+            # lgca.diedcells += 1
             if chronicle:
                 print('lab_m dazu ist', labmoth)
     rel_nodes[dying] = 0
@@ -191,7 +191,7 @@ def inheritance(lgca):
                 if chronicle:
                     print('es proliferiert Zelle', label)
                 lgca.maxlabel += 1
-                lgca.borncells += 1
+                # lgca.borncells += 1
 
                 node[ind] = lgca.maxlabel
                 lgca.apply_boundaries()

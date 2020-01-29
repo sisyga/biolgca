@@ -6,12 +6,12 @@ import time
 from os import environ as env
 from uuid import uuid4 as uuid
 
-dim = int(env['DIMS'])
-rc = int(env['RESTCHANNELS'])
-rep = int(env['REPETITIONS'])
-
-
-
+# dim = int(env['DIMS'])
+# rc = int(env['RESTCHANNELS'])
+# rep = int(env['REPETITIONS'])
+dim = 2
+rc = 1
+rep = 1
 
 dens = 1
 birthrate = 0.5
@@ -21,7 +21,7 @@ uu = str(uuid())[0:7]
 saving_data = True
 
 for i in range(0, rep):
-    #TODO print(bei bei wdh: , i)
+    print('wdh: ', i)
     start = time.time()
     name = str(2*dim + dim*rc) + str(dim)
 

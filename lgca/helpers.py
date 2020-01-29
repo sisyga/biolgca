@@ -7,77 +7,34 @@ from matplotlib import cm
 from datetime import datetime
 import pathlib
 
-def mullerplot(props, id=0, save=False):
-    tend = len(props)
-    time = range(0, tend)
-    maxlab = len(props[0]['num_off']) - 1
+def mullerplot(data, id=0, save=False, int_length=1):
+    tend = len(data)
+    maxlab = len(data[0]) - 1
 
-    val = np.zeros((maxlab, tend))
-    for t in range(0, tend):
-        for lab in range(0, maxlab):
-            val[lab, t] = props[t]['num_off'][lab + 1]
-    valdic = {str(i): val[i] for i in range(0, maxlab)}
-    data = pd.DataFrame(valdic, index=time)
-    data_perc = data.divide(data.sum(axis=1), axis=0)
-    fig = plt.subplot()
-    plt.ylabel(' frequency of families')
-    plt.xlabel('timesteps')
-    plt.xlim(0, tend - 1)
-    plt.ylim(0, 1)
-    if tend <= 15:
-        plt.xticks(np.arange(0, tend, 1))
-    elif tend <= 100:
-        plt.xticks(np.arange(0, tend, 5))
-    elif tend >= 5000:
-        plt.xticks(np.arange(0, tend, 1000))
-    elif tend >= 1000:
-        plt.xticks(np.arange(0, tend, 500))
-    elif tend >= 100:
-        plt.xticks(np.arange(0, tend, 50))
-
-
-    plt.stackplot(time, *[data_perc[str(f)] for f in range(0, maxlab)],\
-                  labels=list(range(0, maxlab)))
-    plt.show()
-
-
-    if save:
-        save_plot(fig, str(id) + '_' + ' mullerplot' + '.jpg')
-
-def mullerplot_extended(props, id=0, save=False, int_range=1, off=False):
-    tend = len(props)
-    if off:
-        maxlab = len(props[0]) - 1
-    else:
-        maxlab = len(props[0]['num_off']) - 1
     fig, ax = plt.subplots()
     # xrange = range(0,tend, int_range)
     val = np.zeros((maxlab, tend))
-    if off:
-        for t in range(0, tend):
-            for lab in range(0, maxlab):
-                val[lab, t] = props[t, lab + 1]
-    else:
-        for t in range(0, tend):
-            for lab in range(0, maxlab):
-                val[lab, t] = props[t]['num_off'][lab + 1]
+
+    for t in range(0, tend):
+        for lab in range(0, maxlab):
+            val[lab, t] = data[t, lab + 1]
 
     plt.xlabel('timesteps')
 
-    if int_range == 1:
+    if int_length == 1:
         xrange = range(0, tend)
         pop = val
     else:
-        int_num = ((tend - 1) // int_range + 1)
-        xrange = np.arange(0, tend, int_range) + int_range / 2
+        int_num = ((tend - 1) // int_length + 1)
+        xrange = np.arange(0, tend, int_length) + int_length / 2
         xrange = np.append(np.append(np.zeros(1), xrange), tend)
         mean_val = np.zeros((maxlab, int_num)) + -999
         for i in range(0, int_num):
             for lab in range(0, maxlab):
-                mean_val[lab, i] = np.sum(val[lab, i * int_range:(i + 1) * int_range]) / int_range
+                mean_val[lab, i] = np.sum(val[lab, i * int_length:(i + 1) * int_length]) / int_length
         for lab in range(0, maxlab):
             mean_val[lab, int_num - 1] = \
-                np.sum(val[lab, (int_num - 1) * int_range:]) / (tend - (int_num - 1) * int_range)
+                np.sum(val[lab, (int_num - 1) * int_length:]) / (tend - (int_num - 1) * int_length)
 
         pop = np.zeros((maxlab, int_num + 2)) + -777
         pop[:, 0] = val[:, 0]
@@ -87,7 +44,7 @@ def mullerplot_extended(props, id=0, save=False, int_range=1, off=False):
     popdic = {str(i): pop[i] for i in range(0, maxlab)}
     data = pd.DataFrame(popdic, index=xrange)
     data_perc = data.divide(data.sum(axis=1), axis=0)
-
+    # print(data_perc)
     plt.ylabel(' frequency of families')
 
     # plot einstellungen
@@ -104,10 +61,11 @@ def mullerplot_extended(props, id=0, save=False, int_range=1, off=False):
 
     plt.stackplot(xrange, *[data_perc[str(f)] for f in range(0, maxlab)], \
                   labels=list(range(0, maxlab)))
+    if save:
+        save_plot(fig, str(id) + '_' + ' mullerplot with intervall=' + str(int_length) + '.jpg')
     plt.show()
 
-    if save:
-        save_plot(fig, str(id) + '_' + ' mullerplot with il=' + str(int_range) + '.jpg')
+
 
 def plot_index(index_data, which, save=False, id=0):
     time = len(index_data)
@@ -249,7 +207,7 @@ def plot_popsize(data, save=False, id=0):
 
     plt.show()
 
-def spacetime_plot(nodes_t, labels, figsize=None, cmap='nipy_spectral', tbeg=None, tend=None, save=False, id=0):
+def spacetime_plot(nodes_t, labels, figsize=None, figindex=None, cmap='nipy_spectral', tbeg=None, tend=None, save=False, id=0):
     tmax, dim, c = nodes_t.shape
     vc = 2
     rc = c - vc
@@ -264,16 +222,7 @@ def spacetime_plot(nodes_t, labels, figsize=None, cmap='nipy_spectral', tbeg=Non
     for t in range(0, tmax):
         for x in range(dim):
             node = nodes_t[t, x]
-            occ = node.astype(np.bool)
-            # print('occ', occ)
-            if occ.sum() == 0:
-                # TODO: neu
-                # val[t, x * c: x * c + c] = None  ???
-                i = 0
-                while i < c:
-                    val[t, x * c + i] = None
-                    i = i + 1
-                continue
+            # print(node)
             for pos in range(len(node)):
                 lab = node[pos]
                 # print('lab', lab)
@@ -317,7 +266,7 @@ def spacetime_plot(nodes_t, labels, figsize=None, cmap='nipy_spectral', tbeg=Non
     elif tend - tbeg <= 100:
         plt.yticks(np.arange(tbeg, tend, 10))
     if save:
-        save_plot(fig, str(id) + '_spacetimeplot' + '.jpg')
+        save_plot(fig, str(id) + '_spacetimeplot_' + str(tbeg) + '-' + str(tend) + '.jpg')
     plt.show()
 
 
