@@ -4,27 +4,13 @@ from lgca.analysis import *
 import numpy as np
 import matplotlib.pyplot as plt
 
-# #choose simulation
-# variation = 'Testdaten'
-# filename = ''
-# path = 'saved_data/'
-# rep = 3
-#
-# selection = [0]
-#
-# # variation = '18060'
-# # filename = '6e8510d'
-# # path = 'saved_data/pummelzeugs_60/'
-# # rep = 500
-#
-# for i in selection:
-#     data = np.load(path + variation + '_' + str(i) + '_' + filename + '_offsprings.npy')
-#     tend, _ = data.shape
-#     mullerplot(data, int_length=2, save=True, id=variation + '_' + str(i))
+names = ['Test_ohne shuffle', 'Test_rd=0.3', 'Test_normal', 'Test_nochmal']
 
-labels = np.load('saved_data/82_0_06c0de0_labels.npy')
-nodest = np.load('saved_data/82_0_06c0de0_nodest.npy')
+for i, name in enumerate(names):
+    labels = np.load('saved_data/' + name + '_labels.npy')
+    nodest = np.load('saved_data/' + name + '_nodest.npy')
+    offsprings = np.load('saved_data/' + name + '_offsprings.npy')
 
-# print(nodest[:20])
+    print(len(nodest), len(offsprings))
 
-spacetime_plot(nodes_t=nodest, labels=labels, save=False, tend=10, id='Testspace')
+

@@ -23,6 +23,8 @@ def create_thom(variation, filename, path, rep, save=False):
         np.save(path + variation + '_thom', thom)
     print('Max: %d, Min: %d, Mean: %f' %(max(thom), min(thom), thom.mean()))
 
+    return thom
+
 def plot_histogram_thom(thom, int_length, save=False, id=0):
     max = thom.max().astype(int)
     l = len(thom)

@@ -16,10 +16,10 @@ rep=1
 
 dens = 1
 birthrate = 0.5
-deathrate = 0.02
+deathrate = 0.3
 
 uu = str(uuid())[0:7]
-saving_data = True
+saving_data = False
 
 for i in range(0, rep):
     print('bin bei wdh: ', i)
@@ -28,9 +28,9 @@ for i in range(0, rep):
 
     lgca= get_lgca(ib=True, geometry='lin', interaction='inheritance', bc='reflecting',\
            density = dens, dims = dim, r_b = birthrate, variation = False, restchannels = rc ,r_d = deathrate)
-    id = name + '_' + str(i) + '_'+ str(uu)
+    # id = name + '_' + str(i) + '_'+ str(uu)
+    id = 'Test_nochmal'
     lgca.timeevo_until_hom(spatial=True)
-    # print(lgca.offsprings[-1])
 
     if saving_data:
         np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)

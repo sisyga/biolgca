@@ -255,6 +255,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                 new_nodes[0] = self.nodes[self.r_int:-self.r_int]
                 self.nodes_t = np.vstack((self.nodes_t, new_nodes))
                 #TODO memory ausreichend?, sonst offs weg
+                # self.offsprings.append(copy(self.props)['num_off'])
                 self.offsprings.append(copy(self.props)['num_off'])
 
 

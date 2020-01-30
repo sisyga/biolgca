@@ -33,7 +33,7 @@ for i in range(0, rep):
 
     if saving_data:
         np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
-        np.savez('saved_data/' + str(id) + '_Parameter', density = lgca.density, restchannels = lgca.restchannels,\
+        np.savez('saved_data/' + str(id) + '_Parameter', density=lgca.density, restchannels=lgca.restchannels,\
         dimension=lgca.l, kappa=lgca.K, rb=lgca.r_b, rd=lgca.r_d, m=lgca.r_int)
     ende = time.time()
     print('{:5.3f}s'.format(ende-start))
