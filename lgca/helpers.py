@@ -12,39 +12,50 @@ def mullerplot(data, id=0, save=False, int_length=1):
     maxlab = len(data[0]) - 1
 
     fig, ax = plt.subplots()
-    # xrange = range(0,tend, int_range)
     val = np.zeros((maxlab, tend))
 
     for t in range(0, tend):
         for lab in range(0, maxlab):
             val[lab, t] = data[t, lab + 1]
 
-    plt.xlabel('timesteps')
-
     if int_length == 1:
         xrange = range(0, tend)
+        print('x', xrange)
         pop = val
+        print('pop', pop)
     else:
-        int_num = ((tend - 1) // int_length + 1)
-        xrange = np.arange(0, tend, int_length) + int_length / 2
-        xrange = np.append(np.append(np.zeros(1), xrange), tend)
-        mean_val = np.zeros((maxlab, int_num)) + -999
+        int_num = ((tend - 1) // int_length)
+        print('anz intervalle', int_num)
+        xrange = [0]
+        for i in range(int_num):
+            xrange.append(i * int_length + 0.5 * int_length)
+        print('xrange1', xrange)
+        # xrange = np.append(np.append(np.zeros(1), xrange), tend)
+        if int_num * int_length != tend:
+            xrange.append((tend - 1 + int_num * int_length) / 2)
+        xrange.append(tend-1)
+        print('xrange2', xrange[0:3])
+
+        acc_val = np.zeros((maxlab, len(xrange) - 2)) + -999 #todo: 0
         for i in range(0, int_num):
             for lab in range(0, maxlab):
-                mean_val[lab, i] = np.sum(val[lab, i * int_length:(i + 1) * int_length]) / int_length
-        for lab in range(0, maxlab):
-            mean_val[lab, int_num - 1] = \
-                np.sum(val[lab, (int_num - 1) * int_length:]) / (tend - (int_num - 1) * int_length)
+                acc_val[lab, i] = np.sum(val[lab, i * int_length:1 + (i+1)*int_length])
+        if int_num * int_length != tend:
+            for lab in range(0, maxlab):
+                acc_val[lab, -1] = np.sum(val[lab, int_length * int_num:tend])
 
-        pop = np.zeros((maxlab, int_num + 2)) + -777
+        print('mean_val', acc_val)
+        pop = np.zeros((maxlab, len(xrange))) + -777
         pop[:, 0] = val[:, 0]
-        pop[:, 1:-1] = mean_val
+        pop[:, 1:-1] = acc_val
         pop[:, -1] = val[:, -1]
+        print('pop', pop)
 
     popdic = {str(i): pop[i] for i in range(0, maxlab)}
     data = pd.DataFrame(popdic, index=xrange)
     data_perc = data.divide(data.sum(axis=1), axis=0)
     # print(data_perc)
+    plt.xlabel('timesteps')
     plt.ylabel(' frequency of families')
 
     # plot einstellungen
