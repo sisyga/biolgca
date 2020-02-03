@@ -22,8 +22,8 @@ for i in range(0, rep):
     start = time.time()
     name = str(2*dim + dim*rc) + str(dim)
 
-    lgca= get_lgca(ib=True, geometry='lin', interaction='inheritance', bc='reflecting',\
-           density = dens, dims = dim, r_b = birthrate, variation = False, restchannels = rc ,r_d = deathrate)
+    lgca = get_lgca(ib=True, geometry='lin', interaction='inheritance', bc='reflecting',\
+           density=dens, dims=dim, r_b=birthrate, variation=False, restchannels=rc, r_d=deathrate)
     id = name + '_' + str(i) + '_' + str(uu)
     lgca.offsprings.append([-99] + [1]*(rc+2)*dim)
     lgca.timeevo_until_hom(offsprings=True)
