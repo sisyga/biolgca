@@ -211,6 +211,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.r_int:-self.r_int]
                 self.props_t.append(copy(self.props))
+                self.offsprings.append(copy(self.props)['num_off'])
             if recordN:
                 self.n_t[t] = self.cell_density.sum()
             if recorddens:
@@ -254,8 +255,6 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                 new_nodes = np.zeros((1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
                 new_nodes[0] = self.nodes[self.r_int:-self.r_int]
                 self.nodes_t = np.vstack((self.nodes_t, new_nodes))
-                #TODO memory ausreichend?, sonst offs weg
-                # self.offsprings.append(copy(self.props)['num_off'])
                 self.offsprings.append(copy(self.props)['num_off'])
 
 
@@ -265,7 +264,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             # if timestep == 5000:
             #     print('WARNING: timestep would be too large!')
             #     break
-        
+        print(timestep)
         return timestep
 
     def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop=None, cmap='cividis'):

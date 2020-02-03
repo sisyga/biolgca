@@ -180,10 +180,13 @@ def inheritance(lgca):
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
         node = lgca.nodes[coord]
-        # print('node', node)
+        if chronicle:
+            print('look at node', node)
         # choose cells that proliferate
         r_bs = [lgca.props['r_b'][i] for i in node]
         proliferating = npr.random(lgca.K) < r_bs
+        if chronicle:
+            print('prolif ', proliferating)
         # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
         for label in node[proliferating]:
             ind = npr.choice(lgca.K)
