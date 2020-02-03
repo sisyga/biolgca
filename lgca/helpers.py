@@ -20,21 +20,21 @@ def mullerplot(data, id=0, save=False, int_length=1):
 
     if int_length == 1:
         xrange = range(0, tend)
-        print('x', xrange)
+        # print('x', xrange)
         pop = val
-        print('pop', pop)
+        # print('pop', pop)
     else:
         int_num = ((tend - 1) // int_length)
-        print('anz intervalle', int_num)
+        # print('anz intervalle', int_num)
         xrange = [0]
         for i in range(int_num):
             xrange.append(i * int_length + 0.5 * int_length)
-        print('xrange1', xrange)
+        # print('xrange1', xrange)
         # xrange = np.append(np.append(np.zeros(1), xrange), tend)
         if int_num * int_length != tend:
             xrange.append((tend - 1 + int_num * int_length) / 2)
         xrange.append(tend-1)
-        print('xrange2', xrange[0:3])
+        # print('xrange2', xrange[0:3])
 
         acc_val = np.zeros((maxlab, len(xrange) - 2)) + -999 #todo: 0
         for i in range(0, int_num):
@@ -44,12 +44,12 @@ def mullerplot(data, id=0, save=False, int_length=1):
             for lab in range(0, maxlab):
                 acc_val[lab, -1] = np.sum(val[lab, int_length * int_num:tend])
 
-        print('mean_val', acc_val)
+        # print('mean_val', acc_val)
         pop = np.zeros((maxlab, len(xrange))) + -777
         pop[:, 0] = val[:, 0]
         pop[:, 1:-1] = acc_val
         pop[:, -1] = val[:, -1]
-        print('pop', pop)
+        # print('pop', pop)
 
     popdic = {str(i): pop[i] for i in range(0, maxlab)}
     data = pd.DataFrame(popdic, index=xrange)
@@ -65,6 +65,10 @@ def mullerplot(data, id=0, save=False, int_length=1):
         plt.xticks(np.arange(0, xrange[-1], 1))
     elif xrange[-1] <= 100:
         plt.xticks(np.arange(0, xrange[-1], 5))
+    elif xrange[-1] >= 10000:
+        plt.xticks(np.arange(0, xrange[-1], 2000))
+    elif xrange[-1] >= 6000:
+        plt.xticks(np.arange(0, xrange[-1], 1000))
     elif xrange[-1] >= 1000:
         plt.xticks(np.arange(0, xrange[-1], 500))
     elif xrange[-1] >= 100:
@@ -222,7 +226,8 @@ def plot_popsize(data, save=False, id=0):
 
     plt.show()
 
-def spacetime_plot(nodes_t, labels, figsize=None, figindex=None, cmap='nipy_spectral', tbeg=None, tend=None, save=False, id=0):
+def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
+                   figsize=None, figindex=None, cmap='nipy_spectral'):
     tmax, dim, c = nodes_t.shape
     vc = 2
     rc = c - vc
@@ -231,6 +236,10 @@ def spacetime_plot(nodes_t, labels, figsize=None, figindex=None, cmap='nipy_spec
         tbeg = 0
     if tend is None:
         tend = tmax
+    if figsize is None:
+        fx = 5  #for c == 180
+        fy = (tend - tbeg) / 50
+        figsize = (fx, fy)
 
     val = np.zeros((tmax, dim*c))
 
@@ -265,13 +274,20 @@ def spacetime_plot(nodes_t, labels, figsize=None, figindex=None, cmap='nipy_spec
     fig = plt.figure(num=figindex, figsize=figsize)
     ax = fig.add_subplot(111)
     plot = ax.matshow(val, cmap=cmap)
-    # fig.colorbar(plot, shrink = 0.5)
 
     plt.ylabel('timesteps')
     plt.xlabel('lattice site')
+
     # nur "Knotenanfang"
-    plt.xlim(-0.5, dim*c-0.5)
-    plt.xticks((np.arange(0, dim*c, c)))
+    plt.xlim(-0.5, dim * c - 0.5)
+
+    if dim >= 20:
+        plt.xticks((np.arange(0, dim*c, 10*c)))
+    elif dim >= 10:
+        plt.xticks((np.arange(0, dim*c, 5*c)))
+    else:
+        plt.xticks((np.arange(0, dim*c, c)))
+
 
     plt.ylim(tend-0.5, tbeg-0.5)
     if tend - tbeg > 700:
