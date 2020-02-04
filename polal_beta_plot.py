@@ -16,19 +16,25 @@ import matplotlib.pyplot as plt
     start_mean_alignment = np.empty((trials,))  #8
     end_mean_alignment = np.empty((trials,))    #9
     ratio_mean_alignment = np.empty((trials,))  #10
+    #std_error_mean_polal  #11
+    #std_error_mean_meanal #12
+    #variance_polal       #13
+    #variance_meanal      #14
 
 """
+filename = "par_100_8_70_dens_beta_500_100_dd"
 #filename= "par_110_2_70_dens_beta_1000_50_di" #without type!
-filename= "par_100_6_70_dens_beta_500_50_dd"
+#filename= "par_100_6_70_dens_beta_500_50_dd"
 #suffix = "_meanal"
-suffix = "_polal"
+suffix = ""
 
 measures = pd.read_pickle("./pickles/" + filename + ".pkl")
 betas = pd.read_pickle("./pickles/" + filename + "_BETA.pkl")
 densities = pd.read_pickle("./pickles/" + filename + "_DENS.pkl")
 
 filenames2=[]
-#filenames2= ["par_110_3_70_dens_beta_1000_50_di", "par_110_4_70_dens_beta_1000_50_di", "par_110_5_70_dens_beta_1000_50_di", "par_110_6_70_dens_beta_1000_50_di", "par_110_7_70_dens_beta_1000_50_di"] #without type!
+#filenames2=["par_110_8_70_dens_beta_1000_50_di"]
+#filenames2= ["par_110_3_70_dens_beta_1000_50_di", "par_110_4_70_dens_beta_1000_50_di", "par_110_5_70_dens_beta_1000_50_di", "par_110_6_70_dens_beta_1000_50_di", "par_110_7_70_dens_beta_1000_50_di", "par_110_8_70_dens_beta_1000_50_di"] #without type!
 for i in range(len(filenames2)):
     measures2 = pd.read_pickle("./pickles/" + filenames2[i] + ".pkl")
     betas2 = pd.read_pickle("./pickles/" + filenames2[i] + "_BETA.pkl")
@@ -59,15 +65,21 @@ plt.title("Polar alignment parameter")
 for d in range(len(densities)):
 #Mean alignment in blue, polar alignment in black, normalized entropy in green
     #plt.plot(betas2, np.divide(measures2[d,:,9], measures2[d,len(betas2)-1,9]), label=("Density: "+ str(densities[d])))
-    #plt.plot(betas2, measures2[d,:,6], label=("Density: "+ str(densities[d])))
-    plt.plot(betas2, measures2[d,:,9], label=("Density: "+ str(densities[d])))
+    plt.plot(betas2, measures2[d,:,6], label=("Density: "+ '{0:.1f}'.format(densities[d])))
+    plt.plot(betas2, measures2[d,:,6]+measures2[d,:,11], c='grey', ls='dashed')
+    plt.plot(betas2, measures2[d,:,6]-measures2[d,:,11], c='grey', ls='dashed')
+    #plt.plot(betas2, measures2[d,:,9], label=("Density: "+ '{0:.1f}'.format(densities[d])))
+    #plt.plot(betas2, measures2[d,:,9]+measures2[d,:,12], c='grey', ls='dashed')
+    #plt.plot(betas2, measures2[d,:,9]-measures2[d,:,12], c='grey', ls='dashed')
     #print(measures2[d,len(betas2)-1,9])
     #print(np.divide(measures2[d,:,9], measures2[d,len(betas2)-1,9]))
     #print(measures[d,:,9])
+#plt.plot(betas2, measures2[1,:,6], label=("Density: "+ str(densities[1])))
 plt.legend()
-#plt.xlim([0, 4.101])
-#plt.ylim([-0.01, 1.01])
+#plt.xlim([0, 4.2])
+plt.ylim([-0.01, 1.01])
+#plt.ylim([-1.01, 1.01])
 plt.grid()
 plt.xlabel('Beta')
-plt.savefig('./images/' + filename + suffix + '.png')
+#plt.savefig('./images/' + filename + suffix + '.png')
 plt.show()
