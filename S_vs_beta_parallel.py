@@ -5,6 +5,7 @@ from multiprocessing import Pool
 import matplotlib.pyplot as plt
 
 """CAREFUL WITH RUNNING! CHANGE FILENAME FIRST!"""
+"""is different to single now! (2 more measures)"""
 
 """Parallel Setup"""
 #number of processes for parallel processing
@@ -12,23 +13,25 @@ nprocesses = 3
 
 """Setup"""
 dims = 70
-timesteps = 500 #500 dd >300, >500 di: 1000
-trials = 50 #50
+timesteps = 1000 #500 dd >300, >500 di: 1000
+trials = 100 #50
 
 # density is outer loop
 # beta to be set
 
 #densities = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
 #densities = np.append(np.arange(0,1,0.05), np.arange(1,3,0.25)) # interesting ranges
-densities = np.array([0.2, 0.5, 1])
-#densities = np.ones(1)*0.2
-betas = np.append(np.arange(0,0.2,0.01), np.arange(0.2,0.4, 0.025)) # interesting ranges
-#betas = np.arange(0, 0.35, 0.01)
-#betas=np.array([4.1, 5.1, 6.1, 7.1, 8.1, 9.1])
+densities = np.arange(0, 1.1, 0.1)
 
+#densities = np.ones(1)*0.2
+betas = np.append(np.arange(0,0.5,0.1), np.arange(0.5,3.3, 0.05)) # interesting ranges
+#betas = np.arange(0, 0.5, 0.005)
+
+#betas=np.array([4.1, 5.1, 6.1, 7.1, 8.1, 9.1])
 #betas = np.append(betas1, np.arange(1, 3, 0.25))
-mode = "dd"
-prefix = "par_100_6_"
+
+mode = "di"
+prefix = "par_110_12_"
 
 savestr = prefix + str(dims) + "_dens_beta_" + str(timesteps) + "_" + str(trials) + "_" + mode + "_BETA"
 pd.to_pickle(betas, "./pickles/" + savestr + ".pkl")
@@ -37,14 +40,14 @@ pd.to_pickle(densities, "./pickles/" + savestr + ".pkl")
 #betas = [0.01, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.5, 2, 2.5, 3]
 #betas=np.arange(0, 5, 0.1)
 
-measures = np.empty((len(densities), len(betas), 11))
+measures = np.empty((len(densities), len(betas), 15))
 #fig, ax = plt.subplots(nrows=1, ncols=1)
 
 def job(d):
 #for d in range(len(densities)):
     #print("Density: ")
     #print(densities[d])
-    measures_t = np.empty((len(betas), 11))
+    measures_t = np.empty((len(betas), 15))
     start_entr = np.empty((trials,))            #0
     end_entr = np.empty((trials,))              #1
     diff_entr = np.empty((trials,))             #2
@@ -56,6 +59,10 @@ def job(d):
     start_mean_alignment = np.empty((trials,))  #8
     end_mean_alignment = np.empty((trials,))    #9
     ratio_mean_alignment = np.empty((trials,))  #10
+    #std_error_mean_polal  #11
+    #std_error_mean_meanal #12
+    #variance_polal       #13
+    #variance_meanal      #14
     for b in range(len(betas)):
         #print("Beta:")
         #print(betas[b])
@@ -86,6 +93,10 @@ def job(d):
         measures_t[b][8] = start_mean_alignment.sum() / trials
         measures_t[b][9] = end_mean_alignment.sum() / trials
         measures_t[b][10] = ratio_mean_alignment.sum() / trials
+        measures_t[b][11] = np.std(end_polar_alignment) / np.sqrt(trials)
+        measures_t[b][12] = np.std(end_mean_alignment) / np.sqrt(trials)
+        measures_t[b][13] = np.var(end_polar_alignment)
+        measures_t[b][14] = np.var(end_mean_alignment)
     #label = "Density: " + str(densities[d])
     savestr = prefix + str(dims) + "_" + '{0:.6f}'.format(densities[d]) + "_beta_" + str(timesteps) + "_" + str(trials)
     pd.to_pickle(measures_t, "./pickles/" + savestr + "_" + mode + ".pkl")
