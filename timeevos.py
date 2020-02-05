@@ -7,12 +7,12 @@ import matplotlib.pyplot as plt
 mpl.use('Agg')
 """CAREFUL WITH RUNNING! CHANGE FILENAME FIRST!"""
 """Setup"""
-dims = 70
-timesteps = 500
+dims = 280
+timesteps = 1000
 trials = 100 #50 for talk
 time = range(timesteps + 1)
-mode = 'dd'
-mode_num = 'ana_old_100_1_'
+mode = 'di'
+mode_num = 'ana_old_110_14_'
 
 plt.rcParams['figure.figsize'] = (9, 5)
 fig_ent = plt.figure("Entropy")
@@ -38,7 +38,7 @@ densities = np.ones(1)*0.6
 #betas=np.array([])
 #betas = [0.01, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.5, 2, 2.5, 3]
 #betas=np.arange(0, 5, 0.1)
-betas = np.ones(1)*0.5
+betas = np.ones(1)*3.5
 
 entropy = np.empty((len(densities), len(betas), 4, trials)) #end_entr, end_normalized_entropy, end_polar alignment param, end_mean_alignment
 
@@ -125,3 +125,11 @@ pd.to_pickle(entropy, "./images/dens_beta" + savestr + ".pkl")
 #lgca1.plot_density()
 #lgca1.plot_flux()
 #plt.show()
+
+#np.histogram(array)
+
+#entropy_longlong = pd.read_pickle("./images/dens_betaana_old_100_3__210_dens_beta_500_100.pkl")
+#plt.cla()
+#fig2 = plt.hist(entropy_longlong[0,0,2])
+#plt.title("Polar alignment parameter histogram, L=210")
+#Out[26]: Text(0.5, 1.0, 'Polar alignment parameter histogram, L=210')

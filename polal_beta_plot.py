@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
     #variance_meanal      #14
 
 """
-filename = "par_100_8_70_dens_beta_500_100_dd"
+filename = "par_110_12_70_dens_beta_1000_100_di"
 #filename= "par_110_2_70_dens_beta_1000_50_di" #without type!
 #filename= "par_100_6_70_dens_beta_500_50_dd"
 #suffix = "_meanal"
