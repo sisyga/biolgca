@@ -33,14 +33,15 @@ data90 = {'offs': np.load('saved_data/pummelzeugs_90/' + '18090_449_e0797e9_offs
 if len(data90['nodes']) != len(data90['offs']):
     print('NEIIIIIIIIIIIN!')
 
-spacetime_plot(nodes_t=data01['nodes'], labels=data01['labels'], \
-               tbeg=None, tend=500, save=True, id='1801')
-spacetime_plot(nodes_t=data60['nodes'], labels=data60['labels'], \
-               tbeg=None, tend=500, save=True, id='18060')
-spacetime_plot(nodes_t=data90['nodes'], labels=data90['labels'], \
-               tbeg=None, tend=500, save=True, id='18090')
+# spacetime_plot(nodes_t=data01['nodes'], labels=data01['labels'], \
+#                tbeg=None, tend=100, save=True, id='1801')
+# spacetime_plot(nodes_t=data60['nodes'], labels=data60['labels'], \
+#                tbeg=None, tend=100, save=True, id='18060')
+# spacetime_plot(nodes_t=data90['nodes'], labels=data90['labels'], \
+#                tbeg=None, tend=100, save=True, id='18090')
 
-
+# create_averaged_entropies(variation='18090', filename='e0797e9', path='saved_data/pummelzeugs_90/',\
+#                           rep=500, save=False, plot=True, saveplot=True)
 # names = ['Test_ohne shuffle', 'Test_rd=0.3', 'Test_normal', 'Test_nochmal']
 # names = ['Test_rd=0.3']
 # for i, name in enumerate(names):
@@ -65,3 +66,4 @@ spacetime_plot(nodes_t=data90['nodes'], labels=data90['labels'], \
 # plot_index(index_data = s, which='shannon')
 # plot_index(index_data=calc_hillnumbers(offs), which='hill2')
 # plot_selected_entropies(shannon=s, hill2=calc_hillnumbers(offs), gini=calc_ginisimpson(offs))
+
