@@ -56,8 +56,6 @@ def plot_histogram_thom(thom, int_length, save=False, id=0):
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
     plt.show()
 
-#TODO: thom_plt_all
-
 def create_averaged_entropies(variation, filename, path, rep,\
                               save=False, plot=False, saveplot=False):
     # thom einlesen
@@ -66,44 +64,47 @@ def create_averaged_entropies(variation, filename, path, rep,\
     # print('tmax', tmax)
 
     result_sh = np.zeros(tmax)
-    # result_gi = np.zeros(tmax)
-    # result_hill = np.zeros(tmax)
+    result_gi = np.zeros(tmax)
+    result_hill = np.zeros(tmax)
 
-    counter = np.zeros(tmax + 1)
+    # counter = np.zeros(tmax + 1)
 
     for i in range(rep):
         print('bin bei wdh: ', i)
         data = np.load(path + variation + '_' + str(i) + '_' + filename + '_offsprings.npy')
         t = int(thom[i])
         # print('t', t)
-        counter[1:t + 1] += 1
+        # counter[1:t + 1] += 1
 
         # 'shannon':
+        print('shannon')
         shannon = calc_shannon(data)
         shannon = np.concatenate((shannon, np.zeros(tmax - t)))
         result_sh = result_sh + shannon
 
-        # # 'ginisimpson':
-        # gini = calc_ginisimpson(data)
-        # gini = np.concatenate((gini, np.zeros(tmax-t)))
-        # result_gi = result_gi + gini
+        # 'ginisimpson':
+        print('gini')
+        gini = calc_ginisimpson(data)
+        gini = np.concatenate((gini, np.zeros(tmax-t)))
+        result_gi = result_gi + gini
         #
-        # # 'hill order 2':
-        # hill = calc_hillnumbers(data)
-        # hill = np.concatenate((hill, np.zeros(tmax-t)))
-        # result_hill = result_hill + hill
+        # 'hill order 2':
+        print('hill')
+        hill = calc_hillnumbers(data)
+        hill = np.concatenate((hill, np.zeros(tmax-t)))
+        result_hill = result_hill + hill
 
     # Mitteln
-    for i in range(tmax):
-        result_sh[i] = result_sh[i] / counter[i + 1]
-        # result_gi[i] = result_gi[i] / counter[i+1]
-        # result_hill[i] = result_hill[i] / counter[i+1]
+    print('mitteln')
+    result_sh = result_sh / rep
+    result_gi = result_gi / rep
+    result_hill = result_hill / rep
 
     # speichern
     if save:
         np.save(path + variation + '_' + filename + '_' + 'shannon' + '.npy', result_sh)
-        # np.save(path + variation + '_' + filename + '_' + 'gini' + '.npy', result_gi)
-        # np.save(path + variation + '_' + filename + '_' + 'hill2' + '.npy', result_hill)
+        np.save(path + variation + '_' + filename + '_' + 'gini' + '.npy', result_gi)
+        np.save(path + variation + '_' + filename + '_' + 'hill2' + '.npy', result_hill)
 
     # plot
     if plot:
