@@ -312,11 +312,12 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
 
 
 def thom_all_plot(time_arrays, xrange, save, id):
-    colors = ['seagreen', 'magenta', 'cyan', 'blue']
+    colors = ['darkred', 'orange', 'olivedrab', 'indigo', 'darkturquoise']
+    # colors = ['darkred', 'olivedrab', 'darkturquoise']
     fig, ax = plt.subplots()
     data = pd.DataFrame({**{'range': xrange}, **time_arrays})
     for index, (name, thom) in enumerate(time_arrays.items()):
-        plt.plot('range', name, data=data, marker='', color=colors[index], linewidth=0.7, label=name)
+        plt.plot('range', name, data=data, marker='', color=colors[index], linewidth=1, label=name)
     plt.legend()
     plt.xlim(0, xrange.max() + xrange[0])
     plt.ylim(bottom=0)
@@ -350,7 +351,7 @@ def thom_all(time_array, int_length, save=False, id=0):
     for name, entry in time_array.items():
         c = create_count(int_length, entry)
         smoothie[name] = np.append(c, np.zeros(len(x) - len(c)))
-    thom_all_plot(smoothie, x, save, id)
+    thom_all_plot(time_arrays=smoothie, xrange=x, save=save, id=id)
 
 def save_plot(plot, filename=None):
     if filename is None:
