@@ -6,13 +6,13 @@ import time
 from os import environ as env
 from uuid import uuid4 as uuid
 
-dim = int(env['DIMS'])
-rc = int(env['RESTCHANNELS'])
-rep = int(env['REPETITIONS'])
+# dim = int(env['DIMS'])
+# rc = int(env['RESTCHANNELS'])
+# rep = int(env['REPETITIONS'])
 
-# dim=2
-# rc=2
-# rep=1
+dim=2
+rc=10
+rep=1
 
 dens = 1
 birthrate = 0.5
@@ -28,11 +28,18 @@ for i in range(0, rep):
 
     lgca = get_lgca(ib=True, geometry='lin', interaction='inheritance', bc='reflecting',\
            density = dens, dims = dim, r_b = birthrate, variation = False, restchannels = rc ,r_d = deathrate)
-    id = name + '_' + str(i) + '_'+ str(uu)
+    id = name + '_' + str(i) + '_'+ str(uu) + 'ohne reori'
     # id = 'Test_nochmal'
     lgca.offsprings.append([-99] + [1] * (rc + 2) * dim)
-    lgca.timeevo_until_hom(spatial=True)
 
+    t = lgca.timeevo_until_hom(spatial=True)
+
+    # spacetime_plot(nodes_t=lgca.nodes_t, labels=lgca.props['lab_m'], \
+    #                tend=None, save=saving_data, id=str(180) + str(name))
+    # spacetime_plot(nodes_t=lgca.nodes_t, labels=lgca.props['lab_m'], \
+    #                tend=500, save=saving_data, id=str(180) + str(name))
+    # spacetime_plot(nodes_t=lgca.nodes_t, labels=lgca.props['lab_m'], \
+    #                tend=50, save=saving_data, id=str(180) + str(name))
     if saving_data:
         np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
         np.save('saved_data/' + str(id) + '_nodest', lgca.nodes_t)

@@ -234,7 +234,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         if chronicle:
             print('props_t', self.props_t)
             print('nodes_t', self.nodes_t)
-
+        # while timestep <= 500:
         while len([x for x in self.props['num_off'][1:] if x > 0]) > 1:
             timestep += 1
             self.timestep()
@@ -264,7 +264,8 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             # if timestep == 5000:
             #     print('WARNING: timestep would be too large!')
             #     break
-        print(timestep)
+        # print(timestep)
+
         return timestep
 
     def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop=None, cmap='cividis'):

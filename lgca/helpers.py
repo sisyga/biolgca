@@ -237,9 +237,14 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
     if tend is None:
         tend = tmax
     if figsize is None:
-        fx = 5  #for c == 180
-        fy = (tend - tbeg) / 50
-        figsize = (fx, fy)
+        if tend-tbeg<=100:
+            fx = 4  #for c == 180
+            fy = (tend - tbeg) / 40
+            figsize = (fx, fy)
+        elif tend-tbeg <= 500:
+            fx = 4.5  #for c == 180
+            fy = (tend - tbeg) / 55
+            figsize = (fx, fy)
 
     val = np.zeros((tmax, dim*c))
 
@@ -275,8 +280,8 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
     ax = fig.add_subplot(111)
     plot = ax.matshow(val, cmap=cmap)
 
-    plt.ylabel('timesteps')
-    plt.xlabel('lattice site')
+    plt.ylabel('timesteps', fontsize=15)
+    plt.xlabel('lattice site', fontsize=15)
 
     # nur "Knotenanfang"
     plt.xlim(-0.5, dim * c - 0.5)
@@ -287,23 +292,23 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
         for i in range(0, len(x1)):
             x2[i] = (x1[i]/c)
         ax.set_xticks(x1)
-        ax.set_xticklabels(x2, minor=False)
+        ax.set_xticklabels(x2, minor=False, fontsize=12)
     elif dim > 1:
         x1 = (np.arange(0, dim * c, c))
         x2 = np.zeros(len(x1)).astype(int)
         for i in range(0, len(x1)):
             x2[i] = (x1[i] / c)
         ax.set_xticks(x1)
-        ax.set_xticklabels(x2, minor=False)
+        ax.set_xticklabels(x2, minor=False, fontsize=12)
     else:
-        plt.xticks((np.arange(0, dim*c, c)))
+        plt.xticks((np.arange(0, dim*c, c)), fontsize=12)
 
 
     plt.ylim(tend-0.5, tbeg-0.5)
     if tend - tbeg > 700:
         plt.yticks(np.arange(tbeg, tend, 100))
     elif tend - tbeg > 100:
-        plt.yticks(np.arange(tbeg, tend, 50))
+        plt.yticks(np.arange(tbeg, tend, 50), fontsize=12)
     elif tend - tbeg <= 100:
         plt.yticks(np.arange(tbeg, tend, 10))
     if save:
