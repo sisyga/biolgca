@@ -68,6 +68,9 @@ data90 = {'offs': np.load('saved_data/18090_nodes/' + '18090_1_b8e3972_offspring
 
 saving = True
 data = {'03': data03}
+
+t = np.load('saved_data/62_9_fe70e98_thom_10.npy')
+print(t)
 # data = {'01': data01, '02': data02, '45': data45, '60': data60, '90': data90}
 #
 # for entry, name in enumerate(data):
@@ -133,11 +136,11 @@ data = {'03': data03}
 # plot_index(index_data=calc_hillnumbers(offs), which='hill2')
 # plot_selected_entropies(shannon=s, hill2=calc_hillnumbers(offs), gini=calc_ginisimpson(offs))
 # name = '242_0_80e9ef6ohne reori, birth=0'
-name = '242_0_3122dc5ohne reori, death=0'
-# name = '242_0_12bc382ohne reori'
-labs = np.load('saved_data/checker/' + name + '_labels.npy')
-offs = np.load('saved_data/checker/' + name + '_offsprings.npy')
-n = np.load('saved_data/checker/' + name + '_nodest.npy')
-
-spacetime_plot(nodes_t=n, labels=labs, figsize=(4,3),\
-               tbeg=None, tend=20, save=True, id='ohneR_d0')
+# name = '242_0_3122dc5ohne reori, death=0'
+# # name = '242_0_12bc382ohne reori'
+# labs = np.load('saved_data/checker/' + name + '_labels.npy')
+# offs = np.load('saved_data/checker/' + name + '_offsprings.npy')
+# n = np.load('saved_data/checker/' + name + '_nodest.npy')
+#
+# spacetime_plot(nodes_t=n, labels=labs, figsize=(4,3),\
+#                tbeg=None, tend=20, save=True, id='ohneR_d0')
