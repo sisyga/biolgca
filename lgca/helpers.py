@@ -6,6 +6,7 @@ import pandas as pd
 from matplotlib import cm
 from datetime import datetime
 import pathlib
+from lgca.analysis import *
 
 def mullerplot(data, id=0, save=False, int_length=1):
     tend = len(data)
@@ -238,7 +239,7 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
         tend = tmax
     if figsize is None:
         if tend-tbeg<=100:
-            fx = 4  #for c == 180
+            fx = 4.5  #for c == 180
             fy = (tend - tbeg) / 40
             figsize = (fx, fy)
         elif tend-tbeg <= 500:
@@ -280,8 +281,8 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
     ax = fig.add_subplot(111)
     plot = ax.matshow(val, cmap=cmap)
 
-    plt.ylabel('timesteps', fontsize=15)
-    plt.xlabel('lattice site', fontsize=15)
+    plt.ylabel('timesteps', fontsize=12) #15
+    plt.xlabel('lattice site', fontsize=12) #, fontsize=12
 
     # nur "Knotenanfang"
     plt.xlim(-0.5, dim * c - 0.5)
@@ -310,14 +311,14 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
     elif tend - tbeg > 100:
         plt.yticks(np.arange(tbeg, tend, 50), fontsize=12)
     elif tend - tbeg <= 100:
-        plt.yticks(np.arange(tbeg, tend, 10))
+        plt.yticks(np.arange(tbeg, tend, 10), fontsize=11)
     if save:
         save_plot(fig, str(id) + '_spacetimeplot_' + str(tbeg) + '-' + str(tend) + '.jpg')
     plt.show()
 
 
 def thom_all_plot(time_arrays, xrange, save, id):
-    colors = ['darkred', 'orange', 'olivedrab', 'indigo', 'darkturquoise']
+    colors = ['darkred', 'orange', 'olivedrab', 'darkturquoise']
     # colors = ['darkred', 'olivedrab', 'darkturquoise']
     fig, ax = plt.subplots()
     data = pd.DataFrame({**{'range': xrange}, **time_arrays})
@@ -326,7 +327,11 @@ def thom_all_plot(time_arrays, xrange, save, id):
     plt.legend()
     plt.xlim(0, xrange.max() + xrange[0])
     plt.ylim(bottom=0)
-    ax.set(xlabel='timesteps', ylabel='absolut frequencies')
+    plt.yticks(fontsize=12)
+    plt.xticks(fontsize=12)
+    plt.ylabel('absolute frequency', fontsize=15) #15
+    plt.xlabel('thom', fontsize=15)
+    # ax.set(xlabel='thom', ylabel='absolute frequency')
 
     if save:
         filename = str(id) + '_compared distribution' + '.jpg'
@@ -364,6 +369,61 @@ def save_plot(plot, filename=None):
 
     plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
+
+def plot_all_lognorm(thomarray, colorarray, int_length, save=False):
+    fig, ax = plt.subplots()
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+    plt.xlabel('thom', fontsize=15)
+    plt.ylabel('absolute frequency', fontsize=15)
+    filename = ''
+
+    for index, name in enumerate(thomarray):
+        thom = thomarray[name]
+        filename += (str(name)) + ',' + (str(len(thom))) + '_'
+
+        fitted_data, maxy, _ = calc_lognormaldistri(thom=thom, int_length=int_length)
+        maxfit = fitted_data.max()
+        x = np.arange(0, thom.max() + int_length, int_length)
+        plt.plot(x + int_length / 2, fitted_data * maxy / maxfit, color=colorarray[index], label=name)
+        print('a', maxy / maxfit)
+        plt.xlim(0, thom.max() + int_length)
+
+    plt.ylim(0)
+    plt.legend()
+
+    if save:
+        filename = str(filename) + 'lognormal_all_intervall=' + str(int_length) + '.jpg'
+        plt.savefig(pathlib.Path('pictures').resolve() / filename)
+    plt.show()
+
+def plot_lognorm_distribution(thom, int_length, save=False, id=0, c='seagreen'):
+    max = thom.max().astype(int)
+    fig, ax = plt.subplots()
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+    plt.xlabel('thom', fontsize=15)
+    plt.ylabel('absolute frequency', fontsize=15)
+
+    fitted_data, maxy, y = calc_lognormaldistri(thom=thom, int_length=int_length)
+    maxfit = fitted_data.max()
+    x = np.arange(0, max + int_length, int_length)
+
+    #     sqd = 0
+    #     for i in range(0, len(x+int_length/2)):
+    #         sqd += (y[i] - pdf_fitted[i]*maxy/maxfit)**2
+    #     sqd = math.sqrt(sqd/len(x+int_length/2))
+    #     error = np.array([sqd]*len(x+int_length/2))
+    plt.xlim(0, max + int_length)
+    plt.bar(x + int_length / 2, y, width=int_length, color='grey', alpha=0.5)
+    plt.plot(x + int_length / 2, fitted_data * maxy / maxfit, color=c, label=id)
+    plt.legend()
+    #     error = [1] * len(x+int_length/2)
+    #     plt.errorbar(x+int_length/2, pdf_fitted*maxy/maxfit, yerr=error)
+    if save:
+        filename = str(id) + '_intervall=' + str(int_length) + '_lognormal_distribution' + '.jpg'
+        plt.savefig(pathlib.Path('pictures').resolve() / filename)
+    plt.show()
 
 def aloha(who):
     print('aloha', who)

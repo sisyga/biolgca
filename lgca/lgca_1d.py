@@ -234,7 +234,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         if chronicle:
             print('props_t', self.props_t)
             print('nodes_t', self.nodes_t)
-        # while timestep <= 500:
+        # while timestep <= 50:
         while len([x for x in self.props['num_off'][1:] if x > 0]) > 1:
             timestep += 1
             self.timestep()

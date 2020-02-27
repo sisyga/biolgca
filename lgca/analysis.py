@@ -2,7 +2,8 @@ import numpy as np
 import math as m
 import matplotlib.pyplot as plt
 import pandas as pd
-
+import scipy as sp
+from scipy import stats, optimize, interpolate
 from matplotlib import cm
 from datetime import datetime
 import pathlib
@@ -187,3 +188,26 @@ def calc_hillnumbers(data, order=2):
                 hill_q[t] += pi ** order
             hill_q[t] = hill_q[t] ** (1 / (1 - order))
         return hill_q
+
+def calc_lognormaldistri(thom, int_length):
+    #number of intervalls
+    ni = (thom.max() / int_length + 1).astype(int)
+    #calc absolue frequency
+    count = np.zeros(ni + 1)
+    for entry in thom:
+        c = (entry / int_length).astype(int)
+        count[c] += 1
+    if count.sum() != len(thom):
+        print('FEHLER!')
+    x = np.arange(0, thom.max() + int_length, int_length)
+    y = count[(x / int_length).astype(int)]
+    maxy = y.max()
+    #calc function parameters
+    thom = (thom / int_length).astype(int)
+    param = sp.stats.lognorm.fit(thom)
+    xxx = np.arange(0, ni + 1)
+    fitted_data = sp.stats.lognorm.pdf(xxx, param[0], loc=0, scale=param[2])
+    print('sigma', param[0])
+    print('mu', np.log(param[2]))
+
+    return fitted_data, maxy, y
