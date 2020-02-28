@@ -5,8 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 thom01 = np.load('saved_data/thoms/' + 'rc=178_thom1500.npy')
-plot_lognorm_distribution(thom01, int_length=1000)
-exit(123456)
+# plot_lognorm_distribution(thom01, int_length=1000)
+# exit(123456)
 
 mini = np.array([1,3,2,3,2,3,4])
 
@@ -51,15 +51,18 @@ plt.xlim(0, x.max() + int_length/2)
 
 # plt.hist(thom, bins=np.arange(0, thom.max() + 2*int_length, int_length))
 plt.bar(x, y, width=int_length, color='grey', alpha=0.5)
-
-xe = []
-ye = []
-for index, entry in enumerate(y):
-    if entry != 0:
-        xe.append(x[index])
-        ye.append(y[index])
-print(len(x), len(xe), len(ye))
-plt.errorbar(xe, ye, yerr=0.75, linestyle='')
+err = calc_barerrs(thom, int_length)
+print(err)
+# xe = []
+# ye = []
+# for index, entry in enumerate(y):
+#     if entry != 0:
+#         xe.append(x[index])
+#         ye.append(y[index])
+# print(len(x), len(xe), len(ye))
+# print(x)
+# print(y)
+plt.errorbar(x[y > 0], y[y > 0], yerr=err[y > 0], linestyle='') #TODO Käsequäse...
 # plt.plot(x + int_length / 2, fitted_data * maxy / maxfit, color=c, label=id)
 plt.legend()
 #     error = [1] * len(x+int_length/2)

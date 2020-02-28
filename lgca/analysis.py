@@ -211,3 +211,17 @@ def calc_lognormaldistri(thom, int_length):
     print('mu', np.log(param[2]))
 
     return fitted_data, maxy, y
+
+def id_var(val, m, v):      #TODO: verwendet?
+    return v + (val - m)**2
+
+def calc_barerrs(thom, int_length):
+    ni = (thom.max() / int_length + 1).astype(int)
+    print('anz intervalle', ni)
+    err = np.zeros(ni)
+    for i in range(0, ni):
+        bar = thom[thom < (i + 1) * int_length]
+        bar = bar[bar >= i * int_length]
+        print(bar)
+        err[i] = bar.std()
+    return err
