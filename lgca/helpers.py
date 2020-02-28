@@ -407,16 +407,16 @@ def plot_lognorm_distribution(thom, int_length, save=False, id=0, c='seagreen'):
 
     fitted_data, maxy, y = calc_lognormaldistri(thom=thom, int_length=int_length)
     maxfit = fitted_data.max()
-    x = np.arange(0, max + int_length, int_length)
+    x = np.arange(0, max, int_length)
 
     #     sqd = 0
     #     for i in range(0, len(x+int_length/2)):
     #         sqd += (y[i] - pdf_fitted[i]*maxy/maxfit)**2
     #     sqd = math.sqrt(sqd/len(x+int_length/2))
     #     error = np.array([sqd]*len(x+int_length/2))
-    plt.xlim(0, max + int_length)
-    plt.bar(x + int_length / 2, y, width=int_length, color='grey', alpha=0.5)
-    plt.plot(x + int_length / 2, fitted_data * maxy / maxfit, color=c, label=id)
+    plt.xlim(0, max + int_length/2)
+    plt.bar(x, y, width=int_length, color='grey', alpha=0.5)
+    plt.plot(x, fitted_data * maxy / maxfit, color=c, label=id)
     plt.legend()
     #     error = [1] * len(x+int_length/2)
     #     plt.errorbar(x+int_length/2, pdf_fitted*maxy/maxfit, yerr=error)

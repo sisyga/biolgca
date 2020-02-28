@@ -193,19 +193,19 @@ def calc_lognormaldistri(thom, int_length):
     #number of intervalls
     ni = (thom.max() / int_length + 1).astype(int)
     #calc absolue frequency
-    count = np.zeros(ni + 1)
+    count = np.zeros(ni)
     for entry in thom:
         c = (entry / int_length).astype(int)
         count[c] += 1
     if count.sum() != len(thom):
         print('FEHLER!')
-    x = np.arange(0, thom.max() + int_length, int_length)
+    x = np.arange(0, thom.max(), int_length)
     y = count[(x / int_length).astype(int)]
     maxy = y.max()
     #calc function parameters
     thom = (thom / int_length).astype(int)
     param = sp.stats.lognorm.fit(thom)
-    xxx = np.arange(0, ni + 1)
+    xxx = np.arange(0, ni)
     fitted_data = sp.stats.lognorm.pdf(xxx, param[0], loc=0, scale=param[2])
     print('sigma', param[0])
     print('mu', np.log(param[2]))
