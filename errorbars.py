@@ -29,6 +29,8 @@ elif which == 2:
     thom = thom01
     int_length = 1000
 
+plot_lognorm_distribution(thom, int_length)
+exit()
 max = thom.max().astype(int)
 print('max', max)
 print('mean', thom.mean())

@@ -175,7 +175,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
     """
     1D version of an identity-based LGCA.
     """
-    interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath', 'inheritance']
+    interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath', 'inheritance', 'passenger_mutations']
 
     def init_nodes(self, density, nodes=None):
         self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.uint)

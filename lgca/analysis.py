@@ -231,4 +231,5 @@ def calc_quaderr(data, fitted_data):
     sqd = np.zeros(len(data))
     for i in range(0, len(data)):
         sqd[i] = (data[i] - fitted_data[i])**2
+    # print(sqd)
     return sqd

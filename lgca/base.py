@@ -428,10 +428,10 @@ class IBLGCA_base(LGCA_base):
 
     def set_interaction(self, **kwargs):
         try:
-            from .ib_interactions import birth, birthdeath, go_or_grow_interaction, inheritance
+            from .ib_interactions import birth, birthdeath, go_or_grow_interaction, inheritance, passenger_mutations
             from .interactions import random_walk
         except ImportError:
-            from ib_interactions import birth, birthdeath, go_or_grow_interaction, inheritance
+            from ib_interactions import birth, birthdeath, go_or_grow_interaction, inheritance, passenger_mutations
             from interactions import random_walk
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
@@ -548,6 +548,37 @@ class IBLGCA_base(LGCA_base):
                 # self.borncells = 0
                 # self.diedcells = 0
                 for i in range(1,self.maxlabel_init.astype(int)+1):
+                    self.props['lab_m'][i] = i
+
+            # passenger MUTATIONS
+            elif interaction is 'passenger_mutations':
+                self.interaction = passenger_mutations
+                if 'r_int' in kwargs:
+                    self.set_r_int(kwargs['r_int'])
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                else:
+                    self.r_b = 0.5
+                    print('birth rate set to r_b = ', self.r_b)
+
+                if 'r_d' in kwargs:
+                    self.r_d = kwargs['r_d']
+                else:
+                    self.r_d = 0.02
+                    print('death rate set to r_d = ', self.r_d)
+
+                if 'std' in kwargs:
+                    self.std = kwargs['std']
+                else:
+                    self.std = 0.1
+                    print('standard deviation set to = ', self.std)
+                self.props.update(lab_m=[0] + [0] * self.maxlabel)
+                self.props.update(num_off=[-99] + [1] * self.maxlabel)
+                # #TODO: Funktion schreiben, die aus props und nodes die offs berechnet
+
+                self.maxlabel_init = self.maxlabel
+
+                for i in range(1, self.maxlabel_init.astype(int) + 1):
                     self.props['lab_m'][i] = i
 
             else:

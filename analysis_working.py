@@ -49,7 +49,7 @@ colors = ['darkred', 'orange', 'olivedrab', 'darkturquoise']
 
 # plot_all_lognorm(thomarray=data, colorarray=colors, int_length=500, save=False)
 example = 'rc=178'
-# plot_lognorm_distribution(thom=data[example], int_length=1000, save=False, id=example, c=colors[0])
+# plot_lognorm_distribution(thom=data[example], int_length=1000, save=True, id=example, c=colors[0])
 
 onenode = np.load('saved_data/onenode_thom_500.npy')
 onerc = np.load('saved_data/onerc_thom_500.npy')

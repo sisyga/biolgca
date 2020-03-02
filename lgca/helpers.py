@@ -414,7 +414,10 @@ def plot_lognorm_distribution(thom, int_length, save=False, id=0, c='seagreen'):
     barerr = calc_barerrs(thom, int_length)
     plt.plot(x, fitted_data * maxy / maxfit, color=c, label=id)
     sqderr = calc_quaderr(fitted_data * maxy / maxfit, y)
-    weightederr = barerr * sqderr / 10000 #skaliert und gewichtet
+    scale = int_length * 5
+    print((barerr * sqderr).max())
+    weightederr = barerr * sqderr / scale #skaliert und gewichtet
+    print(weightederr.max())
     # print(weightederr)
     # print(fitted_data * maxy / maxfit)
     # print(x)
