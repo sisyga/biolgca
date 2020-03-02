@@ -384,8 +384,8 @@ def plot_all_lognorm(thomarray, colorarray, int_length, save=False):
 
         fitted_data, maxy, _ = calc_lognormaldistri(thom=thom, int_length=int_length)
         maxfit = fitted_data.max()
-        x = np.arange(0, thom.max() + int_length, int_length)
-        plt.plot(x + int_length / 2, fitted_data * maxy / maxfit, color=colorarray[index], label=name)
+        x = np.arange(0, thom.max(), int_length) + int_length/2
+        plt.plot(x, fitted_data * maxy / maxfit, color=colorarray[index], label=name)
         print('a', maxy / maxfit)
         plt.xlim(0, thom.max() + int_length)
 
