@@ -407,19 +407,21 @@ def plot_lognorm_distribution(thom, int_length, save=False, id=0, c='seagreen'):
 
     fitted_data, maxy, y = calc_lognormaldistri(thom=thom, int_length=int_length)
     maxfit = fitted_data.max()
-    x = np.arange(0, max, int_length)
+    x = np.arange(0, max, int_length) + int_length/2
 
-    #     sqd = 0
-    #     for i in range(0, len(x+int_length/2)):
-    #         sqd += (y[i] - pdf_fitted[i]*maxy/maxfit)**2
-    #     sqd = math.sqrt(sqd/len(x+int_length/2))
-    #     error = np.array([sqd]*len(x+int_length/2))
     plt.xlim(0, max + int_length/2)
     plt.bar(x, y, width=int_length, color='grey', alpha=0.5)
+    barerr = calc_barerrs(thom, int_length)
     plt.plot(x, fitted_data * maxy / maxfit, color=c, label=id)
+    sqderr = calc_quaderr(fitted_data * maxy / maxfit, y)
+    weightederr = barerr * sqderr / 10000 #skaliert und gewichtet
+    # print(weightederr)
+    # print(fitted_data * maxy / maxfit)
+    # print(x)
+    plt.errorbar(x, fitted_data * maxy / maxfit, yerr=weightederr, lw=1, capsize=2, capthick=1, color=c)
+
     plt.legend()
-    #     error = [1] * len(x+int_length/2)
-    #     plt.errorbar(x+int_length/2, pdf_fitted*maxy/maxfit, yerr=error)
+
     if save:
         filename = str(id) + '_intervall=' + str(int_length) + '_lognormal_distribution' + '.jpg'
         plt.savefig(pathlib.Path('pictures').resolve() / filename)

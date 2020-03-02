@@ -48,12 +48,12 @@ colors = ['darkred', 'orange', 'olivedrab', 'darkturquoise']
 
 # plot_all_lognorm(thomarray=data, colorarray=colors, int_length=500, save=False)
 example = 'rc=178'
-# plot_lognorm_distribution(thom=data[example], int_length=500, save=False, id=example, c=colors[0])
+plot_lognorm_distribution(thom=data[example], int_length=1000, save=False, id=example, c=colors[0])
 
-onenode = np.load('saved_data/onenode_thom_5.npy')
-onerc = np.load('saved_data/onerc_thom_5.npy')
-print(np.load('saved_data/onenode_thom_5.npy'))
-print(np.load('saved_data/onerc_thom_5.npy'))
-print(onenode.mean(), onenode.min(), onenode.max())
-print(onerc.mean(), onerc.min(), onerc.max())
+# onenode = np.load('saved_data/onenode_thom_5.npy')
+# onerc = np.load('saved_data/onerc_thom_5.npy')
+# print(np.load('saved_data/onenode_thom_5.npy'))
+# print(np.load('saved_data/onerc_thom_5.npy'))
+# print(onenode.mean(), onenode.min(), onenode.max())
+# print(onerc.mean(), onerc.min(), onerc.max())
 

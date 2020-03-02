@@ -222,6 +222,13 @@ def calc_barerrs(thom, int_length):
     for i in range(0, ni):
         bar = thom[thom < (i + 1) * int_length]
         bar = bar[bar >= i * int_length]
-        print(bar)
-        err[i] = bar.std()
+        #print(bar)
+        if len(bar) > 0:
+            err[i] = bar.std()
     return err
+
+def calc_quaderr(data, fitted_data):
+    sqd = np.zeros(len(data))
+    for i in range(0, len(data)):
+        sqd[i] = (data[i] - fitted_data[i])**2
+    return sqd

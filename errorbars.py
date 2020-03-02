@@ -3,6 +3,7 @@ from lgca.helpers import *
 from lgca.analysis import *
 import numpy as np
 import matplotlib.pyplot as plt
+import math as m
 
 thom01 = np.load('saved_data/thoms/' + 'rc=178_thom1500.npy')
 # plot_lognorm_distribution(thom01, int_length=1000)
@@ -38,34 +39,32 @@ plt.yticks(fontsize=12)
 plt.xlabel('thom', fontsize=15)
 plt.ylabel('absolute frequency', fontsize=15)
 fitted_data, maxy, y = calc_lognormaldistri(thom=thom, int_length=int_length)
-
 maxfit = fitted_data.max()
 x = np.arange(0, max, int_length) + int_length/2
 
-#     sqd = 0
-#     for i in range(0, len(x+int_length/2)):
-#         sqd += (y[i] - pdf_fitted[i]*maxy/maxfit)**2
-#     sqd = math.sqrt(sqd/len(x+int_length/2))
-#     error = np.array([sqd]*len(x+int_length/2))
-plt.xlim(0, x.max() + int_length/2)
 
-# plt.hist(thom, bins=np.arange(0, thom.max() + 2*int_length, int_length))
+plt.xlim(0, x.max() + int_length/2)
+plt.ylim(0, maxy + 25)
+
+### plt.hist(thom, bins=np.arange(0, thom.max() + 2*int_length, int_length))
 plt.bar(x, y, width=int_length, color='grey', alpha=0.5)
-err = calc_barerrs(thom, int_length)
+
+
+err = calc_barerrs(thom, int_length) / 100 #skaliert
 print(err)
-# xe = []
-# ye = []
-# for index, entry in enumerate(y):
-#     if entry != 0:
-#         xe.append(x[index])
-#         ye.append(y[index])
-# print(len(x), len(xe), len(ye))
-# print(x)
-# print(y)
-plt.errorbar(x[y > 0], y[y > 0], yerr=err[y > 0], linestyle='') #TODO Käsequäse...
-# plt.plot(x + int_length / 2, fitted_data * maxy / maxfit, color=c, label=id)
+#plt.errorbar(x[y > 0], y[y > 0], yerr=err[y > 0], linestyle='') #TODO Käsequäse...?
+
+plt.plot(x, fitted_data * maxy / maxfit)
 plt.legend()
-#     error = [1] * len(x+int_length/2)
-#     plt.errorbar(x+int_length/2, pdf_fitted*maxy/maxfit, yerr=error)
+print(fitted_data * maxy / maxfit, y)
+sqderr = calc_quaderr(fitted_data * maxy / maxfit, y) / 100
+print(sqderr)
+
+sqderr = sqderr * err
+print(sqderr)
+print(fitted_data*maxy/maxfit)
+print(x)
+plt.errorbar(x, fitted_data*maxy/maxfit, yerr=sqderr, lw=1, capsize=2, capthick=1, color='seagreen')
+
 
 plt.show()
