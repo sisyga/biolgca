@@ -560,13 +560,16 @@ class IBLGCA_base(LGCA_base):
                 else:
                     self.r_b = 0.5
                     print('birth rate set to r_b = ', self.r_b)
-
+                if 'r_m' in kwargs:
+                    self.r_m = kwargs['r_m']
+                else:
+                    self.r_m = 0.3
+                    print('mutation rate set to r_m = ', self.r_m)
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']
                 else:
                     self.r_d = 0.02
                     print('death rate set to r_d = ', self.r_d)
-
                 if 'std' in kwargs:
                     self.std = kwargs['std']
                 else:

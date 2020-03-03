@@ -157,7 +157,7 @@ def inheritance(lgca):
     """
     r_d = const
     """
-    chronicle = False   #Ausgabe der einzelnen Schritte für chronicle = True
+    chronicle = True   #Ausgabe der einzelnen Schritte für chronicle = True
 
     rel_nodes = lgca.nodes[lgca.r_int:-lgca.r_int]
     if chronicle:
@@ -227,12 +227,14 @@ def inheritance(lgca):
 
 def passenger_mutations(lgca):
     """
-    r_d = const, r_b = const, new families develop by mutations
+    r_d = const, r_b = const, new families will develop by mutations
     """
     chronicle = True   #Ausgabe der einzelnen Schritte für chronicle = True
+
     rel_nodes = lgca.nodes[lgca.r_int:-lgca.r_int]
     if chronicle:
         print('rel_nodes ', rel_nodes)
+
     #dying process
     dying = npr.random(rel_nodes.shape) < lgca.r_d
     for label in rel_nodes[dying]:
@@ -255,7 +257,7 @@ def passenger_mutations(lgca):
             print('look at node', node)
 
         # choose cells that proliferate
-        r_bs = [0] * len(node)
+        r_bs = [0] * len(node)      #TODO: besserer Weg?
         for i in range(0, len(node)):
             if node[i] > 0:
                 r_bs[i] = lgca.r_b
@@ -271,6 +273,12 @@ def passenger_mutations(lgca):
             if node[ind] == 0:
                 if chronicle:
                     print('es proliferiert Zelle', label)
+                #TODO:  hier mögliche Mutation einbringen;
+                #       und wenn, dann neue Familie
+                mutation = npr.random() < lgca.r_m
+                if mutation:
+                    print('mit Mutation')
+
                 lgca.maxlabel += 1
                 node[ind] = lgca.maxlabel
                 lgca.apply_boundaries()
@@ -278,6 +286,7 @@ def passenger_mutations(lgca):
                 if chronicle:
                     print('%d is born' %(lgca.maxlabel))
                     print('with ancestor ', lgca.props['lab_m'][label])
+                    print('and new family ') #TODO
 
                 labm = lgca.props['lab_m'][label]
                 lgca.props['lab_m'].append(labm)
