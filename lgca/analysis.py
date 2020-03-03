@@ -233,3 +233,36 @@ def calc_quaderr(data, fitted_data):
         sqd[i] = (data[i] - fitted_data[i])**2
     # print(sqd)
     return sqd
+
+def cond_oneancestor(lgca):
+    fi = lgca.maxfamily_init
+    tree = lgca.tree
+    nodes = lgca.nodes[lgca.r_int:-lgca.r_int]
+    parents = []
+
+    for node in nodes:
+        for entry in node[node > 0]:
+            print('entry', entry)
+            if entry != 0:
+                labm = lgca.props['lab_m'][entry]
+                if labm > fi:
+                    p = [key for key, value in tree.items() if labm in value][0]
+                    # print('p vorläufig', p)
+                    while p > fi:
+                        p = [key for key, value in tree.items() if p in value][0]
+                        # print('p during while', p)
+                    print('ancs nach while', p)
+                    parents.append(p)
+
+                else:
+                    print('ancs', labm)
+                    parents.append(labm)
+    #     print('parents node ', parents)
+    # print('result ', parents)
+    if len(parents) == 0:
+        print('ausgestorben')
+        return False
+    elif parents.count(parents[0]) == len(parents):
+        return True
+    else:
+        return False

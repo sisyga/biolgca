@@ -1,4 +1,5 @@
 from copy import deepcopy as copy
+from lgca.analysis import *
 
 import matplotlib.ticker as mticker
 from datetime import datetime
@@ -184,6 +185,8 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.nodes[self.r_int:-self.r_int] = self.convert_bool_to_ib(occupied)
             self.apply_boundaries()
             self.maxlabel = self.nodes.max()
+            self.maxfamily = self.nodes.max()
+            self.maxfamily_init = self.nodes.max()
 
         else:
             occ = nodes > 0
@@ -238,6 +241,45 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             print('nodes_t', self.nodes_t)
         # while timestep <= 50:
         while len([x for x in self.props['num_off'][1:] if x > 0]) > 1:
+            timestep += 1
+            self.timestep()
+
+            if record:
+                new_nodes = np.zeros((1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
+                new_nodes[0] = self.nodes[self.r_int:-self.r_int]
+                self.nodes_t = np.vstack((self.nodes_t, new_nodes))
+                # self.props_t.append({'lab_m': copy(self.props['lab_m']),\
+                #                     'num_off': copy(self.props['num_off'])})
+                # geht auch: self.props_t.append(copy(self.props)['num_off'])
+                self.props_t.append({'num_off': copy(self.props['num_off'])})
+
+            if offsprings: #für offspring script
+                self.offsprings.append(copy(self.props)['num_off'])
+
+            if spatial: #für spatial script
+                new_nodes = np.zeros((1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
+                new_nodes[0] = self.nodes[self.r_int:-self.r_int]
+                self.nodes_t = np.vstack((self.nodes_t, new_nodes))
+                self.offsprings.append(copy(self.props)['num_off'])
+
+            if chronicle:
+                print('props_t', self.props_t)
+                print('nodes_t', self.nodes_t)
+
+        return timestep
+
+    def timeevo_until_pseudohom(self, record=False, offsprings=False, spatial=False):
+        #weitere Paras: recordN=False, recorddens=True, showprogress=True, recordLast=False
+        chronicle = False
+        timestep = 1
+
+        self.timeevo(1, record=True)
+        if chronicle:
+            print('props_t', self.props_t)
+            print('nodes_t', self.nodes_t)
+        # while timestep <= 50:
+        # while len([x for x in self.props['num_off'][1:] if x > 0]) > 1:
+        while cond_oneancestor(self) is False:
             timestep += 1
             self.timestep()
 

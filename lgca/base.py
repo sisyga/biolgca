@@ -553,6 +553,7 @@ class IBLGCA_base(LGCA_base):
             # passenger MUTATIONS
             elif interaction is 'passenger_mutations':
                 self.interaction = passenger_mutations
+                self.tree = {}
                 if 'r_int' in kwargs:
                     self.set_r_int(kwargs['r_int'])
                 if 'r_b' in kwargs:
