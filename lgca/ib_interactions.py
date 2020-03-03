@@ -281,7 +281,7 @@ def passenger_mutations(lgca):
 
                 labm = lgca.props['lab_m'][label]
                 lgca.props['lab_m'].append(labm)
-                # lgca.props['num_off'][labm] += 1
+                # lgca.props['num_off'][labm] += 1 #TODO Lösung finden
 
             if chronicle:
                 print('nodes after birth: ', lgca.nodes)
