@@ -578,7 +578,6 @@ class IBLGCA_base(LGCA_base):
                     print('standard deviation set to = ', self.std)
                 self.props.update(lab_m=[0] + [0] * self.maxlabel)
                 self.props.update(num_off=[-99] + [1] * self.maxlabel)
-                # #TODO: Funktion schreiben, die aus props und nodes die offs berechnet
 
                 self.maxlabel_init = self.maxlabel
 

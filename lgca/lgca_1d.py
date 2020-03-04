@@ -230,8 +230,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             # print('props_t in timeevo', self.props_t[t]['num_off'][:])
 
 
-    def timeevo_until_hom(self, record=False, offsprings=False, spatial=False):
-        #weitere Paras: recordN=False, recorddens=True, showprogress=True, recordLast=False
+    def timeevo_until_hom(self, offsprings=False, spatial=False):
         chronicle = False
         timestep = 1
 
@@ -243,15 +242,6 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         while len([x for x in self.props['num_off'][1:] if x > 0]) > 1:
             timestep += 1
             self.timestep()
-
-            if record:
-                new_nodes = np.zeros((1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
-                new_nodes[0] = self.nodes[self.r_int:-self.r_int]
-                self.nodes_t = np.vstack((self.nodes_t, new_nodes))
-                # self.props_t.append({'lab_m': copy(self.props['lab_m']),\
-                #                     'num_off': copy(self.props['num_off'])})
-                # geht auch: self.props_t.append(copy(self.props)['num_off'])
-                self.props_t.append({'num_off': copy(self.props['num_off'])})
 
             if offsprings: #für offspring script
                 self.offsprings.append(copy(self.props)['num_off'])

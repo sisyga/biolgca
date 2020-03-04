@@ -257,6 +257,8 @@ def cond_oneancestor(lgca):
                 else:
                     print('ancs', labm)
                     parents.append(labm)
+            if len(parents) != 0 and parents.count(parents[0]) != len(parents):
+                return False
     #     print('parents node ', parents)
     # print('result ', parents)
     if len(parents) == 0:

@@ -264,6 +264,8 @@ def passenger_mutations(lgca):
         for i in range(0, len(node)):
             if node[i] > 0:
                 r_bs[i] = lgca.r_b
+
+
         if chronicle:
             print('r_bs', r_bs)
         proliferating = npr.random(lgca.K) < r_bs
