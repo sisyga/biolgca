@@ -8,6 +8,14 @@ except ImportError:
     from interactions import tanh_switch
 
 
+def randomwalk(lgca):
+    relevant = lgca.cell_density[lgca.nonborder] > 0
+    coords = [a[relevant] for a in lgca.nonborder]
+
+    for coord in zip(*coords):
+        npr.shuffle(lgca.nodes[coord])
+
+
 def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
     a = (lower - mu) / sigma
     b = (upper - mu) / sigma
@@ -40,7 +48,7 @@ def birth(lgca):
                 lgca.props['r_b'].append(float(trunc_gauss(0, lgca.a_max, r_b, sigma=lgca.std)))
 
         lgca.nodes[coord] = node
-        npr.shuffle(lgca.nodes[coord])
+    randomwalk(lgca)
 
 
 def birthdeath(lgca):
@@ -50,8 +58,7 @@ def birthdeath(lgca):
     """
     # death process
     dying = npr.random(lgca.nodes.shape) < lgca.r_d
-    lgca.nodes[dying] = 0
-    lgca.update_dynamic_fields()
+    # lgca.update_dynamic_fields()
     # birth
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
                (lgca.cell_density[lgca.nonborder] < lgca.K)
@@ -74,8 +81,9 @@ def birthdeath(lgca):
                 lgca.props['r_b'].append(float(trunc_gauss(0, lgca.a_max, r_b, sigma=lgca.std)))
 
         lgca.nodes[coord] = node
-        npr.shuffle(lgca.nodes[coord])
 
+    lgca.nodes[dying] = 0
+    randomwalk(lgca)
 
 def go_or_grow(lgca):
     """
