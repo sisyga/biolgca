@@ -585,31 +585,27 @@ class IBLGCA_base(LGCA_base):
         self.maxlabel = self.nodes.max()
         self.update_dynamic_fields()
 
-    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True, recordLast=False):
+    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
         self.update_dynamic_fields()
         if record:
             self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
             self.nodes_t[0, ...] = self.nodes[self.nonborder]
-            self.props_t = [copy(self.props)]
+            # self.props_t = [copy(self.props)]  # this is mostly useless, just use self.props of the last time step
         if recordN:
             self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
             self.n_t[0] = self.cell_density[self.nonbroder].sum()
         if recorddens:
             self.dens_t = np.zeros((timesteps + 1,) + self.dims)
             self.dens_t[0, ...] = self.cell_density[self.nonborder]
-        if recordLast:
-            self.props_t = [copy(self.props)]
         for t in range(1, timesteps + 1):
             self.timestep()
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.nonborder]
-                self.props_t.append(copy(self.props))
+                # self.props_t.append(copy(self.props))
             if recordN:
                 self.n_t[t] = self.cell_density[self.nonborder].sum()
             if recorddens:
                 self.dens_t[t, ...] = self.cell_density[self.nonborder]
-            if recordLast and t == (timesteps + 1):
-                self.props_t.append(copy(self.props))
             if showprogress:
                 update_progress(1.0 * t / timesteps)
 
@@ -639,22 +635,21 @@ class IBLGCA_base(LGCA_base):
         mean_prop = mean_prop.reshape(dims[:-1])
         return mean_prop
 
-    def plot_prop_timecourse(self, nodes_t=None, props_t=None, propname=None, figindex=None, figsize=None):
+    def plot_prop_timecourse(self, nodes_t=None, props=None, propname=None, figindex=None, figsize=None):
         if nodes_t is None:
             nodes_t = self.nodes_t
 
-        if props_t is None:
-            props_t = self.props_t
-
         if propname is None:
-            propname = list(props_t[0])[0]
+            propname = next(iter(self.props))
+
+        if props is None:
+            props = self.props
 
         plt.figure(num=figindex, figsize=figsize)
-        tmax = len(props_t)
+        tmax = nodes_t.shape[0]
         mean_prop_t = np.zeros(tmax)
         std_mean_prop_t = np.zeros(mean_prop_t.shape)
         for t in range(tmax):
-            props = props_t[t]
             nodes = nodes_t[t]
             prop = np.asarray(props[propname])[nodes[nodes > 0]]
             mean_prop_t[t] = prop.mean()

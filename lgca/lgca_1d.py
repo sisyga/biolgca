@@ -177,22 +177,22 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.nodes[self.r_int:-self.r_int] = self.convert_bool_to_ib(occ)
             self.maxlabel = self.nodes.max()
 
-    def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=None, figsize=None, propname=None, cmap='cividis'):
+    def plot_prop_spatial(self, nodes_t=None, props=None, figindex=None, figsize=None, propname=None, cmap='cividis'):
         if nodes_t is None:
             nodes_t = self.nodes_t
         if figsize is None:
             figsize = estimate_figsize(nodes_t.sum(-1).T, cbar=True)
 
-        if props_t is None:
-            props_t = self.props_t
+        if props is None:
+            props = self.props
 
         if propname is None:
-            propname = list(props_t[0])[0]
+            propname = next(iter(props))
 
         tmax, l, _ = nodes_t.shape
         mean_prop_t = np.zeros((tmax, l))
         for t in range(tmax):
-            meanprop = self.calc_prop_mean(propname=propname, props=props_t[t], nodes=nodes_t[t])
+            meanprop = self.calc_prop_mean(propname=propname, props=props, nodes=nodes_t[t])
             mean_prop_t[t] = meanprop
 
         dens_t = nodes_t.astype(bool).sum(-1)
@@ -221,15 +221,15 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
 
 
 if __name__ == '__main__':
-    l = 100
+    l = 500
     restchannels = 2
     n_channels = restchannels + 2
     nodes = 1 + np.arange(l * n_channels, dtype=np.uint).reshape((l, n_channels))
     nodes[1:, :] = 0
 
-    system = IBLGCA_1D(bc='reflect', dims=100, interaction='birthdeath', density=0.1, restchannels=2, r_b=0.1, std=0.05,
+    system = IBLGCA_1D(bc='reflect', dims=100, interaction='birthdeath', density=0.1, restchannels=2, r_b=0.1, std=0.005,
                        nodes=nodes)
-    system.timeevo(timesteps=200, record=True)
+    system.timeevo(timesteps=3000, record=True)
     # system.plot_prop()
     # system.plot_density(figindex=1)
     # props = np.array(system.props['kappa'])[system.nodes[system.nodes > 0]]
