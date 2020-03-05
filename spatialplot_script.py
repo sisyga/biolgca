@@ -10,16 +10,16 @@ from uuid import uuid4 as uuid
 # rc = int(env['RESTCHANNELS'])
 # rep = int(env['REPETITIONS'])
 
-dim=3
-rc=15
+dim=2
+rc=1
 rep=1
 
 dens = 1
 birthrate = 0.5
-deathrate = 0.0
+deathrate = 0.02
 
 uu = str(uuid())[0:7]
-saving_data = True
+saving_data = False
 
 for i in range(0, rep):
     print('bin bei wdh: ', i)
@@ -30,15 +30,19 @@ for i in range(0, rep):
            density = dens, dims = dim, r_b = birthrate, variation = False, restchannels = rc ,r_d = deathrate)
     id = name + '_' + str(i) + '_' + str(uu) + 'rc15_mitReori'
     # id = 'Test_nochmal'
-    lgca.offsprings.append([-99] + [1] * (rc + 2) * dim)
     t = lgca.timeevo_until_hom(spatial=True)
     print('thom ', t)
     # spacetime_plot(nodes_t=lgca.nodes_t, labels=lgca.props['lab_m'], \
     #                tend=None, save=saving_data, id=str(180) + str(name))
     # spacetime_plot(nodes_t=lgca.nodes_t, labels=lgca.props['lab_m'], \
     #                tend=500, save=saving_data, id=str(180) + str(name))
-    spacetime_plot(nodes_t=lgca.nodes_t, labels=lgca.props['lab_m'], \
-                   tend=20, save=saving_data, id=id, figsize=(6,3))
+    # spacetime_plot(nodes_t=lgca.nodes_t, labels=lgca.props['lab_m'], \
+    #                tend=20, save=saving_data, id=id, figsize=(6,3))
+    print(np.shape(lgca.offsprings))
+    np.save('saved_data/offsspat', lgca.offsprings)
+    o = np.load('saved_Data/offsspat.npy')
+    print(o)
+    # mullerplot(lgca.offsprings) TODO reparieren
     if saving_data:
         np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
         np.save('saved_data/' + str(id) + '_nodest', lgca.nodes_t)

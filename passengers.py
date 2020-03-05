@@ -11,32 +11,36 @@ import math as m
 def control(lgca, t):
     steps, n, c = lgca.nodes_t.shape
     if len(lgca.offsprings) != len(lgca.nodes_t):
-        exit(900)
+        exit(900) # offs länge != nodest länge
     if steps != t + 1:
-        exit(901)
+        exit(901) # offs länge != timesteps
     for i in range(0, t + 1):
-        if sum(lgca.offsprings[i][1:]) != len(lgca.nodes_t[i, 0][lgca.nodes_t[i,0]>0]):
-            print(sum(lgca.offsprings[i][1:]))
-            print(lgca.nodes_t[i, 0][lgca.nodes_t[i,0]>0])
-            exit(902)
-    return exit(777)
+        if sum(lgca.offsprings[i][1:]) != len(lgca.nodes_t[i, 0][lgca.nodes_t[i, 0] > 0]):
+            print(lgca.offsprings)
+            print(lgca.nodes_t)
+            exit(902)   #anz zellen != offs
+    if lgca.maxfamily - lgca.maxfamily_init != len(lgca.offsprings[-1]) - len(lgca.offsprings[0]):
+        exit(903)   #mutationen stimmen nicht
+
+
 dim = 1
 rc = 2
 
 lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
-           density=1, dims=dim, restchannels=rc, r_d=0.08, r_m=0.5)
+           density=1, dims=dim, restchannels=rc, r_d=0.08, r_m=0.8)
 t = lgca.timeevo_until_pseudohom(spatial=True)
 print(t)
-print(lgca.tree)
-print(len(lgca.tree))
-print('anzahl mutationen ', lgca.maxfamily - lgca.maxfamily_init)
-off = (lgca.offsprings)
-for line in range(0, len(off)):
-    print(off[line])
-n = lgca.nodes_t
-print(n)
-
-print('nodes, offs', n.shape, len(off))
-
+print('Mutationen: ', lgca.maxfamily - lgca.maxfamily_init)
 control(lgca, t)
+print(lgca.offsprings)
+print(np.shape(lgca.offsprings))
+np.save('saved_data/offs', lgca.offsprings) #TODO WHY?!
+real = np.load('saved_data/offs.npy')
+print(real)
+# mullerplot(real)
+# #
+# # spacetime_plot(lgca.nodes_t, lgca.props['lab_m'], figsize=(10,10))
+# offs = np.load('saved_data/Testdaten_1__offsprings.npy')
+# print(offs)
+# mullerplot(offs)
 

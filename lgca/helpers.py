@@ -8,9 +8,12 @@ from datetime import datetime
 import pathlib
 from lgca.analysis import *
 
-def mullerplot(data, id=0, save=False, int_length=1):
-    tend = len(data)
-    maxlab = len(data[0]) - 1
+def mullerplot(data, id=0, save=False, int_length=1, maxfamily=None):
+    tend = len(data) - 1
+    if maxfamily is None:
+        maxlab = len(data[0]) - 1
+    else:
+        maxlab = maxfamily
 
     fig, ax = plt.subplots()
     val = np.zeros((maxlab, tend))

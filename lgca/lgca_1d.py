@@ -258,7 +258,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
 
         return timestep
 
-    def timeevo_until_pseudohom(self, record=False, offsprings=False, spatial=False):
+    def timeevo_until_pseudohom(self, offsprings=False, spatial=False):
         #weitere Paras: recordN=False, recorddens=True, showprogress=True, recordLast=False
         chronicle = False
         timestep = 1
@@ -273,15 +273,6 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             timestep += 1
             self.timestep()
 
-            if record:
-                new_nodes = np.zeros((1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
-                new_nodes[0] = self.nodes[self.r_int:-self.r_int]
-                self.nodes_t = np.vstack((self.nodes_t, new_nodes))
-                # self.props_t.append({'lab_m': copy(self.props['lab_m']),\
-                #                     'num_off': copy(self.props['num_off'])})
-                # geht auch: self.props_t.append(copy(self.props)['num_off'])
-                self.props_t.append({'num_off': copy(self.props['num_off'])})
-
             if offsprings: #für offspring script
                 self.offsprings.append(copy(self.props)['num_off'])
 
@@ -289,7 +280,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                 new_nodes = np.zeros((1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
                 new_nodes[0] = self.nodes[self.r_int:-self.r_int]
                 self.nodes_t = np.vstack((self.nodes_t, new_nodes))
-                self.offsprings.append(copy(self.props)['num_off'])
+                self.offsprings.append(copy(self.props['num_off']))
 
             if chronicle:
                 print('props_t', self.props_t)

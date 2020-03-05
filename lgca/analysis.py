@@ -242,7 +242,7 @@ def cond_oneancestor(lgca):
 
     for node in nodes:
         for entry in node[node > 0]:
-            print('entry', entry)
+            # print('entry', entry)
             if entry != 0:
                 labm = lgca.props['lab_m'][entry]
                 if labm > fi:
@@ -251,11 +251,11 @@ def cond_oneancestor(lgca):
                     while p > fi:
                         p = [key for key, value in tree.items() if p in value][0]
                         # print('p during while', p)
-                    print('ancs nach while', p)
+                    # print('ancs nach while', p)
                     parents.append(p)
 
                 else:
-                    print('ancs', labm)
+                    # print('ancs', labm)
                     parents.append(labm)
             if len(parents) != 0 and parents.count(parents[0]) != len(parents):
                 return False
@@ -263,7 +263,7 @@ def cond_oneancestor(lgca):
     # print('result ', parents)
     if len(parents) == 0:
         print('ausgestorben')
-        return False
+        return True
     elif parents.count(parents[0]) == len(parents):
         return True
     else:
