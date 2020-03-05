@@ -2,6 +2,8 @@ from lgca import get_lgca
 from lgca.helpers import *
 from lgca.analysis import *
 import numpy as np
+from copy import deepcopy as copy
+
 import matplotlib.pyplot as plt
 import math as m
 
@@ -26,15 +28,15 @@ def control(lgca, t):
 dim = 1
 rc = 2
 
-lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
-           density=1, dims=dim, restchannels=rc, r_d=0.08, r_m=0.8)
-t = lgca.timeevo_until_pseudohom(spatial=True)
-print(t)
-print('Mutationen: ', lgca.maxfamily - lgca.maxfamily_init)
-control(lgca, t)
-print(lgca.offsprings)
-print(np.shape(lgca.offsprings))
-np.save('saved_data/offs', lgca.offsprings) #TODO WHY?!
+# lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
+#            density=1, dims=dim, restchannels=rc, r_b=0.8, r_d=0.3, r_m=1)
+# t = lgca.timeevo_until_pseudohom(spatial=True)
+# print(t)
+# print('Mutationen: ', lgca.maxfamily - lgca.maxfamily_init)
+# control(lgca, t)
+# print(lgca.offsprings)
+# # print(np.shape(lgca.offsprings))
+# np.save('saved_data/offs', lgca.offsprings) #TODO WHY?!
 real = np.load('saved_data/offs.npy')
 print(real)
 # mullerplot(real)
@@ -44,3 +46,29 @@ print(real)
 # print(offs)
 # mullerplot(offs)
 
+# p1 = {'labs': [1,2,3,4], 'offs':  [1,1,1,1]}
+# p2 = {'labs': [1,2,3,4,1], 'offs':  [2,1,1,1]}
+# p3 = {'labs': [1,2,3,4,1], 'offs':  [2,0,1,1]}
+#
+# off = [p1['offs']]
+# print(off)
+# off.append(p2['offs'])
+# print(off)
+# off.append(copy(p3['offs']))
+# print(off)
+#
+# p3['offs'].append(99)
+#
+# off.append(copy(p3['offs']))
+# print(off)
+#
+# np.save('saved_data/offsprings', off)
+# o = np.load('saved_data/offsprings.npy')
+# print(o)
+#
+# test = [[1,2], [3,4], [4,5,6]]
+# print(test)
+# np.save('saved_data/test', test)
+# t = np.load('saved_data/test.npy')
+# print(t)
+# print(t[0])

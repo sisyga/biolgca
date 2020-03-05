@@ -8,17 +8,17 @@ from datetime import datetime
 import pathlib
 from lgca.analysis import *
 
-def mullerplot(data, id=0, save=False, int_length=1, maxfamily=None):
-    tend = len(data) - 1
-    if maxfamily is None:
-        maxlab = len(data[0]) - 1
-    else:
-        maxlab = maxfamily
+def mullerplot(data, id=0, save=False, int_length=1):
+    tend = len(data)
+
+    maxxxlab = len(data[-1]) - 1
 
     fig, ax = plt.subplots()
-    val = np.zeros((maxlab, tend))
+    val = np.zeros((maxxxlab, tend))
 
     for t in range(0, tend):
+        maxlab = len(data[t]) - 1
+        # TODO data unterschiedlich lang, nicht immer bis maxlab!
         for lab in range(0, maxlab):
             val[lab, t] = data[t, lab + 1]
 

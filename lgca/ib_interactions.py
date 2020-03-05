@@ -1,6 +1,8 @@
 import numpy as np
 from numpy import random as npr
 from scipy.stats import truncnorm
+from copy import deepcopy as copy
+
 
 try:
     from .interactions import tanh_switch
@@ -290,13 +292,13 @@ def passenger_mutations(lgca):
                     lgca.maxfamily += 1
                     if chronicle:
                         print('mit Mutation und neuer family ', lgca.maxfamily)
-                    lgca.props['num_off'][:] += [1] #TODO list?!
+                    lgca.props['num_off'].append(1) #TODO list?!
                     print(lgca.props['num_off'])
-                    lgca.props['lab_m'].append(lgca.maxfamily)
+                    lgca.props['lab_m'].append(int(lgca.maxfamily))
                     if lgca.props['lab_m'][label] in lgca.tree:
-                        lgca.tree[lgca.props['lab_m'][label]].append(lgca.maxfamily)
+                        lgca.tree[lgca.props['lab_m'][label]].append(int(lgca.maxfamily))
                     else:
-                        lgca.tree[lgca.props['lab_m'][label]] = [lgca.maxfamily]
+                        lgca.tree[lgca.props['lab_m'][label]] = [int(lgca.maxfamily)]
                 else:
                     labm = lgca.props['lab_m'][label]
                     lgca.props['lab_m'].append(labm)

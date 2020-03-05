@@ -16,7 +16,7 @@ rep=1
 
 dens = 1
 birthrate = 0.5
-deathrate = 0.02
+deathrate = 0.2
 
 uu = str(uuid())[0:7]
 saving_data = False
@@ -40,9 +40,9 @@ for i in range(0, rep):
     #                tend=20, save=saving_data, id=id, figsize=(6,3))
     print(np.shape(lgca.offsprings))
     np.save('saved_data/offsspat', lgca.offsprings)
-    o = np.load('saved_Data/offsspat.npy')
+    o = np.load('saved_data/offsspat.npy')
     print(o)
-    # mullerplot(lgca.offsprings) TODO reparieren
+    # mullerplot(lgca.offsprings)
     if saving_data:
         np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
         np.save('saved_data/' + str(id) + '_nodest', lgca.nodes_t)
