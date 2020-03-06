@@ -296,10 +296,6 @@ def passenger_mutations(lgca):
                     # print(lgca.props['num_off'])
                     lgca.props['lab_m'].append(int(lgca.maxfamily))
                     lgca.tree_manager.register(label)
-                    if lgca.props['lab_m'][label] in lgca.tree:
-                        lgca.tree[lgca.props['lab_m'][label]].append(int(lgca.maxfamily))
-                    else:
-                        lgca.tree[lgca.props['lab_m'][label]] = [int(lgca.maxfamily)]
                 else:
                     labm = lgca.props['lab_m'][label]
                     lgca.props['lab_m'].append(labm)
@@ -309,7 +305,6 @@ def passenger_mutations(lgca):
             if chronicle:
                 # print('nodes after birth: ', lgca.nodes)
                 print('props after birth: ', lgca.props)
-                print('tree', lgca.tree)
         lgca.nodes[coord] = node
 
     #reorientation:

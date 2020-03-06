@@ -17,15 +17,20 @@ def control(lgca, t):
     if steps != t + 1:
         exit(901) # offs länge != timesteps
     for i in range(0, t + 1):
-        if sum(lgca.offsprings[i][1:]) != len(lgca.nodes_t[i, 0][lgca.nodes_t[i, 0] > 0]):
+        anz = 0
+        for j in range(0, n):
+            anz += len(lgca.nodes_t[i, j][lgca.nodes_t[i, j] > 0])
+
+        if sum(lgca.offsprings[i][1:]) != anz:
             print(lgca.offsprings)
             print(lgca.nodes_t)
+            print(anz)
             exit(902)   #anz zellen != offs
     if lgca.maxfamily - lgca.maxfamily_init != len(lgca.offsprings[-1]) - len(lgca.offsprings[0]):
         exit(903)   #mutationen stimmen nicht
 
 
-dim = 1
+dim = 3
 rc = 2
 
 lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
@@ -33,8 +38,8 @@ lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='
 t = lgca.timeevo_until_pseudohom(spatial=True)
 print(t)
 print('Mutationen: ', lgca.maxfamily - lgca.maxfamily_init)
-print(lgca.tree)
 print(lgca.tree_manager.tree)
+
 control(lgca, t)
 # print(lgca.offsprings)
 # # print(np.shape(lgca.offsprings))
