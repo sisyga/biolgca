@@ -293,8 +293,9 @@ def passenger_mutations(lgca):
                     if chronicle:
                         print('mit Mutation und neuer family ', lgca.maxfamily)
                     lgca.props['num_off'].append(1) #TODO list?!
-                    print(lgca.props['num_off'])
+                    # print(lgca.props['num_off'])
                     lgca.props['lab_m'].append(int(lgca.maxfamily))
+                    lgca.tree_manager.register(label)
                     if lgca.props['lab_m'][label] in lgca.tree:
                         lgca.tree[lgca.props['lab_m'][label]].append(int(lgca.maxfamily))
                     else:

@@ -187,6 +187,9 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.maxlabel = self.nodes.max()
             self.maxfamily = self.nodes.max()
             self.maxfamily_init = self.nodes.max()
+            for i in range(0, self.maxfamily_init):
+                self.tree_manager.register()
+
 
         else:
             occ = nodes > 0
@@ -289,6 +292,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         return timestep
 
     def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop=None, cmap='cividis'):
+       #TODO benutzt?
         if nodes_t is None:
             nodes_t = self.nodes_t
         if figsize is None:
@@ -336,6 +340,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         return plot
 
+    #TODO kann weg?
     # def spatial_plot(self, nodes_t=None, props_t=None, figindex = None, figsize=None, prop='lab_m',\
     #                  cmap='nipy_spectral', tbeg=None, tend=None, save=False, id=0, restchannels=None, velocitychannels=None):
     #     if nodes_t is None:
@@ -437,6 +442,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         plt.plot(x, y)
         plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True, interpolate=True)
         return
+
 
 
 if __name__ == '__main__':

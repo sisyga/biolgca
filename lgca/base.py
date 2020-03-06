@@ -8,6 +8,8 @@ from matplotlib.cm import ScalarMappable
 from numpy import random as npr
 from sympy.utilities.iterables import multiset_permutations
 
+from lgca.treemanager import TreeManager
+
 pi2 = 2 * np.pi
 plt.style.use('default')
 # hello
@@ -418,6 +420,7 @@ class IBLGCA_base(LGCA_base):
         self.props = {}
         self.offsprings = []
         self.set_bc(bc)
+        self.tree_manager = TreeManager()
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
         self.density = density
         self.init_nodes(density=density, nodes=nodes)
@@ -425,6 +428,7 @@ class IBLGCA_base(LGCA_base):
         self.set_interaction(**kwargs)
         self.cell_density = self.nodes.sum(-1)
         self.apply_boundaries()
+
 
     def set_interaction(self, **kwargs):
         try:

@@ -28,12 +28,14 @@ def control(lgca, t):
 dim = 1
 rc = 2
 
-# lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
-#            density=1, dims=dim, restchannels=rc, r_b=0.8, r_d=0.3, r_m=1)
-# t = lgca.timeevo_until_pseudohom(spatial=True)
-# print(t)
-# print('Mutationen: ', lgca.maxfamily - lgca.maxfamily_init)
-# control(lgca, t)
+lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
+           density=1, dims=dim, restchannels=rc, r_b=0.8, r_d=0.3, r_m=1)
+t = lgca.timeevo_until_pseudohom(spatial=True)
+print(t)
+print('Mutationen: ', lgca.maxfamily - lgca.maxfamily_init)
+print(lgca.tree)
+print(lgca.tree_manager.tree)
+control(lgca, t)
 # print(lgca.offsprings)
 # # print(np.shape(lgca.offsprings))
 # np.save('saved_data/offs', lgca.offsprings) #TODO WHY?!
