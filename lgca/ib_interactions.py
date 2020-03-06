@@ -233,7 +233,7 @@ def passenger_mutations(lgca):
     """
     r_d = const, r_b = const, new families will develop by mutations
     """
-    chronicle = False   #Ausgabe der einzelnen Schritte für chronicle = True
+    chronicle = True   #Ausgabe der einzelnen Schritte für chronicle = True
     # print(lgca.maxlabel, lgca.maxfamily, lgca.maxfamily_init)
     rel_nodes = lgca.nodes[lgca.r_int:-lgca.r_int]
     if chronicle:
@@ -292,7 +292,7 @@ def passenger_mutations(lgca):
                     lgca.maxfamily += 1
                     if chronicle:
                         print('mit Mutation und neuer family ', lgca.maxfamily)
-                    lgca.props['num_off'].append(1) #TODO list?!
+                    lgca.props['num_off'].append(1)
                     # print(lgca.props['num_off'])
                     lgca.props['lab_m'].append(int(lgca.maxfamily))
                     lgca.tree_manager.register(label)

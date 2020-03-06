@@ -30,20 +30,23 @@ def control(lgca, t):
         exit(903)   #mutationen stimmen nicht
 
 
-dim = 3
+dim = 2
 rc = 2
 
 lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
-           density=1, dims=dim, restchannels=rc, r_b=0.8, r_d=0.3, r_m=1)
+           density=1, dims=dim, restchannels=rc, r_b=0.9, r_d=0.2, r_m=1)
 t = lgca.timeevo_until_pseudohom(spatial=True)
 print(t)
 print('Mutationen: ', lgca.maxfamily - lgca.maxfamily_init)
 print(lgca.tree_manager.tree)
-
+id = 'passenger_test'
+np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
+np.save('saved_data/' + str(id) + '_nodest', lgca.nodes_t)
+np.save('saved_data/' + str(id) + '_tree', lgca.tree_manager.tree)
 control(lgca, t)
 # print(lgca.offsprings)
 # # print(np.shape(lgca.offsprings))
-# np.save('saved_data/offs', lgca.offsprings) #TODO WHY?!
+# np.save('saved_data/offs', lgca.offsprings)
 real = np.load('saved_data/offs.npy')
 print(real)
 # mullerplot(real)

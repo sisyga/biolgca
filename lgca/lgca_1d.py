@@ -341,6 +341,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         return plot
 
     #TODO kann weg?
+
     # def spatial_plot(self, nodes_t=None, props_t=None, figindex = None, figsize=None, prop='lab_m',\
     #                  cmap='nipy_spectral', tbeg=None, tend=None, save=False, id=0, restchannels=None, velocitychannels=None):
     #     if nodes_t is None:

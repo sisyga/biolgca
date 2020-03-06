@@ -4,13 +4,25 @@ from lgca.analysis import *
 import numpy as np
 import matplotlib.pyplot as plt
 
-real = np.load('saved_data/offsspat.npy') #example ohne mutations
-# real = np.load('saved_data/offs.npy')
-print(real)
-families = len(real[-1]) - 1
-print(families)
-print(len(real))
-mullerplot(real)
+
+offs = np.load('saved_data/passenger_test_offsprings.npy')
+# offs = np.load('saved_data/82_0_93b103e_offsprings.npy')
+nodest = np.load('saved_data/passenger_test_nodest.npy')
+tree = np.load('saved_data/passenger_test_tree.npy')
+
+print(offs)
+print(len(offs[-1])-1)
+print(nodest)
+print(tree)
+
+# mullerplot(offs)
+# real = np.load('saved_data/offsspat.npy') #example ohne mutations
+# # real = np.load('saved_data/offs.npy')
+# print(real)
+# families = len(real[-1]) - 1
+# print(families)
+# print(len(real))
+# mullerplot(real)
 """
 Beispiele für Datensätze
 """

@@ -11,16 +11,18 @@ from lgca.analysis import *
 def mullerplot(data, id=0, save=False, int_length=1):
     tend = len(data)
 
-    maxxxlab = len(data[-1]) - 1
+    maxlab = len(data[-1]) - 1
+    if len(data[0]) != len(data[-1]):
+        calc_mullplotdata(data, int_length)
 
     fig, ax = plt.subplots()
-    val = np.zeros((maxxxlab, tend))
+    val = np.zeros((maxlab, tend))
 
     for t in range(0, tend):
-        maxlab = len(data[t]) - 1
-        # TODO data unterschiedlich lang, nicht immer bis maxlab!
+        # maxlab = len(data[t]) - 1
+        # # TODO data unterschiedlich lang, nicht immer bis maxlab!
         for lab in range(0, maxlab):
-            val[lab, t] = data[t, lab + 1]
+            val[lab, t] = data[t][lab + 1]
 
     if int_length == 1:
         xrange = range(0, tend)
@@ -433,6 +435,20 @@ def plot_lognorm_distribution(thom, int_length, save=False, id=0, c='seagreen'):
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
     plt.show()
 
+def calc_mullplotdata(data, int_length):
+    maxfamily = len(data[-1]) - 1
+    tend = len(data)
+
+    fig, ax = plt.subplots()
+    val = np.zeros((maxfamily, tend))
+
+    for t in range(0, tend):
+        maxlab = len(data[t]) - 1   #data unterschiedlich lang!
+        for lab in range(0, maxlab):
+            val[lab, t] = data[t][lab + 1]
+    print(val)
+    #TODO how?!
+    exit(987)
 def aloha(who):
     print('aloha', who)
 

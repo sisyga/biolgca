@@ -235,7 +235,7 @@ def calc_quaderr(data, fitted_data):
     return sqd
 
 def cond_oneancestor(lgca):
-    fi = lgca.maxfamily_init
+    # fi = lgca.maxfamily_init
     nodes = lgca.nodes[lgca.r_int:-lgca.r_int]
     parents = []
 
