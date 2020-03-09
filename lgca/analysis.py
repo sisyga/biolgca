@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import scipy as sp
 from scipy import stats, optimize, interpolate
+from scipy.stats import binom
 from matplotlib import cm
 from datetime import datetime
 import pathlib
@@ -215,19 +216,32 @@ def calc_lognormaldistri(thom, int_length):
 def id_var(val, m, v):      #TODO: verwendet?
     return v + (val - m)**2
 
-def calc_barerrs(thom, int_length):
-    ni = (thom.max() / int_length + 1).astype(int)
-    print('anz intervalle', ni)
-    err = np.zeros(ni)
-    for i in range(0, ni):
-        bar = thom[thom < (i + 1) * int_length]
-        bar = bar[bar >= i * int_length]
-        #print(bar)
-        if len(bar) > 0:
-            err[i] = bar.std()
+def calc_barerrs(counted_thom):
+    expect = np.zeros(len(counted_thom))
+    var = np.zeros(len(counted_thom))
+    s = np.zeros(len(counted_thom))
+    b = np.zeros(len(counted_thom))
+    # p = np.zeros(len(expect))
+    n = counted_thom.sum()
+    print('n', n)
+    err = np.zeros(len(counted_thom))
+    for i in range(0, len(err)):
+        # p[i] = counted_thom[i]/n
+        if counted_thom[i] != 0:
+            b[i] = binom.pmf(counted_thom[i], n, p=counted_thom[i]/n)
+        expect[i] = b[i] * n
+        var[i] = expect[i] * (1-b[i])
+        s[i] = (var[i])**0.5
+        err[i] = (counted_thom[i]*(1-(counted_thom[i]/n)))**0.5
+    print('err', err)
+    print('exp', expect)
+    print('var', var)
+    print('s', s)
+    # print('p', p)
+    print('b', b)
     return err
 
-def calc_quaderr(data, fitted_data):
+def calc_quaderr(data, fitted_data): #TODO quad Fehler
     sqd = np.zeros(len(data))
     for i in range(0, len(data)):
         sqd[i] = (data[i] - fitted_data[i])**2

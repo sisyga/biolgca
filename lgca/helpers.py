@@ -416,17 +416,22 @@ def plot_lognorm_distribution(thom, int_length, save=False, id=0, c='seagreen'):
 
     plt.xlim(0, max + int_length/2)
     plt.bar(x, y, width=int_length, color='grey', alpha=0.5)
-    barerr = calc_barerrs(thom, int_length)
+    print('x', x)
+    print('y', y)
+    barerr = calc_barerrs(y)
+    plt.errorbar(x, y, yerr=barerr, color='magenta')
     plt.plot(x, fitted_data * maxy / maxfit, color=c, label=id)
-    sqderr = calc_quaderr(fitted_data * maxy / maxfit, y)
-    scale = int_length * 5
-    print((barerr * sqderr).max())
-    weightederr = barerr * sqderr / scale #skaliert und gewichtet
-    print(weightederr.max())
-    # print(weightederr)
+    # sqderr = calc_quaderr(fitted_data * maxy / maxfit, y)
+    # print('q', sqderr)
+    # scale = int_length * 5
+    # print((barerr * sqderr).max())
+    # weightederr = barerr * sqderr #/ scale #skaliert und gewichtet
+    # print(weightederr.max())
+    # print('w', weightederr)
     # print(fitted_data * maxy / maxfit)
     # print(x)
-    plt.errorbar(x, fitted_data * maxy / maxfit, yerr=weightederr, lw=1, capsize=2, capthick=1, color=c)
+    # plt.errorbar(x, y, yerr=weightederr, lw=1, capsize=2, capthick=1, color=c)
+    # plt.errorbar(x, fitted_data * maxy / maxfit, yerr=weightederr, lw=1, capsize=2, capthick=1, color=c)
 
     plt.legend()
 
