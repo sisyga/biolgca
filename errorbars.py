@@ -17,56 +17,35 @@ thombsp = np.array([1,3,5,7,\
         35,33])
 
     # 0 = mini  1 = bsp  2 = thom01
-which = 2
+which = 1
 
 if which == 0:
     thom = mini
     int_length = 1
 elif which == 1:
     thom = thombsp
-    int_length = 10
+    int_length = 1
 elif which == 2:
     thom = thom01
     int_length = 1000
 
-plot_lognorm_distribution(thom, int_length)
-exit()
-max = thom.max().astype(int)
-print('max', max)
-print('mean', thom.mean())
-print('std', thom.std())
-fig, ax = plt.subplots()
-plt.xticks(fontsize=12)
-plt.yticks(fontsize=12)
-plt.xlabel('thom', fontsize=15)
-plt.ylabel('absolute frequency', fontsize=15)
-fitted_data, maxy, y = calc_lognormaldistri(thom=thom, int_length=int_length)
-maxfit = fitted_data.max()
-x = np.arange(0, max, int_length) + int_length/2
-
-
-plt.xlim(0, x.max() + int_length/2)
-plt.ylim(0, maxy + 25)
-
-### plt.hist(thom, bins=np.arange(0, thom.max() + 2*int_length, int_length))
-plt.bar(x, y, width=int_length, color='grey', alpha=0.5)
-
-
-err = calc_barerrs(thom, int_length) / 100 #skaliert
-print(err)
-#plt.errorbar(x[y > 0], y[y > 0], yerr=err[y > 0], linestyle='') #TODO Käsequäse...?
-
-plt.plot(x, fitted_data * maxy / maxfit)
-plt.legend()
-print(fitted_data * maxy / maxfit, y)
-sqderr = calc_quaderr(fitted_data * maxy / maxfit, y) / 100
-print(sqderr)
-
-sqderr = sqderr * err
-print(sqderr)
-print(fitted_data*maxy/maxfit)
+x = np.arange(1, max(thom)+1)
 print(x)
-plt.errorbar(x, fitted_data*maxy/maxfit, yerr=sqderr, lw=1, capsize=2, capthick=1, color='seagreen')
-
+y = np.zeros(max(thom))
+for i in range(0, len(thom)):
+    y[thom[i] - 1] += 1
+print(y)
+plt.bar(x, y)
+# plt.errorbar(x, y, yerr=[1,1,1,1], color='magenta')
+sigma = np.zeros(len(x))
+n = y.sum()
+print(n)
+for i in range(0, len(x)):
+    sigma[i] = (y[i]*(1-(y[i]/n)))**0.5
+print(sigma)
+plt.errorbar(x, y, yerr=sigma, color='magenta')
 
 plt.show()
+
+
+
