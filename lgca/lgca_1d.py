@@ -272,8 +272,11 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             print('nodes_t', self.nodes_t)
         # while timestep <= 50:
         # while len([x for x in self.props['num_off'][1:] if x > 0]) > 1:
+
         while cond_oneancestor(self) is False:
             timestep += 1
+            if timestep > 20:
+                exit(789)
             self.timestep()
 
             if offsprings: #für offspring script

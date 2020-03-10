@@ -30,55 +30,19 @@ def control(lgca, t):
         exit(903)   #mutationen stimmen nicht
 
 
-dim = 2
-rc = 2
+dim = 1
+rc = 3
 
 lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
-           density=1, dims=dim, restchannels=rc, r_b=0.9, r_d=0.2, r_m=1)
+           density=1, dims=dim, restchannels=rc, r_d=0.2, r_m=0.5, r_b=0.8)
 t = lgca.timeevo_until_pseudohom(spatial=True)
 print(t)
 print('Mutationen: ', lgca.maxfamily - lgca.maxfamily_init)
-print(lgca.tree_manager.tree)
-id = 'passenger_test'
+# print(lgca.tree_manager.tree)
+id = 'passengermutations'
 np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
 np.save('saved_data/' + str(id) + '_nodest', lgca.nodes_t)
 np.save('saved_data/' + str(id) + '_tree', lgca.tree_manager.tree)
 control(lgca, t)
-# print(lgca.offsprings)
-# # print(np.shape(lgca.offsprings))
-# np.save('saved_data/offs', lgca.offsprings)
-real = np.load('saved_data/offs.npy')
-print(real)
-# mullerplot(real)
-# #
-# # spacetime_plot(lgca.nodes_t, lgca.props['lab_m'], figsize=(10,10))
-# offs = np.load('saved_data/Testdaten_1__offsprings.npy')
-# print(offs)
-# mullerplot(offs)
 
-# p1 = {'labs': [1,2,3,4], 'offs':  [1,1,1,1]}
-# p2 = {'labs': [1,2,3,4,1], 'offs':  [2,1,1,1]}
-# p3 = {'labs': [1,2,3,4,1], 'offs':  [2,0,1,1]}
-#
-# off = [p1['offs']]
-# print(off)
-# off.append(p2['offs'])
-# print(off)
-# off.append(copy(p3['offs']))
-# print(off)
-#
-# p3['offs'].append(99)
-#
-# off.append(copy(p3['offs']))
-# print(off)
-#
-# np.save('saved_data/offsprings', off)
-# o = np.load('saved_data/offsprings.npy')
-# print(o)
-#
-# test = [[1,2], [3,4], [4,5,6]]
-# print(test)
-# np.save('saved_data/test', test)
-# t = np.load('saved_data/test.npy')
-# print(t)
-# print(t[0])
+

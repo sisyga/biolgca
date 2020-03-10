@@ -258,6 +258,7 @@ def cond_oneancestor(lgca):
             p = lgca.tree_manager.tree[entry]['origin']
             if p is None:
                 p = entry
+            # print(p)
             parents.append(p)
 
             if len(parents) != 0 and parents.count(parents[0]) != len(parents):

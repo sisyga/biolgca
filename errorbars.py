@@ -32,6 +32,7 @@ elif which == 2:
 plot_lognorm_distribution(thom, int_length)
 # x = np.arange(1, max(thom)+1)
 # print(x)
+
 # y = np.zeros(max(thom))
 # for i in range(0, len(thom)):
 #     y[thom[i] - 1] += 1
