@@ -1,4 +1,6 @@
 - fehlerbalken korrigieren
 
-- passenger mutations einpflegen
+- passenger mutations:
+    - Abbruchbedingung überlegen
+    - Simulationen durchlaufen lassen
 

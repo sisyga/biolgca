@@ -233,7 +233,7 @@ def passenger_mutations(lgca):
     """
     r_d = const, r_b = const, r_m = const, new families will develop by mutations
     """
-    chronicle = True   #Ausgabe der einzelnen Schritte für chronicle = True
+    chronicle = False   #Ausgabe der einzelnen Schritte für chronicle = True
 
     rel_nodes = lgca.nodes[lgca.r_int:-lgca.r_int]
     # if chronicle:
@@ -269,6 +269,12 @@ def passenger_mutations(lgca):
             if node[i] > 0:
                 r_bs[i] = lgca.r_b
 
+        # new = [0] * len(node)
+        # TODO: besser?!
+        # indexes = [index for index in range(len(node)) if node[index] > 0]
+        # for entry in indexes:
+        #     new[entry] = r_b
+
         proliferating = npr.random(lgca.K) < r_bs
         # if chronicle:
         #     print('prolif ', proliferating)
@@ -285,7 +291,7 @@ def passenger_mutations(lgca):
                 if chronicle:
                     print('es proliferiert Zelle', label)
                     print('der Familie', lgca.props['lab_m'][label])
-                    print('%d is born' %(lgca.maxlabel))
+                    print('%d is born' % lgca.maxlabel)
 
                 mutation = npr.random() < lgca.r_m
                 if mutation:
@@ -301,8 +307,6 @@ def passenger_mutations(lgca):
                     lgca.props['num_off'][fam] += 1
                 if chronicle:
                     print('labsm', lgca.props['lab_m'])
-
-
 
             # if chronicle:
             #     # print('nodes after birth: ', lgca.nodes)

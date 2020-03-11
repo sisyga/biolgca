@@ -85,3 +85,14 @@ example = 'rc=178'
 # thom_all(dat, 5000, save=True, id='ones, int=5000')
 # plot_lognorm_distribution(dat['onenode'], 1000, id='onenode', c=colors[0], save=True)
 # plot_lognorm_distribution(dat['onerc'], 1000, id='onerc', c=colors[1], save=True)
+
+name = '62_0_2bb3013'
+offs = np.load('saved_data/' + name + '_offsprings.npy')
+tree = np.load('saved_data/' + name + '_tree.npy')
+fams = np.load('saved_data/' + name + '_families.npy')
+
+print(len(offs))
+print(tree)
+print(fams)
+
+print(offs[-1])

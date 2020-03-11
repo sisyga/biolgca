@@ -296,14 +296,14 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
         x1 = np.arange(0, dim*c, 10*c)
         x2 = np.zeros(len(x1)).astype(int)
         for i in range(0, len(x1)):
-            x2[i] = (x1[i]/c)
+            x2[i] = (x1[i]/c) + 1
         ax.set_xticks(x1)
         ax.set_xticklabels(x2, minor=False, fontsize=12)
     elif dim > 1:
         x1 = (np.arange(0, dim * c, c))
         x2 = np.zeros(len(x1)).astype(int)
         for i in range(0, len(x1)):
-            x2[i] = (x1[i] / c)
+            x2[i] = (x1[i] / c) + 1
         ax.set_xticks(x1)
         ax.set_xticklabels(x2, minor=False, fontsize=12)
     else:

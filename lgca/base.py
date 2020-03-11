@@ -580,7 +580,7 @@ class IBLGCA_base(LGCA_base):
                 else:
                     self.std = 0.1
                     print('standard deviation set to = ', self.std)
-                self.props.update(lab_m=[0] + [0] * self.maxlabel)
+                self.props.update(lab_m=[-99] + [0] * self.maxlabel)
                 self.props.update(num_off=[-99] + [1] * self.maxlabel)
 
                 self.maxlabel_init = self.maxlabel

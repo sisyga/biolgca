@@ -196,7 +196,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.nodes[self.r_int:-self.r_int] = self.convert_bool_to_ib(occ)
             self.maxlabel = self.nodes.max()
 
-    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True, recordLast=False):
+    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=False, showprogress=False, recordLast=False):
 
         self.update_dynamic_fields()
         if record:

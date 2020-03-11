@@ -255,9 +255,10 @@ def cond_oneancestor(lgca):
 
     for node in nodes:
         for entry in node[node > 0]:
-            p = lgca.props['lab_m'][entry]
+            fam = lgca.props['lab_m'][entry]
+            ori = lgca.tree_manager.tree[fam]['origin']
             # print(p)
-            parents.append(p)
+            parents.append(ori)
 
             if len(parents) != 0 and parents.count(parents[0]) != len(parents):
                 return False
