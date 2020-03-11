@@ -248,8 +248,7 @@ def passenger_mutations(lgca):
             if chronicle:
                 print('cell with label %d dies' % label)
 
-            # labmoth = lgca.props['lab_m'][label]
-            fam = lgca.tree_manager.tree[label]['family']
+            fam = lgca.props['lab_m'][label]
             lgca.props['num_off'][fam] -= 1
             if chronicle:
                 print('family dazu ist', fam)
@@ -285,10 +284,8 @@ def passenger_mutations(lgca):
 
                 if chronicle:
                     print('es proliferiert Zelle', label)
-                    print('Stammbaum', lgca.tree_manager.tree[label])
+                    print('der Familie', lgca.props['lab_m'][label])
                     print('%d is born' %(lgca.maxlabel))
-                    # print('with family ', lgca.tree_manager.tree[label]['parent'])
-                    # print('with ancestor ', lgca.tree_manager.tree[label]['parent'])
 
                 mutation = npr.random() < lgca.r_m
                 if mutation:
@@ -296,22 +293,14 @@ def passenger_mutations(lgca):
                     if chronicle:
                         print('mit Mutation und neuer family ', lgca.maxfamily)
                     lgca.props['num_off'].append(1)
-                    # print(lgca.props['num_off'])
-                    # lgca.props['lab_m'].append(int(lgca.maxfamily))
-                    # parent = lgca.tree_manager.tree[label]['family']
-                    lgca.tree_manager.register_mutation(label)
-                    # print('tree', lgca.tree_manager.tree)
+                    lgca.props['lab_m'].append(int(lgca.maxfamily))
+                    lgca.tree_manager.register(lgca.props['lab_m'][label])
                 else:
-                    # labm = lgca.props['lab_m'][label]
-                    # print(labm, label)
-                    # lgca.props['lab_m'].append(labm)
-                    family = lgca.tree_manager.tree[label]['family']
-                    # print('fam', family)
-                    lgca.tree_manager.register(label)
-                    lgca.props['num_off'][family] += 1
-                    # print('tree', lgca.tree_manager.tree)
+                    fam = lgca.props['lab_m'][label]
+                    lgca.props['lab_m'].append(fam)
+                    lgca.props['num_off'][fam] += 1
                 if chronicle:
-                    print(lgca.tree_manager.tree[lgca.maxlabel])
+                    print('labsm', lgca.props['lab_m'])
 
 
 
@@ -328,6 +317,8 @@ def passenger_mutations(lgca):
             npr.shuffle(lgca.nodes[c])
     if chronicle:
         print('props after t ', lgca.props['num_off'])
+        print(lgca.tree_manager.tree)
+
     # if chronicle:
     #     print('nach shuffle', lgca.nodes[1:-1])
 

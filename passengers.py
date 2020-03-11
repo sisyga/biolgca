@@ -30,19 +30,40 @@ def control(lgca, t):
         exit(903)   #mutationen stimmen nicht
 
 
-dim = 1
-rc = 3
+# dim = 1
+# rc = 3
+#
+# lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
+#            density=1, dims=dim, restchannels=rc, r_d=0.1, r_m=0.5, r_b=0.8)
+# t = lgca.timeevo_until_pseudohom(spatial=True)
+# print('tree', lgca.tree_manager.tree)
+# print(t)
+# print('Mutationen: ', lgca.maxfamily - lgca.maxfamily_init)
+# # print(lgca.tree_manager.tree)
+# id = 'passengermutations'
+# np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
+# np.save('saved_data/' + str(id) + '_nodest', lgca.nodes_t)
+# np.save('saved_data/' + str(id) + '_labels', lgca.props['lab_m'])
+# np.save('saved_data/' + str(id) + '_tree', lgca.tree_manager.tree)
+# control(lgca, t)
 
-lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
-           density=1, dims=dim, restchannels=rc, r_d=0.2, r_m=0.5, r_b=0.8)
-t = lgca.timeevo_until_pseudohom(spatial=True)
-print(t)
-print('Mutationen: ', lgca.maxfamily - lgca.maxfamily_init)
-# print(lgca.tree_manager.tree)
-id = 'passengermutations'
-np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
-np.save('saved_data/' + str(id) + '_nodest', lgca.nodes_t)
-np.save('saved_data/' + str(id) + '_tree', lgca.tree_manager.tree)
-control(lgca, t)
+offs = np.load('saved_data/passengermutations_offsprings.npy')
+nodest = np.load('saved_data/passengermutations_nodest.npy')
+tree = np.load('saved_data/passengermutations_tree.npy')
+labels = np.load('saved_data/passengermutations_labels.npy')
+
+spacetime_plot(nodest, labels, figsize=(10, 140))
+oris = []
+# print(tree)
+# print(tree.item().get(42))
+# print(tree.item().get(42)['origin'])
+for entry in labels[1:]:
+    ori = tree.item().get(entry)['origin']
+    oris.append(ori)
+
+print(labels[:20])
+print(oris[:20]) #TODO Kontrolle!
+
+# spacetime_plot(nodest, oris, figsize=(10, 140)) #TODO fix!
 
 

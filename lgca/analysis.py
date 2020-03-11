@@ -217,28 +217,28 @@ def id_var(val, m, v):      #TODO: verwendet?
     return v + (val - m)**2
 
 def calc_barerrs(counted_thom):
-    expect = np.zeros(len(counted_thom))
-    var = np.zeros(len(counted_thom))
-    s = np.zeros(len(counted_thom))
-    b = np.zeros(len(counted_thom))
-    # p = np.zeros(len(expect))
+    # expect = np.zeros(len(counted_thom))
+    # var = np.zeros(len(counted_thom))
+    # s = np.zeros(len(counted_thom))
+    # b = np.zeros(len(counted_thom))
+    # # p = np.zeros(len(expect))
     n = counted_thom.sum()
-    print('n', n)
+    # print('n', n)
     err = np.zeros(len(counted_thom))
     for i in range(0, len(err)):
         # p[i] = counted_thom[i]/n
-        if counted_thom[i] != 0:
-            b[i] = binom.pmf(counted_thom[i], n, p=counted_thom[i]/n)
-        expect[i] = b[i] * n
-        var[i] = expect[i] * (1-b[i])
-        s[i] = (var[i])**0.5
+        # if counted_thom[i] != 0:
+        #     b[i] = binom.pmf(counted_thom[i], n, p=counted_thom[i]/n)
+        # expect[i] = b[i] * n
+        # var[i] = expect[i] * (1-b[i])
+        # s[i] = (var[i])**0.5
         err[i] = (counted_thom[i]*(1-(counted_thom[i]/n)))**0.5
     print('err', err)
-    print('exp', expect)
-    print('var', var)
-    print('s', s)
-    # print('p', p)
-    print('b', b)
+    # print('exp', expect)
+    # print('var', var)
+    # print('s', s)
+    # # print('p', p)
+    # print('b', b)
     return err
 
 def calc_quaderr(data, fitted_data): #TODO quad Fehler
@@ -255,9 +255,7 @@ def cond_oneancestor(lgca):
 
     for node in nodes:
         for entry in node[node > 0]:
-            p = lgca.tree_manager.tree[entry]['origin']
-            if p is None:
-                p = entry
+            p = lgca.props['lab_m'][entry]
             # print(p)
             parents.append(p)
 

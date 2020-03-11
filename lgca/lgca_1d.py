@@ -275,7 +275,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
 
         while cond_oneancestor(self) is False:
             timestep += 1
-            if timestep > 20:
+            if timestep > 2000:
                 exit(789)
             self.timestep()
 
