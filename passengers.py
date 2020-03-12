@@ -30,7 +30,7 @@ def control(lgca, t):
         exit(903)   #mutationen stimmen nicht
 
 
-dim = 10
+dim = 1
 rc = 3
 
 lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
@@ -40,12 +40,12 @@ print('tree', lgca.tree_manager.tree)
 print(t)
 print('Mutationen: ', lgca.maxfamily - lgca.maxfamily_init)
 # # # print(lgca.tree_manager.tree)
-# id = 'passengermutationsdim10rc3'
-# np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
-# np.save('saved_data/' + str(id) + '_nodest', lgca.nodes_t)
-# np.save('saved_data/' + str(id) + '_labels', lgca.props['lab_m'])
-# np.save('saved_data/' + str(id) + '_tree', lgca.tree_manager.tree)
-# control(lgca, t)
+# id = 'bsp'
+np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
+np.save('saved_data/' + str(id) + '_nodest', lgca.nodes_t)
+np.save('saved_data/' + str(id) + '_families', lgca.props['lab_m'])
+np.save('saved_data/' + str(id) + '_tree', lgca.tree_manager.tree)
+control(lgca, t)
 
 # # data = 'passengermutations'
 # data = 'passengermutationsdim10rc3'
