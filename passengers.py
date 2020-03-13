@@ -31,16 +31,16 @@ def control(lgca, t):
 
 
 dim = 1
-rc = 3
+rc = 178
 
 lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
-           density=1, dims=dim, restchannels=rc, r_d=0.1, r_m=0.5, r_b=0.8)
+           density=1, dims=dim, restchannels=rc)
 t = lgca.timeevo_until_pseudohom(spatial=True)
 print('tree', lgca.tree_manager.tree)
 print(t)
 print('Mutationen: ', lgca.maxfamily - lgca.maxfamily_init)
 # # # print(lgca.tree_manager.tree)
-# id = 'bsp'
+id = 'real180_bsp'
 np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
 np.save('saved_data/' + str(id) + '_nodest', lgca.nodes_t)
 np.save('saved_data/' + str(id) + '_families', lgca.props['lab_m'])
