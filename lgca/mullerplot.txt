@@ -57,5 +57,6 @@ edges <- read.csv(paste(path, e_name, sep=""), header=T)
 pop <- data.frame(Generation=timesteps, Identity=families, Population=frequencies)
 
 plotdata <- get_Muller_df(edges, pop)
-Muller_plot(plotdata, cutoff = 0.2)
+#ZENSIEREN
+Muller_plot(plotdata)
 
