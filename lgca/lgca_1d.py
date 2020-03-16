@@ -221,7 +221,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
 
 
 if __name__ == '__main__':
-    l = 500
+    l = 200
     restchannels = 2
     n_channels = restchannels + 2
     nodes = 1 + np.arange(l * n_channels, dtype=np.uint).reshape((l, n_channels))
@@ -229,7 +229,7 @@ if __name__ == '__main__':
 
     system = IBLGCA_1D(bc='reflect', dims=100, interaction='birthdeath', density=0.1, restchannels=2, r_b=0.1, std=0.005,
                        nodes=nodes)
-    system.timeevo(timesteps=3000, record=True)
+    system.timeevo(timesteps=1000, record=True)
     # system.plot_prop()
     # system.plot_density(figindex=1)
     # props = np.array(system.props['kappa'])[system.nodes[system.nodes > 0]]

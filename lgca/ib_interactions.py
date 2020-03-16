@@ -69,10 +69,10 @@ def birthdeath(lgca):
         # choose cells that proliferate
         r_bs = np.array([lgca.props['r_b'][i] for i in node])
         proliferating = npr.random(lgca.K) < r_bs
+        targetchannels = npr.choice(lgca.K, proliferating.sum(), replace=False)  # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
 
-        # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
-        for label in node[proliferating]:
-            ind = npr.choice(lgca.K)
+        for i, label in enumerate(node[proliferating]):
+            ind = targetchannels[i]
             if node[ind] == 0:
                 lgca.maxlabel += 1
                 node[ind] = lgca.maxlabel
@@ -83,6 +83,7 @@ def birthdeath(lgca):
         lgca.nodes[coord] = node
 
     lgca.nodes[dying] = 0
+    lgca.update_dynamic_fields()
     randomwalk(lgca)
 
 def go_or_grow(lgca):
