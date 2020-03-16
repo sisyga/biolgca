@@ -149,3 +149,39 @@ def go_or_grow(lgca):
         r_channels = npr.permutation(rest)
         node = np.hstack((v_channels, r_channels))
         lgca.nodes[coord] = node
+
+
+if __name__ =='__main__':
+    from scipy.special import erf
+    from math import sqrt
+    def gaussian(x):
+        y = np.exp(-0.5 * x ** 2) / sqrt(2 * np.pi)
+        return y
+    def cdf_gaussian(x):
+        y = 0.5 * (1 + erf(x / sqrt(2)))
+        return y
+    def trunc_gaussian(x, mu, sigma, a=0, b=1):
+        xi = (x - mu) / sigma
+        beta = (b - mu) / sigma
+        alpha = (a - mu) / sigma
+        y = gaussian(xi) / sigma
+        y /= cdf_gaussian(beta) - cdf_gaussian(alpha)
+        return y
+
+    from matplotlib import pyplot as plt
+    r_b = 0.1
+    lower = 0
+    mu = 0.1
+    upper = 1
+    sigma = 0.1
+    a = (lower - mu) / sigma
+    b = (upper - mu) / sigma
+    pdf = truncnorm(a, b, loc=mu, scale=sigma).pdf
+    randn = trunc_gauss(0, 1., r_b, sigma=0.1, size=1000)
+    # trunc_gauss(0, 1., r_b, sigma=0.1)
+    plt.hist(randn, range=(0, 1), bins=20, density=True)
+    x = np.linspace(0, 1)
+    tgauss = trunc_gaussian(x, mu, sigma)
+    plt.plot(x, tgauss)
+    plt.plot(x, pdf(x))
+    plt.show()
