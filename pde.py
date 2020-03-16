@@ -19,6 +19,30 @@ def e0(rho0, rho1, a, b):
     e0 = (rho1 - rho0 * br) / (1 + br)
     return e0
 
+def dydt_int(t, y, dx, b=1., a=0.01, r=0., d=0., D=20, R=1, boundary='wrap'):
+    r0, r1 = np.hsplit(y, 2)
+
+    kernel = np.ones(int(2 * R / dx + 1)) / 2
+
+    rho0 = convolve(r0, kernel, mode=boundary)
+    rho1 = convolve(r1, kernel, mode=boundary)
+    e = e0(rho0, rho1, 1, b)
+
+    c = rho0 + rho1
+
+    dr0 = e
+    dr0 += r * r0 * (1/a - c)
+    dr0 += lapl_2nd(r0, dx=dx)
+    # dr0 -= d * r0
+
+
+    dr1 = -e
+    # dr1 += r * r0 * (1 - c)
+    dr1 += lapl_2nd(r1, dx=dx) * D
+    # dr1 -= d * r1
+    dy = np.hstack((dr0, dr1))
+    return dy
+
 
 def dydt(t, y, dx, b=1., a=0.01, r=0., d=0., D=20):
     r0, r1 = np.hsplit(y, 2)
@@ -39,7 +63,6 @@ def dydt(t, y, dx, b=1., a=0.01, r=0., d=0., D=20):
     # dr1 -= d * r1
     dy = np.hstack((dr0, dr1))
     return dy
-
 
 def dydt_ve(t, y, dx, b=1., a=0.05, r=0., d=0., D=20.):
     r0, r1 = np.hsplit(y, 2)
@@ -134,16 +157,18 @@ def update(n):
 
 b = 40
 a = 0.05
-# a = 1. / 12
-r = .05
+a = 10
+r = 0.
 d = .0
-D = 20.
-r00 = 0.3
-r10 = 0.3
-xmax = 1000.
+D = 50.
+r00 = .5
+r10 = .5
+xmax = 20.
 tmax = 1000.
 points = 200
 x, dx = np.linspace(0, xmax, points, endpoint=False, retstep=True)
+print(2 / dx + 1)
+assert (int(2 / dx + 1) % 2 == 1)
 # initial config
 r00 = np.ones_like(x) * r00
 # r00 += np.sin(r00.shape) * 0.1
@@ -153,7 +178,7 @@ r10 = np.ones_like(x) * r10
 y0 = np.hstack((r00, r10))
 y0 *= (np.random.standard_normal(y0.shape) * 0.1 + 1)  # add noise
 
-sol = solve_ivp(fun=lambda t, y: dydt2(t, y, dx, b=b, a=a, r=r, d=d, D=D), t_span=(0, tmax), y0=y0,
+sol = solve_ivp(fun=lambda t, y: dydt_int(t, y, dx, b=b, a=a, r=r, d=d, D=D), t_span=(0, tmax), y0=y0,
                 t_eval=np.linspace(0, tmax, 101), method='Radau')
 print(sol.status)
 fig = plt.figure()
@@ -171,10 +196,10 @@ lines.append(line0)
 lines.append(line1)
 title = plt.title('Time t = 0')
 plt.legend()
-plt.ylim(0, 1)
+plt.ylim(0, sol.y.max())
 plt.xlim(0, xmax)
-ani = animation(fig, update, blit=False, frames=len(t), repeat=False, interval=50)
-# ani.save('pde_pattern.mp4')
+ani = animation(fig, update, blit=False, frames=len(t), repeat=True, interval=50)
+# ani.save('nonlocal_pde_pattern.mp4')
 plt.xlabel('$x$')
 print(data[0].sum(), data[-1].sum())
 plt.show()
