@@ -6,12 +6,10 @@ import time
 from os import environ as env
 from uuid import uuid4 as uuid
 
-dim = 2
-rc = 1
-rep = 1
-# dim = int(env['DIMS'])
-# rc = int(env['RESTCHANNELS'])
-# rep = int(env['REPETITIONS'])
+
+dim = int(env['DIMS'])
+rc = int(env['RESTCHANNELS'])
+rep = int(env['REPETITIONS'])
 
 
 uu = str(uuid())[0:7]
@@ -33,7 +31,7 @@ for i in range(0, rep):
         np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
         np.savez('saved_data/' + str(id) + '_Parameter', density=lgca.density, restchannels=lgca.restchannels,\
         dimension=lgca.l, kappa=lgca.K, rb=lgca.r_b, rd=lgca.r_d, m=lgca.r_int)
-    print('len offs', len(lgca.offsprings))
+    # print('len offs', len(lgca.offsprings))
     print('t', t)
     # print('offs', (lgca.offsprings))
     ende = time.time()
