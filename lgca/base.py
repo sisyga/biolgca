@@ -609,6 +609,21 @@ class IBLGCA_base(LGCA_base):
             if showprogress:
                 update_progress(1.0 * t / timesteps)
 
+    def get_prop(self, nodes=None, props=None, propname=None):
+        if nodes is None:
+            nodes = self.nodes[self.nonborder]
+
+        if props is None:
+            props = self.props
+
+        if propname is None:
+            propname = next(iter(self.props))
+
+        prop = np.array(props[propname])
+        proparray = prop[nodes]
+        return proparray
+
+
     def calc_prop_mean(self, nodes=None, props=None, propname=None):
         if nodes is None:
             nodes = self.nodes[self.nonborder]
@@ -617,22 +632,14 @@ class IBLGCA_base(LGCA_base):
             props = self.props
 
         if propname is None:
-            propname = list(self.props)[0]
+            propname = next(iter(self.props))
 
-        dims = nodes.shape
-        nodes = nodes.reshape((-1, dims[-1]))
+        prop = self.get_prop(nodes=nodes, props=props, propname=propname)
         occupied = nodes.astype(bool)
-        cell_density = occupied.sum(-1)
-        mean_prop = np.zeros_like(cell_density, dtype=float)
-        inds = np.arange(nodes.shape[0])
-        relevant = inds[cell_density > 0]
-
-        for i in relevant:
-            node = nodes[i]
-            occ = occupied[i]
-            mean_prop[i] = np.mean(np.asarray(props[propname])[node[occ]])
-
-        mean_prop = mean_prop.reshape(dims[:-1])
+        mask = 1 - occupied
+        # cell_density = occupied.sum(-1)
+        prop = np.ma.array(prop, mask=mask)
+        mean_prop = prop.mean(-1)
         return mean_prop
 
     def plot_prop_timecourse(self, nodes_t=None, props=None, propname=None, figindex=None, figsize=None):
@@ -645,15 +652,15 @@ class IBLGCA_base(LGCA_base):
         if props is None:
             props = self.props
 
+        prop = self.get_prop(nodes=nodes_t, props=props, propname=propname)
+        occupied = nodes_t.astype(bool)
+        mask = 1 - occupied
+        prop = np.ma.array(prop, mask=mask)
+        tocollapse = tuple(range(1, prop.ndim))
+        mean_prop_t = np.mean(prop, axis=tocollapse)
+        std_mean_prop_t = np.std(prop, axis=tocollapse, ddof=1) / np.sqrt(np.sum(occupied, axis=tocollapse))
         plt.figure(num=figindex, figsize=figsize)
         tmax = nodes_t.shape[0]
-        mean_prop_t = np.zeros(tmax)
-        std_mean_prop_t = np.zeros(mean_prop_t.shape)
-        for t in range(tmax):
-            nodes = nodes_t[t]
-            prop = np.asarray(props[propname])[nodes[nodes > 0]]
-            mean_prop_t[t] = prop.mean()
-            std_mean_prop_t[t] = np.std(prop, ddof=1) / np.sqrt(len(prop))
 
         yerr = std_mean_prop_t
         x = np.arange(tmax)

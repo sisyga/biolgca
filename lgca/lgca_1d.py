@@ -1,4 +1,5 @@
 import matplotlib.ticker as mticker
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 try:
     from base import *
@@ -91,28 +92,38 @@ class LGCA_1D(LGCA_base):
         weights[1:, ..., 1] = qty[:-1, ...]
         return weights
 
-    #
-    # def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
-    #     self.update_dynamic_fields()
-    #     if record:
-    #         self.nodes_t = np.zeros((timesteps + 1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
-    #         self.nodes_t[0, ...] = self.nodes[self.r_int:-self.r_int, ...]
-    #     if recordN:
-    #         self.n_t = np.zeros(timesteps + 1, dtype=np.int)
-    #         self.n_t[0] = self.nodes.sum()
-    #     if recorddens:
-    #         self.dens_t = np.zeros((timesteps + 1, self.l))
-    #         self.dens_t[0, ...] = self.cell_density[self.r_int:-self.r_int]
-    #     for t in range(1, timesteps + 1):
-    #         self.timestep()
-    #         if record:
-    #             self.nodes_t[t, ...] = self.nodes[self.r_int:-self.r_int]
-    #         if recordN:
-    #             self.n_t[t] = self.cell_density.sum()
-    #         if recorddens:
-    #             self.dens_t[t, ...] = self.cell_density[self.r_int:-self.r_int]
-    #         if showprogress:
-    #             update_progress(1.0 * t / timesteps)
+    def setup_figure(self, tmax, figindex=None, figsize=(8, 8), tight_layout=True):
+        if figindex is None:
+            fig = plt.gcf()
+            fig.set_size_inches(figsize)
+            fig.set_tight_layout(tight_layout)
+
+        else:
+            fig = plt.figure(num=figindex)
+            fig.set_size_inches(figsize)
+            fig.set_tight_layout(tight_layout)
+
+        ax = plt.gca()
+        xmax = self.xcoords.max()
+        xmin = self.xcoords.min()
+        ymax = tmax
+        ymin = 0
+        plt.xlim(xmin, xmax)
+        plt.ylim(ymin, ymax)
+        ax.set_aspect('equal')
+
+        plt.xlabel(r'Lattice node $r \, (\varepsilon)$')
+        plt.ylabel('Time $t\\, (\\tau)$')
+        ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
+        ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
+        ax.spines['top'].set_visible(True)
+        ax.spines['right'].set_visible(True)
+        ax.yaxis.set_ticks_position('both')
+        ax.xaxis.set_ticks_position('both')
+        ax.set_autoscale_on(False)
+        ax.xaxis.set_label_position('top')
+        ax.xaxis.tick_top()
+        return fig, ax
 
     def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='hot_r'):
         if density_t is None:
@@ -177,11 +188,9 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.nodes[self.r_int:-self.r_int] = self.convert_bool_to_ib(occ)
             self.maxlabel = self.nodes.max()
 
-    def plot_prop_spatial(self, nodes_t=None, props=None, figindex=None, figsize=None, propname=None, cmap='cividis'):
+    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', **kwargs):
         if nodes_t is None:
             nodes_t = self.nodes_t
-        if figsize is None:
-            figsize = estimate_figsize(nodes_t.sum(-1).T, cbar=True)
 
         if props is None:
             props = self.props
@@ -190,46 +199,30 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             propname = next(iter(props))
 
         tmax, l, _ = nodes_t.shape
-        mean_prop_t = np.zeros((tmax, l))
-        for t in range(tmax):
-            meanprop = self.calc_prop_mean(propname=propname, props=props, nodes=nodes_t[t])
-            mean_prop_t[t] = meanprop
+        fig, ax = self.setup_figure(tmax, **kwargs)
+        mean_prop_t = self.calc_prop_mean(propname=propname, props=props, nodes=nodes_t)
 
-        dens_t = nodes_t.astype(bool).sum(-1)
-        vmax = np.max(mean_prop_t)
-        vmin = np.min(mean_prop_t)
-        rgba = plt.get_cmap(cmap)
-        rgba = rgba((mean_prop_t - vmin) / (vmax - vmin))
-        rgba[dens_t == 0, :] = 0.
-        fig = plt.figure(num=figindex, figsize=figsize)
-        ax = fig.add_subplot(111)
-        plot = ax.imshow(rgba, interpolation='none', aspect='equal')
-        sm = plt.cm.ScalarMappable(cmap=cmap)
-        sm.set_array([vmin, vmax])
-        cbar = plt.colorbar(sm, use_gridspec=True)
+        plot = plt.imshow(mean_prop_t, interpolation='none', aspect='equal', cmap=cmap)
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.1)
+        cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
         cbar.set_label(r'Property ${}$'.format(propname))
-
-        plt.xlabel(r'Lattice node $r \, [\varepsilon]$')
-        plt.ylabel(r'Time step $k \, [\tau]$')
-        ax.xaxis.set_label_position('top')
-        ax.title.set_y(1.05)
-        ax.xaxis.tick_top()
-        ax.xaxis.set_ticks_position('both')
-        ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
-        ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
+        plt.sca(ax)
         return plot
 
 
 if __name__ == '__main__':
-    l = 200
+    l = 100
     restchannels = 2
     n_channels = restchannels + 2
-    nodes = 1 + np.arange(l * n_channels, dtype=np.uint).reshape((l, n_channels))
-    nodes[1:, :] = 0
+    nodes = np.zeros((l, n_channels))
+    nodes[0] = 1
 
     system = IBLGCA_1D(bc='reflect', dims=100, interaction='birthdeath', density=0.1, restchannels=2, r_b=0.1, std=0.005,
                        nodes=nodes)
-    system.timeevo(timesteps=1000, record=True)
+    system.timeevo(timesteps=100, record=True)
+    print(system.nodes_t[0])
+    print(system.get_prop(system.nodes_t[0]).shape)
     # system.plot_prop()
     # system.plot_density(figindex=1)
     # props = np.array(system.props['kappa'])[system.nodes[system.nodes > 0]]
