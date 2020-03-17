@@ -42,12 +42,15 @@ magic <- function(e_name, p_name){
 
 }
 
-tend <- 6616
-maxfam <-7076
-#e_name <- "bspedges.csv"   #
-e_name <- "real180_bspedges.csv"
-#l_name <- "bsplast.csv"     #
-l_name <- "real180_bsplast.csv"
+tend <- 700
+maxfam <- 896
+name <- "real180_bsp"
+
+e_name <- paste(name,tend, "edges.csv", sep="")
+#print(e_name)
+
+l_name <- paste(name, tend, "last.csv", sep="")
+#print(l_name)
 
 timesteps <- rep(0:tend, maxfam+1)
 families <- rep(0:maxfam, each=tend+1)
@@ -55,8 +58,10 @@ frequencies <- read.csv(paste(path, l_name, sep=""), header=T)
 
 edges <- read.csv(paste(path, e_name, sep=""), header=T)
 pop <- data.frame(Generation=timesteps, Identity=families, Population=frequencies)
-
 plotdata <- get_Muller_df(edges, pop)
-#ZENSIEREN
+#plotdata <- get_Muller_df(edges, pop)
 Muller_plot(plotdata)
+
+
+
 

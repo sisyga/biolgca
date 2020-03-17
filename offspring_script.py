@@ -7,9 +7,12 @@ from os import environ as env
 from uuid import uuid4 as uuid
 
 
-dim = int(env['DIMS'])
-rc = int(env['RESTCHANNELS'])
-rep = int(env['REPETITIONS'])
+dim = 1
+rc = 499
+rep = 5
+# dim = int(env['DIMS'])
+# rc = int(env['RESTCHANNELS'])
+# rep = int(env['REPETITIONS'])
 
 
 uu = str(uuid())[0:7]
@@ -25,7 +28,7 @@ for i in range(0, rep):
     id = name + '_' + str(i) + '_' + str(uu)
     t = lgca.timeevo_until_pseudohom(offsprings=True)
 
-    if saving_data:
+    if saving_data and t <= 30000:
         np.save('saved_data/' + str(id) + '_tree', lgca.tree_manager.tree)
         np.save('saved_data/' + str(id) + '_families', lgca.props['lab_m'])
         np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)

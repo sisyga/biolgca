@@ -1,72 +1,90 @@
 import numpy as np
-def create_input(filename):
-    #fam = np.load('saved_data/' + filename + '_families.npy')
+
+def create_input(filename, tbeg=0, tend=None, int_length=1):
     offs = np.load('saved_data/' + filename + '_offsprings.npy')
     tree = np.load('saved_data/' + filename + '_tree.npy')
-    tend = len(offs)  # timesteps = tend-1
-    maxfam = len(offs[-1]) - 1
-
+    if tend is None:
+        tend = len(offs) - 1
+    steps = tend - tbeg
+    nf = len(offs[tend]) - 1
+    # print(nf)
+    filename = name + '_' + str(tbeg) + '-' + str(tend)
     edges = [["Parent", "Identity"]]
-    np.savetxt('saved_data/' + filename + 'edges.csv', edges, delimiter=',', fmt='%s')
-    with open('saved_data/' + filename + 'edges.csv', "a") as file:
-        for i in range(1, len(offs[-1])):
+    np.savetxt('saved_data/' + filename + '_edges.csv', edges, delimiter=',', fmt='%s')
+    with open('saved_data/' + filename + '_edges.csv', "a") as file:
+        for i in range(1, nf + 1):
             ori = tree.item().get(i)['parent']
             if ori == i:
                 file.write(str(0) + ',' + str(i) + '\n')
             else:
                 file.write(str(ori) + ',' + str(i) + '\n')
 
-    pop = [["Generation", "Identity", "Population"]]
-    for i in range(tend):
-        pop.append([i, 0, 0])
-    np.savetxt('saved_data/' + filename + 'pop.csv', pop, delimiter=',', fmt='%s')
-    f = 1
-    with open('saved_data/' + filename + 'pop.csv', "a") as file:
-        while f <= maxfam:
-            for t in range(tend):
-                if f < len(offs[t]):
-                    file.write(str(t) + ',' + str(f) + ',' + str(offs[t][f]) + '\n')
-                    # print([t, f, offs[t][f]])
-                else:
-                    file.write(str(t) + ',' + str(f) + ',' + str(0) + '\n')
-            f += 1
+    if int_length != 1:
+        new_off = create_population(filename, int_length, tbeg, tend)
+    else:
+        pop = ["Population"]
+        for i in range(tbeg, tend + 1):
+            pop.append(0)
+        np.savetxt('saved_data/' + filename + '_population.csv', pop, delimiter=',', fmt='%s')
+        f = 1
+        with open('saved_data/' + filename + '_population.csv', "a") as file:
+            while f <= nf:
+                for t in range(tbeg, tend + 1):
+                    if f < len(offs[t]):
+                        file.write(str(offs[t][f]) + '\n')
+                    else:
+                        file.write(str(0) + '\n')
+                f += 1
 
-def letzte_spalte(filename):
+def create_population(filename, int_length=1, tbeg=0, tend=None):
     offs = np.load('saved_data/' + filename + '_offsprings.npy')
-    tree = np.load('saved_data/' + filename + '_tree.npy')
-    tend = len(offs)  # timesteps = tend-1
-    maxfam = len(offs[-1]) - 1
+    if tend is None:
+        tend = len(offs) - 1
+    steps = tend - tbeg + 1
+    print(steps)
 
-    pop = ["Population"]
-    for i in range(tend):
-        pop.append(0)
-    np.savetxt('saved_data/' + filename + 'last.csv', pop, delimiter=',', fmt='%s')
-    f = 1
-    with open('saved_data/' + filename + 'last.csv', "a") as file:
-        while f <= maxfam:
-            for t in range(tend):
-                if f < len(offs[t]):
-                    file.write(str(offs[t][f]) + '\n')
-                    # print([t, f, offs[t][f]])
-                else:
-                    file.write(str(0) + '\n')
-            f += 1
+    maxfam = len(offs[tend]) - 1
+    int_num = (steps // int_length)
+    last_int = steps % int_length
+    print(int_num, last_int)
 
+    chunks = np.hsplit(offs[0:steps-last_int], int_num)
+    # print(chunks)
+    schnappse = []
+    for chunk in chunks:
+        sums = [0] * (len(chunk[-1]) - 1)
+        for arr in chunk:
+            for i, e in enumerate(arr[1:]):
+                sums[i] = sums[i] + e
+        schnappse.append(sums)
+    if last_int != 0:
+        sums = [0] * (len(offs[tend]) - 1)
+        while last_int != 0:
+            for i, e in enumerate(offs[-last_int][1:]):
+                sums[i] += e
+            last_int -= 1
+        schnappse.append(sums)
+    print(schnappse)
 
-#
+    return schnappse
+
+# name = 'real180_bsp'
 name = 'bsp'
-# create_input(filename)
-fam = np.load('saved_data/' + name + '_families.npy')
+int_length = 5
+
 offs = np.load('saved_data/' + name + '_offsprings.npy')
 tree = np.load('saved_data/' + name + '_tree.npy')
-tend = len(offs) #timesteps = tend-1
-maxfam = len(offs[-1])-1
-print(tend)
-print(offs[0])
-print(maxfam)
 
-# create_input(name)
-letzte_spalte(name)
+tend = None
+tbeg = 0
+if tend is None:
+    tend = len(offs) - 1
+steps = tend - tbeg + 1
+print(steps)
+create_population(name, int_length)
+
+
+
 #####nur mutierende timesteps####
 # timesteps mit Mutationen:
 # mutationsteps = [0]
