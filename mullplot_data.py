@@ -1,7 +1,10 @@
 import numpy as np
 
-def create_input(filename, tbeg=0, tend=None, int_length=1):
+def create_input(filename, tbeg=0, tend=None, int_length=1, cutoff=None):
     offs = np.load('saved_data/' + filename + '_offsprings.npy')
+    if cutoff and int_length == 1:
+        #TODO
+        exit(999)
     tree = np.load('saved_data/' + filename + '_tree.npy')
     if tend is None:
         tend = len(offs) - 1
@@ -18,10 +21,13 @@ def create_input(filename, tbeg=0, tend=None, int_length=1):
                 file.write(str(0) + ',' + str(i) + '\n')
             else:
                 file.write(str(ori) + ',' + str(i) + '\n')
-
+    #TODO edges anpassen für filtered_offs (fams übergeben, dann tree)
     if int_length != 1:
-        new_offs = create_population(filename, int_length, tbeg, tend)
-
+        new_offs = create_newoffs(filename, int_length, tbeg, tend)
+        if cutoff:
+            new_filename = new_filename + '_filtered %.3f' %cutoff
+            new_offs = filter(new_offs)
+            nf = len(new_offs[-1])
         last_int = steps % int_length
         mean_i = np.arange(int(int_length / 2), steps - last_int, int_length)
         if last_int != 0:
@@ -30,14 +36,12 @@ def create_input(filename, tbeg=0, tend=None, int_length=1):
                 times = np.concatenate(([0], mean_i, [mean_li], [len(offs) - 1]))
         else:
             times = np.concatenate(([0], mean_i, [len(offs) - 1]))
-        print(times)
-        trange = []
-        trange.append(entry for entry in times)
-        print(trange)
-        # np.savetxt('saved_data/' + new_filename + '_summed_timerange.csv', times, delimiter=',', fmt='%s')
+        # trange = []
+        # trange.append(entry for entry in times)
+        np.savetxt('saved_data/' + new_filename + '_summed_timerange.csv', times, delimiter=',', fmt='%s')
 
         pop = ["Population"]
-        print(new_offs)
+        # print(new_offs)
         for entry in times:
             pop.append(0)
         np.savetxt('saved_data/' + new_filename + '_summed_population.csv', pop, delimiter=',', fmt='%s')
@@ -66,17 +70,17 @@ def create_input(filename, tbeg=0, tend=None, int_length=1):
                         file.write(str(0) + '\n')
                 f += 1
 
-def create_population(filename, int_length=1, tbeg=0, tend=None):
+def create_newoffs(filename, int_length=1, tbeg=0, tend=None):
     offs = np.load('saved_data/' + filename + '_offsprings.npy')
     if tend is None:
         tend = len(offs) - 1
     steps = tend - tbeg + 1
-    print(steps)
+    print('steps', steps)
 
     maxfam = len(offs[tend]) - 1
     int_num = (steps // int_length)
     last_int = steps % int_length
-    print(int_num, last_int)
+    print('intnum, lastint', int_num, last_int)
 
     chunks = np.hsplit(offs[0:steps-last_int], int_num)
     # print(chunks)
@@ -95,9 +99,40 @@ def create_population(filename, int_length=1, tbeg=0, tend=None):
             last_int -= 1
         schnappse.append(sums)
     schnappse.append(offs[-1][1:])
-    print(schnappse)
+    print('newoffs', schnappse)
 
     return schnappse
+
+def filter(offs, cutoff=0.25):   #egal ob original oder new_offs
+    #TODO -99 bei ori_offs entfernen
+    if offs[0][0] == -99:
+        v = 1
+    else:
+        v = 0
+    rel_offs = [[]] * (len(offs[-1]))
+    filtered_offs = [[]] * (len(offs))
+    filtered_fams = []
+    # abs = []
+    # for step in range(0, 2):
+    for step in range(len(offs)):
+        s = sum(offs[step])
+        # abs.append(s)
+        for i, e in enumerate(offs[step]):
+            rel_offs[i] = np.concatenate((rel_offs[i], [e/s]))
+    # print(rel_offs)
+    # print(abs)
+    for f in range(len(rel_offs)):
+        if max(rel_offs[f]) >= cutoff:
+            filtered_fams.append(f+v)
+    # print(filtered_fams)
+    for step in range(len(offs)):
+        for entry in filtered_fams:
+            if entry < len(offs[step]):
+                filtered_offs[step] = np.concatenate((filtered_offs[step], [offs[step][entry]]))
+
+    print('filtered with %.2f:' % cutoff)
+    print(filtered_offs)
+    return filtered_offs
 
 # name = 'real180_bsp'
 name = 'bsp'
@@ -106,6 +141,8 @@ int_length = 3
 offs = np.load('saved_data/' + name + '_offsprings.npy')
 tree = np.load('saved_data/' + name + '_tree.npy')
 
+# no = create_newoffs(name, int_length=3)
+create_input(name, int_length=int_length, cutoff=0.25)
 # tend = None
 # tbeg = 0
 # if tend is None:
@@ -117,7 +154,6 @@ tree = np.load('saved_data/' + name + '_tree.npy')
 # last_int = steps % int_length
 # print(int_num, last_int)
 
-create_input(name, int_length=3)
 
 
 
