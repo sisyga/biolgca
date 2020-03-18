@@ -1,0 +1,55 @@
+path <- "C:/Users/Franzi/PycharmProjects/biolgca/saved_data/"
+
+library(ggmuller)
+library(ape)
+
+#name der Form "name.csv"
+edges_input <- function(e_name){
+    e_path <- paste(path, e_name, sep="")
+    edges <- read.csv(e_path, header=T)
+
+    return (edges)
+}
+
+trange_input <- function(t_name){
+    t_path <- paste(path, t_name, sep="")
+    trange <- read.csv(t_path, header=F, col.names="Generation")
+
+    return (trange)
+}
+
+pop_input <- function(p_name){
+    p_path <- paste(path, p_name, sep="")
+    pop <- read.csv(p_path, header=T)
+
+    return (pop)
+}
+
+magic <- function(e_name, t_name, p_name){
+    #1: Daten einlesen
+    edges <- edges_input(e_name)
+    nf <- nrow(edges)
+    pop <- pop_input(p_name)
+    time <- trange_input(t_name)
+
+    trange <- rep(time[,1], nf+1)
+
+    ids = c(rep(0, each=length(time[,1])))
+    for(i in edges[,2]) ids <- append(ids, c(rep(i, length(time[,1]))), length(ids))
+
+    pdata <- data.frame(Generation=trange, Identity=ids, Population=pop)
+
+
+    #2: plot-Daten erstellen
+    plotdata <- get_Muller_df(edges, pdata)
+    #print("Fuer Ausgabe des Stammbaums create_tree(e_name) aufrufen!")
+    Muller_plot(plotdata, add_legend=T, xlab = "timesteps", ylab= "relative frequency")
+    return(plotdata)
+    #Muller_plot(plotdata, add_legend=T, xlab = "timesteps", ylab= "relative frequency")
+    #return(Muller_plot(plotdata, add_legend=T, xlab = "timesteps", ylab= "relative frequency"))
+}
+
+d <- magic("bsp_0-11_filtered 0.250_edges.csv", "bsp_0-11_filtered 0.250_summed_timerange.csv", "bsp_0-11_filtered 0.250_summed_population.csv")
+#3:plot
+#print(data)
+#Muller_plot(d, add_legend=T, xlab = "timesteps", ylab= "relative frequency")

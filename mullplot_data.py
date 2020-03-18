@@ -12,22 +12,34 @@ def create_input(filename, tbeg=0, tend=None, int_length=1, cutoff=None):
     nf = len(offs[tend]) - 1
     # print(nf)
     new_filename = name + '_' + str(tbeg) + '-' + str(tend)
-    edges = [["Parent", "Identity"]]
-    np.savetxt('saved_data/' + new_filename + '_edges.csv', edges, delimiter=',', fmt='%s')
-    with open('saved_data/' + new_filename + '_edges.csv', "a") as file:
-        for i in range(1, nf + 1):
-            ori = tree.item().get(i)['parent']
-            if ori == i:
-                file.write(str(0) + ',' + str(i) + '\n')
-            else:
-                file.write(str(ori) + ',' + str(i) + '\n')
+
+    if cutoff is None:
+        edges = [["Parent", "Identity"]]
+        np.savetxt('saved_data/' + new_filename + '_edges.csv', edges, delimiter=',', fmt='%s')
+        with open('saved_data/' + new_filename + '_edges.csv', "a") as file:
+            for i in range(1, nf + 1):
+                ori = tree.item().get(i)['parent']
+                if ori == i:
+                    file.write(str(0) + ',' + str(i) + '\n')
+                else:
+                    file.write(str(ori) + ',' + str(i) + '\n')
+
     #TODO edges anpassen für filtered_offs (fams übergeben, dann tree)
     if int_length != 1:
         new_offs = create_newoffs(filename, int_length, tbeg, tend)
         if cutoff:
             new_filename = new_filename + '_filtered %.3f' %cutoff
-            new_offs = filter(new_offs)
+            new_offs, fams = filter(new_offs)
             nf = len(new_offs[-1])
+            edges = [["Parent", "Identity"]]
+            np.savetxt('saved_data/' + new_filename + '_edges.csv', edges, delimiter=',', fmt='%s')
+            with open('saved_data/' + new_filename + '_edges.csv', "a") as file:
+                for i in fams:
+                    ori = tree.item().get(i+1)['parent']
+                    if ori == i+1:
+                        file.write(str(0) + ',' + str(i+1) + '\n')
+                    else:
+                        file.write(str(ori) + ',' + str(i+1) + '\n')
         last_int = steps % int_length
         mean_i = np.arange(int(int_length / 2), steps - last_int, int_length)
         if last_int != 0:
@@ -132,7 +144,7 @@ def filter(offs, cutoff=0.25):   #egal ob original oder new_offs
 
     print('filtered with %.2f:' % cutoff)
     print(filtered_offs)
-    return filtered_offs
+    return filtered_offs, filtered_fams
 
 # name = 'real180_bsp'
 name = 'bsp'
