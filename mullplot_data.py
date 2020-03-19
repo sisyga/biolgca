@@ -1,92 +1,85 @@
 import numpy as np
 
-def create_input(filename, tbeg=0, tend=None, int_length=1, cutoff=None):
-    offs = np.load('saved_data/' + filename + '_offsprings.npy')
-    if cutoff and int_length == 1:
-        #TODO
-        exit(999)
+def correct(offs):
+    c_offs = []
+    for entry in offs:
+        c_offs.append(entry[1:])
+    return c_offs
+
+def create_edges(tree, fams, name):
+    edges = [["Parent", "Identity"]]
+    np.savetxt('saved_data/' + name + '_edges.csv', edges, delimiter=',', fmt='%s')
+    with open('saved_data/' + name + '_edges.csv', "a") as file:
+        for entry in fams:
+            ori = tree.item().get(entry)['parent']
+            if ori == entry:
+                file.write(str(0) + ',' + str(entry) + '\n')
+            else:
+                file.write(str(ori) + ',' + str(entry) + '\n')
+    print('edges geschrieben')
+
+def create_pop(offs, times, name):
+    nf = len(offs[-1])
+    pop = ["Population"]
+    for entry in times:
+        pop.append(0)
+    np.savetxt('saved_data/' + name + '_population.csv', pop, delimiter=',', fmt='%s')
+    f = 1
+    with open('saved_data/' + name + '_population.csv', "a") as file:
+        while f <= nf:
+            for t in range(len(times)):
+                if f <= len(offs[t]):
+                    file.write(str(offs[t][f - 1]) + '\n')
+                else:
+                    file.write(str(0) + '\n')
+            f += 1
+    print('pop geschrieben')
+
+def create_input(filename, tbeg=0, tend=None, int_length=1, cutoff=0):
+    offs = correct(np.load('saved_data/' + filename + '_offsprings.npy'))
     tree = np.load('saved_data/' + filename + '_tree.npy')
+    name = filename + '_int_length=' + str(int_length) + '_cutoff=' + str(cutoff)
     if tend is None:
         tend = len(offs) - 1
+    print(offs)
+    #TODO tbeg, tend variabel
     steps = tend - tbeg + 1
-    nf = len(offs[tend]) - 1
-    # print(nf)
-    new_filename = name + '_' + str(tbeg) + '-' + str(tend)
-
-    if cutoff is None:
-        edges = [["Parent", "Identity"]]
-        np.savetxt('saved_data/' + new_filename + '_edges.csv', edges, delimiter=',', fmt='%s')
-        with open('saved_data/' + new_filename + '_edges.csv', "a") as file:
-            for i in range(1, nf + 1):
-                ori = tree.item().get(i)['parent']
-                if ori == i:
-                    file.write(str(0) + ',' + str(i) + '\n')
-                else:
-                    file.write(str(ori) + ',' + str(i) + '\n')
+    nf = len(offs[tend])
 
     if int_length != 1:
-        new_offs = create_newoffs(filename, int_length, tbeg, tend)
-        if cutoff:
-            new_filename = new_filename + '_filtered %.3f' %cutoff
-            new_offs, fams = filter(new_offs)
-            nf = len(new_offs[-1])
-            edges = [["Parent", "Identity"]]
-            np.savetxt('saved_data/' + new_filename + '_edges.csv', edges, delimiter=',', fmt='%s')
-            with open('saved_data/' + new_filename + '_edges.csv', "a") as file:
-                for i in fams:
-                    ori = tree.item().get(i+1)['parent']
-                    if ori == i+1:
-                        file.write(str(0) + ',' + str(i+1) + '\n')
-                    else:
-                        file.write(str(ori) + ',' + str(i+1) + '\n')
-        else:
-            #TODO!!!
+        print('in intervalle einteilen, neue offs')
+        offs = create_newoffs(offs, int_length, tbeg, tend)
+        #trange
+        int_num = (steps // int_length)
         last_int = steps % int_length
-        mean_i = np.arange(int(int_length / 2), steps - last_int, int_length)
+        trange = [0]
+        for i in range(int_num):
+            trange.append(i*int_length + int(int_length/2))
         if last_int != 0:
-            mean_li = int((len(offs) + len(offs) - last_int) / 2)   #TODO für tbeg, tend variabel anpassen
-            if tend != mean_li:
-                times = np.concatenate(([0], mean_i, [mean_li], [len(offs) - 1]))
-        else:
-            times = np.concatenate(([0], mean_i, [len(offs) - 1]))
-        # trange = []
-        # trange.append(entry for entry in times)
-        np.savetxt('saved_data/' + new_filename + '_summed_timerange.csv', times, delimiter=',', fmt='%s')
+            trange.append(tend-int(last_int/2))
+        trange.append(tend)
+        print(trange)
+        np.savetxt('saved_data/' + name + '_trange.csv', trange, delimiter=',', fmt='%s')
+    else:
+        trange = np.arange(tbeg, steps)
+        np.savetxt('saved_data/' + name + '_trange.csv', trange, delimiter=',', fmt='%s')
 
-        pop = ["Population"]
-        # print(new_offs)
-        for entry in times:
-            pop.append(0)
-        np.savetxt('saved_data/' + new_filename + '_summed_population.csv', pop, delimiter=',', fmt='%s')
-        f = 1
-        with open('saved_data/' + new_filename + '_summed_population.csv', "a") as file:
-            while f <= nf:
-                for t, _ in enumerate(times):
-                    if f <= len(new_offs[t]):
-                        file.write(str(new_offs[t][f-1]) + '\n')
-                    else:
-                        file.write(str(0) + '\n')
-                f += 1
+    if cutoff: #TODO kontrollieren
+        print('cutoff: edges und pop')
+        offs, fams = filter(offs)
+        nf = len(offs[-1])
+        #edges
+        create_edges(tree, fams=fams, name=name)
+        #pop unten?
 
     else:
-        pop = ["Population"]
-        for i in range(tbeg, tend + 1):
-            pop.append(0)
-        np.savetxt('saved_data/' + new_filename + '_population.csv', pop, delimiter=',', fmt='%s')
-        f = 1
-        with open('saved_data/' + new_filename + '_population.csv', "a") as file:
-            while f <= nf:
-                for t in range(tbeg, tend + 1):
-                    if f < len(offs[t]):
-                        file.write(str(offs[t][f]) + '\n')
-                    else:
-                        file.write(str(0) + '\n')
-                f += 1
+        print('edges komplett, pop nach offs')
+        #edges
+        create_edges(tree, fams=np.arange(1, nf+1), name=name)
+        #pop unten?
+    create_pop(offs, times=trange, name=name)
 
-def create_newoffs(filename, int_length=1, tbeg=0, tend=None):
-    offs = np.load('saved_data/' + filename + '_offsprings.npy')
-    if tend is None:
-        tend = len(offs) - 1
+def create_newoffs(offs, int_length, tbeg, tend):
     steps = tend - tbeg + 1
     print('steps', steps)
 
@@ -94,7 +87,7 @@ def create_newoffs(filename, int_length=1, tbeg=0, tend=None):
     int_num = (steps // int_length)
     last_int = steps % int_length
     print('intnum, lastint', int_num, last_int)
-
+    offs = np.asarray(offs)
     chunks = np.hsplit(offs[0:steps-last_int], int_num)
     # print(chunks)
     schnappse = [[1] * (len(offs[0])-1)]
@@ -146,63 +139,15 @@ def filter(offs, cutoff=0.25):   #egal ob original oder new_offs
     print(filtered_offs)
     return filtered_offs, filtered_fams
 
-name = 'real180_bsp'
-# name = 'bsp'
-int_length = 100
-
+# name = 'real180_bsp'
+name = 'bsp'
+# int_length = 100
+create_input(name, int_length=3)
 # offs = len(np.load('saved_data/' + name + '_offsprings.npy'))
 # print(offs/int_length)
 # tree = np.load('saved_data/' + name + '_tree.npy')
-create_input(filename=name, tbeg=0, tend=None, int_length=int_length)
+# create_input(filename=name, tbeg=0, tend=None, int_length=int_length)
 #TODO create_input(filename=name, tbeg=0, tend=None, int_length=int_length, cutoff=0.2)
 
-# no = create_newoffs(name, int_length=3)
-# create_input(name, int_length=int_length, cutoff=0.25)
-# tend = None
-# tbeg = 0
-# if tend is None:
-#     tend = len(offs) - 1
-# steps = tend - tbeg + 1
-# print(steps)
-# maxfam = len(offs[tend]) - 1
-# int_num = (steps // int_length)
-# last_int = steps % int_length
-# print(int_num, last_int)
 
 
-
-
-#####nur mutierende timesteps####
-# timesteps mit Mutationen:
-# mutationsteps = [0]
-# for i in range(1, tend):
-#     if len(offs[i]) != len(offs[i-1]):
-#         mutationsteps.append(i)
-# mutationsteps.append(tend-1)
-# # print(mutationsteps)
-# # edges erstellen
-# edges = [["Parent", "Identity"]]
-# filename = 'real180_bsp_mut'
-# np.savetxt('saved_data/' + filename + 'edges.csv', edges, delimiter=',', fmt='%s')
-# with open('saved_data/' + filename + 'edges.csv', "a") as file:
-#     for i in range(1, len(offs[-1])):
-#         ori = tree.item().get(i)['parent']
-#         if ori == i:
-#             file.write(str(0) + ',' + str(i) + '\n')
-#         else:
-#             file.write(str(ori) + ',' + str(i) + '\n')
-#
-# #pop erstellen
-# pop = [["Generation", "Identity", "Population"]]
-# for entry in mutationsteps:
-#      pop.append([entry, 0, 0])
-# np.savetxt('saved_data/' + filename + 'pop.csv', pop, delimiter=',', fmt='%s')
-# f = 1
-# with open('saved_data/' + filename + 'pop.csv', "a") as file:
-#     while f <= maxfam:
-#         for t in mutationsteps:
-#             if f < len(offs[t]):
-#                 file.write(str(t) + ',' + str(f) + ',' + str(offs[t][f]) + '\n')
-#             else:
-#                 file.write(str(t) + ',' + str(f) + ',' + str(0) + '\n')
-#         f += 1
