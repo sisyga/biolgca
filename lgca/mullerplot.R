@@ -42,8 +42,8 @@ magic <- function(e_name, p_name){
 
 }
 
-tend <- 700
-maxfam <- 896
+tend <- 100
+maxfam <- 284
 name <- "real180_bsp"
 
 e_name <- paste(name,tend, "edges.csv", sep="")

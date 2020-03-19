@@ -24,7 +24,6 @@ def create_input(filename, tbeg=0, tend=None, int_length=1, cutoff=None):
                 else:
                     file.write(str(ori) + ',' + str(i) + '\n')
 
-    #TODO edges anpassen für filtered_offs (fams übergeben, dann tree)
     if int_length != 1:
         new_offs = create_newoffs(filename, int_length, tbeg, tend)
         if cutoff:
@@ -40,6 +39,8 @@ def create_input(filename, tbeg=0, tend=None, int_length=1, cutoff=None):
                         file.write(str(0) + ',' + str(i+1) + '\n')
                     else:
                         file.write(str(ori) + ',' + str(i+1) + '\n')
+        else:
+            #TODO!!!
         last_int = steps % int_length
         mean_i = np.arange(int(int_length / 2), steps - last_int, int_length)
         if last_int != 0:
@@ -116,7 +117,6 @@ def create_newoffs(filename, int_length=1, tbeg=0, tend=None):
     return schnappse
 
 def filter(offs, cutoff=0.25):   #egal ob original oder new_offs
-    #TODO -99 bei ori_offs entfernen
     if offs[0][0] == -99:
         v = 1
     else:
@@ -146,15 +146,18 @@ def filter(offs, cutoff=0.25):   #egal ob original oder new_offs
     print(filtered_offs)
     return filtered_offs, filtered_fams
 
-# name = 'real180_bsp'
-name = 'bsp'
-int_length = 3
+name = 'real180_bsp'
+# name = 'bsp'
+int_length = 100
 
-offs = np.load('saved_data/' + name + '_offsprings.npy')
-tree = np.load('saved_data/' + name + '_tree.npy')
+# offs = len(np.load('saved_data/' + name + '_offsprings.npy'))
+# print(offs/int_length)
+# tree = np.load('saved_data/' + name + '_tree.npy')
+create_input(filename=name, tbeg=0, tend=None, int_length=int_length)
+#TODO create_input(filename=name, tbeg=0, tend=None, int_length=int_length, cutoff=0.2)
 
 # no = create_newoffs(name, int_length=3)
-create_input(name, int_length=int_length, cutoff=0.25)
+# create_input(name, int_length=int_length, cutoff=0.25)
 # tend = None
 # tbeg = 0
 # if tend is None:

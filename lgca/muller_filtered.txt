@@ -25,31 +25,67 @@ pop_input <- function(p_name){
     return (pop)
 }
 
-magic <- function(e_name, t_name, p_name){
+create_tree <- function(e_name, save=False, filename="unknown"){
+    e_path <- paste(path, e_name, sep="")
+    edges <- read.csv(e_path, header=T)
+
+    tree <- adj_matrix_to_tree(edges)
+    tree$tip.label <- sort(1:length(tree$tip.label), decreasing = T)
+
+    if (save==T) {
+        jpeg(paste("C:/Users/Franzi/PycharmProjects/biolgca/pictures/", filename, "_tree.jpg"))
+        plot(tree, show.tip.label = TRUE, tip.color = "slateblue4", cex=0.5)
+        dev.off()
+       }
+    else {
+        plot(tree, show.tip.label = TRUE, tip.color = "slateblue4")
+    }
+}
+
+magic <- function(e_name, t_name, p_name, tbeg=0, tend=0){
     #1: Daten einlesen
     edges <- edges_input(e_name)
     nf <- nrow(edges)
     pop <- pop_input(p_name)
-    time <- trange_input(t_name)
+    print(tend)
+    if(missing(t_name)) {
+        time <- c(rep(tbeg:tend))
+        trange <- rep(time, nf+1)
+        steps <- length(time)
+    }
+    else {
+        time <- trange_input(t_name)
+        trange <- rep(time[,1], nf+1)
+        steps <- length(time[,1])
+    }
 
-    trange <- rep(time[,1], nf+1)
 
-    ids = c(rep(0, each=length(time[,1])))
-    for(i in edges[,2]) ids <- append(ids, c(rep(i, length(time[,1]))), length(ids))
+    ids = c(rep(0, each=steps))
+    for(i in edges[,2]) ids <- append(ids, c(rep(i, steps)), length(ids))
 
     pdata <- data.frame(Generation=trange, Identity=ids, Population=pop)
 
 
     #2: plot-Daten erstellen
     plotdata <- get_Muller_df(edges, pdata)
-    #print("Fuer Ausgabe des Stammbaums create_tree(e_name) aufrufen!")
+    print("Fuer Ausgabe des Stammbaums create_tree(e_name) aufrufen!")
     Muller_plot(plotdata, add_legend=T, xlab = "timesteps", ylab= "relative frequency")
     return(plotdata)
-    #Muller_plot(plotdata, add_legend=T, xlab = "timesteps", ylab= "relative frequency")
-    #return(Muller_plot(plotdata, add_legend=T, xlab = "timesteps", ylab= "relative frequency"))
 }
 
-d <- magic("bsp_0-11_filtered 0.250_edges.csv", "bsp_0-11_filtered 0.250_summed_timerange.csv", "bsp_0-11_filtered 0.250_summed_population.csv")
+plotting <- function(data, filename="unknown"){
+    #print("plotting")
+    jpeg(paste("C:/Users/Franzi/PycharmProjects/biolgca/pictures/", filename, "_mp.jpg"))
+    plot(Muller_plot(data, xlab = "timesteps", ylab= "relative frequency"))
+    dev.off()
+}
+#d <- magic(e_name="bsp_0-11_filtered 0.250_edges.csv", p_name="bsp_0-11_filtered 0.250_summed_population.csv", t_name="bsp_0-11_filtered 0.250_summed_timerange.csv")
+#d <- magic(e_name="bsp_0-11_filtered 0.250_edges.csv", p_name="bsp_0-11_filtered 0.250_summed_population.csv")
+
+# d <- magic(e_name="real180_bsp100edges.csv", p_name="real180_bsp100last.csv", tend=100)
+d <- magic(e_name="real180_bsp_0-6616_filtered 0.200_edges.csv", p_name="real180_bsp_0-6616_summed_population.csv", t_name="real180_bsp_0-6616_summed_timerange.csv")
+plotting(d)
+#create_tree(e_name="real180_bsp100edges.csv", save=T)
 #3:plot
 #print(data)
 #Muller_plot(d, add_legend=T, xlab = "timesteps", ylab= "relative frequency")
