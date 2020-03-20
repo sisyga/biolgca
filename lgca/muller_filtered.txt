@@ -83,9 +83,14 @@ plotting <- function(data, filename="unknown"){
 #d <- magic(e_name="bsp_0-11_filtered 0.250_edges.csv", p_name="bsp_0-11_filtered 0.250_summed_population.csv")
 
 # d <- magic(e_name="real180_bsp100edges.csv", p_name="real180_bsp100last.csv", tend=100)
-d <- magic(e_name="real180_bsp_0-6616_filtered 0.200_edges.csv", p_name="real180_bsp_0-6616_summed_population.csv", t_name="real180_bsp_0-6616_summed_timerange.csv")
-plotting(d)
-#create_tree(e_name="real180_bsp100edges.csv", save=T)
-#3:plot
-#print(data)
-#Muller_plot(d, add_legend=T, xlab = "timesteps", ylab= "relative frequency")
+# d <- magic(e_name="real180_bsp_0-6616_filtered 0.200_edges.csv", p_name="real180_bsp_0-6616_summed_population.csv", t_name="real180_bsp_0-6616_summed_timerange.csv")
+
+# name <- "bsp_int_length=3_cutoff=0.3"
+# name <- "bsp_int_length=3_cutoff=0.25"
+# name <- "bsp_int_length=5_cutoff=0"
+# name <- "bsp_int_length=5_cutoff=0.25"
+name <- "5011_0_f8684e7_int_length=250_cutoff=0.004"
+d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
+plotting(d, filename=name)
+
+
