@@ -38,7 +38,7 @@ def update_progress(progress):
     sys.stdout.flush()
 
 
-def colorbar_index(ncolors, cmap, use_gridspec=False):
+def colorbar_index(ncolors, cmap, use_gridspec=False, cax=None):
     """Return a discrete colormap with n colors from the continuous colormap cmap and add correct tick labels
 
     :param ncolors: number of colors of the colormap
@@ -50,7 +50,7 @@ def colorbar_index(ncolors, cmap, use_gridspec=False):
     mappable = ScalarMappable(cmap=cmap)
     mappable.set_array([])
     mappable.set_clim(-0.5, ncolors + 0.5)
-    colorbar = plt.colorbar(mappable, use_gridspec=use_gridspec)
+    colorbar = plt.colorbar(mappable, use_gridspec=use_gridspec, cax=cax)
     colorbar.set_ticks(np.linspace(-0.5, ncolors + 0.5, 2 * ncolors + 1)[1::2])
     colorbar.set_ticklabels(list(range(ncolors)))
     return colorbar
@@ -355,9 +355,6 @@ class LGCA_base():
             self.apply_boundaries = self.apply_pbc
 
     def calc_flux(self, nodes):
-        if nodes.dtype != 'bool':
-            nodes = nodes.astype('bool')
-
         return np.einsum('ij,...j', self.c, nodes[..., :self.velocitychannels])
 
     def get_interactions(self):
@@ -608,6 +605,12 @@ class IBLGCA_base(LGCA_base):
                 self.dens_t[t, ...] = self.cell_density[self.nonborder]
             if showprogress:
                 update_progress(1.0 * t / timesteps)
+
+    def calc_flux(self, nodes):
+        if nodes.dtype != 'bool':
+            nodes = nodes.astype('bool')
+
+        return np.einsum('ij,...j', self.c, nodes[..., :self.velocitychannels])
 
     def get_prop(self, nodes=None, props=None, propname=None):
         if nodes is None:

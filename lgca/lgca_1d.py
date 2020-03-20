@@ -104,16 +104,17 @@ class LGCA_1D(LGCA_base):
             fig.set_tight_layout(tight_layout)
 
         ax = plt.gca()
-        xmax = self.xcoords.max()
-        xmin = self.xcoords.min()
-        ymax = tmax
-        ymin = 0
+        xmax = self.xcoords.max() - 0.5
+        xmin = self.xcoords.min() + 0.5
+        ymax = tmax - 0.5
+        ymin = +0.5
         plt.xlim(xmin, xmax)
-        plt.ylim(ymin, ymax)
+        plt.ylim(ymax, ymin)
         ax.set_aspect('equal')
 
-        plt.xlabel(r'Lattice node $r \, (\varepsilon)$')
-        plt.ylabel('Time $t\\, (\\tau)$')
+        plt.xlabel('Lattice node $r \\, (\\varepsilon)$')
+        plt.ylabel('Time $k'
+                   '\\, (\\tau)$')
         ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         ax.spines['top'].set_visible(True)
@@ -125,45 +126,38 @@ class LGCA_1D(LGCA_base):
         ax.xaxis.tick_top()
         return fig, ax
 
-    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='hot_r'):
+    def plot_density(self, density_t=None, cmap='hot_r', **kwargs):
         if density_t is None:
             density_t = self.dens_t
-        if figsize is None:
-            figsize = estimate_figsize(density_t.T, cbar=True)
 
-        fig = plt.figure(num=figindex, figsize=figsize)
-        ax = fig.add_subplot(111)
+        tmax = density_t.shape[0]
+        fig, ax = self.setup_figure(tmax, **kwargs)
         cmap = cmap_discretize(cmap, 3 + self.restchannels)
         plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=2 + self.restchannels, cmap=cmap)
-        cbar = colorbar_index(ncolors=3 + self.restchannels, cmap=cmap, use_gridspec=True)
-        cbar.set_label(r'Particle number $n$')
-        plt.xlabel(r'Lattice node $r \, (\varepsilon)$', )
-        plt.ylabel(r'Time step $k \, (\tau)$')
-        ax.xaxis.set_label_position('top')
-        ax.xaxis.tick_top()
-        plt.tight_layout()
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size=.3, pad=0.1)
+        cbar = colorbar_index(ncolors=3 + self.restchannels, cmap=cmap, use_gridspec=True, cax=cax)
+        cbar.set_label('Particle number $n$')
+        plt.sca(ax)
         return plot
 
-    def plot_flux(self, nodes_t=None, figindex=None, figsize=None):
+    def plot_flux(self, nodes_t=None, **kwargs):
         if nodes_t is None:
             nodes_t = self.nodes_t
 
         dens_t = nodes_t.sum(-1) / nodes_t.shape[-1]
         tmax, l = dens_t.shape
         flux_t = nodes_t[..., 0].astype(int) - nodes_t[..., 1].astype(int)
-        if figsize is None:
-            figsize = estimate_figsize(dens_t.T)
 
         rgba = np.zeros((tmax, l, 4))
         rgba[dens_t > 0, -1] = 1.
         rgba[flux_t == 1, 0] = 1.
         rgba[flux_t == -1, 2] = 1.
         rgba[flux_t == 0, :-1] = 0.
-        fig = plt.figure(num=figindex, figsize=figsize)
-        ax = fig.add_subplot(111)
+        fix, ax = self.setup_figure(tmax, **kwargs)
         plot = ax.imshow(rgba, interpolation='None', origin='upper')
-        plt.xlabel(r'Lattice node $r \, [\varepsilon]$', )
-        plt.ylabel(r'Time step $k \, [\tau]$')
+        plt.xlabel(r'Lattice node $r \, (\varepsilon)$', )
+        plt.ylabel(r'Time step $k \, (\tau)$')
         ax.xaxis.set_label_position('top')
         ax.xaxis.set_ticks_position('top')
         ax.xaxis.tick_top()
@@ -188,6 +182,13 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.nodes[self.r_int:-self.r_int] = self.convert_bool_to_ib(occ)
             self.maxlabel = self.nodes.max()
 
+    def plot_flux(self, nodes_t=None, **kwargs):
+        if nodes_t is None:
+            nodes_t = self.nodes_t.astype('bool')
+        if nodes_t.dtype != 'bool':
+            nodes_t = nodes.astype('bool')
+        LGCA_1D.plot_flux(self, nodes_t, **kwargs)
+
     def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', **kwargs):
         if nodes_t is None:
             nodes_t = self.nodes_t
@@ -204,7 +205,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
 
         plot = plt.imshow(mean_prop_t, interpolation='none', aspect='equal', cmap=cmap)
         divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.1)
+        cax = divider.append_axes("right", size=0.3, pad=0.1)
         cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
         cbar.set_label(r'Property ${}$'.format(propname))
         plt.sca(ax)
@@ -221,7 +222,7 @@ if __name__ == '__main__':
     system = IBLGCA_1D(bc='reflect', dims=100, interaction='birthdeath', density=0.1, restchannels=2, r_b=0.1, std=0.005,
                        nodes=nodes)
     system.timeevo(timesteps=100, record=True)
-    print(system.nodes_t[0])
+    print(system.nodes_t[0].shape)
     print(system.get_prop(system.nodes_t[0]).shape)
     # system.plot_prop()
     # system.plot_density(figindex=1)
@@ -229,7 +230,7 @@ if __name__ == '__main__':
     # print(np.mean(props))
     # system.plot_prop_timecourse()
     # plt.ylabel('$\kappa$')
-    # system.plot_density()
-    system.plot_prop_spatial()
+    system.plot_density()
+    #system.plot_prop_spatial()
     # system.plot_prop_timecourse()
     plt.show()
