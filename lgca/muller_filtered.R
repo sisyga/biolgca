@@ -47,8 +47,13 @@ magic <- function(e_name, t_name, p_name, tbeg=0, tend=0){
     edges <- edges_input(e_name)
     nf <- nrow(edges)
     pop <- pop_input(p_name)
-    print(tend)
+    
+    # print(tend)
     if(missing(t_name)) {
+        if(tend==0){
+            tend <- nrow(pop) / (nf+1) - 1
+            print(tend)
+        }
         time <- c(rep(tbeg:tend))
         trange <- rep(time, nf+1)
         steps <- length(time)
@@ -85,12 +90,32 @@ plotting <- function(data, filename="unknown"){
 # d <- magic(e_name="real180_bsp100edges.csv", p_name="real180_bsp100last.csv", tend=100)
 # d <- magic(e_name="real180_bsp_0-6616_filtered 0.200_edges.csv", p_name="real180_bsp_0-6616_summed_population.csv", t_name="real180_bsp_0-6616_summed_timerange.csv")
 
-# name <- "bsp_int_length=3_cutoff=0.3"
-# name <- "bsp_int_length=3_cutoff=0.25"
+# name <- "bsp_int_length=1_cutoff=0_ori"
+# name <- "bsp_int_length=5_cutoff=0.25_ori"
 # name <- "bsp_int_length=5_cutoff=0"
 # name <- "bsp_int_length=5_cutoff=0.25"
-name <- "5011_0_f8684e7_int_length=250_cutoff=0.004"
+# name <- "5011_0_f8684e7_int_length=250_cutoff=0_ori"
+# name <- "5011_0_f8684e7_int_length=250_cutoff=0.45_ori"
+# # d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""))
+# d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
+# plotting(d, filename=name)
+
+name <- "5011_0_711862f_int_length=250_cutoff=0_schmu"
+# d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""))
 d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
 plotting(d, filename=name)
+
+# name <- "5011_0_711862f_int_length=250_cutoff=0.3_ori"
+# # d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""))
+# d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
+# plotting(d, filename=name)
+
+# name <- "5011_0_711862f_int_length=250_cutoff=0.1_ori"
+# # d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""))
+# d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
+# plotting(d, filename=name)
+
+
+
 
 

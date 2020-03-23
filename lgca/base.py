@@ -568,7 +568,7 @@ class IBLGCA_base(LGCA_base):
                 if 'r_m' in kwargs:
                     self.r_m = kwargs['r_m']
                 else:
-                    self.r_m = 0.3
+                    self.r_m = 0.1
                     print('mutation rate set to r_m = ', self.r_m)
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']

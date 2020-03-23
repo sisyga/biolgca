@@ -41,10 +41,16 @@ def create_pop(offs, times, name):
 
     print('pop geschrieben')
 
-def create_input(filename, tbeg=0, tend=None, int_length=1, cutoff=0):
-    offs = correct(np.load('saved_data/' + filename + '_offsprings.npy'))
+def create_input(filename, tbeg=0, tend=None, int_length=1, cutoff=0, ori=None):
     tree = np.load('saved_data/' + filename + '_tree.npy')
-    name = filename + '_int_length=' + str(int_length) + '_cutoff=' + str(cutoff)
+    offs = correct(np.load('saved_data/' + filename + '_offsprings.npy'))
+    offs = create_ori(offs, tree)
+    name = filename + '_int_length=' + str(int_length) + '_cutoff=' + str(cutoff) + '_schmu'
+
+    if ori:
+        offs_ori = create_ori(offs, tree)   # offs = offs_ori -> plottet ori
+        name = filename + '_int_length=' + str(int_length) + '_cutoff=' + str(cutoff) + '_ori'
+
     if tend is None:
         tend = len(offs) - 1
                                     #TODO tbeg, tend variabel
@@ -53,6 +59,8 @@ def create_input(filename, tbeg=0, tend=None, int_length=1, cutoff=0):
 
     if int_length != 1:
         offs = create_newoffs(offs, int_length, tbeg, tend)
+        if ori:
+            offs_ori = create_newoffs(offs_ori, int_length, tbeg, tend)
         # print('int offs', offs)
         #trange
         int_num = (steps // int_length)
@@ -61,7 +69,7 @@ def create_input(filename, tbeg=0, tend=None, int_length=1, cutoff=0):
         for i in range(int_num):
             trange.append(i*int_length + int(int_length/2))
         if last_int != 0:
-            if last_int > 2:
+            if last_int >= 2:
                 trange.append(tend-int(last_int/2))
         trange.append(tend)
         # print(trange)
@@ -71,7 +79,10 @@ def create_input(filename, tbeg=0, tend=None, int_length=1, cutoff=0):
         np.savetxt('saved_data/' + name + '_trange.csv', trange, delimiter=',', fmt='%s')
 
     if cutoff:
-        offs, fams = filter(offs, cutoff=cutoff)
+        if ori:
+            offs, fams = filter_ori(offs, offs_ori, tree, cutoff=cutoff)
+        else:
+            offs, fams = filter(offs, cutoff=cutoff)
         # print('filt offs', offs)
         # print('fams', fams)
         nf = len(offs[-1])
@@ -84,6 +95,7 @@ def create_input(filename, tbeg=0, tend=None, int_length=1, cutoff=0):
         create_pop(offs, times=trange, name=name)
 
 def create_newoffs(offs, int_length, tbeg, tend):
+    # print('beide', offs)
     steps = tend - tbeg + 1
     # print('steps', steps)
 
@@ -92,8 +104,12 @@ def create_newoffs(offs, int_length, tbeg, tend):
     last_int = steps % int_length
     print('intnum, lastint', int_num, last_int)
     offs = np.asarray(offs)
-    chunks = np.hsplit(offs[0:steps-last_int], int_num)
-    # print(chunks)
+    if last_int != 0:
+        chunks = np.split(offs[:-last_int], int_num)
+    else:
+        chunks = np.split(offs[:], int_num)
+
+    # print('ch', chunks)
     schnappse = [[1] * (len(offs[0]))]
     for chunk in chunks:
         sums = [0] * (len(chunk[-1]))
@@ -126,7 +142,7 @@ def filter(offs, cutoff):   #egal ob original oder new_offs
         s = sum(offs[step])
         for i, e in enumerate(offs[step]):
             rel_offs[i] = np.concatenate((rel_offs[i], [e/s]))
-    # print('rel', rel_offs)
+    print('rel', rel_offs)
     for f in range(len(rel_offs)):
         if max(rel_offs[f]) >= cutoff:
             filtered_fams.append(f)
@@ -140,14 +156,60 @@ def filter(offs, cutoff):   #egal ob original oder new_offs
     print('filtered with %.2f:' % cutoff)
     return filtered_offs, filtered_fams
 
+def create_ori(offs, tree):
+    tend = len(offs)
+    f = len(offs[0])
+    ori = [offs[0]]
+    for line in range(1, tend):
+        ori.append(offs[line][:f])
+        l = len(offs[line])-f
+        while l > 0:
+            entry = offs[line][f-1+l]
+            fam = tree.item().get(f+l)['origin']
+            ori[line][fam-1] += entry
+            l -= 1
+    return ori
+
+def filter_ori(offsprings, originals, tree, cutoff):
+    # print(originals)
+    o, f = filter(originals, cutoff)
+    # print('o', o)
+    # print('f', f)
+    # print(tree)
+    fams = []
+    ori = []
+
+    for entry in f: #todo schlauer?
+        for c in tree.item().keys():
+            if tree.item().get(c)['origin'] == entry+1:
+                fams.append(c-1)
+    # print(fams)
+
+    for step in range(0, len(offsprings)):
+        entries = []
+        for entry in fams:
+            if entry < len(offsprings[step]):
+                entries.append(offsprings[step][entry])
+
+        ori.append(entries)
+    # print(ori)
+
+    return ori, fams
+
+
 # name = 'bsp'
 # name = '42_0_7162808'
-name = '5011_0_f8684e7'
-print(len(np.load('saved_data/' + name + '_offsprings.npy')))
-# print(np.load('saved_data/' + name + '_offsprings.npy'))
+name = '5011_0_711862f'
+
+# o = correct(np.load('saved_data/' + name + '_offsprings.npy'))
+# print(o)
+# create_newoffs(o, int_length=3, tbeg=0, tend=len(o) - 1)
 # create_input(name, int_length=250)
-create_input(name, int_length=250, cutoff=0.004)
-# create_input(name, int_length=3, cutoff=0.3)
+# create_input(name, int_length=250, ori=True)
+# create_input(name, int_length=250, cutoff=0.004)
+create_input(name, int_length=250)
+# create_input(name, int_length=250, cutoff=0.3, ori=True)
+# create_input(name, int_length=250, cutoff=0.1, ori=True)
 
 
 

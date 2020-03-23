@@ -7,9 +7,9 @@ from os import environ as env
 from uuid import uuid4 as uuid
 
 
-dim = 2
-rc = 0
-rep = 1
+dim = 1
+rc = 499
+rep = 2
 # dim = int(env['DIMS'])
 # rc = int(env['RESTCHANNELS'])
 # rep = int(env['REPETITIONS'])
