@@ -646,7 +646,6 @@ class LGCA_Square(LGCA_base):
         ani = animation.FuncAnimation(fig, update, interval=interval)
         return ani
 
-
 class IBLGCA_Square(IBLGCA_base, LGCA_Square):
     """
     Identity-based LGCA simulator class.
@@ -679,22 +678,21 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
 
 
 if __name__ == '__main__':
-    lx = 100
+    lx = 50
     ly = lx
     restchannels = 4
     nodes = np.zeros((lx, ly, 4 + restchannels))
-    nodes[lx // 2, ly // 2, :] = 1
+    nodes[0] = 1
     lgca = IBLGCA_Square(restchannels=restchannels, lx=lx, ly=ly, bc='refl', nodes=nodes,
-                         interaction='go_and_grow', r_b=0.1, std=0.1)
-    lgca.timeevo(100, record=True)
-    lgca.plot_prop_spatial(propname='r_b', cbarlabel='$r_b$')
+                         interaction='go_and_grow', r_b=0.1, std=0.01)
+    # lgca.timeevo(200, record=True)
+    # lgca.plot_prop_spatial(propname='r_b', cbarlabel='$r_b$')
     # print(lgca.cell_density[lgca.nonborder])
-    # lgca.set_interaction(interaction='go_and_grow')
     # ani = lgca.animate_flow(interval=50)
     # ani = lgca.animate_flux(interval=100)
-    # ani = lgca.animate_density(interval=100)
+    # ani = lgca.animate_density(interval=10)
     # ani = lgca.live_animate_flux()
-    # ani = lgca.live_animate_flux()
+    ani = lgca.live_animate_density()
     # lgca.plot_flux()
     # lgca.plot_density()
     # lgca.plot_config(grid=True)
