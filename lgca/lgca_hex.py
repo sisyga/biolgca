@@ -1,10 +1,10 @@
 try:
-    from .base import *
-    from .lgca_square import LGCA_Square, IBLGCA_Square
-
-except ModuleNotFoundError:
     from base import *
     from lgca_square import LGCA_Square, IBLGCA_Square
+
+except ModuleNotFoundError:
+    from .base import *
+    from .lgca_square import LGCA_Square, IBLGCA_Square
 
 
 class LGCA_Hex(LGCA_Square):
@@ -183,62 +183,40 @@ class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
 
 
 if __name__ == '__main__':
-    #lx = 5
-    #ly = lx
-    #restchannels = 6
-    #nodes = np.zeros((lx, ly, 6 + restchannels))
-    #nodes[lx // 2, ly // 2, -1] = 1
-    # nodes[...] = 1
-    # nodes[:lx // 2, :, -2:] = 1
-    # nodes[..., -1] = 1
-    # nodes[:, ly//2:, 6:] = 1
-    # nodes[0, :, :4] = 1
+    lx = 50
+    ly = lx
+    restchannels = 0
+    nodes = np.zeros((lx, ly, 6 + restchannels))
+    nodes[0] = 1
     # lgca = LGCA_Hex(restchannels=restchannels, dims=(lx, ly), density=0.5 / (6 + restchannels), bc='pbc',
     #                 interaction='wetting', beta=20., gamma=10)
-    # lgca.ecm = np.zeros_like(lgca.cell_density, dtype=bool)
-    # lgca = IBLGCA_Hex(nodes=nodes, interaction='go_and_grow')
+    lgca = IBLGCA_Hex(nodes=nodes, interaction='go_and_grow', bc='refl', r_b=0.1)
     # lgca.set_interaction('contact_guidance', beta=2)
     # cProfile.run('lgca.timeevo(timesteps=1000)')
-    # lgca.timeevo(timesteps=50, record=True)
+    lgca.timeevo(timesteps=200, record=True)
     # ani = lgca.animate_flow(interval=500)
     # ani = lgca.animate_flux(interval=50)
     # ani = lgca.animate_density(interval=50)
-    # ani = lgca.animate_density(density_t=refr, interval=50, vmax=lgca.restchannels)
-    # ani2 = lgca.animate_density(density_t=exc, interval=50, vmax=lgca.velocitychannels)
-    # ani = lgca.animate_config(interval=10, grid=False)
+    lgca.plot_prop_spatial()
+    plt.show()
 
-    # ani = lgca.live_animate_density(interval=100, vmax=lgca.restchannels, channels=range(6, lgca.K))
-    # ani2 = lgca.live_animate_density(interval=100, vmax=lgca.velocitychannels, channels=range(6))
-    # ani = lgca.live_animate_flow()
-    # ani = lgca.live_animate_density()
-    #ani = lgca.live_animate_config()
-    # plt.streamplot(lgca.xcoords[:, 0], lgca.ycoords[-1], lgca.g[1:-1, 1:-1, 0].T, lgca.g[1:-1, 1:-1, 1].T, density=.5,
-    #               arrowstyle='->', color='orange', linewidth=2.)
-    # ani = lgca.live_animate_density()
-    # lgca.plot_config()
-    # lgca.plot_density(edgecolor='k')
-    # plt.show()
-    from lgca import get_lgca
-    import numpy as np
-    from matplotlib import pyplot as plt
-
-    l = 50
-    l_spheroid = 2
-    dims = (l, l)
-    tmax = 100
-    restc = 3
-    rho_0 = 3
-    nodes = np.zeros((l, l, restc + 6), dtype=bool)
-    nodes[..., :l_spheroid, -rho_0:] = 1
-    lgca = get_lgca(geometry='hex', interaction='wetting', beta=10., gamma=5., bc='rbc', density=0, restchannels=restc,
-                    nodes=nodes, rho_0=rho_0)
-    lgca.r_b = .05
-    lgca.spheroid = np.zeros_like(lgca.cell_density, dtype=bool)
-    lgca.spheroid[lgca.r_int:-lgca.r_int, :lgca.r_int + l_spheroid] = 1
-    lgca.ecm = 1 - lgca.spheroid.astype(float)
-    lgca.ecm *= 0.
+    # l = 50
+    # l_spheroid = 2
+    # dims = (l, l)
+    # tmax = 100
+    # restc = 3
+    # rho_0 = 3
+    # nodes = np.zeros((l, l, restc + 6), dtype=bool)
+    # nodes[..., :l_spheroid, -rho_0:] = 1
+    # lgca = get_lgca(geometry='hex', interaction='wetting', beta=10., gamma=5., bc='rbc', density=0, restchannels=restc,
+    #                 nodes=nodes, rho_0=rho_0)
+    # lgca.r_b = .05
+    # lgca.spheroid = np.zeros_like(lgca.cell_density, dtype=bool)
+    # lgca.spheroid[lgca.r_int:-lgca.r_int, :lgca.r_int + l_spheroid] = 1
+    # lgca.ecm = 1 - lgca.spheroid.astype(float)
+    # lgca.ecm *= 0.
     # lgca.timestep()
-    lgca.timeevo(12, record=True)
+    # lgca.timeevo(12, record=True)
     # lgca.plot_flow(cbar=False)
     # ani = lgca.live_animate_flow(cbar=False)
-    plt.show()
+    # plt.show()
