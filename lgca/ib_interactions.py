@@ -326,5 +326,11 @@ def passenger_mutations_deprecated(lgca):
     # if chronicle:
     #     print('nach shuffle', lgca.nodes[1:-1])
 
-# def pm2(lgca):
-#
+def passenger_mutations(lgca):
+    if lgca.density != 1:
+        print('maxlabel und maxfam nicht mehr aussagekräftig!')
+    """
+    r_d = const, r_b = const, r_m = const, new families will develop by mutations
+    """
+
+

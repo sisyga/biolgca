@@ -432,10 +432,10 @@ class IBLGCA_base(LGCA_base):
 
     def set_interaction(self, **kwargs):
         try:
-            from .ib_interactions import birth, birthdeath, go_or_grow_interaction, inheritance, passenger_mutations_deprecated
+            from .ib_interactions import birth, birthdeath, go_or_grow_interaction, inheritance, passenger_mutations, passenger_mutations_deprecated
             from .interactions import random_walk
         except ImportError:
-            from ib_interactions import birth, birthdeath, go_or_grow_interaction, inheritance, passenger_mutations_deprecated
+            from ib_interactions import birth, birthdeath, go_or_grow_interaction, inheritance, passenger_mutations, passenger_mutations_deprecated
             from interactions import random_walk
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
@@ -554,9 +554,43 @@ class IBLGCA_base(LGCA_base):
                 for i in range(1,self.maxlabel_init.astype(int)+1):
                     self.props['lab_m'][i] = i
 
-            # passenger MUTATIONS
+            # passenger MUTATIONS start with one cell per family
             elif interaction is 'passenger_mutations_deprecated':
                 self.interaction = passenger_mutations_deprecated
+                self.tree = {}
+                if 'r_int' in kwargs:
+                    self.set_r_int(kwargs['r_int'])
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                else:
+                    self.r_b = 0.5
+                    print('birth rate set to r_b = ', self.r_b)
+                if 'r_m' in kwargs:
+                    self.r_m = kwargs['r_m']
+                else:
+                    self.r_m = 0.0001
+                    print('mutation rate set to r_m = ', self.r_m)
+                if 'r_d' in kwargs:
+                    self.r_d = kwargs['r_d']
+                else:
+                    self.r_d = 0.02
+                    print('death rate set to r_d = ', self.r_d)
+                if 'std' in kwargs:
+                    self.std = kwargs['std']
+                else:
+                    self.std = 0.1
+                    print('standard deviation set to = ', self.std)
+                self.props.update(lab_m=[-99] + [0] * self.maxlabel)
+                self.props.update(num_off=[-99] + [1] * self.maxlabel)
+
+                self.maxlabel_init = self.maxlabel
+
+                for i in range(1, self.maxlabel_init.astype(int) + 1):
+                    self.props['lab_m'][i] = i
+
+            #PASSENGER MUTATIONS
+            elif interaction is 'passenger_mutations':
+                self.interaction = passenger_mutations
                 self.tree = {}
                 if 'r_int' in kwargs:
                     self.set_r_int(kwargs['r_int'])
