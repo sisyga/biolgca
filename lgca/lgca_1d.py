@@ -186,9 +186,9 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.apply_boundaries()
             self.maxlabel = self.nodes.max()
             self.maxfamily = self.nodes.max()
-            self.maxfamily_init = self.nodes.max()
-            for i in range(0, self.maxfamily_init):
-                self.tree_manager.register()
+            # self.maxfamily_init = self.nodes.max()
+            # for i in range(0, self.maxfamily_init):
+            #     self.tree_manager.register()
 
 
         else:
@@ -196,9 +196,13 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.nodes[self.r_int:-self.r_int] = self.convert_bool_to_ib(occ)
             self.maxlabel = self.nodes.max()
 
-    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=False, showprogress=False, recordLast=False):
+    def timeevo(self, timesteps=100, recordMut=False, record=False, recordN=False, recorddens=False, showprogress=False, recordLast=False):
 
         self.update_dynamic_fields()
+        if recordMut:
+            self.offsprings.append(copy(self.props)['num_off'])
+            self.props_t = [copy(self.props)]
+
         if record:
             self.nodes_t = np.zeros((timesteps + 1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
             self.nodes_t[0, ...] = self.nodes[self.r_int:-self.r_int, ...]
@@ -213,8 +217,13 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.dens_t[0, ...] = self.cell_density[self.r_int:-self.r_int]
         if recordLast:
             self.props_t = [copy(self.props)]
+
+
         for t in range(1, timesteps + 1):
             self.timestep()
+            if recordMut:
+                self.offsprings.append(copy(self.props)['num_off'])
+                self.props_t = [copy(self.props)]
 
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.r_int:-self.r_int]

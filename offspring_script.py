@@ -40,7 +40,7 @@ for i in range(0, rep):
         print('_families', lgca.props['lab_m'])
         print('_offsprings', lgca.offsprings)
     # print('len offs', len(lgca.offsprings))
-    print('t', t)
+    # print('t', t)
     # print('offs', (lgca.offsprings))
     ende = time.time()
     print('{:5.3f}s'.format(ende-start))

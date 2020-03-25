@@ -7,8 +7,8 @@ from os import environ as env
 from uuid import uuid4 as uuid
 
 
-dim = 3
-rc = 1
+dim = 5
+rc = 0
 rep = 1
 # dim = int(env['DIMS'])
 # rc = int(env['RESTCHANNELS'])
@@ -19,15 +19,22 @@ uu = str(uuid())[0:7]
 saving_data = False
 ausgabe = True
 
+e = {1: 0.5, 2: 0.3, 3: 0.2}
+f = {1:1}
+
 for i in range(0, rep):
     print('wdh: ', i)
     start = time.time()
     name = str(2*dim + dim*rc) + str(dim)
 
     lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
-           variation=False, density=1, dims=dim, restchannels=rc, r_m=0.1)
+           variation=False, density=1, dims=dim, restchannels=rc, r_m=1,\
+                    pop=f, r_d=0.2, r_b=0.8)
+    # lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
+    #        variation=False, density=1, dims=dim, restchannels=rc, r_m=1,\
+    #                 r_d=0.2, r_b=0.8)
     id = name + '_' + str(i) + '_' + str(uu)
-    t = lgca.timeevo_until_pseudohom(offsprings=True)
+    lgca.timeevo(timesteps=10, recordMut=True)
 
     if saving_data:
         np.save('saved_data/' + str(id) + '_tree', lgca.tree_manager.tree)
@@ -40,7 +47,6 @@ for i in range(0, rep):
         print('_families', lgca.props['lab_m'])
         print('_offsprings', lgca.offsprings)
     # print('len offs', len(lgca.offsprings))
-    print('t', t)
     # print('offs', (lgca.offsprings))
     ende = time.time()
     print('{:5.3f}s'.format(ende-start))

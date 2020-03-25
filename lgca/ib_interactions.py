@@ -332,5 +332,72 @@ def passenger_mutations(lgca):
     """
     r_d = const, r_b = const, r_m = const, new families will develop by mutations
     """
+    chronicle = True  # Ausgabe der einzelnen Schritte für chronicle = True
+    print(lgca.maxfamily)
+    rel_nodes = lgca.nodes[lgca.r_int:-lgca.r_int]
+
+
+    # dying process
+    dying = npr.random(rel_nodes.shape) < lgca.r_d
+
+    for label in rel_nodes[dying]:
+        if label > 0:
+            if chronicle:
+                print('cell with label %d dies' % label)
+            fam = lgca.props['lab_m'][label]
+            lgca.props['num_off'][fam] -= 1
+            if chronicle:
+                print('family dazu ist', fam)
+    rel_nodes[dying] = 0
+
+    # birth process
+    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
+               (lgca.cell_density[lgca.nonborder] < lgca.K)
+    coords = [a[relevant] for a in lgca.nonborder]
+    for coord in zip(*coords):
+        node = lgca.nodes[coord]
+
+        # choose cells that proliferate
+        proliferating = [x for x in node if x > 0 and np.random.random(1) < lgca.r_b]
+
+        # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
+        for label in proliferating:
+            ind = npr.choice(lgca.K)
+            if node[ind] == 0:
+
+                lgca.maxlabel += 1
+                node[ind] = lgca.maxlabel
+                lgca.apply_boundaries()
+
+                if chronicle:
+                    print('es proliferiert Zelle', label)
+                    print('der Familie', lgca.props['lab_m'][label])
+                    print('%d is born' % lgca.maxlabel)
+
+                mutation = npr.random() < lgca.r_m
+                if mutation:
+                    lgca.maxfamily += 1
+                    if chronicle:
+                        print('mit Mutation und neuer family ', lgca.maxfamily)
+                    lgca.props['num_off'].append(1)
+                    lgca.props['lab_m'].append(int(lgca.maxfamily))
+                    lgca.tree_manager.register(lgca.props['lab_m'][label])
+                else:
+                    fam = lgca.props['lab_m'][label]
+                    lgca.props['lab_m'].append(fam)
+                    lgca.props['num_off'][fam] += 1
+                if chronicle:
+                    print('labsm', lgca.props['lab_m'])
+        lgca.nodes[coord] = node
+
+    #reorientation:
+    # if chronicle:
+    #     print('vor shuffle', lgca.nodes[1:-1])
+    for a in lgca.nonborder:
+        for c in a:
+            npr.shuffle(lgca.nodes[c])
+    if chronicle:
+        print('props after t ', lgca.props['num_off'])
+        print(lgca.tree_manager.tree)
 
 

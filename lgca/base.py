@@ -551,7 +551,7 @@ class IBLGCA_base(LGCA_base):
                 # #Parameter zur Kontrolle
                 # self.borncells = 0
                 # self.diedcells = 0
-                for i in range(1,self.maxlabel_init.astype(int)+1):
+                for i in range(1, self.maxlabel_init.astype(int)+1):
                     self.props['lab_m'][i] = i
 
             # passenger MUTATIONS start with one cell per family
@@ -588,7 +588,12 @@ class IBLGCA_base(LGCA_base):
                 for i in range(1, self.maxlabel_init.astype(int) + 1):
                     self.props['lab_m'][i] = i
 
-            #PASSENGER MUTATIONS
+                self.maxfamily_init = self.nodes.max()
+                for i in range(0, self.maxfamily_init):
+                    self.tree_manager.register()
+                print(self.tree_manager.tree)
+
+            #PASSENGER MUTATIONS individual start-families
             elif interaction is 'passenger_mutations':
                 self.interaction = passenger_mutations
                 self.tree = {}
@@ -599,6 +604,7 @@ class IBLGCA_base(LGCA_base):
                 else:
                     self.r_b = 0.5
                     print('birth rate set to r_b = ', self.r_b)
+
                 if 'r_m' in kwargs:
                     self.r_m = kwargs['r_m']
                 else:
@@ -614,13 +620,33 @@ class IBLGCA_base(LGCA_base):
                 else:
                     self.std = 0.1
                     print('standard deviation set to = ', self.std)
-                self.props.update(lab_m=[-99] + [0] * self.maxlabel)
-                self.props.update(num_off=[-99] + [1] * self.maxlabel)
 
-                self.maxlabel_init = self.maxlabel
+                if 'pop' in kwargs:
+                    pop = kwargs['pop']
+                    self.props.update(lab_m=[-99] + [1] * self.maxlabel)
+                    self.props.update(num_off=[-99] + [1] * len(pop))
 
-                for i in range(1, self.maxlabel_init.astype(int) + 1):
-                    self.props['lab_m'][i] = i
+                    for key in pop.keys():
+                        self.props['num_off'][key] = self.maxlabel * pop[key]
+                    self.maxfamily_init = len(pop)
+                    self.maxfamily = len(pop)
+                    for i in range(0, self.maxfamily_init):
+                        self.tree_manager.register()
+                    print(self.tree_manager.tree)
+
+                else: #pro Familie genau eine Zelle initialisiert
+                    self.props.update(lab_m=[-99] + [0] * self.maxlabel)
+                    self.props.update(num_off=[-99] + [1] * self.maxlabel)
+
+                    self.maxlabel_init = self.maxlabel
+
+                    for i in range(1, self.maxlabel_init.astype(int) + 1):
+                        self.props['lab_m'][i] = i
+
+                    self.maxfamily_init = self.nodes.max()
+                    for i in range(0, self.maxfamily_init):
+                        self.tree_manager.register()
+                    print(self.tree_manager.tree)
 
             else:
                 print('keyword', interaction, 'is not defined! Random walk used instead.')
