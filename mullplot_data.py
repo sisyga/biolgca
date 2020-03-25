@@ -197,17 +197,18 @@ def filter_ori(offsprings, originals, tree, cutoff):
     return ori, fams
 
 
-# name = 'bsp'
+name = 'bsp'
 # name = '42_0_7162808'
-name = '5011_0_711862f'
+# name = '5011_0_711862f'
 
-# o = correct(np.load('saved_data/' + name + '_offsprings.npy'))
+o = np.load('saved_data/' + name + '_tree.npy')
+
 # print(o)
 # create_newoffs(o, int_length=3, tbeg=0, tend=len(o) - 1)
 # create_input(name, int_length=250)
 # create_input(name, int_length=250, ori=True)
 # create_input(name, int_length=250, cutoff=0.004)
-create_input(name, int_length=250)
+# create_input(name, int_length=250)
 # create_input(name, int_length=250, cutoff=0.3, ori=True)
 # create_input(name, int_length=250, cutoff=0.1, ori=True)
 

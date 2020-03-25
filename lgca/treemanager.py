@@ -9,6 +9,7 @@ class TreeManager:
         else:
             ori = self.tree[parent]['origin']
             self.tree[self.next_id] = {'parent': parent, 'origin': ori}
+
         self.next_id += 1
 
 

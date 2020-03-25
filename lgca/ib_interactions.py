@@ -227,13 +227,13 @@ def inheritance(lgca):
     if chronicle:
         print('nach shuffle', lgca.nodes[1:-1])
 
-def passenger_mutations(lgca):
+def passenger_mutations_deprecated(lgca):
     if lgca.density != 1:
         print('maxlabel und maxfam nicht mehr aussagekräftig!')
     """
     r_d = const, r_b = const, r_m = const, new families will develop by mutations
     """
-    chronicle = False   #Ausgabe der einzelnen Schritte für chronicle = True
+    chronicle = True   #Ausgabe der einzelnen Schritte für chronicle = True
 
     rel_nodes = lgca.nodes[lgca.r_int:-lgca.r_int]
     # if chronicle:
@@ -326,4 +326,5 @@ def passenger_mutations(lgca):
     # if chronicle:
     #     print('nach shuffle', lgca.nodes[1:-1])
 
-
+# def pm2(lgca):
+#

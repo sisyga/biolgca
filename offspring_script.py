@@ -7,24 +7,25 @@ from os import environ as env
 from uuid import uuid4 as uuid
 
 
-dim = 1
-rc = 499
-rep = 2
+dim = 3
+rc = 1
+rep = 1
 # dim = int(env['DIMS'])
 # rc = int(env['RESTCHANNELS'])
 # rep = int(env['REPETITIONS'])
 
 
 uu = str(uuid())[0:7]
-saving_data = True
+saving_data = False
+ausgabe = True
 
 for i in range(0, rep):
     print('wdh: ', i)
     start = time.time()
     name = str(2*dim + dim*rc) + str(dim)
 
-    lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
-           variation=False, density=1, dims=dim, restchannels=rc)
+    lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations_deprecated', bc='reflecting',\
+           variation=False, density=1, dims=dim, restchannels=rc, r_m=0.1)
     id = name + '_' + str(i) + '_' + str(uu)
     t = lgca.timeevo_until_pseudohom(offsprings=True)
 
@@ -33,7 +34,11 @@ for i in range(0, rep):
         np.save('saved_data/' + str(id) + '_families', lgca.props['lab_m'])
         np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
         np.savez('saved_data/' + str(id) + '_Parameter', density=lgca.density, restchannels=lgca.restchannels,\
-        dimension=lgca.l, kappa=lgca.K, rb=lgca.r_b, rd=lgca.r_d, m=lgca.r_int)
+        dimension=lgca.l, kappa=lgca.K, rb=lgca.r_b, rd=lgca.r_d, rm=lgca.r_m, m=lgca.r_int)
+    if ausgabe:
+        print('tree', lgca.tree_manager.tree)
+        print('_families', lgca.props['lab_m'])
+        print('_offsprings', lgca.offsprings)
     # print('len offs', len(lgca.offsprings))
     print('t', t)
     # print('offs', (lgca.offsprings))

@@ -432,10 +432,10 @@ class IBLGCA_base(LGCA_base):
 
     def set_interaction(self, **kwargs):
         try:
-            from .ib_interactions import birth, birthdeath, go_or_grow_interaction, inheritance, passenger_mutations
+            from .ib_interactions import birth, birthdeath, go_or_grow_interaction, inheritance, passenger_mutations_deprecated
             from .interactions import random_walk
         except ImportError:
-            from ib_interactions import birth, birthdeath, go_or_grow_interaction, inheritance, passenger_mutations
+            from ib_interactions import birth, birthdeath, go_or_grow_interaction, inheritance, passenger_mutations_deprecated
             from interactions import random_walk
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
@@ -555,8 +555,8 @@ class IBLGCA_base(LGCA_base):
                     self.props['lab_m'][i] = i
 
             # passenger MUTATIONS
-            elif interaction is 'passenger_mutations':
-                self.interaction = passenger_mutations
+            elif interaction is 'passenger_mutations_deprecated':
+                self.interaction = passenger_mutations_deprecated
                 self.tree = {}
                 if 'r_int' in kwargs:
                     self.set_r_int(kwargs['r_int'])
@@ -568,7 +568,7 @@ class IBLGCA_base(LGCA_base):
                 if 'r_m' in kwargs:
                     self.r_m = kwargs['r_m']
                 else:
-                    self.r_m = 0.1
+                    self.r_m = 0.0001
                     print('mutation rate set to r_m = ', self.r_m)
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']

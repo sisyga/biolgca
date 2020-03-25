@@ -33,7 +33,7 @@ def control(lgca, t):
 dim = 1
 rc = 178
 
-lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
+lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations_deprecated', bc='reflecting',\
            density=1, dims=dim, restchannels=rc)
 t = lgca.timeevo_until_pseudohom(spatial=True)
 print('tree', lgca.tree_manager.tree)
