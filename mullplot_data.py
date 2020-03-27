@@ -44,8 +44,8 @@ def create_pop(offs, times, name):
 def create_input(filename, tbeg=0, tend=None, int_length=1, cutoff=0, ori=None):
     tree = np.load('saved_data/' + filename + '_tree.npy')
     offs = correct(np.load('saved_data/' + filename + '_offsprings.npy'))
-    offs = create_ori(offs, tree)
-    name = filename + '_int_length=' + str(int_length) + '_cutoff=' + str(cutoff) + '_schmu'
+    # offs = create_ori(offs, tree)
+    name = filename + '_int_length=' + str(int_length) + '_cutoff=' + str(cutoff)
 
     if ori:
         offs_ori = create_ori(offs, tree)   # offs = offs_ori -> plottet ori
@@ -197,20 +197,22 @@ def filter_ori(offsprings, originals, tree, cutoff):
     return ori, fams
 
 
-name = 'bsp'
+# name = 'bsp'
 # name = '42_0_7162808'
 # name = '5011_0_711862f'
 
-o = np.load('saved_data/' + name + '_tree.npy')
+for i in range(0, 1):
+    name = '5011_mut_' + str(i) + '_c7462cd'
+    create_input(name, int_length=250)
+
 
 # print(o)
 # create_newoffs(o, int_length=3, tbeg=0, tend=len(o) - 1)
 # create_input(name, int_length=250)
 # create_input(name, int_length=250, ori=True)
 # create_input(name, int_length=250, cutoff=0.004)
-# create_input(name, int_length=250)
-# create_input(name, int_length=250, cutoff=0.3, ori=True)
-# create_input(name, int_length=250, cutoff=0.1, ori=True)
+
+
 
 
 

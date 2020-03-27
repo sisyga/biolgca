@@ -332,10 +332,8 @@ def passenger_mutations(lgca):
     """
     r_d = const, r_b = const, r_m = const, new families will develop by mutations
     """
-    chronicle = True  # Ausgabe der einzelnen Schritte für chronicle = True
-    print(lgca.maxfamily)
+    chronicle = False  # Ausgabe der einzelnen Schritte für chronicle = True
     rel_nodes = lgca.nodes[lgca.r_int:-lgca.r_int]
-
 
     # dying process
     dying = npr.random(rel_nodes.shape) < lgca.r_d
@@ -391,8 +389,6 @@ def passenger_mutations(lgca):
         lgca.nodes[coord] = node
 
     #reorientation:
-    # if chronicle:
-    #     print('vor shuffle', lgca.nodes[1:-1])
     for a in lgca.nonborder:
         for c in a:
             npr.shuffle(lgca.nodes[c])

@@ -74,13 +74,15 @@ magic <- function(e_name, t_name, p_name, tbeg=0, tend=0){
     #2: plot-Daten erstellen
     plotdata <- get_Muller_df(edges, pdata)
     print("Fuer Ausgabe des Stammbaums create_tree(e_name) aufrufen!")
-    Muller_plot(plotdata, add_legend=T, xlab = "timesteps", ylab= "relative frequency")
+    # windows()
+    # platdata <- Muller_plot(plotdata, add_legend=T, xlab = "timesteps", ylab= "relative frequency")
+
     return(plotdata)
 }
 
 plotting <- function(data, filename="unknown"){
     #print("plotting")
-    jpeg(paste("C:/Users/Franzi/PycharmProjects/biolgca/pictures/", filename, "_mp.jpg"))
+    jpeg(paste("C:/Users/Franzi/PycharmProjects/biolgca/pictures/", filename, "_mp.jpg"), width=600, height=250) 
     plot(Muller_plot(data, xlab = "timesteps", ylab= "relative frequency"))
     dev.off()
 }
@@ -100,20 +102,16 @@ plotting <- function(data, filename="unknown"){
 # d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
 # plotting(d, filename=name)
 
-name <- "5011_0_711862f_int_length=250_cutoff=0_schmu"
-# d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""))
-d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
-plotting(d, filename=name)
-
-# name <- "5011_0_711862f_int_length=250_cutoff=0.3_ori"
-# # d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""))
-# d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
-# plotting(d, filename=name)
-
-# name <- "5011_0_711862f_int_length=250_cutoff=0.1_ori"
-# # d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""))
-# d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
-# plotting(d, filename=name)
+for (i in 0:0){ 
+    
+    # name <- paste("5011_mut_", i, "_6aeb4de_int_length=1_cutoff=0", sep="")
+    name <- "bsp_int_length=1_cutoff=0"
+    d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
+    plotting(d, filename=name)
+    # name <- paste("5011_mut_", i, "_7258cd6_int_length=1_cutoff=0", sep="")
+    # d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
+    # plotting(d, filename=name)
+    } 
 
 
 
