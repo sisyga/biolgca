@@ -5,47 +5,39 @@ import matplotlib.pyplot as plt
 import time
 from os import environ as env
 from uuid import uuid4 as uuid
+import multiprocessing
 
-
-# dim = 2
-# rc = 2
-# rep = 1
-# steps = 10
-dim = int(env['DIMS'])
-rc = int(env['RESTCHANNELS'])
-rep = int(env['REPETITIONS'])
-steps = int(env['STEPS'])
-
-
-uu = str(uuid())[0:7]
-saving_data = True
-ausgabe = False
-
-# e = {1: 0.5, 2: 0.3, 3: 0.2}
-f = {1: 1}
-
-for i in range(0, rep):
-    print('wdh: ', i)
+def magie(dim, rc, steps, uu):
     start = time.time()
-    name = str(2*dim + dim*rc) + str(dim) + "_mut"
+    # uu = str(uuid())
+    saving_data = False
 
-    lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
-           variation=False, density=1, dims=dim, restchannels=rc,\
-                    pop=f)
+    name = str(2 * dim + dim * rc) + str(dim) + "_mut_"
 
-    id = name + '_mut_' + str(i) + '_' + str(uu)
+    lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',
+                    variation=False, density=1, dims=dim, restchannels=rc,
+                    pop={1: 1})
+
+    id = name + '_' + str(uu)
+
     lgca.timeevo(timesteps=steps, recordMut=True)
+
     if saving_data:
         np.save('saved_data/' + str(id) + '_tree', lgca.tree_manager.tree)
-        np.save('saved_data/' + str(id) + '_families', lgca.props['lab_m'])
-        np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
-        np.savez('saved_data/' + str(id) + '_Parameter', density=lgca.density, restchannels=lgca.restchannels,\
-        dimension=lgca.l, kappa=lgca.K, rb=lgca.r_b, rd=lgca.r_d, rm=lgca.r_m, m=lgca.r_int)
-    if ausgabe:
-        print('tree', lgca.tree_manager.tree)
-        print('_families', lgca.props['lab_m'])
-        print('_offsprings', lgca.offsprings)
-    # print('len offs', len(lgca.offsprings))
-    # print('offs', (lgca.offsprings))
+        # np.save('saved_data/' + str(id) + '_families', lgca.props['lab_m'])
+        # np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
+        # np.savez('saved_data/' + str(id) + '_Parameter', density=lgca.density, restchannels=lgca.restchannels,
+        #          dimension=lgca.l, kappa=lgca.K, rb=lgca.r_b, rd=lgca.r_d, rm=lgca.r_m, m=lgca.r_int)
+
     ende = time.time()
-    print('{:5.3f}s'.format(ende-start))
+    print('{:5.3f}min'.format((ende - start)/60))
+
+def zauberei(eins):
+    magie(2, 2, 10, eins)
+
+
+rep = range(5)
+zauberei('irgendwas')
+
+with multiprocessing.Pool() as pool:
+    pool.map(zauberei, rep)
