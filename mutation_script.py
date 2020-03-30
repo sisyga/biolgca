@@ -7,21 +7,22 @@ from os import environ as env
 from uuid import uuid4 as uuid
 
 
-dim = 1
-rc = 499
-rep = 1
-steps = 40000
-# dim = int(env['DIMS'])
-# rc = int(env['RESTCHANNELS'])
-# rep = int(env['REPETITIONS'])
+# dim = 2
+# rc = 2
+# rep = 1
+# steps = 10
+dim = int(env['DIMS'])
+rc = int(env['RESTCHANNELS'])
+rep = int(env['REPETITIONS'])
+steps = int(env['STEPS'])
 
 
 uu = str(uuid())[0:7]
 saving_data = True
 ausgabe = False
 
-e = {1: 0.5, 2: 0.3, 3: 0.2}
-f = {1:1}
+# e = {1: 0.5, 2: 0.3, 3: 0.2}
+f = {1: 1}
 
 for i in range(0, rep):
     print('wdh: ', i)
@@ -31,12 +32,9 @@ for i in range(0, rep):
     lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
            variation=False, density=1, dims=dim, restchannels=rc,\
                     pop=f)
-    # lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
-    #        variation=False, density=1, dims=dim, restchannels=rc, r_m=1,\
-    #                 r_d=0.2, r_b=0.8)
-    id = name + '_' + str(i) + '_' + str(uu)
-    lgca.timeevo(timesteps=steps, recordMut=True)
 
+    id = name + '_mut_' + str(i) + '_' + str(uu)
+    lgca.timeevo(timesteps=steps, recordMut=True)
     if saving_data:
         np.save('saved_data/' + str(id) + '_tree', lgca.tree_manager.tree)
         np.save('saved_data/' + str(id) + '_families', lgca.props['lab_m'])

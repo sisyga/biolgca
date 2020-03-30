@@ -201,7 +201,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         self.update_dynamic_fields()
         if recordMut:
             self.offsprings.append(copy(self.props)['num_off'])
-            self.props_t = [copy(self.props)]
+            # self.props_t = [copy(self.props)]
 
         if record:
             self.nodes_t = np.zeros((timesteps + 1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
@@ -222,8 +222,9 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         for t in range(1, timesteps + 1):
             self.timestep()
             if recordMut:
+                # print(self.props['num_off'])
                 self.offsprings.append(copy(self.props)['num_off'])
-                self.props_t = [copy(self.props)]
+                # self.props_t = [copy(self.props)]
 
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.r_int:-self.r_int]
