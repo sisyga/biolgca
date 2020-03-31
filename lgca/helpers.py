@@ -1,6 +1,7 @@
 import numpy as np
 import math as m
 import matplotlib.pyplot as plt
+from matplotlib import colors
 import pandas as pd
 
 from matplotlib import cm
@@ -285,7 +286,20 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
     fig = plt.figure(num=figindex, figsize=figsize)
     ax = fig.add_subplot(111)
     plot = ax.matshow(val, cmap=cmap)
+    ###
+    vmin = 1
+    vmax = max(labels)
+    print(vmin, vmax)
+    norm = colors.Normalize(vmin=vmin, vmax=vmax+0.2)
+    plot.set_norm(norm)
 
+    cbar = fig.colorbar(plot)
+    cbar.ax.get_yaxis().set_ticks([])
+    for j, lab in enumerate(range(1, vmax+1)):
+        cbar.ax.text(3, j+1.075, lab, ha='center', va='center')
+    cbar.ax.get_yaxis().labelpad = 15
+    cbar.ax.set_ylabel('family', rotation=270)
+    ###
     plt.ylabel('timesteps', fontsize=12) #15
     plt.xlabel('lattice site', fontsize=12) #, fontsize=12
 
@@ -293,7 +307,7 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
     plt.xlim(-0.5, dim * c - 0.5)
 
     if dim >= 20:
-        x1 = np.arange(0, dim*c, 10*c)
+        x1 = np.arange(0, dim*c, 20*c)
         x2 = np.zeros(len(x1)).astype(int)
         for i in range(0, len(x1)):
             x2[i] = (x1[i]/c) + 1
@@ -307,8 +321,7 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
         ax.set_xticks(x1)
         ax.set_xticklabels(x2, minor=False, fontsize=12)
     else:
-        plt.xticks((np.arange(0, dim*c, c)), fontsize=12)
-
+        plt.xticks((np.arange(0, dim*c, c)+1), fontsize=12)
 
     plt.ylim(tend-0.5, tbeg-0.5)
     if tend - tbeg > 700:
@@ -377,8 +390,8 @@ def save_plot(plot, filename=None):
 
 def plot_all_lognorm(thomarray, colorarray, int_length, save=False):
     fig, ax = plt.subplots()
-    plt.xticks(fontsize=12)
-    plt.yticks(fontsize=12)
+    plt.xticks(fontsize=10)
+    plt.yticks(fontsize=10)
     plt.xlabel('thom', fontsize=15)
     plt.ylabel('absolute frequency', fontsize=15)
     filename = ''
@@ -405,8 +418,8 @@ def plot_all_lognorm(thomarray, colorarray, int_length, save=False):
 def plot_lognorm_distribution(thom, int_length, save=False, id=0, c='seagreen'):
     max = thom.max().astype(int)
     fig, ax = plt.subplots()
-    plt.xticks(fontsize=12)
-    plt.yticks(fontsize=12)
+    plt.xticks(fontsize=10)
+    plt.yticks(fontsize=10)
     plt.xlabel('thom', fontsize=15)
     plt.ylabel('absolute frequency', fontsize=15)
 
@@ -419,7 +432,7 @@ def plot_lognorm_distribution(thom, int_length, save=False, id=0, c='seagreen'):
     print('x', x)
     print('y', y)
     barerr = calc_barerrs(y)
-    plt.errorbar(x, y, yerr=barerr, color='magenta')
+    #todo plt.errorbar(x, y, yerr=barerr, color='magenta')
     plt.plot(x, fitted_data * maxy / maxfit, color=c, label=id)
     # sqderr = calc_quaderr(fitted_data * maxy / maxfit, y)
     # print('q', sqderr)

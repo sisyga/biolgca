@@ -159,7 +159,7 @@ def inheritance(lgca):
     """
     r_d = const
     """
-    chronicle = True   #Ausgabe der einzelnen Schritte für chronicle = True
+    chronicle = False   #Ausgabe der einzelnen Schritte für chronicle = True
 
     rel_nodes = lgca.nodes[lgca.r_int:-lgca.r_int]
     if chronicle:

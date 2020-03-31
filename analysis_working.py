@@ -55,13 +55,13 @@ data60 = {'offs': np.load('saved_data/pummelzeugs_60/' + '18060_81_6e8510d_offsp
 Einlesen von thoms der Länge 1500
 plus color-set
 """
-thom01 = np.load('saved_data/thoms/' + 'rc=178_thom1500.npy')
+# thom01 = np.load('saved_data/thoms/' + 'rc=178_thom1500.npy')
 # thom02 = np.load('saved_data/thoms/' + 'rc=88_thom1500.npy')
 # thom45 = np.load('saved_data/thoms/' + 'rc=2_thom1500.npy')
-thom60 = np.load('saved_data/thoms/' + 'rc=1_thom1500.npy')
+# thom60 = np.load('saved_data/thoms/' + 'rc=1_thom1500.npy')
 # data = {'rc=178': thom01, 'rc=88': thom02, 'rc=2': thom45, 'rc=1': thom60}
-data = {'rc=178': thom01, 'rc=1': thom60}
-colors = ['darkred', 'orange', 'olivedrab', 'darkturquoise']
+# data = {'rc=178': thom01, 'rc=1': thom60}
+# colors = ['darkred', 'orange', 'olivedrab', 'darkturquoise']
 # thom90 = np.load('saved_data/thoms/' + 'rc=178_thom1500.npy')
 # data = {'rc=178': thom01, 'rc=88': thom02, 'rc=2': thom45, 'rc=1': thom60, 'rc=0': thom90}
 # colors = ['darkred', 'orange', 'olivedrab', 'indigo', 'darkturquoise']
@@ -73,26 +73,70 @@ colors = ['darkred', 'orange', 'olivedrab', 'darkturquoise']
 example = 'rc=178'
 # plot_lognorm_distribution(thom=data[example], int_length=1000, save=True, id=example, c=colors[0])
 
-# onenode = np.load('saved_data/onenode_thom_500.npy')
-# onerc = np.load('saved_data/onerc_thom_500.npy')
+# onenode = np.load('saved_data/thoms501/501thom01_1000.npy')
+# onerc = np.load('saved_data/thoms501/501thom167_1000.npy')
 # print(np.load('saved_data/onenode_thom_5.npy'))
 # print(np.load('saved_data/onerc_thom_5.npy'))
+# print(len(onenode))
+# print(len(onerc))
 # print(onenode.mean(), onenode.min(), onenode.max())
 # print(onerc.mean(), onerc.min(), onerc.max())
 # dat = {'onenode': onenode, 'onerc': onerc}
-# plot_all_lognorm(dat, colors, 1000)
+# plot_all_lognorm(dat, colors, 1000, save=True)
 # plot_all_lognorm(data, colors, 1000)
-# thom_all(dat, 5000, save=True, id='ones, int=5000')
+# thom_all(dat, 5000, save=False, id='ones, int=5000')
 # plot_lognorm_distribution(dat['onenode'], 1000, id='onenode', c=colors[0], save=True)
 # plot_lognorm_distribution(dat['onerc'], 1000, id='onerc', c=colors[1], save=True)
 
-name = '62_0_2bb3013'
-offs = np.load('saved_data/' + name + '_offsprings.npy')
-tree = np.load('saved_data/' + name + '_tree.npy')
-fams = np.load('saved_data/' + name + '_families.npy')
+dimss = [1, 167]
+rcss = [499, 1]
 
-print(len(offs))
-print(tree)
-print(fams)
+# for i in range(0, 2):
+#     dim = dimss[i]
+#     rc = rcss[i]
+#     name = str(2*dim + dim*rc) + str(dim)
+#
+#     lgca = get_lgca(ib=True, geometry='lin', interaction='inheritance', bc='reflecting',\
+#            variation=False, density=1, dims=dim, restchannels=rc, r_b=0.5, r_d=0.02)
+#     id = name + '_' + str(i) + '_ohne_mut'
+#     lgca.timeevo(timesteps=500, record=True)
+#
+#
+#         # np.save('saved_data/' + str(id) + '_tree', lgca.tree_manager.tree)
+#     np.save('saved_data/' + str(id) + '_families', lgca.props['lab_m'])
+#     np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
+#     np.save('saved_data/' + str(id) + '_nodest', lgca.nodes_t)
+#     np.savez('saved_data/' + str(id) + '_Parameter', density=lgca.density, restchannels=lgca.restchannels,
+#     dimension=lgca.l, kappa=lgca.K, rb=lgca.r_b, rd=lgca.r_d, m=lgca.r_int)
+#
+# for i in range(0, 2):
+#     dim = dimss[i]
+#     rc = rcss[i]
+#     name = str(2*dim + dim*rc) + str(dim)
+#
+#     lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
+#            variation=False, density=1, dims=dim, restchannels=rc, r_b=0.5, r_d=0.02, r_m=0.001, pop={1:1})
+#     id = name + '_' + str(i) + '_mit_mut'
+#     lgca.timeevo(timesteps=500, record=True)
+#
+#
+#     np.save('saved_data/' + str(id) + '_tree', lgca.tree_manager.tree)
+#     np.save('saved_data/' + str(id) + '_families', lgca.props['lab_m'])
+#     np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
+#     np.save('saved_data/' + str(id) + '_nodest', lgca.nodes_t)
+#     np.savez('saved_data/' + str(id) + '_Parameter', density=lgca.density, restchannels=lgca.restchannels,
+#     dimension=lgca.l, kappa=lgca.K, rb=lgca.r_b, rd=lgca.r_d, rm=lgca.r_m, m=lgca.r_int)
 
-print(offs[-1])
+# o=np.load('saved_data/501167_1_mit_mut_offsprings.npy')
+# print(len(o))
+# o=np.load('saved_data/501167_1_ohne_mut_offsprings.npy')
+# print(len(o))
+
+#####spacetimeplot####
+files = ['501167_1_mit_mut']
+# files = ['5011_0_ohne_mut', '501167_1_mit_mut']
+# files = ['5011_0_ohne_mut', '501167_1_ohne_mut', '5011_0_mit_mut', '501167_1_mit_mut']
+for entry in files:
+    nodes = np.load('saved_data/' + entry + '_nodest.npy')
+    fams = np.load('saved_data/' + entry + '_families.npy')
+    spacetime_plot(nodes_t=nodes, labels=fams, tbeg=None, tend=None, save=True, id=entry)

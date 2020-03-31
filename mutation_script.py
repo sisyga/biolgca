@@ -24,20 +24,15 @@ def magie(dim, rc, steps, uu):
 
     if saving_data:
         np.save('saved_data/' + str(id) + '_tree', lgca.tree_manager.tree)
-        # np.save('saved_data/' + str(id) + '_families', lgca.props['lab_m'])
-        # np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
-        # np.savez('saved_data/' + str(id) + '_Parameter', density=lgca.density, restchannels=lgca.restchannels,
-        #          dimension=lgca.l, kappa=lgca.K, rb=lgca.r_b, rd=lgca.r_d, rm=lgca.r_m, m=lgca.r_int)
-
+        np.save('saved_data/' + str(id) + '_families', lgca.props['lab_m'])
+        np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
+        np.savez('saved_data/' + str(id) + '_Parameter', density=lgca.density, restchannels=lgca.restchannels,
+                 dimension=lgca.l, kappa=lgca.K, rb=lgca.r_b, rd=lgca.r_d, rm=lgca.r_m, m=lgca.r_int)
+    print(lgca.tree_manager.tree)
     ende = time.time()
     print('{:5.3f}min'.format((ende - start)/60))
 
 def zauberei(eins):
-    magie(2, 2, 10, eins)
+    magie(167, 1, 40000, eins)
 
-
-rep = range(5)
-zauberei('irgendwas')
-
-with multiprocessing.Pool() as pool:
-    pool.map(zauberei, rep)
+magie(dim=167, rc=1, steps=4, uu=0)

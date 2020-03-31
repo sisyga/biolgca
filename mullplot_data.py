@@ -202,7 +202,9 @@ def filter_ori(offsprings, originals, tree, cutoff):
 # name = '5011_0_711862f'
 
 for i in range(0, 1):
-    name = '5011_mut_' + str(i) + '_c7462cd'
+    name = '501167_1_mit_mut'
+    create_input(name, int_length=250)
+    name = '501167_1_ohne_mut'
     create_input(name, int_length=250)
 
 

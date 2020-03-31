@@ -105,7 +105,10 @@ plotting <- function(data, filename="unknown"){
 for (i in 0:0){ 
     
     # name <- paste("5011_mut_", i, "_6aeb4de_int_length=1_cutoff=0", sep="")
-    name <- "bsp_int_length=1_cutoff=0"
+    name <- "501167_1_mit_mut_int_length=250_cutoff=0"
+    d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
+    plotting(d, filename=name)
+    name <- "501167_1_ohne_mut_int_length=250_cutoff=0"
     d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
     plotting(d, filename=name)
     # name <- paste("5011_mut_", i, "_7258cd6_int_length=1_cutoff=0", sep="")
