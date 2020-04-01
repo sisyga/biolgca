@@ -1,4 +1,5 @@
 import sys
+from copy import deepcopy as copy
 
 import matplotlib.colors as mcolors
 import numpy as np
@@ -12,7 +13,7 @@ from lgca.treemanager import TreeManager
 
 pi2 = 2 * np.pi
 plt.style.use('default')
-# hello
+
 
 def update_progress(progress):
     """
@@ -40,7 +41,7 @@ def update_progress(progress):
     sys.stdout.flush()
 
 
-def colorbar_index(ncolors, cmap, use_gridspec=False):
+def colorbar_index(ncolors, cmap, use_gridspec=False, cax=None):
     """Return a discrete colormap with n colors from the continuous colormap cmap and add correct tick labels
 
     :param ncolors: number of colors of the colormap
@@ -52,7 +53,7 @@ def colorbar_index(ncolors, cmap, use_gridspec=False):
     mappable = ScalarMappable(cmap=cmap)
     mappable.set_array([])
     mappable.set_clim(-0.5, ncolors + 0.5)
-    colorbar = plt.colorbar(mappable, use_gridspec=use_gridspec)
+    colorbar = plt.colorbar(mappable, use_gridspec=use_gridspec, cax=cax)
     colorbar.set_ticks(np.linspace(-0.5, ncolors + 0.5, 2 * ncolors + 1)[1::2])
     colorbar.set_ticklabels(list(range(ncolors)))
     return colorbar
@@ -120,23 +121,24 @@ class LGCA_base():
         self.density = density
         self.init_nodes(density=density, nodes=nodes)
         self.init_coords()
+        self.init_nodes(density=density, nodes=nodes)
         self.set_interaction(**kwargs)
         self.cell_density = self.nodes.sum(-1)
         self.apply_boundaries()
 
     def set_r_int(self, r):
         self.r_int = r
-        self.init_nodes(nodes=self.nodes[self.nonborder], density=self.density)
+        self.init_nodes(nodes=self.nodes[self.nonborder] #todo density=self.density
         self.init_coords()
         self.update_dynamic_fields()
 
     def set_interaction(self, **kwargs):
         try:
             from .interactions import go_or_grow, birth, alignment, persistent_walk, chemotaxis, \
-                contact_guidance, nematic, aggregation, wetting, random_walk, birth_death, excitable_medium
-        except ImportError:
+                contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium
+        except:
             from interactions import go_or_grow, birth, alignment, persistent_walk, chemotaxis, \
-                contact_guidance, nematic, aggregation, wetting, random_walk, birth_death, excitable_medium
+                contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
             if interaction == 'go_or_grow':
@@ -300,8 +302,8 @@ class LGCA_base():
                     self.r_b = 0.2
                     print('birth rate set to r_b = ', self.r_b)
 
-            elif interaction == 'birth_death':
-                self.interaction = birth_death
+            elif interaction == 'birthdeath':
+                self.interaction = birthdeath
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
                 else:
@@ -370,6 +372,7 @@ class LGCA_base():
         :return:
         """
         self.nodes = npr.random(self.nodes.shape) < density
+        self.apply_boundaries()
         self.update_dynamic_fields()
 
     def update_dynamic_fields(self):
@@ -388,8 +391,29 @@ class LGCA_base():
         self.apply_boundaries()
         self.propagation()
         self.apply_boundaries()
-        # print('bc nodes', self.nodes)
         self.update_dynamic_fields()
+# todo doofe verschobene function!!!
+    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
+        self.update_dynamic_fields()
+        if record:
+            self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
+            self.nodes_t[0, ...] = self.nodes[self.nonborder]
+        if recordN:
+            self.n_t = np.zeros(timesteps + 1, dtype=np.int)
+            self.n_t[0] = self.cell_density[self.nonborder].sum()
+        if recorddens:
+            self.dens_t = np.zeros((timesteps + 1,) + self.dims)
+            self.dens_t[0, ...] = self.cell_density[self.nonborder]
+        for t in range(1, timesteps + 1):
+            self.timestep()
+            if record:
+                self.nodes_t[t, ...] = self.nodes[self.nonborder]
+            if recordN:
+                self.n_t[t] = self.cell_density[self.nonborder].sum()
+            if recorddens:
+                self.dens_t[t, ...] = self.cell_density[self.nonborder]
+            if showprogress:
+                update_progress(1.0 * t / timesteps)
 
     def calc_permutations(self):
         self.permutations = [np.array(list(multiset_permutations([1] * n + [0] * (self.K - n))), dtype=np.int8)
@@ -428,7 +452,6 @@ class IBLGCA_base(LGCA_base):
         self.set_interaction(**kwargs)
         self.cell_density = self.nodes.sum(-1)
         self.apply_boundaries()
-
 
     def set_interaction(self, **kwargs):
         try:
@@ -474,7 +497,7 @@ class IBLGCA_base(LGCA_base):
                     print('Max. birth rate set to a_max =', self.a_max)
 
             elif interaction is 'go_or_grow':
-                self.interaction = go_or_grow_interaction
+                self.interaction = go_or_grow
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']
                 else:
@@ -486,17 +509,25 @@ class IBLGCA_base(LGCA_base):
                     self.r_b = 0.2
                     print('birth rate set to r_b = ', self.r_b)
                 if 'kappa' in kwargs:
-                    self.kappa = kwargs['kappa']
+                    kappa = kwargs['kappa']
+                    try:
+                        self.kappa = list(kappa)
+                    except TypeError:
+                        self.kappa = [kappa] * self.maxlabel
                 else:
                     self.kappa = [5.] * self.maxlabel
-                    print('switch rate set to kappa = ', self.kappa)
+                    print('switch rate set to kappa = ', self.kappa[0])
                 # self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
                 self.props.update(kappa=[0.] + self.kappa)
                 if 'theta' in kwargs:
-                    self.theta = kwargs['theta']
+                    theta = kwargs['theta']
+                    try:
+                        self.theta = list(theta)
+                    except TypeError:
+                        self.theta = [theta] * self.maxlabel
                 else:
                     self.theta = [0.75] * self.maxlabel
-                    print('switch threshold set to theta = ', self.theta)
+                    print('switch threshold set to theta = ', self.theta[0])
                 # MK:
                 self.props.update(theta=[0.] + self.theta)  # * self.maxlabel)
                 if self.restchannels < 2:
@@ -509,6 +540,18 @@ class IBLGCA_base(LGCA_base):
                 else:
                     self.r_b = 0.2
                     print('birth rate set to r_b = ', self.r_b)
+
+                if 'std' in kwargs:
+                    self.std = kwargs['std']
+                else:
+                    self.std = 0.01
+                    print('standard deviation set to = ', self.std)
+
+                if 'a_max' in kwargs:
+                    self.a_max = kwargs['a_max']
+                else:
+                    self.a_max = 1.
+                    print('Max. birth rate set to a_max =', self.a_max)
 
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
 
@@ -674,10 +717,8 @@ class IBLGCA_base(LGCA_base):
         :param density:
         :return:
         """
-        occupied = npr.random(self.nonborder.shape) < density
+        occupied = npr.random(self.dims + (self.K,)) < density
         self.nodes[self.nonborder] = self.convert_bool_to_ib(occupied)
         self.apply_boundaries()
         self.maxlabel = self.nodes.max()
         self.update_dynamic_fields()
-
-

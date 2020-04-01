@@ -5,6 +5,7 @@ import matplotlib.ticker as mticker
 from datetime import datetime
 import pathlib
 
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 try:
     from base import *
@@ -17,7 +18,7 @@ class LGCA_1D(LGCA_base):
     1D version of an LGCA.
     """
     interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation', 'parameter_controlled_diffusion',
-                    'random_walk', 'persistent_motion']
+                    'random_walk', 'persistent_motion', 'birthdeath']
     velocitychannels = 2
     c = np.array([1., -1.])[None, ...]
 
@@ -25,6 +26,7 @@ class LGCA_1D(LGCA_base):
         if nodes is not None:
             self.l, self.K = nodes.shape
             self.restchannels = self.K - self.velocitychannels
+            self.dims = self.l,
             return
 
         elif dims is None:
@@ -36,9 +38,9 @@ class LGCA_1D(LGCA_base):
         else:
             self.l = dims[0]
 
+        self.dims = self.l,
         self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels
-        # print('capacity = ', self.K)
 
     def init_nodes(self, density, nodes=None):
         self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.bool)
@@ -100,71 +102,76 @@ class LGCA_1D(LGCA_base):
 
     def channel_weight(self, qty):
         weights = np.zeros(qty.shape + (self.velocitychannels,))
-        weights[:-1, :, 0] = qty[1:, ...]
-        weights[1:, :, 2] = qty[:-1, ...]
+        weights[:-1, ..., 0] = qty[1:, ...]
+        weights[1:, ..., 1] = qty[:-1, ...]
         return weights
 
-    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
-        self.update_dynamic_fields()
-        if record:
-            self.nodes_t = np.zeros((timesteps + 1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
-            self.nodes_t[0, ...] = self.nodes[self.r_int:-self.r_int, ...]
-        if recordN:
-            self.n_t = np.zeros(timesteps + 1, dtype=np.int)
-            self.n_t[0] = self.nodes.sum()
-        if recorddens:
-            self.dens_t = np.zeros((timesteps + 1, self.l))
-            self.dens_t[0, ...] = self.cell_density[self.r_int:-self.r_int]
-        for t in range(1, timesteps + 1):
-            self.timestep()
-            if record:
-                self.nodes_t[t, ...] = self.nodes[self.r_int:-self.r_int]
-            if recordN:
-                self.n_t[t] = self.cell_density.sum()
-            if recorddens:
-                self.dens_t[t, ...] = self.cell_density[self.r_int:-self.r_int]
-            if showprogress:
-                update_progress(1.0 * t / timesteps)
+    def setup_figure(self, tmax, figindex=None, figsize=(8, 8), tight_layout=True):
+        if figindex is None:
+            fig = plt.gcf()
+            fig.set_size_inches(figsize)
+            fig.set_tight_layout(tight_layout)
 
-    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='hot_r'):
-        if density_t is None:
-            density_t = self.dens_t
-        if figsize is None:
-            figsize = estimate_figsize(density_t.T, cbar=True)
+        else:
+            fig = plt.figure(num=figindex)
+            fig.set_size_inches(figsize)
+            fig.set_tight_layout(tight_layout)
 
-        fig = plt.figure(num=figindex, figsize=figsize)
-        ax = fig.add_subplot(111)
-        cmap = cmap_discretize(cmap, 3 + self.restchannels)
-        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=2 + self.restchannels, cmap=cmap)
-        cbar = colorbar_index(ncolors=3 + self.restchannels, cmap=cmap, use_gridspec=True)
-        cbar.set_label(r'Particle number $n$')
-        plt.xlabel(r'Lattice node $r \, [\varepsilon]$', )
-        plt.ylabel(r'Time step $k \, [\tau]$')
+        ax = plt.gca()
+        xmax = self.xcoords.max() - 0.5
+        xmin = self.xcoords.min() + 0.5
+        ymax = tmax - 0.5
+        ymin = +0.5
+        plt.xlim(xmin, xmax)
+        plt.ylim(ymax, ymin)
+        ax.set_aspect('equal')
+
+        plt.xlabel('Lattice node $r \\, (\\varepsilon)$')
+        plt.ylabel('Time $k'
+                   '\\, (\\tau)$')
+        ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
+        ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
+        ax.spines['top'].set_visible(True)
+        ax.spines['right'].set_visible(True)
+        ax.yaxis.set_ticks_position('both')
+        ax.xaxis.set_ticks_position('both')
+        ax.set_autoscale_on(False)
         ax.xaxis.set_label_position('top')
         ax.xaxis.tick_top()
-        plt.tight_layout()
+        return fig, ax
+
+    def plot_density(self, density_t=None, cmap='hot_r', **kwargs):
+        if density_t is None:
+            density_t = self.dens_t
+
+        tmax = density_t.shape[0]
+        fig, ax = self.setup_figure(tmax, **kwargs)
+        cmap = cmap_discretize(cmap, 3 + self.restchannels)
+        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=2 + self.restchannels, cmap=cmap)
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size=.3, pad=0.1)
+        cbar = colorbar_index(ncolors=3 + self.restchannels, cmap=cmap, use_gridspec=True, cax=cax)
+        cbar.set_label('Particle number $n$')
+        plt.sca(ax)
         return plot
 
-    def plot_flux(self, nodes_t=None, figindex=None, figsize=None):
+    def plot_flux(self, nodes_t=None, **kwargs):
         if nodes_t is None:
             nodes_t = self.nodes_t
 
         dens_t = nodes_t.sum(-1) / nodes_t.shape[-1]
         tmax, l = dens_t.shape
         flux_t = nodes_t[..., 0].astype(int) - nodes_t[..., 1].astype(int)
-        if figsize is None:
-            figsize = estimate_figsize(dens_t.T)
 
         rgba = np.zeros((tmax, l, 4))
         rgba[dens_t > 0, -1] = 1.
         rgba[flux_t == 1, 0] = 1.
         rgba[flux_t == -1, 2] = 1.
         rgba[flux_t == 0, :-1] = 0.
-        fig = plt.figure(num=figindex, figsize=figsize)
-        ax = fig.add_subplot(111)
+        fix, ax = self.setup_figure(tmax, **kwargs)
         plot = ax.imshow(rgba, interpolation='None', origin='upper')
-        plt.xlabel(r'Lattice node $r \, [\varepsilon]$', )
-        plt.ylabel(r'Time step $k \, [\tau]$')
+        plt.xlabel(r'Lattice node $r \, (\varepsilon)$', )
+        plt.ylabel(r'Time step $k \, (\tau)$')
         ax.xaxis.set_label_position('top')
         ax.xaxis.set_ticks_position('top')
         ax.xaxis.tick_top()
@@ -186,9 +193,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.apply_boundaries()
             self.maxlabel = self.nodes.max()
             self.maxfamily = self.nodes.max()
-            # self.maxfamily_init = self.nodes.max()
-            # for i in range(0, self.maxfamily_init):
-            #     self.tree_manager.register()
+
 
 
         else:
@@ -303,178 +308,55 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
 
         return timestep
 
+    def plot_flux(self, nodes_t=None, **kwargs):
+        if nodes_t is None:
+            nodes_t = self.nodes_t.astype('bool')
+        if nodes_t.dtype != 'bool':
+            nodes_t = nodes.astype('bool')
+        LGCA_1D.plot_flux(self, nodes_t, **kwargs)
+
     def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop=None, cmap='cividis'):
-       #TODO benutzt?
-        if nodes_t is None:
-            nodes_t = self.nodes_t
-        if figsize is None:
-            figsize = estimate_figsize(nodes_t.sum(-1).T, cbar=True)
-
-        if props_t is None:
-            props_t = self.props_t
-        if prop is None:
-            prop = list(props_t[0].keys())[0]
-
-        tmax, l, _ = nodes_t.shape
-        # print('tmax=%d, l=%d' %(tmax, l))
-        mean_prop = np.zeros((tmax, l))
-
-        for t in range(tmax):
-            for x in range(l):
-                node = nodes_t[t, x]
-                occ = node.astype(np.bool)
-                if occ.sum() == 0:
-                    continue
-                mean_prop[t, x] = np.mean(np.array(props_t[t][prop])[node[node > 0]])
-
-        dens_t = nodes_t.astype(bool).sum(-1)
-        vmax = np.max(mean_prop)
-        vmin = np.min(mean_prop)
-        rgba = plt.get_cmap(cmap)
-        rgba = rgba((mean_prop - vmin) / (vmax - vmin))
-        rgba[dens_t == 0, :] = 0.
-        fig = plt.figure(num=figindex, figsize=figsize)
-        ax = fig.add_subplot(111)
-        plot = ax.imshow(rgba, interpolation='none', aspect='equal')
-        sm = plt.cm.ScalarMappable(cmap=cmap)
-        sm.set_array([vmin, vmax])
-        cbar = plt.colorbar(sm, use_gridspec=True)
-        cbar.set_label(r'Property ${}$'.format(prop))
-
-        plt.xlabel(r'Lattice node $r \, [\varepsilon]$')
-        plt.ylabel(r'Time step $k \, [\tau]$')
-        # matshow style
-        ax.xaxis.set_label_position('top')
-        ax.title.set_y(1.05)
-        ax.xaxis.tick_top()
-        ax.xaxis.set_ticks_position('both')
-        ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
-        ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
-        return plot
-
-    #TODO kann weg?
-
-    # def spatial_plot(self, nodes_t=None, props_t=None, figindex = None, figsize=None, prop='lab_m',\
-    #                  cmap='nipy_spectral', tbeg=None, tend=None, save=False, id=0, restchannels=None, velocitychannels=None):
-    #     if nodes_t is None:
-    #         nodes_t = self.nodes_t
-    #     if props_t is None:
-    #         props_t = self.props_t
-    #     if restchannels is None:
-    #         restchannels = self.restchannels
-    #     if velocitychannels is None:
-    #         velocitychannels = self.velocitychannels
-    #     tmax, l, _ = nodes_t.shape
-    #     if tbeg is None:
-    #         tbeg = 0
-    #     if tend is None:
-    #         tend = tmax
-    #     else:
-    #         tend += 1
-    #     k = restchannels + velocitychannels
-    #     ltotal = l * k
-    #     val = np.zeros((tmax, ltotal))
-    #
-    #     for t in range(0, tmax):
-    #         for x in range(l):
-    #             node = nodes_t[t, x]
-    #             occ = node.astype(np.bool)
-    #             if occ.sum() == 0:
-    #                 i = 0
-    #                 while i < k:
-    #                     val[t, x * k + i] = None
-    #                     i = i + 1
-    #                 continue
-    #             for pos in range(len(node)):
-    #                 lab = node[pos]
-    #                 if pos == 0 or pos == 1:
-    #                     if lab == 0:
-    #                         val[t, x*k + pos * (k - 1)] = None
-    #                     else:
-    #                         val[t, x*k + pos * (k - 1)] = props_t[t][prop][lab]
-    #
-    #                 else:
-    #                     if lab == 0:
-    #                         val[t, x*k + pos - 1] = None
-    #                     else:
-    #                         val[t, x*k + pos - 1] = props_t[t][prop][lab]
-    #     # print('val', val)
-    #
-    #     fig = plt.figure(num=figindex, figsize=figsize)
-    #     ax = fig.add_subplot(111)
-    #     plot = ax.matshow(val, cmap=cmap)
-    #     # fig.colorbar(plot, shrink = 0.5)
-    #
-    #     plt.ylabel('timesteps')
-    #     plt.xlabel('lattice site')
-    #     # nur "Knotenanfang"
-    #     plt.xlim(-0.5, ltotal-0.5)
-    #     plt.xticks((np.arange(0, ltotal, k)))
-    #
-    #     plt.ylim(tend-0.5, tbeg-0.5)
-    #     if tend - tbeg > 700:
-    #         plt.yticks(np.arange(tbeg, tend, 100))
-    #     elif tend - tbeg > 100:
-    #         plt.yticks(np.arange(tbeg, tend, 50))
-    #     elif tend - tbeg <= 100:
-    #         plt.yticks(np.arange(tbeg, tend, 10))
-    #     plt.show()
-    #     if save:
-    #         filename = str(id) + ', ' + 'spatial plot step ' +\
-    #                    str(tbeg) + ' to ' + str(tend-1) + '.jpg'
-    #         plt.savefig(pathlib.Path('pictures').resolve() / filename)
-
-    def plot_prop_timecourse(self, nodes_t=None, props_t=None, propname=None, figindex=None, figsize=None):
         if nodes_t is None:
             nodes_t = self.nodes_t
 
-        if props_t is None:
-            props_t = self.props_t
+        if props is None:
+            props = self.props
 
         if propname is None:
-            propname = list(props_t[0].keys())[0]
+            propname = next(iter(props))
 
-        plt.figure(num=figindex, figsize=figsize)
-        tmax = len(props_t)
-        mean_prop = np.zeros(tmax)
-        std_mean_prop = np.zeros(mean_prop.shape)
-        for t in range(tmax):
-            props = props_t[t]
-            nodes = nodes_t[t]
-            prop = np.array(props[propname])[nodes[nodes > 0]]
-            mean_prop[t] = np.mean(prop)
-            std_mean_prop[t] = np.std(prop, ddof=1) / np.sqrt(len(prop))
+        tmax, l, _ = nodes_t.shape
+        fig, ax = self.setup_figure(tmax, **kwargs)
+        mean_prop_t = self.calc_prop_mean(propname=propname, props=props, nodes=nodes_t)
 
-        yerr = std_mean_prop
-        x = np.arange(tmax)
-        y = mean_prop
-
-        plt.xlabel('$t$')
-        plt.ylabel('${}$'.format(propname))
-        plt.title('Time course of the cell property')
-        plt.plot(x, y)
-        plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True, interpolate=True)
-        return
-
+        plot = plt.imshow(mean_prop_t, interpolation='none', aspect='equal', cmap=cmap)
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size=0.3, pad=0.1)
+        cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
+        cbar.set_label(r'Property ${}$'.format(propname))
+        plt.sca(ax)
+        return plot
 
 
 if __name__ == '__main__':
     l = 100
     restchannels = 2
     n_channels = restchannels + 2
-    nodes = 1 + np.arange(l * n_channels, dtype=np.uint).reshape((l, n_channels))
-    # nodes[1:, :] = 0
-    # nodes[0, 1:] = 0
+    nodes = np.zeros((l, n_channels))
+    nodes[0] = 1
 
-    system = IBLGCA_1D(bc='reflect', dims=1, interaction='birthdeath', density=1, restchannels=5000, r_b=0.2)
-    system.timeevo(timesteps=2000, record=True)
+    system = IBLGCA_1D(bc='reflect', dims=100, interaction='birthdeath', density=0.1, restchannels=2, r_b=0.1, std=0.005,
+                       nodes=nodes)
+    system.timeevo(timesteps=100, record=True)
+    print(system.nodes_t[0].shape)
+    print(system.get_prop(system.nodes_t[0]).shape)
     # system.plot_prop()
     # system.plot_density(figindex=1)
     # props = np.array(system.props['kappa'])[system.nodes[system.nodes > 0]]
     # print(np.mean(props))
     # system.plot_prop_timecourse()
     # plt.ylabel('$\kappa$')
-    # system.plot_density()
-    # system.plot_prop_spatial()
-    system.plot_prop_timecourse()
+    system.plot_density()
+    #system.plot_prop_spatial()
+    # system.plot_prop_timecourse()
     plt.show()
