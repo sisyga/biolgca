@@ -214,16 +214,6 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.props_t = [copy(self.props)]
             self.offsprings.append(copy(self.props)['num_off'])
 
-        if recordN:
-            self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
-            self.n_t[0] = self.nodes.sum()
-        if recorddens:
-            self.dens_t = np.zeros((timesteps + 1, self.l))
-            self.dens_t[0, ...] = self.cell_density[self.r_int:-self.r_int]
-        if recordLast:
-            self.props_t = [copy(self.props)]
-
-
         for t in range(1, timesteps + 1):
             self.timestep()
             if recordMut:
@@ -235,18 +225,6 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                 self.nodes_t[t, ...] = self.nodes[self.r_int:-self.r_int]
                 self.props_t.append(copy(self.props))
                 self.offsprings.append(copy(self.props)['num_off'])
-            if recordN:
-                self.n_t[t] = self.cell_density.sum()
-            if recorddens:
-                self.dens_t[t, ...] = self.cell_density[self.r_int:-self.r_int]
-            if recordLast and t == (timesteps + 1):
-                self.props_t.append(copy(self.props))
-            if showprogress:
-                update_progress(1.0 * t / timesteps)
-            # print('t=', t)
-            # print('props in timeevo:', self.props['num_off'])
-            # print('props_t in timeevo', self.props_t[t]['num_off'][:])
-
 
     def timeevo_until_hom(self, offsprings=False, spatial=False):
         chronicle = False

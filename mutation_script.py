@@ -35,7 +35,7 @@ def magie(dim, rc, steps, uu):
 def zauberei(eins):
     magie(167, 1, 40000, eins)
 
-magie(dim=167, rc=1, steps=4, uu=0)
+magie(dim=1, rc=3, steps=4, uu=0)
 
 #####___server___####
 # from lgca import get_lgca

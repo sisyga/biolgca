@@ -128,7 +128,7 @@ class LGCA_base():
 
     def set_r_int(self, r):
         self.r_int = r
-        self.init_nodes(nodes=self.nodes[self.nonborder] #todo density=self.density
+        self.init_nodes(nodes=self.nodes[self.nonborder]) #todo density=self.density
         self.init_coords()
         self.update_dynamic_fields()
 
@@ -455,10 +455,10 @@ class IBLGCA_base(LGCA_base):
 
     def set_interaction(self, **kwargs):
         try:
-            from .ib_interactions import birth, birthdeath, go_or_grow_interaction, inheritance, passenger_mutations, passenger_mutations_deprecated
+            from .ib_interactions import birth, birthdeath, go_or_grow, inheritance, passenger_mutations, passenger_mutations_deprecated
             from .interactions import random_walk
         except ImportError:
-            from ib_interactions import birth, birthdeath, go_or_grow_interaction, inheritance, passenger_mutations, passenger_mutations_deprecated
+            from ib_interactions import birth, birthdeath, go_or_grow, inheritance, passenger_mutations, passenger_mutations_deprecated
             from interactions import random_walk
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
