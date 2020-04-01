@@ -138,7 +138,7 @@ def plot_hillnumbers_together(hill_1, hill_2, hill_3, save=False, id=0):
 
 
 
-def plot_entropies_together(simpson, gini, shannon, save, id):
+def plot_entropies_together(simpson, gini, shannon, save=False, id=0):
     if save is None:
         save = False
     if id is None:

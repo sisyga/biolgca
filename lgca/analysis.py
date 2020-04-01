@@ -70,6 +70,7 @@ def create_averaged_entropies(dic_offs, save=False, plot=False, saveplot=False):
     result_sh = [0] * tmax
     result_gi = [0] * tmax
     result_hill = [0] * tmax
+
     #falls unterschiedlich lange Einträge np.concatenate((gini, np.zeros(tmax-t)))
 
     for key in dic_offs:
@@ -95,14 +96,14 @@ def create_averaged_entropies(dic_offs, save=False, plot=False, saveplot=False):
 
     # speichern
     if save:
-        np.save(filename + '_' + 'shannon' + '.npy', result_sh)
-        np.save(filename + '_' + 'gini' + '.npy', result_gi)
-        np.save(filename + '_' + 'hill2' + '.npy', result_hill)
+        np.save('saved_data/' + filename + '_' + 'averaged_shannon' + '.npy', result_sh)
+        np.save('saved_data/' + filename + '_' + 'averaged_gini' + '.npy', result_gi)
+        np.save('saved_data/' + filename + '_' + 'averaged_hill2' + '.npy', result_hill)
 
     # plot
-    # if plot:
-    #     plot_selected_entropies(shannon=result_sh, hill2=result_hill, gini=result_gi,\
-    #                             save=saveplot, id=filename+'_averaged')
+    if plot:
+        plot_selected_entropies(shannon=result_sh, hill2=result_hill, gini=result_gi,\
+                                save=saveplot, id=filename+'_averaged')
 
     return result_sh, result_gi, result_hill
 

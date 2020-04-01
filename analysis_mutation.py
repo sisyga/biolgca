@@ -23,10 +23,16 @@ def search_offs(path, name):
 
 path ="saved_data/5011_mut_04_01/"
 names = search_names(path)
-print(len(search_offs(path, names[0])))
-
+data = {}
+# for name in names:
+#     data[name] = search_offs(path, name)
+# print(data.keys())
 test = [[5], [4, 1], [4, 1, 1], [3, 0, 1], [3, 0, 0, 1]]
 test2 = [[5], [5, 1], [4, 1, 1, 1], [3, 2, 1, 0], [0, 3, 0,	0]]
 data = {'test': test, 'test2': test2}
 
-print(create_averaged_entropies(data))
+print(create_averaged_entropies(data, save=True))
+# sh = np.load('saved_data/test_averaged_shannon.npy')
+# hh = np.load('saved_data/test_averaged_hill2.npy')
+# gi = np.load('saved_data/test_averaged_gini.npy')
+# plot_selected_entropies(sh, hh, gi)
