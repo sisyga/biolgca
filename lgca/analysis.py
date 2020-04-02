@@ -27,37 +27,6 @@ def create_thom(variation, filename, path, rep, save=False):
 
     return thom
 
-def plot_histogram_thom(thom, int_length, save=False, id=0):
-    max = thom.max().astype(int)
-    l = len(thom)
-
-    #number of intervalls
-    ni = (max / int_length + 1).astype(int)
-    count = np.zeros(ni+1)
-
-    for entry in thom:
-        c = (entry / int_length).astype(int)
-        count[c] += 1
-    if count.sum() != l:
-        print('FEHLER!')
-
-    fig, ax = plt.subplots()
-    x = np.arange(0, max + int_length, int_length)
-    y = count[(x/int_length).astype(int)]
-    int_max = x[(y==y.max())]
-    for entry in int_max:
-        print('max in intervall [%d, %d]' %(entry, entry + int_length))
-    print('with total= ', y.max())
-
-    plt.bar(x+int_length/2, y, width=int_length, color='black', alpha=0.5)
-    plt.xlim(0, max + int_length)
-    plt.ylim(0, y.max()+1)
-    ax.set(xlabel='timesteps', ylabel='absolut')
-    if save:
-        filename = str(id) + '_distribution with int_length=' + str(int_length) + '.jpg'
-        plt.savefig(pathlib.Path('pictures').resolve() / filename)
-    plt.show()
-
 def create_averaged_entropies(dic_offs, save=False, plot=False, saveplot=False):
     tmax = len(list(dic_offs.values())[0])
     print('tmax', tmax)
@@ -187,8 +156,6 @@ def calc_lognormaldistri(thom, int_length):
 
     return fitted_data, maxy, y
 
-def id_var(val, m, v):      #TODO: verwendet?
-    return v + (val - m)**2
 
 def calc_barerrs(counted_thom):
     # expect = np.zeros(len(counted_thom))

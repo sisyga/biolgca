@@ -397,6 +397,37 @@ def plot_popsize(data, save=False, id=0):
 
     plt.show()
 
+def plot_histogram_thom(thom, int_length, save=False, id=0):
+    max = thom.max().astype(int)
+    l = len(thom)
+
+    #number of intervalls
+    ni = (max / int_length + 1).astype(int)
+    count = np.zeros(ni+1)
+
+    for entry in thom:
+        c = (entry / int_length).astype(int)
+        count[c] += 1
+    if count.sum() != l:
+        print('FEHLER!')
+
+    fig, ax = plt.subplots()
+    x = np.arange(0, max + int_length, int_length)
+    y = count[(x/int_length).astype(int)]
+    int_max = x[(y==y.max())]
+    for entry in int_max:
+        print('max in intervall [%d, %d]' %(entry, entry + int_length))
+    print('with total= ', y.max())
+
+    plt.bar(x+int_length/2, y, width=int_length, color='black', alpha=0.5)
+    plt.xlim(0, max + int_length)
+    plt.ylim(0, y.max()+1)
+    ax.set(xlabel='timesteps', ylabel='absolut')
+    if save:
+        filename = str(id) + '_distribution with int_length=' + str(int_length) + '.jpg'
+        plt.savefig(pathlib.Path('pictures').resolve() / filename)
+    plt.show()
+
 def thom_all(time_array, int_length, save=False, id=0):
     """
     coordinates plot of thom-plots for different variations in lattice structue
