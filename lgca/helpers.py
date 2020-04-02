@@ -398,6 +398,11 @@ def plot_popsize(data, save=False, id=0):
     plt.show()
 
 def plot_histogram_thom(thom, int_length, save=False, id=0):
+    """
+    plots histogram of times of homogeneity
+    :param thom: array with times of homogeneity
+    :param int_length: desired length of interval
+    """
     max = thom.max().astype(int)
     l = len(thom)
 

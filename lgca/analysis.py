@@ -13,6 +13,15 @@ from lgca import get_lgca
 from lgca.helpers import *
 
 def create_thom(variation, filename, path, rep, save=False):
+    """
+    reads offspring-data from path and add length of offsprings (time until homogeneity) to array thom
+    :param variation: =(2 * dim + dim * rc) + dim as part of filename of saved offsprings
+    :param filename: part of saved filename
+    :param path: path to the data
+    :param rep: number of repetitions = number of offspring-data
+    :param save: saves array of thoms
+    :return: array of times until homogeneity has been reached
+    """
     thom = np.zeros(rep)
     tmax = 0
     for i in range(rep):
@@ -27,7 +36,93 @@ def create_thom(variation, filename, path, rep, save=False):
 
     return thom
 
+def calc_shannon(data):
+    """
+    calculate shannon index
+    :param data: correct(lgca.offsprings)
+    :return: shannon index
+    """
+    time = len(data)
+    # print(time)
+    shannon = np.zeros(time)
+
+    for t in range(time):
+        for lab in range(0, len(data[t])):
+            pi = data[t][lab] / sum(data[t])
+            # print('pi', pi)
+            if pi != 0:
+                shannon[t] -= pi * m.log(pi)
+    return shannon
+
+def calc_ginisimpson(data):
+    """
+    calculate ginisimpson index
+    :param data: correct(lgca.offsprings)
+    :return: ginisimpson index
+    """
+    time = len(data)
+    ginisimpson = np.zeros(time) + 1
+
+    for t in range(time):
+        for lab in range(0, len(data[t])):
+            pi = data[t][lab] / sum(data[t])
+            # print('pi', pi)
+            if pi != 0:
+                ginisimpson[t] -= pi * pi
+    return ginisimpson
+
+def calc_simpson(data):
+    """
+    calculate simpson index
+    :param data: correct(lgca.offsprings)
+    :return: simpson index
+    """
+    time = len(data)
+    # print('time', time)
+
+    simpson = np.zeros(time) + 1
+    for t in range(time):
+        n = sum(data[t][:])
+
+        for lab in range(0, len(data[t])):
+            ni = data[t][lab]
+            simpson[t] -= (ni * (ni - 1))/(n * (n - 1))
+    return simpson
+
+def calc_hillnumbers(data, order=2):
+    """
+    calculate hillnumber of order=order
+    :param data: correct(lgca.offsprings)
+    :param order: desired order
+    :return: hillnumber
+    """
+    time = len(data)
+
+    if order == 1:
+        hill_lin = np.zeros(time)
+        shannon = calc_shannon(data)
+        for t in range(time):
+            hill_lin[t] = np.exp(shannon[t])
+        return hill_lin
+
+    else:
+        hill_q = np.zeros(time)
+        for t in range(time):
+            for lab in range(0, len(data[t])):
+                pi = data[t][lab] / sum(data[t])
+                hill_q[t] += pi ** order
+            hill_q[t] = hill_q[t] ** (1 / (1 - order))
+        return hill_q
+
 def create_averaged_entropies(dic_offs, save=False, plot=False, saveplot=False):
+    """
+    calculate averaged diversity indices (shannon, ginisimpson, hill 2nd order)
+    :param dic_offs: like {'1st data': correct(offsprings), '2nd data': correct(offsprings)}
+    :param save: saves indices
+    :param plot: calls plot_selected_entropies
+    :param saveplot: saves plot
+    :return: averaged indices (shannon, ginisimpson, hill 2nd order)
+    """
     tmax = len(list(dic_offs.values())[0])
     print('tmax', tmax)
     if '5011' in dic_offs.keys():
@@ -76,64 +171,11 @@ def create_averaged_entropies(dic_offs, save=False, plot=False, saveplot=False):
 
     return result_sh, result_gi, result_hill
 
-def calc_shannon(data):
-    time = len(data)
-    # print(time)
-    shannon = np.zeros(time)
-
-    for t in range(time):
-        for lab in range(0, len(data[t])):
-            pi = data[t][lab] / sum(data[t])
-            # print('pi', pi)
-            if pi != 0:
-                shannon[t] -= pi * m.log(pi)
-    return shannon
-
-def calc_ginisimpson(data):
-    time = len(data)
-    ginisimpson = np.zeros(time) + 1
-
-    for t in range(time):
-        for lab in range(0, len(data[t])):
-            pi = data[t][lab] / sum(data[t])
-            # print('pi', pi)
-            if pi != 0:
-                ginisimpson[t] -= pi * pi
-    return ginisimpson
-
-def calc_simpson(data):
-    time = len(data)
-    # print('time', time)
-
-    simpson = np.zeros(time) + 1
-    for t in range(time):
-        n = sum(data[t][:])
-
-        for lab in range(0, len(data[t])):
-            ni = data[t][lab]
-            simpson[t] -= (ni * (ni - 1))/(n * (n - 1))
-    return simpson
-
-def calc_hillnumbers(data, order=2):
-    time = len(data)
-
-    if order == 1:
-        hill_lin = np.zeros(time)
-        shannon = calc_shannon(data)
-        for t in range(time):
-            hill_lin[t] = np.exp(shannon[t])
-        return hill_lin
-
-    else:
-        hill_q = np.zeros(time)
-        for t in range(time):
-            for lab in range(0, len(data[t])):
-                pi = data[t][lab] / sum(data[t])
-                hill_q[t] += pi ** order
-            hill_q[t] = hill_q[t] ** (1 / (1 - order))
-        return hill_q
-
 def calc_lognormaldistri(thom, int_length):
+    """
+    calculate lognormal distribution;
+    called by plot_lognorm_distribution
+    """
     #number of intervalls
     ni = (thom.max() / int_length + 1).astype(int)
     #calc absolue frequency
@@ -158,6 +200,10 @@ def calc_lognormaldistri(thom, int_length):
 
 
 def calc_barerrs(counted_thom):
+    """
+    calculate error in thom histograms;
+    called by plot_lognorm_distribution
+    """
     # expect = np.zeros(len(counted_thom))
     # var = np.zeros(len(counted_thom))
     # s = np.zeros(len(counted_thom))
@@ -183,6 +229,10 @@ def calc_barerrs(counted_thom):
     return err
 
 def calc_quaderr(data, fitted_data): #TODO quad Fehler
+    """
+    calculate squared error in thom histograms;
+    called by plot_lognorm_distribution
+    """
     sqd = np.zeros(len(data))
     for i in range(0, len(data)):
         sqd[i] = (data[i] - fitted_data[i])**2
@@ -190,6 +240,11 @@ def calc_quaderr(data, fitted_data): #TODO quad Fehler
     return sqd
 
 def cond_oneancestor(lgca):
+    """
+    check if population is pseudo-homogenous;
+    means that all cells from only one origin family
+    used as exit condition in timeevo_until_pseudohom
+    """
     # fi = lgca.maxfamily_init
     nodes = lgca.nodes[lgca.r_int:-lgca.r_int]
     parents = []
