@@ -1,15 +1,40 @@
-import numpy as np
-import math as m
-import matplotlib.pyplot as plt
-from matplotlib import colors
-import pandas as pd
-
-from matplotlib import cm
-from datetime import datetime
-import pathlib
 from lgca.analysis import *
 
+def aloha(who):
+    print('aloha', who)
+
+def calc_mullplotdata(data, int_length):
+    """
+    calculate the required data for mullerplot()
+    :param data: lgca offsprings
+    :param int_length: length of interval
+    :return: array of size familynumber*timesteps with number of familymembers per timepoint
+    """
+    maxfamily = len(data[-1]) - 1
+    tend = len(data)
+
+    fig, ax = plt.subplots()
+    val = np.zeros((maxfamily, tend))
+
+    for t in range(0, tend):
+        maxlab = len(data[t]) - 1   #data unterschiedlich lang!
+        for lab in range(0, maxlab):
+            val[lab, t] = data[t][lab + 1]
+    return val
+
+
+
 def mullerplot(data, id=0, save=False, int_length=1):
+    """
+    create mullerplot-like barstack-plot;
+    only use in the case of: decreasing family number (without mutations)
+    for simulation which include mutations: mullplot_data.py & muller_create.R
+    for now: only 1d-data
+    :param data: array of lgca offsprings
+    :param int_length: desired length of interval
+    :param id: filename for saving
+    :param save: saves the plot if true
+    """
     tend = len(data)
 
     maxlab = len(data[-1]) - 1
@@ -20,30 +45,22 @@ def mullerplot(data, id=0, save=False, int_length=1):
     val = np.zeros((maxlab, tend))
 
     for t in range(0, tend):
-        # maxlab = len(data[t]) - 1
-        # # TODO data unterschiedlich lang, nicht immer bis maxlab!
         for lab in range(0, maxlab):
             val[lab, t] = data[t][lab + 1]
 
     if int_length == 1:
         xrange = range(0, tend)
-        # print('x', xrange)
         pop = val
-        # print('pop', pop)
     else:
         int_num = ((tend - 1) // int_length)
-        # print('anz intervalle', int_num)
         xrange = [0]
         for i in range(int_num):
             xrange.append(i * int_length + 0.5 * int_length)
-        # print('xrange1', xrange)
-        # xrange = np.append(np.append(np.zeros(1), xrange), tend)
         if int_num * int_length != tend:
             xrange.append((tend - 1 + int_num * int_length) / 2)
         xrange.append(tend-1)
-        # print('xrange2', xrange[0:3])
 
-        acc_val = np.zeros((maxlab, len(xrange) - 2)) + -999 #todo: 0
+        acc_val = np.zeros((maxlab, len(xrange) - 2)) + -999
         for i in range(0, int_num):
             for lab in range(0, maxlab):
                 acc_val[lab, i] = np.sum(val[lab, i * int_length:1 + (i+1)*int_length])
@@ -51,21 +68,18 @@ def mullerplot(data, id=0, save=False, int_length=1):
             for lab in range(0, maxlab):
                 acc_val[lab, -1] = np.sum(val[lab, int_length * int_num:tend])
 
-        # print('mean_val', acc_val)
         pop = np.zeros((maxlab, len(xrange))) + -777
         pop[:, 0] = val[:, 0]
         pop[:, 1:-1] = acc_val
         pop[:, -1] = val[:, -1]
-        # print('pop', pop)
 
     popdic = {str(i): pop[i] for i in range(0, maxlab)}
     data = pd.DataFrame(popdic, index=xrange)
     data_perc = data.divide(data.sum(axis=1), axis=0)
-    # print(data_perc)
     plt.xlabel('timesteps')
     plt.ylabel(' frequency of families')
 
-    # plot einstellungen
+    # plot
     plt.xlim(0, xrange[-1])
     plt.ylim(0, 1)
     if xrange[-1] <= 15:
@@ -87,158 +101,26 @@ def mullerplot(data, id=0, save=False, int_length=1):
         save_plot(fig, str(id) + '_' + ' mullerplot with intervall=' + str(int_length) + '.jpg')
     plt.show()
 
-
-
-def plot_index(index_data, which, save=False, id=0):
-    time = len(index_data)
-    x = np.arange(0, time, 1)
-    y = index_data[x]
-
-    fig, ax = plt.subplots()
-    ax.plot(x, y)
-
-    ax.set(xlabel='timestep', ylabel=str(which))
-    plt.xlim(0, time-1)
-
-    if time >= 700:
-        plt.xticks(np.arange(0, time, 100))
-    elif time >= 100:
-        plt.xticks(np.arange(0, time, 50))
-    else:
-        plt.xticks(np.arange(0, time, 2))
-    plt.ylim(0, max(y))
-
-    if save:
-        save_plot(fig, str(id) + str(which) + '.jpg')
-    plt.show()
-
-
-
-def plot_hillnumbers_together(hill_1, hill_2, hill_3, save=False, id=0):
-    time = len(hill_1)
-    x = np.arange(0, time, 1)
-
-    fig, ax = plt.subplots()
-    plt.plot(x, hill_1, 'b-', label='order 1')
-    plt.plot(x, hill_2, 'c--', label='order 2')
-    plt.plot(x, hill_3, 'm:', label='order 3')
-
-    ax.set(xlabel='timesteps', ylabel='Hillnumbers')
-    ax.legend()
-    plt.xlim(0, time-1)
-    if time >= 700:
-        plt.xticks(np.arange(0, time, 100))
-    elif time >= 100:
-        plt.xticks(np.arange(0, time, 50))
-
-    plt.ylim(1, max(hill_1)*1.1, 10)
-    if save:
-        save_plot(plot=fig, filename= str(id) + '_comparing hillnumbers' + '.jpg')
-    plt.show()
-
-
-
-def plot_entropies_together(simpson, gini, shannon, save=False, id=0):
-    if save is None:
-        save = False
-    if id is None:
-        id = 0
-    time = len(gini)
-    x = np.arange(0, time, 1)
-
-    fig, ax = plt.subplots()
-    plt.plot(x, shannon, 'b-', label='Shannonindex')
-    plt.plot(x, simpson, 'c--', label='Simpsonindex')
-    plt.plot(x, gini, 'm:', label='GiniSimpsonindex')
-
-    ax.set(xlabel='timesteps', ylabel='Index')
-    ax.legend()
-    plt.xlim(0, time-1)
-    if time >= 700:
-        plt.xticks(np.arange(0, time, 100))
-    elif time >= 100:
-        plt.xticks(np.arange(0, time, 50))
-
-    plt.ylim(0, max(shannon) * 1.1)
-    if save:
-        save_plot(fig, str(id) + '_comparing entropies' + '.jpg')
-    plt.show()
-
-
-
-def make_patch_spines_invisible(ax):
-    ax.set_frame_on(True)
-    ax.patch.set_visible(False)
-    for sp in ax.spines.values():
-        sp.set_visible(False)
-
-def plot_selected_entropies(shannon, hill2, gini, save=False, id=0):
-    time = len(shannon)
-    x = np.arange(0, time, 1)
-
-    fig, host = plt.subplots()
-    par1 = host.twinx()
-    par2 = host.twinx()
-    par2.spines["right"].set_position(("axes", 1.2))
-    make_patch_spines_invisible(par2)
-    par2.spines["right"].set_visible(True)
-
-    p1, = host.plot(x, shannon, "m", linewidth=0.7, label="Shannonindex")
-    p2, = par1.plot(x, gini, "b", linewidth=0.7, label="GiniSimpsonindex")
-    p3, = par2.plot(x, hill2, "c", linewidth=0.7, label="Hillnumber of order 2")
-
-    host.set_xlim(0, time - 1)
-    host.set_ylim(bottom=0)
-    par1.set_ylim(bottom=0)
-    par2.set_ylim(bottom=0)
-
-    host.set_xlabel("timesteps")
-    host.set_ylabel("Shannonindex")
-    par1.set_ylabel("GiniSimpsonindex")
-    par2.set_ylabel("Hillnumber of order 2")
-
-    host.yaxis.label.set_color(p1.get_color())
-    par1.yaxis.label.set_color(p2.get_color())
-    par2.yaxis.label.set_color(p3.get_color())
-
-    tkw = dict(size=4, width=1.5)
-    host.tick_params(axis='y', colors=p1.get_color(), **tkw)
-    par1.tick_params(axis='y', colors=p2.get_color(), **tkw)
-    par2.tick_params(axis='y', colors=p3.get_color(), **tkw)
-    host.tick_params(axis='x', **tkw)
-
-    lines = [p1, p2, p3]
-
-    host.legend(lines, [l.get_label() for l in lines])
-    if save:
-        filename = str(id) + '_comparing sh, gi, hh' + '.jpg'
-        plt.savefig(pathlib.Path('pictures').resolve() / filename, bbox_inches='tight')
-    plt.show()
-
-def plot_popsize(data, save=False, id=0):
-    time = len(data)
-    x = np.arange(0, time, 1)
-    size = np.zeros(time)
-    for t in range(time):
-        size[t] = sum(data[t][1:])
-    y = size[x]
-
-    fig, ax = plt.subplots()
-    ax.plot(x, y)
-    plt.xlim(0, time - 1)
-    plt.ylim(0, max(size) * 1.1)
-    ax.set(xlabel='timestep', ylabel='total number of living cells')
-    if save:
-        save_plot(fig, str(id) + '_population size ' + '.jpg')
-
-    plt.show()
-
 def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
                    figsize=None, figindex=None, cmap='nipy_spectral'):
+    """
+    create plot with distribution of the cells in the lattice per timepoint
+    for now: only 1d-data
+
+    :param nodes_t: lgca.node per timepoint
+    :param labels: data from lgca.props['labm] -> family of each cell
+    :param tbeg: desired starting time
+    :param tend: desired end time
+    :param save: saves the plot if true
+    :param id: filename for saving
+    :param figsize: size of figure
+    :param figindex: index of figure
+    :param cmap: colormap
+    """
     tmax, dim, c = nodes_t.shape
     vc = 2
     rc = c - vc
-    print('tmax, Knoten, rc', tmax, dim, rc)
+    print('steps, nodes, rc', tmax, dim, rc)
     if tbeg is None:
         tbeg = 0
     if tend is None:
@@ -289,7 +171,7 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
     ###
     vmin = 1
     vmax = max(labels)
-    print(vmin, vmax)
+    print('Legende von ', vmin, ' bis ', vmax)
     norm = colors.Normalize(vmin=vmin, vmax=vmax+0.2)
     plot.set_norm(norm)
 
@@ -335,7 +217,208 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
     plt.show()
 
 
+
+def plot_index(index_data, which, save=False, id=0):
+    """
+    plot desired diversity index
+    :param index_data: array of indices per timestep
+    :param which: desired y-label
+    :param save: saving plot if true
+    :param id: filename for saving
+    """
+    time = len(index_data)
+    x = np.arange(0, time, 1)
+    y = index_data[x]
+
+    fig, ax = plt.subplots()
+    ax.plot(x, y)
+
+    ax.set(xlabel='timestep', ylabel=str(which))
+    plt.xlim(0, time-1)
+
+    if time >= 700:
+        plt.xticks(np.arange(0, time, 100))
+    elif time >= 100:
+        plt.xticks(np.arange(0, time, 50))
+    else:
+        plt.xticks(np.arange(0, time, 2))
+    plt.ylim(0, max(y))
+
+    if save:
+        save_plot(fig, str(id) + str(which) + '.jpg')
+    plt.show()
+
+def plot_hillnumbers_together(hill_1, hill_2, hill_3, save=False, id=0):
+    """
+    plot hillnumbers of order 1,2,3 together
+    :param hill_1: array of hillnumbers 1st order
+    :param hill_2: array of hillnumbers 2nd order
+    :param hill_3: array of hillnumbers 3rd order
+    :param save: saves plot if true
+    :param id: filename for saving
+    """
+    time = len(hill_1)
+    x = np.arange(0, time, 1)
+
+    fig, ax = plt.subplots()
+    plt.plot(x, hill_1, 'b-', label='order 1')
+    plt.plot(x, hill_2, 'c--', label='order 2')
+    plt.plot(x, hill_3, 'm:', label='order 3')
+
+    ax.set(xlabel='timesteps', ylabel='Hillnumbers')
+    ax.legend()
+    plt.xlim(0, time-1)
+    if time >= 700:
+        plt.xticks(np.arange(0, time, 100))
+    elif time >= 100:
+        plt.xticks(np.arange(0, time, 50))
+
+    plt.ylim(1, max(hill_1)*1.1, 10)
+    if save:
+        save_plot(plot=fig, filename= str(id) + '_comparing hillnumbers' + '.jpg')
+    plt.show()
+
+def plot_entropies_together(simpson, gini, shannon, save=False, id=0):
+    """
+    plot simpson index, gini-simpson index and shannon index together
+    :param simpson: array of simpson index
+    :param gini: array of ginisimpson index
+    :param shannon: array of shannon index
+    :param save: saves plot if true
+    :param id: filename for saving
+    """
+    if save is None:
+        save = False
+    if id is None:
+        id = 0
+    time = len(gini)
+    x = np.arange(0, time, 1)
+
+    fig, ax = plt.subplots()
+    plt.plot(x, shannon, 'b-', label='Shannonindex')
+    plt.plot(x, simpson, 'c--', label='Simpsonindex')
+    plt.plot(x, gini, 'm:', label='GiniSimpsonindex')
+
+    ax.set(xlabel='timesteps', ylabel='Index')
+    ax.legend()
+    plt.xlim(0, time-1)
+    if time >= 700:
+        plt.xticks(np.arange(0, time, 100))
+    elif time >= 100:
+        plt.xticks(np.arange(0, time, 50))
+
+    plt.ylim(0, max(shannon) * 1.1)
+    if save:
+        save_plot(fig, str(id) + '_comparing entropies' + '.jpg')
+    plt.show()
+
+def plot_selected_entropies(shannon, hill2, gini, save=False, id=0):
+    """
+    plt shannonindex, hillnumber 2nd order and ginisimpson index together with different y-axes
+    :param shannon: shannonindices
+    :param hill2: hillnumbers 2nd order
+    :param gini: ginisimpson indices
+    :param save: save plot if true
+    :param id: filename for saving
+    """
+    time = len(shannon)
+    x = np.arange(0, time, 1)
+
+    fig, host = plt.subplots()
+    par1 = host.twinx()
+    par2 = host.twinx()
+    par2.spines["right"].set_position(("axes", 1.2))
+    make_patch_spines_invisible(par2)
+    par2.spines["right"].set_visible(True)
+
+    p1, = host.plot(x, shannon, "m", linewidth=0.7, label="Shannonindex")
+    p2, = par1.plot(x, gini, "b", linewidth=0.7, label="GiniSimpsonindex")
+    p3, = par2.plot(x, hill2, "c", linewidth=0.7, label="Hillnumber of order 2")
+
+    host.set_xlim(0, time - 1)
+    host.set_ylim(bottom=0)
+    par1.set_ylim(bottom=0)
+    par2.set_ylim(bottom=0)
+
+    host.set_xlabel("timesteps")
+    host.set_ylabel("Shannonindex")
+    par1.set_ylabel("GiniSimpsonindex")
+    par2.set_ylabel("Hillnumber of order 2")
+
+    host.yaxis.label.set_color(p1.get_color())
+    par1.yaxis.label.set_color(p2.get_color())
+    par2.yaxis.label.set_color(p3.get_color())
+
+    tkw = dict(size=4, width=1.5)
+    host.tick_params(axis='y', colors=p1.get_color(), **tkw)
+    par1.tick_params(axis='y', colors=p2.get_color(), **tkw)
+    par2.tick_params(axis='y', colors=p3.get_color(), **tkw)
+    host.tick_params(axis='x', **tkw)
+
+    lines = [p1, p2, p3]
+
+    host.legend(lines, [l.get_label() for l in lines])
+    if save:
+        filename = str(id) + '_comparing sh, gi, hh' + '.jpg'
+        plt.savefig(pathlib.Path('pictures').resolve() / filename, bbox_inches='tight')
+    plt.show()
+
+
+def make_patch_spines_invisible(ax):
+    """
+    required for plot_selected_entropies
+    """
+    ax.set_frame_on(True)
+    ax.patch.set_visible(False)
+    for sp in ax.spines.values():
+        sp.set_visible(False)
+
+def plot_popsize(data, save=False, id=0):
+    """
+    plot of population size during time
+    :param data: lgca.offsprings
+    :param save: saves plot if true
+    :param id: filename for saving
+    """
+    time = len(data)
+    x = np.arange(0, time, 1)
+    size = np.zeros(time)
+    for t in range(time):
+        size[t] = sum(data[t][1:])
+    y = size[x]
+
+    fig, ax = plt.subplots()
+    ax.plot(x, y)
+    plt.xlim(0, time - 1)
+    plt.ylim(0, max(size) * 1.1)
+    ax.set(xlabel='timestep', ylabel='total number of living cells')
+    if save:
+        save_plot(fig, str(id) + '_population size ' + '.jpg')
+
+    plt.show()
+
+def thom_all(time_array, int_length, save=False, id=0):
+    """
+    coordinates plot of thom-plots for different variations in lattice structue
+    :param time_array: structure like data = {'rc=02': thom02, 'rc=01': thom01}
+    :param int_length: desired length of intervals
+    """
+    maxx = max([x.max() for x in time_array.values()])
+    x = np.arange(0, maxx + int_length, int_length) + int_length / 2
+    smoothie = {}
+    for name, entry in time_array.items():
+        c = create_count(int_length, entry)
+        smoothie[name] = np.append(c, np.zeros(len(x) - len(c)))
+    thom_all_plot(time_arrays=smoothie, xrange=x, save=save, id=id)
+
 def thom_all_plot(time_arrays, xrange, save, id):
+    """
+    plot of times of homogeneity for different lattice variation;
+    uses middle of bars from histograms as x-values;
+    called by thom_all
+    :param time_arrays: structure like data = {'rc=02': thom02, 'rc=01': thom01}
+    :param xrange: used x-values
+    """
     colors = ['darkred', 'orange', 'olivedrab', 'darkturquoise']
     # colors = ['darkred', 'olivedrab', 'darkturquoise']
     fig, ax = plt.subplots()
@@ -357,7 +440,12 @@ def thom_all_plot(time_arrays, xrange, save, id):
 
     plt.show()
 
+
 def create_count(int_length, thom):
+    """
+    utility function of thom_all, calculate bars
+    called by thom_all
+    """
     max = thom.max().astype(int)
     l = len(thom)
     # anz intervalle
@@ -372,50 +460,13 @@ def create_count(int_length, thom):
 
     return count
 
-def thom_all(time_array, int_length, save=False, id=0):
-    maxx = max([x.max() for x in time_array.values()])
-    x = np.arange(0, maxx + int_length, int_length) + int_length / 2
-    smoothie = {}
-    for name, entry in time_array.items():
-        c = create_count(int_length, entry)
-        smoothie[name] = np.append(c, np.zeros(len(x) - len(c)))
-    thom_all_plot(time_arrays=smoothie, xrange=x, save=save, id=id)
-
-def save_plot(plot, filename=None):
-    if filename is None:
-        filename = 'no_name'
-
-    plt.savefig(pathlib.Path('pictures').resolve() / filename)
-
-
-def plot_all_lognorm(thomarray, colorarray, int_length, save=False):
-    fig, ax = plt.subplots()
-    plt.xticks(fontsize=10)
-    plt.yticks(fontsize=10)
-    plt.xlabel('thom', fontsize=15)
-    plt.ylabel('absolute frequency', fontsize=15)
-    filename = ''
-
-    for index, name in enumerate(thomarray):
-        thom = thomarray[name]
-        filename += (str(name)) + ',' + (str(len(thom))) + '_'
-
-        fitted_data, maxy, _ = calc_lognormaldistri(thom=thom, int_length=int_length)
-        maxfit = fitted_data.max()
-        x = np.arange(0, thom.max(), int_length) + int_length/2
-        plt.plot(x, fitted_data * maxy / maxfit, color=colorarray[index], label=name)
-        print('a', maxy / maxfit)
-        plt.xlim(0, thom.max() + int_length)
-
-    plt.ylim(0)
-    plt.legend()
-
-    if save:
-        filename = str(filename) + 'lognormal_all_intervall=' + str(int_length) + '.jpg'
-        plt.savefig(pathlib.Path('pictures').resolve() / filename)
-    plt.show()
-
 def plot_lognorm_distribution(thom, int_length, save=False, id=0, c='seagreen'):
+    """
+    plot histogram of thom & lognormal distribution
+    :param thom: timepoints of homogeneity
+    :param int_length: desired length of intervals
+    :param c: desired color of distribution function
+    """
     max = thom.max().astype(int)
     fig, ax = plt.subplots()
     plt.xticks(fontsize=10)
@@ -449,25 +500,52 @@ def plot_lognorm_distribution(thom, int_length, save=False, id=0, c='seagreen'):
     plt.legend()
 
     if save:
-        filename = str(id) + '_intervall=' + str(int_length) + '_lognormal_distribution' + '.jpg'
+        filename = str(id) + '_interval=' + str(int_length) + '_lognormal_distribution' + '.jpg'
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
     plt.show()
 
-def calc_mullplotdata(data, int_length):
-    maxfamily = len(data[-1]) - 1
-    tend = len(data)
-
+def plot_all_lognorm(thomarray, colorarray, int_length, save=False):
+    """
+    plot_lognormal_distribution for numerous cases
+    :param thomarray: structure like data = {'rc=02': thom02, 'rc=01': thom01}
+    :param colorarray: structure like data = {'rc=02': 'red', 'rc=01': 'blue'}
+    :param int_length: desired length of interval
+    """
     fig, ax = plt.subplots()
-    val = np.zeros((maxfamily, tend))
+    plt.xticks(fontsize=10)
+    plt.yticks(fontsize=10)
+    plt.xlabel('thom', fontsize=15)
+    plt.ylabel('absolute frequency', fontsize=15)
+    filename = ''
 
-    for t in range(0, tend):
-        maxlab = len(data[t]) - 1   #data unterschiedlich lang!
-        for lab in range(0, maxlab):
-            val[lab, t] = data[t][lab + 1]
-    print(val)
-    #TODO how?!
-    exit(987)
-def aloha(who):
-    print('aloha', who)
+    for index, name in enumerate(thomarray):
+        thom = thomarray[name]
+        filename += (str(name)) + ',' + (str(len(thom))) + '_'
+
+        fitted_data, maxy, _ = calc_lognormaldistri(thom=thom, int_length=int_length)
+        maxfit = fitted_data.max()
+        x = np.arange(0, thom.max(), int_length) + int_length/2
+        plt.plot(x, fitted_data * maxy / maxfit, color=colorarray[index], label=name)
+        print('a', maxy / maxfit)
+        plt.xlim(0, thom.max() + int_length)
+
+    plt.ylim(0)
+    plt.legend()
+
+    if save:
+        filename = str(filename) + 'lognormal_all_intervall=' + str(int_length) + '.jpg'
+        plt.savefig(pathlib.Path('pictures').resolve() / filename)
+    plt.show()
+
+def save_plot(plot, filename=None):
+    """
+    manages the saving of plots
+    :param plot: desired plot
+    :param filename: individual filename
+    """
+    if filename is None:
+        filename = 'no_name'
+
+    plt.savefig(pathlib.Path('pictures').resolve() / filename)
 
 

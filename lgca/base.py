@@ -128,7 +128,7 @@ class LGCA_base():
 
     def set_r_int(self, r):
         self.r_int = r
-        self.init_nodes(nodes=self.nodes[self.nonborder]) #todo density=self.density
+        self.init_nodes(nodes=self.nodes[self.nonborder], density=self.density)
         self.init_coords()
         self.update_dynamic_fields()
 
@@ -392,7 +392,7 @@ class LGCA_base():
         self.propagation()
         self.apply_boundaries()
         self.update_dynamic_fields()
-# todo doofe verschobene function!!!
+# todo verschobene function!!!
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
         self.update_dynamic_fields()
         if record:
