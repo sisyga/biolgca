@@ -1,6 +1,23 @@
-- fehlerbalken korrigieren
+1. Start mit vollbesetztem Gitte, pro Familie genau eine Zelle, Laufzeit bis Homogenität erreicht
 
-- passenger mutations:
-    - Abbruchbedingung überlegen
-    - Simulationen durchlaufen lassen
+def create(name, dim, rc):
+    lgca = get_lgca(ib=True, geometry='lin', interaction='inheritance', bc='reflecting',
+                    variation=False, density=1, dims=dim, restchannels=rc, r_b=0.8, r_d=0.1)
+    lgca.timeevo_until_hom(spatial=True)
 
+    np.save('saved_data/' + name + '_families', lgca.props['lab_m'])
+    np.save('saved_data/' + name + '_offsprings', lgca.offsprings)
+    np.save('saved_data/' + name + '_nodes', lgca.nodes_t)
+
+2. Start mit vollbesetztem Gitter, Anfangsbelegung über pop={Familie: Anzahl Vertreter, ..}
+
+def create(name, dim, rc):
+    lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',
+                    variation=False, density=1, dims=dim, restchannels=rc, r_b=0.8, r_d=0.1, r_m=0.3,
+                    pop={1:1})
+    lgca.timeevo(timesteps=5, record=True)
+
+    np.save('saved_data/' + name + '_tree', lgca.tree_manager.tree)
+    np.save('saved_data/' + name + '_families', lgca.props['lab_m'])
+    np.save('saved_data/' + name + '_offsprings', lgca.offsprings)
+    np.save('saved_data/' + name + '_nodes', lgca.nodes_t)

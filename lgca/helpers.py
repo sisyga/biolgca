@@ -1,4 +1,5 @@
 from lgca.analysis import *
+from matplotlib import colors
 
 def aloha(who):
     print('aloha', who)

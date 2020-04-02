@@ -525,6 +525,7 @@ class LGCA_Square(LGCA_base):
             cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[1::2])
             cbar.set_ticklabels(1 + np.arange(K))
             plt.sca(ax)
+        plt.show()
 
         return fig, pc, cmap
 
