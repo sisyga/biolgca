@@ -27,10 +27,10 @@ import matplotlib.pyplot as plt
 Beispiele für Datensätze
 """
 
-data01 = {'offs': np.load('saved_data/pummelzeugs_1/' + '1801_286_21fb7db_offsprings.npy'),\
-          'labels': np.load('saved_data/pummelzeugs_1/' + '1801_286_21fb7db_labels.npy'),\
-          'nodes': np.load('saved_data/pummelzeugs_1/' + '1801_286_21fb7db_nodest.npy')}
-#
+# data01 = {'offs': np.load('saved_data/pummelzeugs_1/' + '1801_286_21fb7db_offsprings.npy'),\
+#           'labels': np.load('saved_data/pummelzeugs_1/' + '1801_286_21fb7db_labels.npy'),\
+#           'nodes': np.load('saved_data/pummelzeugs_1/' + '1801_286_21fb7db_nodest.npy')}
+# #
 # data02 = {'offs': np.load('saved_data/1802_nodes/' + '1802_0_995dedd_offsprings.npy'),\
 #           'labels': np.load('saved_data/1802_nodes/' + '1802_0_995dedd_labels.npy'),\
 #           'nodes': np.load('saved_data/1802_nodes/' + '1802_0_995dedd_nodest.npy')}
@@ -42,10 +42,10 @@ data01 = {'offs': np.load('saved_data/pummelzeugs_1/' + '1801_286_21fb7db_offspr
 # data45 = {'offs': np.load('saved_data/18045_nodes/' + '18045_3_fca2b14_offsprings.npy'),\
 #           'labels': np.load('saved_data/18045_nodes/' + '18045_3_fca2b14_labels.npy'),\
 #           'nodes': np.load('saved_data/18045_nodes/' + '18045_3_fca2b14_nodest.npy')}
-#
-data60 = {'offs': np.load('saved_data/pummelzeugs_60/' + '18060_81_6e8510d_offsprings.npy'),\
-          'labels': np.load('saved_data/pummelzeugs_60/' + '18060_81_6e8510d_labels.npy'),\
-          'nodes': np.load('saved_data/pummelzeugs_60/' + '18060_81_6e8510d_nodest.npy')}
+# #
+# data60 = {'offs': np.load('saved_data/pummelzeugs_60/' + '18060_81_6e8510d_offsprings.npy'),\
+#           'labels': np.load('saved_data/pummelzeugs_60/' + '18060_81_6e8510d_labels.npy'),\
+#           'nodes': np.load('saved_data/pummelzeugs_60/' + '18060_81_6e8510d_nodest.npy')}
 #
 # data90 = {'offs': np.load('saved_data/18090_nodes/' + '18090_1_b8e3972_offsprings.npy'),\
 #           'labels': np.load('saved_data/18090_nodes/' + '18090_1_b8e3972_labels.npy'),\
@@ -88,55 +88,12 @@ example = 'rc=178'
 # plot_lognorm_distribution(dat['onenode'], 1000, id='onenode', c=colors[0], save=True)
 # plot_lognorm_distribution(dat['onerc'], 1000, id='onerc', c=colors[1], save=True)
 
-dimss = [1, 167]
-rcss = [499, 1]
 
-# for i in range(0, 2):
-#     dim = dimss[i]
-#     rc = rcss[i]
-#     name = str(2*dim + dim*rc) + str(dim)
-#
-#     lgca = get_lgca(ib=True, geometry='lin', interaction='inheritance', bc='reflecting',\
-#            variation=False, density=1, dims=dim, restchannels=rc, r_b=0.5, r_d=0.02)
-#     id = name + '_' + str(i) + '_ohne_mut'
-#     lgca.timeevo(timesteps=500, record=True)
-#
-#
-#         # np.save('saved_data/' + str(id) + '_tree', lgca.tree_manager.tree)
-#     np.save('saved_data/' + str(id) + '_families', lgca.props['lab_m'])
-#     np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
-#     np.save('saved_data/' + str(id) + '_nodest', lgca.nodes_t)
-#     np.savez('saved_data/' + str(id) + '_Parameter', density=lgca.density, restchannels=lgca.restchannels,
-#     dimension=lgca.l, kappa=lgca.K, rb=lgca.r_b, rd=lgca.r_d, m=lgca.r_int)
-#
-# for i in range(0, 2):
-#     dim = dimss[i]
-#     rc = rcss[i]
-#     name = str(2*dim + dim*rc) + str(dim)
-#
-#     lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',\
-#            variation=False, density=1, dims=dim, restchannels=rc, r_b=0.5, r_d=0.02, r_m=0.001, pop={1:1})
-#     id = name + '_' + str(i) + '_mit_mut'
-#     lgca.timeevo(timesteps=500, record=True)
-#
-#
-#     np.save('saved_data/' + str(id) + '_tree', lgca.tree_manager.tree)
-#     np.save('saved_data/' + str(id) + '_families', lgca.props['lab_m'])
-#     np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
-#     np.save('saved_data/' + str(id) + '_nodest', lgca.nodes_t)
-#     np.savez('saved_data/' + str(id) + '_Parameter', density=lgca.density, restchannels=lgca.restchannels,
-#     dimension=lgca.l, kappa=lgca.K, rb=lgca.r_b, rd=lgca.r_d, rm=lgca.r_m, m=lgca.r_int)
+test = [[5], [4, 1], [4, 1, 1], [3, 0, 1], [3, 0, 0, 1]]
+test2 = [[5], [5, 1], [4, 1, 1, 1], [3, 2, 1, 0], [0, 3, 0,	0]]
+data = {'test': test, 'test2': test2}
 
-# o=np.load('saved_data/501167_1_mit_mut_offsprings.npy')
-# print(len(o))
-# o=np.load('saved_data/501167_1_ohne_mut_offsprings.npy')
-# print(len(o))
-
-#####spacetimeplot####
-files = ['501167_1_mit_mut']
-# files = ['5011_0_ohne_mut', '501167_1_mit_mut']
-# files = ['5011_0_ohne_mut', '501167_1_ohne_mut', '5011_0_mit_mut', '501167_1_mit_mut']
-for entry in files:
-    nodes = np.load('saved_data/' + entry + '_nodest.npy')
-    fams = np.load('saved_data/' + entry + '_families.npy')
-    spacetime_plot(nodes_t=nodes, labels=fams, tbeg=None, tend=None, save=True, id=entry)
+i1 = np.load('saved_data/0_averaged_gini.npy')
+i2 = np.load('saved_data/0_averaged_shannon.npy')
+inds = {'i1': i1, 'i2': i2, 'lalala': [0.5]*5}
+plot_sth(inds)

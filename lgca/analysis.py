@@ -10,7 +10,7 @@ from datetime import datetime
 import pathlib
 
 from lgca import get_lgca
-from lgca.helpers import *
+import lgca.helpers
 
 def create_thom(variation, filename, path, rep, save=False):
     """
@@ -114,7 +114,7 @@ def calc_hillnumbers(data, order=2):
             hill_q[t] = hill_q[t] ** (1 / (1 - order))
         return hill_q
 
-def create_averaged_entropies(dic_offs, save=False, plot=False, saveplot=False):
+def create_averaged_entropies(dic_offs, save=False, id=0, plot=False, saveplot=False):
     """
     calculate averaged diversity indices (shannon, ginisimpson, hill 2nd order)
     :param dic_offs: like {'1st data': correct(offsprings), '2nd data': correct(offsprings)}
@@ -124,13 +124,8 @@ def create_averaged_entropies(dic_offs, save=False, plot=False, saveplot=False):
     :return: averaged indices (shannon, ginisimpson, hill 2nd order)
     """
     tmax = len(list(dic_offs.values())[0])
-    print('tmax', tmax)
-    if '5011' in dic_offs.keys():
-        filename = '5011'
-    elif "501167" in dic_offs.keys():
-        filename = '501167'
-    else:
-        filename = 'test'
+    # print('tmax', tmax)
+    filename = str(id)
     result_sh = [0] * tmax
     result_gi = [0] * tmax
     result_hill = [0] * tmax
@@ -166,7 +161,7 @@ def create_averaged_entropies(dic_offs, save=False, plot=False, saveplot=False):
 
     # plot
     if plot:
-        plot_selected_entropies(shannon=result_sh, hill2=result_hill, gini=result_gi,\
+        lgca.helpers.plot_selected_entropies(shannon=result_sh, hill2=result_hill, gini=result_gi,\
                                 save=saveplot, id=filename+'_averaged')
 
     return result_sh, result_gi, result_hill

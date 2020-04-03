@@ -1,4 +1,4 @@
-from lgca.analysis import *
+from .analysis import *
 from matplotlib import colors
 
 def aloha(who):
@@ -217,7 +217,34 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
         save_plot(fig, str(id) + '_spacetimeplot_' + str(tbeg) + '-' + str(tend) + '.jpg')
     plt.show()
 
+def plot_sth(data, save=False, id=0):
+    """
+    plot of variable indices
+    :param data: structure {'name1': index_data, 'name2': index_data}
+    """
+    colors = ['seagreen', 'magenta', 'cyan']
+    tend = len(list(data.values())[0])
+    x = np.arange(0, tend)
+    maxy = 0
+    filename = list(data.keys())
+    fig, ax = plt.subplots()
+    for i, name in enumerate(data):
+        m = max(data[name])
+        if m > maxy:
+            maxy = m
+        plt.plot(x, data[name], colors[i], label=str(name))
+    ax.set(xlabel='timesteps', ylabel='Index')
+    ax.legend()
+    plt.xlim(0, tend-1)
+    if tend >= 700:
+        plt.xticks(np.arange(0, tend, 100))
+    elif tend >= 100:
+        plt.xticks(np.arange(0, tend, 50))
 
+    plt.ylim(0, maxy)
+    if save:
+        save_plot(plot=fig, filename=str(filename) + '_' + str(id) + '.jpg')
+    plt.show()
 
 def plot_index(index_data, which, save=False, id=0):
     """
@@ -573,6 +600,12 @@ def plot_all_lognorm(thomarray, colorarray, int_length, save=False):
         filename = str(filename) + 'lognormal_all_intervall=' + str(int_length) + '.jpg'
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
     plt.show()
+
+def correct(offs):
+    c_offs = []
+    for entry in offs:
+        c_offs.append(entry[1:])
+    return c_offs
 
 def save_plot(plot, filename=None):
     """
