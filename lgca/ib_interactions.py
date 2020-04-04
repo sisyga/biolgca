@@ -231,7 +231,7 @@ def mutations(lgca):
     """
     chronicle = True  # Ausgabe der einzelnen Schritte für chronicle = True
     rel_nodes = lgca.nodes[lgca.r_int:-lgca.r_int]
-
+    print('anfang mit knoten ', rel_nodes)
     # dying process
     dying = npr.random(rel_nodes.shape) < lgca.r_d
     for label in rel_nodes[dying]:
@@ -250,12 +250,15 @@ def mutations(lgca):
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
         node = lgca.nodes[coord]
-
+        print('schau auf node ', node)
         # choose cells that proliferate
-        proliferating = [x for x in node if x > 0 and np.random.random(1) < lgca.r_b]
+        r_bs = np.array([lgca.props['r_b'][lgca.props['lab_m'][i]] for i in node])
+        print('r_bs', r_bs)
+        proliferating = npr.random(lgca.K) < r_bs
+        print('prolif', proliferating)
 
         # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
-        for label in proliferating:
+        for label in node[proliferating]:
             ind = npr.choice(lgca.K)
             if node[ind] == 0:
 
@@ -278,13 +281,13 @@ def mutations(lgca):
                     lgca.tree_manager.register(lgca.props['lab_m'][label])
                     if lgca.mut:
                         lgca.props['r_b'].append(round(0.05 + lgca.props['r_b'][lgca.props['lab_m'][label]], 2))
-                    print(lgca.props)
+
                 else:
                     fam = lgca.props['lab_m'][label]
                     lgca.props['lab_m'].append(fam)
                     lgca.props['num_off'][fam] += 1
                 if chronicle:
-                    print('labsm', lgca.props['lab_m'])
+                    print('neue props ', lgca.props)
         lgca.nodes[coord] = node
 
     # reorientation:

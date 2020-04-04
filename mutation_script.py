@@ -1,83 +1,58 @@
-from lgca import get_lgca
-from lgca.helpers import *
-import numpy as np
-import matplotlib.pyplot as plt
-import time
-from os import environ as env
-from uuid import uuid4 as uuid
+import argparse
+import logging
 import multiprocessing
+import sys
+import time
 
-def magie(dim, rc, steps, uu):
-    start = time.time()
-    # uu = str(uuid())
-    saving_data = False
+from lgca import get_lgca
+from numpy import save, savez
+from uuid import uuid4 as uuid
 
-    name = str(2 * dim + dim * rc) + str(dim) + "_mut_"
+class Simulation(object):
+  def __init__(self, dim, rc, steps, save_dir=None):
+    self.dim = dim
+    self.rc = rc
+    self.steps = steps
+    self.save_dir = save_dir
 
+  def __call__(self, id):
+    logging.info("starting simulation %s", str(id))
     lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',
-                    variation=False, density=1, dims=dim, restchannels=rc,
-                    pop={1: 1})
+                    variation=False, density=1, dims=self.dim, restchannels=self.rc, pop={1: 1})
+    lgca.timeevo(timesteps=self.steps, recordMut=True)
+    logging.info('completed simulation %s', str(id))
 
-    id = name + '_' + str(uu)
+    if self.save_dir != None:
+      prefix = self.save_dir + str(2 * self.dim + self.dim * self.rc) + str(self.dim) + "_mut_" + str(id)
+      logging.info("saving data with prefix '%s'", prefix)
+      save(prefix  + '_tree',       lgca.tree_manager.tree)
+      save(prefix  + '_families',   lgca.props['lab_m'])
+      save(prefix  + '_offsprings', lgca.offsprings)
+      savez(prefix + '_Parameter',  density=lgca.density, restchannels=lgca.restchannels, dimension=lgca.l, kappa=lgca.K, rb=lgca.r_b, rd=lgca.r_d, rm=lgca.r_m, m=lgca.r_int)
 
-    lgca.timeevo(timesteps=steps, recordMut=True)
+def get_arg_parser():
+  parser = argparse.ArgumentParser(description='LGCA Mutation', formatter_class=argparse.RawDescriptionHelpFormatter,)
+  parser.add_argument('-d', '--dimensions',    dest='d', type=int, required=True, help="dimensions of the lgca used in simulations")
+  parser.add_argument('-r', '--rest-channels', dest='r', type=int, required=True, help="number of rest channels (per node) in the lgca used in simulations")
+  parser.add_argument('-t', '--timesteps',     dest='t', type=int, required=True, help="number of timesteps to simulate")
+  parser.add_argument('-n', '--simulations',   dest='n', type=int, default=1, help="number of concurrent simulations")
+  parser.add_argument('-o', '--output-dir',    dest='o', nargs='?', help="simulation data will be written to this directory (if set)")
+  parser.add_argument('-v', '--verbose',       dest='v', action='store_true', help="enable debug logging")
+  return parser
 
-    if saving_data:
-        np.save('saved_data/' + str(id) + '_tree', lgca.tree_manager.tree)
-        np.save('saved_data/' + str(id) + '_families', lgca.props['lab_m'])
-        np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
-        np.savez('saved_data/' + str(id) + '_Parameter', density=lgca.density, restchannels=lgca.restchannels,
-                 dimension=lgca.l, kappa=lgca.K, rb=lgca.r_b, rd=lgca.r_d, rm=lgca.r_m, m=lgca.r_int)
-    print(lgca.tree_manager.tree)
-    ende = time.time()
-    print('{:5.3f}min'.format((ende - start)/60))
+def main(args):
+  args = get_arg_parser().parse_args(args)
 
-def zauberei(eins):
-    magie(167, 1, 40000, eins)
+  # configure logging
+  logging.basicConfig(format='%(asctime)s [PID%(process)d] %(name)s - %(levelname)s: %(message)s',
+                      level=logging.DEBUG if args.v else logging.INFO)
 
-magie(dim=1, rc=3, steps=4, uu=0)
+  logging.info("simulation parameters: dim=%d, rc=%d, steps=%d", args.d, args.r, args.t)
+  logging.info("starting %d concurrent simulations", args.n)
+  start = time.time()
+  with multiprocessing.Pool() as pool:
+    pool.map(Simulation(args.d, args.r, args.t, args.o), [uuid() for _ in range(args.n)])
 
-#####___server___####
-# from lgca import get_lgca
-# from lgca.helpers import *
-# import numpy as np
-# import matplotlib.pyplot as plt
-# import time
-# from os import environ as env
-# from uuid import uuid4 as uuid
-# import multiprocessing
-#
-# def magie(dim, rc, steps, uu):
-#     start = time.time()
-#
-#     saving_data = True
-#
-#     id = str(2 * dim + dim * rc) + str(dim) + "_mut_" + str(uu)
-#
-#     lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',
-#                     variation=False, density=1, dims=dim, restchannels=rc,
-#                     pop={1: 1})
-#
-#     #id = name + str(uu)
-#
-#     lgca.timeevo(timesteps=steps, recordMut=True)
-#
-#     if saving_data:
-#         np.save('saved_data/' + str(id) + '_tree', lgca.tree_manager.tree)
-#         np.save('saved_data/' + str(id) + '_families', lgca.props['lab_m'])
-#         np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
-#         np.savez('saved_data/' + str(id) + '_Parameter', density=lgca.density, restchannels=lgca.restchannels,
-#                   dimension=lgca.l, kappa=lgca.K, rb=lgca.r_b, rd=lgca.r_d, rm=lgca.r_m, m=lgca.r_int)
-#
-#     ende = time.time()
-#     print(uu, ': {:5.3f}min'.format((ende - start)/60))
-#
-# def zauberei(i):
-#     magie(1, 499, 40000, i)
-#
-# print("starting threads")
-# simulation_ids = [uuid() for _ in range(4)]
-# with multiprocessing.Pool() as pool:
-#     pool.map(zauberei, simulation_ids)
-#
-# print("all threads completed")
+  logging.info('all threads completed in {:5.3f} minutes'.format((time.time() - start)/60))
+
+main(sys.argv[1:])

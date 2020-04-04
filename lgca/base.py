@@ -632,7 +632,7 @@ class IBLGCA_base(LGCA_base):
                 self.maxfamily_init = 1
                 self.maxfamily = self.maxfamily_init
                 print('start with one family')
-                self.props.update(lab_m=[-99] + [1] * self.maxlabel)
+                self.props.update(lab_m=[0] + [1] * self.maxlabel)
                 self.props.update(num_off=[-99] + [self.maxlabel] * self.maxfamily_init)
                 self.props.update(r_b=[-99] + [self.r_b] * self.maxfamily_init)
                 self.maxlabel_init = self.maxlabel

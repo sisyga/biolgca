@@ -48,7 +48,7 @@ for i in range(0, 6+rc):
     nodes[1, 1, i] = i+1
 
 lgca_hex = get_lgca(ib=True, geometry='hex', bc='reflecting', nodes=nodes, interaction='mutations',
-                r_b=0.8, r_d=0.3, r_m=0.8, mut=True)
+                r_b=0.8, r_d=0.1, r_m=0.5, mut=True)
 print(lgca_hex.props)
 print(lgca_hex.maxlabel, lgca_hex.maxfamily_init)
 print(lgca_hex.nodes[lgca_hex.nonborder])
@@ -56,6 +56,7 @@ lgca_lin = get_lgca(ib=True, geometry='lin', interaction='mutations', bc='reflec
                 restchannels=1, r_b=0.8, r_d=0.1, r_m=0.3)
 # print(lgca_lin.nodes)
 
-lgca_hex.timeevo(timesteps=2, record=True)
+lgca_hex.timeevo(timesteps=5, record=True)
 print(lgca_hex.nodes[lgca_hex.nonborder])
+print(lgca_hex.props)
 
