@@ -489,6 +489,56 @@ class LGCA_Square(LGCA_base):
 
         return fig, pc, cmap
 
+    def plot_test(self, data=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
+                  edgecolor='None', cbar=True):
+        if data is None:
+            nodes_t = self.nodes_t
+            tend, lx, ly, K = nodes_t.shape
+            data = np.array([[[-99]*lx]*ly]*tend)
+            for t in range(0, tend):
+                for dy in range(0, ly):
+                    for dx in range(0, lx):
+                        fams = []
+                        for lab in nodes_t[t][dy][dx]:
+                            if lab != 0:
+                                fams.append(self.props['lab_m'][lab])
+                        reg = {}
+                        for f in fams:
+                            reg[f] = fams.count(f)
+                        if len(reg) > 0:
+                            max_fam = max(reg, key=reg.get)
+                        else:
+                            max_fam = 0
+                        data[t][dy][dx] = max_fam
+        if figsize is None:
+            # figsize = estimate_figsize(data, cbar=True, dy=self.dy)
+            figsize=((10,10))
+        if vmax is None:
+            K = self.K
+
+        fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
+        cmap = plt.cm.get_cmap(cmap)
+        cmap.set_under(alpha=0.0)
+        if K > 1:
+            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
+        else:
+            cmap = plt.cm.ScalarMappable(cmap=cmap)
+        cmap.set_array(data)
+        polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
+                                   orientation=self.orientation, facecolor=c, edgecolor=edgecolor)
+                    for x, y, c in zip(self.xcoords.ravel(), self.ycoords.ravel(), cmap.to_rgba(data.ravel()))]
+        pc = PatchCollection(polygons, match_original=True)
+        ax.add_collection(pc)
+        if cbar:
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="5%", pad=0.1)
+            cbar = fig.colorbar(cmap, extend='min', use_gridspec=True, cax=cax)
+            cbar.set_label('Particle number $n$')
+            cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[1::2])
+            cbar.set_ticklabels(1 + np.arange(K))
+            plt.sca(ax)
+        plt.show()
+
     def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
                      edgecolor='None', cbar=True):
         if density is None:
