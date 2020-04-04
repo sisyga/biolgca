@@ -229,9 +229,9 @@ def mutations(lgca):
     if lgca.mut ==True: driver mutations -> r_b increases by mutation;
                 ==False: passenger mutations
     """
-    chronicle = True  # Ausgabe der einzelnen Schritte für chronicle = True
+    chronicle = False  # Ausgabe der einzelnen Schritte für chronicle = True
     rel_nodes = lgca.nodes[lgca.r_int:-lgca.r_int]
-    print('anfang mit knoten ', rel_nodes)
+    # print('anfang mit knoten ', rel_nodes)
     # dying process
     dying = npr.random(rel_nodes.shape) < lgca.r_d
     for label in rel_nodes[dying]:
@@ -250,12 +250,12 @@ def mutations(lgca):
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
         node = lgca.nodes[coord]
-        print('schau auf node ', node)
+        # print('schau auf node ', node)
         # choose cells that proliferate
         r_bs = np.array([lgca.props['r_b'][lgca.props['lab_m'][i]] for i in node])
-        print('r_bs', r_bs)
+        # print('r_bs', r_bs)
         proliferating = npr.random(lgca.K) < r_bs
-        print('prolif', proliferating)
+        # print('prolif', proliferating)
 
         # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
         for label in node[proliferating]:
@@ -280,7 +280,7 @@ def mutations(lgca):
                     lgca.props['lab_m'].append(int(lgca.maxfamily))
                     lgca.tree_manager.register(lgca.props['lab_m'][label])
                     if lgca.mut:
-                        lgca.props['r_b'].append(round(0.05 + lgca.props['r_b'][lgca.props['lab_m'][label]], 2))
+                        lgca.props['r_b'].append(round(0.2 + lgca.props['r_b'][lgca.props['lab_m'][label]], 2))
 
                 else:
                     fam = lgca.props['lab_m'][label]

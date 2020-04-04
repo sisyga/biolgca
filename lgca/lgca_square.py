@@ -365,7 +365,6 @@ class LGCA_Square(LGCA_base):
             return ani
 
     def live_animate_density(self, interval=100, **kwargs):
-
         fig, pc, cmap = self.plot_density(**kwargs)
         title = plt.title('Time $k =$0')
 

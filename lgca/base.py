@@ -398,6 +398,8 @@ class LGCA_base():
         if record:
             self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
             self.nodes_t[0, ...] = self.nodes[self.nonborder]
+            self.offsprings.append(copy(self.props)['num_off'])
+
         if recordN:
             self.n_t = np.zeros(timesteps + 1, dtype=np.int)
             self.n_t[0] = self.cell_density[self.nonborder].sum()
@@ -408,6 +410,8 @@ class LGCA_base():
             self.timestep()
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.nonborder]
+                self.offsprings.append(copy(self.props)['num_off'])
+
             if recordN:
                 self.n_t[t] = self.cell_density[self.nonborder].sum()
             if recorddens:

@@ -181,7 +181,6 @@ class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
             self.nodes[self.nonborder] = nodes.astype(np.uint)
             self.maxlabel = self.nodes.max()
 
-
 if __name__ == '__main__':
     lx = 50
     ly = lx

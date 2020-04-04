@@ -401,7 +401,7 @@ def make_patch_spines_invisible(ax):
     for sp in ax.spines.values():
         sp.set_visible(False)
 
-def plot_popsize(data, save=False, id=0):
+def plot_popsize(data, save=False, id=0, plotmax=0):
     """
     plot of population size during time
     :param data: lgca.offsprings
@@ -418,8 +418,13 @@ def plot_popsize(data, save=False, id=0):
     fig, ax = plt.subplots()
     ax.plot(x, y)
     plt.xlim(0, time - 1)
-    plt.ylim(0, max(size) * 1.1)
+    if plotmax != 0:
+        plt.ylim(0, plotmax + 10)
+    else:
+        plt.ylim(0, max(size) * 1.1)
     ax.set(xlabel='timestep', ylabel='total number of living cells')
+    if plotmax != 0:
+        plt.plot(x, [plotmax]*len(x), 'seagreen')
     if save:
         save_plot(fig, str(id) + '_population size ' + '.jpg')
 
