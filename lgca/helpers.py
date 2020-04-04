@@ -217,7 +217,7 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
         save_plot(fig, str(id) + '_spacetimeplot_' + str(tbeg) + '-' + str(tend) + '.jpg')
     plt.show()
 
-def plot_sth(data, save=False, id=0):
+def plot_sth(data, save=False, id=0, ylabel='index'):
     """
     plot of variable indices
     :param data: structure {'name1': index_data, 'name2': index_data}
@@ -233,11 +233,11 @@ def plot_sth(data, save=False, id=0):
         if m > maxy:
             maxy = m
         plt.plot(x, data[name], colors[i], label=str(name))
-    ax.set(xlabel='timesteps', ylabel='Index')
+    ax.set(xlabel='timesteps', ylabel=ylabel)
     ax.legend()
     plt.xlim(0, tend-1)
-    if tend >= 700:
-        plt.xticks(np.arange(0, tend, 100))
+    if tend >= 10000:
+        plt.xticks(np.arange(0, tend, 5000))
     elif tend >= 100:
         plt.xticks(np.arange(0, tend, 50))
 

@@ -223,27 +223,21 @@ def inheritance(lgca):
     if chronicle:
         print('nach shuffle', lgca.nodes[1:-1])
 
-def passenger_mutations_deprecated(lgca):
-    if lgca.density != 1:
-        print('maxlabel und maxfam nicht mehr aussagekräftig!')
+def mutations(lgca):
     """
-    r_d = const, r_b = const, r_m = const, new families will develop by mutations
+    new families will develop by mutations
+    if lgca.mut ==True: driver mutations -> r_b increases by mutation;
+                ==False: passenger mutations
     """
-    chronicle = True   #Ausgabe der einzelnen Schritte für chronicle = True
-
+    chronicle = True  # Ausgabe der einzelnen Schritte für chronicle = True
     rel_nodes = lgca.nodes[lgca.r_int:-lgca.r_int]
-    # if chronicle:
-    #     print('rel_nodes ', rel_nodes)
 
-    #dying process
+    # dying process
     dying = npr.random(rel_nodes.shape) < lgca.r_d
-    # if chronicle:
-    #     print('dying ', dying)
     for label in rel_nodes[dying]:
         if label > 0:
             if chronicle:
                 print('cell with label %d dies' % label)
-
             fam = lgca.props['lab_m'][label]
             lgca.props['num_off'][fam] -= 1
             if chronicle:
@@ -256,27 +250,12 @@ def passenger_mutations_deprecated(lgca):
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
         node = lgca.nodes[coord]
-        # if chronicle:
-        #     print('look at node', node)
 
         # choose cells that proliferate
-        r_bs = [0] * len(node)      #TODO: besserer Weg?
-        for i in range(0, len(node)):
-            if node[i] > 0:
-                r_bs[i] = lgca.r_b
-
-        # new = [0] * len(node)
-        # TODO: besser?!
-        # indexes = [index for index in range(len(node)) if node[index] > 0]
-        # for entry in indexes:
-        #     new[entry] = r_b
-
-        proliferating = npr.random(lgca.K) < r_bs
-        # if chronicle:
-        #     print('prolif ', proliferating)
+        proliferating = [x for x in node if x > 0 and np.random.random(1) < lgca.r_b]
 
         # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
-        for label in node[proliferating]:
+        for label in proliferating:
             ind = npr.choice(lgca.K)
             if node[ind] == 0:
 
@@ -297,32 +276,30 @@ def passenger_mutations_deprecated(lgca):
                     lgca.props['num_off'].append(1)
                     lgca.props['lab_m'].append(int(lgca.maxfamily))
                     lgca.tree_manager.register(lgca.props['lab_m'][label])
+                    if lgca.mut:
+                        lgca.props['r_b'].append(round(0.05 + lgca.props['r_b'][lgca.props['lab_m'][label]], 2))
+                    print(lgca.props)
                 else:
                     fam = lgca.props['lab_m'][label]
                     lgca.props['lab_m'].append(fam)
                     lgca.props['num_off'][fam] += 1
                 if chronicle:
                     print('labsm', lgca.props['lab_m'])
-
-            # if chronicle:
-            #     # print('nodes after birth: ', lgca.nodes)
-            #     print('props after birth: ', lgca.props)
         lgca.nodes[coord] = node
 
-    #reorientation:
-    # if chronicle:
-    #     print('vor shuffle', lgca.nodes[1:-1])
-    for a in lgca.nonborder:
-        for c in a:
-            npr.shuffle(lgca.nodes[c])
+    # reorientation:
+    # todo shuffle einfügen
+    # for a in lgca.nonborder:
+    #     for c in a:
+    #         npr.shuffle(lgca.nodes[c])
     if chronicle:
         print('props after t ', lgca.props['num_off'])
         print(lgca.tree_manager.tree)
 
-    # if chronicle:
-    #     print('nach shuffle', lgca.nodes[1:-1])
-
 def passenger_mutations(lgca):
+    """
+    NUR 1d vorerst!
+    """
     if lgca.density != 1:
         print('maxlabel und maxfam nicht mehr aussagekräftig!')
     """

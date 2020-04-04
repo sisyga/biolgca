@@ -89,11 +89,23 @@ example = 'rc=178'
 # plot_lognorm_distribution(dat['onerc'], 1000, id='onerc', c=colors[1], save=True)
 
 
-test = [[5], [4, 1], [4, 1, 1], [3, 0, 1], [3, 0, 0, 1]]
-test2 = [[5], [5, 1], [4, 1, 1, 1], [3, 2, 1, 0], [0, 3, 0,	0]]
-data = {'test': test, 'test2': test2}
+# test = [[5], [4, 1], [4, 1, 1], [3, 0, 1], [3, 0, 0, 1]]
+# test2 = [[5], [5, 1], [4, 1, 1, 1], [3, 2, 1, 0], [0, 3, 0,	0]]
+# data = {'test': test, 'test2': test2}
 
-i1 = np.load('saved_data/0_averaged_gini.npy')
-i2 = np.load('saved_data/0_averaged_shannon.npy')
-inds = {'i1': i1, 'i2': i2, 'lalala': [0.5]*5}
-plot_sth(inds)
+# gi1 = np.load('saved_data/5011_mut_averaged_gini.npy')
+# gi167 = np.load('saved_data/501167_mut_averaged_gini.npy')
+#
+# sh1 = np.load('saved_data/5011_mut_averaged_shannon.npy')
+# sh167 = np.load('saved_data/501167_mut_averaged_shannon.npy')
+#
+# hill1 = np.load('saved_data/5011_mut_averaged_hill2.npy')
+# hill167 = np.load('saved_data/501167_mut_averaged_hill2.npy')
+#
+# gini = {'onenode': gi1, 'onerc': gi167}
+# shannon = {'onenode': sh1, 'onerc': sh167}
+# hill2 = {'onenode': hill1, 'onerc': hill167}
+#
+# plot_sth(gini, id='ginisimpson', save=True, ylabel='ginisimpson')
+# plot_sth(shannon, id='shannon', save=True, ylabel='shannon')
+# plot_sth(hill2, id='hill2', save=True, ylabel='hill2')

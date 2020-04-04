@@ -121,7 +121,7 @@ class LGCA_base():
         self.density = density
         self.init_nodes(density=density, nodes=nodes)
         self.init_coords()
-        self.init_nodes(density=density, nodes=nodes)
+        # self.init_nodes(density=density, nodes=nodes)
         self.set_interaction(**kwargs)
         self.cell_density = self.nodes.sum(-1)
         self.apply_boundaries()
@@ -447,18 +447,19 @@ class IBLGCA_base(LGCA_base):
         self.tree_manager = TreeManager()
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
         self.density = density
-        self.init_nodes(density=density, nodes=nodes)
         self.init_coords()
+        self.init_nodes(density=density, nodes=nodes)
+
         self.set_interaction(**kwargs)
         self.cell_density = self.nodes.sum(-1)
         self.apply_boundaries()
 
     def set_interaction(self, **kwargs):
         try:
-            from .ib_interactions import birth, birthdeath, go_or_grow, inheritance, passenger_mutations, passenger_mutations_deprecated
+            from .ib_interactions import birth, birthdeath, go_or_grow, inheritance, passenger_mutations, mutations
             from .interactions import random_walk
         except ImportError:
-            from ib_interactions import birth, birthdeath, go_or_grow, inheritance, passenger_mutations, passenger_mutations_deprecated
+            from ib_interactions import birth, birthdeath, go_or_grow, inheritance, passenger_mutations, mutations
             from interactions import random_walk
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
@@ -597,9 +598,9 @@ class IBLGCA_base(LGCA_base):
                 for i in range(1, self.maxlabel_init.astype(int)+1):
                     self.props['lab_m'][i] = i
 
-            # passenger MUTATIONS start with one cell per family
-            elif interaction is 'passenger_mutations_deprecated':
-                self.interaction = passenger_mutations_deprecated
+            # MUTATIONS
+            elif interaction is 'mutations':
+                self.interaction = mutations
                 self.tree = {}
                 if 'r_int' in kwargs:
                     self.set_r_int(kwargs['r_int'])
@@ -611,7 +612,7 @@ class IBLGCA_base(LGCA_base):
                 if 'r_m' in kwargs:
                     self.r_m = kwargs['r_m']
                 else:
-                    self.r_m = 0.0001
+                    self.r_m = 0.001
                     print('mutation rate set to r_m = ', self.r_m)
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']
@@ -623,15 +624,19 @@ class IBLGCA_base(LGCA_base):
                 else:
                     self.std = 0.1
                     print('standard deviation set to = ', self.std)
-                self.props.update(lab_m=[-99] + [0] * self.maxlabel)
-                self.props.update(num_off=[-99] + [1] * self.maxlabel)
-
+                if 'mut' in kwargs:
+                #True..driver mutations, False..passenger mutations
+                    self.mut = kwargs['mut']
+                else:
+                    self.mut = False
+                self.maxfamily_init = 1
+                self.maxfamily = self.maxfamily_init
+                print('start with one family')
+                self.props.update(lab_m=[-99] + [1] * self.maxlabel)
+                self.props.update(num_off=[-99] + [self.maxlabel] * self.maxfamily_init)
+                self.props.update(r_b=[-99] + [self.r_b] * self.maxfamily_init)
                 self.maxlabel_init = self.maxlabel
 
-                for i in range(1, self.maxlabel_init.astype(int) + 1):
-                    self.props['lab_m'][i] = i
-
-                self.maxfamily_init = self.nodes.max()
                 for i in range(0, self.maxfamily_init):
                     self.tree_manager.register()
                 print(self.tree_manager.tree)
@@ -663,6 +668,11 @@ class IBLGCA_base(LGCA_base):
                 else:
                     self.std = 0.1
                     print('standard deviation set to = ', self.std)
+                if 'variation' in kwargs:
+                    self.variation = kwargs['variation']
+                else:
+                    self.variation = False
+                    print('set to no variation')
 
                 if 'pop' in kwargs:
                     pop = kwargs['pop']

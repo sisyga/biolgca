@@ -8,15 +8,15 @@ from uuid import uuid4 as uuid
 
 
 dim = 1
-rc = 499
-rep = 3
+rc = 2
+rep = 1
 # dim = int(env['DIMS'])
 # rc = int(env['RESTCHANNELS'])
 # rep = int(env['REPETITIONS'])
 
 
 uu = str(uuid())[0:7]
-saving_data = True
+saving_data = False
 ausgabe = False
 
 for i in range(0, rep):

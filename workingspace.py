@@ -23,8 +23,7 @@ def read_inh(name):
     return fams, offs, nodes
 
 def create_pm(name, dim, rc):
-    lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',
-                    variation=False, density=1, dims=dim, restchannels=rc, r_b=0.8, r_d=0.1, r_m=0.3,
+    lgca = get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting', density=1, dims=dim, restchannels=rc, r_b=0.8, r_d=0.1, r_m=0.3,
                     pop={1:1})
     lgca.timeevo(timesteps=20, record=True)
 
@@ -41,17 +40,22 @@ def read_pm(name):
     return tree, fams, offs, nodes
 
 datanames = {'inh': 'todo1', 'pm': 'todo2'}
-dim = 3
+dim = 2
 rc = 1
 
-nodes = np.zeros((dim, dim, 4+rc))
+nodes = np.zeros((dim, dim, 6+rc))
+for i in range(0, 6+rc):
+    nodes[1, 1, i] = i+1
 
-nodes[dim//2, dim//2, :] = 1
+lgca_hex = get_lgca(ib=True, geometry='hex', bc='reflecting', nodes=nodes, interaction='mutations',
+                r_b=0.8, r_d=0.3, r_m=0.8, mut=True)
+print(lgca_hex.props)
+print(lgca_hex.maxlabel, lgca_hex.maxfamily_init)
+print(lgca_hex.nodes[lgca_hex.nonborder])
+lgca_lin = get_lgca(ib=True, geometry='lin', interaction='mutations', bc='reflecting', density=1, dims=3,
+                restchannels=1, r_b=0.8, r_d=0.1, r_m=0.3)
+# print(lgca_lin.nodes)
 
-print(nodes)
-lgca = get_lgca(geometry='square', density=0.25, nodes=nodes, bc='absorbing')
-lgca.plot_density()
-print(lgca.nodes)
-print(lgca.dims, lgca.velocitychannels, lgca.restchannels)
-lgca.timeevo(timesteps=1, record=True)
-lgca.plot_density()
+lgca_hex.timeevo(timesteps=2, record=True)
+print(lgca_hex.nodes[lgca_hex.nonborder])
+
