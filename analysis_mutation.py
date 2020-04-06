@@ -27,20 +27,43 @@ def set_data(path):
         data[name] = search_offs(path, name)
     return data
 
-# path ="saved_data/501167_mut_04_02/"
-path ="saved_data/5011_mut_04_01/"
-# data = set_data(path)
-# create_averaged_entropies(data, save=True, saveplot=True, plot=True)
+# path167 ="saved_data/501167_mut_04_02/"
+# path1 ="saved_data/5011_mut_04_01/"
+# data167 = set_data(path167)
+# data1 = set_data(path1)
+# # create_averaged_entropies(data, save=True, saveplot=True, plot=True)
+#
+# names1 = []
+# for name in data1:
+#     names1.append(name)
+# print(names1)
+# names167 = []
+# for name in data167:
+#     names167.append(name)
+# print(names167)
 
-# path ="saved_data/501167_mut_04_02/"
-data = set_data(path)
-create_averaged_entropies(data, id='5011_mut_0,', save=True, saveplot=True, plot=True)
-# test = [[5], [4, 1], [4, 1, 1], [3, 0, 1], [3, 0, 0, 1]]
-# test2 = [[5], [5, 1], [4, 1, 1, 1], [3, 2, 1, 0], [0, 3, 0,	0]]
-# data = {'test': test, 'test2': test2}
-#
-# sh = np.load('saved_data/test_averaged_shannon.npy')
-# hh = np.load('saved_data/test_averaged_hill2.npy')
-# gi = np.load('saved_data/test_averaged_gini.npy')
-#
-# plot_selected_entropies(sh, hh, gi)
+
+data1 = correct(np.load('saved_data/5011_mut_04_01/'
+                        '5011_mut_55186c3c-e01e-4609-8952-d1314b736521_offsprings.npy'))
+data167 = correct(np.load('saved_data/501167_mut_04_02/'
+                          '501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d_offsprings.npy'))
+data = {'onenode': data1, 'onerc': data167}
+
+shannon = {}
+simpson = {}
+gini = {}
+hill1 = {}
+hill2 = {}
+hill3 = {}
+hill_5 = {}
+for var in data:
+    o = data[var]
+    shannon[var] = calc_shannon(o)
+    simpson[var] = calc_simpson(o)
+    gini[var] = calc_ginisimpson(o)
+    hill1[var] = calc_hillnumbers(o, 1)
+    hill2[var] = calc_hillnumbers(o, 2)
+    hill3[var] = calc_hillnumbers(o, 3)
+    hill_5[var] = calc_hillnumbers(o, 0.5)
+
+# plot_sth(shannon)

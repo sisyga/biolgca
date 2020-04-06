@@ -43,7 +43,7 @@ def read_pm(name):
     return tree, fams, offs, nodes
 
 datanames = {'inh': 'todo1', 'pm': 'todo2'}
-dim = 4
+dim = 50
 rc = 1
 
 nodes = np.zeros((dim, dim, 6+rc))
@@ -51,16 +51,16 @@ for i in range(0, 6+rc):
     nodes[dim//2, dim//2, i] = i+1
 
 lgca_hex = get_lgca(ib=True, geometry='hex', bc='reflecting', nodes=nodes, interaction='mutations',
-                mut=True, r_b=0.8, r_d=0.1, r_m=0.3)
+                mut=True, r_m=0.01)
 lgca_hex.timeevo(timesteps=1, record=True)
 print(lgca_hex.nodes_t)
 tend, lx, ly, K = lgca_hex.nodes_t.shape
 print('tend, lx, ly, K', tend, lx, ly, K)
-for t in range(0, 30):
+for t in range(0, 6):
     lgca_hex.plot_test()
-    lgca_hex.timeevo(timesteps=1, record=True)
+    lgca_hex.timeevo(timesteps=5, record=True)
 lgca_hex.plot_test()
-plot_popsize(data=lgca_hex.offsprings, plotmax=dim*dim*lgca_hex.K)
+# plot_popsize(data=lgca_hex.offsprings, plotmax=0)   #dim*dim*lgca_hex.K)
 # print(lgca_hex.dens_t)
 # data = np.array([[[-99]*lx]*ly]*tend)
 # print(data)

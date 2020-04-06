@@ -82,7 +82,7 @@ magic <- function(e_name, t_name, p_name, tbeg=0, tend=0){
 
 plotting <- function(data, filename="unknown"){
     #print("plotting")
-    jpeg(paste("C:/Users/Franzi/PycharmProjects/biolgca/pictures/", filename, "_mp.jpg"), width=600, height=250) 
+    jpeg(paste("C:/Users/Franzi/PycharmProjects/biolgca/pictures/", filename, "_mp.jpg", sep=""), width=600, height=250) 
     plot(Muller_plot(data, xlab = "timesteps", ylab= "relative frequency"))
     dev.off()
 }
@@ -102,19 +102,28 @@ plotting <- function(data, filename="unknown"){
 # d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
 # plotting(d, filename=name)
 
-for (i in 0:0){ 
+names = c('5011_0_f8684e7')
+for (i in 1:1){ 
+    name <- paste(names[i], "_int_length=250_cutoff=0", sep="")
+    print(name)
     
-    # name <- paste("5011_mut_", i, "_6aeb4de_int_length=1_cutoff=0", sep="")
-    name <- "501167_1_mit_mut_int_length=250_cutoff=0"
     d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
     plotting(d, filename=name)
-    name <- "501167_1_ohne_mut_int_length=250_cutoff=0"
-    d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
-    plotting(d, filename=name)
-    # name <- paste("5011_mut_", i, "_7258cd6_int_length=1_cutoff=0", sep="")
-    # d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
-    # plotting(d, filename=name)
     } 
+# names = c('5011_mut_01d15ca8-03d6-4ca0-985c-777dc41365d8',
+#  '5011_mut_062b726c-48ab-4c6a-b2ad-e4cc27cc165a',
+#   '5011_mut_498d4c70-5dc8-4f0f-bb52-51820fc66505',
+#    '5011_mut_55186c3c-e01e-4609-8952-d1314b736521',
+#  '5011_mut_623a24a3-be94-4a90-9141-9ddbafd4f0a8')
+# for (i in 1:5){ 
+#     name <- paste("5011_mut_04_01/", names[i], "_int_length=250_cutoff=0", sep="")
+#     print(name)
+    
+#     d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
+#     plotting(d, filename=name)
+# }
+
+
 
 
 
