@@ -202,16 +202,23 @@ def filter_ori(offsprings, originals, tree, cutoff):
 # name = '5011_0_711862f'
 # names = ['5011_mut_01d15ca8-03d6-4ca0-985c-777dc41365d8', '5011_mut_062b726c-48ab-4c6a-b2ad-e4cc27cc165a', '5011_mut_498d4c70-5dc8-4f0f-bb52-51820fc66505', '5011_mut_55186c3c-e01e-4609-8952-d1314b736521', '5011_mut_623a24a3-be94-4a90-9141-9ddbafd4f0a8']
 #
-for i in names:
-    name = '5011_mut_04_01/' + i
-    print(name)
-    create_input(name, int_length=250)
-names = ['501167_mut_0017b261-6db6-44a2-9b43-1adf27c36267', '501167_mut_085323c9-de7e-4419-904b-34c72ba2aa62', '501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d']
-for i in names:
-    name = '501167_mut_04_02/' + i
-    print(name)
-    create_input(name, int_length=250)
+# for i in names:
+#     name = '5011_mut_04_01/' + i
+#     print(name)
+#     create_input(name, int_length=250)
+# names = ['501167_mut_0017b261-6db6-44a2-9b43-1adf27c36267', '501167_mut_085323c9-de7e-4419-904b-34c72ba2aa62', '501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d']
+# for i in names:
+#     name = '501167_mut_04_02/' + i
+#     print(name)
+#     create_input(name, int_length=250)
+name1 = 'Varianten ohne mut/5011_2_640e948'
+name167 = 'Varianten ohne mut/501167_4_ac06cfb'
 
+names = [name1, name167]
+
+for i in names:
+    print(i)
+    create_input(i, int_length=250)
 # print(o)
 # create_newoffs(o, int_length=3, tbeg=0, tend=len(o) - 1)
 # create_input(name, int_length=250)

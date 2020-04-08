@@ -7,16 +7,16 @@ from os import environ as env
 from uuid import uuid4 as uuid
 
 
-dim = 1
-rc = 2
-rep = 1
+dim = 167
+rc = 1
+rep = 10
 # dim = int(env['DIMS'])
 # rc = int(env['RESTCHANNELS'])
 # rep = int(env['REPETITIONS'])
 
 
 uu = str(uuid())[0:7]
-saving_data = False
+saving_data = True
 ausgabe = False
 
 for i in range(0, rep):
@@ -27,12 +27,13 @@ for i in range(0, rep):
     lgca = get_lgca(ib=True, geometry='lin', interaction='inheritance', bc='reflecting',\
            variation=False, density=1, dims=dim, restchannels=rc, r_b=0.5, r_d=0.02)
     id = name + '_' + str(i) + '_' + str(uu)
-    t = lgca.timeevo_until_hom(offsprings=True)
+    t = lgca.timeevo_until_hom(spatial=True)
     print(t)
     if saving_data:
         # np.save('saved_data/' + str(id) + '_tree', lgca.tree_manager.tree)
         np.save('saved_data/' + str(id) + '_families', lgca.props['lab_m'])
         np.save('saved_data/' + str(id) + '_offsprings', lgca.offsprings)
+        np.save('saved_data/' + str(id) + '_nodes', lgca.nodes_t)
         np.savez('saved_data/' + str(id) + '_Parameter', density=lgca.density, restchannels=lgca.restchannels,\
         dimension=lgca.l, kappa=lgca.K, rb=lgca.r_b, rd=lgca.r_d, m=lgca.r_int)
     if ausgabe:

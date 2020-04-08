@@ -4,6 +4,7 @@ from lgca.analysis import *
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import multiprocessing
 
 def correct(offs):
     c_offs = []
@@ -27,6 +28,17 @@ def set_data(path):
         data[name] = search_offs(path, name)
     return data
 
+def plot_ind_com(which='si', save=False, plot=True):
+    path = 'saved_data/Indizes_explizit/'
+    files = os.listdir(path)
+    dataset = {}
+    ind = which
+    for file in files:
+        if ind in file:
+            dataset[file[:-(4+len(ind))]] = np.loadtxt(path + file)
+    if plot:
+        plot_sth(dataset, ylabel=ind, save=save, id=which)
+    return dataset
 # path167 ="saved_data/501167_mut_04_02/"
 # path1 ="saved_data/5011_mut_04_01/"
 # data167 = set_data(path167)
@@ -43,27 +55,36 @@ def set_data(path):
 # print(names167)
 
 
-data1 = correct(np.load('saved_data/5011_mut_04_01/'
-                        '5011_mut_55186c3c-e01e-4609-8952-d1314b736521_offsprings.npy'))
-data167 = correct(np.load('saved_data/501167_mut_04_02/'
-                          '501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d_offsprings.npy'))
-data = {'onenode': data1, 'onerc': data167}
-
-shannon = {}
-simpson = {}
-gini = {}
-hill1 = {}
-hill2 = {}
-hill3 = {}
-hill_5 = {}
-for var in data:
-    o = data[var]
-    shannon[var] = calc_shannon(o)
-    simpson[var] = calc_simpson(o)
-    gini[var] = calc_ginisimpson(o)
-    hill1[var] = calc_hillnumbers(o, 1)
-    hill2[var] = calc_hillnumbers(o, 2)
-    hill3[var] = calc_hillnumbers(o, 3)
-    hill_5[var] = calc_hillnumbers(o, 0.5)
-
+# data1 = correct(np.load('saved_data/5011_mut_04_01/'
+#                         '5011_mut_55186c3c-e01e-4609-8952-d1314b736521_offsprings.npy'))
+# data167 = correct(np.load('saved_data/501167_mut_04_02/'
+#                           '501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d_offsprings.npy'))
+inds = ['si', 'gi', 'sh', 'hill1', 'hill2', 'hill3', 'hill_5']
+inds = ['gi', 'sh', 'hill2']
+sh = plot_ind_com(which='sh', save=False, plot=False)
+gi = plot_ind_com(which='gi', save=False, plot=False)
+hill2 = plot_ind_com(which='hill2', save=False, plot=False)
+# for ind in inds:
+#     plot_ind_com(which=ind, save=True, plot=True)
+for var in sh:
+    plot_selected_entropies(shannon=sh[var], hill2=hill2[var], gini=gi[var], save=True, id=var)
+# plot_ind_com(which=inds[-1], save=True)
 # plot_sth(shannon)
+
+
+
+# def funk(file):
+#     print(file)
+#     # np.savetxt('saved_data/' + file + 'sh.csv', calc_shannon(data[file]), delimiter=',', fmt='%s')
+#     # np.savetxt('saved_data/' + file + 'si.csv', calc_simpson(data[file]), delimiter=',', fmt='%s')
+#     # np.savetxt('saved_data/' + file + 'gi.csv', calc_ginisimpson(data[file]), delimiter=',', fmt='%s')
+#     # np.savetxt('saved_data/' + file + 'hill1.csv', calc_hillnumbers(data[file], order=1), delimiter=',', fmt='%s')
+#     # np.savetxt('saved_data/' + file + 'hill2.csv', calc_hillnumbers(data[file]), delimiter=',', fmt='%s')
+#     # np.savetxt('saved_data/' + file + 'hill3.csv', calc_hillnumbers(data[file], order=3), delimiter=',', fmt='%s')
+#     np.savetxt('saved_data/' + file + 'hill_5.csv', calc_hillnumbers(data[file], order=0.5), delimiter=',', fmt='%s')
+#
+# if __name__ == '__main__':
+#     pool = multiprocessing.Pool(4)
+#     with pool as p:
+#         p.map(funk, data)
+

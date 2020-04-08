@@ -392,6 +392,7 @@ class LGCA_base():
         self.propagation()
         self.apply_boundaries()
         self.update_dynamic_fields()
+
 # todo verschobene function!!!
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
         self.update_dynamic_fields()

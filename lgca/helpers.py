@@ -1,5 +1,6 @@
 from .analysis import *
 from matplotlib import colors
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 def aloha(who):
     print('aloha', who)
@@ -170,21 +171,22 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
     ax = fig.add_subplot(111)
     plot = ax.matshow(val, cmap=cmap)
     ###
-    vmin = 1
-    vmax = max(labels)
-    print('Legende von ', vmin, ' bis ', vmax)
-    norm = colors.Normalize(vmin=vmin, vmax=vmax+0.2)
-    plot.set_norm(norm)
-
-    cbar = fig.colorbar(plot)
-    cbar.ax.get_yaxis().set_ticks([])
-    for j, lab in enumerate(range(1, vmax+1)):
-        cbar.ax.text(3, j+1.075, lab, ha='center', va='center')
-    cbar.ax.get_yaxis().labelpad = 15
-    cbar.ax.set_ylabel('family', rotation=270)
+    # vmin = 1
+    # vmax = max(labels)
+    # print('Legende von ', vmin, ' bis ', vmax)
+    # norm = colors.Normalize(vmin=vmin, vmax=vmax)
+    # plot.set_norm(norm)
+    #
+    # cbar = fig.colorbar(plot, ax=ax)
+    # cbar.ax.get_yaxis().set_ticks([])
+    # # for j, lab in enumerate(range(1, vmax+1)):
+    # #     cbar.ax.text(3, j+1.075, lab, ha='center', va='center')
+    # cbar.ax.get_yaxis().labelpad = 15
+    # cbar.ax.set_ylabel('family', rotation=270)
     ###
-    plt.ylabel('timesteps', fontsize=12) #15
-    plt.xlabel('lattice site', fontsize=12) #, fontsize=12
+    plt.ylabel('timesteps', fontsize=15, labelpad=10) #15
+    ax.xaxis.set_label_position('top')
+    plt.xlabel('lattice site', fontsize=15, labelpad=10) #, fontsize=12
 
     # nur "Knotenanfang"
     plt.xlim(-0.5, dim * c - 0.5)
@@ -222,7 +224,7 @@ def plot_sth(data, save=False, id=0, ylabel='index'):
     plot of variable indices
     :param data: structure {'name1': index_data, 'name2': index_data}
     """
-    colors = ['seagreen', 'magenta', 'cyan']
+    colors = ['darkred', 'orange', 'cyan']
     tend = len(list(data.values())[0])
     x = np.arange(0, tend)
     maxy = 0
@@ -232,7 +234,7 @@ def plot_sth(data, save=False, id=0, ylabel='index'):
         m = max(data[name])
         if m > maxy:
             maxy = m
-        plt.plot(x, data[name], colors[i], label=str(name))
+        plt.plot(x, data[name], colors[i], label=str(name), linewidth=0.75)
     ax.set(xlabel='timesteps', ylabel=ylabel)
     ax.legend()
     plt.xlim(0, tend-1)

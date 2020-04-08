@@ -4,6 +4,11 @@ from lgca.analysis import *
 import numpy as np
 import matplotlib.pyplot as plt
 
+def correct(offs):
+    c_offs = []
+    for entry in offs:
+        c_offs.append(entry[1:])
+    return c_offs
 
 # offs = np.load('saved_data/passenger_test_offsprings.npy')
 # # offs = np.load('saved_data/82_0_93b103e_offsprings.npy')
@@ -109,3 +114,24 @@ example = 'rc=178'
 # plot_sth(gini, id='ginisimpson', save=True, ylabel='ginisimpson')
 # plot_sth(shannon, id='shannon', save=True, ylabel='shannon')
 # plot_sth(hill2, id='hill2', save=True, ylabel='hill2')
+# path = 'saved_data/Varianten ohne mut/'
+# name1 = '5011_2_640e948'
+# vari1 = {'offs': correct(np.load(path + name1 + '_offsprings.npy')),
+#          'fams': np.load(path + name1 + '_families.npy'),
+#          'nodes': np.load(path + name1 + '_nodes.npy'),
+#          'tree': np.load(path + name1 + '_tree.npy')}
+#
+# name167 = '501167_4_ac06cfb'
+# vari167 = {'offs': correct(np.load(path + name167 + '_offsprings.npy')),
+#          'fams': np.load(path + name167 + '_families.npy'),
+#          'nodes': np.load(path + name167 + '_nodes.npy'),
+#          'tree': np.load(path + name167 + '_tree.npy')}
+#
+# # data = {'onenode': vari1}
+# data = {'onenode': vari1, 'onerc': vari167}
+#
+# for entry in data:
+#     for i in range(0, int(len(data[entry]['nodes'])/1000)):
+#         spacetime_plot(data[entry]['nodes'], data[entry]['fams'], tbeg=1000*i, tend=1000*i+1000, save=True, id=entry)
+    # spacetime_plot(data[entry]['nodes'], data[entry]['fams'], save=False, id=entry)
+

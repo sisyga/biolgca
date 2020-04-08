@@ -202,7 +202,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.maxlabel = self.nodes.max()
 
     def timeevo(self, timesteps=100, recordMut=False, record=False, recordN=False, recorddens=False, showprogress=False, recordLast=False):
-        print('nutze ib class')
+        print('nutze timeevo aus ib class')
         self.update_dynamic_fields()
         if recordMut:
             self.offsprings.append(copy(self.props)['num_off'])
@@ -213,12 +213,10 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.nodes_t[0, ...] = self.nodes[self.r_int:-self.r_int, ...]
             self.props_t = [copy(self.props)]
             self.offsprings.append(copy(self.props)['num_off'])
-            print('mehr offs', self.offsprings)
 
         for t in range(1, timesteps + 1):
             self.timestep()
             if recordMut:
-                # print(self.props['num_off'])
                 self.offsprings.append(copy(self.props)['num_off'])
                 # self.props_t = [copy(self.props)]
 
