@@ -533,7 +533,7 @@ class LGCA_Square(LGCA_base):
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("right", size="5%", pad=0.1)
             cbar = fig.colorbar(cmap, extend='min', use_gridspec=True, cax=cax)
-            cbar.set_label('Particle number $n$')
+            cbar.set_label('family')
             cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[1::2])
             cbar.set_ticklabels(1 + np.arange(K))
             plt.sca(ax)

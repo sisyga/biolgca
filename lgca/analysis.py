@@ -54,6 +54,22 @@ def calc_shannon(data):
                 shannon[t] -= pi * m.log(pi)
     return shannon
 
+def calc_evenness(data):
+    """
+    calculate evenness of shannon
+    :param data: correct(lgca.offsprings)
+    :return: evenness
+    """
+    time = len(data)
+    # print(time)
+    shannon = calc_shannon(data)
+    evenness = np.zeros(time)
+
+    for t in range(time):
+        N = sum(data[t])
+        evenness[t] = shannon[t]/m.log(N)
+    return evenness
+
 def calc_ginisimpson(data):
     """
     calculate ginisimpson index
@@ -129,6 +145,7 @@ def create_averaged_entropies(dic_offs, save=False, id=0, plot=False, saveplot=F
     result_sh = [0] * tmax
     result_gi = [0] * tmax
     result_hill = [0] * tmax
+    result_hill5 = [0] * tmax
 
     #falls unterschiedlich lange Einträge np.concatenate((gini, np.zeros(tmax-t)))
 
@@ -148,22 +165,30 @@ def create_averaged_entropies(dic_offs, save=False, id=0, plot=False, saveplot=F
         hill = calc_hillnumbers(data)
         result_hill += hill
 
+        # 'hill order 25':
+        hill5 = calc_hillnumbers(data, order=0.5)
+        result_hill5 += hill5
+
     # Mitteln
     result_sh = result_sh / len(dic_offs)
     result_gi = result_gi / len(dic_offs)
     result_hill = result_hill / len(dic_offs)
+    result_hill5 = result_hill5 / len(dic_offs)
+    print('gemittelt über ', len(dic_offs))
 
     # speichern
     if save:
         np.save('saved_data/' + filename + '_' + 'averaged_shannon' + '.npy', result_sh)
         np.save('saved_data/' + filename + '_' + 'averaged_gini' + '.npy', result_gi)
         np.save('saved_data/' + filename + '_' + 'averaged_hill2' + '.npy', result_hill)
+        np.save('saved_data/' + filename + '_' + 'averaged_hill5' + '.npy', result_hill5)
 
     # plot
     if plot:
         lgca.helpers.plot_selected_entropies(shannon=result_sh, hill2=result_hill, gini=result_gi,\
-                                save=saveplot, id=filename+'_averaged')
-
+                                hill_5=result_hill5, save=saveplot, id=filename+'_averaged')
+        lgca.helpers.plot_sth(data={'gi': result_gi, 'sh': result_sh, 'hill_5': result_hill5,
+                       'hill_2': result_hill}, save=True, id='averaged_unscaled')
     return result_sh, result_gi, result_hill
 
 def calc_lognormaldistri(thom, int_length):

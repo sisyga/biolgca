@@ -39,12 +39,15 @@ def plot_ind_com(which='si', save=False, plot=True):
     if plot:
         plot_sth(dataset, ylabel=ind, save=save, id=which)
     return dataset
-# path167 ="saved_data/501167_mut_04_02/"
-# path1 ="saved_data/5011_mut_04_01/"
+
+# path167 ="saved_data/501167_ges/"
+# path1 ="saved_data/5011_ges/"
 # data167 = set_data(path167)
 # data1 = set_data(path1)
-# # create_averaged_entropies(data, save=True, saveplot=True, plot=True)
-#
+# datas = {'167': data167, '1': data1}
+# for data in datas:
+#     create_averaged_entropies(datas[data], save=True, saveplot=True, plot=True)
+# #
 # names1 = []
 # for name in data1:
 #     names1.append(name)
@@ -59,20 +62,68 @@ def plot_ind_com(which='si', save=False, plot=True):
 #                         '5011_mut_55186c3c-e01e-4609-8952-d1314b736521_offsprings.npy'))
 # data167 = correct(np.load('saved_data/501167_mut_04_02/'
 #                           '501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d_offsprings.npy'))
-inds = ['si', 'gi', 'sh', 'hill1', 'hill2', 'hill3', 'hill_5']
-inds = ['gi', 'sh', 'hill2']
+
+inds = ['si', 'gi', 'sh', 'hill1', 'hill2', 'hill3', 'hill_5', 'hill_25', 'hill_75']
+# inds = ['hill1', 'hill2', 'hill3', 'hill_5']
+#
+si = plot_ind_com(which='si', save=False, plot=False)
 sh = plot_ind_com(which='sh', save=False, plot=False)
+eve = plot_ind_com(which='eve', save=False, plot=False)
 gi = plot_ind_com(which='gi', save=False, plot=False)
+hill1 = plot_ind_com(which='hill1', save=False, plot=False)
 hill2 = plot_ind_com(which='hill2', save=False, plot=False)
-# for ind in inds:
-#     plot_ind_com(which=ind, save=True, plot=True)
-for var in sh:
-    plot_selected_entropies(shannon=sh[var], hill2=hill2[var], gini=gi[var], save=True, id=var)
-# plot_ind_com(which=inds[-1], save=True)
-# plot_sth(shannon)
+hill3 = plot_ind_com(which='hill3', save=False, plot=False)
+hill_5 = plot_ind_com(which='hill_5', save=False, plot=False)
+hill_25 = plot_ind_com(which='hill_25', save=False, plot=False)
+hill_75 = plot_ind_com(which='hill_75', save=False, plot=False)
+
+# # # for ind in inds:
+# # #     plot_ind_com(which=ind, save=True, plot=True)
+# vars = ['onenode', 'onerc']
+vars = ['onenode']
+
+# m = max(hill_25['onenode'][22500:30000])
+# print(m)
+# p = list(hill_25['onenode'][22500:30000]).index(m)
+# print(p)
+# print(hill2['onenode'][22500+562])
+# gr = 0
+# gl = 0
+# kl = 0
+# n = 0
+# for i, entry in enumerate(sh['onenode']):
+#     if entry > gi['onenode'][i]:
+#         gr += 1
+#     elif entry == gi['onenode'][i]:
+#         gl += 1
+#         if entry == 0:
+#             n += 1
+#     elif entry < gi['onenode'][i]:
+#         kl += 1
+# print(gr, gl, kl, n)
+# print(gr+gl+kl)
+# plot_sth(data=gi, save=True, id='gi')
+# plot_sth(data=hill2, save=True, id='hill2')
+# plot_sth(data=hill_5, save=True, id='hill_5')
 
 
-
+for var in vars:
+    # plot_sth(data={'onenode': si[var] - gi[var]}, ylabel='diff: simpson - gini', savename='diff_SiGi', save=True)
+    # plot_sth(data={'gi': gi[var], 'eve': eve[var]}, save=True, savename=var + '_GiEve')
+    # plot_sth(data={'gi': gi[var], 'sh': sh[var], 'eve': eve[var]}, save=True, savename=var + '_GiEveSh')
+    # plot_sth(data={'gi': gi[var], 'sh': sh[var]}, save=True, savename=var + '_GiSh')
+#     plot_hillnumbers_together(hill2[var],hill_25[var], hill_75[var], save=True, id=var)
+#     plot_entropies_together(gini=gi[var], shannon=sh[var])
+    plot_selected_entropies(gini=gi[var], shannon=sh[var], hill2=hill2[var], save=False, id=var)
+#
+#
+# data1 = correct(np.load('saved_data/Indizes_explizit/Daten/'
+#                         '5011_mut_55186c3c-e01e-4609-8952-d1314b736521_offsprings.npy'))
+# data167 = correct(np.load('saved_data/Indizes_explizit/Daten/'
+#                           '501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d_offsprings.npy'))
+#
+# data = {"1": data1, "167": data167}
+#
 # def funk(file):
 #     print(file)
 #     # np.savetxt('saved_data/' + file + 'sh.csv', calc_shannon(data[file]), delimiter=',', fmt='%s')
@@ -81,10 +132,21 @@ for var in sh:
 #     # np.savetxt('saved_data/' + file + 'hill1.csv', calc_hillnumbers(data[file], order=1), delimiter=',', fmt='%s')
 #     # np.savetxt('saved_data/' + file + 'hill2.csv', calc_hillnumbers(data[file]), delimiter=',', fmt='%s')
 #     # np.savetxt('saved_data/' + file + 'hill3.csv', calc_hillnumbers(data[file], order=3), delimiter=',', fmt='%s')
-#     np.savetxt('saved_data/' + file + 'hill_5.csv', calc_hillnumbers(data[file], order=0.5), delimiter=',', fmt='%s')
+#     # np.savetxt('saved_data/' + file + 'hill_25.csv', calc_hillnumbers(data[file], order=0.25), delimiter=',', fmt='%s')
+#     # np.savetxt('saved_data/' + file + 'hill_75.csv', calc_hillnumbers(data[file], order=0.75), delimiter=',', fmt='%s')
+#     np.savetxt('saved_data/' + file + 'eve.csv', calc_evenness(data[file]), delimiter=',', fmt='%s')
 #
 # if __name__ == '__main__':
 #     pool = multiprocessing.Pool(4)
 #     with pool as p:
 #         p.map(funk, data)
 
+
+# test = [[5], [4, 1], [4, 1, 1], [3, 0, 1], [3, 0, 0, 1]]
+# test2 = [[5], [5, 1], [4, 1, 1, 1], [3, 2, 1, 0], [0, 3, 0,	0]]
+# data = {'test': test, 'test2': test2}
+# #
+# for t in data:
+#     print(calc_evenness(data[t]))
+#     print(calc_ginisimpson(data[t]))
+#     print(calc_simpson(data[t]))

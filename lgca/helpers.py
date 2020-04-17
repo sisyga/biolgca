@@ -2,6 +2,21 @@ from .analysis import *
 from matplotlib import colors
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
+farben = {
+    'si':       'gold',
+    'gi':       'seagreen',
+    'sh':       'red',
+    'eve':      'red',
+    'hill_25':  'rosybrown',
+    'hill_5':   'lawngreen',
+    'hill_75':  'aqua',
+    'hill_1':   'mediumblue',
+    'hill_2':   'sienna',
+    'hill_3':   'coral',
+    'onenode':  'darkred',
+    'onerc':    'orange'
+}
+
 def aloha(who):
     print('aloha', who)
 
@@ -219,22 +234,24 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
         save_plot(fig, str(id) + '_spacetimeplot_' + str(tbeg) + '-' + str(tend) + '.jpg')
     plt.show()
 
-def plot_sth(data, save=False, id=0, ylabel='index'):
+def plot_sth(data, save=False, id=0, ylabel='index', savename=None):
     """
     plot of variable indices
     :param data: structure {'name1': index_data, 'name2': index_data}
     """
-    colors = ['darkred', 'orange', 'cyan']
     tend = len(list(data.values())[0])
     x = np.arange(0, tend)
     maxy = 0
     filename = list(data.keys())
-    fig, ax = plt.subplots()
-    for i, name in enumerate(data):
+    fig, ax = plt.subplots(figsize=(12,4))
+    for name in data:
         m = max(data[name])
         if m > maxy:
-            maxy = m
-        plt.plot(x, data[name], colors[i], label=str(name), linewidth=0.75)
+            maxy = m + 0.1
+        if name=='eve':
+            plt.plot(x, data[name], farben[name], label=name, linewidth=0.75, linestyle=(0, (1, 10)))
+        else:
+            plt.plot(x, data[name], farben[name], label=name, linewidth=0.75)
     ax.set(xlabel='timesteps', ylabel=ylabel)
     ax.legend()
     plt.xlim(0, tend-1)
@@ -245,7 +262,11 @@ def plot_sth(data, save=False, id=0, ylabel='index'):
 
     plt.ylim(0, maxy)
     if save:
-        save_plot(plot=fig, filename=str(filename) + '_' + str(id) + '.jpg')
+        if savename is None:
+            save_plot(plot=fig, filename=str(id) + '_comparing_' + str(filename) + '.jpg')
+        else:
+            save_plot(plot=fig, filename=savename + '.jpg')
+
     plt.show()
 
 def plot_index(index_data, which, save=False, id=0):
@@ -278,7 +299,8 @@ def plot_index(index_data, which, save=False, id=0):
         save_plot(fig, str(id) + str(which) + '.jpg')
     plt.show()
 
-def plot_hillnumbers_together(hill_1, hill_2, hill_3, save=False, id=0):
+# def plot_hillnumbers_together(hill_1, hill_2, hill_3, hill_5, hill_25, hill_75, save=False, id=0):
+def plot_hillnumbers_together(hill_2, hill_25, hill_75, save=False, id=0):
     """
     plot hillnumbers of order 1,2,3 together
     :param hill_1: array of hillnumbers 1st order
@@ -287,28 +309,36 @@ def plot_hillnumbers_together(hill_1, hill_2, hill_3, save=False, id=0):
     :param save: saves plot if true
     :param id: filename for saving
     """
-    time = len(hill_1)
+    time = len(hill_2)
     x = np.arange(0, time, 1)
 
-    fig, ax = plt.subplots()
-    plt.plot(x, hill_1, 'b-', label='order 1')
-    plt.plot(x, hill_2, 'c--', label='order 2')
-    plt.plot(x, hill_3, 'm:', label='order 3')
+    fig, ax = plt.subplots(figsize=(12, 4))
+    # plt.plot(x, hill_1, farben['hill_1'], label='order 1', linewidth=1)
+    plt.plot(x, hill_2, farben['hill_2'], label='order 2', linewidth=1)
+    # plt.plot(x, hill_3, farben['hill_3'], label='order 3', linewidth=1)
+    # plt.plot(x, hill_5, farben['hill_5'], label='order 0.5', linewidth=1)
+    plt.plot(x, hill_25, farben['hill_25'], label='order 0.25', linewidth=1)
+    plt.plot(x, hill_75, farben['hill_75'], label='order 0.75', linewidth=1)
 
     ax.set(xlabel='timesteps', ylabel='Hillnumbers')
-    ax.legend()
+    ax.legend(handlelength=2.5)
     plt.xlim(0, time-1)
     if time >= 700:
-        plt.xticks(np.arange(0, time, 100))
+        plt.xticks(np.arange(0, time, 5000))
     elif time >= 100:
         plt.xticks(np.arange(0, time, 50))
-
-    plt.ylim(1, max(hill_1)*1.1, 10)
+    plt.axvline(x=23062, ymax=0.9, linestyle='--')
+    plt.axvline(x=36157, ymax=0.9, linestyle='--')
+    plt.axvline(x=37562, ymax=0.9, linestyle='--')
+    plt.text(23062-250, 7.3, '$k_1$')
+    plt.text(36157-250, 7.3, '$k_2$')
+    plt.text(37562-250, 7.3, '$k_3$')
+    plt.ylim(1, max(hill_25) + 0.5, 10)
     if save:
-        save_plot(plot=fig, filename= str(id) + '_comparing hillnumbers' + '.jpg')
+        save_plot(plot=fig, filename= str(id) + '_comparing hillnumbers_hilfslinien' + '.jpg')
     plt.show()
 
-def plot_entropies_together(simpson, gini, shannon, save=False, id=0):
+def plot_entropies_together(gini, shannon, save=False, id=0, simpson=None):
     """
     plot simpson index, gini-simpson index and shannon index together
     :param simpson: array of simpson index
@@ -324,16 +354,17 @@ def plot_entropies_together(simpson, gini, shannon, save=False, id=0):
     time = len(gini)
     x = np.arange(0, time, 1)
 
-    fig, ax = plt.subplots()
-    plt.plot(x, shannon, 'b-', label='Shannonindex')
-    plt.plot(x, simpson, 'c--', label='Simpsonindex')
-    plt.plot(x, gini, 'm:', label='GiniSimpsonindex')
+    fig, ax = plt.subplots(figsize=(12, 4))
+    plt.plot(x, shannon, farben['sh'], label='Shannonindex', linewidth=0.75)
+    if simpson is not None:
+        plt.plot(x, simpson, farben['si'], label='Simpsonindex', linewidth=0.75)
+    plt.plot(x, gini, farben['gi'], label='GiniSimpsonindex', linewidth=0.75)
 
     ax.set(xlabel='timesteps', ylabel='Index')
     ax.legend()
     plt.xlim(0, time-1)
     if time >= 700:
-        plt.xticks(np.arange(0, time, 100))
+        plt.xticks(np.arange(0, time, 5000))
     elif time >= 100:
         plt.xticks(np.arange(0, time, 50))
 
@@ -354,35 +385,38 @@ def plot_selected_entropies(shannon, hill2, gini, save=False, id=0):
     time = len(shannon)
     x = np.arange(0, time, 1)
 
-    fig, host = plt.subplots()
+    fig, host = plt.subplots(figsize=(12, 4))
     par1 = host.twinx()
     par2 = host.twinx()
-    par2.spines["right"].set_position(("axes", 1.2))
+    par2.spines["right"].set_position(("axes", 1.1))
     make_patch_spines_invisible(par2)
     par2.spines["right"].set_visible(True)
 
-    p1, = host.plot(x, shannon, "m", linewidth=0.7, label="Shannonindex")
-    p2, = par1.plot(x, gini, "b", linewidth=0.7, label="GiniSimpsonindex")
-    p3, = par2.plot(x, hill2, "c", linewidth=0.7, label="Hillnumber of order 2")
-
     host.set_xlim(0, time - 1)
-    host.set_ylim(bottom=0)
-    par1.set_ylim(bottom=0)
-    par2.set_ylim(bottom=0)
+    host.set_ylim(bottom=1, top=max(hill2)*1.1)
+    par1.set_ylim(bottom=0, top=max(gini)*1.1)
+    par2.set_ylim(bottom=0, top=max(shannon)*1.1)
 
     host.set_xlabel("timesteps")
-    host.set_ylabel("Shannonindex")
+    host.set_ylabel("Hillnumber")
     par1.set_ylabel("GiniSimpsonindex")
-    par2.set_ylabel("Hillnumber of order 2")
+    par2.set_ylabel("Shannonindex")
 
-    host.yaxis.label.set_color(p1.get_color())
+    p1, = par2.plot(x, shannon, farben['sh'], linewidth=0.75, label="Shannonindex")
+    p2, = par1.plot(x, gini, farben['gi'], linewidth=0.75, label="GiniSimpsonindex")
+    p3, = host.plot(x, hill2, farben['hill_2'], linewidth=0.75, label="Hillnumber of order 2")
+    # p4, = par2.plot(x, hill5, farben['hill_5'], linewidth=0.75, label="Hillnumber of order 0.5")
+
+
+
+    host.yaxis.label.set_color(p3.get_color())
     par1.yaxis.label.set_color(p2.get_color())
-    par2.yaxis.label.set_color(p3.get_color())
+    par2.yaxis.label.set_color(p1.get_color())
 
     tkw = dict(size=4, width=1.5)
-    host.tick_params(axis='y', colors=p1.get_color(), **tkw)
+    host.tick_params(axis='y', colors=p3.get_color(), **tkw)
     par1.tick_params(axis='y', colors=p2.get_color(), **tkw)
-    par2.tick_params(axis='y', colors=p3.get_color(), **tkw)
+    par2.tick_params(axis='y', colors=p1.get_color(), **tkw)
     host.tick_params(axis='x', **tkw)
 
     lines = [p1, p2, p3]

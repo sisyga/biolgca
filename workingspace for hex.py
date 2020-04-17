@@ -44,7 +44,7 @@ def read_pm(name):
 
 datanames = {'inh': 'todo1', 'pm': 'todo2'}
 dim = 50
-rc = 1
+rc = 2
 
 nodes = np.zeros((dim, dim, 6+rc))
 for i in range(0, 6+rc):
