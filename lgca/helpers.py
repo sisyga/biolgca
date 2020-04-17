@@ -253,7 +253,7 @@ def plot_sth(data, save=False, id=0, ylabel='index', savename=None):
         else:
             plt.plot(x, data[name], farben[name], label=name, linewidth=0.75)
     ax.set(xlabel='timesteps', ylabel=ylabel)
-    ax.legend()
+    ax.legend(loc='upper left')
     plt.xlim(0, tend-1)
     if tend >= 10000:
         plt.xticks(np.arange(0, tend, 5000))
@@ -405,7 +405,7 @@ def plot_selected_entropies(shannon, hill2, gini, save=False, id=0):
     p1, = par2.plot(x, shannon, farben['sh'], linewidth=0.75, label="Shannonindex")
     p2, = par1.plot(x, gini, farben['gi'], linewidth=0.75, label="GiniSimpsonindex")
     p3, = host.plot(x, hill2, farben['hill_2'], linewidth=0.75, label="Hillnumber of order 2")
-    # p4, = par2.plot(x, hill5, farben['hill_5'], linewidth=0.75, label="Hillnumber of order 0.5")
+    # p4, = host.plot(x, hill5, farben['hill_5'], linewidth=0.75, label="Hillnumber of order 0.5")
 
 
 
