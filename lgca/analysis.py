@@ -70,6 +70,23 @@ def calc_evenness(data):
         evenness[t] = shannon[t]/m.log(N)
     return evenness
 
+def calc_richness(data):
+    """
+    calculate species richness per timestep
+    :param data: correct(offsprings)
+    :return: richness
+    """
+    rich = []
+    for t in range(0, len(data)):
+        # print(data[t])
+        N = np.array(data[t])[np.nonzero(data[t])]
+        # print(N)
+        # print(len(N))
+        rich.append(len(N))
+        # print(rich)
+    return rich
+
+
 def calc_ginisimpson(data):
     """
     calculate ginisimpson index

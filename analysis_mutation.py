@@ -64,7 +64,7 @@ def zahlende(path, steps):
     ende = {}
     for i, f in enumerate(rel):
         offs = correct(np.load(path + f)[-steps:])
-        fams = []
+        fams = [] #todo aufpassen mit Länge, immer längsten off eintrag aus den steps nehmen!
         for w, e in enumerate(offs[-1]):
             if e > 0:
                 fams.append(w+1)
@@ -97,9 +97,9 @@ def plotende(ave, fams):
 
 
 
-ende, fams = zahlende(path = 'saved_data/5011_ges/', steps=1)
-print(ende, fams)
-plotende(ende, fams)
+# ende, fams = zahlende(path = 'saved_data/5011_ges/', steps=1)
+# print(ende, fams)
+# plotende(ende, fams)
 # print(mittelende(ende))
 
 """
@@ -171,8 +171,13 @@ plotende(ende, fams)
 """
         ---Test offs---  
 """
-# test = [[5], [4, 1], [4, 1, 1], [3, 0, 1], [3, 0, 0, 1]]
-# test2 = [[5], [5, 1], [4, 1, 1, 1], [3, 2, 1, 0], [0, 3, 0,	0]]
+test = [[5], [4, 1], [4, 1, 1], [3, 0, 1], [3, 0, 0, 1]]
+c = calc_richness(test)
+plot_sth(data={'rich': c})
+test2 = [[5], [5, 1], [4, 1, 1, 1], [3, 2, 1, 0], [0, 3, 0,	0]]
+calc_richness(test2)
+plot_sth(data={'rich': c})
+
 # data = {'test': test, 'test2': test2}
 # #
 # for t in data:

@@ -13,6 +13,7 @@ farben = {
     'hill_1':   'mediumblue',
     'hill_2':   'sienna',
     'hill_3':   'coral',
+    'rich':     'darkmagenta',
     'onenode':  'darkred',
     'onerc':    'orange'
 }
