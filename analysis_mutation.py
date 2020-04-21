@@ -126,10 +126,47 @@ def plotende(ave, fams, muts):
 
         plt.show()
 
+# path = 'saved_data/5011_ges/'
+path = 'saved_data/501167_ges/'
+files = os.listdir(path)
+print(len(files))
+rel = []
+for file in files:
+    if 'offsprings' in file and '501167_mut' in file:
+        rel.append(file)
+print(len(rel))
+oris = []
+akti = []
+fam_max = []
+max_akti = []
+# rel = rel[:3]
+for r in rel:
+    offs = correct(np.load(path + r)[-1:])
+    fam_max.append(len(offs[0])-1)
+    akti.append(len([entry for entry in offs[0] if entry > 0]))
+    oris.append(offs[0][0] > 0)
+    max_akti.append('{:.2f}%'.format(max(offs[0])/sum(offs[0])*100))
+# print(oris, akti, fam_max, max_akti)
 
-ende, fams, muts = zahlende(path='saved_data/5011_ges/', steps=10)
+import csv
+toWrite = [['Simulation:'] + [i+1 for i in range(0, len(fam_max))],
+           ['Anz. Mutationen:'] + fam_max,
+           ['aktive Familien:'] + akti,
+           ['proz. dominierende:'] + max_akti,
+           ['Anfangsfamilie da:'] + oris
+           ]
+print(toWrite)
 
-plotende(ende, fams, muts)
+file = open(path + '501167_ges.csv', 'w')
+
+with file as csvfile:
+    writer = csv.writer(csvfile, delimiter=',')
+    for row in toWrite:
+        writer.writerow(row)
+
+# ende, fams, muts = zahlende(path='saved_data/5011_ges/', steps=10)
+
+# plotende(ende, fams, muts)
 # print(mittelende(ende))
 
 # o1 = [[-99, 1,3,5,0], [-99, 2,2,4,0,4], [-99, 0,0,4,0,0]]
