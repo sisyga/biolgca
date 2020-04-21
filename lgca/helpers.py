@@ -244,7 +244,7 @@ def plot_sth(data, save=False, id=0, ylabel='index', savename=None):
     x = np.arange(0, tend)
     maxy = 0
     filename = list(data.keys())
-    fig, ax = plt.subplots(figsize=(12,4))
+    fig, ax = plt.subplots(figsize=(12, 4))
     for name in data:
         m = max(data[name])
         if m > maxy:

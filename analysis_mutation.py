@@ -58,49 +58,85 @@ def zahlende(path, steps):
     for file in files:
         if 'offspring' in file:
             rel.append(file)
+    # rel = rel[:10]
+    # rel = ['Probe_offsprings.npy', 'Probe2_offsprings.npy']
     print('anz daten', len(rel))
-    rel = ['5011_mut_f308e6f3-b126-4189-a736-0de904c67c89_offsprings.npy',
-           '5011_mut_f308e6f3-b126-4189-a736-0de904c67c89_offsprings.npy']
     ende = {}
-    for i, f in enumerate(rel):
-        offs = correct(np.load(path + f)[-steps:])
-        fams = [] #todo aufpassen mit Länge, immer längsten off eintrag aus den steps nehmen!
-        for w, e in enumerate(offs[-1]):
-            if e > 0:
-                fams.append(w+1)
-        for s in range(len(offs)):
-            offs[s] = [entry for entry in offs[s] if entry > 0]
-        ende[str(i + 1)] = offs
+    fams = {}
+    muts = {}
+    for i, f_rel in enumerate(rel):
+        offs = correct(np.load(path + f_rel)[-steps:])
+        # print(i+1, offs)
+        lmax = len(offs[-1])
+        for step in range(1, steps):
+            l = len(offs[-1-step])
+            if l < lmax:
+                offs[-1-step] = offs[-1-step] + [0]*(lmax-l)
+        mean_offs = list(np.mean(offs, axis=0))
+        nn = []
+        nf = []
+        for index, entry in enumerate(mean_offs):
+            if entry > 0:
+                nn.append(entry)
+                nf.append(index + 1)
 
-    return ende, fams
+        ende[str(i + 1)] = nn
+        fams[str(i + 1)] = nf
+        muts[str(i+1)] = mut_number(nf, path, filename=f_rel[:-len('offsprings.npy')] + 'tree.npy')
 
-def mittelende(ende):
-    ave = {}
-    for key in ende:
-        offs = ende[key]
-        ave[key] = np.mean(offs, axis=0)
-        #todo: mean klappt nicht :D
-    return ave
+    return ende, fams, muts
 
-def plotende(ave, fams):
-    print(ave)
+def mut_number(fams, path, filename):
+    tree = np.load(path + filename)
+    muts = []
+    for entry in fams:
+        if entry == 1:
+            m_anz = 0
+        else:
+            m_anz = 1
+            while tree.item().get(entry)['parent'] != tree.item().get(entry)['origin']:
+                # print(entry, ' stammt von ', tree.item().get(entry))
+                m_anz += 1
+                entry = tree.item().get(entry)['parent']
+        muts.append(m_anz)
+    return muts
+
+def plotende(ave, fams, muts):
     for sim in ave:
-        # fams = np.arange(0, len(ave[sim][0])) + 1
-        print(fams)
-        anz = pd.Series(ave[sim][0], index=fams, name='Sim ' + str(sim))
-        # explode = [0.1]*len(ave[sim][0])
-        anz.plot.pie(figsize=(6, 6))
-        # plt.legend()
+        data = ave[sim]
+        fs = fams[sim]
+        ms = muts[sim]
+
+        fig, ax = plt.subplots(figsize=(6, 3), subplot_kw=dict(aspect="equal"))
+
+        def func(pct, allvals):
+            absolute = pct / 100. * np.sum(allvals)
+            return "{:.1f}%\n(~ {:.1f})".format(pct, absolute)
+
+        wedges, texts, autotexts = ax.pie(data, autopct=lambda pct: func(pct, data),
+                                  textprops=dict(color="w"))
+        ax.legend(wedges, ms,
+                  title="Number of Mutations",
+                  loc="center left",
+                  bbox_to_anchor=(1, 0, 0.5, 1))
+
+        plt.setp(autotexts, size=8, weight="bold")
+
+        ax.set_title("pie of Simulation {:s}".format(sim))
+
         plt.show()
 
-    #todo: klappt danna uch nach mittelerde todo mit mehreren steps?
 
+ende, fams, muts = zahlende(path='saved_data/5011_ges/', steps=10)
 
-
-# ende, fams = zahlende(path = 'saved_data/5011_ges/', steps=1)
-# print(ende, fams)
-# plotende(ende, fams)
+plotende(ende, fams, muts)
 # print(mittelende(ende))
+
+# o1 = [[-99, 1,3,5,0], [-99, 2,2,4,0,4], [-99, 0,0,4,0,0]]
+# np.save('saved_data/testoffs1.npy', o1)
+# o2 = [[-99, 0,0,0,1,2], [-99, 0,0,0,2,5], [-99, 0,0,0,0,3,1]]
+# np.save('saved_data/testoffs2.npy', o2)
+
 
 """
     --- Index-Daten einlesen    ---
@@ -120,6 +156,9 @@ def plotende(ave, fams):
 # hill_5 = read_inds(which='hill_5')
 # hill_25 = read_inds(which='hill_25')
 # hill_75 = read_inds(which='hill_75')
+# rich = read_inds(which='rich')
+# plot_sth(data={'rich': rich['onerc']})
+# plot_sth(data={'rich': rich['onenode'], 'hill_2': hill2['onenode'], 'sh': sh['onenode']}, save=True, savename='onenode_richHillSh')
 #
 # ave_sh = ave_inds(which='shannon')
 # ave_hill2 = ave_inds(which='hill2')
@@ -149,6 +188,8 @@ def plotende(ave, fams):
 # data167 = correct(np.load('saved_data/Indizes_explizit/Daten/'
 #                           '501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d_offsprings.npy'))
 #
+# np.savetxt('saved_data/' + 'onenode' + 'rich.csv', calc_richness(data1), delimiter=',', fmt='%s')
+# np.savetxt('saved_data/' + 'onerc' + 'rich.csv', calc_richness(data167), delimiter=',', fmt='%s')
 # data = {"1": data1, "167": data167}
 #
 # def funk(file):
@@ -171,15 +212,11 @@ def plotende(ave, fams):
 """
         ---Test offs---  
 """
-test = [[5], [4, 1], [4, 1, 1], [3, 0, 1], [3, 0, 0, 1]]
-c = calc_richness(test)
-plot_sth(data={'rich': c})
-test2 = [[5], [5, 1], [4, 1, 1, 1], [3, 2, 1, 0], [0, 3, 0,	0]]
-calc_richness(test2)
-plot_sth(data={'rich': c})
+# test = [[5], [4, 1], [4, 1, 1], [3, 0, 1], [3, 0, 0, 1]]
+# test2 = [[5], [5, 1], [4, 1, 1, 1], [3, 2, 1, 0], [0, 3, 0,	0]]
+# # data = {'test': test, 'test2': test2}
+# plot_sth(data={'rich': calc_richness(test), 'hill_2': calc_hillnumbers(test, order=2), 'sh': calc_shannon(test)}, save=False, savename='onenode_richHillSh')
 
-# data = {'test': test, 'test2': test2}
-# #
 # for t in data:
 #     print(calc_evenness(data[t]))
 #     print(calc_ginisimpson(data[t]))
@@ -216,7 +253,7 @@ plot_sth(data={'rich': c})
 # data1 = set_data(path1)
 # datas = {'167': data167, '1': data1}
 # for data in datas:
-#     create_averaged_entropies(datas[data], save=True, saveplot=True, plot=True)
+    # create_averaged_entropies(datas[data], save=True, saveplot=True, plot=True)
 # #
 # names1 = []
 # for name in data1:
