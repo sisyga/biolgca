@@ -102,8 +102,8 @@ plotting <- function(data, filename="unknown"){
 # d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
 # plotting(d, filename=name)
 
-names = c('Varianten ohne mut/5011_2_640e948',
-'Varianten ohne mut/501167_4_ac06cfb')
+names = c('5011_ges/5011_mut_062b726c-48ab-4c6a-b2ad-e4cc27cc165a',
+'5011_ges/5011_mut_f0f4f654-b8b4-4d67-8553-783a622d2f9d')
 for (i in 1:2){ 
     name <- paste(names[i], "_int_length=250_cutoff=0", sep="")
     print(name)

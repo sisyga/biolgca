@@ -229,8 +229,10 @@ def calc_lognormaldistri(thom, int_length):
     thom = (thom / int_length).astype(int)
     param = sp.stats.lognorm.fit(thom)
     xxx = np.arange(0, ni)
-    fitted_data = sp.stats.lognorm.pdf(xxx, param[0], loc=0, scale=param[2])
+    fitted_data = sp.stats.lognorm.pdf(xxx, param[0], loc=param[1], scale=param[2])
     print('sigma', param[0])
+    print('?', param[1])
+    print('p2', param[2])
     print('mu', np.log(param[2]))
 
     return fitted_data, maxy, y

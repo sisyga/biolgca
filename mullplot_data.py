@@ -215,7 +215,7 @@ name1 = 'Varianten ohne mut/5011_2_640e948'
 name167 = 'Varianten ohne mut/501167_4_ac06cfb'
 
 names = [name1, name167]
-
+names = ['5011_ges/5011_mut_062b726c-48ab-4c6a-b2ad-e4cc27cc165a', '5011_ges/5011_mut_f0f4f654-b8b4-4d67-8553-783a622d2f9d']
 for i in names:
     print(i)
     create_input(i, int_length=250)

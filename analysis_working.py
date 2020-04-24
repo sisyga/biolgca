@@ -60,16 +60,21 @@ Beispiele für Datensätze
 Einlesen von thoms der Länge 1500
 plus color-set
 """
-# thom01 = np.load('saved_data/thoms/' + 'rc=178_thom1500.npy')
-# thom02 = np.load('saved_data/thoms/' + 'rc=88_thom1500.npy')
-# thom45 = np.load('saved_data/thoms/' + 'rc=2_thom1500.npy')
-# thom60 = np.load('saved_data/thoms/' + 'rc=1_thom1500.npy')
-# data = {'rc=178': thom01, 'rc=88': thom02, 'rc=2': thom45, 'rc=1': thom60}
+thom01 = np.load('saved_data/thoms/' + 'rc=178_thom1500.npy')
+thom02 = np.load('saved_data/thoms/' + 'rc=88_thom1500.npy')
+thom45 = np.load('saved_data/thoms/' + 'rc=2_thom1500.npy')
+thom60 = np.load('saved_data/thoms/' + 'rc=1_thom1500.npy')
+data = {'rc=178': thom01, 'rc=88': thom02, 'rc=2': thom45, 'rc=1': thom60}
 # data = {'rc=178': thom01, 'rc=1': thom60}
-# colors = ['darkred', 'orange', 'olivedrab', 'darkturquoise']
+colors = ['darkred', 'orange', 'olivedrab', 'darkturquoise']
+
+for var in data:
+    print(var)
+    print('max', max(data[var]))
+    print('min', min(data[var]))
+    print('mean', np.mean(data[var]))
+
 # thom90 = np.load('saved_data/thoms/' + 'rc=178_thom1500.npy')
-# data = {'rc=178': thom01, 'rc=88': thom02, 'rc=2': thom45, 'rc=1': thom60, 'rc=0': thom90}
-# colors = ['darkred', 'orange', 'olivedrab', 'indigo', 'darkturquoise']
 # mullerplot(data01['offs'], save=True, id='mp18001')
 # mullerplot(data01['offs'], int_length=250, save=True, id='mp18001')
 # mullerplot(data60['offs'], save=True, id='mp18060')
@@ -78,20 +83,25 @@ plus color-set
 example = 'rc=178'
 # plot_lognorm_distribution(thom=data[example], int_length=1000, save=True, id=example, c=colors[0])
 
-# onenode = np.load('saved_data/thoms501/501thom01_1000.npy')
-# onerc = np.load('saved_data/thoms501/501thom167_1000.npy')
+onenode = np.load('saved_data/thoms501/501thom01_1000.npy')
+onerc = np.load('saved_data/thoms501/501thom167_1000.npy')
 # print(np.load('saved_data/onenode_thom_5.npy'))
 # print(np.load('saved_data/onerc_thom_5.npy'))
 # print(len(onenode))
 # print(len(onerc))
 # print(onenode.mean(), onenode.min(), onenode.max())
 # print(onerc.mean(), onerc.min(), onerc.max())
-# dat = {'onenode': onenode, 'onerc': onerc}
+dat = {'onenode': onenode, 'onerc': onerc}
+for var in dat:
+    print(var)
+    print('max', max(dat[var]))
+    print('min', min(dat[var]))
+    print('mean', np.mean(dat[var]))
 # plot_all_lognorm(dat, colors, 1000, save=True)
-# plot_all_lognorm(data, colors, 1000)
+plot_all_lognorm(dat, colors, 5000, save=False)
 # thom_all(dat, 5000, save=False, id='ones, int=5000')
-# plot_lognorm_distribution(dat['onenode'], 1000, id='onenode', c=colors[0], save=True)
-# plot_lognorm_distribution(dat['onerc'], 1000, id='onerc', c=colors[1], save=True)
+# plot_lognorm_distribution(dat['onenode'], 5000, id='onenode', c=colors[0], save=True)
+# plot_lognorm_distribution(dat['onerc'], 5000, id='onerc', c=colors[1], save=True)
 
 
 # test = [[5], [4, 1], [4, 1, 1], [3, 0, 1], [3, 0, 0, 1]]

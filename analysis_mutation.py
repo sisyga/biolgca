@@ -58,7 +58,7 @@ def zahlende(path, steps):
     for file in files:
         if 'offspring' in file:
             rel.append(file)
-    # rel = rel[:10]
+    rel = rel[:3]
     # rel = ['Probe_offsprings.npy', 'Probe2_offsprings.npy']
     print('anz daten', len(rel))
     ende = {}
@@ -127,48 +127,59 @@ def plotende(ave, fams, muts):
         plt.show()
 
 # path = 'saved_data/5011_ges/'
-path = 'saved_data/501167_ges/'
-files = os.listdir(path)
-print(len(files))
-rel = []
-for file in files:
-    if 'offsprings' in file and '501167_mut' in file:
-        rel.append(file)
-print(len(rel))
-oris = []
-akti = []
-fam_max = []
-max_akti = []
-# rel = rel[:3]
-for r in rel:
-    offs = correct(np.load(path + r)[-1:])
-    fam_max.append(len(offs[0])-1)
-    akti.append(len([entry for entry in offs[0] if entry > 0]))
-    oris.append(offs[0][0] > 0)
-    max_akti.append('{:.2f}%'.format(max(offs[0])/sum(offs[0])*100))
+# path = 'saved_data/501167_ges/'
+# path = 'saved_data/Indizes_explizit/Daten/'
+# files = os.listdir(path)
+# print(len(files))
+# rel = []
+# for file in files:
+#     if 'offsprings' in file:
+#     # if 'offsprings' in file and '5011_mut' in file:
+#         rel.append(file)
+# print(len(rel))
+# print(rel)
+#
+# oris = []
+# akti = []
+# fam_max = []
+# max_akti = []
+# # rel = rel[:3]
+# for r in rel:
+#     offs = correct(np.load(path + r)[-1:])
+#     fam_max.append(len(offs[0])-1)
+#     akti.append(len([entry for entry in offs[0] if entry > 0]))
+#     oris.append(int(1*offs[0][0] > 0))
+#     max_akti.append('{:.2f}'.format(max(offs[0])/sum(offs[0])))
+# print('oris, ati, fammax, maxakti')
 # print(oris, akti, fam_max, max_akti)
 
-import csv
-toWrite = [['Simulation:'] + [i+1 for i in range(0, len(fam_max))],
-           ['Anz. Mutationen:'] + fam_max,
-           ['aktive Familien:'] + akti,
-           ['proz. dominierende:'] + max_akti,
-           ['Anfangsfamilie da:'] + oris
-           ]
-print(toWrite)
+# import csv
+# toWrite = [['Simulation:'] + [i+1 for i in range(0, len(fam_max))],
+#            ['Anz. Mutationen:'] + fam_max,
+#            ['aktive Familien:'] + akti,
+#            ['proz. dominierende:'] + max_akti,
+#            ['Anfangsfamilie da:'] + oris
+#            ]
+# print(toWrite)
+#
+# file = open(path + '5011_ges.csv', 'w')
+#
+# with file as csvfile:
+#     writer = csv.writer(csvfile, delimiter=',')
+#     for row in toWrite:
+#         writer.writerow(row)
 
-file = open(path + '501167_ges.csv', 'w')
-
-with file as csvfile:
-    writer = csv.writer(csvfile, delimiter=',')
-    for row in toWrite:
-        writer.writerow(row)
-
-# ende, fams, muts = zahlende(path='saved_data/5011_ges/', steps=10)
-
+ende, fams, muts = zahlende(path='saved_data/5011_ges/', steps=10)
+print(ende, fams)
 # plotende(ende, fams, muts)
-# print(mittelende(ende))
 
+popdic = {0: [1,2], 1: [3,4], 2: [2,0]}
+xrange = np.arange(0, 2)
+data = pd.DataFrame(popdic, index=xrange)
+data_perc = data.divide(data.sum(axis=1), axis=0)
+plt.stackplot(xrange, *[data_perc[f] for f in range(0, 3)],
+              labels=list(range(0, 3)))
+plt.show()
 # o1 = [[-99, 1,3,5,0], [-99, 2,2,4,0,4], [-99, 0,0,4,0,0]]
 # np.save('saved_data/testoffs1.npy', o1)
 # o2 = [[-99, 0,0,0,1,2], [-99, 0,0,0,2,5], [-99, 0,0,0,0,3,1]]

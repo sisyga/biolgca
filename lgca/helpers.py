@@ -574,7 +574,7 @@ def plot_lognorm_distribution(thom, int_length, save=False, id=0, c='seagreen'):
     :param c: desired color of distribution function
     """
     max = thom.max().astype(int)
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(8,4))
     plt.xticks(fontsize=10)
     plt.yticks(fontsize=10)
     plt.xlabel('thom', fontsize=15)
@@ -586,11 +586,12 @@ def plot_lognorm_distribution(thom, int_length, save=False, id=0, c='seagreen'):
 
     plt.xlim(0, max + int_length/2)
     plt.bar(x, y, width=int_length, color='grey', alpha=0.5)
-    print('x', x)
-    print('y', y)
-    barerr = calc_barerrs(y)
+    # print('x', x)
+    # print('y', y)
+    # barerr = calc_barerrs(y)
     #todo plt.errorbar(x, y, yerr=barerr, color='magenta')
     plt.plot(x, fitted_data * maxy / maxfit, color=c, label=id)
+    print('a ', maxy / maxfit)
     # sqderr = calc_quaderr(fitted_data * maxy / maxfit, y)
     # print('q', sqderr)
     # scale = int_length * 5
@@ -617,7 +618,7 @@ def plot_all_lognorm(thomarray, colorarray, int_length, save=False):
     :param colorarray: structure like data = {'rc=02': 'red', 'rc=01': 'blue'}
     :param int_length: desired length of interval
     """
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(8, 4))
     plt.xticks(fontsize=10)
     plt.yticks(fontsize=10)
     plt.xlabel('thom', fontsize=15)
