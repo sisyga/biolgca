@@ -226,8 +226,8 @@ def inheritance(lgca):
 def mutations(lgca):
     """
     new families will develop by mutations
-    if lgca.mut ==True: driver mutations -> r_b increases by mutation;
-                ==False: passenger mutations
+    if lgca.effect == driver_mut -> r_b increases by mutation;
+                == passenger_mut -> r_b=const
     """
     chronicle = False  # Ausgabe der einzelnen Schritte für chronicle = True
     rel_nodes = lgca.nodes[lgca.r_int:-lgca.r_int]
@@ -250,12 +250,12 @@ def mutations(lgca):
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
         node = lgca.nodes[coord]
-        # print('schau auf node ', node)
+        print('schau auf node ', node)
         # choose cells that proliferate
         r_bs = np.array([lgca.props['r_b'][lgca.props['lab_m'][i]] for i in node])
-        # print('r_bs', r_bs)
+        print('r_bs', r_bs)
         proliferating = npr.random(lgca.K) < r_bs
-        # print('prolif', proliferating)
+        print('prolif', proliferating)
 
         # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
         for label in node[proliferating]:
@@ -279,8 +279,7 @@ def mutations(lgca):
                     lgca.props['num_off'].append(1)
                     lgca.props['lab_m'].append(int(lgca.maxfamily))
                     lgca.tree_manager.register(lgca.props['lab_m'][label])
-                    if lgca.mut:
-                        lgca.props['r_b'].append(round(0.2 + lgca.props['r_b'][lgca.props['lab_m'][label]], 2))
+                    lgca.props['r_b'].append(lgca.effect(lgca.props['r_b'][lgca.props['lab_m'][label]]))
 
                 else:
                     fam = lgca.props['lab_m'][label]
@@ -373,3 +372,11 @@ def passenger_mutations(lgca):
         print(lgca.tree_manager.tree)
 
 
+def driver_mut(rb):
+    print('driver')
+    return rb + 0.1
+
+
+def passenger_mut(rb):
+    print('passenger')
+    return rb
