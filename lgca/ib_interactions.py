@@ -292,10 +292,14 @@ def mutations(lgca):
         lgca.nodes[coord] = node
 
     # reorientation:
-    # todo shuffle einfügen
-    # for a in lgca.nonborder:
-    #     for c in a:
-    #         npr.shuffle(lgca.nodes[c])
+    for x in range(1, lgca.lx + 1):
+        for y in range(1, lgca.ly + 1):
+            # print(x, y)
+            # print('cv', lgca.nodes[x][y])
+            npr.shuffle(lgca.nodes[x][y])
+            # print('cn', lgca.nodes[x][y])
+
+    # print('nachher', lgca.nodes)
     if chronicle:
         print('props after t ', lgca.props['num_off'])
         print(lgca.tree_manager.tree)
