@@ -489,30 +489,39 @@ class LGCA_Square(LGCA_base):
 
         return fig, pc, cmap
 
-    def plot_test(self, data=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
+    def plot_test(self, nodes_t=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
                   edgecolor='None', cbar=True):
-        if data is None:
-            nodes_t = self.nodes_t
-            tend, lx, ly, K = nodes_t.shape
-            data = np.array([[[-99]*lx]*ly]*tend)
-            for t in range(0, tend):
-                for dy in range(0, ly):
-                    for dx in range(0, lx):
-                        fams = []
-                        for lab in nodes_t[t][dy][dx]:
-                            if lab != 0:
-                                fams.append(self.props['lab_m'][lab])
-                        reg = {}
-                        for f in fams:
-                            reg[f] = fams.count(f)
-                        if len(reg) > 0:
-                            max_fam = max(reg, key=reg.get)
-                        else:
-                            max_fam = 0
-                        data[t][dy][dx] = max_fam
+        """
+        Idee: für einen Zeitschritt (nodes_t entsprechend übergeben)
+         für jeden Knoten die häufigste Familie plotten
+
+        """
+        if nodes_t is None:
+            nodes_t = self.nodes_t[-1]
+
+            lx, ly, K = nodes_t.shape
+        else:
+            lx, ly, K = nodes_t.shape
+        # print(nodes_t)
+        data = np.array([[-99]*lx]*ly)
+        for dy in range(0, ly):
+            for dx in range(0, lx):
+                fams = []
+                for lab in nodes_t[dy][dx]:
+                    if lab != 0:
+                        fams.append(self.props['lab_m'][lab])
+                reg = {}
+                for f in fams:
+                    reg[f] = fams.count(f)
+                if len(reg) > 0:
+                    max_fam = max(reg, key=reg.get)
+                else:
+                    max_fam = 0
+                data[dy][dx] = max_fam
+        print('data', data)
         if figsize is None:
-            # figsize = estimate_figsize(data, cbar=True, dy=self.dy)
-            figsize=((10,10))
+            figsize = estimate_figsize(data, cbar=True, dy=self.dy)
+            # figsize=((10, 10))
         if vmax is None:
             K = self.K
 

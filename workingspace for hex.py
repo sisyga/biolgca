@@ -48,7 +48,7 @@ def read_pm(name):
 
 # datanames = {'inh': 'todo1', 'pm': 'todo2'}
 
-dim = 2
+dim = 3
 rc = 2
 
 nodes = np.zeros((dim, dim, 6+rc))
@@ -56,16 +56,19 @@ for i in range(0, 6+rc):
     nodes[dim//2, dim//2, i] = i+1
 
 lgca_hex = get_lgca(ib=True, geometry='hex', bc='reflecting', nodes=nodes, interaction='mutations',
-                r_b=0.8, r_d=0.3, r_m=0.5, effect=passenger_mut)
-lgca_hex.timeevo(timesteps=2, record=True)
+                r_b=0.8, r_d=0.3, r_m=0.5, effect=driver_mut)
+# lgca_hex.timeevo(timesteps=2, record=True)
 
-# print(lgca_hex.props)
-# print(lgca_hex.nodes[lgca_hex.r_int:-lgca_hex.r_int])
-# for t in range(0, 2):
-#     lgca_hex.timeevo(timesteps=1, record=True)
-#     print(lgca_hex.props)
-#     lgca_hex.plot_test()
-# print(lgca_hex.nodes_t)
+
+n = np.array([x[1:-1] for x in lgca_hex.nodes[lgca_hex.r_int:-lgca_hex.r_int]])
+# print(n)
+# for t in range(0, 3):
+lgca_hex.timeevo(timesteps=3, record=True)
+print('nt', lgca_hex.nodes_t)
+for t in range(0, 4):
+    lgca_hex.plot_test(nodes_t=lgca_hex.nodes_t[t])
+    lgca_hex.plot_density(density=lgca_hex.dens_t[t])
+print(lgca_hex.props)
 
 
 # print(lgca_hex.props)

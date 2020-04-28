@@ -250,12 +250,14 @@ def mutations(lgca):
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
         node = lgca.nodes[coord]
-        print('schau auf node ', node)
+        if chronicle:
+            print('schau auf node ', node)
         # choose cells that proliferate
         r_bs = np.array([lgca.props['r_b'][lgca.props['lab_m'][i]] for i in node])
-        print('r_bs', r_bs)
+        if chronicle:
+            print('r_bs', r_bs)
         proliferating = npr.random(lgca.K) < r_bs
-        print('prolif', proliferating)
+        # print('prolif', proliferating)
 
         # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
         for label in node[proliferating]:
