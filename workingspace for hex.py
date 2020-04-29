@@ -47,11 +47,11 @@ def create_hex(dim, rc, steps, driver=False, save=False):
     nodes = np.zeros((dim, dim, 6 + rc))
     for i in range(0, 6 + rc):
         nodes[dim//2, dim//2, i] = i+1
-    name = str(dim) + 'x' + str(dim) + '_rc=' + str(rc) + '_steps=' + str(steps) + '_Test'
+    name = str(dim) + 'x' + str(dim) + '_rc=' + str(rc) + '_steps=' + str(steps) + '_miniTest'
 
     if driver:
         lgca_hex = get_lgca(ib=True, geometry='hex', bc='reflecting', nodes=nodes, interaction='mutations',
-                        r_m=0.01, effect=driver_mut)
+                        r_b=0.8, r_d=0.1, r_m=0.5, effect=driver_mut)
         name += '_driver'
     else:
         lgca_hex = get_lgca(ib=True, geometry='hex', bc='reflecting', nodes=nodes, interaction='mutations',
@@ -65,16 +65,29 @@ def create_hex(dim, rc, steps, driver=False, save=False):
         np.save('saved_data/' + name + '_families', lgca_hex.props['lab_m'])
         np.save('saved_data/' + name + '_offsprings', lgca_hex.offsprings)
         np.save('saved_data/' + name + '_nodes', lgca_hex.nodes_t)
-    for t in range(0, steps + 1, steps):
-        lgca_hex.plot_test(nodes_t=lgca_hex.nodes_t[t], save=save, id=name + '_step' + str(t))
+    # for t in range(0, steps + 1, steps):
+    t=steps
+    lgca_hex.plot_test(nodes_t=lgca_hex.nodes_t[t], save=save, id=name + '_step' + str(t))
         # lgca_hex.plot_density(density=lgca_hex.dens_t[t], save=save, id=name + '_step' + str(t))
 
 
-create_hex(dim=50, rc=1, steps=50, driver=True, save=False)
+# create_hex(dim=4, rc=1, steps=10, driver=True, save=True)
 # create_hex(dim=50, rc=1, steps=50, driver=False, save=True)
 
-# name = '50x50_rc=1_steps=70_Test'
+# name = '4x4_rc=1_steps=10_miniTest_driver'
 # tree, fams, offs, nodes = read_pm(name=name)
 # offs = correct(offs)
 # print(len(offs), len(nodes))
+# print(nodes[0])
+# print(fams)
+# plot_families(nodes_t=nodes[-1], lab_m=fams, dims=4)
+# print(np.linspace(1,8,7))
+nodes = np.zeros((4, 4, 6 + 1)).astype(int)
+nodes[0,0,0] = 1
+nodes[1,0,0] = 0
+nodes[2,0,0] = 0
+fs = np.array([0,1,2,3])
+print(nodes)
+print(fs)
+plot_families(nodes_t=nodes, lab_m=fs, dims=4)
 #
