@@ -43,74 +43,38 @@ def read_pm(name):
     nodes = np.load('saved_data/' + name + '_nodes.npy')
     return tree, fams, offs, nodes
 
-# create_pm(name='Probe', dim=3, rc=1, save=True)
-# print(read_pm('Probe'))
+def create_hex(dim, rc, steps, driver=False, save=False):
+    nodes = np.zeros((dim, dim, 6 + rc))
+    for i in range(0, 6 + rc):
+        nodes[dim//2, dim//2, i] = i+1
+    name = str(dim) + 'x' + str(dim) + '_rc=' + str(rc) + '_steps=' + str(steps) + '_Test'
 
-# datanames = {'inh': 'todo1', 'pm': 'todo2'}
+    if driver:
+        lgca_hex = get_lgca(ib=True, geometry='hex', bc='reflecting', nodes=nodes, interaction='mutations',
+                        r_m=0.01, effect=driver_mut)
+        name += '_driver'
+    else:
+        lgca_hex = get_lgca(ib=True, geometry='hex', bc='reflecting', nodes=nodes, interaction='mutations',
+                            effect=passenger_mut)
+        name += '_passenger'
 
-dim = 4
-rc = 2
+    lgca_hex.timeevo(timesteps=steps, record=True)
+    print('maxfam', len(lgca_hex.tree_manager.tree))
+    if save:
+        np.save('saved_data/' + name + '_tree', lgca_hex.tree_manager.tree)
+        np.save('saved_data/' + name + '_families', lgca_hex.props['lab_m'])
+        np.save('saved_data/' + name + '_offsprings', lgca_hex.offsprings)
+        np.save('saved_data/' + name + '_nodes', lgca_hex.nodes_t)
+    for t in range(0, steps + 1, steps):
+        lgca_hex.plot_test(nodes_t=lgca_hex.nodes_t[t], save=save, id=name + '_step' + str(t))
+        # lgca_hex.plot_density(density=lgca_hex.dens_t[t], save=save, id=name + '_step' + str(t))
 
-nodes = np.zeros((dim, dim, 6+rc))
-for i in range(0, 6+rc):
-    nodes[dim//2, dim//2, i] = i+1
 
-# print(nodes)
-# nodes[1,3,1] = 4
+create_hex(dim=50, rc=1, steps=50, driver=True, save=False)
+# create_hex(dim=50, rc=1, steps=50, driver=False, save=True)
 
-lgca_hex = get_lgca(ib=True, geometry='hex', bc='reflecting', nodes=nodes, interaction='mutations',
-                r_b=0, r_d=0, r_m=0.5, effect=passenger_mut)
-# # lgca_hex.timeevo(timesteps=2, record=True)
+# name = '50x50_rc=1_steps=70_Test'
+# tree, fams, offs, nodes = read_pm(name=name)
+# offs = correct(offs)
+# print(len(offs), len(nodes))
 #
-# lgca_hex.plot_density()
-# n = np.array([x[1:-1] for x in lgca_hex.nodes[lgca_hex.r_int:-lgca_hex.r_int]])
-# # print(n)
-# # for t in range(0, 3):
-lgca_hex.timeevo(timesteps=2, record=True)
-# # print('nt', lgca_hex.nodes_t)
-for t in range(0, 3):
-    # lgca_hex.plot_test(nodes_t=lgca_hex.nodes_t[t])
-    lgca_hex.plot_density(density=lgca_hex.dens_t[t])
-# print(lgca_hex.props)
-# print(lgca_hex.nodes_t)
-# lgca_hex.plot_density()
-# lgca_hex.plot_test()
-
-
-# print(lgca_hex.props)
-# lgca_hex.timeevo(timesteps=2, record=True)
-# print(lgca_hex.nodes_t)
-# print(lgca_hex.nodes_t[0])
-# print(lgca_hex.nodes_t[-1])
-# print(lgca_hex.props)
-# lgca_hex.timeevo(timesteps=1, record=True)
-# print(lgca_hex.nodes_t)
-# print(lgca_hex.props)
-
-
-
-# lgca_hex.plot_test()
-# lgca_hex.plot_density()
-# lgca_hex.timeevo(timesteps=1, record=True)
-# lgca_hex.plot_test()
-# print(lgca_hex.nodes_t)
-# tend, lx, ly, K = lgca_hex.nodes_t.shape
-# print('tend, lx, ly, K', tend, lx, ly, K)
-
-# lgca_hex.plot_test()
-
-
-# plot_popsize(data=lgca_hex.offsprings, plotmax=0)   #dim*dim*lgca_hex.K)
-# print(lgca_hex.dens_t)
-# data = np.array([[[-99]*lx]*ly]*tend)
-# print(data)
-# lgca_hex.plot_test()
-# lgca_hex.live_animate_density()
-# t = 10
-# lgca_hex.timeevo(timesteps=t, record=True)
-# steps = np.arange(0, t, 4)
-# # for step in steps:
-# #     lgca_hex.plot_density(lgca_hex.dens_t[step])
-# # print('popmax', dim*dim*lgca_hex.K)
-# # plot_popsize(data=lgca_hex.offsprings, plotmax=dim*dim*lgca_hex.K)
-# plot_families(lgca_hex.nodes_t)

@@ -5,7 +5,7 @@ from matplotlib.collections import PatchCollection
 from matplotlib.colors import Normalize
 from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
+from lgca.helpers import *
 try:
     from base import *
 except ModuleNotFoundError:
@@ -489,8 +489,8 @@ class LGCA_Square(LGCA_base):
 
         return fig, pc, cmap
 
-    def plot_test(self, nodes_t=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
-                  edgecolor='None', cbar=True):
+    def plot_test(self, nodes_t=None, figindex=None, figsize=None, tight_layout=True, cmap='inferno', vmax=None,
+                  edgecolor='None', cbar=True, save=False, id=0):
         """
         Idee: für einen Zeitschritt (nodes_t entsprechend übergeben)
          für jeden Knoten die häufigste Familie plotten
@@ -499,9 +499,7 @@ class LGCA_Square(LGCA_base):
         if nodes_t is None:
             nodes_t = self.nodes_t[-1]
 
-            lx, ly, K = nodes_t.shape
-        else:
-            lx, ly, K = nodes_t.shape
+        lx, ly, K = nodes_t.shape
         # print(nodes_t)
         data = np.array([[-99]*lx]*ly)
         for dy in range(0, ly):
@@ -518,20 +516,20 @@ class LGCA_Square(LGCA_base):
                 else:
                     max_fam = 0
                 data[dy][dx] = max_fam
-        print('data', data)
+        # print('data', data)
         if figsize is None:
             figsize = estimate_figsize(data, cbar=True, dy=self.dy)
-            # figsize=((10, 10))
         if vmax is None:
-            K = self.K
+            K = data.max()
+
 
         fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
         cmap = plt.cm.get_cmap(cmap)
         cmap.set_under(alpha=0.0)
         if K > 1:
             cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
-        else:
-            cmap = plt.cm.ScalarMappable(cmap=cmap)
+        elif K==1:
+            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 2), cmap.N))
         cmap.set_array(data)
         polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
                                    orientation=self.orientation, facecolor=c, edgecolor=edgecolor)
@@ -543,13 +541,19 @@ class LGCA_Square(LGCA_base):
             cax = divider.append_axes("right", size="5%", pad=0.1)
             cbar = fig.colorbar(cmap, extend='min', use_gridspec=True, cax=cax)
             cbar.set_label('family')
-            cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[1::2])
-            cbar.set_ticklabels(1 + np.arange(K))
+            # cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[1::2])
+            # cbar.set_ticklabels(1 + np.arange(0, K+1, K))
+            cbar.set_ticks(np.linspace(0., K + 1, K))
+            cbar.set_ticklabels(1 + np.arange(0, K+1, K))
             plt.sca(ax)
+
+        if save:
+            filename = str(id) + 'fams_hex' + '.jpg'
+            plt.savefig(pathlib.Path('pictures').resolve() / filename)
         plt.show()
 
     def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
-                     edgecolor='None', cbar=True):
+                     edgecolor='None', cbar=True, save=False, id=0):
         if density is None:
             density = self.cell_density[self.nonborder]
 
@@ -583,6 +587,9 @@ class LGCA_Square(LGCA_base):
             cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[1::2])
             cbar.set_ticklabels(1 + np.arange(K))
             plt.sca(ax)
+        if save:
+            filename = str(id) + 'dens_hex' + '.jpg'
+            plt.savefig(pathlib.Path('pictures').resolve() / filename)
         plt.show()
 
         return fig, pc, cmap
