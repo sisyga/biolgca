@@ -215,10 +215,12 @@ name1 = 'Varianten ohne mut/5011_2_640e948'
 name167 = 'Varianten ohne mut/501167_4_ac06cfb'
 
 names = [name1, name167]
-names = ['5011_ges/5011_mut_062b726c-48ab-4c6a-b2ad-e4cc27cc165a', '5011_ges/5011_mut_f0f4f654-b8b4-4d67-8553-783a622d2f9d']
-for i in names:
-    print(i)
-    create_input(i, int_length=250)
+names = ['100x100_rc=1_steps=500_Test_passenger', '100x100_rc=1_steps=500_Test_driver', '100x100_rc=1_steps=500_rb1_5_driver']
+names = names[0]
+# for i in names:
+i='2x2_rc=1_steps=5mini_driver'
+print(i)
+create_input(i, int_length=1)
 # print(o)
 # create_newoffs(o, int_length=3, tbeg=0, tend=len(o) - 1)
 # create_input(name, int_length=250)

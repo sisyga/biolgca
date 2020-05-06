@@ -380,7 +380,7 @@ def passenger_mutations(lgca):
 
 def driver_mut(rb):
     # print('driver')
-    return rb * 1.1
+    return rb * 1.2
 
 
 def passenger_mut(rb):

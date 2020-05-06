@@ -82,8 +82,8 @@ magic <- function(e_name, t_name, p_name, tbeg=0, tend=0){
 
 plotting <- function(data, filename="unknown"){
     #print("plotting")
-    jpeg(paste("C:/Users/Franzi/PycharmProjects/biolgca/pictures/", filename, "_mp.jpg", sep=""), width=600, height=250) 
-    plot(Muller_plot(data, xlab = "timesteps", ylab= "relative frequency"))
+    jpeg(paste("C:/Users/Franzi/PycharmProjects/biolgca/pictures/", filename, "_mp.jpg", sep=""), width=400, height=400) #width=600, height=250) 
+    plot(Muller_plot(data, xlab = "timesteps", ylab= "relative frequency"))     #400,250
     dev.off()
 }
 #d <- magic(e_name="bsp_0-11_filtered 0.250_edges.csv", p_name="bsp_0-11_filtered 0.250_summed_population.csv", t_name="bsp_0-11_filtered 0.250_summed_timerange.csv")
@@ -102,11 +102,14 @@ plotting <- function(data, filename="unknown"){
 # d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
 # plotting(d, filename=name)
 
-names = c('5011_ges/5011_mut_062b726c-48ab-4c6a-b2ad-e4cc27cc165a',
-'5011_ges/5011_mut_f0f4f654-b8b4-4d67-8553-783a622d2f9d')
-for (i in 1:2){ 
-    name <- paste(names[i], "_int_length=250_cutoff=0", sep="")
-    print(name)
+# names = c('50x50_rc=1_steps=50_Test_driver', '50x50_rc=1_steps=50_Test_passenger',
+#          '50x50_rc=20_steps=50_Test_driver', '50x50_rc=20_steps=50_Test_passenger')
+names = c('4x4_rc=1_steps=10_miniTest_driver')
+
+for (i in 1:1){ 
+    
+    name <- paste(names[i], "_int_length=1_cutoff=0", sep="")
+
     
     d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
     plotting(d, filename=name)

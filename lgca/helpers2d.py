@@ -20,7 +20,7 @@ def plot_families(nodes_t, lab_m, dims=50,
     cond = get_lgca(ib=True, geometry='hex', bc='reflecting', dims=dims,
                     interaction='mutations', effect=driver_mut)
     lx, ly, K = nodes_t.shape
-    maxfam = lab_m.max()
+    maxfam = max(lab_m)
     print('mf', maxfam)
     print('lx, ly, K', lx, ly, K)
 
@@ -58,18 +58,18 @@ def plot_families(nodes_t, lab_m, dims=50,
     pc = PatchCollection(polygons, match_original=True)
     ax.add_collection(pc)
 
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.1)
-    cbar = fig.colorbar(cmap, extend='min', use_gridspec=True, cax=cax)
-    cbar.set_label('family')
-    if maxi > 10:
-        cbar.set_ticks(np.linspace(1, maxi + 1, maxi + 1))
-        cbar.set_ticklabels([1] + ['']*(maxi-1) + [maxi+1])
-    else:
-        cbar.set_ticks(np.linspace(1, maxi + 1, maxi+1))
-        cbar.set_ticklabels(np.arange(1, maxi+2, 1))
+    # divider = make_axes_locatable(ax)
+    # cax = divider.append_axes("right", size="5%", pad=0.1)
+    # cbar = fig.colorbar(cmap, extend='min', use_gridspec=True, cax=cax)
+    # cbar.set_label('family')
+    # if maxi > 10:
+    #     cbar.set_ticks(np.linspace(1, maxi + 1, maxi + 1))
+    #     cbar.set_ticklabels([1] + ['']*(maxi-1) + [maxi+1])
+    # else:
+    #     cbar.set_ticks(np.linspace(1, maxi + 1, maxi+1))
+    #     cbar.set_ticklabels(np.arange(1, maxi+2, 1))
 
-    plt.sca(ax)
+    # plt.sca(ax)
 
     if save:
         filename = str(id) + 'fams_hex' + '.jpg'

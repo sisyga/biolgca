@@ -43,19 +43,19 @@ def read_pm(name):
     nodes = np.load('saved_data/' + name + '_nodes.npy')
     return tree, fams, offs, nodes
 
-def create_hex(dim, rc, steps, driver=False, save=False):
+def create_hex(dim, rc, steps, iiid, driver=False, save=False):
     nodes = np.zeros((dim, dim, 6 + rc))
     for i in range(0, 6 + rc):
         nodes[dim//2, dim//2, i] = i+1
-    name = str(dim) + 'x' + str(dim) + '_rc=' + str(rc) + '_steps=' + str(steps) + '_miniTest'
+    name = str(dim) + 'x' + str(dim) + '_rc=' + str(rc) + '_steps=' + str(steps) + str(iiid)
 
     if driver:
         lgca_hex = get_lgca(ib=True, geometry='hex', bc='reflecting', nodes=nodes, interaction='mutations',
-                        r_b=0.8, r_d=0.1, r_m=0.5, effect=driver_mut)
+                        r_b=0.8, r_d=0.3, r_m=0.5, effect=driver_mut) #r_m=0.01
         name += '_driver'
     else:
         lgca_hex = get_lgca(ib=True, geometry='hex', bc='reflecting', nodes=nodes, interaction='mutations',
-                            effect=passenger_mut)
+                            r_m=0.01, effect=passenger_mut)
         name += '_passenger'
 
     lgca_hex.timeevo(timesteps=steps, record=True)
@@ -65,29 +65,71 @@ def create_hex(dim, rc, steps, driver=False, save=False):
         np.save('saved_data/' + name + '_families', lgca_hex.props['lab_m'])
         np.save('saved_data/' + name + '_offsprings', lgca_hex.offsprings)
         np.save('saved_data/' + name + '_nodes', lgca_hex.nodes_t)
-    # for t in range(0, steps + 1, steps):
-    t=steps
-    lgca_hex.plot_test(nodes_t=lgca_hex.nodes_t[t], save=save, id=name + '_step' + str(t))
-        # lgca_hex.plot_density(density=lgca_hex.dens_t[t], save=save, id=name + '_step' + str(t))
+    return lgca_hex
 
 
-# create_hex(dim=4, rc=1, steps=10, driver=True, save=True)
-# create_hex(dim=50, rc=1, steps=50, driver=False, save=True)
+# lgca = create_hex(dim=2, rc=1, steps=10, driver=True, save=True, iiid='mini_kplx')
+# create_hex(dim=100, rc=1, steps=500, driver=False, save=True, iiid='_Test')
 
-# name = '4x4_rc=1_steps=10_miniTest_driver'
-# tree, fams, offs, nodes = read_pm(name=name)
-# offs = correct(offs)
-# print(len(offs), len(nodes))
-# print(nodes[0])
-# print(fams)
-# plot_families(nodes_t=nodes[-1], lab_m=fams, dims=4)
-# print(np.linspace(1,8,7))
-nodes = np.zeros((4, 4, 6 + 1)).astype(int)
-nodes[0,0,0] = 1
-nodes[1,0,0] = 0
-nodes[2,0,0] = 0
-fs = np.array([0,1,2,3])
-print(nodes)
-print(fs)
-plot_families(nodes_t=nodes, lab_m=fs, dims=4)
+# for t in range(0, 11):
+#     plot_families(nodes_t=lgca.nodes_t[t], lab_m=lgca.props['lab_m'], dims=2)
+# for t in range(0, 11):
+#     print(lgca.offsprings[t])
+# print(lgca.tree_manager.tree)
+
+names_g = ['100x100_rc=1_steps=500_rb1_5_driver']
+names_g = ['100x100_rc=1_steps=500_Test_passenger', '100x100_rc=1_steps=500_Test_driver', '100x100_rc=1_steps=500_rb1_5_driver']
+names_g= ['2x2_rc=1_steps=10mini_kplx_driver']
+
+data = {}
+# for ind, name in enumerate(names_g):
+#     print(ind, name)
+#     data[str(ind)] = np.loadtxt('saved_data/' + name + '_sh.csv')
+# plot_sth(data, save=True, ylabel='shannon-index', savename='shannon_hex')
+
+for name in names_g:
+    tree, fams, offs, nodes = read_pm(name=name)
+    offs = correct(offs)
+    print(offs)
+#     print(tree)
+#     print(fams)
+#     # tree = {1: {'parent': 1, 'origin': 1},
+#     #         2: {'parent': 1, 'origin': 1},
+#     #         3: {'parent': 1, 'origin': 1},
+#     #         4: {'parent': 3, 'origin': 1},
+#     #         5: {'parent': 2, 'origin': 1},
+#     #         6: {'parent': 3, 'origin': 1},
+#     #         7: {'parent': 6, 'origin': 1}}
+#     # print(tree)
+#     # fams = np.array([0, 1, 4, 3, 2, 5, 7, 6, 7])
+#     # print(fams)
+#     print(len(offs), len(nodes), len(fams))
+#     maxfam = max(fams)
+#     gen = [0]*maxfam
+#     print(maxfam)
+#     for f in range(2, maxfam+1):
+#                         # f==1 always generation 0
+#         # par = tree.get(f)['parent']
+#         par = tree.item().get(f)['parent']
+#         gen[f-1] += 1
 #
+#         while par != 1:
+#             # par = tree.get(par)['parent']
+#             par = tree.item().get(par)['parent']
+#             gen[f - 1] += 1
+#
+#     generations = [0]*len(fams)
+#     for i, f in enumerate(fams):
+#         if i != 0:
+#             generations[i] = gen[f-1]
+#     np.save('saved_data/' + name + '_generations', generations)
+    # print(generations)
+
+    # for t in range(0, 101, 100):
+    # sh = calc_shannon(offs)
+    # np.savetxt('saved_data/' + name + '_sh.csv', sh, delimiter=',', fmt='%s')
+    # plot_sth({'sh': sh})
+    # plot_families(nodes_t=nodes[0], lab_m=fams, dims=100, save=True, id=name + '_0')
+    # plot_families(nodes_t=nodes[50], lab_m=fams, dims=100, save=True, id=name + '_50')
+    # plot_families(nodes_t=nodes[100], lab_m=fams, dims=100, save=True, id=name + '_100')
+
