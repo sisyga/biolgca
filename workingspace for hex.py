@@ -79,18 +79,48 @@ def create_hex(dim, rc, steps, iiid, driver=False, save=False):
 
 names_g = ['100x100_rc=1_steps=500_rb1_5_driver']
 names_g = ['100x100_rc=1_steps=500_Test_passenger', '100x100_rc=1_steps=500_Test_driver', '100x100_rc=1_steps=500_rb1_5_driver']
-names_g= ['2x2_rc=1_steps=10mini_kplx_driver']
+# names_g= ['2x2_rc=1_steps=10mini_kplx_driver']
 
 data = {}
 # for ind, name in enumerate(names_g):
 #     print(ind, name)
 #     data[str(ind)] = np.loadtxt('saved_data/' + name + '_sh.csv')
 # plot_sth(data, save=True, ylabel='shannon-index', savename='shannon_hex')
+tree, fams, offs, nodes = read_pm(name='100x100/'+names_g[0])
+x, yp = plot_popsize(offs)
+tree, fams, offs, nodes = read_pm(name='100x100/'+names_g[1])
+_, yd1 = plot_popsize(offs)
+tree, fams, offs, nodes = read_pm(name='100x100/'+names_g[2])
+_, yd5 = plot_popsize(offs)
 
-for name in names_g:
-    tree, fams, offs, nodes = read_pm(name=name)
-    offs = correct(offs)
-    print(offs)
+
+
+fig, ax = plt.subplots(figsize=(10, 5))
+plt.plot(x, yp, farben['0'], label='pass', linewidth=1.5)
+plt.plot(x, yd1, farben['1'], label='driver 1,1', linewidth=1.5)
+plt.plot(x, yd5, farben['2'], label='driver 1,5', linewidth=1.5)
+
+ax.set(xlabel='timesteps', ylabel='absolute number')
+ax.legend(loc='upper left')
+tend=501
+plt.xlim(0, tend - 1)
+if tend >= 10000:
+    plt.xticks(np.arange(0, tend, 5000))
+elif tend >= 100:
+    plt.xticks(np.arange(0, tend, 50))
+
+plt.ylim(0, 100*100*7+10)
+# if save:
+#     if savename is None:
+save_plot(plot=fig, filename='hexis_popsizes.jpg')
+#     else:
+#         save_plot(plot=fig, filename=savename + '.jpg')
+
+plt.show()
+# for name in names_g:
+#     tree, fams, offs, nodes = read_pm(name='100x100/'+name)
+#     # offs = correct(offs)
+#     plot_popsize(offs)
 #     print(tree)
 #     print(fams)
 #     # tree = {1: {'parent': 1, 'origin': 1},

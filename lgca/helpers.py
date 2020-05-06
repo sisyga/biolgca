@@ -470,6 +470,7 @@ def plot_popsize(data, save=False, id=0, plotmax=0):
         save_plot(fig, str(id) + '_population size ' + '.jpg')
 
     plt.show()
+    return x, y
 
 def plot_histogram_thom(thom, int_length, save=False, id=0):
     """
