@@ -75,3 +75,18 @@ def plot_families(nodes_t, lab_m, dims=50,
         filename = str(id) + 'fams_hex' + '.jpg'
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
     plt.show()
+
+def plot_density_after(nodes_t, dim=100, rc=1, id=0, save=False):
+
+    lgca_hex = get_lgca(dims=dim, ib=True, geometry='hex', bc='reflecting', interaction='mutations',
+                        restchannels=rc, r_b=0.5, r_d=0.02, r_m=0.01, effect=driver_mut)
+    den = np.array([[0] * dim] * dim)
+    for x in range(0, dim):
+        for y in range(0, dim):
+            s = 0
+            for entry in nodes_t[x][y]:
+                if entry > 0:
+                    s += 1
+            den[x][y] = s
+    # print(den)
+    lgca_hex.plot_density(density=den, save=save, id=id)

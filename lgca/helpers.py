@@ -265,7 +265,8 @@ def plot_sth(data, save=False, id=0, ylabel='index', savename=None):
     elif tend >= 100:
         plt.xticks(np.arange(0, tend, 50))
 
-    plt.ylim(0, maxy)
+    plt.ylim(0, 70000, 10000)
+    # plt.ylim(0, maxy)
     if save:
         if savename is None:
             save_plot(plot=fig, filename=str(id) + '_comparing_' + str(filename) + '.jpg')
@@ -470,7 +471,7 @@ def plot_popsize(data, save=False, id=0, plotmax=0):
         save_plot(fig, str(id) + '_population size ' + '.jpg')
 
     plt.show()
-    return x, y
+    return y
 
 def plot_histogram_thom(thom, int_length, save=False, id=0):
     """
