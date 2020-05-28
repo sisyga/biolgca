@@ -525,7 +525,7 @@ class LGCA_Square(LGCA_base):
             cbar.set_ticklabels(1 + np.arange(K))
             plt.sca(ax)
         if save:
-            filename = str(id) + '_dens_hex' + '.jpg'
+            filename = str(id) + '_dens_hex' + '.png'
             plt.savefig(pathlib.Path('pictures').resolve() / filename)
         plt.show()
 
@@ -588,7 +588,7 @@ class LGCA_Square(LGCA_base):
         # plt.sca(ax)
 
         if save:
-            filename = str(id) + '_fams_hex' + '.jpg'
+            filename = str(id) + '_fams_hex' + '.png'
             plt.savefig(pathlib.Path('pictures').resolve() / filename)
         plt.show()
 

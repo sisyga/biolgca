@@ -46,8 +46,8 @@ class Simulation(object):
             if step % self.trange == 0:
                 print(step, uu)
                 if sum(lgca.offsprings[-1][1:]) > 0:
-                    lgca.plot_families(save=True, id=str(uu) + '_step=' + str(step) + '_famplot')
-                    lgca.plot_density(cbar=False, save=True, id=str(uu) + '_step=' + str(step) + '_densplot')
+                    lgca.plot_families(save=True, id=str(uu) + '_step=' + str(step))
+                    lgca.plot_density(cbar=False, save=True, id=str(uu) + '_step=' + str(step))
                 else:
                     print('\n--------- ausgestorben -----------\n')
         return during_timeevo
