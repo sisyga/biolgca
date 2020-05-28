@@ -395,7 +395,7 @@ class LGCA_base():
         self.update_dynamic_fields()
 
 # adapted function!!!
-    def timeevo(self, timesteps=100, record=False, recordoffs=False, trange=False,
+    def timeevo(self, timesteps=100, record=False, recordoffs=False, callback=None,
                 recordN=False, recorddens=False, showprogress=True):
         self.update_dynamic_fields()
 
@@ -426,15 +426,8 @@ class LGCA_base():
                 self.dens_t[t, ...] = self.cell_density[self.nonborder]
             if showprogress:
                 update_progress(1.0 * t / timesteps)
-            # plots für fixe Zeiten
-            if t in trange[0]:
-                if sum(self.offsprings[-1][1:]) > 0:
-                    self.plot_families(save=True,
-                                       id='uuid=' + str(trange[2]) + '_step=' + str(t) + str(trange[1]))
-                    self.plot_density(cbar=False, save=True,
-                                      id='uuid=' + str(trange[2]) + '_step=' + str(t) + str(trange[1]))
-                else:
-                    print('\n--------- ausgestorben -----------\n')
+            if callback:
+                callback(self, t)
 
     def calc_permutations(self):
         self.permutations = [np.array(list(multiset_permutations([1] * n + [0] * (self.K - n))), dtype=np.int8)
