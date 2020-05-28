@@ -225,6 +225,7 @@ def inheritance(lgca):
 
 def mutations(lgca):
     """
+    only for 2d lattices
     new families will develop by mutations
     if lgca.effect == driver_mut -> r_b increases by mutation;
                 == passenger_mut -> r_b=const
@@ -380,7 +381,7 @@ def passenger_mutations(lgca):
 
 def driver_mut(rb):
     # print('driver')
-    return rb * 1.2
+    return rb * 1.1
 
 
 def passenger_mut(rb):

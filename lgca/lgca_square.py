@@ -489,69 +489,6 @@ class LGCA_Square(LGCA_base):
 
         return fig, pc, cmap
 
-    def plot_test(self, nodes_t=None, figindex=None, figsize=None, tight_layout=True, cmap='inferno', vmax=None,
-                  edgecolor='None', cbar=True, save=False, id=0):
-        """
-        Idee: für einen Zeitschritt (nodes_t entsprechend übergeben)
-         für jeden Knoten die häufigste Familie plotten
-
-        """
-        if nodes_t is None:
-            nodes_t = self.nodes_t[-1]
-
-        lx, ly, K = nodes_t.shape
-        # print(nodes_t)
-        data = np.array([[-99]*lx]*ly)
-        for dy in range(0, ly):
-            for dx in range(0, lx):
-                fams = []
-                for lab in nodes_t[dy][dx]:
-                    if lab != 0:
-                        fams.append(self.props['lab_m'][lab])
-                reg = {}
-                for f in fams:
-                    reg[f] = fams.count(f)
-                if len(reg) > 0:
-                    max_fam = max(reg, key=reg.get)
-                else:
-                    max_fam = 0
-                data[dy][dx] = max_fam
-        # print('data', data)
-        if figsize is None:
-            figsize = estimate_figsize(data, cbar=True, dy=self.dy)
-        if vmax is None:
-            K = data.max()
-
-
-        fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
-        cmap = plt.cm.get_cmap(cmap)
-        cmap.set_under(alpha=0.0)
-        if K > 1:
-            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
-        elif K==1:
-            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 2), cmap.N))
-        cmap.set_array(data)
-        polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
-                                   orientation=self.orientation, facecolor=c, edgecolor=edgecolor)
-                    for x, y, c in zip(self.xcoords.ravel(), self.ycoords.ravel(), cmap.to_rgba(data.ravel()))]
-        pc = PatchCollection(polygons, match_original=True)
-        ax.add_collection(pc)
-        if cbar:
-            divider = make_axes_locatable(ax)
-            cax = divider.append_axes("right", size="5%", pad=0.1)
-            cbar = fig.colorbar(cmap, extend='min', use_gridspec=True, cax=cax)
-            cbar.set_label('family')
-            # cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[1::2])
-            # cbar.set_ticklabels(1 + np.arange(0, K+1, K))
-            cbar.set_ticks(np.linspace(0., K + 1, K))
-            cbar.set_ticklabels(1 + np.arange(0, K+1, K))
-            plt.sca(ax)
-
-        if save:
-            filename = str(id) + 'fams_hex' + '.jpg'
-            plt.savefig(pathlib.Path('pictures').resolve() / filename)
-        plt.show()
-
     def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
                      edgecolor='None', cbar=True, save=False, id=0):
         if density is None:
@@ -588,11 +525,72 @@ class LGCA_Square(LGCA_base):
             cbar.set_ticklabels(1 + np.arange(K))
             plt.sca(ax)
         if save:
-            filename = str(id) + 'dens_hex' + '.jpg'
+            filename = str(id) + '_dens_hex' + '.jpg'
             plt.savefig(pathlib.Path('pictures').resolve() / filename)
         plt.show()
 
         return fig, pc, cmap
+
+    def plot_families(self, figsize=None, cmap='inferno', save=False, id=0):
+        """
+        Idee: für einen Zeitschritt (nodes_t entsprechend übergeben)
+         für jeden Knoten die häufigste Familie plotten
+
+        """
+        maxfam = max(self.props['lab_m'])
+        # print('mf', maxfam)
+        # print('lx, ly, K', self.lx, self.ly, self.K)
+        data = np.array([[-99] * self.lx] * self.ly)
+        for dy in range(0, self.ly):
+            for dx in range(0, self.lx):
+                fams = []
+                for lab in self.nodes[self.nonborder][dy][dx]:
+                    if lab != 0:
+                        fams.append(self.props['lab_m'][lab])
+                reg = {}
+                for f in fams:
+                    reg[f] = fams.count(f)
+                if len(reg) > 0:
+                    max_fam = max(reg, key=reg.get)
+                else:
+                    max_fam = 0
+                data[dy][dx] = max_fam
+        # print('data', data)
+        if figsize is None:
+            figsize = estimate_figsize(data, cbar=True, dy=self.dy)
+        maxi = data.max()
+        # print('maxi', maxi)
+        fig, ax = self.setup_figure(figsize=figsize, tight_layout=True)
+        cmap = plt.cm.get_cmap(cmap)
+        cmap.set_under(alpha=0.0)
+        if maxi > 1:
+            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(maxi + 1), cmap.N))
+        else:
+            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(maxi + 2), cmap.N))
+        cmap.set_array(data)
+        polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
+                                   orientation=self.orientation, facecolor=c, edgecolor=None)
+                    for x, y, c in zip(self.xcoords.ravel(), self.ycoords.ravel(), cmap.to_rgba(data.ravel()))]
+        pc = PatchCollection(polygons, match_original=True)
+        ax.add_collection(pc)
+
+        # divider = make_axes_locatable(ax)
+        # cax = divider.append_axes("right", size="5%", pad=0.1)
+        # cbar = fig.colorbar(cmap, extend='min', use_gridspec=True, cax=cax)
+        # cbar.set_label('family')
+        # if maxi > 10:
+        #     cbar.set_ticks(np.linspace(1, maxi + 1, maxi + 1))
+        #     cbar.set_ticklabels([1] + ['']*(maxi-1) + [maxi+1])
+        # else:
+        #     cbar.set_ticks(np.linspace(1, maxi + 1, maxi+1))
+        #     cbar.set_ticklabels(np.arange(1, maxi+2, 1))
+
+        # plt.sca(ax)
+
+        if save:
+            filename = str(id) + '_fams_hex' + '.jpg'
+            plt.savefig(pathlib.Path('pictures').resolve() / filename)
+        plt.show()
 
     def plot_vectorfield(self, x, y, vfx, vfy, figindex=None, figsize=None, tight_layout=True, cmap='viridis'):
         l = np.sqrt(vfx ** 2 + vfy ** 2)

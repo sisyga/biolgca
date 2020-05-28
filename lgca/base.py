@@ -9,6 +9,7 @@ from matplotlib.cm import ScalarMappable
 from numpy import random as npr
 from sympy.utilities.iterables import multiset_permutations
 
+from lgca.helpers2d import *
 from lgca.treemanager import TreeManager
 
 pi2 = 2 * np.pi
@@ -393,12 +394,16 @@ class LGCA_base():
         self.apply_boundaries()
         self.update_dynamic_fields()
 
-# verschobene function!!!
-    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
+# adapted function!!!
+    def timeevo(self, timesteps=100, record=False, recordoffs=False, trange=False,
+                recordN=False, recorddens=False, showprogress=True):
         self.update_dynamic_fields()
+
         if record:
             self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
             self.nodes_t[0, ...] = self.nodes[self.nonborder]
+            self.offsprings.append(copy(self.props)['num_off'])
+        if recordoffs:
             self.offsprings.append(copy(self.props)['num_off'])
 
         if recordN:
@@ -412,6 +417,8 @@ class LGCA_base():
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.nonborder]
                 self.offsprings.append(copy(self.props)['num_off'])
+            if recordoffs:
+                self.offsprings.append(copy(self.props)['num_off'])
 
             if recordN:
                 self.n_t[t] = self.cell_density[self.nonborder].sum()
@@ -419,6 +426,15 @@ class LGCA_base():
                 self.dens_t[t, ...] = self.cell_density[self.nonborder]
             if showprogress:
                 update_progress(1.0 * t / timesteps)
+            # plots für fixe Zeiten
+            if t in trange[0]:
+                if sum(self.offsprings[-1][1:]) > 0:
+                    self.plot_families(save=True,
+                                       id='uuid=' + str(trange[2]) + '_step=' + str(t) + str(trange[1]))
+                    self.plot_density(cbar=False, save=True,
+                                      id='uuid=' + str(trange[2]) + '_step=' + str(t) + str(trange[1]))
+                else:
+                    print('\n--------- ausgestorben -----------\n')
 
     def calc_permutations(self):
         self.permutations = [np.array(list(multiset_permutations([1] * n + [0] * (self.K - n))), dtype=np.int8)

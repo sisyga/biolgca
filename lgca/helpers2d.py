@@ -6,8 +6,10 @@ from .base import estimate_figsize
 from .lgca_square import *
 from .ib_interactions import driver_mut
 
+def test(val):
+    print(str(val))
 
-def plot_families(nodes_t, lab_m, dims=50,
+def plot_families_after(nodes_t, lab_m, dims=50,
                   figsize=None, cmap='inferno', save=False, id=0):
     """
     Idee: für einen Zeitschritt (nodes_t entsprechend übergeben)
@@ -90,3 +92,33 @@ def plot_density_after(nodes_t, dim=100, rc=1, id=0, save=False):
             den[x][y] = s
     # print(den)
     lgca_hex.plot_density(density=den, save=save, id=id)
+
+# def plot_popsize_2d(data, save=False, id=0, plotmax=0):
+#     """
+#     plot of population size during time
+#     :param data: lgca.offsprings
+#     :param save: saves plot if true
+#     :param id: filename for saving
+#     """
+#     time = len(data)
+#     x = np.arange(0, time, 1)
+#     size = np.zeros(time)
+#     for t in range(time):
+#         size[t] = sum(data[t][1:])
+#     y = size[x]
+#
+#     fig, ax = plt.subplots()
+#     ax.plot(x, y)
+#     plt.xlim(0, time - 1)
+#     if plotmax != 0:
+#         plt.ylim(0, plotmax + 10)
+#     else:
+#         plt.ylim(0, max(size) * 1.1)
+#     ax.set(xlabel='timestep', ylabel='total number of living cells')
+#     if plotmax != 0:
+#         plt.plot(x, [plotmax]*len(x), 'seagreen')
+#     if save:
+#         save_plot(fig, str(id) + '_population size ' + '.jpg')
+#
+#     plt.show()
+#     return y
