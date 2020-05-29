@@ -2,6 +2,18 @@ from .analysis import *
 from matplotlib import colors
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
+# \definecolor{gold}       {RGB}{255, 215, 0}
+# \definecolor{seagreen}   {RGB}{46, 139, 87}
+# \definecolor{red}        {RGB}{255,0,0}
+# \definecolor{red}        {RGB}{255,0,0}
+# \definecolor{rosybrown}  {RGB}{188, 143, 13}
+# \definecolor{lawngreen}  {RGB}{124,252,0}
+# \definecolor{aqua}       {RGB}{0,255,255}
+# \definecolor{mediumblue} {RGB}{0,0,205}
+# \definecolor{sienna}     {RGB}{160,82,45}
+# \definecolor{coral}      {RGB}{255,127,80}
+# \definecolor{darkmagenta}{RGB}{139,0,139}
+
 farben = {
     'si':       'gold',
     'gi':       'seagreen',
@@ -14,6 +26,8 @@ farben = {
     'hill_2':   'sienna',
     'hill_3':   'coral',
     'rich':     'darkmagenta',
+    'bp':       'hotpink',
+    'bpinv':    'hotpink',
     'onenode':  'darkred',
     'onerc':    'orange',
     '0':        'darkred',
@@ -247,13 +261,13 @@ def plot_sth(data, save=False, id=0, ylabel='index', savename=None):
     x = np.arange(0, tend)
     maxy = 0
     filename = list(data.keys())
-    fig, ax = plt.subplots(figsize=(8, 4))
-    # fig, ax = plt.subplots(figsize=(12, 4))
+    # fig, ax = plt.subplots(figsize=(8, 4))
+    fig, ax = plt.subplots(figsize=(12, 4))
     for name in data:
         m = max(data[name])
         if m > maxy:
             maxy = m + 0.1
-        if name=='eve':
+        if name == 'eve' or name == 'bpinv':
             plt.plot(x, data[name], farben[name], label=name, linewidth=0.75, linestyle=(0, (1, 10)))
         else:
             plt.plot(x, data[name], farben[name], label=name, linewidth=0.75)
@@ -265,8 +279,8 @@ def plot_sth(data, save=False, id=0, ylabel='index', savename=None):
     elif tend >= 100:
         plt.xticks(np.arange(0, tend, 50))
 
-    plt.ylim(0, 70000, 10000)
-    # plt.ylim(0, maxy)
+    # plt.ylim(0, 70000, 10000)
+    plt.ylim(0, maxy)
     if save:
         if savename is None:
             save_plot(plot=fig, filename=str(id) + '_comparing_' + str(filename) + '.jpg')

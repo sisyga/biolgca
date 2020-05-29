@@ -38,6 +38,7 @@ def read_inds(which='si'):
     for file in files:
         if ind in file:
             dataset[file[:-(4+len(ind))]] = np.loadtxt(path + file)
+    # print('d', dataset)
     return dataset
 
 def ave_inds(which='shannon', plot=False, save=False, savename=None):
@@ -168,18 +169,18 @@ def plotende(ave, fams, muts):
 #     writer = csv.writer(csvfile, delimiter=',')
 #     for row in toWrite:
 #         writer.writerow(row)
-
-ende, fams, muts = zahlende(path='saved_data/5011_ges/', steps=10)
-print(ende, fams)
-# plotende(ende, fams, muts)
-
-popdic = {0: [1,2], 1: [3,4], 2: [2,0]}
-xrange = np.arange(0, 2)
-data = pd.DataFrame(popdic, index=xrange)
-data_perc = data.divide(data.sum(axis=1), axis=0)
-plt.stackplot(xrange, *[data_perc[f] for f in range(0, 3)],
-              labels=list(range(0, 3)))
-plt.show()
+#
+# ende, fams, muts = zahlende(path='saved_data/5011_ges/', steps=10)
+# print(ende, fams)
+# # plotende(ende, fams, muts)
+#
+# popdic = {0: [1,2], 1: [3,4], 2: [2,0]}
+# xrange = np.arange(0, 2)
+# data = pd.DataFrame(popdic, index=xrange)
+# data_perc = data.divide(data.sum(axis=1), axis=0)
+# plt.stackplot(xrange, *[data_perc[f] for f in range(0, 3)],
+#               labels=list(range(0, 3)))
+# plt.show()
 # o1 = [[-99, 1,3,5,0], [-99, 2,2,4,0,4], [-99, 0,0,4,0,0]]
 # np.save('saved_data/testoffs1.npy', o1)
 # o2 = [[-99, 0,0,0,1,2], [-99, 0,0,0,2,5], [-99, 0,0,0,0,3,1]]
@@ -189,12 +190,16 @@ plt.show()
 """
     --- Index-Daten einlesen    ---
 """
-## data1 = correct(np.load('saved_data/5011_mut_04_01/'
-##                         '5011_mut_55186c3c-e01e-4609-8952-d1314b736521_offsprings.npy'))
-## data167 = correct(np.load('saved_data/501167_mut_04_02/'
-##                           '501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d_offsprings.npy'))
-
-# si = read_inds(which='si')
+# data1 = correct(np.load('saved_data/5011_mut_04_01/'
+#                         '5011_mut_55186c3c-e01e-4609-8952-d1314b736521_offsprings.npy'))
+# data167 = correct(np.load('saved_data/501167_mut_04_02/'
+#                           '501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d_offsprings.npy'))
+bp = read_inds(which='bp')
+bpinv = {}
+for key in bp:
+    print(key)
+    bpinv[key] = [1/entry for entry in bp[key]]
+si = read_inds(which='si')
 # sh = read_inds(which='sh')
 # eve = read_inds(which='eve')
 # gi = read_inds(which='gi')
@@ -205,9 +210,22 @@ plt.show()
 # hill_25 = read_inds(which='hill_25')
 # hill_75 = read_inds(which='hill_75')
 # rich = read_inds(which='rich')
-# plot_sth(data={'rich': rich['onerc']})
-# plot_sth(data={'rich': rich['onenode'], 'hill_2': hill2['onenode'], 'sh': sh['onenode']}, save=True, savename='onenode_richHillSh')
-#
+# plot_sth(data={'bp': bp['onenode'], 'si': si['onenode']})
+# data = correct(np.load('saved_data/2x2_rc=1_steps=5mini_driver_offsprings.npy'))
+# print(data)
+# bp = {}
+# bp['eins'] = calc_bergerparker(data)
+# bp['zwei'] = calc_bergerparker(data)
+
+
+    # print(bpinv[key])
+
+plot_sth(data={'bp': bp['onenode'], 'bpinv': bpinv['onenode'], 'si': si['onenode']})
+
+
+# plot_sth(data={'sh': sh['onenode'], 'gi': gi['onenode'], 'hill_2': hill2['onenode']}, save=True, savename='onenode_ShGiHh')
+# plot_sth(data={'sh': sh['onerc'], 'gi': gi['onerc'], 'hill_2': hill2['onerc']}, save=True, savename='onerc_ShGiHh')
+# #
 # ave_sh = ave_inds(which='shannon')
 # ave_hill2 = ave_inds(which='hill2')
 # ave_hill_5 = ave_inds(which='hill5')
@@ -221,7 +239,7 @@ plt.show()
 # for var in vars:
     # plot_sth(data={'onenode': si[var] - gi[var]}, ylabel='diff: simpson - gini', savename='diff_SiGi', save=True)
     # plot_sth(data={'hill_2': hill2[var], 'eve': eve[var]}, save=True, savename=var + '_HhEve')
-    # plot_sth(data={'gi': gi[var], 'eve': eve[var]}, save=True, savename=var + '_GiEve')
+    # plot_sth(data={'gi': gi[var], 'eve': eve[var]}, save=False, savename=var + '_GiEve')
     # plot_sth(data={'gi': gi[var], 'sh': sh[var], 'eve': eve[var]}, save=True, savename=var + '_GiEveSh')
     # plot_sth(data={'gi': gi[var], 'sh': sh[var]}, save=True, savename=var + '_GiSh')
 #     plot_hillnumbers_together(hill2[var],hill_25[var], hill_75[var], save=True, id=var)
@@ -231,6 +249,14 @@ plt.show()
 """
     --- krasse Indexberechnung  ---  
 """
+# data1 = correct(np.load('saved_data/Indizes_explizit/Daten/'
+#                         '5011_mut_55186c3c-e01e-4609-8952-d1314b736521_offsprings.npy'))
+# data167 = correct(np.load('saved_data/Indizes_explizit/Daten/'
+#                           '501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d_offsprings.npy'))
+#
+# np.savetxt('saved_data/' + 'onenode' + 'bp.csv', calc_bergerparker(data1), delimiter=',', fmt='%s')
+# np.savetxt('saved_data/' + 'onerc' + 'bp.csv', calc_bergerparker(data167), delimiter=',', fmt='%s')
+
 # data1 = correct(np.load('saved_data/Indizes_explizit/Daten/'
 #                         '5011_mut_55186c3c-e01e-4609-8952-d1314b736521_offsprings.npy'))
 # data167 = correct(np.load('saved_data/Indizes_explizit/Daten/'

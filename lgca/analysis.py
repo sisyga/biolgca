@@ -86,6 +86,18 @@ def calc_richness(data):
         # print(rich)
     return rich
 
+def calc_bergerparker(data):
+    """
+    calculate berger parker index per timestep
+    :param data: correct(offsprings)
+    :return: berger parker index
+    """
+    bp = []
+    for t in range(0, len(data)):
+        m = max(data[t])
+        s = sum(data[t])
+        bp.append(m/s)
+    return bp
 
 def calc_ginisimpson(data):
     """
