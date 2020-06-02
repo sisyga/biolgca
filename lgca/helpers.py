@@ -262,6 +262,7 @@ def plot_sth(data, save=False, id=0, ylabel='index', savename=None):
     maxy = 0
     filename = list(data.keys())
     # fig, ax = plt.subplots(figsize=(8, 4))
+    # fig, ax = plt.subplots(figsize=(15, 4)) #richness
     fig, ax = plt.subplots(figsize=(12, 4))
     for name in data:
         m = max(data[name])
@@ -272,15 +273,19 @@ def plot_sth(data, save=False, id=0, ylabel='index', savename=None):
         else:
             plt.plot(x, data[name], farben[name], label=name, linewidth=0.75)
     ax.set(xlabel='timesteps', ylabel=ylabel)
-    ax.legend(loc='upper left')
+    # ax.legend(loc='upper left')
     plt.xlim(0, tend-1)
     if tend >= 10000:
         plt.xticks(np.arange(0, tend, 5000))
     elif tend >= 100:
         plt.xticks(np.arange(0, tend, 50))
-
+    plt.axvline(x=19389, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
+    plt.axvline(x=19061, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
+    plt.text(19061-500, 4.1, '$k_1$')
+    plt.text(19389, 4.1, '$k_2$')
     # plt.ylim(0, 70000, 10000)
     plt.ylim(0, maxy)
+    # plt.yticks([0, 0.001, 0.002])
     if save:
         if savename is None:
             save_plot(plot=fig, filename=str(id) + '_comparing_' + str(filename) + '.jpg')

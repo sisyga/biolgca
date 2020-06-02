@@ -40,7 +40,7 @@ class Simulation(object):
         logging.info('completed simulation %s', str(uu))
         if self.save_dir != None:
             self.save_data(lgca_hex, uu)
-
+    #---!!!MATPLOTLIB NOT THREAD SAFE!!!---
     def prep_during_timeevo(self, uu):
         def during_timeevo(lgca, step):
             if step % self.trange == 0:

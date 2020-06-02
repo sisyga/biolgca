@@ -127,6 +127,11 @@ def plotende(ave, fams, muts):
 
         plt.show()
 
+def max_wert(which, intervallmin=0, intervallmax=40000):
+    m = max(which['onenode'][intervallmin:intervallmax])
+    print('max bei ', m)
+    print('k=', np.where(which['onenode'][intervallmin:intervallmax] == m))
+
 # path = 'saved_data/5011_ges/'
 # path = 'saved_data/501167_ges/'
 # path = 'saved_data/Indizes_explizit/Daten/'
@@ -190,8 +195,9 @@ def plotende(ave, fams, muts):
 """
     --- Index-Daten einlesen    ---
 """
-# data1 = correct(np.load('saved_data/5011_mut_04_01/'
+# data1 = correct(np.load('saved_data/Indizes_explizit/Daten/'
 #                         '5011_mut_55186c3c-e01e-4609-8952-d1314b736521_offsprings.npy'))
+
 # data167 = correct(np.load('saved_data/501167_mut_04_02/'
 #                           '501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d_offsprings.npy'))
 bp = read_inds(which='bp')
@@ -200,27 +206,55 @@ for key in bp:
     print(key)
     bpinv[key] = [1/entry for entry in bp[key]]
 si = read_inds(which='si')
-# sh = read_inds(which='sh')
-# eve = read_inds(which='eve')
-# gi = read_inds(which='gi')
-# hill1 = read_inds(which='hill1')
-# hill2 = read_inds(which='hill2')
-# hill3 = read_inds(which='hill3')
-# hill_5 = read_inds(which='hill_5')
-# hill_25 = read_inds(which='hill_25')
-# hill_75 = read_inds(which='hill_75')
-# rich = read_inds(which='rich')
-# plot_sth(data={'bp': bp['onenode'], 'si': si['onenode']})
+sh = read_inds(which='sh')
+eve = read_inds(which='eve')
+gi = read_inds(which='gi')
+hill1 = read_inds(which='hill1')
+hill2 = read_inds(which='hill2')
+hill3 = read_inds(which='hill3')
+hill_5 = read_inds(which='hill_5')
+hill_25 = read_inds(which='hill_25')
+hill_75 = read_inds(which='hill_75')
+rich = read_inds(which='rich')
+
+max_wert(which=gi, intervallmax=25000)
+max_wert(which=hill2, intervallmax=25000)
+max_wert(which=bpinv, intervallmax=25000)
 # data = correct(np.load('saved_data/2x2_rc=1_steps=5mini_driver_offsprings.npy'))
 # print(data)
 # bp = {}
 # bp['eins'] = calc_bergerparker(data)
 # bp['zwei'] = calc_bergerparker(data)
+# print('max ', max(gi['onenode'][:30000]))
+# print('max ', max(sh['onenode'][:30000]))
+# print('max ', max(eve['onenode'][:30000]))
+# print(np.where(gi['onenode'] == max(gi['onenode'][:40000])))
+# print(np.where(eve['onenode'] == max(eve['onenode'][:30000])))
+# print(np.where(sh['onenode'] == max(sh['onenode'][:30000])))
+# print(sh['onenode'][19389])
+# print(gi['onenode'][19389])
+# print(eve['onenode'][19389])
+# gleich = 0
+# ungleich = 0
+# shkleinereve = 0
+# gikleinereve = 0
+# for i, entry in enumerate(gi['onenode']):
+#     if entry == eve['onenode'][i]:
+#         if entry == 0:
+#             gleich += 1
+#         else:
+#             ungleich += 1
+#
+# print(gleich, ungleich)
+    # if entry < eve['onenode'][i]:
+    #     shkleinereve += 1
+# print(shkleinergi, shkleinereve)
+# for i, entry in enumerate(gi['onenode']):
+#     if entry < eve['onenode'][i]:
+#         gikleinereve += 1
+# print(gikleinereve)
 
-
-    # print(bpinv[key])
-
-plot_sth(data={'bp': bp['onenode'], 'bpinv': bpinv['onenode'], 'si': si['onenode']})
+# plot_sth(data={'bp': bp['onenode'], 'bpinv': bpinv['onenode'], 'si': si['onenode']})
 
 
 # plot_sth(data={'sh': sh['onenode'], 'gi': gi['onenode'], 'hill_2': hill2['onenode']}, save=True, savename='onenode_ShGiHh')
@@ -235,9 +269,12 @@ plot_sth(data={'bp': bp['onenode'], 'bpinv': bpinv['onenode'], 'si': si['onenode
     --- diverse plots ---
 """
 # vars = ['onenode', 'onerc']
-# vars = ['onenode']
-# for var in vars:
-    # plot_sth(data={'onenode': si[var] - gi[var]}, ylabel='diff: simpson - gini', savename='diff_SiGi', save=True)
+vars = ['onenode']
+for var in vars:
+    # plot_sth(data={'onenode': hill2[var]-gi[var], 'bp': bp[var], 'bpinv': bpinv[var]}, save=True, savename='Hh-Gi_bp_bpinv')
+    # plot_sth(data={'bp': bp[var], 'gi': gi[var], 'bpinv': bpinv[var]})
+    plot_sth(data={'bp': bp[var], 'hill_2': hill2[var], 'bpinv': bpinv[var], 'gi': gi[var]}, save=True, savename='GidHh')
+#     plot_sth(data={'onenode': si[var] - gi[var]}, ylabel='simpson - gini', savename='diff_SiGi', save=True)
     # plot_sth(data={'hill_2': hill2[var], 'eve': eve[var]}, save=True, savename=var + '_HhEve')
     # plot_sth(data={'gi': gi[var], 'eve': eve[var]}, save=False, savename=var + '_GiEve')
     # plot_sth(data={'gi': gi[var], 'sh': sh[var], 'eve': eve[var]}, save=True, savename=var + '_GiEveSh')
@@ -251,6 +288,7 @@ plot_sth(data={'bp': bp['onenode'], 'bpinv': bpinv['onenode'], 'si': si['onenode
 """
 # data1 = correct(np.load('saved_data/Indizes_explizit/Daten/'
 #                         '5011_mut_55186c3c-e01e-4609-8952-d1314b736521_offsprings.npy'))
+# print('dataaa', sum(data1[38548]))
 # data167 = correct(np.load('saved_data/Indizes_explizit/Daten/'
 #                           '501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d_offsprings.npy'))
 #
