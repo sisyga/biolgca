@@ -34,6 +34,7 @@ class Simulation(object):
         effect = driver_mut if self.driver else passenger_mut
         lgca_hex = lgca.get_lgca(ib=True, geometry='hex', bc='reflecting', nodes=nodes, interaction='mutations',
                                  r_b=0.09, r_d=0.08, r_m=0.001, effect=effect)
+                                 # r_b=0.8, r_d=0.2, r_m=0.7, effect=effect)
 
         lgca_hex.timeevo(timesteps=self.steps, recordoffs=True, callback=self.prep_during_timeevo(uu))
 

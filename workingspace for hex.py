@@ -88,7 +88,7 @@ def read_mut(name, pod):
     return tree, fams, offs #, nodes
 
 
-create_hex(dim=4, rc=2, steps=6, driver=True, rec_off=True, save=False, trange=[[2, 5]])
+# create_hex(dim=4, rc=2, steps=6, driver=True, rec_off=True, save=False, trange=[[2, 5]])
 
 # for i in range(0, 2):
 #     print('bin bei ', i)

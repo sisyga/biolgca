@@ -36,6 +36,16 @@ def create_thom(variation, filename, path, rep, save=False):
 
     return thom
 
+def calc_popsize(data):
+    """
+    :param data: corrected offsprings
+    """
+    time = len(data)
+    size = [0]*time
+    for t in range(time):
+        size[t] = sum(data[t])
+    return size
+
 def calc_shannon(data):
     """
     calculate shannon index
@@ -159,7 +169,7 @@ def calc_hillnumbers(data, order=2):
             hill_q[t] = hill_q[t] ** (1 / (1 - order))
         return hill_q
 
-def create_averaged_entropies(dic_offs, save=False, id=0, plot=False, saveplot=False):
+def create_averaged_entropies(dic_offs, save=True, id=0, plot=False, saveplot=False):
     """
     calculate averaged diversity indices (shannon, ginisimpson, hill 2nd order)
     :param dic_offs: like {'1st data': correct(offsprings), '2nd data': correct(offsprings)}
@@ -174,13 +184,22 @@ def create_averaged_entropies(dic_offs, save=False, id=0, plot=False, saveplot=F
     result_sh = [0] * tmax
     result_gi = [0] * tmax
     result_hill = [0] * tmax
-    result_hill5 = [0] * tmax
+    result_richness = [0] * tmax
+    result_popsize = [0] * tmax
 
     #falls unterschiedlich lange Einträge np.concatenate((gini, np.zeros(tmax-t)))
 
     for key in dic_offs:
         print('bin bei file: ', key)
         data = dic_offs[key]
+
+        #popsize
+        size = np.array(calc_popsize(data))
+        result_popsize += size
+
+        #richness
+        rich = np.array(calc_richness(data))
+        result_richness += rich
 
         # 'shannon':
         shannon = calc_shannon(data)
@@ -195,30 +214,32 @@ def create_averaged_entropies(dic_offs, save=False, id=0, plot=False, saveplot=F
         result_hill += hill
 
         # 'hill order 25':
-        hill5 = calc_hillnumbers(data, order=0.5)
-        result_hill5 += hill5
+        # hill5 = calc_hillnumbers(data, order=0.5)
+        # result_hill5 += hill5
 
     # Mitteln
     result_sh = result_sh / len(dic_offs)
     result_gi = result_gi / len(dic_offs)
     result_hill = result_hill / len(dic_offs)
-    result_hill5 = result_hill5 / len(dic_offs)
+    result_richness = result_richness / len(dic_offs)
+    result_popsize = result_popsize / len(dic_offs)
     print('gemittelt über ', len(dic_offs))
 
     # speichern
     if save:
-        np.save('saved_data/' + filename + '_' + 'averaged_shannon' + '.npy', result_sh)
-        np.save('saved_data/' + filename + '_' + 'averaged_gini' + '.npy', result_gi)
-        np.save('saved_data/' + filename + '_' + 'averaged_hill2' + '.npy', result_hill)
-        np.save('saved_data/' + filename + '_' + 'averaged_hill5' + '.npy', result_hill5)
+        np.savetxt('saved_data/' + filename + '_' + 'averaged_shannon' + '.csv', result_sh, delimiter=',', fmt='%s')
+        np.savetxt('saved_data/' + filename + '_' + 'averaged_gini' + '.csv', result_gi, delimiter=',', fmt='%s')
+        np.savetxt('saved_data/' + filename + '_' + 'averaged_hill2' + '.csv', result_hill, delimiter=',', fmt='%s')
+        np.savetxt('saved_data/' + filename + '_' + 'averaged_popsize' + '.csv', result_popsize, delimiter=',', fmt='%s')
+        np.savetxt('saved_data/' + filename + '_' + 'averaged_richness' + '.csv', result_richness, delimiter=',', fmt='%s')
 
     # plot
-    if plot:
-        lgca.helpers.plot_selected_entropies(shannon=result_sh, hill2=result_hill, gini=result_gi,\
-                                hill_5=result_hill5, save=saveplot, id=filename+'_averaged')
-        lgca.helpers.plot_sth(data={'gi': result_gi, 'sh': result_sh, 'hill_5': result_hill5,
-                       'hill_2': result_hill}, save=True, id='averaged_unscaled')
-    return result_sh, result_gi, result_hill
+    # if plot:
+    #     lgca.helpers.plot_selected_entropies(shannon=result_sh, hill2=result_hill, gini=result_gi,\
+    #                             hill_5=result_hill5, save=saveplot, id=filename+'_averaged')
+    #     lgca.helpers.plot_sth(data={'gi': result_gi, 'sh': result_sh, 'hill_5': result_hill5,
+    #                    'hill_2': result_hill}, save=True, id='averaged_unscaled')
+   # return result_sh, result_gi, result_hill
 
 def calc_lognormaldistri(thom, int_length):
     """

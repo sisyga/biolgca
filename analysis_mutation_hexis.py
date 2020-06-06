@@ -52,17 +52,43 @@ def set_data(path):
 #     if plot:
 #         plot_sth(dataset, ylabel=ind, save=save, id=which, savename=savename)
 #     return dataset
-path = 'C:/Users/Franzi/Downloads/sim123_driver.tar/sim123_driver/'
+path = 'saved_data/driver_45sims/'
+# path = 'saved_data/hexi_test/'
 names = search_names(path)
-# np.savetxt(path + '.csv', names, delimiter=',', fmt='%s')
-for name in names:
-    offs = search_offs(path, name)
-    if len(offs) != 2501:
-        print('!!')
-    if sum(offs[-1]) == 0:
-        print(name, 'ist ausgestorben')
+# for name in names:
+#     offs = search_offs(path, name)
+#     if len(offs) != 2501:
+#         print('!!')
+#     if sum(offs[-1]) == 0:
+#         print(name, 'ist ausgestorben')
+
+data_driver = {}
+for name in names[5:15]:
+    print(name)
+    data_driver[str(name[:6])] = search_offs(path, name)
 
 
+def funk(file):
+    # print(file)
+    np.savetxt(path + file + 'sh.csv', calc_shannon(data_driver[file]), delimiter=',', fmt='%s')
+    # np.savetxt(path + file + 'gi.csv', calc_ginisimpson(data_driver[file]), delimiter=',', fmt='%s')
+    np.savetxt(path + file + 'hill2.csv', calc_hillnumbers(data_driver[file]), delimiter=',', fmt='%s')
+    # np.savetxt(path + file + 'size.csv', calc_popsize(data_driver[file]), delimiter=',', fmt='%s')
+    # np.savetxt(path + file + 'rich.csv', calc_richness(data_driver[file]), delimiter=',', fmt='%s')
 
 
+if __name__ == '__main__':
+    pool = multiprocessing.Pool(4)
+    with pool as p:
+        p.map(funk, data_driver)
 
+# r = [0]*11
+# g = [0]*11
+# for name in names:
+#     r += np.loadtxt(path + name[:6] + 'rich.csv')
+#     g += np.loadtxt(path + name[:6] + 'gi.csv')
+#
+#
+# r = r/len(names)
+# g = g/len(names)
+# print(g)

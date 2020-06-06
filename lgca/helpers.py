@@ -279,12 +279,21 @@ def plot_sth(data, save=False, id=0, ylabel='index', savename=None):
         plt.xticks(np.arange(0, tend, 5000))
     elif tend >= 100:
         plt.xticks(np.arange(0, tend, 50))
-    plt.axvline(x=19389, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
-    plt.axvline(x=19061, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
-    plt.text(19061-500, 4.1, '$k_1$')
-    plt.text(19389, 4.1, '$k_2$')
+    # plt.axvline(x=22477, ymax=0.95, linestyle='--', color='black', linewidth=0.5)
+    # plt.axvline(x=23637, ymax=0.95, linestyle='--', color='black', linewidth=0.5)
+    # plt.axvline(x=23062, ymax=0.95, linestyle='--', color='black', linewidth=0.5)
+    # plt.axvline(x=37562, ymax=0.95, linestyle='--', color='black', linewidth=0.5)
+    # plt.axvline(x=38466, ymax=0.95, linestyle='--', color='black', linewidth=0.5)
+    # plt.text(22477-250, 7.1, '$k_1$')
+    # plt.text(23637-250, 7.1, '$k_3$')
+    # plt.text(23062-250, 7.1, '$k_2$')
+    # plt.text(37562-250, 7.1, '$k_4$')
+    # plt.text(38466-250, 7.1, '$k_5$')
     # plt.ylim(0, 70000, 10000)
-    plt.ylim(0, maxy)
+    # plt.ylim(0, 7.5)
+    # plt.ylim(0, maxy)
+    plt.ylim(1, 2)
+    print(maxy)
     # plt.yticks([0, 0.001, 0.002])
     if save:
         if savename is None:
@@ -491,6 +500,7 @@ def plot_popsize(data, save=False, id=0, plotmax=0):
 
     plt.show()
     return y
+
 
 def plot_histogram_thom(thom, int_length, save=False, id=0):
     """
