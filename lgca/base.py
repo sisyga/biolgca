@@ -360,6 +360,9 @@ class LGCA_base():
     def get_interactions(self):
         print(self.interactions)
 
+    def print_nodes(self):
+        print(self.nodes)
+
     def random_reset(self, density):
         """
 
