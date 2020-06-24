@@ -623,7 +623,7 @@ def create_count(int_length, thom):
 
     return count
 
-def plot_lognorm_distribution(thom, int_length, save=False, id=0, c='seagreen'):
+def plot_lognorm_distribution(thom, int_length, save=None, id=0, c='seagreen'):
     """
     plot histogram of thom & lognormal distribution
     :param thom: timepoints of homogeneity
@@ -635,10 +635,17 @@ def plot_lognorm_distribution(thom, int_length, save=False, id=0, c='seagreen'):
     size_legend = 30
 
     xrange = np.arange(0, max(thom) + int_length, int_length)
-    plt.hist(thom, bins=xrange, density=True)
-
+    #histogram
+    data, _, _ = ax.hist(thom, bins=xrange, color='grey', alpha=0.5)
+    print('max', max(data))
+    #calc lognorm func
     fitted_data, new_x = calc_lognorm(thom, xrange)
-    plt.plot(new_x, fitted_data)
+    #calc errors for hist
+    err = calc_barerrs(data)
+    #plotting
+    ax.errorbar(new_x, y=data, yerr=err, ls='', capsize=3, capthick=2, color='black', label='error')
+    ax.plot(new_x, fitted_data * max(data)/max(fitted_data), color=c, linewidth=3, label='lognormal')
+    #labels, ticks etc
     plt.xlim(0, xrange[-1])
     if xrange[-1] > 140000:
         plt.xticks(np.arange(0, xrange[-1], 40000))
@@ -648,44 +655,46 @@ def plot_lognorm_distribution(thom, int_length, save=False, id=0, c='seagreen'):
     plt.xticks(fontsize=size_ticks)
     plt.yticks(fontsize=size_ticks)
     plt.xlabel('thom', fontsize=size_legend)
-    plt.ylabel('probability', fontsize=size_legend)
-
+    plt.ylabel('absolute frequency', fontsize=size_legend)
+    plt.legend(fontsize=size_legend)
     if save:
         filename = str(id) + '_interval=' + str(int_length) + '_lognormal_distribution' + '.jpg'
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
     plt.show()
 
 
-def plot_all_lognorm(thomarray, colorarray, int_length, save=False):
+def plot_all_lognorm(thomarray, int_length, save=None):
     """
     plot_lognormal_distribution for numerous cases
     :param thomarray: structure like data = {'rc=02': thom02, 'rc=01': thom01}
     :param colorarray: structure like data = {'rc=02': 'red', 'rc=01': 'blue'}
     :param int_length: desired length of interval
     """
-    fig, ax = plt.subplots(figsize=(8, 4))
-    plt.xticks(fontsize=10)
-    plt.yticks(fontsize=10)
-    plt.xlabel('thom', fontsize=15)
-    plt.ylabel('absolute frequency', fontsize=15)
-    filename = ''
-
-    for index, name in enumerate(thomarray):
+    fig, ax = plt.subplots(figsize=(12, 8))
+    size_ticks = 20
+    size_legend = 30
+    max_data = {'onenode': 184, 'onerc': 149}
+    for name in thomarray:
         thom = thomarray[name]
-        filename += (str(name)) + ',' + (str(len(thom))) + '_'
+        xrange = np.arange(0, max(thom) + int_length, int_length)
 
-        fitted_data, maxy, _ = calc_lognormaldistri(thom=thom, int_length=int_length)
-        maxfit = fitted_data.max()
-        x = np.arange(0, thom.max(), int_length) + int_length / 2
-        plt.plot(x, fitted_data * maxy / maxfit, color=colorarray[index], label=name)
-        print('a', maxy / maxfit)
-        plt.xlim(0, thom.max() + int_length)
+        fitted_data, new_x = calc_lognorm(thom, xrange)
+
+        ax.plot(new_x, fitted_data * max_data[name] / max(fitted_data), color=farben[name], linewidth=3, label=name)
+
+    #labels, ticks etc
+    plt.xlim(0, xrange[-1])
+    plt.xticks(np.arange(0, xrange[-1], 40000))
 
     plt.ylim(0)
-    plt.legend()
+    plt.xticks(fontsize=size_ticks)
+    plt.yticks(fontsize=size_ticks)
+    plt.xlabel('thom', fontsize=size_legend)
+    plt.ylabel('absolute frequency', fontsize=size_legend)
+    plt.legend(fontsize=size_legend)
 
     if save:
-        filename = str(filename) + 'lognormal_all_intervall=' + str(int_length) + '.jpg'
+        filename = 'all_lognormal_distributions_' + str(int_length) + '.jpg'
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
     plt.show()
 

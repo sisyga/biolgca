@@ -252,34 +252,19 @@ def calc_lognorm(thom, xrange):
 
     return fitted_data, new_x
 
-def calc_barerrs(counted_thom):
+def calc_barerrs(hist_data):
     """
     calculate error in thom histograms;
     called by plot_lognorm_distribution
     """
-    # expect = np.zeros(len(counted_thom))
-    # var = np.zeros(len(counted_thom))
-    # s = np.zeros(len(counted_thom))
-    # b = np.zeros(len(counted_thom))
-    # # p = np.zeros(len(expect))
-    n = counted_thom.sum()
-    # print('n', n)
-    err = np.zeros(len(counted_thom))
-    for i in range(0, len(err)):
-        # p[i] = counted_thom[i]/n
-        # if counted_thom[i] != 0:
-        #     b[i] = binom.pmf(counted_thom[i], n, p=counted_thom[i]/n)
-        # expect[i] = b[i] * n
-        # var[i] = expect[i] * (1-b[i])
-        # s[i] = (var[i])**0.5
-        err[i] = (counted_thom[i]*(1-(counted_thom[i]/n)))**0.5
-    print('err', err)
-    # print('exp', expect)
-    # print('var', var)
-    # print('s', s)
-    # # print('p', p)
-    # print('b', b)
+    print(hist_data)
+    n = sum(hist_data)
+    print(n)
+    err = [(entry * (1 - entry/n))**0.5 for entry in hist_data]
+    print(err)
+
     return err
+
 
 def calc_quaderr(data, fitted_data): #TODO quad Fehler
     """

@@ -11,16 +11,19 @@ def whichone(which):
         nbars = int(math.ceil(len(thom) ** 0.5))
         print('nbars', nbars)
         int_length = 7
+        c = None
 
     elif which == 1:
         thom = thom_01
         nbars = int(math.ceil(len(thom) ** 0.5))
         print('nbars', nbars)
         int_length = 4575
+        c = farben['onenode']
     elif which == 2:
         thom = thom_167
         int_length = 4575
-    return thom, int_length
+        c = farben['onerc']
+    return thom, int_length, c
 
 thom_01 = np.load('C:/Users/Franzi/PycharmProjects/biolgca/saved_data/thoms501/501thom01_1000.npy')
 thom_167 = np.load('C:/Users/Franzi/PycharmProjects/biolgca/saved_data/thoms501/501thom167_1000.npy')
@@ -31,27 +34,11 @@ thombsp = np.array([1,3,5,7,\
         35,33])
 
     # 0 = bsp  1 = 01  2 = 167
-thom, int_length = whichone(1)
-plot_lognorm_distribution(thom, int_length)
-thom, int_length = whichone(2)
-plot_lognorm_distribution(thom, int_length)
-
-
-# y = np.zeros(max(thom))
-# for i in range(0, len(thom)):
-#     y[thom[i] - 1] += 1
-# print(y)
-# plt.bar(x, y)
-# # plt.errorbar(x, y, yerr=[1,1,1,1], color='magenta')
-# sigma = np.zeros(len(x))
-# n = y.sum()
-# print(n)
-# for i in range(0, len(x)):
-#     sigma[i] = (y[i]*(1-(y[i]/n)))**0.5
-# print(sigma)
-# plt.errorbar(x, y, yerr=sigma, color='magenta')
+# thom, int_length, c = whichone(1)
+# plot_lognorm_distribution(thom, int_length, c=c, id='onenode')
 #
-# plt.show()
+# thom, int_length, c = whichone(2)
+# plot_lognorm_distribution(thom, int_length, c=c, id='onerc')
 
-
+plot_all_lognorm({'onenode': thom_01, 'onerc': thom_167}, int_length=4575, save=True)
 
