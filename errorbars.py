@@ -3,35 +3,39 @@ from lgca.helpers import *
 from lgca.analysis import *
 import numpy as np
 import matplotlib.pyplot as plt
-import math as m
+import math
 
-thom01 = np.load('saved_data/thoms/' + 'rc=178_thom1500.npy')
-# plot_lognorm_distribution(thom01, int_length=1000)
-# exit(123456)
+def whichone(which):
+    if which == 0:
+        thom = thombsp
+        nbars = int(math.ceil(len(thom) ** 0.5))
+        print('nbars', nbars)
+        int_length = 7
 
-mini = np.array([1,3,2,3,2,3,4])
+    elif which == 1:
+        thom = thom_01
+        nbars = int(math.ceil(len(thom) ** 0.5))
+        print('nbars', nbars)
+        int_length = 4575
+    elif which == 2:
+        thom = thom_167
+        int_length = 4575
+    return thom, int_length
+
+thom_01 = np.load('C:/Users/Franzi/PycharmProjects/biolgca/saved_data/thoms501/501thom01_1000.npy')
+thom_167 = np.load('C:/Users/Franzi/PycharmProjects/biolgca/saved_data/thoms501/501thom167_1000.npy')
 
 thombsp = np.array([1,3,5,7,\
         11,11,13,15,16,12,18,17,\
         22,21,25,27,21,22,\
         35,33])
 
-    # 0 = mini  1 = bsp  2 = thom01
-which = 2
-
-if which == 0:
-    thom = mini
-    int_length = 1
-elif which == 1:
-    thom = thombsp
-    int_length = 10
-elif which == 2:
-    thom = thom01
-    int_length = 1000
-
+    # 0 = bsp  1 = 01  2 = 167
+thom, int_length = whichone(1)
 plot_lognorm_distribution(thom, int_length)
-# x = np.arange(1, max(thom)+1)
-# print(x)
+thom, int_length = whichone(2)
+plot_lognorm_distribution(thom, int_length)
+
 
 # y = np.zeros(max(thom))
 # for i in range(0, len(thom)):

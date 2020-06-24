@@ -241,35 +241,16 @@ def create_averaged_entropies(dic_offs, save=True, id=0, plot=False, saveplot=Fa
     #                    'hill_2': result_hill}, save=True, id='averaged_unscaled')
    # return result_sh, result_gi, result_hill
 
-def calc_lognormaldistri(thom, int_length):
-    """
-    calculate lognormal distribution;
-    called by plot_lognorm_distribution
-    """
-    #number of intervalls
-    ni = (thom.max() / int_length + 1).astype(int)
-    #calc absolue frequency
-    count = np.zeros(ni)
-    for entry in thom:
-        c = (entry / int_length).astype(int)
-        count[c] += 1
-    if count.sum() != len(thom):
-        print('FEHLER!')
-    x = np.arange(0, thom.max(), int_length)
-    y = count[(x / int_length).astype(int)]
-    maxy = y.max()
-    #calc function parameters
-    thom = (thom / int_length).astype(int)
-    param = sp.stats.lognorm.fit(thom)
-    xxx = np.arange(0, ni)
-    fitted_data = sp.stats.lognorm.pdf(xxx, param[0], loc=param[1], scale=param[2])
+def calc_lognorm(thom, xrange):
+    param = sp.stats.lognorm.fit(thom, loc=0)
+    new_x = [entry - xrange[1]/2 for entry in xrange[1:]]
+    fitted_data = sp.stats.lognorm.pdf(new_x, param[0], loc=param[1], scale=param[2])
     print('sigma', param[0])
     print('?', param[1])
     print('p2', param[2])
     print('mu', np.log(param[2]))
 
-    return fitted_data, maxy, y
-
+    return fitted_data, new_x
 
 def calc_barerrs(counted_thom):
     """

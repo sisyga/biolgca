@@ -93,6 +93,8 @@ def plot_density_after(nodes_t, dim=100, rc=1, id=0, save=False):
     # print(den)
     lgca_hex.plot_density(density=den, save=save, id=id)
 
+
+
 # def plot_popsize_2d(data, save=False, id=0, plotmax=0):
 #     """
 #     plot of population size during time

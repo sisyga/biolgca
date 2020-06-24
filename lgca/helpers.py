@@ -15,28 +15,32 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 # \definecolor{darkmagenta}{RGB}{139,0,139}
 
 farben = {
-    'si':       'gold',
-    'gi':       'seagreen',
-    'sh':       'red',
-    'eve':      'red',
-    'hill_25':  'rosybrown',
-    'hill_5':   'lawngreen',
-    'hill_75':  'aqua',
-    'hill_1':   'mediumblue',
-    'hill_2':   'sienna',
-    'hill_3':   'coral',
-    'rich':     'darkmagenta',
-    'bp':       'hotpink',
-    'bpinv':    'hotpink',
-    'onenode':  'darkred',
-    'onerc':    'orange',
-    '0':        'darkred',
-    '1':        'orange',
-    '2':        'seagreen'
+    'si': 'gold',
+    'gi': 'seagreen',
+    'sh': 'red',
+    'eve': 'red',
+    'hill_25': 'rosybrown',
+    'hill_5': 'lawngreen',
+    'hill_75': 'aqua',
+    'hill_1': 'mediumblue',
+    'hill_2': 'sienna',
+    'hill_3': 'coral',
+    'rich': 'darkmagenta',
+    'bp': 'hotpink',
+    'bpinv': 'hotpink',
+    'onenode': 'darkred',
+    'onerc': 'orange',
+    '0': 'darkred',
+    '1': 'orange',
+    '2': 'seagreen',
+    'driver': 'Indigo',
+    'passenger': 'MediumSeaGreen'
 }
+
 
 def aloha(who):
     print('aloha', who)
+
 
 def calc_mullplotdata(data, int_length):
     """
@@ -52,11 +56,10 @@ def calc_mullplotdata(data, int_length):
     val = np.zeros((maxfamily, tend))
 
     for t in range(0, tend):
-        maxlab = len(data[t]) - 1   #data unterschiedlich lang!
+        maxlab = len(data[t]) - 1  # data unterschiedlich lang!
         for lab in range(0, maxlab):
             val[lab, t] = data[t][lab + 1]
     return val
-
 
 
 def mullerplot(data, id=0, save=False, int_length=1):
@@ -93,12 +96,12 @@ def mullerplot(data, id=0, save=False, int_length=1):
             xrange.append(i * int_length + 0.5 * int_length)
         if int_num * int_length != tend:
             xrange.append((tend - 1 + int_num * int_length) / 2)
-        xrange.append(tend-1)
+        xrange.append(tend - 1)
 
         acc_val = np.zeros((maxlab, len(xrange) - 2)) + -999
         for i in range(0, int_num):
             for lab in range(0, maxlab):
-                acc_val[lab, i] = np.sum(val[lab, i * int_length:1 + (i+1)*int_length])
+                acc_val[lab, i] = np.sum(val[lab, i * int_length:1 + (i + 1) * int_length])
         if int_num * int_length != tend:
             for lab in range(0, maxlab):
                 acc_val[lab, -1] = np.sum(val[lab, int_length * int_num:tend])
@@ -136,7 +139,8 @@ def mullerplot(data, id=0, save=False, int_length=1):
         save_plot(fig, str(id) + '_' + ' mullerplot with intervall=' + str(int_length) + '.jpg')
     plt.show()
 
-def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
+
+def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0, \
                    figsize=None, figindex=None, cmap='nipy_spectral'):
     """
     create plot with distribution of the cells in the lattice per timepoint
@@ -161,16 +165,16 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
     if tend is None:
         tend = tmax
     if figsize is None:
-        if tend-tbeg<=100:
-            fx = 4.5  #for c == 180
+        if tend - tbeg <= 100:
+            fx = 4.5  # for c == 180
             fy = (tend - tbeg) / 40
             figsize = (fx, fy)
-        elif tend-tbeg <= 500:
-            fx = 4.5  #for c == 180
+        elif tend - tbeg <= 500:
+            fx = 4.5  # for c == 180
             fy = (tend - tbeg) / 55
             figsize = (fx, fy)
 
-    val = np.zeros((tmax, dim*c))
+    val = np.zeros((tmax, dim * c))
 
     for t in range(0, tmax):
         for x in range(dim):
@@ -182,9 +186,9 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
                 if pos == 0 or pos == 1:
                     if pos == 0:
                         if lab == 0:
-                            val[t, (c-1) + x * c] = None
+                            val[t, (c - 1) + x * c] = None
                         else:
-                            val[t,  (c-1) + x * c] = labels[lab]
+                            val[t, (c - 1) + x * c] = labels[lab]
 
                     elif pos == 1:
                         if lab == 0:
@@ -193,9 +197,9 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
                             val[t, x * c] = labels[lab]
                 else:
                     if lab == 0:
-                        val[t, x*c + pos - 1] = None
+                        val[t, x * c + pos - 1] = None
                     else:
-                        val[t, x*c + pos - 1] = labels[lab]
+                        val[t, x * c + pos - 1] = labels[lab]
                     # print('stückchen val', val[t, x*c + pos - 1])
         # print('val[t]', val[t])
     # print('val', val)
@@ -217,18 +221,18 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
     # cbar.ax.get_yaxis().labelpad = 15
     # cbar.ax.set_ylabel('family', rotation=270)
     ###
-    plt.ylabel('timesteps', fontsize=15, labelpad=10) #15
+    plt.ylabel('timesteps', fontsize=15, labelpad=10)  # 15
     ax.xaxis.set_label_position('top')
-    plt.xlabel('lattice site', fontsize=15, labelpad=10) #, fontsize=12
+    plt.xlabel('lattice site', fontsize=15, labelpad=10)  # , fontsize=12
 
     # nur "Knotenanfang"
     plt.xlim(-0.5, dim * c - 0.5)
 
     if dim >= 20:
-        x1 = np.arange(0, dim*c, 20*c)
+        x1 = np.arange(0, dim * c, 20 * c)
         x2 = np.zeros(len(x1)).astype(int)
         for i in range(0, len(x1)):
-            x2[i] = (x1[i]/c) + 1
+            x2[i] = (x1[i] / c) + 1
         ax.set_xticks(x1)
         ax.set_xticklabels(x2, minor=False, fontsize=12)
     elif dim > 1:
@@ -239,9 +243,9 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
         ax.set_xticks(x1)
         ax.set_xticklabels(x2, minor=False, fontsize=12)
     else:
-        plt.xticks((np.arange(0, dim*c, c)+1), fontsize=12)
+        plt.xticks((np.arange(0, dim * c, c) + 1), fontsize=12)
 
-    plt.ylim(tend-0.5, tbeg-0.5)
+    plt.ylim(tend - 0.5, tbeg - 0.5)
     if tend - tbeg > 700:
         plt.yticks(np.arange(tbeg, tend, 100))
     elif tend - tbeg > 100:
@@ -252,18 +256,22 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0,\
         save_plot(fig, str(id) + '_spacetimeplot_' + str(tbeg) + '-' + str(tend) + '.jpg')
     plt.show()
 
-def plot_sth(data, save=False, id=0, ylabel='index', savename=None):
+
+def plot_sth(data, save=False, id=0, ylabel='index', savename=None, yrange=None):
     """
     plot of variable indices
     :param data: structure {'name1': index_data, 'name2': index_data}
     """
+    size_ticks = 20
+    size_legend = 30
     tend = len(list(data.values())[0])
     x = np.arange(0, tend)
     maxy = 0
     filename = list(data.keys())
-    # fig, ax = plt.subplots(figsize=(8, 4))
+    fig, ax = plt.subplots(figsize=(12, 8))  # figsize=(6, 3)
+    fig, ax = plt.subplots(figsize=(12, 6))  # figsize=(6, 3) #halbwegs okayige plots t=1400
     # fig, ax = plt.subplots(figsize=(15, 4)) #richness
-    fig, ax = plt.subplots(figsize=(12, 4))
+    # fig, ax = plt.subplots(figsize=(12, 4))
     for name in data:
         m = max(data[name])
         if m > maxy:
@@ -271,14 +279,17 @@ def plot_sth(data, save=False, id=0, ylabel='index', savename=None):
         if name == 'eve' or name == 'bpinv':
             plt.plot(x, data[name], farben[name], label=name, linewidth=0.75, linestyle=(0, (1, 10)))
         else:
-            plt.plot(x, data[name], farben[name], label=name, linewidth=0.75)
-    ax.set(xlabel='timesteps', ylabel=ylabel)
+            plt.plot(x, data[name], farben[name], label=name, linewidth=2)  # 0.75
+    # ax.set(xlabel='timesteps', ylabel=ylabel)
     # ax.legend(loc='upper left')
-    plt.xlim(0, tend-1)
+    plt.xlim(0, tend - 1)
     if tend >= 10000:
         plt.xticks(np.arange(0, tend, 5000))
     elif tend >= 100:
-        plt.xticks(np.arange(0, tend, 50))
+        plt.xticks(np.arange(0, tend + 1, 500), fontsize=size_ticks)
+        # plt.xticks(np.arange(0, tend+1, 200), fontsize=size_ticks)
+    plt.ylabel(ylabel=ylabel, fontsize=size_legend)
+    plt.xlabel(xlabel='timesteps', fontsize=size_legend)
     # plt.axvline(x=22477, ymax=0.95, linestyle='--', color='black', linewidth=0.5)
     # plt.axvline(x=23637, ymax=0.95, linestyle='--', color='black', linewidth=0.5)
     # plt.axvline(x=23062, ymax=0.95, linestyle='--', color='black', linewidth=0.5)
@@ -289,10 +300,16 @@ def plot_sth(data, save=False, id=0, ylabel='index', savename=None):
     # plt.text(23062-250, 7.1, '$k_2$')
     # plt.text(37562-250, 7.1, '$k_4$')
     # plt.text(38466-250, 7.1, '$k_5$')
+    if yrange is None:
+        plt.ylim(0, maxy)
+    else:
+        plt.yticks(np.arange(0, yrange[0], yrange[1]), fontsize=size_ticks)
+        plt.ylim(0, yrange[2])
+
     # plt.ylim(0, 70000, 10000)
     # plt.ylim(0, 7.5)
+    # plt.yticks(np.arange(1, 3.5, 0.4), fontsize=size_ticks)
     # plt.ylim(0, maxy)
-    plt.ylim(1, 2)
     print(maxy)
     # plt.yticks([0, 0.001, 0.002])
     if save:
@@ -302,6 +319,7 @@ def plot_sth(data, save=False, id=0, ylabel='index', savename=None):
             save_plot(plot=fig, filename=savename + '.jpg')
 
     plt.show()
+
 
 def plot_index(index_data, which, save=False, id=0):
     """
@@ -319,7 +337,7 @@ def plot_index(index_data, which, save=False, id=0):
     ax.plot(x, y)
 
     ax.set(xlabel='timestep', ylabel=str(which))
-    plt.xlim(0, time-1)
+    plt.xlim(0, time - 1)
 
     if time >= 700:
         plt.xticks(np.arange(0, time, 100))
@@ -332,6 +350,7 @@ def plot_index(index_data, which, save=False, id=0):
     if save:
         save_plot(fig, str(id) + str(which) + '.jpg')
     plt.show()
+
 
 # def plot_hillnumbers_together(hill_1, hill_2, hill_3, hill_5, hill_25, hill_75, save=False, id=0):
 def plot_hillnumbers_together(hill_2, hill_25, hill_75, save=False, id=0):
@@ -356,7 +375,7 @@ def plot_hillnumbers_together(hill_2, hill_25, hill_75, save=False, id=0):
 
     ax.set(xlabel='timesteps', ylabel='Hillnumbers')
     ax.legend(handlelength=2.5)
-    plt.xlim(0, time-1)
+    plt.xlim(0, time - 1)
     if time >= 700:
         plt.xticks(np.arange(0, time, 5000))
     elif time >= 100:
@@ -364,13 +383,14 @@ def plot_hillnumbers_together(hill_2, hill_25, hill_75, save=False, id=0):
     plt.axvline(x=23062, ymax=0.9, linestyle='--')
     plt.axvline(x=36157, ymax=0.9, linestyle='--')
     plt.axvline(x=37562, ymax=0.9, linestyle='--')
-    plt.text(23062-250, 7.3, '$k_1$')
-    plt.text(36157-250, 7.3, '$k_2$')
-    plt.text(37562-250, 7.3, '$k_3$')
+    plt.text(23062 - 250, 7.3, '$k_1$')
+    plt.text(36157 - 250, 7.3, '$k_2$')
+    plt.text(37562 - 250, 7.3, '$k_3$')
     plt.ylim(1, max(hill_25) + 0.5, 10)
     if save:
-        save_plot(plot=fig, filename= str(id) + '_comparing hillnumbers_hilfslinien' + '.jpg')
+        save_plot(plot=fig, filename=str(id) + '_comparing hillnumbers_hilfslinien' + '.jpg')
     plt.show()
+
 
 def plot_entropies_together(gini, shannon, save=False, id=0, simpson=None):
     """
@@ -396,7 +416,7 @@ def plot_entropies_together(gini, shannon, save=False, id=0, simpson=None):
 
     ax.set(xlabel='timesteps', ylabel='Index')
     ax.legend()
-    plt.xlim(0, time-1)
+    plt.xlim(0, time - 1)
     if time >= 700:
         plt.xticks(np.arange(0, time, 5000))
     elif time >= 100:
@@ -406,6 +426,7 @@ def plot_entropies_together(gini, shannon, save=False, id=0, simpson=None):
     if save:
         save_plot(fig, str(id) + '_comparing entropies' + '.jpg')
     plt.show()
+
 
 def plot_selected_entropies(shannon, hill2, gini, save=False, id=0):
     """
@@ -427,9 +448,9 @@ def plot_selected_entropies(shannon, hill2, gini, save=False, id=0):
     par2.spines["right"].set_visible(True)
 
     host.set_xlim(0, time - 1)
-    host.set_ylim(bottom=1, top=max(hill2)*1.1)
-    par1.set_ylim(bottom=0, top=max(gini)*1.1)
-    par2.set_ylim(bottom=0, top=max(shannon)*1.1)
+    host.set_ylim(bottom=1, top=max(hill2) * 1.1)
+    par1.set_ylim(bottom=0, top=max(gini) * 1.1)
+    par2.set_ylim(bottom=0, top=max(shannon) * 1.1)
 
     host.set_xlabel("timesteps")
     host.set_ylabel("Hillnumber")
@@ -440,8 +461,6 @@ def plot_selected_entropies(shannon, hill2, gini, save=False, id=0):
     p2, = par1.plot(x, gini, farben['gi'], linewidth=0.75, label="GiniSimpsonindex")
     p3, = host.plot(x, hill2, farben['hill_2'], linewidth=0.75, label="Hillnumber of order 2")
     # p4, = host.plot(x, hill5, farben['hill_5'], linewidth=0.75, label="Hillnumber of order 0.5")
-
-
 
     host.yaxis.label.set_color(p3.get_color())
     par1.yaxis.label.set_color(p2.get_color())
@@ -471,6 +490,7 @@ def make_patch_spines_invisible(ax):
     for sp in ax.spines.values():
         sp.set_visible(False)
 
+
 def plot_popsize(data, save=False, id=0, plotmax=0):
     """
     plot of population size during time
@@ -494,7 +514,7 @@ def plot_popsize(data, save=False, id=0, plotmax=0):
         plt.ylim(0, max(size) * 1.1)
     ax.set(xlabel='timestep', ylabel='total number of living cells')
     if plotmax != 0:
-        plt.plot(x, [plotmax]*len(x), 'seagreen')
+        plt.plot(x, [plotmax] * len(x), 'seagreen')
     if save:
         save_plot(fig, str(id) + '_population size ' + '.jpg')
 
@@ -511,9 +531,9 @@ def plot_histogram_thom(thom, int_length, save=False, id=0):
     max = thom.max().astype(int)
     l = len(thom)
 
-    #number of intervalls
+    # number of intervalls
     ni = (max / int_length + 1).astype(int)
-    count = np.zeros(ni+1)
+    count = np.zeros(ni + 1)
 
     for entry in thom:
         c = (entry / int_length).astype(int)
@@ -523,20 +543,21 @@ def plot_histogram_thom(thom, int_length, save=False, id=0):
 
     fig, ax = plt.subplots()
     x = np.arange(0, max + int_length, int_length)
-    y = count[(x/int_length).astype(int)]
-    int_max = x[(y==y.max())]
+    y = count[(x / int_length).astype(int)]
+    int_max = x[(y == y.max())]
     for entry in int_max:
-        print('max in intervall [%d, %d]' %(entry, entry + int_length))
+        print('max in intervall [%d, %d]' % (entry, entry + int_length))
     print('with total= ', y.max())
 
-    plt.bar(x+int_length/2, y, width=int_length, color='black', alpha=0.5)
+    plt.bar(x + int_length / 2, y, width=int_length, color='black', alpha=0.5)
     plt.xlim(0, max + int_length)
-    plt.ylim(0, y.max()+1)
+    plt.ylim(0, y.max() + 1)
     ax.set(xlabel='timesteps', ylabel='absolut')
     if save:
         filename = str(id) + '_distribution with int_length=' + str(int_length) + '.jpg'
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
     plt.show()
+
 
 def thom_all(time_array, int_length, save=False, id=0):
     """
@@ -551,6 +572,7 @@ def thom_all(time_array, int_length, save=False, id=0):
         c = create_count(int_length, entry)
         smoothie[name] = np.append(c, np.zeros(len(x) - len(c)))
     thom_all_plot(time_arrays=smoothie, xrange=x, save=save, id=id)
+
 
 def thom_all_plot(time_arrays, xrange, save, id):
     """
@@ -571,7 +593,7 @@ def thom_all_plot(time_arrays, xrange, save, id):
     plt.ylim(bottom=0)
     plt.yticks(fontsize=12)
     plt.xticks(fontsize=12)
-    plt.ylabel('absolute frequency', fontsize=15) #15
+    plt.ylabel('absolute frequency', fontsize=15)  # 15
     plt.xlabel('thom', fontsize=15)
     # ax.set(xlabel='thom', ylabel='absolute frequency')
 
@@ -608,43 +630,31 @@ def plot_lognorm_distribution(thom, int_length, save=False, id=0, c='seagreen'):
     :param int_length: desired length of intervals
     :param c: desired color of distribution function
     """
-    max = thom.max().astype(int)
-    fig, ax = plt.subplots(figsize=(8,4))
-    plt.xticks(fontsize=10)
-    plt.yticks(fontsize=10)
-    plt.xlabel('thom', fontsize=15)
-    plt.ylabel('absolute frequency', fontsize=15)
+    fig, ax = plt.subplots(figsize=(12, 8))
+    size_ticks = 20
+    size_legend = 30
 
-    fitted_data, maxy, y = calc_lognormaldistri(thom=thom, int_length=int_length)
-    maxfit = fitted_data.max()
-    x = np.arange(0, max, int_length) + int_length/2
+    xrange = np.arange(0, max(thom) + int_length, int_length)
+    plt.hist(thom, bins=xrange, density=True)
 
-    plt.xlim(0, max + int_length/2)
-    plt.bar(x, y, width=int_length, color='grey', alpha=0.5)
-    # print('x', x)
-    # print('y', y)
-    # barerr = calc_barerrs(y)
-    #todo plt.errorbar(x, y, yerr=barerr, color='magenta')
-    plt.plot(x, fitted_data * maxy / maxfit, color=c, label=id)
-    print('a ', maxy / maxfit)
-    # sqderr = calc_quaderr(fitted_data * maxy / maxfit, y)
-    # print('q', sqderr)
-    # scale = int_length * 5
-    # print((barerr * sqderr).max())
-    # weightederr = barerr * sqderr #/ scale #skaliert und gewichtet
-    # print(weightederr.max())
-    # print('w', weightederr)
-    # print(fitted_data * maxy / maxfit)
-    # print(x)
-    # plt.errorbar(x, y, yerr=weightederr, lw=1, capsize=2, capthick=1, color=c)
-    # plt.errorbar(x, fitted_data * maxy / maxfit, yerr=weightederr, lw=1, capsize=2, capthick=1, color=c)
-
-    plt.legend()
+    fitted_data, new_x = calc_lognorm(thom, xrange)
+    plt.plot(new_x, fitted_data)
+    plt.xlim(0, xrange[-1])
+    if xrange[-1] > 140000:
+        plt.xticks(np.arange(0, xrange[-1], 40000))
+    else:
+        plt.xticks(np.arange(0, xrange[-1], 20000))
+    plt.ymin = 0
+    plt.xticks(fontsize=size_ticks)
+    plt.yticks(fontsize=size_ticks)
+    plt.xlabel('thom', fontsize=size_legend)
+    plt.ylabel('probability', fontsize=size_legend)
 
     if save:
         filename = str(id) + '_interval=' + str(int_length) + '_lognormal_distribution' + '.jpg'
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
     plt.show()
+
 
 def plot_all_lognorm(thomarray, colorarray, int_length, save=False):
     """
@@ -666,7 +676,7 @@ def plot_all_lognorm(thomarray, colorarray, int_length, save=False):
 
         fitted_data, maxy, _ = calc_lognormaldistri(thom=thom, int_length=int_length)
         maxfit = fitted_data.max()
-        x = np.arange(0, thom.max(), int_length) + int_length/2
+        x = np.arange(0, thom.max(), int_length) + int_length / 2
         plt.plot(x, fitted_data * maxy / maxfit, color=colorarray[index], label=name)
         print('a', maxy / maxfit)
         plt.xlim(0, thom.max() + int_length)
@@ -679,11 +689,13 @@ def plot_all_lognorm(thomarray, colorarray, int_length, save=False):
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
     plt.show()
 
+
 def correct(offs):
     c_offs = []
     for entry in offs:
         c_offs.append(entry[1:])
     return c_offs
+
 
 def save_plot(plot, filename=None):
     """
@@ -695,5 +707,3 @@ def save_plot(plot, filename=None):
         filename = 'no_name'
 
     plt.savefig(pathlib.Path('pictures').resolve() / filename)
-
-

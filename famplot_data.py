@@ -152,11 +152,12 @@ def create_ori(offs, tree):
     return ori
 
 
-names = ['100x100_rc=1_steps=500_Test_passenger', '100x100_rc=1_steps=500_Test_driver', '100x100_rc=1_steps=500_rb1_5_driver']
-
+named = 'd785cf8_50x50rc=500_driver'
+namep = '46a8f13_50x50rc=500_passenger'
+names = [namep, named]
 for i in names:
 # create_input(i, int_length=1)
 # tree = np.load('saved_data/' + i + '_tree.npy')
 # fams = np.load('saved_data/' + i + '_families.npy')
-    create_input(filename='100x100/' + i)
+    create_input(filename=i)
 

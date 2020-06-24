@@ -104,16 +104,18 @@ plotting <- function(data, filename="unknown"){
 
 # names = c('50x50_rc=1_steps=50_Test_driver', '50x50_rc=1_steps=50_Test_passenger',
 #          '50x50_rc=20_steps=50_Test_driver', '50x50_rc=20_steps=50_Test_passenger')
-names = c('4x4_rc=1_steps=10_miniTest_driver')
+names = c('46a8f13_50x50rc=500_passenger', 'd785cf8_50x50rc=500_driver')
 
-for (i in 1:1){ 
+for (i in 1:2){ 
     
-    name <- paste(names[i], "_int_length=1_cutoff=0", sep="")
+    name <- paste(names[i], "_int_length=250", sep="")
 
     
     d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
     plotting(d, filename=name)
     } 
+
+print("fertig mit alllem (:")
 # names = c('5011_mut_01d15ca8-03d6-4ca0-985c-777dc41365d8',
 #  '5011_mut_062b726c-48ab-4c6a-b2ad-e4cc27cc165a',
 #   '5011_mut_498d4c70-5dc8-4f0f-bb52-51820fc66505',

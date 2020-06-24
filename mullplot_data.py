@@ -45,7 +45,7 @@ def create_input(filename, tbeg=0, tend=None, int_length=1, cutoff=0, ori=None):
     tree = np.load('saved_data/' + filename + '_tree.npy')
     offs = correct(np.load('saved_data/' + filename + '_offsprings.npy'))
     # offs = create_ori(offs, tree)
-    name = filename + '_int_length=' + str(int_length) + '_cutoff=' + str(cutoff)
+    name = filename + '_int_length=' + str(int_length)
 
     if ori:
         offs_ori = create_ori(offs, tree)   # offs = offs_ori -> plottet ori
@@ -211,16 +211,18 @@ def filter_ori(offsprings, originals, tree, cutoff):
 #     name = '501167_mut_04_02/' + i
 #     print(name)
 #     create_input(name, int_length=250)
-name1 = 'Varianten ohne mut/5011_2_640e948'
-name167 = 'Varianten ohne mut/501167_4_ac06cfb'
+named = 'd785cf8_50x50rc=500_driver'
+namep = '46a8f13_50x50rc=500_passenger'
 
-names = [name1, name167]
-names = ['100x100_rc=1_steps=500_Test_passenger', '100x100_rc=1_steps=500_Test_driver', '100x100_rc=1_steps=500_rb1_5_driver']
-names = names[0]
-# for i in names:
-i='2x2_rc=1_steps=5mini_driver'
-print(i)
-create_input(i, int_length=1)
+names = [named, namep]
+# names = ['100x100_rc=1_steps=500_Test_passenger', '100x100_rc=1_steps=500_Test_driver', '100x100_rc=1_steps=500_rb1_5_driver']
+# names = names[0]
+for i in names:
+# i='2x2_rc=1_steps=5mini_driver'
+# print(i)
+    create_input(i, int_length=1)
+    create_input(i, int_length=100)
+    create_input(i, int_length=250)
 # print(o)
 # create_newoffs(o, int_length=3, tbeg=0, tend=len(o) - 1)
 # create_input(name, int_length=250)

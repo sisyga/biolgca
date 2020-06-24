@@ -195,32 +195,32 @@ def max_wert(which, intervallmin=0, intervallmax=40000):
 """
     --- Index-Daten einlesen    ---
 """
-data1 = correct(np.load('saved_data/Indizes_explizit/Daten/'
-                        '5011_mut_55186c3c-e01e-4609-8952-d1314b736521_offsprings.npy'))
-
-data167 = correct(np.load('saved_data/Indizes_explizit/Daten/'
-                          '501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d_offsprings.npy'))
-bp = read_inds(which='bp')
-bpinv = {}
-for key in bp:
-    print(key)
-    bpinv[key] = [1/entry for entry in bp[key]]
-si = read_inds(which='si')
-sh = read_inds(which='sh')
-eve = read_inds(which='eve')
-gi = read_inds(which='gi')
-hill1 = read_inds(which='hill1')
-hill2 = read_inds(which='hill2')
-hill3 = read_inds(which='hill3')
-hill_5 = read_inds(which='hill_5')
-hill_25 = read_inds(which='hill_25')
-hill_75 = read_inds(which='hill_75')
-rich = read_inds(which='rich')
-size = {'onenode': calc_popsize(data1), 'onerc': calc_popsize(data167)}
+# data1 = correct(np.load('saved_data/Indizes_explizit/Daten/'
+#                         '5011_mut_55186c3c-e01e-4609-8952-d1314b736521_offsprings.npy'))
+#
+# data167 = correct(np.load('saved_data/Indizes_explizit/Daten/'
+#                           '501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d_offsprings.npy'))
+# bp = read_inds(which='bp')
+# bpinv = {}
+# for key in bp:
+#     print(key)
+#     bpinv[key] = [1/entry for entry in bp[key]]
+# si = read_inds(which='si')
+# sh = read_inds(which='sh')
+# eve = read_inds(which='eve')
+# gi = read_inds(which='gi')
+# hill1 = read_inds(which='hill1')
+# hill2 = read_inds(which='hill2')
+# hill3 = read_inds(which='hill3')
+# hill_5 = read_inds(which='hill_5')
+# hill_25 = read_inds(which='hill_25')
+# hill_75 = read_inds(which='hill_75')
+# rich = read_inds(which='rich')
+# size = {'onenode': calc_popsize(data1), 'onerc': calc_popsize(data167)}
 
 
 # plot_sth(data={'onenode': size['onenode'], 'onerc': size['onerc']})
-whichlist = [hill2, hill1, hill_5, hill_25]
+# whichlist = [hill2, hill1, hill_5, hill_25]
 # for w in whichlist:
     # max_wert(which=w)
     # max_wert(which=w, intervallmin=22000, intervallmax=25000)
@@ -272,15 +272,15 @@ whichlist = [hill2, hill1, hill_5, hill_25]
 # plot_sth(data={'sh': sh['onenode'], 'gi': gi['onenode'], 'hill_2': hill2['onenode']}, save=True, savename='onenode_ShGiHh')
 # plot_sth(data={'sh': sh['onerc'], 'gi': gi['onerc'], 'hill_2': hill2['onerc']}, save=True, savename='onerc_ShGiHh')
 # #
-ave_sh = ave_inds(which='shannon')
-ave_hill2 = ave_inds(which='hill2')
-ave_hill_5 = ave_inds(which='hill5')
-ave_gi = ave_inds(which='gini')
+# ave_sh = ave_inds(which='shannon')
+# ave_hill2 = ave_inds(which='hill2')
+# ave_hill_5 = ave_inds(which='hill5')
+# ave_gi = ave_inds(which='gini')
 
 # plot_sth(data={'sh': ave_sh['onenode'], 'hill_2': ave_hill2['onenode']-1})
 # plot_sth(data={'sh': ave_sh['onerc'], 'hill_2': ave_hill2['onerc']-1})
 # plot_sth(data={'onenode': ave_sh['onenode'], 'onerc': ave_sh['onerc']}, save=True, savename='sh_vgl', ylabel='shannon-index')
-plot_sth(data={'onenode': ave_hill2['onenode'], 'onerc': ave_hill2['onerc']}, save=True, savename='hill2_vgl', ylabel='hill of order 2')
+# plot_sth(data={'onenode': ave_hill2['onenode'], 'onerc': ave_hill2['onerc']}, save=True, savename='hill2_vgl', ylabel='hill of order 2')
 # plot_sth(data={'onenode': ave_sh['onenode'], 'onerc': ave_sh['onerc']}, ylabel='shannon')
 # plot_sth(data={'onenode': ave_hill2['onenode'], 'onerc': ave_hill2['onerc']}, ylabel='hill2')
 # plot_sth(data={'onenode': ave_hill_5['onenode'], 'onerc': ave_hill_5['onerc']}, ylabel='hill_5')
@@ -289,7 +289,7 @@ plot_sth(data={'onenode': ave_hill2['onenode'], 'onerc': ave_hill2['onerc']}, sa
     --- diverse plots ---
 """
 # vars = ['onenode', 'onerc']
-vars = ['onenode']
+# vars = ['onenode']
 # for var in vars:
 #     plot_sth(data={'hill_2': hill2[var], 'hill_1': hill1[var],
 #                    'hill_25': hill_25[var], 'hill_5': hill_5[var]}, save=True, savename='hills_aus')
@@ -397,3 +397,35 @@ vars = ['onenode']
 # for name in data167:
 #     names167.append(name)
 # print(names167)
+
+# path = 'saved_data/5011_ges/'
+# files = os.listdir(path)
+# names = [entry for entry in files if 'offspring' in entry]
+# print(len(names))
+# mini = []
+# maxi = []
+# mitte = []
+# s = []
+# for file in names:
+#     offs = correct(np.load(path + file))
+#     s = [sum(offs[t]) for t in range(0, 40001)]
+#     for i, e in enumerate(s):
+#         if e==501:
+#             print(i, ' file')
+    # mini.append(min(s))
+    # maxi.append(max(s))
+    # mitte.append(np.mean(s))
+
+#
+# import csv
+# toWrite = [['mini'] + mini,
+#            ['maxi'] + maxi,
+#            ['mitte'] + mitte
+#            ]
+#
+# file = open(path + '501167_popsize.csv', 'w')
+#
+# with file as csvfile:
+#     writer = csv.writer(csvfile, delimiter=',')
+#     for row in toWrite:
+#         writer.writerow(row)
