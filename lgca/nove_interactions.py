@@ -33,9 +33,12 @@ def dd_alignment(lgca):
         #print(coord)
         #print("Weights:")
         #print(weights)
-        sample = npr.choice(lgca.c[0], size=(n,), replace=True, p=weights) #TODO: only works for 1D; multinomial dist.?
-        #print("Sample:")
-        #print(sample)
+        #sample = npr.choice(lgca.c[0], size=(n,), replace=True, p=weights) #TODO: only works for 1D; multinomial dist.?
+
+        sample = npr.multinomial(lgca.c[0,0], weights, size = (n,) )
+
+        print("Sample:")
+        print(sample)
         #direction, counts = np.unique(sample, return_counts=True)
         newnodes[coord] = np.array([np.count_nonzero(sample == 1), np.count_nonzero(sample == -1)]) #TODO: only works for 1D
         # multiply neighborhood flux with the flux for each possible direction
@@ -79,7 +82,10 @@ def di_alignment(lgca):
         #print(coord)
         #print("Weights:")
         #print(weights)
-        sample = npr.choice(lgca.c[0], size=(n,), replace=True, p=weights) #TODO: only works for 1D
+        #sample = npr.choice(lgca.c[0], size=(n,), replace=True, p=weights) #TODO: only works for 1D
+
+        sample = npr.multinomial(lgca.c[0,0], weights, size = (n,) )
+
         #print("Sample:")
         #print(sample)
         #direction, counts = np.unique(sample, return_counts=True)
