@@ -1,6 +1,6 @@
 try:
     from .base import *
-    from .lgca_square import LGCA_Square, IBLGCA_Square
+    from .lgca_square import LGCA_Square, IBLGCA_Square, LGCA_NoVE_2D
 
 except ModuleNotFoundError:
     from base import *
@@ -180,6 +180,32 @@ class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
         else:
             self.nodes[self.nonborder] = nodes.astype(np.uint)
             self.maxlabel = self.nodes.max()
+
+
+
+
+class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
+    def init_coords(self):
+        if self.ly % 2 != 0:
+            print('Warning: uneven number of rows; only use for plotting - boundary conditions do not work!')
+        self.x = np.arange(self.lx) + self.r_int
+        self.y = np.arange(self.ly) + self.r_int
+        self.xx, self.yy = np.meshgrid(self.x, self.y, indexing='ij')
+        self.coord_pairs = list(zip(self.xx.flat, self.yy.flat))
+
+        self.xcoords, self.ycoords = np.meshgrid(np.arange(self.lx + 2 * self.r_int) - self.r_int,
+                                                 np.arange(self.ly + 2 * self.r_int) - self.r_int, indexing='ij')
+        self.xcoords = self.xcoords.astype(float)
+        self.ycoords = self.ycoords.astype(float)
+
+        self.xcoords[:, 1::2] += 0.5
+        self.ycoords *= self.dy
+        self.xcoords = self.xcoords[self.r_int:-self.r_int, self.r_int:-self.r_int]
+        self.ycoords = self.ycoords[self.r_int:-self.r_int, self.r_int:-self.r_int]
+        self.nonborder = (self.xx, self.yy)
+
+    def calc_polar_alignment_parameter(self):
+        return np.abs(self.calc_flux(self.nodes)[self.nonborder].sum()/self.nodes[self.nonborder].sum())
 
 
 if __name__ == '__main__':

@@ -304,6 +304,7 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         ax.xaxis.tick_top()
         plt.title("Density plot.\n VE: False  Align: " + self.interaction.__name__ + "  BC: " + self.apply_boundaries.__name__ \
                   + "\n Dims: " + str(self.dims) + "  Dens: " + '{0:.3f}'.format(self.eff_dens) + "  Beta: " + str(self.beta), fontsize=10)
+
         plt.tight_layout()
         return plot
 
@@ -365,15 +366,15 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         plt.tight_layout()
 
 
-    def nb_sum(self, qty, addSelf):
-         sum = np.zeros(qty.shape)
-         sum[:-1, ...] += qty[1:, ...]
-         sum[1:, ...] += qty[:-1, ...]
-         if addSelf:
-            sum += qty
+    #def nb_sum(self, qty, addSelf):
+     #    sum = np.zeros(qty.shape)
+      #   sum[:-1, ...] += qty[1:, ...]
+       #  sum[1:, ...] += qty[:-1, ...]
+        # if addSelf:
+         #   sum += qty
          # shift to left without padding and add to shift to the right without padding
          #sums up fluxes (in qty) of neighboring particles
-         return sum
+         #return sum
 
 
     def update_dynamic_fields(self):
@@ -401,13 +402,13 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         return np.abs(self.calc_flux(self.nodes)[self.nonborder].sum()/self.nodes[self.nonborder].sum())
 
     def calc_mean_alignment(self):
-        no_neighbors = self.nb_sum(np.ones(self.cell_density[self.nonborder].shape), False) #neighborhood is defined s.t. border particles don't have them
+        no_neighbors = self.nb_sum(np.ones(self.cell_density[self.nonborder].shape)) #neighborhood is defined s.t. border particles don't have them
         f = self.calc_flux(self.nodes[self.nonborder])
         d = self.cell_density[self.nonborder]
         d_div = np.where(d > 0, d, 1)
         #np.maximum(d, 1, out=d_div)
         f_norm = f.flatten()/d_div #Todo: only 1 D! (this whole method basically)
-        f_norm = self.nb_sum(f_norm, False)
+        f_norm = self.nb_sum(f_norm)
         f_norm = f_norm/no_neighbors
         return (np.dot(f_norm, f)).sum() / d.sum() #first sum probably unnecessary
 
