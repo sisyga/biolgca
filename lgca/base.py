@@ -450,11 +450,9 @@ class IBLGCA_base(LGCA_base):
 
     def set_interaction(self, **kwargs):
         try:
-            from .ib_interactions import birth, birthdeath, go_or_grow
-            from .interactions import random_walk
+            from .ib_interactions import randomwalk, birth, birthdeath, birthdeath_discrete, go_or_grow
         except ImportError:
-            from ib_interactions import birth, birthdeath, go_or_grow
-            from interactions import random_walk
+            from ib_interactions import randomwalk, birth, birthdeath, birthdeath_discrete, go_or_grow
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
             if interaction is 'birth':
@@ -490,6 +488,38 @@ class IBLGCA_base(LGCA_base):
                 else:
                     self.a_max = 1.
                     print('Max. birth rate set to a_max =', self.a_max)
+
+            elif interaction is 'birthdeath_discrete':
+                self.interaction = birthdeath_discrete
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                else:
+                    self.r_b = 0.2
+                    print('Birth rate set to r_b = ', self.r_b)
+
+                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+                if 'r_d' in kwargs:
+                    self.r_d = kwargs['r_d']
+                else:
+                    self.r_d = 0.02
+                    print('Death rate set to r_d = ', self.r_d)
+
+                if 'drb' in kwargs:
+                    self.drb = kwargs['drb']
+                else:
+                    self.drb = 0.01
+                    print('Delta r_b set to = ', self.drb)
+                if 'a_max' in kwargs:
+                    self.a_max = kwargs['a_max']
+                else:
+                    self.a_max = 1.
+                    print('Max. birth rate set to a_max =', self.a_max)#
+
+                if 'pmut' in kwargs:
+                    self.pmut = kwargs['pmut']
+                else:
+                    self.pmut = 0.1
+                    print('Mutation probability set to p_mut =', self.pmut)
 
             elif interaction is 'go_or_grow':
                 self.interaction = go_or_grow
@@ -570,7 +600,7 @@ class IBLGCA_base(LGCA_base):
 
     def convert_bool_to_ib(self, occ):
         occ = occ.astype(np.uint)
-        occ[occ > 0] = 1 + np.arange((occ.sum()), dtype=np.uint)
+        occ[occ > 0] = np.arange(1, 1+occ.sum(), dtype=np.uint)
         return occ
 
     def random_reset(self, density):
