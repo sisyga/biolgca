@@ -104,10 +104,10 @@ class LGCA_1D(LGCA_base):
             fig.set_tight_layout(tight_layout)
 
         ax = plt.gca()
-        xmax = self.xcoords.max() - 0.5
-        xmin = self.xcoords.min() + 0.5
+        xmax = self.xcoords.max() - 0.5 * self.r_int
+        xmin = self.xcoords.min() + 0.5 * self.r_int
         ymax = tmax - 0.5
-        ymin = +0.5
+        ymin = -0.5
         plt.xlim(xmin, xmax)
         plt.ylim(ymax, ymin)
         ax.set_aspect('equal')
@@ -133,7 +133,7 @@ class LGCA_1D(LGCA_base):
         tmax = density_t.shape[0]
         fig, ax = self.setup_figure(tmax, **kwargs)
         cmap = cmap_discretize(cmap, 3 + self.restchannels)
-        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=2 + self.restchannels, cmap=cmap)
+        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=self.K, cmap=cmap)
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size=.3, pad=0.1)
         cbar = colorbar_index(ncolors=3 + self.restchannels, cmap=cmap, use_gridspec=True, cax=cax)
