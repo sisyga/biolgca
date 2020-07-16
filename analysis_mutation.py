@@ -195,28 +195,28 @@ def max_wert(which, intervallmin=0, intervallmax=40000):
 """
     --- Index-Daten einlesen    ---
 """
-# data1 = correct(np.load('saved_data/Indizes_explizit/Daten/'
-#                         '5011_mut_55186c3c-e01e-4609-8952-d1314b736521_offsprings.npy'))
-#
-# data167 = correct(np.load('saved_data/Indizes_explizit/Daten/'
-#                           '501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d_offsprings.npy'))
-# bp = read_inds(which='bp')
-# bpinv = {}
-# for key in bp:
-#     print(key)
-#     bpinv[key] = [1/entry for entry in bp[key]]
-# si = read_inds(which='si')
-# sh = read_inds(which='sh')
-# eve = read_inds(which='eve')
-# gi = read_inds(which='gi')
-# hill1 = read_inds(which='hill1')
-# hill2 = read_inds(which='hill2')
-# hill3 = read_inds(which='hill3')
-# hill_5 = read_inds(which='hill_5')
-# hill_25 = read_inds(which='hill_25')
-# hill_75 = read_inds(which='hill_75')
-# rich = read_inds(which='rich')
-# size = {'onenode': calc_popsize(data1), 'onerc': calc_popsize(data167)}
+data1 = correct(np.load('saved_data/Indizes_explizit/Daten/'
+                        '5011_mut_55186c3c-e01e-4609-8952-d1314b736521_offsprings.npy'))
+
+data167 = correct(np.load('saved_data/Indizes_explizit/Daten/'
+                          '501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d_offsprings.npy'))
+bp = read_inds(which='bp')
+bpinv = {}
+for key in bp:
+    print(key)
+    bpinv[key] = [1/entry for entry in bp[key]]
+si = read_inds(which='si')
+sh = read_inds(which='sh')
+eve = read_inds(which='eve')
+gi = read_inds(which='gi')
+hill1 = read_inds(which='hill1')
+hill2 = read_inds(which='hill2')
+hill3 = read_inds(which='hill3')
+hill_5 = read_inds(which='hill_5')
+hill_25 = read_inds(which='hill_25')
+hill_75 = read_inds(which='hill_75')
+rich = read_inds(which='rich')
+size = {'onenode': calc_popsize(data1), 'onerc': calc_popsize(data167)}
 
 
 # plot_sth(data={'onenode': size['onenode'], 'onerc': size['onerc']})
@@ -269,15 +269,39 @@ def max_wert(which, intervallmin=0, intervallmax=40000):
 # plot_sth(data={'bp': bp['onenode'], 'bpinv': bpinv['onenode'], 'si': si['onenode']})
 
 
-# plot_sth(data={'sh': sh['onenode'], 'gi': gi['onenode'], 'hill_2': hill2['onenode']}, save=True, savename='onenode_ShGiHh')
-# plot_sth(data={'sh': sh['onerc'], 'gi': gi['onerc'], 'hill_2': hill2['onerc']}, save=True, savename='onerc_ShGiHh')
-# #
-# ave_sh = ave_inds(which='shannon')
-# ave_hill2 = ave_inds(which='hill2')
-# ave_hill_5 = ave_inds(which='hill5')
-# ave_gi = ave_inds(which='gini')
 
-# plot_sth(data={'sh': ave_sh['onenode'], 'hill_2': ave_hill2['onenode']-1})
+# #
+ave_sh = ave_inds(which='shannon')
+ave_hill2 = ave_inds(which='hill2')
+ave_hill_5 = ave_inds(which='hill5')
+ave_gi = ave_inds(which='gini')
+
+## ++++indizes neu++++++
+# plot_sth(data={'onenode': rich['onenode'], 'onerc': rich['onerc']})
+# plot_sth(data={'onerc': rich['onerc']})
+# plot_sth(data={'sh': sh['onenode'], 'gi': gi['onenode'], 'hill_2': hill2['onenode']})
+# plot_sth(data={'sh': sh['onerc'], 'gi': gi['onerc'], 'hill_2': hill2['onerc']})
+# plot_sth(data={'onenode': si['onenode'] - gi['onenode']}, ylabel='$D(k)-D_{GS}(k)$',
+#          yrange=[0.0021, 0.001, 0.0021 ])
+# plot_sth(data={'gi': gi['onenode'], 'sh': sh['onenode'], 'eve': eve['onenode']},
+#          ylabel='Indexwert', yrange=[1.7, 0.4, 1.7])
+# plot_sth(data={'bp': bp['onenode'], 'hill_2': hill2['onenode'], 'bpinv': bpinv['onenode'], 'gi': gi['onenode']},
+#          ylabel='Indexwert')
+# plot_sth(data={'hill_2': hill2['onenode']-1, 'bp': bp['onenode']},
+#          ylabel='Indexwert', yrange=[3.6,1,3.6])
+# plot_sth(data={'hill_2': hill2['onenode']-gi['onenode']-1, 'bp': bp['onenode']},
+#          ylabel='Indexwert', yrange=[2.7,1,2.7])
+# plot_sth(data={'hill_2': hill2['onenode'], 'hill_1': hill1['onenode'],
+#                 'hill_25': hill_25['onenode'], 'hill_5': hill_5['onenode']},
+#          ylabel='Indexwert', yrange=[8,2,8])
+# plot_sth(data={'onenode': ave_sh['onenode'], 'onerc': ave_sh['onerc']},
+#          ylabel='$H(k)$', yrange=[1.1,0.2,1])
+plot_sth(data={'onenode': ave_hill2['onenode'], 'onerc': ave_hill2['onerc']},
+         ylabel='$D_2(k)$', yrange=[2.1,0.2,2])
+
+
+
+
 # plot_sth(data={'sh': ave_sh['onerc'], 'hill_2': ave_hill2['onerc']-1})
 # plot_sth(data={'onenode': ave_sh['onenode'], 'onerc': ave_sh['onerc']}, save=True, savename='sh_vgl', ylabel='shannon-index')
 # plot_sth(data={'onenode': ave_hill2['onenode'], 'onerc': ave_hill2['onerc']}, save=True, savename='hill2_vgl', ylabel='hill of order 2')
@@ -295,11 +319,9 @@ def max_wert(which, intervallmin=0, intervallmax=40000):
 #                    'hill_25': hill_25[var], 'hill_5': hill_5[var]}, save=True, savename='hills_aus')
     # plot_sth(data={'onenode': hill2[var]-gi[var], 'bp': bp[var], 'bpinv': bpinv[var]}, save=True, savename='Hh-Gi_bp_bpinv')
     # plot_sth(data={'bp': bp[var], 'gi': gi[var], 'bpinv': bpinv[var]})
-    # plot_sth(data={'bp': bp[var], 'hill_2': hill2[var], 'bpinv': bpinv[var], 'gi': gi[var]}, save=True, savename='GidHh')
 #     plot_sth(data={'onenode': si[var] - gi[var]}, ylabel='simpson - gini', savename='diff_SiGi', save=True)
     # plot_sth(data={'hill_2': hill2[var], 'eve': eve[var]}, save=True, savename=var + '_HhEve')
     # plot_sth(data={'gi': gi[var], 'eve': eve[var]}, save=False, savename=var + '_GiEve')
-    # plot_sth(data={'gi': gi[var], 'sh': sh[var], 'eve': eve[var]}, save=True, savename=var + '_GiEveSh')
     # plot_sth(data={'gi': gi[var], 'sh': sh[var]}, save=True, savename=var + '_GiSh')
 #     plot_hillnumbers_together(hill2[var],hill_25[var], hill_75[var], save=True, id=var)
 #     plot_entropies_together(gini=gi[var], shannon=sh[var])

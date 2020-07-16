@@ -212,46 +212,58 @@ rel = []
 # print(g)
 # size_d = []
 # size_p = []
-# path = 'saved_data/passenger_45sims/'
+# # path = 'saved_data/passenger_45sims/'
+# path = 'saved_data/driver_45sims/'
 # names = search_names(path)
 # for name in names:
 #     offs = search_offs(path, name)
-#     size_p.append(sum(offs[-1]))
 #     # size_p.append(sum(offs[-1]))
-#
-# fig, ax = plt.subplots(figsize=(20, 12))
-# plt.xlabel('simulation', fontsize=60)
-# plt.ylabel('final population size', fontsize=60)
-# plt.xticks(fontsize=50)
-# plt.yticks(fontsize=50)
-# plt.xlim(0, 45, 5)
-# dotsize = [250]*45
+#     size_d.append(sum(offs[-1]))
+#     print(sum(offs[-1]))
+# fig, ax = plt.subplots(figsize=(13, 8))
+# plt.xlabel('Simulation', fontsize=30)
+# plt.ylabel('finale Populationsgröße', fontsize=30)
+# plt.xticks(fontsize=20)
+# plt.yticks(fontsize=20)
+# plt.xlim(0, 45.5, 5)
+# dotsize = [200]*45
 # #
 # #-----DRIVER-----
 # plt.scatter(range(1, 46), size_d, c='Indigo', s=dotsize)
 # plt.yticks([0, 300000, 700000], ['0', '3$\cdot$10e5', '7$\cdot$10e5'])
 # plt.ylim(0, 700000, 4)
 # save_plot(plot=fig, filename='finalsize_driver')
+# plt.show()
+#
 #
 # #-----PASSENGER-----
 # plt.scatter(range(1, 46), size_p, s=dotsize, c='MediumSeaGreen')
 # plt.yticks([0, 1000, 2000], ['0', '1$\cdot$10e3', '2$\cdot$10e3'])
 # plt.ylim(0, 2000)
-# # save_plot(plot=fig, filename='finalsize_passenger')
 #
+# save_plot(plot=fig, filename='finalsize_passenger')
 # plt.show()
-# p_hill = np.loadtxt('saved_data/passenger_45sims/passenger_ave_hill2.csv')
-# p_sh = np.loadtxt('saved_data/passenger_45sims/passenger_ave_sh.csv')
-# d_hill = np.loadtxt('saved_data/driver_45sims/driver_ave_hill.csv')
-# d_sh = np.loadtxt('saved_data/driver_45sims/driver_ave_sh.csv')
 #
-# plot_sth(data={'passenger': p_hill[:1400], 'driver': d_hill[:1400]}, ylabel='hill second order')
-# plot_sth(data={'passenger': p_sh[:1400], 'driver': d_sh[:1400]},
-#          ylabel='shannon index', save=True, savename='shannon_d_p_bis1400')
 
-# o_d = correct(np.load('saved_data/hexis_mit_bild/d785cf8_50x50rc=500_driver_offsprings.npy'))
-# o_p = correct(np.load('saved_data/hexis_mit_bild/46a8f13_50x50rc=500_passenger_offsprings.npy'))
-# sd = calc_bergerparker(o_d)
-# sp = calc_bergerparker(o_p)
+p_hill = np.loadtxt('saved_data/passenger_45sims/passenger_ave_hill2.csv')
+p_sh = np.loadtxt('saved_data/passenger_45sims/passenger_ave_sh.csv')
+d_hill = np.loadtxt('saved_data/driver_45sims/driver_ave_hill.csv')
+d_sh = np.loadtxt('saved_data/driver_45sims/driver_ave_sh.csv')
+
+# plot_sth(data={'passenger': p_hill[:1400], 'driver': d_hill[:1400]}, ylabel='$D_2(k)$',
+#          yrange=[3.5,0.4,3.4], save=True, savename='ave_hill_TP3')
+# plot_sth(data={'passenger': p_sh[:1400], 'driver': d_sh[:1400]},
+#          ylabel='$H(k)$',yrange=[1.5, 0.2, 1.4], save=False, savename='shannon_d_p_bis1400')
+
+o_d = correct(np.load('saved_data/hexis_mit_bild/d785cf8_50x50rc=500_driver_offsprings.npy'))
+o_p = correct(np.load('saved_data/hexis_mit_bild/46a8f13_50x50rc=500_passenger_offsprings.npy'))
+sd = calc_bergerparker(o_d)
+sp = calc_bergerparker(o_p)
+richd = calc_richness(o_d)[:1401]
+richp = calc_richness(o_p)[:1401]
+sized = calc_popsize(o_d)[:1401]
+sizep = calc_popsize(o_p)[:1401]
 # print(sd[0], sp[0])
-# plot_sth(data={'passenger': sp, 'driver': sd}, ylabel='berger-parker index', yrange=[1.1, 0.25, 1.1s])
+# plot_sth(data={'passenger': sp, 'driver': sd}, ylabel='$d(k)$', yrange=[1.1, 0.25, 1.1])
+# plot_sth(data={'passenger': richp, 'driver': richd}, ylabel='$S(k)$', yrange=[19,3, 19])
+plot_sth(data={'passenger': sizep, 'driver': sized}, ylabel='$N(k)$', yrange=[4001,1000, 4000])

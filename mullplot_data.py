@@ -213,17 +213,19 @@ def filter_ori(offsprings, originals, tree, cutoff):
 #     create_input(name, int_length=250)
 named = 'd785cf8_50x50rc=500_driver'
 namep = '46a8f13_50x50rc=500_passenger'
+n = '501167_ges/501167_mut_55b10ca1-c2ec-434d-bcfe-ec60cf186abc'
+create_input(n, int_length=250)
 
 names = [named, namep]
 # names = ['100x100_rc=1_steps=500_Test_passenger', '100x100_rc=1_steps=500_Test_driver', '100x100_rc=1_steps=500_rb1_5_driver']
 # names = names[0]
-for i in names:
-# i='2x2_rc=1_steps=5mini_driver'
-# print(i)
-    create_input(i, int_length=1)
-    create_input(i, int_length=100)
-    create_input(i, int_length=250)
-# print(o)
+# for i in names:
+# # i='2x2_rc=1_steps=5mini_driver'
+# # print(i)
+#     create_input(i, int_length=1)
+#     create_input(i, int_length=100)
+#     create_input(i, int_length=250)
+# # print(o)
 # create_newoffs(o, int_length=3, tbeg=0, tend=len(o) - 1)
 # create_input(name, int_length=250)
 # create_input(name, int_length=250, ori=True)

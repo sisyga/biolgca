@@ -34,11 +34,20 @@ thombsp = np.array([1,3,5,7,\
         35,33])
 
     # 0 = bsp  1 = 01  2 = 167
-# thom, int_length, c = whichone(1)
-# plot_lognorm_distribution(thom, int_length, c=c, id='onenode')
-#
-# thom, int_length, c = whichone(2)
-# plot_lognorm_distribution(thom, int_length, c=c, id='onerc')
+thom, int_length, c = whichone(1)
+# plot_lognorm_distribution(thom, int_length, c=c, id='onenode', save=True)
+a = 0
+for t in thom:
+    if t <= 40000:
+        a += 1
+print(a)
+thom, int_length, c = whichone(2)
+# plot_lognorm_distribution(thom, int_length, c=c, id='onerc', save=True)
+a = 0
+for t in thom:
+    if t <= 40000:
+        a += 1
+print(a)
+# plot_all_lognorm({'onenode': thom_01, 'onerc': thom_167}, int_length=4575, save=True)
 
-plot_all_lognorm({'onenode': thom_01, 'onerc': thom_167}, int_length=4575, save=True)
 

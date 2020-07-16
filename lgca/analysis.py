@@ -241,41 +241,29 @@ def create_averaged_entropies(dic_offs, save=True, id=0, plot=False, saveplot=Fa
     #                    'hill_2': result_hill}, save=True, id='averaged_unscaled')
    # return result_sh, result_gi, result_hill
 
-def calc_lognorm(thom, xrange):
-    param = sp.stats.lognorm.fit(thom, loc=0)
-    new_x = [entry - xrange[1]/2 for entry in xrange[1:]]
-    fitted_data = sp.stats.lognorm.pdf(new_x, param[0], loc=param[1], scale=param[2])
+def calc_lognorm(thom):
+    param = sp.stats.lognorm.fit(thom, loc=0) #loc=0, sonst Regression zu ungenau
+    fitted_data = sp.stats.lognorm.pdf(range(0, max(thom)), param[0], loc=param[1], scale=param[2])
     print('sigma', param[0])
     print('?', param[1])
     print('p2', param[2])
     print('mu', np.log(param[2]))
 
-    return fitted_data, new_x
+    return fitted_data
 
 def calc_barerrs(hist_data):
     """
     calculate error in thom histograms;
     called by plot_lognorm_distribution
     """
-    print(hist_data)
+    # print(hist_data)
     n = sum(hist_data)
-    print(n)
+    # print(n)
     err = [(entry * (1 - entry/n))**0.5 for entry in hist_data]
-    print(err)
+    # print(err)
 
     return err
 
-
-def calc_quaderr(data, fitted_data): #TODO quad Fehler
-    """
-    calculate squared error in thom histograms;
-    called by plot_lognorm_distribution
-    """
-    sqd = np.zeros(len(data))
-    for i in range(0, len(data)):
-        sqd[i] = (data[i] - fitted_data[i])**2
-    # print(sqd)
-    return sqd
 
 def cond_oneancestor(lgca):
     """

@@ -165,14 +165,14 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0, \
     if tend is None:
         tend = tmax
     if figsize is None:
-        if tend - tbeg <= 100:
-            fx = 4.5  # for c == 180
-            fy = (tend - tbeg) / 40
-            figsize = (fx, fy)
-        elif tend - tbeg <= 500:
-            fx = 4.5  # for c == 180
-            fy = (tend - tbeg) / 55
-            figsize = (fx, fy)
+        # if tend - tbeg <= 100:
+        figsize=(12, 4)
+        size_ticks = 20
+        size_legend = 30
+        # elif tend - tbeg <= 500:
+        #     fx = 4.5  # for c == 180
+        #     fy = (tend - tbeg) / 55
+        #     figsize = (fx, fy)
 
     val = np.zeros((tmax, dim * c))
 
@@ -221,9 +221,9 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0, \
     # cbar.ax.get_yaxis().labelpad = 15
     # cbar.ax.set_ylabel('family', rotation=270)
     ###
-    plt.ylabel('timesteps', fontsize=15, labelpad=10)  # 15
+    plt.ylabel('Zeitschritt', fontsize=size_legend, labelpad=10)  # 15
     ax.xaxis.set_label_position('top')
-    plt.xlabel('lattice site', fontsize=15, labelpad=10)  # , fontsize=12
+    plt.xlabel('Gitterknoten', fontsize=size_legend, labelpad=10)  # , fontsize=12
 
     # nur "Knotenanfang"
     plt.xlim(-0.5, dim * c - 0.5)
@@ -234,24 +234,24 @@ def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0, \
         for i in range(0, len(x1)):
             x2[i] = (x1[i] / c) + 1
         ax.set_xticks(x1)
-        ax.set_xticklabels(x2, minor=False, fontsize=12)
+        ax.set_xticklabels(x2, minor=False, fontsize=size_ticks)
     elif dim > 1:
         x1 = (np.arange(0, dim * c, c))
         x2 = np.zeros(len(x1)).astype(int)
         for i in range(0, len(x1)):
             x2[i] = (x1[i] / c) + 1
         ax.set_xticks(x1)
-        ax.set_xticklabels(x2, minor=False, fontsize=12)
+        ax.set_xticklabels(x2, minor=False, fontsize=size_ticks)
     else:
-        plt.xticks((np.arange(0, dim * c, c) + 1), fontsize=12)
+        plt.xticks((np.arange(0, dim * c, c) + 1), fontsize=size_ticks)
 
     plt.ylim(tend - 0.5, tbeg - 0.5)
     if tend - tbeg > 700:
         plt.yticks(np.arange(tbeg, tend, 100))
     elif tend - tbeg > 100:
-        plt.yticks(np.arange(tbeg, tend, 50), fontsize=12)
+        plt.yticks(np.arange(tbeg, tend, 50), fontsize=size_ticks)
     elif tend - tbeg <= 100:
-        plt.yticks(np.arange(tbeg, tend, 10), fontsize=11)
+        plt.yticks(np.arange(tbeg, tend + 1, 20), fontsize=size_ticks)
     if save:
         save_plot(fig, str(id) + '_spacetimeplot_' + str(tbeg) + '-' + str(tend) + '.jpg')
     plt.show()
@@ -268,49 +268,66 @@ def plot_sth(data, save=False, id=0, ylabel='index', savename=None, yrange=None)
     x = np.arange(0, tend)
     maxy = 0
     filename = list(data.keys())
-    fig, ax = plt.subplots(figsize=(12, 8))  # figsize=(6, 3)
-    fig, ax = plt.subplots(figsize=(12, 6))  # figsize=(6, 3) #halbwegs okayige plots t=1400
+    # fig, ax = plt.subplots(figsize=(12, 8))  # figsize=(6, 3)
+    # fig, ax = plt.subplots(figsize=(12, 6))  # figsize=(6, 3) #halbwegs okayige plots t=1400
     # fig, ax = plt.subplots(figsize=(15, 4)) #richness
-    # fig, ax = plt.subplots(figsize=(12, 4))
+    fig, ax = plt.subplots(figsize=(12, 5))
+    lab = {'passenger': 'Passenger', 'driver': 'Driver', 'onenode': 'I', 'onerc': 'II',
+           'sh': '$H(k)$', 'gi': '$D_{GS}(k)$', 'hill_2': '$D_2(k)$',
+           'eve': '$E_H(k)$', 'bp': '$d(k)$', 'bpinv': '$d^{-1}(k)$',
+           'hill_25': '$D_{0.25}(k)$', 'hill_5': '$D_{0.5}(k)$',
+           'hill_1': '$D_{1}(k)$'}
     for name in data:
         m = max(data[name])
         if m > maxy:
             maxy = m + 0.1
         if name == 'eve' or name == 'bpinv':
-            plt.plot(x, data[name], farben[name], label=name, linewidth=0.75, linestyle=(0, (1, 10)))
+            plt.plot(x, data[name], farben[name], label=lab[name], linewidth=0.75, linestyle=(0, (1, 10)))
         else:
-            plt.plot(x, data[name], farben[name], label=name, linewidth=2)  # 0.75
+            plt.plot(x, data[name], farben[name], label=lab[name], linewidth=1.5)  # 0.75
     # ax.set(xlabel='timesteps', ylabel=ylabel)
-    # ax.legend(loc='upper left')
+    ax.legend(loc='upper left', fontsize=size_ticks)
     plt.xlim(0, tend - 1)
     if tend >= 10000:
-        plt.xticks(np.arange(0, tend, 5000))
+        plt.xticks(np.arange(0, tend, 10000), fontsize=size_ticks)
     elif tend >= 100:
-        plt.xticks(np.arange(0, tend + 1, 500), fontsize=size_ticks)
-        # plt.xticks(np.arange(0, tend+1, 200), fontsize=size_ticks)
+        # plt.xticks(np.arange(0, tend + 1, 500), fontsize=size_ticks)
+        plt.xticks(np.arange(0, tend+1, 200), fontsize=size_ticks)
+    # plt.ylabel(ylabel='Indexwert', fontsize=size_legend)
     plt.ylabel(ylabel=ylabel, fontsize=size_legend)
-    plt.xlabel(xlabel='timesteps', fontsize=size_legend)
-    # plt.axvline(x=22477, ymax=0.95, linestyle='--', color='black', linewidth=0.5)
-    # plt.axvline(x=23637, ymax=0.95, linestyle='--', color='black', linewidth=0.5)
-    # plt.axvline(x=23062, ymax=0.95, linestyle='--', color='black', linewidth=0.5)
-    # plt.axvline(x=37562, ymax=0.95, linestyle='--', color='black', linewidth=0.5)
-    # plt.axvline(x=38466, ymax=0.95, linestyle='--', color='black', linewidth=0.5)
-    # plt.text(22477-250, 7.1, '$k_1$')
-    # plt.text(23637-250, 7.1, '$k_3$')
-    # plt.text(23062-250, 7.1, '$k_2$')
-    # plt.text(37562-250, 7.1, '$k_4$')
-    # plt.text(38466-250, 7.1, '$k_5$')
+    plt.xlabel(xlabel='Zeitschritte', fontsize=size_legend)
+    ##GiShEve:
+    # plt.axvline(x=19389, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
+    # plt.text(19389-1200, 1.55, '$k=19389$', fontsize=size_ticks)
+    ##bpGibpinvHh
+    # plt.axvline(x=19389, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
+    # plt.text(19389+100, 4.1, '$k_4$', fontsize=size_ticks)
+    # plt.axvline(x=19061, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
+    # plt.text(19061-1100, 4.1, '$k_3$', fontsize=size_ticks)
+    ##hills
+    # plt.axvline(x=22477, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
+    # plt.axvline(x=23637, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
+    # plt.axvline(x=23062, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
+    # plt.axvline(x=37562, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
+    # plt.axvline(x=38466, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
+    # plt.text(22477-1100, 7.4, '$k_1$', fontsize=size_ticks)
+    # plt.text(23637+100, 7.4, '$k_3$', fontsize=size_ticks)
+    # plt.text(23062-500, 7.4, '$k_2$', fontsize=size_ticks)
+    # plt.text(37562-500, 7.4, '$k_4$', fontsize=size_ticks)
+    # plt.text(38466-100, 7.4, '$k_5$', fontsize=size_ticks)
     if yrange is None:
-        plt.ylim(0, maxy)
+        plt.yticks(fontsize=size_ticks)
+        plt.ylim(1, maxy)
     else:
-        plt.yticks(np.arange(0, yrange[0], yrange[1]), fontsize=size_ticks)
-        plt.ylim(0, yrange[2])
+        plt.yticks(np.arange(1, yrange[0], yrange[1]), fontsize=size_ticks)
+        # plt.ylim(0, yrange[2])
+        plt.ylim(1, yrange[2])
 
     # plt.ylim(0, 70000, 10000)
     # plt.ylim(0, 7.5)
     # plt.yticks(np.arange(1, 3.5, 0.4), fontsize=size_ticks)
     # plt.ylim(0, maxy)
-    print(maxy)
+    # print(maxy)
     # plt.yticks([0, 0.001, 0.002])
     if save:
         if savename is None:
@@ -637,14 +654,13 @@ def plot_lognorm_distribution(thom, int_length, save=None, id=0, c='seagreen'):
     xrange = np.arange(0, max(thom) + int_length, int_length)
     #histogram
     data, _, _ = ax.hist(thom, bins=xrange, color='grey', alpha=0.5)
-    print('max', max(data))
     #calc lognorm func
-    fitted_data, new_x = calc_lognorm(thom, xrange)
+    fitted_data = calc_lognorm(thom)
     #calc errors for hist
     err = calc_barerrs(data)
     #plotting
-    ax.errorbar(new_x, y=data, yerr=err, ls='', capsize=3, capthick=2, color='black', label='error')
-    ax.plot(new_x, fitted_data * max(data)/max(fitted_data), color=c, linewidth=3, label='lognormal')
+    ax.errorbar([entry - int_length/2 for entry in xrange[1:]], y=data, yerr=err, ls='', capsize=3, capthick=2, color='black', label='Fehler')
+    ax.plot(range(0, max(thom)), fitted_data * max(data)/max(fitted_data), color=c, linewidth=3, label='lognorm')
     #labels, ticks etc
     plt.xlim(0, xrange[-1])
     if xrange[-1] > 140000:
@@ -654,14 +670,16 @@ def plot_lognorm_distribution(thom, int_length, save=None, id=0, c='seagreen'):
     plt.ymin = 0
     plt.xticks(fontsize=size_ticks)
     plt.yticks(fontsize=size_ticks)
-    plt.xlabel('thom', fontsize=size_legend)
-    plt.ylabel('absolute frequency', fontsize=size_legend)
+    plt.xlabel('$k_{hom}$', fontsize=size_legend)
+    plt.ylabel('Anzahl Simulationen', fontsize=size_legend)
     plt.legend(fontsize=size_legend)
     if save:
         filename = str(id) + '_interval=' + str(int_length) + '_lognormal_distribution' + '.jpg'
         plt.savefig(pathlib.Path('pictures').resolve() / filename)
     plt.show()
 
+def fun_lognorm(x, sigma, mu, a):
+    return a*1/((2*np.pi)**0.5 * sigma * x) * np.exp(-(np.log(x)-mu)**2/(2*sigma**2))
 
 def plot_all_lognorm(thomarray, int_length, save=None):
     """
@@ -674,23 +692,31 @@ def plot_all_lognorm(thomarray, int_length, save=None):
     size_ticks = 20
     size_legend = 30
     max_data = {'onenode': 184, 'onerc': 149}
+    lab = {'onenode': 'I', 'onerc': 'II'}
     for name in thomarray:
         thom = thomarray[name]
-        xrange = np.arange(0, max(thom) + int_length, int_length)
+        xrange = np.arange(0, max(thom))
 
-        fitted_data, new_x = calc_lognorm(thom, xrange)
+        fitted_data = calc_lognorm(thom)
 
-        ax.plot(new_x, fitted_data * max_data[name] / max(fitted_data), color=farben[name], linewidth=3, label=name)
+        ax.plot(xrange, fitted_data * max_data[name] / max(fitted_data), color=farben[name], linewidth=3, label=lab[name])
+        # KONTROLLE
+        # mu = np.log(20950.97)
+        # sigma = 0.5094
+        # a = 184/(4.23*10**(-5))
+        # y = [fun_lognorm(entry,  sigma, mu, a) for entry in realx]
+        # ax.plot([entry + 700 for entry in realx], y, color='black', ls='dotted')
 
     #labels, ticks etc
+    xrange = np.arange(0, max(thomarray['onerc']))
     plt.xlim(0, xrange[-1])
     plt.xticks(np.arange(0, xrange[-1], 40000))
 
     plt.ylim(0)
     plt.xticks(fontsize=size_ticks)
     plt.yticks(fontsize=size_ticks)
-    plt.xlabel('thom', fontsize=size_legend)
-    plt.ylabel('absolute frequency', fontsize=size_legend)
+    plt.xlabel('$k_{hom}$', fontsize=size_legend)
+    plt.ylabel('$f\,(k_{hom})$', fontsize=size_legend)
     plt.legend(fontsize=size_legend)
 
     if save:

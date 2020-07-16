@@ -60,19 +60,19 @@ Beispiele für Datensätze
 Einlesen von thoms der Länge 1500
 plus color-set
 """
-thom01 = np.load('saved_data/thoms/' + 'rc=178_thom1500.npy')
-thom02 = np.load('saved_data/thoms/' + 'rc=88_thom1500.npy')
-thom45 = np.load('saved_data/thoms/' + 'rc=2_thom1500.npy')
-thom60 = np.load('saved_data/thoms/' + 'rc=1_thom1500.npy')
-data = {'rc=178': thom01, 'rc=88': thom02, 'rc=2': thom45, 'rc=1': thom60}
-# data = {'rc=178': thom01, 'rc=1': thom60}
-colors = ['darkred', 'orange', 'olivedrab', 'darkturquoise']
-
-for var in data:
-    print(var)
-    print('max', max(data[var]))
-    print('min', min(data[var]))
-    print('mean', np.mean(data[var]))
+# thom01 = np.load('saved_data/thoms/' + 'rc=178_thom1500.npy')
+# thom02 = np.load('saved_data/thoms/' + 'rc=88_thom1500.npy')
+# thom45 = np.load('saved_data/thoms/' + 'rc=2_thom1500.npy')
+# thom60 = np.load('saved_data/thoms/' + 'rc=1_thom1500.npy')
+# data = {'rc=178': thom01, 'rc=88': thom02, 'rc=2': thom45, 'rc=1': thom60}
+# # data = {'rc=178': thom01, 'rc=1': thom60}
+# colors = ['darkred', 'orange', 'olivedrab', 'darkturquoise']
+#
+# for var in data:
+#     print(var)
+#     print('max', max(data[var]))
+#     print('min', min(data[var]))
+#     print('mean', np.mean(data[var]))
 
 # thom90 = np.load('saved_data/thoms/' + 'rc=178_thom1500.npy')
 # mullerplot(data01['offs'], save=True, id='mp18001')
@@ -91,17 +91,17 @@ onerc = np.load('saved_data/thoms501/501thom167_1000.npy')
 # print(len(onerc))
 # print(onenode.mean(), onenode.min(), onenode.max())
 # print(onerc.mean(), onerc.min(), onerc.max())
-dat = {'onenode': onenode, 'onerc': onerc}
-for var in dat:
-    print(var)
-    print('max', max(dat[var]))
-    print('min', min(dat[var]))
-    print('mean', np.mean(dat[var]))
-# plot_all_lognorm(dat, colors, 1000, save=True)
-plot_all_lognorm(dat, colors, 5000, save=False)
+# dat = {'onerc': onerc, 'onenode': onenode}
+# for var in dat:
+#     print(var)
+#     print('max', max(dat[var]))
+#     print('min', min(dat[var]))
+#     print('mean', np.mean(dat[var]))
+# plot_all_lognorm(dat, 1000, save=True)
+# plot_all_lognorm(dat, colors, 5000, save=False)
 # thom_all(dat, 5000, save=False, id='ones, int=5000')
-# plot_lognorm_distribution(dat['onenode'], 5000, id='onenode', c=colors[0], save=True)
-# plot_lognorm_distribution(dat['onerc'], 5000, id='onerc', c=colors[1], save=True)
+# plot_lognorm_distribution(dat['onenode'], 4575, id='onenode', c=colors[0], save=True)
+# plot_lognorm_distribution(dat['onerc'], 4575, id='onerc', c=colors[1], save=True)
 
 
 # test = [[5], [4, 1], [4, 1, 1], [3, 0, 1], [3, 0, 0, 1]]
@@ -124,24 +124,33 @@ plot_all_lognorm(dat, colors, 5000, save=False)
 # plot_sth(gini, id='ginisimpson', save=True, ylabel='ginisimpson')
 # plot_sth(shannon, id='shannon', save=True, ylabel='shannon')
 # plot_sth(hill2, id='hill2', save=True, ylabel='hill2')
-# path = 'saved_data/Varianten ohne mut/'
-# name1 = '5011_2_640e948'
-# vari1 = {'offs': correct(np.load(path + name1 + '_offsprings.npy')),
-#          'fams': np.load(path + name1 + '_families.npy'),
-#          'nodes': np.load(path + name1 + '_nodes.npy'),
-#          'tree': np.load(path + name1 + '_tree.npy')}
-#
-# name167 = '501167_4_ac06cfb'
-# vari167 = {'offs': correct(np.load(path + name167 + '_offsprings.npy')),
-#          'fams': np.load(path + name167 + '_families.npy'),
-#          'nodes': np.load(path + name167 + '_nodes.npy'),
-#          'tree': np.load(path + name167 + '_tree.npy')}
-#
-# # data = {'onenode': vari1}
-# data = {'onenode': vari1, 'onerc': vari167}
+
+path = 'saved_data/Varianten ohne mut/'
+name1 = '5011_2_640e948'
+vari1 = {'offs': correct(np.load(path + name1 + '_offsprings.npy')),
+         'fams': np.load(path + name1 + '_families.npy'),
+         'nodes': np.load(path + name1 + '_nodes.npy'),
+         'tree': np.load(path + name1 + '_tree.npy')}
+
+name167 = '501167_4_ac06cfb'
+vari167 = {'offs': correct(np.load(path + name167 + '_offsprings.npy')),
+         'fams': np.load(path + name167 + '_families.npy'),
+         'nodes': np.load(path + name167 + '_nodes.npy'),
+         'tree': np.load(path + name167 + '_tree.npy')}
+
+# data = {'onenode': vari1}
+data = {'onenode': vari1, 'onerc': vari167}
 #
 # for entry in data:
-#     for i in range(0, int(len(data[entry]['nodes'])/1000)):
-#         spacetime_plot(data[entry]['nodes'], data[entry]['fams'], tbeg=1000*i, tend=1000*i+1000, save=True, id=entry)
-    # spacetime_plot(data[entry]['nodes'], data[entry]['fams'], save=False, id=entry)
-
+#     print(len(data[entry]['offs'])-1)
+#     steps = len(data[entry]['offs'])
+#     p = [0]*steps
+#     for t in range(0, steps):
+#         p[t] = sum(data[entry]['offs'][t])
+#         if p[t]==501:
+#             print('miiez', t)
+#     print('kontr', p[0], p[-1])
+#     print('min', min(p), 'max', max(p), 'mean', np.mean(p))
+    # for i in range(0, int(len(data[entry]['nodes'])/1000)):
+    #     spacetime_plot(data[entry]['nodes'], data[entry]['fams'], tbeg=1000*i, tend=1000*i+1000, save=True, id=entry)
+    # spacetime_plot(data[entry]['nodes'], data[entry]['fams'], tend=100, save=True, id=entry)

@@ -82,7 +82,7 @@ magic <- function(e_name, t_name, p_name, tbeg=0, tend=0){
 
 plotting <- function(data, filename="unknown"){
     #print("plotting")
-    jpeg(paste("C:/Users/Franzi/PycharmProjects/biolgca/pictures/", filename, "_mp.jpg", sep=""), width=400, height=400) #width=600, height=250) 
+    jpeg(paste("C:/Users/Franzi/PycharmProjects/biolgca/pictures/", filename, "_mp.jpg", sep=""), width=250, height=250) #width=600, height=250) 
     plot(Muller_plot(data, xlab = "timesteps", ylab= "relative frequency"))     #400,250
     dev.off()
 }
@@ -105,8 +105,8 @@ plotting <- function(data, filename="unknown"){
 # names = c('50x50_rc=1_steps=50_Test_driver', '50x50_rc=1_steps=50_Test_passenger',
 #          '50x50_rc=20_steps=50_Test_driver', '50x50_rc=20_steps=50_Test_passenger')
 names = c('46a8f13_50x50rc=500_passenger', 'd785cf8_50x50rc=500_driver')
-
-for (i in 1:2){ 
+names = c('501167_ges/501167_mut_55b10ca1-c2ec-434d-bcfe-ec60cf186abc')
+for (i in 1:1){ 
     
     name <- paste(names[i], "_int_length=250", sep="")
 
