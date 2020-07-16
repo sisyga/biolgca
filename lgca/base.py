@@ -659,21 +659,10 @@ class IBLGCA_base(LGCA_base):
         proparray = prop[nodes]
         return proparray
 
-
     def calc_prop_mean(self, nodes=None, props=None, propname=None):
-        if nodes is None:
-            nodes = self.nodes[self.nonborder]
-
-        if props is None:
-            props = self.props
-
-        if propname is None:
-            propname = next(iter(self.props))
-
         prop = self.get_prop(nodes=nodes, props=props, propname=propname)
         occupied = nodes.astype(bool)
         mask = 1 - occupied
-        # cell_density = occupied.sum(-1)
         prop = np.ma.array(prop, mask=mask)
         mean_prop = prop.mean(-1)
         return mean_prop
@@ -681,12 +670,6 @@ class IBLGCA_base(LGCA_base):
     def plot_prop_timecourse(self, nodes_t=None, props=None, propname=None, figindex=None, figsize=None):
         if nodes_t is None:
             nodes_t = self.nodes_t
-
-        if propname is None:
-            propname = next(iter(self.props))
-
-        if props is None:
-            props = self.props
 
         prop = self.get_prop(nodes=nodes_t, props=props, propname=propname)
         occupied = nodes_t.astype(bool)
