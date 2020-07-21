@@ -7,7 +7,7 @@ import numpy.random as npr
 
 nodes = np.array([[0,0],[1,0],[0,2],[0,0],[0,1],[2,0],[3,0],[0,1],[0,2],[0,0],[0,1],[1,0],[1,0],[0,0]])
 
-lgca2 = get_lgca(density=3, ve=False, geometry='hex', bc='refl', interaction='dd_alignment', nodes=None, beta=3)
+lgca2 = get_lgca(density=1, ve=False, geometry='hex', bc='refl', interaction='dd_alignment', nodes=None, beta=3)
 
 #lgca2 = get_lgca(density=1, ve=False, geometry='lin', bc='refl', interaction='di_alignment', nodes=None, beta=0)
 
@@ -17,7 +17,7 @@ lgca2 = get_lgca(density=3, ve=False, geometry='hex', bc='refl', interaction='dd
 
 """TIMESTEPPING"""
 lgca2.print_nodes()
-lgca2.timeevo(timesteps=35, record=True)
+lgca2.timeevo(timesteps=25, record=True)
 lgca2.print_nodes()
 
 #ani = lgca2.plot_density()
