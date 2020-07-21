@@ -205,8 +205,13 @@ class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
         self.nonborder = (self.xx, self.yy)
 
     def calc_polar_alignment_parameter(self):
-        return np.abs(self.calc_flux(self.nodes)[self.nonborder].sum()/self.nodes[self.nonborder].sum())
+        return np.abs(self.calc_flux(self.nodes)[self.nonborder].sum() / self.nodes[self.nonborder].sum())
 
+    def nbofnodes(self):
+        return self.nodes[self.nonborder].sum()
+
+    def vectorsum(self):
+        return self.calc_flux(self.nodes)[self.nonborder].sum()
 
 if __name__ == '__main__':
     lx = 200

@@ -650,7 +650,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels
 
-    print("aaaa")
+
 
     def init_nodes(self, density=4, nodes=None):
         self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
@@ -822,6 +822,8 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
 
     def calc_polar_alignment_parameter(self):
         return np.abs(self.calc_flux(self.nodes)[self.nonborder].sum() / self.nodes[self.nonborder].sum())
+
+
 
 
 """

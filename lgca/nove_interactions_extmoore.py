@@ -25,6 +25,19 @@ def dd_alignment(lgca):
     #lgca.print_nodes()
 
     Palignment = []
+    polar_alignment = lgca.calc_polar_alignment_parameter()  # Its getting the same for every iteration
+    nonodes = lgca.nbofnodes()
+    vsum = lgca.vectorsum()
+
+    print(" ")
+    print("number of nodes")
+    print(nonodes)
+
+    print("vector sum")
+    print(vsum)
+
+    print("polar alignment")
+    print(polar_alignment)
     for coord in zip(*coords): #Todo: can do all at once?
         n = lgca.cell_density[coord]
     #     permutations = lgca.permutations[n]
@@ -211,7 +224,8 @@ def di_alignment(lgca):
         #print(sample)
         #direction, counts = np.unique(sample, return_counts=True)
         polar_alignment = lgca.calc_polar_alignment_parameter()  # Its getting the same for every iteration
-        Palignment.append(polar_alignment)
+        print("polar alignment")
+        print(polar_alignment)
 
         newnodes[coord] = sample
 
