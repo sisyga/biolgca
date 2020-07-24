@@ -292,7 +292,8 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             nodes_t = nodes.astype('bool')
         LGCA_1D.plot_flux(self, nodes_t, **kwargs)
 
-    def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=None, figsize=None, prop=None, cmap='cividis'):
+    def plot_prop_spatial(self, nodes_t=None, props_t=None, figindex=None, figsize=None,
+                          props=None, propname=None, cmap='cividis'):
         if nodes_t is None:
             nodes_t = self.nodes_t
 

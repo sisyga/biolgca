@@ -141,16 +141,16 @@ vari167 = {'offs': correct(np.load(path + name167 + '_offsprings.npy')),
 # data = {'onenode': vari1}
 data = {'onenode': vari1, 'onerc': vari167}
 #
-# for entry in data:
-#     print(len(data[entry]['offs'])-1)
-#     steps = len(data[entry]['offs'])
-#     p = [0]*steps
-#     for t in range(0, steps):
-#         p[t] = sum(data[entry]['offs'][t])
-#         if p[t]==501:
-#             print('miiez', t)
-#     print('kontr', p[0], p[-1])
-#     print('min', min(p), 'max', max(p), 'mean', np.mean(p))
+for entry in data:
+    print(len(data[entry]['offs'])-1)
+    steps = len(data[entry]['offs'])
+    p = [0]*steps
+    for t in range(0, steps):
+        p[t] = sum(data[entry]['offs'][t])
+        if p[t]==501:
+            print('miiez', t)
+    print('kontr', p[0], p[-1])
+    print('min', min(p), 'max', max(p), 'mean', np.mean(p))
     # for i in range(0, int(len(data[entry]['nodes'])/1000)):
     #     spacetime_plot(data[entry]['nodes'], data[entry]['fams'], tbeg=1000*i, tend=1000*i+1000, save=True, id=entry)
     # spacetime_plot(data[entry]['nodes'], data[entry]['fams'], tend=100, save=True, id=entry)

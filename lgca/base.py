@@ -9,7 +9,7 @@ from matplotlib.cm import ScalarMappable
 from numpy import random as npr
 from sympy.utilities.iterables import multiset_permutations
 
-from lgca.helpers2d import *
+# from lgca.helpers2d import *
 from lgca.treemanager import TreeManager
 
 pi2 = 2 * np.pi

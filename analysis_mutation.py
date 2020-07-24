@@ -195,28 +195,28 @@ def max_wert(which, intervallmin=0, intervallmax=40000):
 """
     --- Index-Daten einlesen    ---
 """
-data1 = correct(np.load('saved_data/Indizes_explizit/Daten/'
-                        '5011_mut_55186c3c-e01e-4609-8952-d1314b736521_offsprings.npy'))
-
-data167 = correct(np.load('saved_data/Indizes_explizit/Daten/'
-                          '501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d_offsprings.npy'))
-bp = read_inds(which='bp')
-bpinv = {}
-for key in bp:
-    print(key)
-    bpinv[key] = [1/entry for entry in bp[key]]
-si = read_inds(which='si')
-sh = read_inds(which='sh')
-eve = read_inds(which='eve')
-gi = read_inds(which='gi')
-hill1 = read_inds(which='hill1')
-hill2 = read_inds(which='hill2')
-hill3 = read_inds(which='hill3')
-hill_5 = read_inds(which='hill_5')
-hill_25 = read_inds(which='hill_25')
-hill_75 = read_inds(which='hill_75')
-rich = read_inds(which='rich')
-size = {'onenode': calc_popsize(data1), 'onerc': calc_popsize(data167)}
+# data1 = correct(np.load('saved_data/Indizes_explizit/Daten/'
+#                         '5011_mut_55186c3c-e01e-4609-8952-d1314b736521_offsprings.npy'))
+#
+# data167 = correct(np.load('saved_data/Indizes_explizit/Daten/'
+#                           '501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d_offsprings.npy'))
+# bp = read_inds(which='bp')
+# bpinv = {}
+# for key in bp:
+#     print(key)
+#     bpinv[key] = [1/entry for entry in bp[key]]
+# si = read_inds(which='si')
+# sh = read_inds(which='sh')
+# eve = read_inds(which='eve')
+# gi = read_inds(which='gi')
+# hill1 = read_inds(which='hill1')
+# hill2 = read_inds(which='hill2')
+# hill3 = read_inds(which='hill3')
+# hill_5 = read_inds(which='hill_5')
+# hill_25 = read_inds(which='hill_25')
+# hill_75 = read_inds(which='hill_75')
+# rich = read_inds(which='rich')
+# size = {'onenode': calc_popsize(data1), 'onerc': calc_popsize(data167)}
 
 
 # plot_sth(data={'onenode': size['onenode'], 'onerc': size['onerc']})
@@ -271,14 +271,15 @@ size = {'onenode': calc_popsize(data1), 'onerc': calc_popsize(data167)}
 
 
 # #
-ave_sh = ave_inds(which='shannon')
-ave_hill2 = ave_inds(which='hill2')
-ave_hill_5 = ave_inds(which='hill5')
-ave_gi = ave_inds(which='gini')
-
-## ++++indizes neu++++++
-# plot_sth(data={'onenode': rich['onenode'], 'onerc': rich['onerc']})
-# plot_sth(data={'onerc': rich['onerc']})
+# ave_sh = ave_inds(which='shannon')
+# ave_hill2 = ave_inds(which='hill2')
+# ave_hill_5 = ave_inds(which='hill5')
+# ave_gi = ave_inds(which='gini')
+#
+# ## ++++indizes neu++++++
+# # plot_sth(data={'onenode': rich['onenode'], 'onerc': rich['onerc']})
+# plot_sth(data={'onerc': rich['onerc']}, ylabel='$S(k)$', yrange=[11.1,2,11])
+# plot_sth(data={'onenode': rich['onenode']}, ylabel='$S(k)$', yrange=[11.1,2,11])
 # plot_sth(data={'sh': sh['onenode'], 'gi': gi['onenode'], 'hill_2': hill2['onenode']})
 # plot_sth(data={'sh': sh['onerc'], 'gi': gi['onerc'], 'hill_2': hill2['onerc']})
 # plot_sth(data={'onenode': si['onenode'] - gi['onenode']}, ylabel='$D(k)-D_{GS}(k)$',
@@ -296,8 +297,8 @@ ave_gi = ave_inds(which='gini')
 #          ylabel='Indexwert', yrange=[8,2,8])
 # plot_sth(data={'onenode': ave_sh['onenode'], 'onerc': ave_sh['onerc']},
 #          ylabel='$H(k)$', yrange=[1.1,0.2,1])
-plot_sth(data={'onenode': ave_hill2['onenode'], 'onerc': ave_hill2['onerc']},
-         ylabel='$D_2(k)$', yrange=[2.1,0.2,2])
+# plot_sth(data={'onenode': ave_hill2['onenode'], 'onerc': ave_hill2['onerc']},
+#          ylabel='$D_2(k)$', yrange=[2.1,0.2,2])
 
 
 
@@ -403,14 +404,35 @@ plot_sth(data={'onenode': ave_hill2['onenode'], 'onerc': ave_hill2['onerc']},
 """
     --- create avereaged entropies  ---
 """
-# path167 ="saved_data/501167_ges/"
-# path1 ="saved_data/5011_ges/"
-# data167 = set_data(path167)
-# data1 = set_data(path1)
-# datas = {'167': data167, '1': data1}
-# for data in datas:
+path167 ="saved_data/501167_ges/Daten/"
+path1 ="saved_data/5011_ges/Daten/"
+data167 = set_data(path167)
+data1 = set_data(path1)
+datas = {'167': data167, '1': data1}
+# datas = {'167': data167}
+print('ja?', len(data1))
+print('ja?', len(data167))
+
+time = 40001
+anz = 45
+
+sh = [[]*time]*anz
+hh = [[]*time]*anz
+for data in datas:
+    print('onenode, onerc', data)
+    n = 0
+    for name in datas[data]:
+        print('versuch', n)
+        sh[n] = [entry for entry in calc_shannon(datas[data][name])]
+        hh[n] = [entry for entry in calc_hillnumbers(datas[data][name], order=2)]
+        n += 1
+    np.savetxt('saved_data/' + str(data) + '_sh_501.csv', sh, delimiter=',', fmt='%s')
+    np.savetxt('saved_data/' + str(data) + '_hh_501.csv', hh, delimiter=',', fmt='%s')
+
+
     # create_averaged_entropies(datas[data], save=True, saveplot=True, plot=True)
 # #
+
 # names1 = []
 # for name in data1:
 #     names1.append(name)

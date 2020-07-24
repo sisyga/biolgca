@@ -139,9 +139,84 @@ def mullerplot(data, id=0, save=False, int_length=1):
         save_plot(fig, str(id) + '_' + ' mullerplot with intervall=' + str(int_length) + '.jpg')
     plt.show()
 
+def spacetime_extra(nodes_t, labels, cmap='inferno', save=None, id=None):
+    '''
+    plot like spacetime_plot, but with identical colors for the lattice at k=0
+    '''
+    figsize = (10, 6)
+    size_ticks = 20
+    size_legend = 30
+
+    tmax, dim, c = nodes_t.shape
+    vc = 2
+    rc = c - vc
+    val = np.zeros((tmax, dim * c))
+    print('steps, nodes, rc', tmax, dim, rc)
+    if dim==1:
+        print('einknotig')
+        for t in range(0, tmax):
+            node = nodes_t[t, 0]
+            print(node)
+            for pos in range(len(node)):
+                lab = node[pos]
+                if lab == 0:
+                    val[t, pos] = None
+                else:
+                    val[t, pos] = labels[lab]
+            print(val)
+
+    else:
+        print('mehrknotig')
+        for t in range(0, tmax):
+            for x in range(dim):
+                node = nodes_t[t, x]
+                print(node)
+                for pos in range(len(node)):
+                    lab = node[pos]
+                    val[t, x + pos + (x*(c-1))] = lab
+                print(val)
+
+    fig = plt.figure(figsize=figsize)
+    ax = fig.add_subplot(111)
+    plot = ax.matshow(val, cmap=cmap)
+
+    plt.ylabel('Zeitschritt', fontsize=size_legend, labelpad=10)  # 15
+    ax.xaxis.set_label_position('top')
+    plt.xlabel('Gitterknoten', fontsize=size_legend, labelpad=10)  # , fontsize=12
+
+    # nur "Knotenanfang"
+    plt.xlim(-0.5, dim * c - 0.5)
+
+    x1 = (np.arange(0, dim * c, c))
+    x2 = np.zeros(len(x1)).astype(int)
+    for i in range(0, len(x1)):
+        x2[i] = (x1[i] / c) + 1
+    ax.set_xticks(x1)
+    ax.set_xticklabels(x2, minor=False, fontsize=size_ticks)
+
+    tbeg = 0
+    tend = tmax-1
+    plt.ylim(tend + 0.5, tbeg - 0.5)
+    plt.yticks(np.arange(tbeg, tend+1, 1), fontsize=size_ticks)
+    # if tend - tbeg > 700:
+    #     plt.yticks(np.arange(tbeg, tend, 100))
+    # elif tend - tbeg > 100:
+    #     plt.yticks(np.arange(tbeg, tend, 50), fontsize=size_ticks)
+    # elif tend - tbeg <= 100:
+    #     plt.yticks(np.arange(tbeg, tend + 1, 20), fontsize=size_ticks)
+    if save:
+        save_plot(fig, str(id) + '_spacetimeplot_' + str(tbeg) + '-' + str(tend) + '.jpg')
+    cbar = fig.colorbar(plot, use_gridspec=True)
+    cbar.set_label('Familie')
+    # divider = make_axes_locatable(ax)
+    # cax = divider.append_axes("right", size="5%", pad=0.1)
+    # cbar = fig.colorbar(cmap, use_gridspec=True, cax=cax)
+    # cbar.set_label('Familie')
+    # plt.sca(ax)
+    plt.show()
 
 def spacetime_plot(nodes_t, labels, tbeg=None, tend=None, save=False, id=0, \
-                   figsize=None, figindex=None, cmap='nipy_spectral'):
+                   figsize=None, figindex=None, cmap='inferno'):
     """
     create plot with distribution of the cells in the lattice per timepoint
     for now: only 1d-data
@@ -319,9 +394,9 @@ def plot_sth(data, save=False, id=0, ylabel='index', savename=None, yrange=None)
         plt.yticks(fontsize=size_ticks)
         plt.ylim(1, maxy)
     else:
-        plt.yticks(np.arange(1, yrange[0], yrange[1]), fontsize=size_ticks)
+        plt.yticks(np.arange(0, yrange[0], yrange[1]), fontsize=size_ticks)
         # plt.ylim(0, yrange[2])
-        plt.ylim(1, yrange[2])
+        plt.ylim(0, yrange[2])
 
     # plt.ylim(0, 70000, 10000)
     # plt.ylim(0, 7.5)
