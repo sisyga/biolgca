@@ -738,7 +738,7 @@ def plot_lognorm_distribution(thom, int_length, save=None, id=0, c='seagreen'):
     print('maxfit', max(fitted_data))
     ax.errorbar([entry - int_length/2 for entry in xrange[1:]], y=data, yerr=err,
                 ls='', capsize=3, capthick=2, color='black', label='Fehler')
-    ax.plot(range(0, max(thom)), fitted_data * max(data)/max(fitted_data), color=c, linewidth=3, label='lognorm')
+    ax.plot(range(0, max(thom)), fitted_data * 100/max(fitted_data), color=c, linewidth=3, label='lognorm')
     kon = []
     a = max(data)/max(fitted_data)
     for x in range(0, max(thom)):
