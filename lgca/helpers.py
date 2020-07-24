@@ -359,9 +359,9 @@ def plot_sth(data, save=False, id=0, ylabel='index', savename=None, yrange=None)
         if name == 'eve' or name == 'bpinv':
             plt.plot(x, data[name], farben[name], label=lab[name], linewidth=0.75, linestyle=(0, (1, 10)))
         else:
-            plt.plot(x, data[name], farben[name], label=lab[name], linewidth=1.5)  # 0.75
+            plt.plot(x, data[name], 'black', label=lab[name], linewidth=1.5)  # 0.75
     # ax.set(xlabel='timesteps', ylabel=ylabel)
-    ax.legend(loc='upper left', fontsize=size_ticks)
+    # ax.legend(loc='upper left', fontsize=size_ticks)
     plt.xlim(0, tend - 1)
     if tend >= 10000:
         plt.xticks(np.arange(0, tend, 10000), fontsize=size_ticks)
@@ -725,18 +725,31 @@ def plot_lognorm_distribution(thom, int_length, save=None, id=0, c='seagreen'):
     fig, ax = plt.subplots(figsize=(12, 8))
     size_ticks = 20
     size_legend = 30
-
+    print(thom[:10])
     xrange = np.arange(0, max(thom) + int_length, int_length)
     #histogram
     data, _, _ = ax.hist(thom, bins=xrange, color='grey', alpha=0.5)
     #calc lognorm func
     fitted_data = calc_lognorm(thom)
+
     #calc errors for hist
     err = calc_barerrs(data)
     #plotting
-    ax.errorbar([entry - int_length/2 for entry in xrange[1:]], y=data, yerr=err, ls='', capsize=3, capthick=2, color='black', label='Fehler')
+    print('maxfit', max(fitted_data))
+    ax.errorbar([entry - int_length/2 for entry in xrange[1:]], y=data, yerr=err,
+                ls='', capsize=3, capthick=2, color='black', label='Fehler')
     ax.plot(range(0, max(thom)), fitted_data * max(data)/max(fitted_data), color=c, linewidth=3, label='lognorm')
-    #labels, ticks etc
+    kon = []
+    a = max(data)/max(fitted_data)
+    for x in range(0, max(thom)):
+        if x != 0:
+            kon.append(fun_lognorm(x, sigma=0.5, mu=10.1, a=a))
+        else:
+            kon.append(0)
+    # print(kon)
+    print('maxkon', max(kon))
+    # ax.plot(range(0, max(thom)), kon, color='Seagreen')
+    #labels, ticks etc #max(data)/max(fitted_data)
     plt.xlim(0, xrange[-1])
     if xrange[-1] > 140000:
         plt.xticks(np.arange(0, xrange[-1], 40000))

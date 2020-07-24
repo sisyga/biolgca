@@ -210,26 +210,26 @@ rel = []
 # r = r/len(names)
 # g = g/len(names)
 # print(g)
-# size_d = []
-# size_p = []
-# # path = 'saved_data/passenger_45sims/'
+size_d = []
+size_p = []
+path = 'saved_data/passenger_45sims/'
 # path = 'saved_data/driver_45sims/'
-# names = search_names(path)
-# for name in names:
-#     offs = search_offs(path, name)
-#     # size_p.append(sum(offs[-1]))
-#     size_d.append(sum(offs[-1]))
+names = search_names(path)
+for name in names:
+    offs = search_offs(path, name)
+    size_p.append(sum(offs[-1]))
+    # size_d.append(sum(offs[-1]))
 #     print(sum(offs[-1]))
-# fig, ax = plt.subplots(figsize=(13, 8))
-# plt.xlabel('Simulation', fontsize=30)
-# plt.ylabel('finale Populationsgröße', fontsize=30)
-# plt.xticks(fontsize=20)
-# plt.yticks(fontsize=20)
-# plt.xlim(0, 45.5, 5)
-# dotsize = [200]*45
+fig, ax = plt.subplots(figsize=(13, 8))
+plt.xlabel('Simulation', fontsize=30)
+plt.ylabel('finale Populationsgröße', fontsize=30)
+plt.xticks(fontsize=20)
+plt.yticks(fontsize=20)
+plt.xlim(0, 45.5, 5)
+dotsize = [200]*45
 # #
 # #-----DRIVER-----
-# plt.scatter(range(1, 46), size_d, c='Indigo', s=dotsize)
+# plt.scatter(range(1, 46), size_d, c='black', s=dotsize)
 # plt.yticks([0, 300000, 700000], ['0', '3$\cdot$10e5', '7$\cdot$10e5'])
 # plt.ylim(0, 700000, 4)
 # save_plot(plot=fig, filename='finalsize_driver')
@@ -237,12 +237,12 @@ rel = []
 #
 #
 # #-----PASSENGER-----
-# plt.scatter(range(1, 46), size_p, s=dotsize, c='MediumSeaGreen')
-# plt.yticks([0, 1000, 2000], ['0', '1$\cdot$10e3', '2$\cdot$10e3'])
-# plt.ylim(0, 2000)
-#
-# save_plot(plot=fig, filename='finalsize_passenger')
-# plt.show()
+plt.scatter(range(1, 46), size_p, s=dotsize, c='Black')
+plt.yticks([0, 1000, 2000], ['0', '1$\cdot$10e3', '2$\cdot$10e3'])
+plt.ylim(0, 2000)
+
+save_plot(plot=fig, filename='finalsize_passenger')
+plt.show()
 #
 
 p_hill = np.loadtxt('saved_data/passenger_45sims/passenger_ave_hill2.csv')

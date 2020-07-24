@@ -215,7 +215,7 @@ def max_wert(which, intervallmin=0, intervallmax=40000):
 # hill_5 = read_inds(which='hill_5')
 # hill_25 = read_inds(which='hill_25')
 # hill_75 = read_inds(which='hill_75')
-# rich = read_inds(which='rich')
+rich = read_inds(which='rich')
 # size = {'onenode': calc_popsize(data1), 'onerc': calc_popsize(data167)}
 
 
@@ -276,10 +276,13 @@ def max_wert(which, intervallmin=0, intervallmax=40000):
 # ave_hill_5 = ave_inds(which='hill5')
 # ave_gi = ave_inds(which='gini')
 #
-# ## ++++indizes neu++++++
-# # plot_sth(data={'onenode': rich['onenode'], 'onerc': rich['onerc']})
-# plot_sth(data={'onerc': rich['onerc']}, ylabel='$S(k)$', yrange=[11.1,2,11])
-# plot_sth(data={'onenode': rich['onenode']}, ylabel='$S(k)$', yrange=[11.1,2,11])
+'''
+ ++++indizes neu++++++
+'''
+# ##
+# plot_sth(data={'onenode': rich['onenode'], 'onerc': rich['onerc']})
+plot_sth(data={'onerc': rich['onerc']}, ylabel='$S(k)$', yrange=[11.1,2,11])
+plot_sth(data={'onenode': rich['onenode']}, ylabel='$S(k)$', yrange=[11.1,2,11])
 # plot_sth(data={'sh': sh['onenode'], 'gi': gi['onenode'], 'hill_2': hill2['onenode']})
 # plot_sth(data={'sh': sh['onerc'], 'gi': gi['onerc'], 'hill_2': hill2['onerc']})
 # plot_sth(data={'onenode': si['onenode'] - gi['onenode']}, ylabel='$D(k)-D_{GS}(k)$',

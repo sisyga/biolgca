@@ -242,10 +242,10 @@ def create_averaged_entropies(dic_offs, save=True, id=0, plot=False, saveplot=Fa
    # return result_sh, result_gi, result_hill
 
 def calc_lognorm(thom):
-    param = sp.stats.lognorm.fit(thom, loc=0) #loc=0, sonst Regression zu ungenau
-    fitted_data = sp.stats.lognorm.pdf(range(0, max(thom)), param[0], loc=param[1], scale=param[2])
+    param = sp.stats.lognorm.fit(thom, floc=0, fscale=np.mean(thom)) #loc=0, sonst Regression zu ungenau
+    fitted_data = sp.stats.lognorm.pdf(range(0, max(thom)), param[0], loc=0, scale=param[2])
     print('sigma', param[0])
-    print('?', param[1])
+    print('shift', param[1])
     print('p2', param[2])
     print('mu', np.log(param[2]))
 
