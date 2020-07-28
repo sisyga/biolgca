@@ -242,8 +242,8 @@ def create_averaged_entropies(dic_offs, save=True, id=0, plot=False, saveplot=Fa
    # return result_sh, result_gi, result_hill
 
 def calc_lognorm(thom):
-    param = sp.stats.lognorm.fit(thom, floc=0, fscale=np.mean(thom)) #loc=0, sonst Regression zu ungenau
-    fitted_data = sp.stats.lognorm.pdf(range(0, max(thom)), param[0], loc=0, scale=param[2])
+    param = sp.stats.lognorm.fit(thom, floc=0) #loc=0, sonst Regression zu ungenau
+    fitted_data = sp.stats.lognorm.pdf(range(0, max(thom)), param[0], loc=param[1], scale=param[2])
     print('sigma', param[0])
     print('shift', param[1])
     print('p2', param[2])
@@ -256,12 +256,17 @@ def calc_barerrs(hist_data):
     calculate error in thom histograms;
     called by plot_lognorm_distribution
     """
-    # print(hist_data)
+    print(hist_data[:10])
     n = sum(hist_data)
-    # print(n)
-    err = [(entry * (1 - entry/n))**0.5 for entry in hist_data]
-    # print(err)
-
+    print('N', n)
+    # err = [(entry * (1 - entry/n))**0.5 for entry in hist_data]
+    err = [(entry*4575*1000)**0.5 for entry in hist_data]
+    print(err[:10])
+    err = [e / 4575 / 1000 for e in err]
+    print(err[:10])
+    print(len(err))
+    fl = [entry * 4575 for entry in hist_data]
+    print('sum', sum(fl))
     return err
 
 

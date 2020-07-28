@@ -359,9 +359,9 @@ def plot_sth(data, save=False, id=0, ylabel='index', savename=None, yrange=None)
         if name == 'eve' or name == 'bpinv':
             plt.plot(x, data[name], farben[name], label=lab[name], linewidth=0.75, linestyle=(0, (1, 10)))
         else:
-            plt.plot(x, data[name], 'black', label=lab[name], linewidth=1.5)  # 0.75
+            plt.plot(x, data[name], farben[name], label=lab[name], linewidth=1.5)  # 0.75
     # ax.set(xlabel='timesteps', ylabel=ylabel)
-    # ax.legend(loc='upper left', fontsize=size_ticks)
+    ax.legend(loc='upper left', fontsize=size_ticks)
     plt.xlim(0, tend - 1)
     if tend >= 10000:
         plt.xticks(np.arange(0, tend, 10000), fontsize=size_ticks)
@@ -380,23 +380,23 @@ def plot_sth(data, save=False, id=0, ylabel='index', savename=None, yrange=None)
     # plt.axvline(x=19061, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
     # plt.text(19061-1100, 4.1, '$k_3$', fontsize=size_ticks)
     ##hills
-    # plt.axvline(x=22477, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
-    # plt.axvline(x=23637, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
-    # plt.axvline(x=23062, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
-    # plt.axvline(x=37562, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
-    # plt.axvline(x=38466, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
-    # plt.text(22477-1100, 7.4, '$k_1$', fontsize=size_ticks)
-    # plt.text(23637+100, 7.4, '$k_3$', fontsize=size_ticks)
-    # plt.text(23062-500, 7.4, '$k_2$', fontsize=size_ticks)
-    # plt.text(37562-500, 7.4, '$k_4$', fontsize=size_ticks)
-    # plt.text(38466-100, 7.4, '$k_5$', fontsize=size_ticks)
+    plt.axvline(x=22477, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
+    plt.axvline(x=23637, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
+    plt.axvline(x=23062, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
+    plt.axvline(x=37562, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
+    plt.axvline(x=38466, ymax=0.9, linestyle='--', color='black', linewidth=0.5)
+    plt.text(22477-1100, 7.4, '$k_1$', fontsize=size_ticks)
+    plt.text(23637+100, 7.4, '$k_3$', fontsize=size_ticks)
+    plt.text(23062-500, 7.4, '$k_2$', fontsize=size_ticks)
+    plt.text(37562-500, 7.4, '$k_4$', fontsize=size_ticks)
+    plt.text(38466-100, 7.4, '$k_5$', fontsize=size_ticks)
     if yrange is None:
         plt.yticks(fontsize=size_ticks)
         plt.ylim(1, maxy)
     else:
-        plt.yticks(np.arange(0, yrange[0], yrange[1]), fontsize=size_ticks)
+        plt.yticks(np.arange(1, yrange[0], yrange[1]), fontsize=size_ticks)
         # plt.ylim(0, yrange[2])
-        plt.ylim(0, yrange[2])
+        plt.ylim(1, yrange[2])
 
     # plt.ylim(0, 70000, 10000)
     # plt.ylim(0, 7.5)
@@ -728,7 +728,7 @@ def plot_lognorm_distribution(thom, int_length, save=None, id=0, c='seagreen'):
     print(thom[:10])
     xrange = np.arange(0, max(thom) + int_length, int_length)
     #histogram
-    data, _, _ = ax.hist(thom, bins=xrange, color='grey', alpha=0.5)
+    data, _, _ = ax.hist(thom, bins=xrange, color='grey', alpha=0.5, density=True)
     #calc lognorm func
     fitted_data = calc_lognorm(thom)
 
@@ -737,17 +737,17 @@ def plot_lognorm_distribution(thom, int_length, save=None, id=0, c='seagreen'):
     #plotting
     print('maxfit', max(fitted_data))
     ax.errorbar([entry - int_length/2 for entry in xrange[1:]], y=data, yerr=err,
-                ls='', capsize=3, capthick=2, color='black', label='Fehler')
-    ax.plot(range(0, max(thom)), fitted_data * 100/max(fitted_data), color=c, linewidth=3, label='lognorm')
-    kon = []
-    a = max(data)/max(fitted_data)
-    for x in range(0, max(thom)):
-        if x != 0:
-            kon.append(fun_lognorm(x, sigma=0.5, mu=10.1, a=a))
-        else:
-            kon.append(0)
-    # print(kon)
-    print('maxkon', max(kon))
+                ls='', capsize=3, capthick=2, color='black')
+    ax.plot(range(0, max(thom)), fitted_data, color='black', linewidth=3, label='Verteilung')
+    # kon = []
+    # a = max(data)/max(fitted_data)
+    # for x in range(0, max(thom)):
+    #     if x != 0:
+    #         kon.append(fun_lognorm(x, sigma=0.5, mu=10.1, a=a))
+    #     else:
+    #         kon.append(0)
+    # # print(kon)
+    # print('maxkon', max(kon))
     # ax.plot(range(0, max(thom)), kon, color='Seagreen')
     #labels, ticks etc #max(data)/max(fitted_data)
     plt.xlim(0, xrange[-1])
@@ -756,10 +756,11 @@ def plot_lognorm_distribution(thom, int_length, save=None, id=0, c='seagreen'):
     else:
         plt.xticks(np.arange(0, xrange[-1], 20000))
     plt.ymin = 0
-    plt.xticks(fontsize=size_ticks)
+    plt.xticks(fontsize=size_ticks) #['0', '1$\cdot$10e-5', '2$\cdot$10e3']
+    plt.yticks(np.arange(0, 0.00004, 0.00001), [str(z) + '$\cdot$10e-5' for z in range(0,5,1)])
     plt.yticks(fontsize=size_ticks)
     plt.xlabel('$k_{hom}$', fontsize=size_legend)
-    plt.ylabel('Anzahl Simulationen', fontsize=size_legend)
+    plt.ylabel('Wahrscheinlichkeit', fontsize=size_legend)
     plt.legend(fontsize=size_legend)
     if save:
         filename = str(id) + '_interval=' + str(int_length) + '_lognormal_distribution' + '.jpg'
@@ -787,7 +788,7 @@ def plot_all_lognorm(thomarray, int_length, save=None):
 
         fitted_data = calc_lognorm(thom)
 
-        ax.plot(xrange, fitted_data * max_data[name] / max(fitted_data), color=farben[name], linewidth=3, label=lab[name])
+        ax.plot(xrange, fitted_data, color=farben[name], linewidth=3, label=lab[name])
         # KONTROLLE
         # mu = np.log(20950.97)
         # sigma = 0.5094
@@ -799,6 +800,7 @@ def plot_all_lognorm(thomarray, int_length, save=None):
     xrange = np.arange(0, max(thomarray['onerc']))
     plt.xlim(0, xrange[-1])
     plt.xticks(np.arange(0, xrange[-1], 40000))
+    plt.yticks(np.arange(0, 0.00005, 0.00001), [str(z) + '$\cdot$10e-5' for z in range(0,5,1)])
 
     plt.ylim(0)
     plt.xticks(fontsize=size_ticks)

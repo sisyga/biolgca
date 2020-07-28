@@ -209,13 +209,13 @@ def max_wert(which, intervallmin=0, intervallmax=40000):
 # sh = read_inds(which='sh')
 # eve = read_inds(which='eve')
 # gi = read_inds(which='gi')
-# hill1 = read_inds(which='hill1')
-# hill2 = read_inds(which='hill2')
+hill1 = read_inds(which='hill1')
+hill2 = read_inds(which='hill2')
 # hill3 = read_inds(which='hill3')
-# hill_5 = read_inds(which='hill_5')
-# hill_25 = read_inds(which='hill_25')
+hill_5 = read_inds(which='hill_5')
+hill_25 = read_inds(which='hill_25')
 # hill_75 = read_inds(which='hill_75')
-rich = read_inds(which='rich')
+# rich = read_inds(which='rich')
 # size = {'onenode': calc_popsize(data1), 'onerc': calc_popsize(data167)}
 
 
@@ -281,8 +281,8 @@ rich = read_inds(which='rich')
 '''
 # ##
 # plot_sth(data={'onenode': rich['onenode'], 'onerc': rich['onerc']})
-plot_sth(data={'onerc': rich['onerc']}, ylabel='$S(k)$', yrange=[11.1,2,11])
-plot_sth(data={'onenode': rich['onenode']}, ylabel='$S(k)$', yrange=[11.1,2,11])
+# plot_sth(data={'onerc': rich['onerc']}, ylabel='$S(k)$', yrange=[11.1,2,11])
+# plot_sth(data={'onenode': rich['onenode']}, ylabel='$S(k)$', yrange=[11.1,2,11])
 # plot_sth(data={'sh': sh['onenode'], 'gi': gi['onenode'], 'hill_2': hill2['onenode']})
 # plot_sth(data={'sh': sh['onerc'], 'gi': gi['onerc'], 'hill_2': hill2['onerc']})
 # plot_sth(data={'onenode': si['onenode'] - gi['onenode']}, ylabel='$D(k)-D_{GS}(k)$',
@@ -295,9 +295,9 @@ plot_sth(data={'onenode': rich['onenode']}, ylabel='$S(k)$', yrange=[11.1,2,11])
 #          ylabel='Indexwert', yrange=[3.6,1,3.6])
 # plot_sth(data={'hill_2': hill2['onenode']-gi['onenode']-1, 'bp': bp['onenode']},
 #          ylabel='Indexwert', yrange=[2.7,1,2.7])
-# plot_sth(data={'hill_2': hill2['onenode'], 'hill_1': hill1['onenode'],
-#                 'hill_25': hill_25['onenode'], 'hill_5': hill_5['onenode']},
-#          ylabel='Indexwert', yrange=[8,2,8])
+plot_sth(data={'hill_2': hill2['onenode'], 'hill_1': hill1['onenode'],
+                'hill_5': hill_5['onenode'], 'hill_25': hill_25['onenode']},
+         ylabel='Indexwert', yrange=[8,2,8])
 # plot_sth(data={'onenode': ave_sh['onenode'], 'onerc': ave_sh['onerc']},
 #          ylabel='$H(k)$', yrange=[1.1,0.2,1])
 # plot_sth(data={'onenode': ave_hill2['onenode'], 'onerc': ave_hill2['onerc']},
