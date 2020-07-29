@@ -82,8 +82,8 @@ magic <- function(e_name, t_name, p_name, tbeg=0, tend=0){
 
 plotting <- function(data, filename="unknown"){
     #print("plotting")
-    jpeg(paste("C:/Users/Franzi/PycharmProjects/biolgca/pictures/", filename, "_mp.jpg", sep=""), width=250, height=250) #width=600, height=250) 
-    plot(Muller_plot(data, xlab = "timesteps", ylab= "relative frequency"))     #400,250
+    jpeg(paste("C:/Users/Franzi/PycharmProjects/biolgca/pictures/", filename, "_mp_big.jpg", sep=""), width=1000, height=1000) #width=600, height=250) 
+    plot(Muller_plot(data, xlab = "timesteps", ylab= "relative frequency"))     #400,250 #width=2400, height=1000
     dev.off()
 }
 #d <- magic(e_name="bsp_0-11_filtered 0.250_edges.csv", p_name="bsp_0-11_filtered 0.250_summed_population.csv", t_name="bsp_0-11_filtered 0.250_summed_timerange.csv")
@@ -104,12 +104,16 @@ plotting <- function(data, filename="unknown"){
 
 # names = c('50x50_rc=1_steps=50_Test_driver', '50x50_rc=1_steps=50_Test_passenger',
 #          '50x50_rc=20_steps=50_Test_driver', '50x50_rc=20_steps=50_Test_passenger')
-names = c('46a8f13_50x50rc=500_passenger', 'd785cf8_50x50rc=500_driver')
-names = c('501167_ges/501167_mut_55b10ca1-c2ec-434d-bcfe-ec60cf186abc')
-for (i in 1:1){ 
+#names = c('46a8f13_50x50rc=500_passenger', 'd785cf8_50x50rc=500_driver')
+#names = c('501167_ges/501167_mut_55b10ca1-c2ec-434d-bcfe-ec60cf186abc')
+#names = c('Varianten ohne mut/5011_2_640e948_int_length=250_cutoff=0', 'Varianten ohne mut/501167_4_ac06cfb_int_length=250_cutoff=0')
+names = c('46a8f13_50x50rc=500_passenger_int_length=250', 'd785cf8_50x50rc=500_driver_int_length=250')
+#names = c('46a8f13_50x50rc=500_passenger_int_length=1_gen', 'd785cf8_50x50rc=500_driver_int_length=1_gen')
+#names = c('5011_mut_04_01_csvs/5011_mut_55186c3c-e01e-4609-8952-d1314b736521_int_length=250_cutoff=0','501167_mut_04_02_zusatz/501167_mut_499d1a96-d0f2-4872-b3db-f949ce1f933d_int_length=250_cutoff=0')
+for (i in 1:2){ 
     
-    name <- paste(names[i], "_int_length=250", sep="")
-
+    #name <- paste(names[i], "_int_length=250", sep="")
+    name <- names[i]
     
     d <- magic(e_name=paste(name, "_edges.csv", sep=""), p_name=paste(name, "_population.csv", sep=""), t_name=paste(name, "_trange.csv", sep=""))
     plotting(d, filename=name)
