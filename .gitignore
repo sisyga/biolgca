@@ -1,7 +1,5 @@
 lcga/__pycache__/*
 lgca/__pycache__
-lgca/CImg/
-lgca/rng/
 .idea/
 .ipynb_checkpoints/
 lgca/.idea/
