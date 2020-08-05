@@ -250,7 +250,15 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
     interactions = ['dd_alignment', 'di_alignment']
 
     def set_dims(self, dims=None, nodes=None, restchannels=0): # changed to not allow resting channels
+        """
+        Set the dimensions of the instance according to given values. Sets self.l, self.K, self.dims and self.restchannels
+        :param dims: desired lattice size (int or array-like)
+        :param nodes: existing lattice to use (ndarray)
+        :param restchannels: desired number of resting channels, not allowed here
+        :throws Exception if number of resting channels is not zero
+        """
         # works with the current default values in the _init_() method/here
+        # set instance dimensions according to passed lattice
         if nodes is not None:
             self.l, self.K = nodes.shape
             if self.K - self.velocitychannels != 0:
@@ -258,16 +266,15 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
             self.restchannels = 0
             self.dims = self.l,
             return
-
+        # default value for dimension
         elif dims is None:
             dims = 100
-
+        # prohibit resting channels
         if restchannels != 0:
             raise Exception('No resting channels allowed, but {} resting channels specified!'.format(restchannels))
-
+        # set instance dimensions according to desired size
         if isinstance(dims, int):
             self.l = dims
-
         else:
             self.l = dims[0]
 
@@ -277,24 +284,43 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
 
 
     def init_nodes(self, density, nodes=None):
+        """
+        Initialize nodes for the instance.
+        :param density: desired particle density in the lattice: number of particles/(dimensions*number of channels)
+        :param nodes: existing lattice to use, optionally containing particles (ndarray)
+        """
+        # create lattice according to size specified earlier
         self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.uint)
+        # if no lattice given, populate randomly
         if nodes is None:
             self.random_reset(density)
-
+        # if lattice given, populate lattice with given particles. Virtual lattice sites for boundary conditions not included
         else:
             self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.uint)
 
 
-    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis_r'): #cmap='hot_r'
+    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis_r'):
+        """
+        Create a plot showing the number of particles per lattice site.
+        :param density_t: particle number per lattice site (ndarray of dimension (timesteps + 1,) + self.dims)
+        :param figindex: number of the figure to create/activate
+        :param figsize: desired figure size
+        :param cmap: matplotlib color map for encoding the number of particles
+        :return: plot as a matplotlib.image
+        """
+        # set values for unused arguments
         if density_t is None:
             density_t = self.dens_t
         if figsize is None:
             figsize = estimate_figsize(density_t.T, cbar=True)
 
-        max_part_per_cell = int(density_t.max()) #alternatively plot using the expected density - number of particles in total / lattice sites
+        # set up figure
         fig = plt.figure(num=figindex, figsize=figsize)
         ax = fig.add_subplot(111)
+        # set up color scaling
+        max_part_per_cell = int(density_t.max())  # alternatively plot using the expected density - number of particles in total / lattice sites
         cmap = cmap_discretize(cmap, max_part_per_cell + 1) #todo adjust number of colours
+        # create plot with color bar, axis labels, title and layout
         plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=max_part_per_cell, cmap=cmap) #TODO adjust vmax
         cbar = colorbar_index(ncolors=max_part_per_cell + 1, cmap=cmap, use_gridspec=True) #todo adjust ncolors
         cbar.set_label(r'Particle number $n$')
@@ -309,22 +335,35 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
 
 
     def plot_flux(self, nodes_t=None, figindex=None, figsize=None):
+        """
+        Create a plot showing the main direction of particles per lattice site.
+        :param nodes_t: particles per velocity channel at lattice site
+                        (ndarray of dimension (timesteps + 1,) + self.dims + (self.K,))
+        :param figindex: number of the figure to create/activate
+        :param figsize: desired figure size
+        :return: plot as a matplotlib.image
+        """
+        # set values for unused arguments
         if nodes_t is None:
             nodes_t = self.nodes_t
-
+        # calculate particle density, max time and dimension values, flux
         dens_t = nodes_t.sum(-1) / nodes_t.shape[-1]
         tmax, l = dens_t.shape
         flux_t = nodes_t[..., 0].astype(int) - nodes_t[..., 1].astype(int)
         if figsize is None:
             figsize = estimate_figsize(dens_t.T)
 
+        # encode flux as RGBA values
+        # 4: RGBA A=alpha: transparency
         rgba = np.zeros((tmax, l, 4))
         rgba[dens_t > 0, -1] = 1.
         rgba[flux_t > 0, 0] = 1.
         rgba[flux_t < 0, 2] = 1.
-        rgba[flux_t == 0, :-1] = 0.
+        rgba[flux_t == 0, :-1] = 0. # unpopulated lattice sites are white
+        # set up figure
         fig = plt.figure(num=figindex, figsize=figsize)
         ax = fig.add_subplot(111)
+        # create plot with axis labels, title and layout
         plot = ax.imshow(rgba, interpolation='None', origin='upper')
         plt.xlabel(r'Lattice node $r \, [\varepsilon]$', )
         plt.ylabel(r'Time step $k \, [\tau]$')
@@ -366,20 +405,27 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
 
 
     def nb_sum(self, qty, addSelf):
+         """
+         Calculate sum of values in neighboring lattice sites of each lattice site.
+         :param qty: ndarray in which neighboring values have to be added
+                     first dimension indexes lattice sites
+         :param addSelf: toggle adding central value
+         :return: sum as ndarray
+         """
          sum = np.zeros(qty.shape)
+         # shift to left padding 0 and add to shift to the right padding 0
          sum[:-1, ...] += qty[1:, ...]
          sum[1:, ...] += qty[:-1, ...]
+         # add central value
          if addSelf:
             sum += qty
-         # shift to left without padding and add to shift to the right without padding
-         #sums up fluxes (in qty) of neighboring particles
+         # used for summing up fluxes
          return sum
 
 
     def update_dynamic_fields(self):
-        """Update "fields" that store important variables to compute other dynamic steps
-
-        :return:
+        """
+        Update "fields" that store important variables to compute other dynamic steps.
         """
         self.cell_density = self.nodes.sum(-1)
         #cell_density ist ein array von Werten. Es wird als Summe über die Channel berechnet. (.sum(-1) summiert über die letzte Achse des Arrays).
@@ -388,29 +434,56 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
 
 #TODO section!
     def calc_entropy(self):
+        """
+        Calculate entropy of the lattice.
+        :return: entropy according to information theory as scalar
+        """
+        # calculate relative frequencies
         rel_freq = self.nodes[self.nonborder].sum(-1)/self.nodes[self.nonborder].sum()
+        # empty lattice sites are not considered in the sum
         a = np.where(rel_freq > 0, np.log(rel_freq), 0)
         return -np.multiply(rel_freq, a).sum()
 
     def calc_normalized_entropy(self):
+        """
+        Calculate entropy of the lattice normalized to maximal possible entropy.
+        :return: normalized entropy as scalar
+        """
         smax = np.log(self.l)
         self.smax = smax
         return 1 - self.calc_entropy()/smax
 
     def calc_polar_alignment_parameter(self):
+        """
+        Calculate the polar alignment parameter.
+        The polar alignment parameter is a measure for global agreement of particle orientation in the lattice.
+        It is calculated as the magnitude of the sum of the velocities of all particles normalized by the number of particles.
+        :return: polar alignment parameter as scalar
+        """
         return np.abs(self.calc_flux(self.nodes)[self.nonborder].sum()/self.nodes[self.nonborder].sum())
 
     def calc_mean_alignment(self):
+        """
+        Calculate the mean alignment measure.
+        The mean alignment is a measure for local alignment of particle orientation in the lattice.
+        It is calculated as the agreement in direction between the ﬂux of a lattice site and the ﬂux of the director ﬁeld
+        summed up and normalized over all lattice sites.
+        :return: mean alignment as scalar
+        """
+        # retrieve particle numbers and fluxes from instance
         no_neighbors = self.nb_sum(np.ones(self.cell_density[self.nonborder].shape), False) #neighborhood is defined s.t. border particles don't have them
         f = self.calc_flux(self.nodes[self.nonborder])
         d = self.cell_density[self.nonborder]
         d_div = np.where(d > 0, d, 1)
         #np.maximum(d, 1, out=d_div)
+        # calculate flux director field and normalize by number of neighbors
         f_norm = f.flatten()/d_div #Todo: only 1 D! (this whole method basically)
         f_norm = self.nb_sum(f_norm, False)
         f_norm = f_norm/no_neighbors
+        # calculate agreement between flux and director field flux, take mean over lattice
         return (np.dot(f_norm, f)).sum() / d.sum() #first sum probably unnecessary
 
+    # under construction
     def plot_hist(self):
         pass
        

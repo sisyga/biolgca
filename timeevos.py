@@ -3,16 +3,22 @@ import numpy as np
 import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-
+#c:\Users\Nr.12\Anaconda3\Lib\site-packages\
 mpl.use('Agg')
 """CAREFUL WITH RUNNING! CHANGE FILENAME FIRST!"""
+
+"""
+Script to plot the time evolution of 4 summary statistics for the lgca
+For each parameter combination and measure all trials are plotted into one figure
+"""
+
 """Setup"""
-dims = 280
-timesteps = 1000
-trials = 100 #50 for talk
+dims = 10
+timesteps = 10
+trials = 1 #50 for talk
 time = range(timesteps + 1)
 mode = 'di'
-mode_num = 'ana_old_110_14_'
+mode_num = 'CRAP_TEST'
 
 plt.rcParams['figure.figsize'] = (9, 5)
 fig_ent = plt.figure("Entropy")
@@ -31,14 +37,9 @@ plt.rcdefaults()
 # density is outer loop
 # beta to be set
 
-#densities = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
-#densities = np.arange(0.1, 3.1, 0.5)
-densities = np.ones(1)*0.6
-#betas = np.arange(0, 3.75, 0.25) #valid
-#betas=np.array([])
-#betas = [0.01, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.5, 2, 2.5, 3]
-#betas=np.arange(0, 5, 0.1)
-betas = np.ones(1)*3.5
+
+densities = np.ones(2)*0.6
+betas = np.ones(2)*3.5
 
 entropy = np.empty((len(densities), len(betas), 4, trials)) #end_entr, end_normalized_entropy, end_polar alignment param, end_mean_alignment
 
@@ -59,7 +60,7 @@ for d in range(len(densities)):
         for i in range(trials):
             #print("Beta:")
             #print(betas[b])
-            lgca1 = get_lgca(interaction=(mode + '_alignment'), ve=False, bc='periodic', density=densities[d], geometry='lin', dims=dims, beta=betas[b], no_ext_moore=True) #no_ext_moore=True
+            lgca1 = get_lgca(interaction=(mode + '_alignment'), ve=False, bc='periodic', density=densities[d], geometry='lin', dims=dims, beta=betas[b], exclude_center=True) #exclude_center=True
             #start_entr[i] = lgca1.calc_entropy()
             #start_norm_entr[i] = lgca1.calc_normalized_entropy()
             lgca1.timeevo(timesteps=timesteps, record=True, recordnove=True, showprogress=False)
@@ -82,7 +83,7 @@ for d in range(len(densities)):
         #entropy[d][b][3] = start_norm_entr.sum() / trials
         entropy[d][b][1] = end_norm_entr
         entropy[d][b][2] = end_polar_alignment
-        entropy[d][b][3] = end_polar_alignment
+        entropy[d][b][3] = end_mean_alignment #MISTAKE!!!!
         paramstr = "Density: " + '{0:.1f}'.format(densities[d]) + ", Beta: " + '{0:.1f}'.format(betas[b])
         savestr = mode_num + "_" + str(dims) + "_" + '{0:.6f}'.format(densities[d]) + "_" + '{0:.6f}'.format(\
             betas[b]) + "_" + str(timesteps) + "_" + str(trials)
@@ -113,20 +114,8 @@ for d in range(len(densities)):
     #ax.plot(betas, entropy[d,:,6], label=label) #4
 
 
-#ax.set_title("Normalized Entropy")
-#ax.set_title("Polar alignment parameter")
-#plt.xlabel("Beta")
-#plt.ylabel("S_norm")
-#plt.legend()
 savestr = mode_num + "_" + str(dims) + "_" + 'dens' + "_" + 'beta' + "_" + str(timesteps) + "_" + str(trials)
 pd.to_pickle(entropy, "./images/dens_beta" + savestr + ".pkl")
-
-
-#lgca1.plot_density()
-#lgca1.plot_flux()
-#plt.show()
-
-#np.histogram(array)
 
 #entropy_longlong = pd.read_pickle("./images/dens_betaana_old_100_3__210_dens_beta_500_100.pkl")
 #plt.cla()
