@@ -3,8 +3,6 @@ import numpy as np
 import pandas as pd
 from multiprocessing import Pool
 
-"""CAREFUL WITH RUNNING! CHANGE FILENAME FIRST!"""
-
 """
 Script to obtain summary statistics/measures from a specified number of 1D lgca runs
 for all combinations of all given densities and sensitivities
@@ -76,7 +74,7 @@ def job(d):
         # run <trials> samples of this lgca configuration
         for i in range(trials):
             # initiate lgca
-            lgca1 = get_lgca(interaction=(mode + '_alignment'), ve=False, bc='periodic', density=densities[d], geometry='lin', dims=dims, beta=betas[b]) #density=densities[d]
+            lgca1 = get_lgca(interaction=(mode + '_alignment'), ve=False, bc='periodic', density=densities[d], geometry='lin', dims=dims, beta=betas[b])
             # compute statistics of initial state
             start_entr[i] = lgca1.calc_entropy()
             start_norm_entr[i] = lgca1.calc_normalized_entropy()
@@ -131,17 +129,3 @@ if __name__ == '__main__':
     savestr = prefix + str(dims) + "_dens_beta_" + str(timesteps) + "_" + str(trials)
     pd.to_pickle(measures, "./pickles/" + savestr + "_" + mode + ".pkl")
 
-"""
-# verification
-savestr = "par_110_" + str(dims) + "_dens_beta_" + str(timesteps) + "_" + str(trials)
-measures_new2 = pd.read_pickle("./pickles/" + savestr + "_" + mode + ".pkl")
-savestr = "110_" + str(dims) + "_dens_beta_" + str(timesteps) + "_" + str(trials)
-measures_new = pd.read_pickle("./pickles/" + savestr + "_" + mode + ".pkl")
-#print(np.all(measures_new == measures_new2))
-fig=plt.figure()
-plt.plot(betas, measures_new[1,:,6], label='serial')
-plt.plot(betas, measures_new2[1,:,6], label='parallel')
-plt.legend()
-plt.xlabel('beta')
-plt.savefig('./images/serpar_polal.png')
-"""

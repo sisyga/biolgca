@@ -797,25 +797,11 @@ class LGCA_noVE_base(LGCA_base):
         Distribute particles in the lattice according to a given density
         :param density: particle density in the lattice: number of particles/(dimensions*number of channels)
         """
-        
-        # if I program this like Josué did, I can only get 1 or 0 new particle per channel in the random step
-        ##################################
-        """
-        density_below_zero, density = math.modf(density)
-        density = abs(int(density))
-        #noparticles = density * self.K * self. l
-        if density == 0:
-            self.nodes = np.zeros(self.nodes.shape, dtype=np.uint)
-        else:
-            self.nodes = np.ones(self.nodes.shape, dtype=np.uint) * density
-        newparts = npr.random(self.nodes.shape) < density
-        self.nodes = self.nodes + newparts
-        """
-        ##################################
-        
+
         # sample from a Poisson distribution with mean=density
         density = abs(density)
         self.nodes = npr.poisson(lam=density, size=self.nodes.shape)
 		#print("Required density: {}, Achieved density: {}".format(density, effective_dens))
         self.apply_boundaries()
         self.update_dynamic_fields()
+

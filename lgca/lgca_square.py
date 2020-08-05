@@ -506,7 +506,6 @@ class LGCA_Square(LGCA_base):
             cbar.set_ticks(np.arange(self.velocitychannels) * 360 / self.velocitychannels)
         return fig, pc, cmap
 
-
     def animate_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis', interval=500, vmax=None,
                         tight_layout=True, edgecolor='None'):
         if density_t is None:
@@ -628,6 +627,216 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
             cbar.set_label(cbarlabel)
         return fig, pc, cmap
 
+
+class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
+    interactions = ['dd_alignment', 'di_alignment']
+
+    def set_dims(self, dims=None, nodes=None, restchannels=0):
+        if nodes is not None:
+            self.lx, self.ly, self.K = nodes.shape
+            self.restchannels = self.K - self.velocitychannels
+            self.dims = self.lx, self.ly
+            return
+
+        elif dims is None:
+            dims = (50, 50)
+
+        try:
+            self.lx, self.ly = dims
+        except TypeError:
+            self.lx, self.ly = dims, dims
+
+        self.dims = self.lx, self.ly
+        self.restchannels = restchannels
+        self.K = self.velocitychannels + self.restchannels
+
+
+
+    def init_nodes(self, density=4, nodes=None):
+        self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
+        if nodes is None:
+            self.random_reset(density)
+
+        else:
+            self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(np.uint)
+
+    def nb_sum(self, qty):
+        sum = np.zeros(qty.shape)
+        sum[:-1, ...] += qty[1:, ...]
+        sum[1:, ...] += qty[:-1, ...]
+        sum[:, :-1, ...] += qty[:, 1:, ...]
+        sum[:, 1:, ...] += qty[:, :-1, ...]
+        return sum
+
+    def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
+                     edgecolor='None', cbar=True):
+        if density is None:
+            density = self.cell_density[self.nonborder]
+
+        if figsize is None:
+            figsize = estimate_figsize(density, cbar=True, dy=self.dy)
+
+        max_part_per_cell = int(density.max())
+
+        if vmax is None:
+            # K = self.K
+            K = max_part_per_cell
+        else:
+            K = vmax
+
+        fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
+        cmap = plt.cm.get_cmap(cmap)
+        cmap.set_under(alpha=0.0)
+
+        if K > 1:
+            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
+        else:
+            cmap = plt.cm.ScalarMappable(cmap=cmap)
+        cmap.set_array(density)
+
+        #   max_part_per_cell = int(
+        #      density_t.max())  # alternatively plot using the expected density - number of particles in total / lattice sites
+        #  fig = plt.figure(num=figindex, figsize=figsize)
+        # ax = fig.add_subplot(111)
+        # cmap = cmap_discretize(cmap, max_part_per_cell + 1)  # todo adjust number of colours
+        #  plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=max_part_per_cell, cmap=cmap)  # TODO adjust vmax
+        # cbar = colorbar_index(ncolors=max_part_per_cell + 1, cmap=cmap, use_gridspec=True)  # todo adjust ncolors
+
+        polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
+                                   orientation=self.orientation, facecolor=c, edgecolor=edgecolor)
+                    for x, y, c in zip(self.xcoords.ravel(), self.ycoords.ravel(), cmap.to_rgba(density.ravel()))]
+        pc = PatchCollection(polygons, match_original=True)
+        ax.add_collection(pc)
+        if cbar:
+            cbar = fig.colorbar(cmap, extend='min', use_gridspec=True)
+            cbar.set_label('Particle number $n$')
+            cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[1::2])
+            cbar.set_ticklabels(1 + np.arange(K))
+        return fig, pc, cmap
+
+    def plot_flux(self, nodes=None, figindex=None, figsize=None, tight_layout=True, edgecolor='None', cbar=True):
+        if nodes is None:
+            nodes = self.nodes[self.nonborder]
+
+        if nodes.dtype != 'bool':
+            nodes = nodes.astype('bool')
+
+        nodes = nodes.astype(np.int8)
+        density = nodes.sum(-1).astype(float) / self.K
+
+        if figsize is None:
+            figsize = estimate_figsize(density, cbar=True)
+
+        fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
+        cmap = plt.cm.get_cmap('hsv')
+        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.Normalize(vmin=0, vmax=360))
+
+        jx, jy = np.moveaxis(self.calc_flux(nodes), -1, 0)
+        angle = np.zeros(density.shape, dtype=complex)
+        angle.real = jx
+        angle.imag = jy
+        angle = np.angle(angle, deg=True) % 360.
+        cmap.set_array(angle)
+        angle = cmap.to_rgba(angle)
+        angle[..., -1] = np.sqrt(density)
+        angle[(jx ** 2 + jy ** 2) < 1e-6, :3] = 0.
+        polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
+                                   orientation=self.orientation, facecolor=c,
+                                   edgecolor=edgecolor)
+                    for x, y, c in zip(self.xcoords.ravel(), self.ycoords.ravel(), angle.reshape(-1, 4))]
+        pc = PatchCollection(polygons, match_original=True)
+        ax.add_collection(pc)
+        if cbar:
+            cbar = fig.colorbar(cmap, use_gridspec=True)
+            cbar.set_label('Direction of movement $(\degree)$')
+            cbar.set_ticks(np.arange(self.velocitychannels) * 360 / self.velocitychannels)
+        return fig, pc, cmap
+
+    def animate_flow(self, nodes_t=None, figindex=None, figsize=None, interval=100, tight_layout=True, cmap='viridis'):
+        if nodes_t is None:
+            nodes_t = self.nodes_t
+
+        nodes = nodes_t.astype(float)
+        density = nodes.sum(-1)
+        jx, jy = np.moveaxis(self.calc_flux(nodes.astype(float)), -1, 0)
+
+        fig, plot, cmap = self.plot_flow(nodes[0], figindex=figindex, figsize=figsize, tight_layout=tight_layout,
+                                         cmap=cmap)
+        title = plt.title('Time $k =$0')
+
+        def update(n):
+            title.set_text('Time $k =${}'.format(n))
+            plot.set_UVC(jx[n], jy[n], cmap.to_rgba(density[n]))
+            return plot, title
+
+        ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
+        return ani
+
+    def animate_flux(self, nodes_t=None, figindex=None, figsize=None, interval=200, tight_layout=True,
+                     edgecolor='None', cbar=True):
+        if nodes_t is None:
+            nodes_t = self.nodes_t
+
+        nodes = nodes_t.astype(float)
+        density = nodes.sum(-1) / self.K
+        jx, jy = np.moveaxis(self.calc_flux(nodes), -1, 0)
+
+        angle = np.zeros(density.shape, dtype=complex)
+        angle.real = jx
+        angle.imag = jy
+        angle = np.angle(angle, deg=True) % 360.
+        fig, pc, cmap = self.plot_flux(nodes=nodes[0], figindex=figindex, figsize=figsize, tight_layout=tight_layout,
+                                       edgecolor=edgecolor, cbar=cbar)
+        angle = cmap.to_rgba(angle[None, ...])[0]
+        angle[..., -1] = np.sign(density)
+
+        # angle[..., -1] = 1
+
+        angle[(jx ** 2 + jy ** 2) < 1e-6, :3] = 0.
+        title = plt.title('Time $k =$ 0')
+
+        def update(n):
+            title.set_text('Time $k =${}'.format(n))
+            pc.set(facecolor=angle[n, ...].reshape(-1, 4))
+            return pc, title
+
+        ani = animation.FuncAnimation(fig, update, interval=3 * interval, frames=nodes_t.shape[0])
+        return ani
+
+    def animate_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis', interval=500, vmax=None,
+                        tight_layout=True, edgecolor='None'):
+        if density_t is None:
+            density_t = self.dens_t
+
+        fig, pc, cmap = self.plot_density(density_t[0], figindex=figindex, figsize=figsize, cmap=cmap, vmax=vmax,
+                                          tight_layout=tight_layout, edgecolor=edgecolor)
+        title = plt.title('Time $k =$0')
+
+        def update(n):
+            title.set_text('Time $k =${}'.format(n))
+            pc.set(facecolor=cmap.to_rgba(density_t[n, ...].ravel()))
+            return pc, title
+
+        ani = animation.FuncAnimation(fig, update, interval=interval, frames=density_t.shape[0])
+        return ani
+
+    def calc_polar_alignment_parameter(self):
+        return np.abs(self.calc_flux(self.nodes)[self.nonborder].sum() / self.nodes[self.nonborder].sum())
+
+
+
+
+"""
+    def calc_mean_alignment(self):
+        no_neighbors = self.nb_sum(np.ones(self.cell_density[self.nonborder].shape)) #neighborhood is defined s.t. border particles don't have them
+        f = self.calc_flux(self.nodes[self.nonborder])
+        d = self.cell_density[self.nonborder]
+        d_div = np.where(d > 0, d, 1)
+        #np.maximum(d, 1, out=d_div)
+        f_norm = f.flatten()/d_div #Todo: only 1 D! (this whole method basically)
+        f_norm = self.nb_sum(f_norm)
+        f_norm = f_norm/no_neighbors
+        return (np.dot(f_norm, f)).sum() / d.sum() """
 
 if __name__ == '__main__':
     lx = 100
