@@ -257,7 +257,6 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         :param restchannels: desired number of resting channels, not allowed here
         :throws Exception if number of resting channels is not zero
         """
-        # works with the current default values in the _init_() method/here
         # set instance dimensions according to passed lattice
         if nodes is not None:
             self.l, self.K = nodes.shape
@@ -318,11 +317,11 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         fig = plt.figure(num=figindex, figsize=figsize)
         ax = fig.add_subplot(111)
         # set up color scaling
-        max_part_per_cell = int(density_t.max())  # alternatively plot using the expected density - number of particles in total / lattice sites
-        cmap = cmap_discretize(cmap, max_part_per_cell + 1) #todo adjust number of colours
+        max_part_per_cell = int(density_t.max())
+        cmap = cmap_discretize(cmap, max_part_per_cell + 1)
         # create plot with color bar, axis labels, title and layout
-        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=max_part_per_cell, cmap=cmap) #TODO adjust vmax
-        cbar = colorbar_index(ncolors=max_part_per_cell + 1, cmap=cmap, use_gridspec=True) #todo adjust ncolors
+        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=max_part_per_cell, cmap=cmap)
+        cbar = colorbar_index(ncolors=max_part_per_cell + 1, cmap=cmap, use_gridspec=True)
         cbar.set_label(r'Particle number $n$')
         plt.xlabel(r'Lattice node $r \, (\varepsilon)$', )
         plt.ylabel(r'Time step $k \, (\tau)$')
@@ -330,6 +329,7 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         ax.xaxis.tick_top()
         plt.title("Density plot.\n VE: False  Align: " + self.interaction.__name__ + "  BC: " + self.apply_boundaries.__name__ \
                   + "\n Dims: " + str(self.dims) + "  Dens: " + '{0:.3f}'.format(self.eff_dens) + "  Beta: " + str(self.beta), fontsize=10)
+
         plt.tight_layout()
         return plot
 
@@ -374,65 +374,33 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
             + "\n Dims: " + str(self.dims) + "  Dens: " + '{0:.3f}'.format(self.eff_dens) + "  Beta: " + str(self.beta), fontsize=10)
         plt.tight_layout()
         return plot
-    
-    
-    # TODO!!!
-    def plot_flux_fancy(self, nodes_t=None, figindex=None, figsize=None, cmap='bwr'):
-        if nodes_t is None:
-            nodes_t = self.nodes_t
-        if figsize is None:
-            figsize = estimate_figsize(self.dens_t.T, cbar=True)
-            
-        tmax, l = self.dens_t.shape
-        flux_t = self.calc_flux(nodes_t[..., 0].astype(int))
-        max_flux_per_cell = int(flux_t.max())
-        min_flux_per_cell = int(flux_t.min())
-            
-        fig = plt.figure(num=figindex, figsize=figsize)
-        ax = fig.add_subplot(111)
-        cmap = cmap_discretize(cmap, max_flux_per_cell - min_flux_per_cell + 1) #todo adjust number of colours
-        plot = ax.imshow(flux_t, interpolation='None', vmin=min_flux_per_cell, vmax=max_flux_per_cell, cmap=cmap) #TODO adjust vmax
-        cbar = colorbar_index(ncolors=max_flux_per_cell - min_flux_per_cell + 1, cmap=cmap, use_gridspec=True) #todo adjust ncolors
-        
-        plt.xlabel(r'Lattice node $r \, [\varepsilon]$', )
-        plt.ylabel(r'Time step $k \, [\tau]$')
-        ax.xaxis.set_label_position('top')
-        ax.xaxis.set_ticks_position('top')
-        ax.xaxis.tick_top()
-        plt.title("Flux plot.\n VE: False  Align: " + self.interaction.__name__ + "  BC: " + self.apply_boundaries.__name__ \
-            + "\n Dims: " + str(self.dims) + "  Dens: " + str(self.eff_dens) + "  Beta: " + str(self.beta))
-        plt.tight_layout()
 
-
-    def nb_sum(self, qty, addSelf):
-         """
-         Calculate sum of values in neighboring lattice sites of each lattice site.
-         :param qty: ndarray in which neighboring values have to be added
-                     first dimension indexes lattice sites
-         :param addSelf: toggle adding central value
-         :return: sum as ndarray
-         """
-         sum = np.zeros(qty.shape)
-         # shift to left padding 0 and add to shift to the right padding 0
-         sum[:-1, ...] += qty[1:, ...]
-         sum[1:, ...] += qty[:-1, ...]
-         # add central value
-         if addSelf:
-            sum += qty
-         # used for summing up fluxes
-         return sum
-
+    # def nb_sum(self, qty, addSelf):
+    #      """
+    #      Calculate sum of values in neighboring lattice sites of each lattice site.
+    #      :param qty: ndarray in which neighboring values have to be added
+    #                  first dimension indexes lattice sites
+    #      :param addSelf: toggle adding central value
+    #      :return: sum as ndarray
+    #      """
+    #      sum = np.zeros(qty.shape)
+    #      # shift to left padding 0 and add to shift to the right padding 0
+    #      sum[:-1, ...] += qty[1:, ...]
+    #      sum[1:, ...] += qty[:-1, ...]
+    #      # add central value
+    #      if addSelf:
+    #         sum += qty
+    #      # used for summing up fluxes
+    #      return sum
 
     def update_dynamic_fields(self):
         """
         Update "fields" that store important variables to compute other dynamic steps.
         """
         self.cell_density = self.nodes.sum(-1)
-        #cell_density ist ein array von Werten. Es wird als Summe über die Channel berechnet. (.sum(-1) summiert über die letzte Achse des Arrays).
         self.eff_dens = self.nodes[self.nonborder].sum()/(self.K * self.l)
         #print("Required density: {}, Achieved density: {}".format(density, self.eff_dens))
 
-#TODO section!
     def calc_entropy(self):
         """
         Calculate entropy of the lattice.
@@ -471,21 +439,16 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         :return: mean alignment as scalar
         """
         # retrieve particle numbers and fluxes from instance
-        no_neighbors = self.nb_sum(np.ones(self.cell_density[self.nonborder].shape), False) #neighborhood is defined s.t. border particles don't have them
+        no_neighbors = self.nb_sum(np.ones(self.cell_density[self.nonborder].shape))
         f = self.calc_flux(self.nodes[self.nonborder])
         d = self.cell_density[self.nonborder]
         d_div = np.where(d > 0, d, 1)
-        #np.maximum(d, 1, out=d_div)
         # calculate flux director field and normalize by number of neighbors
-        f_norm = f.flatten()/d_div #Todo: only 1 D! (this whole method basically)
-        f_norm = self.nb_sum(f_norm, False)
+        f_norm = f.flatten()/d_div
+        f_norm = self.nb_sum(f_norm)
         f_norm = f_norm/no_neighbors
         # calculate agreement between flux and director field flux, take mean over lattice
         return (np.dot(f_norm, f)).sum() / d.sum() #first sum probably unnecessary
-
-    # under construction
-    def plot_hist(self):
-        pass
        
 
 if __name__ == '__main__':
