@@ -5,6 +5,11 @@ import matplotlib.pyplot as plt
 """CAREFUL WITH RUNNING! CHANGE FILENAME FIRST!"""
 
 """
+Script to plot one measure for one varying parameter with standard error/variance/etc.
+can combine several measure matrices if they match in format (careful with matching content)
+"""
+
+"""
     start_entr = np.empty((trials,))            #0
     end_entr = np.empty((trials,))              #1
     diff_entr = np.empty((trials,))             #2
@@ -22,7 +27,8 @@ import matplotlib.pyplot as plt
     #variance_meanal      #14
 
 """
-filename = "par_110_12_70_dens_beta_1000_100_di"
+#filename = "par_100_8_70_dens_beta_500_100_dd"
+filename = "par_110_12_70_dens_beta_1000_100_di" # relevant
 #filename= "par_110_2_70_dens_beta_1000_50_di" #without type!
 #filename= "par_100_6_70_dens_beta_500_50_dd"
 #suffix = "_meanal"
@@ -62,15 +68,28 @@ for i in range(len(betas2)):
 fig1=plt.figure()
 #plt.title("Mean alignment")
 plt.title("Polar alignment parameter")
+col = ['b', 'r', 'g', 'm', 'c', 'b', 'r', 'g', 'm', 'c']
 for d in range(len(densities)):
 #Mean alignment in blue, polar alignment in black, normalized entropy in green
     #plt.plot(betas2, np.divide(measures2[d,:,9], measures2[d,len(betas2)-1,9]), label=("Density: "+ str(densities[d])))
-    plt.plot(betas2, measures2[d,:,6], label=("Density: "+ '{0:.1f}'.format(densities[d])))
-    plt.plot(betas2, measures2[d,:,6]+measures2[d,:,11], c='grey', ls='dashed')
-    plt.plot(betas2, measures2[d,:,6]-measures2[d,:,11], c='grey', ls='dashed')
+    plt.plot(betas2, measures2[d,:,9], color='k', label=("Density: "+ '{0:.1f}'.format(densities[d])))
+    plt.plot(betas2, measures2[d,:,9]+np.divide(1.9842* np.sqrt(measures2[d,:,14]), np.sqrt(100)), c=col[d], ls='dashed') #confidence interval
+    plt.plot(betas2, measures2[d,:,9]-np.divide(1.9842 * np.sqrt(measures2[d,:,14]), np.sqrt(100)), c=col[d], ls='dashed') #confidence interval
+
     #plt.plot(betas2, measures2[d,:,9], label=("Density: "+ '{0:.1f}'.format(densities[d])))
     #plt.plot(betas2, measures2[d,:,9]+measures2[d,:,12], c='grey', ls='dashed')
     #plt.plot(betas2, measures2[d,:,9]-measures2[d,:,12], c='grey', ls='dashed')
+    if d in [1, len(densities)-1]:
+        #plt.plot(betas2, measures2[d,:,6]+measures2[d,:,11], c='grey', ls='dotted') #std error
+        #plt.plot(betas2, measures2[d,:,6]-measures2[d,:,11], c='grey', ls='dotted')
+        #plt.plot(betas2, measures2[d,:,6]+np.divide(1.9842 * np.sqrt(measures2[d,:,13]), np.sqrt(100)), c='grey', ls='dashed') #confidence interval
+        #plt.plot(betas2, measures2[d,:,6]-np.divide(1.9842 * np.sqrt(measures2[d,:,13]), np.sqrt(100)), c='grey', ls='dashed') #confidence interval
+
+        #plt.plot(betas2, measures2[d,:,9]+measures2[d,:,12], c='grey', ls='dotted')
+        print("hi")
+        #plt.plot(betas2, measures2[d,:,9]-measures2[d,:,12], c='grey', ls='dotted')
+        #plt.plot(betas2, measures2[d,:,9]+np.divide(1.9842 * np.sqrt(measures2[d,:,14]), np.sqrt(100)), c='grey', ls='dashed') #confidence interval
+        #plt.plot(betas2, measures2[d,:,9]-np.divide(1.9842 * np.sqrt(measures2[d,:,14]), np.sqrt(100)), c='grey', ls='dashed') #confidence interval
     #print(measures2[d,len(betas2)-1,9])
     #print(np.divide(measures2[d,:,9], measures2[d,len(betas2)-1,9]))
     #print(measures[d,:,9])
@@ -79,6 +98,8 @@ plt.legend()
 #plt.xlim([0, 4.2])
 plt.ylim([-0.01, 1.01])
 #plt.ylim([-1.01, 1.01])
+#plt.yticks(np.arange(0,1,0.1))
+plt.xticks(np.arange(0.05,0.35,0.005))
 plt.grid()
 plt.xlabel('Beta')
 #plt.savefig('./images/' + filename + suffix + '.png')

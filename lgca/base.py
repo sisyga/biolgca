@@ -83,9 +83,9 @@ def cmap_discretize(cmap, N):
 def estimate_figsize(array, x=8., cbar=False, dy=1.):
     lx, ly = array.shape
     if cbar:
-        y = min([abs(x * ly /lx - 1), 10.])
+        y = min([abs(x * ly /lx - 1), 8.])
     else:
-        y = min([x * ly / lx, 10.])
+        y = min([x * ly / lx, 8.])
     y *= dy
     figsize = (x, y)
     return figsize
@@ -738,30 +738,32 @@ class LGCA_noVE_base(LGCA_base):
     Base class for LGCA without volume exclusion.
     """
     def set_interaction(self, **kwargs):
-        if 'no_ext_moore' in kwargs:
+        # choose neighborhood
+        if 'exclude_center' in kwargs:
             try:
                 from .nove_interactions import dd_alignment, di_alignment
             except:
-                from nove_interactions import alignment
+                from nove_interactions import dd_alignment, di_alignment
         else:
             try:
-                from .nove_interactions_extmoore import dd_alignment, di_alignment
+                from .nove_interactions_wcenter import dd_alignment, di_alignment
             except:
-                from nove_interactions_extmoore import alignment
+                from nove_interactions_wcenter import dd_alignment, di_alignment
+        # configure interaction
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
+            # density-dependent interaction rule
             if interaction == 'dd_alignment':
                 self.interaction = dd_alignment
-                self.calc_permutations()
 
                 if 'beta' in kwargs:
                     self.beta = kwargs['beta']
                 else:
                     self.beta = 2.
                     print('sensitivity set to beta = ', self.beta)
+            # density-independent alignment rule
             elif interaction == 'di_alignment':
                 self.interaction = di_alignment
-                self.calc_permutations()
 
                 if 'beta' in kwargs:
                     self.beta = kwargs['beta']
@@ -772,18 +774,16 @@ class LGCA_noVE_base(LGCA_base):
                 print('interaction', kwargs['interaction'], 'is not defined! Density-dependent alignment interaction used instead.')
                 print('Implemented interactions:', self.interactions)
                 self.interaction = dd_alignment
-                self.calc_permutations()
 
                 if 'beta' in kwargs:
                     self.beta = kwargs['beta']
                 else:
                     self.beta = 2.
                     print('sensitivity set to beta = ', self.beta)
-
+        # if nothing is specified, use density-dependent interaction rule
         else:
             print('Density-dependent alignment interaction is used.')
             self.interaction = dd_alignment
-            self.calc_permutations()
 
             if 'beta' in kwargs:
                 self.beta = kwargs['beta']
@@ -794,12 +794,11 @@ class LGCA_noVE_base(LGCA_base):
 
     def random_reset(self, density):
         """
-
-        :param density:
-        :return:
+        Distribute particles in the lattice according to a given density
+        :param density: particle density in the lattice: number of particles/(dimensions*number of channels)
         """
         
-        # if I program this like Josue did, I can only get 1 or 0 new particle per channel in the random step
+        # if I program this like Josué did, I can only get 1 or 0 new particle per channel in the random step
         ##################################
         """
         density_below_zero, density = math.modf(density)
@@ -814,7 +813,7 @@ class LGCA_noVE_base(LGCA_base):
         """
         ##################################
         
-        # I can also sample with a Poisson distribution with parameter density
+        # sample from a Poisson distribution with mean=density
         density = abs(density)
         self.nodes = npr.poisson(lam=density, size=self.nodes.shape)
 		#print("Required density: {}, Achieved density: {}".format(density, effective_dens))

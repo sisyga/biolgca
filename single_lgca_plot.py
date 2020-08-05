@@ -1,20 +1,23 @@
 from lgca import get_lgca
 import matplotlib.pyplot as plt
-import pandas as pd
 import matplotlib as mpl
-import numpy as np
-#mpl.use('Agg')
+import pandas as pd
+mpl.use('Agg')
 """give it a name before you run it!"""
 
+"""
+Script to plot the time evolution of 2 lgcas with different neighborhoods for the same initial state
+"""
+
 """INITIAL STATE"""
-density = 0.1
+density = 0.4
 mode = "dd"
-mode_num="100_TALK_10"
-beta = 0.1
+mode_num="TESTLATER3"
+beta = 1.63
 dims = 70
 timesteps = 100
 
-lgca_moore = get_lgca(density=density, ve=False, geometry='lin', bc='periodic', interaction=(mode+'_alignment'), beta=beta, dims=dims, no_ext_moore=True)
+lgca_moore = get_lgca(density=density, ve=False, geometry='lin', bc='periodic', interaction=(mode+'_alignment'), beta=beta, dims=dims, exclude_center=True)
 nodes = lgca_moore.nodes[lgca_moore.nonborder]
 lgca_moore_ext = get_lgca(density=density, ve=False, geometry='lin', bc='periodic', interaction=(mode+'_alignment'), nodes=nodes, beta=beta)
 
@@ -56,15 +59,15 @@ Python 3.6.8 (default, Apr  9 2019, 04:59:38)
 runfile('/home/bianca/repos/biolgca/single_lgca_plot.py', wdir='/home/bianca/repos/biolgca')
 Backend TkAgg is interactive backend. Turning interactive mode on.
 Density: 0.6
-{'interaction': 'dd_alignment', 'beta': 0.5, 'no_ext_moore': True, 've': False}
+{'interaction': 'dd_alignment', 'beta': 0.5, 'exclude_center': True, 've': False}
 Density: 0.6
 {'interaction': 'dd_alignment', 'beta': 0.5, 've': False}
 /home/bianca/repos/biolgca/lgca/lgca_1d.py:392: RuntimeWarning: divide by zero encountered in log
   a = np.where(rel_freq > 0, np.log(rel_freq), 0)
 nodes = lgca_moore.nodes[lgca_moore.nonborder]
-lgca_moore_long = get_lgca(density=density, ve=False, geometry='lin', bc='periodic', interaction=(mode+'_alignment'), nodes=nodes, beta=beta, no_ext_moore=True)
+lgca_moore_long = get_lgca(density=density, ve=False, geometry='lin', bc='periodic', interaction=(mode+'_alignment'), nodes=nodes, beta=beta, exclude_center=True)
 Density: 0.6
-{'interaction': 'dd_alignment', 'beta': 0.5, 'no_ext_moore': True, 've': False}
+{'interaction': 'dd_alignment', 'beta': 0.5, 'exclude_center': True, 've': False}
 lgca_moore_long.timeevo(timesteps=100000, record=True, recordnove=True, showprogress=True)
 Progress: [####################] 100% Done...
 lgca_moore_long.calc_mean_alignment()

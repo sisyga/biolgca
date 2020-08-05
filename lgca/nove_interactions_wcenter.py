@@ -1,10 +1,11 @@
 import numpy as np
 import numpy.random as npr
 
+# the same as nove_interactions.py except that in all nb_sum() methods the second argument has to be True! (to include center)
 
 def dd_alignment(lgca):
     """
-    Rearrangement step for density-dependent alignment interaction excluding the central lattice site.
+    Rearrangement step for density-dependent alignment interaction including the central lattice site.
     """
     newnodes = lgca.nodes.copy()
     # filter for nodes that are not virtual border lattice sites
@@ -14,7 +15,7 @@ def dd_alignment(lgca):
     # should be included. Returns only the indices of the relevant lattice sites and coords is a list here
     # calculate director field
     g = lgca.calc_flux(lgca.nodes)  # calculates flux for each lattice site
-    g = lgca.nb_sum(g, False)  # calculates sum of flux of neighbors for each lattice site
+    g = lgca.nb_sum(g, True)  # calculates sum of flux of neighbors for each lattice site
     # 1st dim: nodes
     # 2nd dim: flux vectors
     #print("Before:")
@@ -48,7 +49,7 @@ def dd_alignment(lgca):
 
 def di_alignment(lgca):
     """
-    Rearrangement step for density-independent alignment interaction excluding the central lattice site.
+    Rearrangement step for density-independent alignment interaction including the central lattice site.
     """
     newnodes = lgca.nodes.copy()
     # filter for nodes that are not virtual border lattice sites
@@ -58,12 +59,12 @@ def di_alignment(lgca):
     # should be included. Returns only the indices of the relevant lattice sites and coords is a list here
     # calculate director field
     g = lgca.calc_flux(lgca.nodes)  # calculates flux for each lattice site
-    g = lgca.nb_sum(g, False)  # calculates sum of flux of neighbors for each lattice site
+    g = lgca.nb_sum(g, True)  # calculates sum of flux of neighbors for each lattice site
     #print(g)
     # 1st dim: nodes
     # 2nd dim: flux vectors
     # normalize director field by number of neighbors
-    nsum = lgca.nb_sum(lgca.cell_density, False)[None, ...] #Todo: hier anders?
+    nsum = lgca.nb_sum(lgca.cell_density, True)[None, ...] #Todo: hier anders?
     np.maximum(nsum, 1, out=nsum) #avoid dividing by zero later
     #print(nsum.T)
     g = g/ nsum.T #todo: T kann vielleicht weg und numpy.divide benutzen
