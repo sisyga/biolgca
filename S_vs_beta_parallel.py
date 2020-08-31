@@ -79,14 +79,14 @@ def job(d):
             start_entr[i] = lgca1.calc_entropy()
             start_norm_entr[i] = lgca1.calc_normalized_entropy()
             start_polar_alignment[i] = lgca1.calc_polar_alignment_parameter()
-            start_mean_alignment[i] = lgca1.calc_mean_alignment()
+            start_mean_alignment[i] = lgca1.calc_mean_alignment
             # run the lgca
             lgca1.timeevo(timesteps=timesteps, record=True, showprogress=False)
             # compute statistics of final state
             end_entr[i] = lgca1.calc_entropy()
             end_norm_entr[i] = lgca1.calc_normalized_entropy()
             end_polar_alignment[i] = lgca1.calc_polar_alignment_parameter()
-            end_mean_alignment[i] = lgca1.calc_mean_alignment()
+            end_mean_alignment[i] = lgca1.calc_mean_alignment
             # compute desired comparisons between initial and final state
             diff_entr[i] = end_entr[i] - start_entr[i]
             ratio_polar_alignment[i] = end_polar_alignment[i]/start_polar_alignment[i]
