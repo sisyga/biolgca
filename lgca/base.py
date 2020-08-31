@@ -416,7 +416,8 @@ class LGCA_base():
             self.ent_t = np.zeros(timesteps + 1, dtype=np.float)
             self.ent_t[0, ...] = self.calc_entropy()
             self.normEnt_t = np.zeros(timesteps + 1, dtype=np.float)
-            self.normEnt_t[0, ...] = self.calc_normalized_entropy()
+            aux = self.calc_normalized_entropy()                 # AAAAAAAAAAAAAAAAAAAAAAa MARK
+            self.normEnt_t[0, ...] = aux[0]                         #AAAAAAAAAAAAAAAAAAAAAAA
             self.polAlParam_t = np.zeros(timesteps + 1, dtype=np.float)
             self.polAlParam_t[0, ...] = self.calc_polar_alignment_parameter()
             self.meanAlign_t = np.zeros(timesteps + 1, dtype=np.float)
@@ -437,6 +438,9 @@ class LGCA_base():
                 self.meanAlign_t[t, ...] = self.calc_mean_alignment()
             if showprogress:
                 update_progress(1.0 * t / timesteps)
+
+
+
 
     def get_nodes(self):
         return self.nodes

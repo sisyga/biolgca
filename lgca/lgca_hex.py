@@ -205,13 +205,115 @@ class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
         self.nonborder = (self.xx, self.yy)
 
     def calc_polar_alignment_parameter(self):
-        return np.abs(self.calc_flux(self.nodes)[self.nonborder].sum() / self.nodes[self.nonborder].sum())
+        sumx = 0
+        sumy = 0
+
+        abb = self.calc_flux(self.nodes)[self.nonborder] #nonborder?
+        x = len(abb)
+        y = len(abb[0])
+        z = len(abb[0][0])
+
+        for a in range(0, x):
+            for b in range(0, y):
+                for c in range(0, z):
+                    if c == 0:
+                        sumx = sumx + abb[a][b][c]
+                    if c == 1:
+                        sumy = sumy + abb[a][b][c]
+
+        cells = self.nodes[self.nonborder].sum()
+        sumy = sumy / cells  # / self.nodes[self.nonborder].sum()
+
+        sumx = sumx / cells
+
+
+        magnitude = np.sqrt(sumx**2 + sumy**2)
+
+        return magnitude
 
     def nbofnodes(self):
         return self.nodes[self.nonborder].sum()
 
     def vectorsum(self):
         return self.calc_flux(self.nodes)[self.nonborder].sum()
+
+
+
+    def calc_mean_alignment(self):
+
+        no_neighbors = self.nb_sum(np.ones(self.cell_density[
+                                                   self.nonborder].shape))  # neighborhood is defined s.t. border particles don't have them
+        f = self.calc_flux(self.nodes[self.nonborder])
+        d = self.cell_density[self.nonborder]
+        d_div = np.where(d > 0, d, 1)
+        # np.maximum(d, 1, out=d_div)
+
+
+
+        x = len(f)
+        y = len(f[0])
+        z = len(f[0][0])
+
+        for a in range(0, x):
+            for b in range(0, y):
+                for c in range(0, z):
+                    f[a][b][c] = (f[a][b][c]) / d_div[a][b]
+
+
+        fsum = self.nb_sum(f)
+
+        #f_norm = f.flatten() / d_div  # Todo: only 1 D! (this whole method basically)
+
+        #f_norm = self.nb_sum(f_norm)
+
+        x = len(fsum)
+        y = len(fsum[0])
+        z = len(fsum[0][0])
+
+        for a in range(0, x):
+            for b in range(0, y):
+                for c in range(0, z):
+                    fsum[a][b][c] = (fsum[a][b][c]) / no_neighbors[a][b]
+
+
+
+
+        #f_norm = fsum / no_neighbors
+        return (np.dot(fsum, f)).sum() / d.sum()
+
+        #return Sum / d.sum
+
+
+
+    def calc_entropy(self):
+        """
+        Calculate entropy of the lattice.
+        :return: entropy according to information theory as scalar
+        """
+        # calculate relative frequencies
+        rel_freq = self.nodes[self.nonborder].sum(-1)/self.nodes[self.nonborder].sum()
+        # empty lattice sites are not considered in the sum
+        a = np.where(rel_freq > 0, np.log(rel_freq), 0)
+        return -np.multiply(rel_freq, a).sum()
+
+
+    def calc_normalized_entropy(self):
+        """
+        Calculate entropy of the lattice normalized to maximal possible entropy.
+        :return: normalized entropy as scalar
+
+        """
+        n_ofnodes = self.dims[0] * self.dims[1]
+        smax = np.log(n_ofnodes)
+
+        #smax = np.log(self.dims) #used to be self.l, but I understood that self.l = self.dims (?)
+        self.smax = smax
+
+
+        return 1 - self.calc_entropy()/smax
+
+
+
 
 if __name__ == '__main__':
     lx = 200

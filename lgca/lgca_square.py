@@ -3,6 +3,7 @@ import matplotlib.colors as colors
 import matplotlib.ticker as mticker
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
+import numpy as np
 
 try:
     from base import *
@@ -821,22 +822,135 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         return ani
 
     def calc_polar_alignment_parameter(self):
-        return np.abs(self.calc_flux(self.nodes)[self.nonborder].sum() / self.nodes[self.nonborder].sum())
+        sumx = 0
+        sumy = 0
+
+        abb = self.calc_flux(self.nodes)[self.nonborder] #nonborder?
+        x = len(abb)
+        y = len(abb[0])
+        z = len(abb[0][0])
+
+        for a in range(0, x):
+            for b in range(0, y):
+                for c in range(0, z):
+                    if c == 0:
+                        sumx = sumx + abb[a][b][c]
+                    if c == 1:
+                        sumy = sumy + abb[a][b][c]
+
+        cells = self.nodes[self.nonborder].sum()
+        sumy = sumy / cells
+
+        sumx = sumx / cells
+
+
+        magnitude = np.sqrt(sumx**2 + sumy**2)
+
+        return magnitude
+
+        #return np.abs(self.calc_flux(self.nodes)[self.nonborder].sum() / self.nodes[self.nonborder].sum())
 
 
 
 
-"""
+
+    @property
     def calc_mean_alignment(self):
+
         no_neighbors = self.nb_sum(np.ones(self.cell_density[self.nonborder].shape)) #neighborhood is defined s.t. border particles don't have them
+
         f = self.calc_flux(self.nodes[self.nonborder])
+        print("f")
+        print(f)
         d = self.cell_density[self.nonborder]
+        print("d")
+        print(d)
+
+        x = len(f)
+        y = len(f[0])
+        z = len(f[0][0])
+
+        print(x)
+        print(y)
+        print(z)
+
         d_div = np.where(d > 0, d, 1)
+        print("ddiv")
+        r = len(d_div)
+        t = len(d_div[0])
+
+
+
+        print("r")
+        print(r)
+        print("t")
+        print(t)
+
+        print(d_div)
+
+        fnorm = []
+
+        for a in range(0, x):
+            for b in range(0, y):
+                for c in range(0, z):
+                        fnorm.append(f[a][b][c] / d_div[a][b])
+
+
+        item = []
+        f2d = []
+        for i in range (0, len(fnorm)):
+            item.append(fnorm[i])
+            if i % 2 != 0:
+                f2d.append(item)
+                item = []
+
+
+        print(f2d)
+        f2d = np.reshape(f2d, -1, order='C')
+        print("f2d")
+        print(f2d)
+        neiflux = self.nb_sum(f2d)
+
+
+        print("neiflux")
+        print(neiflux)
+
+
         #np.maximum(d, 1, out=d_div)
-        f_norm = f.flatten()/d_div #Todo: only 1 D! (this whole method basically)
-        f_norm = self.nb_sum(f_norm)
-        f_norm = f_norm/no_neighbors
-        return (np.dot(f_norm, f)).sum() / d.sum() """
+
+        #f_norm = f.flatten()/d_div #Todo: only 1 D! (this whole method basically)
+
+
+        #f_norm = self.nb_sum(f_norm)
+        #f_norm = f_norm/no_neighbors
+        #return (np.dot(f_norm, f)).sum() / d.sum()"""
+        return 1
+
+    def calc_entropy(self):
+        """
+        Calculate entropy of the lattice.
+        :return: entropy according to information theory as scalar
+        """
+        # calculate relative frequencies
+        rel_freq = self.nodes[self.nonborder].sum(-1)/self.nodes[self.nonborder].sum()
+        # empty lattice sites are not considered in the sum
+        a = np.where(rel_freq > 0, np.log(rel_freq), 0)
+        return -np.multiply(rel_freq, a).sum()
+
+
+    def calc_normalized_entropy(self):
+        """
+        Calculate entropy of the lattice normalized to maximal possible entropy.
+        :return: normalized entropy as scalar
+        """
+
+        n_ofnodes = self.dims[0] * self.dims[1]
+        smax = np.log(n_ofnodes)
+
+        #smax = np.log(self.dims)  # used to be self.l, but I understood that self.l = self.dims (?)
+        self.smax = smax
+        return 1 - self.calc_entropy()/smax
+
 
 if __name__ == '__main__':
     lx = 100
