@@ -18,27 +18,6 @@ def dd_alignment(lgca):
     g = lgca.calc_flux(lgca.nodes)  # flux for each lattice site
     g = lgca.nb_sum(g)  # sum of flux of neighbors for each lattice site
 
-    polar_alignment = lgca.calc_polar_alignment_parameter()
-    #mean_alignment = lgca.calc_mean_alignment()
-    #nonodes = lgca.nbofnodes()
-    #vsum = lgca.vectorsum()
-
-    print(" ")
-    #print("number of nodes")
-    #print(nonodes)
-
-    #print("vector sum")
-    #print(vsum)
-
-
-    entropy = lgca.calc_normalized_entropy()  #For some reason this function returns a vector
-    print("entropy")
-    print(entropy)
-
-
-
-    print("polar alignment")
-    print(polar_alignment)
 
     # loop through lattice sites and reassign particle directions
     for coord in zip(*coords):
@@ -47,26 +26,15 @@ def dd_alignment(lgca):
         # calculate transition probabilities for directions
         weights = np.exp(lgca.beta * np.einsum('i,ij', g[coord], lgca.c))
 
-       # print("Weights:")
-        #print(weights)
-
         z = weights.sum()
-        #print(z)
 
         aux = np.nan_to_num(z)
-
 
         weights = np.nan_to_num(weights)
 
         weights = (weights / aux)
 
-       # print("Weights2:")
-        #print(weights)
-
-
         if weights.sum() > 1:
-          #  print("Sum")
-           # print(weights.sum())
             weights = (weights / weights.sum())
 
 
@@ -96,8 +64,7 @@ def di_alignment(lgca):
     # normalize director field by number of neighbors
     nsum = lgca.nb_sum(lgca.cell_density)[None, ...]
     np.maximum(nsum, 1, out=nsum) #avoid dividing by zero later
-    g = g/ nsum.T
-    Palignment = []
+    g = g / nsum.T
 
     # loop through lattice sites and reassign particle directions
     for coord in zip(*coords):
@@ -121,8 +88,6 @@ def di_alignment(lgca):
 
         sample = npr.multinomial(n, weights, )
 
-
-        polar_alignment = lgca.calc_polar_alignment_parameter()  # Its getting the same for every iteration
 
 
         newnodes[coord] = sample

@@ -854,77 +854,50 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
 
 
 
-    @property
+   # @property
     def calc_mean_alignment(self):
 
-        no_neighbors = self.nb_sum(np.ones(self.cell_density[self.nonborder].shape)) #neighborhood is defined s.t. border particles don't have them
-
+        no_neighbors = self.nb_sum(np.ones(self.cell_density[
+                                                   self.nonborder].shape))  # neighborhood is defined s.t. border particles don't have them
         f = self.calc_flux(self.nodes[self.nonborder])
-        print("f")
-        print(f)
         d = self.cell_density[self.nonborder]
-        print("d")
-        print(d)
-
+        d_div = np.where(d > 0, d, 1)
         x = len(f)
         y = len(f[0])
         z = len(f[0][0])
 
-        print(x)
-        print(y)
-        print(z)
+        for a in range(0, x):
+            for b in range(0, y):
+                for c in range(0, z):
+                    f[a][b][c] = (f[a][b][c]) / d_div[a][b]
 
-        d_div = np.where(d > 0, d, 1)
-        print("ddiv")
-        r = len(d_div)
-        t = len(d_div[0])
+        fsum = self.nb_sum(f)
 
+        # f_norm = f.flatten() / d_div  # Todo: only 1 D! (this whole method basically)
 
+        # f_norm = self.nb_sum(f_norm)
 
-        print("r")
-        print(r)
-        print("t")
-        print(t)
-
-        print(d_div)
-
-        fnorm = []
+        x = len(fsum)
+        y = len(fsum[0])
+        z = len(fsum[0][0])
 
         for a in range(0, x):
             for b in range(0, y):
                 for c in range(0, z):
-                        fnorm.append(f[a][b][c] / d_div[a][b])
+                    fsum[a][b][c] = (fsum[a][b][c]) / no_neighbors[a][b]
 
+        dot_p = []
 
-        item = []
-        f2d = []
-        for i in range (0, len(fnorm)):
-            item.append(fnorm[i])
-            if i % 2 != 0:
-                f2d.append(item)
-                item = []
+        for a in range(0, x):
+            for b in range(0, y):
+                dot_p.append(np.dot(fsum[a][b], f[a][b]))
 
+        tot = 0
+        for i in range(0, len(dot_p)):
+            tot = tot + dot_p[i]
 
-        print(f2d)
-        f2d = np.reshape(f2d, -1, order='C')
-        print("f2d")
-        print(f2d)
-        neiflux = self.nb_sum(f2d)
+        return tot / d.sum()
 
-
-        print("neiflux")
-        print(neiflux)
-
-
-        #np.maximum(d, 1, out=d_div)
-
-        #f_norm = f.flatten()/d_div #Todo: only 1 D! (this whole method basically)
-
-
-        #f_norm = self.nb_sum(f_norm)
-        #f_norm = f_norm/no_neighbors
-        #return (np.dot(f_norm, f)).sum() / d.sum()"""
-        return 1
 
     def calc_entropy(self):
         """
