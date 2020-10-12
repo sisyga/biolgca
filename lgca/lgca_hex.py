@@ -248,8 +248,6 @@ class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
         d_div = np.where(d > 0, d, 1)
         # np.maximum(d, 1, out=d_div)
 
-
-
         x = len(f)
         y = len(f[0])
         z = len(f[0][0])
@@ -275,14 +273,21 @@ class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
                 for c in range(0, z):
                     fsum[a][b][c] = (fsum[a][b][c]) / no_neighbors[a][b]
 
+        dot_p = []
 
+        for a in range(0, x):
+            for b in range(0, y):
+                dot_p.append(np.dot(fsum[a][b], f[a][b]))
 
+        tot = 0
+        for i in range(0, len(dot_p)):
+            tot = tot + dot_p[i]
 
         #f_norm = fsum / no_neighbors
-        return (np.dot(fsum, f)).sum() / d.sum()
+        #return (np.dot(fsum, f)).sum() / d.sum()
 
         #return Sum / d.sum
-
+        return tot / d.sum()
 
 
     def calc_entropy(self):

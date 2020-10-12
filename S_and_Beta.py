@@ -1,9 +1,10 @@
 from lgca import get_lgca
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
 import pandas as pd
 
-
+np.set_printoptions(threshold=sys.maxsize)
 
 """
 Script to obtain summary statistics/measures from a specified number of lgca runs
@@ -14,15 +15,16 @@ for all combinations of all given densities and sensitivities
 # number of lattice sites in x-direction
 #dims = 70
 # number of sample runs per lgca configuration
-trials = 3 #50
+trials = 30 #50
 # length of each sample run
-timesteps = 25 #300 dd, >500 di
+timesteps = 200 #300 dd, >500 di
+
 
 # Set varying parameters as ndarrays
 # density outer loop
 # beta inner loop
-densities = np.array([0.2, 0.6, 1, 1.5])
-betas = np.array([0.1, 0.2, 0.3, 0.35, 0.5, 0.8, 1, 1.5, 1.8, 2.2])
+densities = np.array([0.2, 0.4, 0.6, 1, 1.3, 1.5, 2, 2.5])
+betas = np.array([0, 0.1, 0.2, 0.35, 0.5, 0.65 , 0.8, 1, 1.2, 1.5, 1.8, 2, 2.2, 2.5, 3, 5])
 # choice of transition probability model
 # density-dependent (dd) or density-independent (di)
 mode = "dd"
@@ -55,11 +57,12 @@ ratio_mean_alignment = np.empty((trials,))  #10
 entropy = []
 normentropy = []
 palignment = []
+mpalignment = []
 
 fentropy = []
 fnormentropy = []
 fpalignment = []
-
+fmpalignment = []
 
 
 
@@ -84,6 +87,7 @@ for d in range(len(densities)):
             #start_polar_alignment[i] = lgca1.calc_polar_alignment_parameter()
             palignment.append(lgca1.calc_polar_alignment_parameter())
             #start_mean_alignment[i] = lgca1.calc_mean_alignment
+            mpalignment.append(lgca1.calc_mean_alignment())
             # run the lgca
             lgca1.timeevo(timesteps=timesteps, record=True)
             # compute statistics of final state
@@ -94,6 +98,7 @@ for d in range(len(densities)):
             #end_polar_alignment[i] = lgca1.calc_polar_alignment_parameter()
             fpalignment.append(lgca1.calc_polar_alignment_parameter())
             #end_mean_alignment[i] = lgca1.calc_mean_alignment
+            fmpalignment.append(lgca1.calc_mean_alignment())
             # compute desired comparisons between initial and final state
             #diff_entr[i] = end_entr[i] - start_entr[i]
             #ratio_polar_alignment[i] = end_polar_alignment[i]/start_polar_alignment[i]
@@ -127,10 +132,13 @@ for d in range(len(densities)):
 entropyavg = []
 normentropyavg = []
 palignmentavg = []
+mpalignmentavg = []
 
 fentropyavg = []
 fnormentropyavg = []
 fpalignmentavg = []
+fmpalignmentavg = []
+
 
 
 ii = 0
@@ -140,9 +148,11 @@ for x in range(len(betas) * len(densities)):
     ent = 0
     norment = 0
     palign = 0
+    mpalign = 0
     fent = 0
     fnorment = 0
     fpalign = 0
+    fmpalign = 0
 
     for i in range(trials):
 
@@ -152,26 +162,66 @@ for x in range(len(betas) * len(densities)):
 
         palign = palign + palignment[ii]
 
+        mpalign = mpalign + mpalignment[ii]
+
         fent = fent + fentropy[ii]
 
         fnorment = fnorment + fnormentropy[ii]
 
         fpalign = fpalign + fpalignment[ii]
 
+        fmpalign = fmpalign + fmpalignment[ii]
+
+
+
         ii = ii + 1
 
-    entropyavg.append(ent)
-    normentropyavg.append(norment)
-    palignmentavg.append(palign)
+    entropyavg.append(ent / trials)
+    normentropyavg.append(norment / trials)
+    palignmentavg.append(palign / trials)
+    mpalignmentavg.append(mpalign / trials)
 
-    fentropyavg.append(fent)
-    fnormentropyavg.append(fnorment)
-    fpalignmentavg.append(fpalign)
+    fentropyavg.append(fent / trials)
+    fnormentropyavg.append(fnorment / trials)
+    fpalignmentavg.append(fpalign / trials)
+    fmpalignmentavg.append(fmpalign / trials)
+
 
 print(len(entropyavg))
 print(len(fentropyavg))
 print(len(palignmentavg))
 print(len(fnormentropyavg))
+
+
+print("")
+
+print("trials:")
+print(trials)
+
+print("")
+
+print("betas:")
+print(betas)
+
+print("")
+
+print("densities:")
+print(densities)
+
+print("")
+
+print("final entropies")
+print(fentropy)
+print("final total alignments")
+print(fpalignment)
+print("final local alignments")
+print(fmpalignment)
+print("final normalized entropies")
+print(fnormentropy)
+
+print("")
+
+
 
 # For density = 1,
 #Initial states
@@ -182,6 +232,7 @@ for j in range(len(densities)):
     plotentropy1 =[]
     plotnormentropy1 = []
     plotalignment1 = []
+    plotmalignment1 = []
     print(k)
 
     for i in range(len(betas)):
@@ -193,6 +244,8 @@ for j in range(len(densities)):
     for i in range(len(betas)):
         plotalignment1.append(palignmentavg[k + i])
 
+    for i in range(len(betas)):
+        plotmalignment1.append(mpalignmentavg[k + i])
 
     plt.plot(betas, plotentropy1)
     plt.title("initial entropy density =  " + str(densities[j]))
@@ -207,11 +260,16 @@ for j in range(len(densities)):
     plt.title("initial norm entropy density = " + str(densities[j]))
     plt.show()
 
+    plt.plot(betas, plotmalignment1)
+    plt.title("initial mean alignment (local) = " + str(densities[j]))
+    plt.show()
+
     #Final states
 
     plotentropy2 =[]
     plotnormentropy2 = []
     plotalignment2 = []
+    plotmalignment2 = []
 
 
     for i in range(len(betas)):
@@ -222,6 +280,9 @@ for j in range(len(densities)):
 
     for i in range(len(betas)):
         plotalignment2.append(fpalignmentavg[k + i])
+
+    for i in range(len(betas)):
+        plotmalignment2.append(fmpalignmentavg[k + i])
 
     plt.plot(betas, plotentropy2)
     plt.title("final entropy, density = " + str(densities[j]))
@@ -236,11 +297,19 @@ for j in range(len(densities)):
     plt.title("final norm entropy density = " + str(densities[j]))
     plt.show()
 
+    plt.plot(betas, plotmalignment2)
+    plt.title("final mean alignment (local) = " + str(densities[j]))
+    plt.show()
+
 
     k = k + len(betas)
 
 
 input()
+
+
+
+
 
 """
 plt.plot(betas, entropyavg)
