@@ -27,19 +27,15 @@ def dd_alignment(lgca):
         weights = np.exp(lgca.beta * np.einsum('i,ij', g[coord], lgca.c))
 
         z = weights.sum()
-
+        # to prevent divisions by zero if the weight is zero
         aux = np.nan_to_num(z)
-
         weights = np.nan_to_num(weights)
-
         weights = (weights / aux)
-
+        # In case there are some rounding problems
         if weights.sum() > 1:
             weights = (weights / weights.sum())
 
-
         # reassign particle directions
-
         sample = npr.multinomial(n, weights,)
 
         newnodes[coord] = sample
@@ -59,11 +55,10 @@ def di_alignment(lgca):
     # calculate director field
     g = lgca.calc_flux(lgca.nodes)  # flux for each lattice site
     g = lgca.nb_sum(g)  # sum of flux of neighbors for each lattice site
-    #Se tiene que volver a poner el addself en nbsum para que funcione bien - sí, esto es la única diferencia entre este código y nove_interactions.py
-    #ayyyy hablas español! Jajaja dejame un mensaje cuando leas esto
+
     # normalize director field by number of neighbors
     nsum = lgca.nb_sum(lgca.cell_density)[None, ...]
-    np.maximum(nsum, 1, out=nsum) #avoid dividing by zero later
+    np.maximum(nsum, 1, out=nsum)   # avoid dividing by zero later
     g = g / nsum.T
 
     # loop through lattice sites and reassign particle directions
@@ -73,25 +68,18 @@ def di_alignment(lgca):
         # calculate transition probabilities for directions
         weights = np.exp(lgca.beta * np.einsum('i,ij', g[coord], lgca.c))
         z = weights.sum()
-
+        # avoid division by zero if weights is zero
         aux = np.nan_to_num(z)
-
         weights = np.nan_to_num(weights)
-
         weights = (weights / aux)
-
+        # In case there are rounding problems
         if weights.sum() > 1:
             weights = (weights / weights.sum())
 
-
         # reassign particle directions
-
         sample = npr.multinomial(n, weights, )
-
-
 
         newnodes[coord] = sample
 
-       # newnodes[coord] = np.array([np.count_nonzero(sample == 1), np.count_nonzero(sample == -1)])
     lgca.nodes = newnodes
 

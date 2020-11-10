@@ -4,9 +4,11 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-lgca1 = get_lgca(interaction='di', ve=False, bc='refl', density=2, geometry='hex', nodes=None, beta=10)
+lgca1 = get_lgca(interaction='di', ve=False, bc='pbc', density=5, geometry='sq', nodes=None, beta=0.2, dims=(25, 25))
 
-lgca1.timeevo(timesteps=20, record=True)
+
+
+lgca1.timeevo(timesteps=150, record=True)
 
 ani = lgca1.animate_flow()
 ani2 = lgca1.animate_flux()

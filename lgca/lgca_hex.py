@@ -6,6 +6,8 @@ except ModuleNotFoundError:
     from base import *
     from lgca_square import LGCA_Square, IBLGCA_Square
 
+import numpy as np
+np.set_printoptions(threshold=sys.maxsize)
 
 class LGCA_Hex(LGCA_Square):
     """
@@ -205,10 +207,11 @@ class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
         self.nonborder = (self.xx, self.yy)
 
     def calc_polar_alignment_parameter(self):
+
         sumx = 0
         sumy = 0
 
-        abb = self.calc_flux(self.nodes)[self.nonborder] #nonborder?
+        abb = self.calc_flux(self.nodes)[self.nonborder]
         x = len(abb)
         y = len(abb[0])
         z = len(abb[0][0])
@@ -222,14 +225,17 @@ class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
                         sumy = sumy + abb[a][b][c]
 
         cells = self.nodes[self.nonborder].sum()
-        sumy = sumy / cells  # / self.nodes[self.nonborder].sum()
 
+        sumy = sumy / cells
         sumx = sumx / cells
-
 
         magnitude = np.sqrt(sumx**2 + sumy**2)
 
         return magnitude
+
+
+
+
 
     def nbofnodes(self):
         return self.nodes[self.nonborder].sum()
@@ -241,37 +247,25 @@ class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
 
     def calc_mean_alignment(self):
 
-        no_neighbors = self.nb_sum(np.ones(self.cell_density[
-                                                   self.nonborder].shape))  # neighborhood is defined s.t. border particles don't have them
+        no_neighbors = self.nb_sum(self.cell_density[
+                                                   self.nonborder])  # neighborhood is defined s.t. border particles don't have them
+
         f = self.calc_flux(self.nodes[self.nonborder])
+
         d = self.cell_density[self.nonborder]
-        d_div = np.where(d > 0, d, 1)
-        # np.maximum(d, 1, out=d_div)
-
-        x = len(f)
-        y = len(f[0])
-        z = len(f[0][0])
-
-        for a in range(0, x):
-            for b in range(0, y):
-                for c in range(0, z):
-                    f[a][b][c] = (f[a][b][c]) / d_div[a][b]
-
 
         fsum = self.nb_sum(f)
-
-        #f_norm = f.flatten() / d_div  # Todo: only 1 D! (this whole method basically)
-
-        #f_norm = self.nb_sum(f_norm)
 
         x = len(fsum)
         y = len(fsum[0])
         z = len(fsum[0][0])
 
+        no_nbdiv = np.where(no_neighbors > 0, no_neighbors, 1)
+
         for a in range(0, x):
             for b in range(0, y):
                 for c in range(0, z):
-                    fsum[a][b][c] = (fsum[a][b][c]) / no_neighbors[a][b]
+                    fsum[a][b][c] = (fsum[a][b][c]) / no_nbdiv[a][b]
 
         dot_p = []
 
@@ -283,10 +277,6 @@ class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
         for i in range(0, len(dot_p)):
             tot = tot + dot_p[i]
 
-        #f_norm = fsum / no_neighbors
-        #return (np.dot(fsum, f)).sum() / d.sum()
-
-        #return Sum / d.sum
         return tot / d.sum()
 
 
@@ -306,14 +296,11 @@ class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
         """
         Calculate entropy of the lattice normalized to maximal possible entropy.
         :return: normalized entropy as scalar
-
         """
         n_ofnodes = self.dims[0] * self.dims[1]
         smax = np.log(n_ofnodes)
 
-        #smax = np.log(self.dims) #used to be self.l, but I understood that self.l = self.dims (?)
         self.smax = smax
-
 
         return 1 - self.calc_entropy()/smax
 
