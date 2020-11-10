@@ -708,11 +708,14 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
                     for x, y, c in zip(self.xcoords.ravel(), self.ycoords.ravel(), cmap.to_rgba(density.ravel()))]
         pc = PatchCollection(polygons, match_original=True)
         ax.add_collection(pc)
+
         if cbar:
             cbar = fig.colorbar(cmap, extend='min', use_gridspec=True)
             cbar.set_label('Particle number $n$')
-            cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[1::2])
-            cbar.set_ticklabels(1 + np.arange(K))
+            #cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[1::2])
+            cbar.set_ticks(np.linspace(0., K, 9, endpoint=True))  # 8 evenly spaced ticks (for high densities)
+            #cbar.set_ticklabels(1 + np.arange(K))
+            cbar.set_ticklabels(np.trunc(np.linspace(K/8, K, 8, endpoint=True)))  # 8 evenly spaced ticks (for high densities)
         return fig, pc, cmap
 
     def plot_flux(self, nodes=None, figindex=None, figsize=None, tight_layout=True, edgecolor='None', cbar=True):
@@ -753,7 +756,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
             cbar.set_ticks(np.arange(self.velocitychannels) * 360 / self.velocitychannels)
         return fig, pc, cmap
 
-    def animate_flow(self, nodes_t=None, figindex=None, figsize=None, interval=100, tight_layout=True, cmap='viridis'):
+    def animate_flow(self, nodes_t=None, figindex=None, figsize=None, interval=200, tight_layout=True, cmap='viridis'):
         if nodes_t is None:
             nodes_t = self.nodes_t
 
@@ -801,10 +804,10 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
             pc.set(facecolor=angle[n, ...].reshape(-1, 4))
             return pc, title
 
-        ani = animation.FuncAnimation(fig, update, interval=3 * interval, frames=nodes_t.shape[0])
+        ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
         return ani
 
-    def animate_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis', interval=500, vmax=None,
+    def animate_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis', interval=200, vmax=None,
                         tight_layout=True, edgecolor='None'):
         if density_t is None:
             density_t = self.dens_t
@@ -822,14 +825,20 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         return ani
 
     def calc_polar_alignment_parameter(self):
+        """
+        Calculates the magnitude of the normalized total average direction vector of the whole lattice
+        :return: Total lattice alignment parameter from 0 (no alignment) to 1 (complete alignment)
+        """
+
         sumx = 0
         sumy = 0
 
-        abb = self.calc_flux(self.nodes)[self.nonborder] #nonborder?
+        abb = self.calc_flux(self.nodes)[self.nonborder]
         x = len(abb)
         y = len(abb[0])
         z = len(abb[0][0])
 
+        # add the directions x and y velocity vectors in the whole lattice
         for a in range(0, x):
             for b in range(0, y):
                 for c in range(0, z):
@@ -839,64 +848,62 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
                         sumy = sumy + abb[a][b][c]
 
         cells = self.nodes[self.nonborder].sum()
-        sumy = sumy / cells
 
+        # normalize the resulting vector
+        sumy = sumy / cells
         sumx = sumx / cells
 
-
+        #obtain the magnitude of the resulting normalized vector
         magnitude = np.sqrt(sumx**2 + sumy**2)
 
         return magnitude
 
-        #return np.abs(self.calc_flux(self.nodes)[self.nonborder].sum() / self.nodes[self.nonborder].sum())
-
-
-
-
-
    # @property
     def calc_mean_alignment(self):
-
-        no_neighbors = self.nb_sum(np.ones(self.cell_density[
-                                                   self.nonborder].shape))  # neighborhood is defined s.t. border particles don't have them
+        """
+        Calculate magnitude of the sum of all local (neighboring) normalized direction vectors for every cell in the lattice.
+        :return: Local alignment parameter: ranging from -1 (antiparallel alignment), through 0, (no alignment) to 1 (parallel alignment)
+        """
+        #obtain number of neighbors
+        no_neighbors = self.nb_sum(self.cell_density[
+                                                   self.nonborder])  # neighborhood is defined s.t. border particles don't have them
+        #obtain flux at each lattice site
         f = self.calc_flux(self.nodes[self.nonborder])
+        #obtain number of particles at each lattice site
         d = self.cell_density[self.nonborder]
-        d_div = np.where(d > 0, d, 1)
-        x = len(f)
-        y = len(f[0])
-        z = len(f[0][0])
 
-        for a in range(0, x):
-            for b in range(0, y):
-                for c in range(0, z):
-                    f[a][b][c] = (f[a][b][c]) / d_div[a][b]
-
+        #obtain neighbor flow at each lattice site
         fsum = self.nb_sum(f)
-
-        # f_norm = f.flatten() / d_div  # Todo: only 1 D! (this whole method basically)
-
-        # f_norm = self.nb_sum(f_norm)
 
         x = len(fsum)
         y = len(fsum[0])
         z = len(fsum[0][0])
 
+        #to avoid 0/0
+        no_nbdiv = np.where(no_neighbors > 0, no_neighbors, 1)
+
+        #divide the neighbor flow at each site by the number of neighbors
         for a in range(0, x):
             for b in range(0, y):
                 for c in range(0, z):
-                    fsum[a][b][c] = (fsum[a][b][c]) / no_neighbors[a][b]
+                    fsum[a][b][c] = (fsum[a][b][c]) / no_nbdiv[a][b]
 
         dot_p = []
 
+        #dot product of the flow of each cell with the normalized neihgbors cell
         for a in range(0, x):
             for b in range(0, y):
                 dot_p.append(np.dot(fsum[a][b], f[a][b]))
 
         tot = 0
+        #add the results from the dot product
         for i in range(0, len(dot_p)):
             tot = tot + dot_p[i]
 
+        #divide by the number of particles
         return tot / d.sum()
+
+
 
 
     def calc_entropy(self):
@@ -913,14 +920,13 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
 
     def calc_normalized_entropy(self):
         """
-        Calculate entropy of the lattice normalized to maximal possible entropy.
-        :return: normalized entropy as scalar
+        Calculate order parameter of the lattice normalized to maximal possible entropy.
+        :return: 1 - normalized entropy as scalar
         """
 
         n_ofnodes = self.dims[0] * self.dims[1]
         smax = np.log(n_ofnodes)
 
-        #smax = np.log(self.dims)  # used to be self.l, but I understood that self.l = self.dims (?)
         self.smax = smax
         return 1 - self.calc_entropy()/smax
 

@@ -15,19 +15,21 @@ for all combinations of all given densities and sensitivities
 # number of lattice sites in x-direction
 #dims = 70
 # number of sample runs per lgca configuration
-trials = 30 #50
+trials = 5 #50
 # length of each sample run
-timesteps = 200 #300 dd, >500 di
+timesteps = 150 #300 dd, >500 di
 
 
 # Set varying parameters as ndarrays
 # density outer loop
 # beta inner loop
-densities = np.array([0.2, 0.4, 0.6, 1, 1.3, 1.5, 2, 2.5])
-betas = np.array([0, 0.1, 0.2, 0.35, 0.5, 0.65 , 0.8, 1, 1.2, 1.5, 1.8, 2, 2.2, 2.5, 3, 5])
+#densities = np.array([0.2, 0.4, 0.6, 1, 1.3, 1.5, 2, 2.5])
+densities = np.array([0.01, 0.05, 0.1, 0.5, 1, 2, 5, 8, 12])
+betas = np.array([step * 0.2 for step in range(0, 50)])
 # choice of transition probability model
 # density-dependent (dd) or density-independent (di)
 mode = "dd"
+
 # set prefix for boundary conditions etc. further down (better in parallel script)
 
 # save configuration (densities and sensitivities)
@@ -78,7 +80,7 @@ for d in range(len(densities)):
         # run <trials> samples of this lgca configuration
         for i in range(trials):
             # initiate lgca
-            lgca1 = get_lgca(interaction=(mode + '_alignment'), ve=False, bc='refl', density=densities[d], geometry='hex', nodes=None, beta=betas[b])
+            lgca1 = get_lgca(interaction=(mode + '_alignment'), ve=False, bc='pbc', density=densities[d], geometry='sq', nodes=None, beta=betas[b], dims=(26, 26))
             # compute statistics of initial state
             #start_entr[i] = lgca1.calc_entropy()
             entropy.append(lgca1.calc_entropy())
@@ -89,6 +91,7 @@ for d in range(len(densities)):
             #start_mean_alignment[i] = lgca1.calc_mean_alignment
             mpalignment.append(lgca1.calc_mean_alignment())
             # run the lgca
+            lgca1.timeevo(timesteps=50, record=False)
             lgca1.timeevo(timesteps=timesteps, record=True)
             # compute statistics of final state
             #end_entr[i] = lgca1.calc_entropy()
