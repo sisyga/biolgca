@@ -6,8 +6,7 @@ except ModuleNotFoundError:
     from base import *
     from lgca_square import LGCA_Square, IBLGCA_Square
 
-import numpy as np
-np.set_printoptions(threshold=sys.maxsize)
+
 
 class LGCA_Hex(LGCA_Square):
     """
@@ -187,6 +186,22 @@ class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
 
 
 class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
+
+    def nb_sum(self, qty):
+        sum = np.zeros(qty.shape)
+        sum[:-1, ...] += qty[1:, ...]
+        sum[1:, ...] += qty[:-1, ...]
+        sum[:, 1::2, ...] += qty[:, :-1:2, ...]
+        sum[1:, 2::2, ...] += qty[:-1, 1:-1:2, ...]
+        sum[:-1, 1::2, ...] += qty[1:, :-1:2, ...]
+        sum[:, 2::2, ...] += qty[:, 1:-1:2, ...]
+        sum[:, :-1:2, ...] += qty[:, 1::2, ...]
+        sum[:-1, 1:-1:2, ...] += qty[1:, 2::2, ...]
+        sum[1:, :-1:2, ...] += qty[:-1, 1::2, ...]
+        sum[:, 1:-1:2, ...] += qty[:, 2::2, ...]
+        return sum
+
+
     def init_coords(self):
         if self.ly % 2 != 0:
             print('Warning: uneven number of rows; only use for plotting - boundary conditions do not work!')
@@ -246,6 +261,8 @@ class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
 
 
     def calc_mean_alignment(self):
+
+
 
         no_neighbors = self.nb_sum(self.cell_density[
                                                    self.nonborder])  # neighborhood is defined s.t. border particles don't have them
