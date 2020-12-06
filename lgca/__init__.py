@@ -1,5 +1,10 @@
-def get_lgca(geometry='hex', ib=False, **kwargs):
-    if ib:
+def get_lgca(geometry='hex', ib=False, ve=False, **kwargs):
+    if (ib and ve):
+        if geometry in ['1d', 'lin', 'linear']:
+            from .lgca_1d import BOSON_IBLGCA_1D
+            return BOSON_IBLGCA_1D(**kwargs)
+        
+    elif ib:
         if geometry in ['1d', 'lin', 'linear']:
             from .lgca_1d import IBLGCA_1D
             return IBLGCA_1D(**kwargs)
@@ -23,3 +28,4 @@ def get_lgca(geometry='hex', ib=False, **kwargs):
         else:
             from .lgca_hex import LGCA_Hex
             return LGCA_Hex(**kwargs)
+    
