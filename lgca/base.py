@@ -7,6 +7,7 @@ from matplotlib import pyplot as plt
 from matplotlib.cm import ScalarMappable
 from numpy import random as npr
 from sympy.utilities.iterables import multiset_permutations
+from operator import itemgetter
 
 pi2 = 2 * np.pi
 plt.style.use('default')
@@ -112,7 +113,7 @@ class LGCA_base():
         :param r_int:
         :param kwargs:
         """
-        self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
+        self.r_int = 1  # interaction range; must be at least 1 to handle propagationser
         self.set_bc(bc)
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
         self.init_coords()
@@ -691,3 +692,180 @@ class IBLGCA_base(LGCA_base):
         line = plt.plot(x, y)
         errors = plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True, interpolate=True)
         return line, errors
+
+class BOSON_IBLGCA_base(IBLGCA_base):
+    temp2 = 2
+    def __init__(self, nodes=None, dims=None, ini_channel_pop=None, bc='periodic', **kwargs):
+        #ini_channel_pop is the inital population of a channel. This is useful when the nodes is not given
+        """
+        Initialize class instance.
+        :param nodes:
+        :param l:
+        :param restchannels:
+        :param density:
+        :param bc:
+        :param r_int:
+        :param kwargs:
+        """
+        self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
+        self.props = {}
+        self.set_bc(bc)
+        self.set_dims(dims=dims, nodes=nodes)
+        self.init_coords()
+        self.init_nodes(ini_channel_pop=ini_channel_pop, nodes=nodes, **kwargs)
+        self.set_interaction(**kwargs)
+       
+        self.apply_boundaries()
+        self.update_dynamic_fields()
+
+    
+    def update_dynamic_fields(self):
+        #vectorising len
+        self.length_checker = np.vectorize(len)
+        self.channel_pop = self.length_checker(self.nodes) #population of a channel
+        self.nodes_pop = self.channel_pop.sum(-1)  #population of a node
+        
+    def set_interaction(self, **kwargs):
+        try:
+            from .boson_ib_interactions import randomwalk, birth, birthdeath, go_or_grow
+        except ImportError:
+            from boson_ib_interactions import randomwalk, birth, birthdeath, go_or_grow
+        if 'interaction' in kwargs:
+            interaction = kwargs['interaction']
+            if interaction is 'birth':
+                self.interaction = birth
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                else:
+                    self.r_b = 0.2
+                    print('birth rate set to r_b = ', self.r_b)
+                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+
+            elif interaction is 'birthdeath':
+                self.interaction = birthdeath
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                else:
+                    self.r_b = 0.2
+                    print('birth rate set to r_b = ', self.r_b)
+                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+                if 'r_d' in kwargs:
+                    self.r_d = kwargs['r_d']
+                else:
+                    self.r_d = 0.02
+                    print('death rate set to r_d = ', self.r_d)
+
+                if 'std' in kwargs:
+                    self.std = kwargs['std']
+                else:
+                    self.std = 0.01
+                    print('standard deviation set to = ', self.std)
+                if 'a_max' in kwargs:
+                    self.a_max = kwargs['a_max']
+                else:
+                    self.a_max = 1.
+                    print('Max. birth rate set to a_max =', self.a_max)
+            
+            elif interaction is 'go_or_grow':
+                self.interaction = go_or_grow
+                if 'capacity' in kwargs:
+                    self.capacity = kwargs['capacity']
+                else:
+                    self.capacity = 8
+                    print('capacity of channel set to ', self.capacity)
+                    
+                if 'r_d' in kwargs:
+                    self.r_d = kwargs['r_d']
+                else:
+                    self.r_d = 0.01
+                    print('death rate set to r_d = ', self.r_d)
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                else:
+                    self.r_b = 0.2
+                    print('birth rate set to r_b = ', self.r_b)
+                if 'kappa' in kwargs:
+                    kappa = kwargs['kappa']
+                    try:
+                        self.kappa = list(kappa)
+                    except TypeError:
+                        self.kappa = [kappa] * self.maxlabel
+                else:
+                    self.kappa = [5.] * self.maxlabel
+                    print('switch rate set to kappa = ', self.kappa[0])
+                # self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
+                self.props.update(kappa=[0.] + self.kappa)
+                if 'theta' in kwargs:
+                    theta = kwargs['theta']
+                    try:
+                        self.theta = list(theta)
+                    except TypeError:
+                        self.theta = [theta] * self.maxlabel
+                else:
+                    self.theta = [0.75] * self.maxlabel
+                    print('switch threshold set to theta = ', self.theta[0])
+                # MK:
+                self.props.update(theta=[0.] + self.theta)  # * self.maxlabel)
+        else:
+            self.interaction = randomwalk
+    def timestep(self):
+        """
+        Update the state of the LGCA from time k to k+1.
+        :return:
+        """
+        self.interaction(self)
+        self.apply_boundaries()
+        self.propagation()
+        self.apply_boundaries()
+        self.update_dynamic_fields()
+
+    def timeevo(self, timesteps=100, record=False, recordN=False, recordnodespop=False, showprogress=True):
+        self.update_dynamic_fields()
+        if record:#to be implemented
+            nodes_t = np.empty((timesteps+1)*(self.l+2*self.r_int)*self.K, dtype=object)
+            for k in range((timesteps+1)*(self.l+2*self.r_int)*self.K):
+                nodes_t[k] = []
+            self.nodes_t = nodes_t.reshape(timesteps+1, self.l+2*self.r_int, self.K)
+            self.nodes_t[0, ...] = self.nodes
+        if recordN:# to be implemented
+            self.n_t = np.zeros(timesteps + 1, dtype=np.int)
+            self.n_t[0] = self.cell_density[self.nonborder].sum()
+        if recordnodespop:
+            self.nodespop_t = np.zeros((timesteps + 1,) + self.dims)
+            self.nodespop_t[0, ...] = self.nodes_pop[self.nonborder]
+        for t in range(1, timesteps + 1):
+            self.timestep()
+            if record:
+                self.nodes_t[t, ...] = self.nodes
+            if recordN:
+                self.n_t[t] = self.cell_density[self.nonborder].sum()
+            if recordnodespop:
+                self.nodespop_t[t, ...] = self.nodes_pop[self.nonborder]
+            if showprogress:
+                update_progress(1.0 * t / timesteps)
+                
+    def calc_max_label(self):
+        self.maxlabel = [len(value) for key, value in self.props.items()][0]
+
+    def calc_prop_mean(self, nodes=None, props=None, propname=None):
+        """
+        prop = self.get_prop(nodes=nodes, props=props, propname=propname)
+        occupied = nodes.astype(bool)
+        mask = 1 - occupied
+        prop = np.ma.array(prop, mask=mask)
+        mean_prop = prop.mean(-1)
+        return mean_prop"""
+        mean_prop = np.ones(self.l+2*self.r_int)*-1
+        counter = 0
+        for node in nodes:
+            cells = []
+            for channel in node:
+                cells.extend(channel)
+            if(cells != []):
+                nodeprops = np.array(itemgetter(*cells)(props[propname]))
+                mean_prop[counter]=nodeprops.mean()
+            counter+=1
+        return mean_prop
+                
+
+            
