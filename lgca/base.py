@@ -773,39 +773,42 @@ class BOSON_IBLGCA_base(IBLGCA_base):
                 else:
                     self.capacity = 8
                     print('capacity of channel set to ', self.capacity)
-                    
+                print(self.maxlabel)    
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']
+                    print('death rate set to r_d = ', self.r_d)
                 else:
                     self.r_d = 0.01
                     print('death rate set to r_d = ', self.r_d)
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
+                    print('birth rate set to r_b = ', self.r_b)
                 else:
                     self.r_b = 0.2
                     print('birth rate set to r_b = ', self.r_b)
                 if 'kappa' in kwargs:
                     kappa = kwargs['kappa']
                     try:
-                        self.kappa = list(kappa)
+                        self.kappa = [2.0] + list(kappa)
                     except TypeError:
-                        self.kappa = [kappa] * self.maxlabel
+                        self.kappa = [2.0] + [kappa] * self.maxlabel
                 else:
-                    self.kappa = [5.] * self.maxlabel
+                    self.kappa = [2.0] + [5.] * self.maxlabel
                     print('switch rate set to kappa = ', self.kappa[0])
+                print(self.kappa)
                 # self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
-                self.props.update(kappa=[0.] + self.kappa)
+                self.props.update(kappa=self.kappa)
                 if 'theta' in kwargs:
                     theta = kwargs['theta']
                     try:
-                        self.theta = list(theta)
+                        self.theta = [2.0] + list(theta)
                     except TypeError:
-                        self.theta = [theta] * self.maxlabel
+                        self.theta = [2.0] + [theta] * self.maxlabel
                 else:
-                    self.theta = [0.75] * self.maxlabel
+                    self.theta = [2.0]+[0.75] * self.maxlabel
                     print('switch threshold set to theta = ', self.theta[0])
                 # MK:
-                self.props.update(theta=[0.] + self.theta)  # * self.maxlabel)
+                self.props.update(theta=[2.] + self.theta)  # * self.maxlabel)
         else:
             self.interaction = randomwalk
     def timestep(self):

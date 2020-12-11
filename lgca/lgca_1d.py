@@ -280,12 +280,8 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         else:
             #to be implemented(I am not sure about this approach
             oldnodes = np.empty((self.l+2*self.r_int)*self.K, dtype=object)
-            oldnodes[0] = []
-            oldnodes[1] = []
-            oldnodes[2] = []
-            oldnodes[-1] = []
-            oldnodes[-2] = []
-            oldnodes[-3] = []
+            oldnodes[0:3] = [],[],[]
+            oldnodes[-3:] = [],[],[]
             self.nodes = oldnodes.reshape((self.l+2*self.r_int,self.K))
             self.nodes[self.r_int:-self.r_int] = nodes
             if(maxlabel is None):
@@ -304,11 +300,11 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
 
         tmax = nodespop_t.shape[0]
         fig, ax = self.setup_figure(tmax, **kwargs)
-        cmap = cmap_discretize(cmap, self.capacity*6)
-        plot = ax.imshow(nodespop_t, interpolation='None', vmin=0, vmax=self.capacity*6, cmap=cmap)
+        cmap = cmap_discretize(cmap, 1+self.capacity)
+        plot = ax.imshow(nodespop_t, interpolation='None', vmin=0, vmax=self.capacity, cmap=cmap, aspect = 'auto')
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size=.3, pad=0.1)
-        cbar = colorbar_index(ncolors=3*self.capacity, cmap=cmap, use_gridspec=True, cax=cax)
+        cbar = colorbar_index(ncolors=1+self.capacity, cmap=cmap, use_gridspec=True, cax=cax)
         cbar.set_label('Particle number $n$')
         plt.sca(ax)
         return plot
@@ -328,8 +324,8 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         mean_prop_t = np.zeros([tmax, l])
         for t in range(tmax):
             mean_prop_t[t] = self.calc_prop_mean(propname=propname, props=props, nodes=nodes_t[t])
-
-        plot = plt.imshow(mean_prop_t, interpolation='none', aspect='equal', cmap=cmap)
+        masked_mean_prop_t = np.ma.masked_where(mean_prop_t==-1, mean_prop_t)
+        plot = plt.imshow(masked_mean_prop_t, interpolation='none', cmap=cmap, aspect = 'auto')
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size=0.3, pad=0.1)
         cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
