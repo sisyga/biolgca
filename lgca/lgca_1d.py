@@ -260,48 +260,42 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
 
         else:
             self.l = dims[0]
-
-        self.dims = self.l,
+           
+        self.dims = self.l
         self.restchannels = 1
         self.K = 3
         
-    def init_nodes(self, ini_channel_pop=None, nodes=None, maxlabel=None, **kwargs):
-        #self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.uint)
-        if nodes is None:
-            nodes = np.empty((self.l+2*self.r_int)*self.K, dtype=object)
-            for k in range((self.l+2*self.r_int)*self.K):
-                nodes[k] = [ini_channel_pop*k+i+1 for i in range(ini_channel_pop)]
-            #for j in range(self.r_int*self.K):
-            #    nodes[j] = []
-            #    nodes[-j] = []
-            self.nodes = nodes.reshape((self.l+2*self.r_int,self.K))
-            self.maxlabel = (self.l+2*self.r_int)*self.K*ini_channel_pop
-            print(self.maxlabel)
-        else:
-            #to be implemented(I am not sure about this approach
+    def init_nodes(self, ini_channel_pop=None, nodes=None, nodes_filled=None, **kwargs):
+        if(nodes_filled): #nodes_filled is number of nodes to fill, ini_channel_pop is number of 
             oldnodes = np.empty((self.l+2*self.r_int)*self.K, dtype=object)
-            oldnodes[0:3] = [],[],[]
-            oldnodes[-3:] = [],[],[]
+            #oldnodes[0:self.K] = [],[],[]
+            #oldnodes[-self.K:] = [],[],[]
+            for k in range((self.l+2*self.r_int)*self.K):
+                oldnodes[k] = []
+            for n in range(nodes_filled):
+                for c in range(self.K):
+                    oldnodes[self.K+n*self.K+c] = [ini_channel_pop*(n*self.K+c+1)+j-ini_channel_pop+1 for j in range(ini_channel_pop)]
+            #for n in range(self.l*self.K 
             self.nodes = oldnodes.reshape((self.l+2*self.r_int,self.K))
-            self.nodes[self.r_int:-self.r_int] = nodes
-            if(maxlabel is None):
-                self.maxlabel = 0
-                for channel in nodes:
-                    for cell in channel:
-                        if(cell > self.maxlabel):
-                            self.maxlabel = cell
-            else: 
-                self.maxlabel = maxlabel
+            print(self.nodes)
+            self.maxlabel = nodes_filled*self.K*ini_channel_pop
             
             
-    def plot_nodes_population(self, nodespop_t=None, cmap='hot_r', **kwargs):
-        if nodespop_t is None:
-            nodespop_t = self.nodespop_t
-
-        tmax = nodespop_t.shape[0]
+            
+    def plot_density(self, density_t=None, cmap='hot_r', channel_type='all', **kwargs):
+        if(channel_type == 'all'):
+            if density_t is None:
+                density_t = self.density_t
+        elif(channel_type == 'rest'):
+            if density_t is None:
+                density_t = self.resting_density_t
+        elif(channel_type == 'velocity'):
+            if density_t is None:
+                density_t = self.moving_density_t
+        tmax = density_t.shape[0]
         fig, ax = self.setup_figure(tmax, **kwargs)
         cmap = cmap_discretize(cmap, 1+self.capacity)
-        plot = ax.imshow(nodespop_t, interpolation='None', vmin=0, vmax=self.capacity, cmap=cmap, aspect = 'auto')
+        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=self.capacity, cmap=cmap, aspect = 'auto')
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size=.3, pad=0.1)
         cbar = colorbar_index(ncolors=1+self.capacity, cmap=cmap, use_gridspec=True, cax=cax)
@@ -309,22 +303,30 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         plt.sca(ax)
         return plot
     
-    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', **kwargs):
+    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', channeltype='all', **kwargs):
         if nodes_t is None:
             nodes_t = self.nodes_t
-
+        """
         if props is None:
             props = self.props
 
         if propname is None:
             propname = next(iter(props))
-
+        """
+        if(self.mean_prop_t=={}):
+            self.calc_prop_mean_spatiotemp()
+        #make some changes to the next few lines to remove redundancy    
         tmax, l, _ = nodes_t.shape
         fig, ax = self.setup_figure(tmax, **kwargs)
-        mean_prop_t = np.zeros([tmax, l])
-        for t in range(tmax):
-            mean_prop_t[t] = self.calc_prop_mean(propname=propname, props=props, nodes=nodes_t[t])
-        masked_mean_prop_t = np.ma.masked_where(mean_prop_t==-1, mean_prop_t)
+        #mean_prop_t = np.zeros([tmax, l])
+        if(channeltype == 'all'):
+            mean_prop_t = self.mean_prop_t[propname]
+        #elif(channeltype == 'velocity'):
+        #    mean_prop_t = self.mean_prop_vel_t[propname]
+        #elif(channeltype == 'rest'):   
+        #    mean_prop_t = self.mean_prop_rest_t[propname]
+
+        masked_mean_prop_t = np.ma.masked_where(mean_prop_t==-1000, mean_prop_t)
         plot = plt.imshow(masked_mean_prop_t, interpolation='none', cmap=cmap, aspect = 'auto')
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size=0.3, pad=0.1)
