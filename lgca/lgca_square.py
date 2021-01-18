@@ -478,7 +478,7 @@ class LGCA_Square(LGCA_base):
         polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly, alpha=v,
                                    orientation=self.orientation, facecolor=c, edgecolor=edgecolor)
                     for x, y, c, v in
-                    zip(self.xcoords.ravel(), self.ycoords.ravel(), cmap.to_rgba(field.ravel()), mask.ravel())]
+                    zip(self.xcoords.ravel(), self.ycoords.ravel(), cmap.to_rgba(field.ravel()), mask.ravel().astype(float))]
         pc = PatchCollection(polygons, match_original=True)
         ax.add_collection(pc)
         if cbar:
