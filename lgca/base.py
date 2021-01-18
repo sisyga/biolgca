@@ -667,7 +667,17 @@ class IBLGCA_base(LGCA_base):
         mean_prop = prop.mean(-1)
         return mean_prop
 
-    def plot_prop_timecourse(self, nodes_t=None, props=None, propname=None, figindex=None, figsize=None):
+    def plot_prop_timecourse(self, nodes_t=None, props=None, propname=None, figindex=None, figsize=None, **kwargs):
+        """
+        Plot the time evolution of the cell property 'propname'
+        :param nodes_t:
+        :param props:
+        :param propname:
+        :param figindex:
+        :param figsize:
+        :param kwargs: keyword arguments for the matplotlib.plot command
+        :return:
+        """
         if nodes_t is None:
             nodes_t = self.nodes_t
 
@@ -688,6 +698,6 @@ class IBLGCA_base(LGCA_base):
         plt.xlabel('$t$')
         plt.ylabel('${}$'.format(propname))
         plt.title('Time course of the cell property')
-        line = plt.plot(x, y)
+        line = plt.plot(x, y, **kwargs)
         errors = plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True, interpolate=True)
         return line, errors

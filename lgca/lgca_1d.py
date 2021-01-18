@@ -126,17 +126,24 @@ class LGCA_1D(LGCA_base):
         ax.xaxis.tick_top()
         return fig, ax
 
-    def plot_density(self, density_t=None, cmap='hot_r', **kwargs):
+    def plot_density(self, density_t=None, cmap='hot_r', vmax='auto', colorbarwidth=0.03, **kwargs):
         if density_t is None:
             density_t = self.dens_t
 
         tmax = density_t.shape[0]
         fig, ax = self.setup_figure(tmax, **kwargs)
-        cmap = cmap_discretize(cmap, 3 + self.restchannels)
-        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=self.K, cmap=cmap)
         divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size=.3, pad=0.1)
-        cbar = colorbar_index(ncolors=3 + self.restchannels, cmap=cmap, use_gridspec=True, cax=cax)
+        cax = divider.append_axes("right", size=colorbarwidth, pad=0.1)
+        if vmax is None:
+            vmax = self.K
+
+        elif vmax == 'auto':
+            vmax = int(density_t.max())
+
+        cmap = cmap_discretize(cmap, 1 + vmax)
+        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=vmax, cmap=cmap)
+        cbar = colorbar_index(ncolors=1 + vmax, cmap=cmap, use_gridspec=True, cax=cax)
+
         cbar.set_label('Particle number $n$')
         plt.sca(ax)
         return plot
