@@ -193,7 +193,7 @@ if __name__ == '__main__':
     lgca = IBLGCA_Hex(nodes=nodes, interaction='go_and_grow', bc='refl', r_b=0.1)
     # lgca.set_interaction('contact_guidance', beta=2)
     # cProfile.run('lgca.timeevo(timesteps=1000)')
-    lgca.timeevo(timesteps=200, record=True)
+    lgca.timeevo(timesteps=100, record=True)
     # ani = lgca.animate_flow(interval=500)
     # ani = lgca.animate_flux(interval=50)
     # ani = lgca.animate_density(interval=50)
