@@ -60,7 +60,8 @@ def birthdeath(lgca):
     dying = (npr.random(size=lgca.nodes.shape) < lgca.r_d) & lgca.occupied
     # lgca.update_dynamic_fields()
     # birth
-    relevant = (lgca.cell_density[lgca.nonborder] > 0)
+    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
+               (lgca.cell_density[lgca.nonborder] < lgca.K)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
         node = lgca.nodes[coord]
@@ -95,7 +96,8 @@ def birthdeath_discrete(lgca):
     # determine which cells will die
     dying = (npr.random(size=lgca.nodes.shape) < lgca.r_d) & lgca.occupied
     # lgca.update_dynamic_fields()
-    relevant = (lgca.cell_density[lgca.nonborder] > 0)
+    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
+               (lgca.cell_density[lgca.nonborder] < lgca.K)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
         node = lgca.nodes[coord]
@@ -104,12 +106,12 @@ def birthdeath_discrete(lgca):
         # choose cells that proliferate
 
         r_bs = np.array([lgca.props['r_b'][i] for i in node])
-        proliferating = (npr.random(lgca.K) * occ) < r_bs
+        proliferating = npr.random(lgca.K) < r_bs
         n_p = proliferating.sum()
         if n_p == 0:
             continue
         # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
-        targetchannels = npr.choice(lgca.K, size=n_p, replace=False)
+        targetchannels = npr.choice(lgca.K, n_p, replace=False)
 
         for i, label in enumerate(node[proliferating]):
             ind = targetchannels[i]
@@ -118,10 +120,10 @@ def birthdeath_discrete(lgca):
                 node[ind] = lgca.maxlabel
                 r_b = lgca.props['r_b'][label]
                 if r_b < lgca.a_max:
-                    lgca.props['r_b'].append(choices((r_b-lgca.drb, r_b+lgca.drb, r_b), weights=(lgca.pmut/2, lgca.pmut/2,
-                                                                                                 1-lgca.pmut))[0])
+                    lgca.props['r_b'].append(choices((r_b-lgca.drb, r_b+lgca.drb, r_b), weights=(lgca.pmut, lgca.pmut,
+                                                                                                 1-2*lgca.pmut))[0])
                 else:
-                    lgca.props['r_b'].append(choices((r_b-lgca.drb, r_b), weights=(lgca.pmut/2, 1-lgca.pmut/2))[0])
+                    lgca.props['r_b'].append(choices((r_b-lgca.drb, r_b), weights=(lgca.pmut, 1-lgca.pmut))[0])
 
         lgca.nodes[coord] = node
 
