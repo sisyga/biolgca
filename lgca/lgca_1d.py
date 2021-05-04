@@ -212,7 +212,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         return plot
 
 class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
-    interactions = ['go_or_grow']
+    interactions = ['go_or_grow', 'memory_go_or_grow']
     
     def propagation(self):
         """
@@ -265,7 +265,7 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         self.restchannels = 1
         self.K = 3
         
-    def init_nodes(self, ini_channel_pop=None, nodes=None, nodes_filled=None, **kwargs):
+    def init_nodes(self, ini_channel_pop=None, nodes=None, nodes_filled=None, capacity=4, **kwargs):
         if(nodes_filled): #nodes_filled is number of nodes to fill, ini_channel_pop is number of 
             oldnodes = np.empty((self.l+2*self.r_int)*self.K, dtype=object)
             #oldnodes[0:self.K] = [],[],[]
@@ -277,9 +277,9 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
                     oldnodes[self.K+n*self.K+c] = [ini_channel_pop*(n*self.K+c+1)+j-ini_channel_pop+1 for j in range(ini_channel_pop)]
             #for n in range(self.l*self.K 
             self.nodes = oldnodes.reshape((self.l+2*self.r_int,self.K))
-            print(self.nodes)
-            self.maxlabel = nodes_filled*self.K*ini_channel_pop
-            
+            #print(self.nodes)
+            self.maxlabel = nodes_filled*capacity*ini_channel_pop
+
             
             
     def plot_density(self, density_t=None, cmap='hot_r', channel_type='all', **kwargs):
@@ -295,7 +295,7 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         tmax = density_t.shape[0]
         fig, ax = self.setup_figure(tmax, **kwargs)
         cmap = cmap_discretize(cmap, 1+self.capacity)
-        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=self.capacity, cmap=cmap, aspect = 'auto')
+        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=12, cmap=cmap, aspect = 'auto')
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size=.3, pad=0.1)
         cbar = colorbar_index(ncolors=1+self.capacity, cmap=cmap, use_gridspec=True, cax=cax)
