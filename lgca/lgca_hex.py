@@ -6,7 +6,7 @@ except ModuleNotFoundError:
     from .base import *
     from .lgca_square import LGCA_Square, IBLGCA_Square
 
-#test
+
 class LGCA_Hex(LGCA_Square):
     """
     2d lattice-gas cellular automaton on a hexagonal lattice.
