@@ -105,23 +105,48 @@ def go_or_grow(lgca):
         # random reorientation
         for cell in velcells:
             node[npr.randint(lgca.K-1)].append(cell)
-        lgca.nodes[coord] = deepcopy(node)   
-    
-"""   
-        for cell in node[-1]:
-            if(npr.random() <= lgca.r_b*(1-rho)):
-                node[-1].append(len(lgca.props["kappa"]))
-                lgca.props['kappa'].append(npr.normal(loc=lgca.props['kappa'][cell], scale=lgca.kappa_std))
-                lgca.props['theta'].append(trunc_gauss(0,1,mu=lgca.props['theta'][cell],sigma=lgca.theta_std))
-                density+=1
-                
+        lgca.nodes[coord] = deepcopy(node)
+        
+###
+def memory_go_or_grow(lgca):
+    relevant = (lgca.density[lgca.nonborder] > 0)
+    coords = [a[relevant] for a in lgca.nonborder]
+    for coord in zip(*coords):
+        node = deepcopy(lgca.nodes[coord])
+        density = 0
         for channel in node:
             for cell in channel:
-                if(npr.random()<=tanh_switch(rho=rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell])):
-                    node[-1].append(cell)
+                if(npr.random() <= lgca.r_d):
                     channel.remove(cell)
+            density += len(channel)
+        rho = density/lgca.capacity
+        #lgca.maxlabel=len(lgca.props["kappa"])       
+        velcells = []
+        restcells = []
+        ch_counter = 0
+        for channel in node:
+            for cell in channel:
+                if ch_counter == 2:
+                    if(npr.random()<=(1-(tanh_switch(rho=-rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell])**(1/1.0)))*(1-np.exp(-lgca.time_since_change[cell]/lgca.beta))):#increasing resting cells probability to rest
+                        restcells.append(cell)
+                        lgca.time_since_change[cell] += 1
+                    else:
+                        velcells.append(cell)
+                        lgca.time_since_change[cell] = 0
+                    if(npr.random() <= lgca.r_b*(1-rho)):
+                        restcells.append(len(lgca.props["kappa"]))
+                        lgca.props['kappa'].append(npr.normal(loc=lgca.props['kappa'][cell], scale=lgca.kappa_std))
+                        lgca.props['theta'].append(trunc_gauss(0,1,mu=lgca.props['theta'][cell],sigma=lgca.theta_std))
+                        lgca.time_since_change.append(lgca.beta*4.0)
                 else:
-                    node[npr.randint(0,lgca.K-1)].append(cell)
-                    channel.remove(cell)
-
-"""
+                    if(npr.random()<=(tanh_switch(rho=rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell])**(1.0))*(1-np.exp(-lgca.time_since_change[cell]/lgca.beta))): #reducing moving cells probability to rest
+                        restcells.append(cell)
+                        lgca.time_since_change[cell] = 0
+                    else:
+                        velcells.append(cell)
+                        lgca.time_since_change[cell] += 1
+            ch_counter +=1
+        node = [[],[],restcells]
+        for cell in velcells:
+            node[npr.randint(lgca.K-1)].append(cell)
+        lgca.nodes[coord] = deepcopy(node)

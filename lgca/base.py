@@ -696,7 +696,7 @@ class IBLGCA_base(LGCA_base):
 
 class BOSON_IBLGCA_base(IBLGCA_base):
     temp2 = 2
-    def __init__(self, nodes=None, dims=None, ini_channel_pop=None, nodes_filled=None, bc='periodic', **kwargs):
+    def __init__(self, nodes=None, dims=None, ini_channel_pop=None, nodes_filled=None, bc='periodic', capacity=4, **kwargs):
         #ini_channel_pop is the inital population of a channel. This is useful when the nodes is not given
         """
         Initialize class instance.
@@ -715,7 +715,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
         self.set_dims(dims=dims, nodes=nodes)
         
         self.init_coords()
-        self.init_nodes(ini_channel_pop=ini_channel_pop, nodes=nodes,nodes_filled=nodes_filled, **kwargs)
+        self.init_nodes(ini_channel_pop=ini_channel_pop, nodes=nodes,nodes_filled=nodes_filled, capacity=capacity)
         self.set_interaction(**kwargs)
        
         #self.apply_boundaries()  -> Harish to Simon: is this really needed? If yes why?
@@ -737,9 +737,9 @@ class BOSON_IBLGCA_base(IBLGCA_base):
         
     def set_interaction(self, **kwargs):
         try:
-            from .boson_ib_interactions import randomwalk, birth, birthdeath, go_or_grow
+            from .boson_ib_interactions import randomwalk, birth, birthdeath, go_or_grow, memory_go_or_grow
         except ImportError:
-            from boson_ib_interactions import randomwalk, birth, birthdeath, go_or_grow
+            from boson_ib_interactions import randomwalk, birth, birthdeath, go_or_grow, memory_go_or_grow
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
             if interaction is 'birth':
@@ -833,6 +833,77 @@ class BOSON_IBLGCA_base(IBLGCA_base):
                     print('switch threshold set to theta = ', self.theta[0])
                 # MK:
                 self.props.update(theta=self.theta)  # * self.maxlabel)
+            elif interaction is 'memory_go_or_grow':
+                self.interaction = memory_go_or_grow
+                if 'capacity' in kwargs:
+                    self.capacity = kwargs['capacity']
+                else:
+                    self.capacity = 8
+                    print('capacity of channel set to ', self.capacity)
+                    
+                if 'kappa_std' in kwargs:
+                    self.kappa_std = kwargs['kappa_std']
+                else:
+                    self.kappa_std = 0.2
+                    print('capacity of channel set to ', self.kappa_std)
+                    
+                if 'theta_std' in kwargs:
+                    self.theta_std = kwargs['theta_std']
+                else:
+                    self.theta_std = 0.05
+                    print('capacity of channel set to ', self.theta_std)
+                    
+                if 'r_d' in kwargs:
+                    self.r_d = kwargs['r_d']
+                    print('death rate set to r_d = ', self.r_d)
+                else:
+                    self.r_d = 0.01
+                    print('death rate set to r_d = ', self.r_d)
+                    
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                    print('birth rate set to r_b = ', self.r_b)
+                else:
+                    self.r_b = 0.2
+                    print('birth rate set to r_b = ', self.r_b)
+                    
+                if 'kappa' in kwargs:
+                    kappa = kwargs['kappa']
+                    try:
+                        self.kappa = [0.0] + list(kappa)
+                    except TypeError:
+                        self.kappa = [0.0] + [kappa] * self.maxlabel
+                else:
+                    self.kappa = [0.0] + [5.] * self.maxlabel
+                    print('switch rate set to kappa = ', self.kappa[0])
+                
+                # self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
+                self.props.update(kappa=self.kappa)
+                if 'theta' in kwargs:
+                    theta = kwargs['theta']
+                    try:
+                        self.theta = [0.0] + list(theta)
+                    except TypeError:
+                        self.theta = [0.0] + [theta] * self.maxlabel
+                else:
+                    self.theta = [0.0]+[0.5] * self.maxlabel
+                    print('switch threshold set to theta = ', self.theta[0])
+                # MK:
+                self.props.update(theta=self.theta)  # * self.maxlabel)
+                if('beta' in kwargs): #beta is the parameter to tune memory persistence
+                    beta = kwargs['beta']
+                    self.beta = beta
+                    try:
+                        #self.beta = [0.0] + list(beta)
+                        self.time_since_change = [0.0] + list(beta*4.0)
+                    except TypeError:
+                        #self.beta = [0.0] + [beta] * self.maxlabel
+                        self.time_since_change = [0.0] + [beta*4.0] * self.maxlabel
+                else:
+                    self.beta = 1.0
+                    print('switch threshold set to beta = ', self.beta)
+                    self.time_since_change = [4.0]+[4.0]*self.maxlabel #keeps tracks of number of timesteps since phenotype changed.
+                self.props.update(time_since_change=self.time_since_change)
         else:
             self.interaction = randomwalk
 

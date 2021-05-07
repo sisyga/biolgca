@@ -212,7 +212,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         return plot
 
 class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
-    interactions = ['go_or_grow']
+    interactions = ['go_or_grow', 'memory_go_or_grow']
     
     def propagation(self):
         """
@@ -272,7 +272,8 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         self.restchannels = 1
         self.K = 3
         
-    def init_nodes(self, ini_channel_pop=None, nodes=None, nodes_filled=None, **kwargs):
+
+    def init_nodes(self, ini_channel_pop=None, nodes=None, nodes_filled=None, capacity=4, **kwargs):
         if nodes_filled is not None and ini_channel_pop is not None: #nodes_filled is number of nodes to fill, ini_channel_pop is number of
             oldnodes = np.empty((self.l+2*self.r_int)*self.K, dtype=object)
             #oldnodes[0:self.K] = [],[],[]
@@ -284,8 +285,9 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
                     oldnodes[self.K+n*self.K+c] = [ini_channel_pop*(n*self.K+c+1)+j-ini_channel_pop+1 for j in range(ini_channel_pop)]
             #for n in range(self.l*self.K 
             self.nodes = oldnodes.reshape((self.l+2*self.r_int,self.K))
-            print(self.nodes)
+            #print(self.nodes)
             self.maxlabel = nodes_filled*self.K*ini_channel_pop
+            # self.maxlabel = nodes_filled*capacity*ini_channel_pop #why capacity?
         if nodes is not None:
             # set boundary nodes to be empty - they have to be lists to ensure function of other methods
             boundary_nodes = np.empty(self.r_int*self.K, dtype=object)
@@ -301,7 +303,6 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
                 raise ValueError("Maximum ID from provided nodes must be in kwarg 'maxlabel'. Too expensive to compute it myself.")
             maxlabel = kwargs['maxlabel']
             self.maxlabel=maxlabel
-            
             
             
     def plot_density(self, density_t=None, cmap='hot_r', channel_type='all', scaling=1, **kwargs):
