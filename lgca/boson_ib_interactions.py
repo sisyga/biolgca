@@ -91,8 +91,8 @@ def go_or_grow(lgca):
                     if(npr.random() <= lgca.r_b*(1-rho)):
                         # len(...) to find identity index of new cell
                         restcells.append(len(lgca.props["kappa"]))
-                        lgca.props['kappa'].append(npr.normal(loc=lgca.props['kappa'][cell], scale=lgca.kappa_std))
-                        lgca.props['theta'].append(trunc_gauss(0,1,mu=lgca.props['theta'][cell],sigma=lgca.theta_std))
+                        lgca.props['kappa'].append(lgca.props['kappa'][cell])
+                        lgca.props['theta'].append(lgca.props['theta'][cell])
                 # migrating cells
                 else:
                     if(npr.random()<=(tanh_switch(rho=rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell])**(1.0))): #reducing moving cells probability to rest by putting 3.0 here
