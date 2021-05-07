@@ -854,12 +854,12 @@ class BOSON_IBLGCA_base(IBLGCA_base):
             self.n_t = np.zeros(timesteps + 1, dtype=np.int)
             self.n_t[0] = self.cell_density[self.nonborder].sum()
         if recordDensity:
-            self.density_t = np.zeros([(timesteps + 1), self.dims])
+            self.density_t = np.zeros((timesteps + 1,) + self.dims)
             self.density_t[0, ...] = self.density[self.nonborder]
         if recordDensityOther:    # useful for plotting channel wise densities
-            self.resting_density_t = np.zeros([(timesteps + 1), self.dims])
+            self.resting_density_t = np.zeros((timesteps + 1,) + self.dims)
             self.resting_density_t[0, ...] = self.resting_density[self.nonborder]
-            self.moving_density_t = np.zeros([(timesteps + 1), self.dims])
+            self.moving_density_t = np.zeros((timesteps + 1,) + self.dims)
             self.moving_density_t[0, ...] = self.moving_density[self.nonborder]
 
         for t in range(1, timesteps + 1):

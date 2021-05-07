@@ -46,6 +46,7 @@ def go_or_growold(lgca):
                     restcells.append(cell)
                 else:
                     velcells.append(cell)
+                # works only in 1D
                 if ch_counter == 2:
                     if(npr.random() <= lgca.r_b*(1-rho)):
                         restcells.append(len(lgca.props["kappa"]))
@@ -64,7 +65,9 @@ def go_or_grow(lgca):
     for coord in zip(*coords):
         node = deepcopy(lgca.nodes[coord])
         density = 0
+        # death
         for channel in node:
+            # channel is a list, not a numpy array
             for cell in channel:
                 if(npr.random() <= lgca.r_d):
                     channel.remove(cell)
@@ -75,26 +78,31 @@ def go_or_grow(lgca):
         velcells = []
         restcells = []
         ch_counter = 0
+        # switch
         for channel in node:
             for cell in channel:
-                
+                # rest cells (works only in 1D because of hard coded 2!)
                 if ch_counter == 2:
-                    if(npr.random()<=(tanh_switch(rho=rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell])**(1/3.0))):#increasing resting cells probability to rest
+                    if(npr.random()<=(tanh_switch(rho=rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell])**(1/1.0))):#increasing resting cells probability to rest by putting 3.0 here
                         restcells.append(cell)
                     else:
                         velcells.append(cell)
+                    # birth
                     if(npr.random() <= lgca.r_b*(1-rho)):
+                        # len(...) to find identity index of new cell
                         restcells.append(len(lgca.props["kappa"]))
                         lgca.props['kappa'].append(npr.normal(loc=lgca.props['kappa'][cell], scale=lgca.kappa_std))
                         lgca.props['theta'].append(trunc_gauss(0,1,mu=lgca.props['theta'][cell],sigma=lgca.theta_std))
+                # migrating cells
                 else:
-                    if(npr.random()<=(tanh_switch(rho=rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell])**(3.0))): #reducing moving cells probability to rest
+                    if(npr.random()<=(tanh_switch(rho=rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell])**(1.0))): #reducing moving cells probability to rest by putting 3.0 here
                         restcells.append(cell)
                     else:
                         velcells.append(cell)
             ch_counter +=1
             
         node = [[],[],restcells]
+        # random reorientation
         for cell in velcells:
             node[npr.randint(lgca.K-1)].append(cell)
         lgca.nodes[coord] = deepcopy(node)   

@@ -229,22 +229,29 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         self.nodes = deepcopy(newnodes)
 
     def apply_pbc(self):
-        #to be implemented
+        # same like the classical LGCA version without Boson and IB
         self.nodes[:self.r_int, :] = self.nodes[-2 * self.r_int:-self.r_int, :]
         self.nodes[-self.r_int:, :] = self.nodes[self.r_int:2 * self.r_int, :]
 
     def apply_rbc(self):
-        self.nodes[self.r_int - 1, 1] = self.nodes[self.r_int - 1, 1] + self.nodes[self.r_int - 1, 0]
-        self.nodes[-self.r_int, 0] =  self.nodes[-self.r_int, 0] + self.nodes[-self.r_int, 1]
-        self.nodes[self.r_int - 1, 0] = []
-        self.nodes[-self.r_int, 1] = []
-        
+        # same like the classical LGCA version without Boson and IB
+        self.nodes[self.r_int, 0] = self.nodes[self.r_int - 1, 1] + self.nodes[self.r_int, 0]
+        self.nodes[-self.r_int-1, 1] = self.nodes[-self.r_int, 0] + self.nodes[-self.r_int-1, 1]
+        self.apply_abc()
 
     def apply_abc(self):
-        # to be checked
-        self.nodes[:self.r_int, :] = []
-        self.nodes[-self.r_int:, :] = []
-    
+        # make the empty boundary nodes permanent after first call of this function
+        # notably not very elegant
+        if not hasattr(self, "boundary_nodes"):
+            # construct empty boundary nodes and save
+            boundary_nodes = np.empty(self.r_int * self.K, dtype=object)
+            for n in range(self.r_int * self.K):
+                boundary_nodes[n] = []
+            self.boundary_nodes = boundary_nodes.reshape((self.r_int, self.K))
+        # enforce abc
+        self.nodes[:self.r_int] = self.boundary_nodes
+        self.nodes[-self.r_int:] = self.boundary_nodes
+
     def set_dims(self, dims=None, nodes=None):
         if nodes is not None:
             self.l, self.K = nodes.shape
@@ -253,7 +260,7 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
             return
 
         elif dims is None:
-            dims = 100
+            dims = 100,
 
         if isinstance(dims, int):
             self.l = dims
@@ -261,12 +268,12 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         else:
             self.l = dims[0]
            
-        self.dims = self.l
+        self.dims = self.l,
         self.restchannels = 1
         self.K = 3
         
     def init_nodes(self, ini_channel_pop=None, nodes=None, nodes_filled=None, **kwargs):
-        if(nodes_filled): #nodes_filled is number of nodes to fill, ini_channel_pop is number of 
+        if nodes_filled is not None and ini_channel_pop is not None: #nodes_filled is number of nodes to fill, ini_channel_pop is number of
             oldnodes = np.empty((self.l+2*self.r_int)*self.K, dtype=object)
             #oldnodes[0:self.K] = [],[],[]
             #oldnodes[-self.K:] = [],[],[]
@@ -279,10 +286,25 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
             self.nodes = oldnodes.reshape((self.l+2*self.r_int,self.K))
             print(self.nodes)
             self.maxlabel = nodes_filled*self.K*ini_channel_pop
+        if nodes is not None:
+            # set boundary nodes to be empty - they have to be lists to ensure function of other methods
+            boundary_nodes = np.empty(self.r_int*self.K, dtype=object)
+            for n in range(self.r_int*self.K):
+                    boundary_nodes[n] = []
+            boundary_nodes = boundary_nodes.reshape((self.r_int, self.K))
+            # store empty boundary nodes for use in absorbing boundary conditions
+            self.boundary_nodes = boundary_nodes
+            # set non-boundary nodes to be the passed nodes
+            self.nodes = np.concatenate((boundary_nodes,nodes,boundary_nodes), axis=0)
+            # set current maximum ID for birth process
+            if not 'maxlabel' in kwargs:
+                raise ValueError("Maximum ID from provided nodes must be in kwarg 'maxlabel'. Too expensive to compute it myself.")
+            maxlabel = kwargs['maxlabel']
+            self.maxlabel=maxlabel
             
             
             
-    def plot_density(self, density_t=None, cmap='hot_r', channel_type='all', **kwargs):
+    def plot_density(self, density_t=None, cmap='hot_r', channel_type='all', scaling=1, **kwargs):
         if(channel_type == 'all'):
             if density_t is None:
                 density_t = self.density_t
@@ -294,11 +316,16 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
                 density_t = self.moving_density_t
         tmax = density_t.shape[0]
         fig, ax = self.setup_figure(tmax, **kwargs)
-        cmap = cmap_discretize(cmap, 1+self.capacity)
-        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=self.capacity, cmap=cmap, aspect = 'auto')
+        # allow plotting densities > self.capacity as color for highest occupancy
+        if np.abs(scaling)>1:
+            maxval = self.capacity*scaling
+        else:
+            maxval = self.capacity
+        cmap = cmap_discretize(cmap, 1 + maxval)
+        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=maxval, cmap=cmap, aspect = 'auto')
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size=.3, pad=0.1)
-        cbar = colorbar_index(ncolors=1+self.capacity, cmap=cmap, use_gridspec=True, cax=cax)
+        cbar = colorbar_index(ncolors=1+maxval, cmap=cmap, use_gridspec=True, cax=cax)
         cbar.set_label('Particle number $n$')
         plt.sca(ax)
         return plot
