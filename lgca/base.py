@@ -715,8 +715,8 @@ class BOSON_IBLGCA_base(IBLGCA_base):
         self.set_dims(dims=dims, nodes=nodes)
         
         self.init_coords()
-        self.init_nodes(ini_channel_pop=ini_channel_pop, nodes=nodes,nodes_filled=nodes_filled, capacity=capacity)
-        self.set_interaction(**kwargs)
+        self.init_nodes(ini_channel_pop=ini_channel_pop, nodes=nodes,nodes_filled=nodes_filled, capacity=capacity, **kwargs)
+        self.set_interaction(capacity=capacity, **kwargs)
        
         #self.apply_boundaries()  -> Harish to Simon: is this really needed? If yes why?
         #vectorising len function
