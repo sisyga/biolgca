@@ -285,7 +285,6 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
                     oldnodes[self.K+n*self.K+c] = [ini_channel_pop*(n*self.K+c+1)+j-ini_channel_pop+1 for j in range(ini_channel_pop)]
             #for n in range(self.l*self.K 
             self.nodes = oldnodes.reshape((self.l+2*self.r_int,self.K))
-            #print(self.nodes)
             self.maxlabel = nodes_filled*self.K*ini_channel_pop
             # self.maxlabel = nodes_filled*capacity*ini_channel_pop #why capacity?
         if nodes is not None:
@@ -304,7 +303,6 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
             maxlabel = kwargs['maxlabel']
             self.maxlabel=maxlabel
             
-            
     def plot_density(self, density_t=None, cmap='hot_r', channel_type='all', scaling=1, **kwargs):
         if(channel_type == 'all'):
             if density_t is None:
@@ -322,11 +320,11 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
             maxval = self.capacity*scaling
         else:
             maxval = self.capacity
-        cmap = cmap_discretize(cmap, 1 + maxval)
-        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=maxval, cmap=cmap, aspect = 'auto')
+        cmap = cmap_discretize(cmap, 4 + maxval)
+        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=maxval+4, cmap=cmap, aspect = 'auto')
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size=.3, pad=0.1)
-        cbar = colorbar_index(ncolors=1+maxval, cmap=cmap, use_gridspec=True, cax=cax)
+        cbar = colorbar_index(ncolors=4+maxval, cmap=cmap, use_gridspec=True, cax=cax)
         cbar.set_label('Particle number $n$')
         plt.sca(ax)
         return plot

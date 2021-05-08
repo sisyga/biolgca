@@ -93,7 +93,7 @@ def go_or_grow(lgca):
                         restcells.append(len(lgca.props["kappa"]))
                         #lgca.props['kappa'].append(lgca.props['kappa'][cell])
                         #lgca.props['theta'].append(lgca.props['theta'][cell])
-						lgca.props['kappa'].append(npr.normal(loc=lgca.props['kappa'][cell], scale=lgca.kappa_std))
+                        lgca.props['kappa'].append(npr.normal(loc=lgca.props['kappa'][cell], scale=lgca.kappa_std))
                         lgca.props['theta'].append(trunc_gauss(0,1,mu=lgca.props['theta'][cell],sigma=lgca.theta_std))
                 # migrating cells
                 else:
@@ -129,19 +129,19 @@ def memory_go_or_grow(lgca):
         for channel in node:
             for cell in channel:
                 if ch_counter == 2:
-                    if(npr.random()<=(1-(tanh_switch(rho=-rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell])**(1/1.0)))*(1-np.exp(-lgca.time_since_change[cell]/lgca.beta))):#increasing resting cells probability to rest
+                    if(npr.random()<=(1-(tanh_switch(rho=-rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell])))*(1-np.exp(-lgca.time_since_change[cell]/lgca.beta))):#increasing resting cells probability to rest
                         restcells.append(cell)
-                        lgca.time_since_change[cell] += 1
+                        lgca.time_since_change[cell] += 1.0
                     else:
                         velcells.append(cell)
-                        lgca.time_since_change[cell] = 0
+                        lgca.time_since_change[cell] = 0.0
                     if(npr.random() <= lgca.r_b*(1-rho)):
                         restcells.append(len(lgca.props["kappa"]))
                         lgca.props['kappa'].append(npr.normal(loc=lgca.props['kappa'][cell], scale=lgca.kappa_std))
                         lgca.props['theta'].append(trunc_gauss(0,1,mu=lgca.props['theta'][cell],sigma=lgca.theta_std))
                         lgca.time_since_change.append(lgca.beta*4.0)
                 else:
-                    if(npr.random()<=(tanh_switch(rho=rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell])**(1.0))*(1-np.exp(-lgca.time_since_change[cell]/lgca.beta))): #reducing moving cells probability to rest
+                    if(npr.random()<=(tanh_switch(rho=rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell]))*(1-np.exp(-lgca.time_since_change[cell]/lgca.beta))): #reducing moving cells probability to rest
                         restcells.append(cell)
                         lgca.time_since_change[cell] = 0
                     else:

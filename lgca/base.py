@@ -819,7 +819,6 @@ class BOSON_IBLGCA_base(IBLGCA_base):
                 else:
                     self.kappa = [0.0] + [5.] * self.maxlabel
                     print('switch rate set to kappa = ', self.kappa[0])
-                
                 # self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
                 self.props.update(kappa=self.kappa)
                 if 'theta' in kwargs:
@@ -866,7 +865,6 @@ class BOSON_IBLGCA_base(IBLGCA_base):
                 else:
                     self.r_b = 0.2
                     print('birth rate set to r_b = ', self.r_b)
-                    
                 if 'kappa' in kwargs:
                     kappa = kwargs['kappa']
                     try:
@@ -876,7 +874,6 @@ class BOSON_IBLGCA_base(IBLGCA_base):
                 else:
                     self.kappa = [0.0] + [5.] * self.maxlabel
                     print('switch rate set to kappa = ', self.kappa[0])
-                
                 # self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
                 self.props.update(kappa=self.kappa)
                 if 'theta' in kwargs:
@@ -895,7 +892,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
                     self.beta = beta
                     try:
                         #self.beta = [0.0] + list(beta)
-                        self.time_since_change = [0.0] + list(beta*4.0)
+                        self.time_since_change = [0.0] + list(beta*4.0) * self.maxlabel
                     except TypeError:
                         #self.beta = [0.0] + [beta] * self.maxlabel
                         self.time_since_change = [0.0] + [beta*4.0] * self.maxlabel
