@@ -129,7 +129,7 @@ def memory_go_or_grow(lgca):
         for channel in node:
             for cell in channel:
                 if ch_counter == 2:
-                    if(npr.random()<=(1-(tanh_switch(rho=-rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell])))*(1-np.exp(-lgca.time_since_change[cell]/lgca.beta))):#increasing resting cells probability to rest
+                    if(npr.random()<=1.0-(tanh_switch(rho=-rho, kappa=lgca.props['kappa'][cell], theta=-lgca.props['theta'][cell]))*(1-np.exp(-lgca.time_since_change[cell]/lgca.beta))):#increasing resting cells probability to rest
                         restcells.append(cell)
                         lgca.time_since_change[cell] += 1.0
                     else:
