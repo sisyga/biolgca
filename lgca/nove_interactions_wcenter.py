@@ -88,7 +88,7 @@ def di_alignment(lgca):
 
 def go_or_grow(lgca):
     """
-    interactions (reorientation, birth, death) of the go-or-grow model for volume exclusion free LGCA
+    interactions (switch, reorientation, birth, death) of the go-or-grow model for volume exclusion free LGCA
     """
     relevant = lgca.cell_density[lgca.nonborder] > 0
     coords = [a[relevant] for a in lgca.nonborder]
@@ -114,6 +114,38 @@ def go_or_grow(lgca):
 
         # birth
         n_rxy += npr.binomial(n_rxy * np.heaviside(n_rxy, 0), np.maximum(lgca.r_b*(1-rho), 0))
+
+        # reorientation
+        v_channels = npr.multinomial(n_mxy, [1/lgca.velocitychannels]*lgca.velocitychannels)
+
+        # add resting cells and assign new content of node at the end of interaction step
+        r_channels = np.array([n_rxy])
+        node = np.hstack((v_channels, r_channels))
+        lgca.nodes[coord] = node
+
+
+def go_or_rest(lgca):
+    """
+    interactions (switch, reorientation) of the go-or-rest model for volume exclusion free LGCA
+    go-or-rest is a go-or-grow model without birth and death
+    """
+    relevant = lgca.cell_density[lgca.nonborder] > 0
+    coords = [a[relevant] for a in lgca.nonborder]
+    n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
+    n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
+
+    for coord in zip(*coords):
+        # determine cell number and moving and resting cell population at coordinate
+        n = lgca.cell_density[coord]
+        n_mxy = n_m[coord]
+        n_rxy = n_r[coord]
+        rho = n / lgca.capacity
+
+        # phenotypic switch
+        j_1 = npr.binomial(n_mxy, tanh_switch(rho, kappa=lgca.kappa, theta=lgca.theta))
+        j_2 = npr.binomial(n_rxy, 1 - tanh_switch(rho, kappa=lgca.kappa, theta=lgca.theta))
+        n_mxy += j_2 - j_1
+        n_rxy += j_1 - j_2
 
         # reorientation
         v_channels = npr.multinomial(n_mxy, [1/lgca.velocitychannels]*lgca.velocitychannels)
