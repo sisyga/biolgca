@@ -750,9 +750,9 @@ class LGCA_noVE_base(LGCA_base):
                 from nove_interactions import dd_alignment, di_alignment
         else:
             try:
-                from .nove_interactions_wcenter import dd_alignment, di_alignment, go_or_grow
+                from .nove_interactions_wcenter import dd_alignment, di_alignment, go_or_grow, go_or_rest
             except:
-                from nove_interactions_wcenter import dd_alignment, di_alignment, go_or_grow
+                from nove_interactions_wcenter import dd_alignment, di_alignment, go_or_grow, go_or_rest
         # configure interaction
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
@@ -786,6 +786,23 @@ class LGCA_noVE_base(LGCA_base):
                 else:
                     self.r_b = 0.2
                     print('birth rate set to r_b = ', self.r_b)
+                if 'kappa' in kwargs:
+                    self.kappa = kwargs['kappa']
+                else:
+                    self.kappa = 5.
+                    print('switch rate set to kappa = ', self.kappa)
+                if 'theta' in kwargs:
+                    self.theta = kwargs['theta']
+                else:
+                    self.theta = 0.75
+                    print('switch threshold set to theta = ', self.theta)
+                if 'capacity' in kwargs:
+                    self.capacity = kwargs['capacity']
+                else:
+                    self.capacity = self.K
+                    print('capacity set to C = ', self.capacity)
+            elif interaction == 'go_or_rest':
+                self.interaction = go_or_rest
                 if 'kappa' in kwargs:
                     self.kappa = kwargs['kappa']
                 else:
