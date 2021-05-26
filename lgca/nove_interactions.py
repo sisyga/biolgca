@@ -1,10 +1,16 @@
 import numpy as np
 import numpy.random as npr
 
+try:
+    from .interactions import tanh_switch
+except ImportError:
+    from interactions import tanh_switch
+
 
 def dd_alignment(lgca):
     """
     Rearrangement step for density-dependent alignment interaction excluding the central lattice site.
+	This interaction only works in 1D so far!
     """
     newnodes = lgca.nodes.copy()
     # filter for nodes that are not virtual border lattice sites
@@ -41,6 +47,7 @@ def dd_alignment(lgca):
 def di_alignment(lgca):
     """
     Rearrangement step for density-independent alignment interaction excluding the central lattice site.
+	This interaction only works in 1D so far!
     """
     newnodes = lgca.nodes.copy()
     # filter for nodes that are not virtual border lattice sites
@@ -76,4 +83,3 @@ def di_alignment(lgca):
         #print(sample)
         newnodes[coord] = np.array([np.count_nonzero(sample == 1), np.count_nonzero(sample == -1)])
     lgca.nodes = newnodes
-

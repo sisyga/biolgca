@@ -750,9 +750,9 @@ class LGCA_noVE_base(LGCA_base):
                 from nove_interactions import dd_alignment, di_alignment
         else:
             try:
-                from .nove_interactions_wcenter import dd_alignment, di_alignment
+                from .nove_interactions_wcenter import dd_alignment, di_alignment, go_or_grow
             except:
-                from nove_interactions_wcenter import dd_alignment, di_alignment
+                from nove_interactions_wcenter import dd_alignment, di_alignment, go_or_grow
         # configure interaction
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
@@ -774,6 +774,34 @@ class LGCA_noVE_base(LGCA_base):
                 else:
                     self.beta = 2.
                     print('sensitivity set to beta = ', self.beta)
+            elif interaction == 'go_or_grow':
+                self.interaction = go_or_grow
+                if 'r_d' in kwargs:
+                    self.r_d = kwargs['r_d']
+                else:
+                    self.r_d = 0.01
+                    print('death rate set to r_d = ', self.r_d)
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                else:
+                    self.r_b = 0.2
+                    print('birth rate set to r_b = ', self.r_b)
+                if 'kappa' in kwargs:
+                    self.kappa = kwargs['kappa']
+                else:
+                    self.kappa = 5.
+                    print('switch rate set to kappa = ', self.kappa)
+                if 'theta' in kwargs:
+                    self.theta = kwargs['theta']
+                else:
+                    self.theta = 0.75
+                    print('switch threshold set to theta = ', self.theta)
+                if 'capacity' in kwargs:
+                    self.capacity = kwargs['capacity']
+                else:
+                    self.capacity = self.K
+                    print('capacity set to C = ', self.capacity)
+
             else:
                 print('interaction', kwargs['interaction'], 'is not defined! Density-dependent alignment interaction used instead.')
                 print('Implemented interactions:', self.interactions)
@@ -805,7 +833,7 @@ class LGCA_noVE_base(LGCA_base):
         # sample from a Poisson distribution with mean=density
         density = abs(density)
         self.nodes = npr.poisson(lam=density, size=self.nodes.shape)
-		#print("Required density: {}, Achieved density: {}".format(density, effective_dens))
+        #print("Required density: {}, Achieved density: {}".format(density, effective_dens))
         self.apply_boundaries()
         self.update_dynamic_fields()
 

@@ -630,12 +630,31 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
 
 
 class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
-    interactions = ['dd_alignment', 'di_alignment']
+    """
+    2D square version of an LGCA without volume exclusion.
+    """
+    interactions = ['dd_alignment', 'di_alignment', 'go_or_grow']
 
     def set_dims(self, dims=None, nodes=None, restchannels=0):
+        """
+        Set the dimensions of the instance according to given values. Sets self.l, self.K, self.dims and self.restchannels
+        :param dims: desired lattice size (int or array-like)
+        :param nodes: existing lattice to use (ndarray)
+        :param restchannels: desired number of resting channels, will be capped to 1 if >1 because of no volume exclusion
+        """
+        # set instance dimensions according to passed lattice
         if nodes is not None:
             self.lx, self.ly, self.K = nodes.shape
-            self.restchannels = self.K - self.velocitychannels
+            # set number of rest channels to <= 1 because >1 cells are allowed per channel
+            if restchannels > 1:
+                self.restchannels = 1
+            elif 0 <= restchannels <= 1:
+                self.restchannels = restchannels
+            # for now, raise Exception if format of nodes does no fit
+            # (To Do: just sum the cells in surplus rest channels in init_nodes and print a warning)
+            if self.K - self.restchannels > self.velocitychannels:
+                raise Exception('Only one resting channel allowed, \
+                 but {} resting channels specified!'.format(self.K - self.velocitychannels))
             self.dims = self.lx, self.ly
             return
 
@@ -646,9 +665,13 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
             self.lx, self.ly = dims
         except TypeError:
             self.lx, self.ly = dims, dims
-
         self.dims = self.lx, self.ly
-        self.restchannels = restchannels
+
+        # set number of rest channels to <= 1 because >1 cells are allowed per channel
+        if restchannels > 1:
+            self.restchannels = 1
+        elif 0 <= restchannels <= 1:
+            self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels
 
 
@@ -657,7 +680,6 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
         if nodes is None:
             self.random_reset(density)
-
         else:
             self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(np.uint)
 
