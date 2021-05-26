@@ -247,39 +247,46 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
     """
     1D version of an LGCA without volume exclusion.
     """
-    interactions = ['dd_alignment', 'di_alignment']
+    interactions = ['dd_alignment', 'di_alignment', 'go_or_grow']
 
-    def set_dims(self, dims=None, nodes=None, restchannels=0): # changed to not allow resting channels
+    def set_dims(self, dims=None, nodes=None, restchannels=0):
         """
         Set the dimensions of the instance according to given values. Sets self.l, self.K, self.dims and self.restchannels
         :param dims: desired lattice size (int or array-like)
         :param nodes: existing lattice to use (ndarray)
-        :param restchannels: desired number of resting channels, not allowed here
-        :throws Exception if number of resting channels is not zero
+        :param restchannels: desired number of resting channels, will be capped to 1 if >1 because of no volume exclusion
         """
         # set instance dimensions according to passed lattice
         if nodes is not None:
             self.l, self.K = nodes.shape
-            if self.K - self.velocitychannels != 0:
-                raise Exception('No resting channels allowed, but {} resting channels specified!'.format(self.K - self.velocitychannels))
-            self.restchannels = 0
+            # set number of rest channels to <= 1 because >1 cells are allowed per channel
+            if restchannels > 1:
+                self.restchannels = 1
+            elif 0 <= restchannels <= 1:
+                self.restchannels = restchannels
+            # for now, raise Exception if format of nodes does no fit
+            # (To Do: just sum the cells in surplus rest channels in init_nodes and print a warning)
+            if self.K - self.restchannels > self.velocitychannels:
+                raise Exception('Only one resting channel allowed, \
+                 but {} resting channels specified!'.format(self.K - self.velocitychannels))
             self.dims = self.l,
             return
         # default value for dimension
         elif dims is None:
-            dims = 100
-        # prohibit resting channels
-        if restchannels != 0:
-            raise Exception('No resting channels allowed, but {} resting channels specified!'.format(restchannels))
+            dims = 100,
         # set instance dimensions according to desired size
         if isinstance(dims, int):
             self.l = dims
         else:
             self.l = dims[0]
-
         self.dims = self.l,
-        self.restchannels = 0
-        self.K = self.velocitychannels
+
+        # set number of rest channels to <= 1 because >1 cells are allowed per channel
+        if restchannels > 1:
+            self.restchannels = 1
+        elif 0 <= restchannels <= 1:
+            self.restchannels = restchannels
+        self.K = self.velocitychannels + self.restchannels
 
 
     def init_nodes(self, density, nodes=None):
@@ -327,8 +334,8 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         plt.ylabel(r'Time step $k \, (\tau)$')
         ax.xaxis.set_label_position('top')
         ax.xaxis.tick_top()
-        plt.title("Density plot.\n VE: False  Align: " + self.interaction.__name__ + "  BC: " + self.apply_boundaries.__name__ \
-                  + "\n Dims: " + str(self.dims) + "  Dens: " + '{0:.3f}'.format(self.eff_dens) + "  Beta: " + str(self.beta), fontsize=10)
+        plt.title("Density plot.\n VE: False  Interaction: " + self.interaction.__name__ + "  BC: " + self.apply_boundaries.__name__ \
+                  + "\n Dims: " + str(self.dims) + "  Dens: " + '{0:.3f}'.format(self.eff_dens), fontsize=10)
 
         plt.tight_layout()
         return plot
@@ -370,8 +377,8 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         ax.xaxis.set_label_position('top')
         ax.xaxis.set_ticks_position('top')
         ax.xaxis.tick_top()
-        plt.title("Flux plot.\n VE: False  Align: " + self.interaction.__name__ + "  BC: " + self.apply_boundaries.__name__ \
-            + "\n Dims: " + str(self.dims) + "  Dens: " + '{0:.3f}'.format(self.eff_dens) + "  Beta: " + str(self.beta), fontsize=10)
+        plt.title("Flux plot.\n VE: False  Interaction: " + self.interaction.__name__ + "  BC: " + self.apply_boundaries.__name__ \
+            + "\n Dims: " + str(self.dims) + "  Dens: " + '{0:.3f}'.format(self.eff_dens), fontsize=10)
         plt.tight_layout()
         return plot
 
