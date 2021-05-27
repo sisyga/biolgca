@@ -635,7 +635,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
     """
     interactions = ['dd_alignment', 'di_alignment', 'go_or_grow']
 
-    def set_dims(self, dims=None, nodes=None, restchannels=0):
+    def set_dims(self, dims=None, nodes=None, restchannels=0, capacity=None):
         """
         Set the dimensions of the instance according to given values. Sets self.l, self.K, self.dims and self.restchannels
         :param dims: desired lattice size (int or array-like)
@@ -674,12 +674,20 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
             self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels
 
+        if capacity is not None:
+            self.capacity = capacity
+        else:
+            self.capacity = self.K
 
 
-    def init_nodes(self, density=4, nodes=None):
+
+    def init_nodes(self, density=4, nodes=None, hom=None):
         self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
         if nodes is None:
-            self.random_reset(density)
+            if hom:
+                self.homogeneous_random_reset(density)
+            else:
+                self.random_reset(density)
         else:
             self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(np.uint)
 
@@ -951,6 +959,14 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
 
         self.smax = smax
         return 1 - self.calc_entropy()/smax
+
+
+    def update_dynamic_fields(self):
+        """
+        Update "fields" that store important variables to compute other dynamic steps.
+        """
+        self.cell_density = self.nodes.sum(-1)
+        self.eff_dens = self.nodes[self.nonborder].sum()/(self.capacity * self.lx * self.ly)
 
 
 if __name__ == '__main__':

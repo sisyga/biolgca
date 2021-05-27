@@ -48,12 +48,29 @@ def colorbar_index(ncolors, cmap, use_gridspec=False):
     :return: colormap instance
     """
     cmap = cmap_discretize(cmap, ncolors)
+    if ncolors > 101:
+        stride = 10
+    elif ncolors > 51:
+        stride = 5
+    elif ncolors > 31:
+        stride = 2
+    else:
+        stride=1
     mappable = ScalarMappable(cmap=cmap)
     mappable.set_array([])
     mappable.set_clim(-0.5, ncolors + 0.5)
     colorbar = plt.colorbar(mappable, use_gridspec=use_gridspec)
-    colorbar.set_ticks(np.linspace(-0.5, ncolors + 0.5, 2 * ncolors + 1)[1::2])
-    colorbar.set_ticklabels(list(range(ncolors)))
+    ticks = np.linspace(-0.5, ncolors + 0.5, 2 * ncolors + 1)[1::2]
+    labels = list(range(ncolors))
+    if ticks[-1] == ticks[0::stride][-1]:
+        colorbar.set_ticks(ticks[0::stride])
+        colorbar.set_ticklabels(labels[0::stride])
+    elif ticks[-1] != ticks[0::stride][-1] and ticks[-1] - ticks[0::stride][-1] < stride/2:
+        colorbar.set_ticks(list(ticks[0::stride][:-1]) + [ticks[-1]])
+        colorbar.set_ticklabels(labels[0::stride][:-1] + [labels[-1]])
+    else:
+        colorbar.set_ticks(list(ticks[0::stride]) + [ticks[-1]])
+        colorbar.set_ticklabels(labels[0::stride] + [labels[-1]])
     return colorbar
 
 
@@ -105,18 +122,16 @@ class LGCA_base():
     def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', **kwargs):
         """
         Initialize class instance.
-        :param nodes: np.ndarray initial configuration manually
-        :param dims: array determining lattice dimensions
-        :param l: lattice size- how is extra stuff for bc incorporated? set_dims?
-        :param restchannels:
-        :param density:
-        :param bc:
+        :param nodes: np.ndarray initial configuration set manually
+        :param dims: tuple determining lattice dimensions
+        :param restchannels: number of resting channels
+        :param density: float, if nodes is None, initialize lattice randomly with this particle density
+        :param bc: boundary conditions
         :param r_int: interaction range
-        :param kwargs:
         """
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
         self.set_bc(bc)
-        self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes) #Java abstract method
+        self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
         self.init_coords()
         self.init_nodes(density=density, nodes=nodes)
         self.set_interaction(**kwargs)
@@ -124,8 +139,6 @@ class LGCA_base():
         self.apply_boundaries()
         print("Density: " + str(density))
         print(kwargs)
-        if 've' in kwargs:
-            self.ve = kwargs['ve']
 
     def set_r_int(self, r):
         self.r_int = r
@@ -401,7 +414,7 @@ class LGCA_base():
         self.apply_boundaries()
         self.update_dynamic_fields()
 
-    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True, recordnove=False):
+    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True, recordnove=False, recordpertype=False):
         self.update_dynamic_fields()
         if record:
             self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
@@ -422,6 +435,11 @@ class LGCA_base():
             self.polAlParam_t[0, ...] = self.calc_polar_alignment_parameter()
             self.meanAlign_t = np.zeros(timesteps + 1, dtype=np.float)
             self.meanAlign_t[0, ...] = self.calc_mean_alignment()
+        if recordpertype:
+            self.velcells_t = np.zeros((timesteps + 1,) + self.dims)
+            self.velcells_t[0, ...] = self.nodes[self.nonborder][..., :self.velocitychannels].sum(-1)
+            self.restcells_t = np.zeros((timesteps + 1,) + self.dims)
+            self.restcells_t[0, ...] = self.nodes[self.nonborder][..., self.velocitychannels:].sum(-1)
         for t in range(1, timesteps + 1):
             #print("\nTimestep: {}".format(t))
             self.timestep()
@@ -436,10 +454,11 @@ class LGCA_base():
                 self.normEnt_t[t, ...] = self.calc_normalized_entropy()
                 self.polAlParam_t[t, ...] = self.calc_polar_alignment_parameter()
                 self.meanAlign_t[t, ...] = self.calc_mean_alignment()
+            if recordpertype:
+                self.velcells_t[t, ...] = self.nodes[self.nonborder][..., :self.velocitychannels].sum(-1)
+                self.restcells_t[t, ...] = self.nodes[self.nonborder][..., self.velocitychannels:].sum(-1)
             if showprogress:
                 update_progress(1.0 * t / timesteps)
-
-
 
 
     def get_nodes(self):
@@ -741,6 +760,31 @@ class LGCA_noVE_base(LGCA_base):
     """
     Base class for LGCA without volume exclusion.
     """
+    def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, hom=None, bc='periodic', capacity=None, **kwargs):
+        """
+        Initialize class instance.
+        :param nodes: np.ndarray initial configuration set manually
+        :param dims: tuple determining lattice dimensions
+        :param restchannels: number of resting channels
+        :param density: float, if nodes is None, initialize lattice randomly with this particle density
+        :param bc: boundary conditions
+        :param r_int: interaction range
+        """
+
+        self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
+        self.set_bc(bc)
+        self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes, capacity=capacity)
+        self.init_coords()
+        self.init_nodes(density=density, nodes=nodes, hom=hom)
+        self.set_interaction(capacity=capacity, **kwargs)
+        #self.cell_density = self.nodes.sum(-1)
+        self.update_dynamic_fields()
+        self.ve = False
+        self.apply_boundaries()
+        print("Density: " + str(density))
+        print(kwargs)
+
+
     def set_interaction(self, **kwargs):
         # choose neighborhood
         if 'exclude_center' in kwargs:
@@ -843,14 +887,31 @@ class LGCA_noVE_base(LGCA_base):
 
     def random_reset(self, density):
         """
-        Distribute particles in the lattice according to a given density
-        :param density: particle density in the lattice: number of particles/(dimensions*number of channels)
+        Distribute particles in the lattice according to a given density; can yield different cell numbers per lattice site
+        :param density: particle density in the lattice: number of particles/(dimensions*capacity)
         """
 
         # sample from a Poisson distribution with mean=density
         density = abs(density)
-        self.nodes = npr.poisson(lam=density, size=self.nodes.shape)
-        #print("Required density: {}, Achieved density: {}".format(density, effective_dens))
+        draw1 = npr.poisson(lam=density, size=self.nodes.shape)
+        if self.capacity > self.K:
+            draw2 = npr.poisson(lam=density, size=self.nodes.shape[:-1]+((self.capacity-self.K),))
+            draw1[..., -1] += draw2.sum(-1)
+        self.nodes = draw1
         self.apply_boundaries()
         self.update_dynamic_fields()
+        print("Required density: {}, Achieved density: {}".format(density, self.eff_dens))
+
+    def homogeneous_random_reset(self, density):
+        """
+        Distribute particles in the lattice homogeneously according to a given density: each lattice site has the same
+            number of particles, randomly distributed among the channels
+        :param density: particle density in the lattice: number of particles/(dimensions*capacity)
+        """
+        initcells = int(density * self.capacity)
+        self.nodes = npr.multinomial(initcells, [1 / self.K] * self.K, size=self.nodes.shape[:-1])
+        self.apply_boundaries()
+        self.update_dynamic_fields()
+        print("Required density: {}, Achieved density: {}".format(density, self.eff_dens))
+
 
