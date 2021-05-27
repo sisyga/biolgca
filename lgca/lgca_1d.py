@@ -148,9 +148,6 @@ class LGCA_1D(LGCA_base):
         plt.ylabel(r'Time step $k \, (\tau)$')
         ax.xaxis.set_label_position('top')
         ax.xaxis.tick_top()
-        plt.title("Density plot.\n VE: True  Align: " + self.interaction.__name__ + "  BC: " + self.apply_boundaries.__name__ + "\n Dims: " + str(
-            self.dims) + "  Dens: " + str(self.nodes[self.nonborder].sum()/(self.K * self.l)) + "  Beta: " + str(self.beta))
-
         plt.tight_layout()
         return plot
 
@@ -177,8 +174,6 @@ class LGCA_1D(LGCA_base):
         ax.xaxis.set_label_position('top')
         ax.xaxis.set_ticks_position('top')
         ax.xaxis.tick_top()
-        plt.title("Flux plot.\n VE: True  Align: " + self.interaction.__name__ + "  BC: " + self.apply_boundaries.__name__ + "\n Dims: " + str(
-                self.dims) + "  Dens: " + str(self.nodes[self.nonborder].sum() / (self.K * self.l)) + "  Beta: " + str(self.beta))
         plt.tight_layout()
         return plot
 
@@ -249,7 +244,7 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
     """
     interactions = ['dd_alignment', 'di_alignment', 'go_or_grow']
 
-    def set_dims(self, dims=None, nodes=None, restchannels=0):
+    def set_dims(self, dims=None, nodes=None, restchannels=0, capacity=None):
         """
         Set the dimensions of the instance according to given values. Sets self.l, self.K, self.dims and self.restchannels
         :param dims: desired lattice size (int or array-like)
@@ -288,8 +283,13 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
             self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels
 
+        if capacity is not None:
+            self.capacity = capacity
+        else:
+            self.capacity = self.K
 
-    def init_nodes(self, density, nodes=None):
+
+    def init_nodes(self, density, nodes=None, hom=None):
         """
         Initialize nodes for the instance.
         :param density: desired particle density in the lattice: number of particles/(dimensions*number of channels)
@@ -299,13 +299,16 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.uint)
         # if no lattice given, populate randomly
         if nodes is None:
-            self.random_reset(density)
+            if hom:
+                self.homogeneous_random_reset(density)
+            else:
+                self.random_reset(density)
         # if lattice given, populate lattice with given particles. Virtual lattice sites for boundary conditions not included
         else:
             self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.uint)
 
 
-    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis_r'):
+    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis_r', scaling=None, absolute_max=None, offset_t=None, offset_x=None):
         """
         Create a plot showing the number of particles per lattice site.
         :param density_t: particle number per lattice site (ndarray of dimension (timesteps + 1,) + self.dims)
@@ -324,19 +327,36 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         fig = plt.figure(num=figindex, figsize=figsize)
         ax = fig.add_subplot(111)
         # set up color scaling
-        max_part_per_cell = int(density_t.max())
+        if scaling is not None:
+            scale = scaling
+        else:
+            scale = 1.0
+        max_part_per_cell = int(scale*density_t.max())
+        if absolute_max is not None:
+            max_part_per_cell = int(absolute_max)
         cmap = cmap_discretize(cmap, max_part_per_cell + 1)
         # create plot with color bar, axis labels, title and layout
         plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=max_part_per_cell, cmap=cmap)
+        # plot slice with an x-offset
+        if offset_x is not None:
+            fig.canvas.draw() # otherwise the list will be empty
+            labels = [item.get_text() for item in ax.get_xticklabels()]
+            for i in range(len(labels)):
+                labels[i] = str(int(float(labels[i].strip().replace("−", "-")))+offset_x) #replace long dash by minus
+            ax.set_xticklabels(labels)
+        # plot slice with a y-offset
+        if offset_t is not None:
+            fig.canvas.draw() # otherwise the list will be empty
+            labels = [item.get_text() for item in ax.get_yticklabels()]
+            for i in range(len(labels)):
+                labels[i] = str(int(float(labels[i].strip().replace("−", "-")))+offset_t) #replace long dash by minus
+            ax.set_yticklabels(labels)
         cbar = colorbar_index(ncolors=max_part_per_cell + 1, cmap=cmap, use_gridspec=True)
         cbar.set_label(r'Particle number $n$')
         plt.xlabel(r'Lattice node $r \, (\varepsilon)$', )
         plt.ylabel(r'Time step $k \, (\tau)$')
         ax.xaxis.set_label_position('top')
         ax.xaxis.tick_top()
-        plt.title("Density plot.\n VE: False  Interaction: " + self.interaction.__name__ + "  BC: " + self.apply_boundaries.__name__ \
-                  + "\n Dims: " + str(self.dims) + "  Dens: " + '{0:.3f}'.format(self.eff_dens), fontsize=10)
-
         plt.tight_layout()
         return plot
 
@@ -377,8 +397,6 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         ax.xaxis.set_label_position('top')
         ax.xaxis.set_ticks_position('top')
         ax.xaxis.tick_top()
-        plt.title("Flux plot.\n VE: False  Interaction: " + self.interaction.__name__ + "  BC: " + self.apply_boundaries.__name__ \
-            + "\n Dims: " + str(self.dims) + "  Dens: " + '{0:.3f}'.format(self.eff_dens), fontsize=10)
         plt.tight_layout()
         return plot
 
@@ -399,14 +417,6 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
     #         sum += qty
     #      # used for summing up fluxes
     #      return sum
-
-    def update_dynamic_fields(self):
-        """
-        Update "fields" that store important variables to compute other dynamic steps.
-        """
-        self.cell_density = self.nodes.sum(-1)
-        self.eff_dens = self.nodes[self.nonborder].sum()/(self.K * self.l)
-        #print("Required density: {}, Achieved density: {}".format(density, self.eff_dens))
 
     def calc_entropy(self):
         """
@@ -456,7 +466,15 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         f_norm = f_norm/no_neighbors
         # calculate agreement between flux and director field flux, take mean over lattice
         return (np.dot(f_norm, f)).sum() / d.sum() #first sum probably unnecessary
-       
+
+
+    def update_dynamic_fields(self):
+        """
+        Update "fields" that store important variables to compute other dynamic steps.
+        """
+        self.cell_density = self.nodes.sum(-1)
+        self.eff_dens = self.nodes[self.nonborder].sum()/(self.capacity * self.l)
+
 
 if __name__ == '__main__':
     l = 100
