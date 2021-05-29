@@ -65,7 +65,7 @@ def colorbar_index(ncolors, cmap, use_gridspec=False):
     if ticks[-1] == ticks[0::stride][-1]:
         colorbar.set_ticks(ticks[0::stride])
         colorbar.set_ticklabels(labels[0::stride])
-    elif ticks[-1] != ticks[0::stride][-1] and ticks[-1] - ticks[0::stride][-1] < stride/2:
+    elif stride > 1 and ticks[-1] != ticks[0::stride][-1] and ticks[-1] - ticks[0::stride][-1] < stride/2:
         colorbar.set_ticks(list(ticks[0::stride][:-1]) + [ticks[-1]])
         colorbar.set_ticklabels(labels[0::stride][:-1] + [labels[-1]])
     else:
