@@ -707,11 +707,8 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         if figsize is None:
             figsize = estimate_figsize(density, cbar=True, dy=self.dy)
 
-        max_part_per_cell = int(density.max())
-
         if vmax is None:
-            # K = self.K
-            K = max_part_per_cell
+            K = int(density.max())
         else:
             K = vmax
 
@@ -720,18 +717,10 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         cmap.set_under(alpha=0.0)
 
         if K > 1:
-            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
+            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N)) #gives me problems for density>256
         else:
             cmap = plt.cm.ScalarMappable(cmap=cmap)
         cmap.set_array(density)
-
-        #   max_part_per_cell = int(
-        #      density_t.max())  # alternatively plot using the expected density - number of particles in total / lattice sites
-        #  fig = plt.figure(num=figindex, figsize=figsize)
-        # ax = fig.add_subplot(111)
-        # cmap = cmap_discretize(cmap, max_part_per_cell + 1)  # todo adjust number of colours
-        #  plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=max_part_per_cell, cmap=cmap)  # TODO adjust vmax
-        # cbar = colorbar_index(ncolors=max_part_per_cell + 1, cmap=cmap, use_gridspec=True)  # todo adjust ncolors
 
         polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
                                    orientation=self.orientation, facecolor=c, edgecolor=edgecolor)
@@ -742,10 +731,28 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         if cbar:
             cbar = fig.colorbar(cmap, extend='min', use_gridspec=True)
             cbar.set_label('Particle number $n$')
-            #cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[1::2])
-            cbar.set_ticks(np.linspace(0., K, 9, endpoint=True))  # 8 evenly spaced ticks (for high densities)
-            #cbar.set_ticklabels(1 + np.arange(K))
-            cbar.set_ticklabels(np.trunc(np.linspace(K/8, K, 8, endpoint=True)))  # 8 evenly spaced ticks (for high densities)
+            ncolors = K
+            # set a numbering interval for high densities (e.g. 5-10-15-20)
+            if ncolors > 101:
+                stride = 10
+            elif ncolors > 51:
+                stride = 5
+            elif ncolors > 31:
+                stride = 2
+            else:
+                stride = 1
+            ticks = np.linspace(1, ncolors+1, 2 * ncolors + 1)[1::2]
+            labels = list(np.arange(1,ncolors+1,1))
+            if ticks[-1] == ticks[0::stride][-1]:
+                cbar.set_ticks(ticks[0::stride])
+                cbar.set_ticklabels(labels[0::stride])
+                print(ticks[0::stride], labels[0::stride])
+            elif stride > 1 and ticks[-1] != ticks[0::stride][-1] and ticks[-1] - ticks[0::stride][-1] < stride / 2:
+                cbar.set_ticks(list(ticks[0::stride][:-1]) + [ticks[-1]])
+                cbar.set_ticklabels(labels[0::stride][:-1] + [labels[-1]])
+            else:
+                cbar.set_ticks(list(ticks[0::stride]) + [ticks[-1]])
+                cbar.set_ticklabels(labels[0::stride] + [labels[-1]])
         return fig, pc, cmap
 
     def plot_flux(self, nodes=None, figindex=None, figsize=None, tight_layout=True, edgecolor='None', cbar=True):
@@ -842,7 +849,12 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         if density_t is None:
             density_t = self.dens_t
 
-        fig, pc, cmap = self.plot_density(density_t[0], figindex=figindex, figsize=figsize, cmap=cmap, vmax=vmax,
+        if vmax is not None:
+            vmax_val = vmax
+        else:
+            vmax_val = int(density_t.max())
+
+        fig, pc, cmap = self.plot_density(density_t[0], figindex=figindex, figsize=figsize, cmap=cmap, vmax=vmax_val,
                                           tight_layout=tight_layout, edgecolor=edgecolor)
         title = plt.title('Time $k =$0')
 
