@@ -7,6 +7,7 @@ from matplotlib import pyplot as plt
 from matplotlib.cm import ScalarMappable
 from numpy import random as npr
 from sympy.utilities.iterables import multiset_permutations
+from operator import itemgetter
 
 pi2 = 2 * np.pi
 plt.style.use('default')
@@ -112,7 +113,7 @@ class LGCA_base():
         :param r_int:
         :param kwargs:
         """
-        self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
+        self.r_int = 1  # interaction range; must be at least 1 to handle propagationser
         self.set_bc(bc)
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
         self.init_coords()
@@ -439,6 +440,7 @@ class IBLGCA_base(LGCA_base):
         :param kwargs:
         """
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
+
         self.props = {}
         self.set_bc(bc)
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
@@ -701,3 +703,221 @@ class IBLGCA_base(LGCA_base):
         line = plt.plot(x, y, **kwargs)
         errors = plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True, interpolate=True)
         return line, errors
+
+class BOSON_IBLGCA_base(IBLGCA_base):
+    temp2 = 2
+    def __init__(self, nodes=None, dims=None, ini_channel_pop=None, nodes_filled=None, bc='periodic', **kwargs):
+        #ini_channel_pop is the inital population of a channel. This is useful when the nodes is not given
+        """
+        Initialize class instance.
+        :param nodes:
+        :param l:
+        :param restchannels:
+        :param density:
+        :param bc:
+        :param r_int:
+        :param kwargs:
+        """
+        self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
+        self.props = {}
+        self.set_bc(bc)
+        
+        self.set_dims(dims=dims, nodes=nodes)
+        
+        self.init_coords()
+        self.init_nodes(ini_channel_pop=ini_channel_pop, nodes=nodes,nodes_filled=nodes_filled, **kwargs)
+        self.set_interaction(**kwargs)
+       
+        #self.apply_boundaries()  -> Harish to Simon: is this really needed? If yes why?
+        #vectorising len function
+        self.length_checker = np.vectorize(len)
+        self.update_dynamic_fields()
+        self.mean_prop_t = {}
+        self.mean_prop_vel_t = {}
+        self.mean_prop_rest_t = {}
+        self.calc_max_label()
+        
+        
+    def update_dynamic_fields(self):
+        self.channel_pop = self.length_checker(self.nodes) #population of a channel
+        self.density = self.channel_pop.sum(-1)  #population of a node
+        # next two lines can be omitted if uninterested in densities of other channels
+        self.resting_density = self.channel_pop[:,-1]
+        self.moving_density = self.density - self.resting_density
+        
+    def set_interaction(self, **kwargs):
+        try:
+            from .boson_ib_interactions import randomwalk, birth, birthdeath, go_or_grow
+        except ImportError:
+            from boson_ib_interactions import randomwalk, birth, birthdeath, go_or_grow
+        if 'interaction' in kwargs:
+            interaction = kwargs['interaction']
+            if interaction is 'birth':
+                self.interaction = birth
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                else:
+                    self.r_b = 0.2
+                    print('birth rate set to r_b = ', self.r_b)
+                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+
+            elif interaction is 'birthdeath':
+                self.interaction = birthdeath
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                else:
+                    self.r_b = 0.2
+                    print('birth rate set to r_b = ', self.r_b)
+                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+                if 'r_d' in kwargs:
+                    self.r_d = kwargs['r_d']
+                else:
+                    self.r_d = 0.02
+                    print('death rate set to r_d = ', self.r_d)
+
+                if 'std' in kwargs:
+                    self.std = kwargs['std']
+                else:
+                    self.std = 0.01
+                    print('standard deviation set to = ', self.std)
+                if 'a_max' in kwargs:
+                    self.a_max = kwargs['a_max']
+                else:
+                    self.a_max = 1.
+                    print('Max. birth rate set to a_max =', self.a_max)
+            
+            elif interaction is 'go_or_grow':
+                self.interaction = go_or_grow
+                if 'capacity' in kwargs:
+                    self.capacity = kwargs['capacity']
+                else:
+                    self.capacity = 8
+                    print('capacity of channel set to ', self.capacity)
+                    
+                if 'kappa_std' in kwargs:
+                    self.kappa_std = kwargs['kappa_std']
+                else:
+                    self.kappa_std = 0.2
+                    print('capacity of channel set to ', self.kappa_std)
+                    
+                if 'theta_std' in kwargs:
+                    self.theta_std = kwargs['theta_std']
+                else:
+                    self.theta_std = 0.05
+                    print('capacity of channel set to ', self.theta_std)
+                    
+                if 'r_d' in kwargs:
+                    self.r_d = kwargs['r_d']
+                    print('death rate set to r_d = ', self.r_d)
+                else:
+                    self.r_d = 0.01
+                    print('death rate set to r_d = ', self.r_d)
+                    
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                    print('birth rate set to r_b = ', self.r_b)
+                else:
+                    self.r_b = 0.2
+                    print('birth rate set to r_b = ', self.r_b)
+                    
+                if 'kappa' in kwargs:
+                    kappa = kwargs['kappa']
+                    try:
+                        self.kappa = [0.0] + list(kappa)
+                    except TypeError:
+                        self.kappa = [0.0] + [kappa] * self.maxlabel
+                else:
+                    self.kappa = [0.0] + [5.] * self.maxlabel
+                    print('switch rate set to kappa = ', self.kappa[0])
+                
+                # self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
+                self.props.update(kappa=self.kappa)
+                if 'theta' in kwargs:
+                    theta = kwargs['theta']
+                    try:
+                        self.theta = [0.0] + list(theta)
+                    except TypeError:
+                        self.theta = [0.0] + [theta] * self.maxlabel
+                else:
+                    self.theta = [0.0]+[0.5] * self.maxlabel
+                    print('switch threshold set to theta = ', self.theta[0])
+                # MK:
+                self.props.update(theta=self.theta)  # * self.maxlabel)
+        else:
+            self.interaction = randomwalk
+
+    def timeevo(self, timesteps=100, record=False, recordN=False, recordDensity=False, showprogress=True, recordDensityOther=False):
+        self.update_dynamic_fields()
+        if record:#to be implemented
+            """
+            nodes_t = np.empty((timesteps+1)*(self.l+2*self.r_int)*self.K, dtype=object)
+            for k in range((timesteps+1)*(self.l+2*self.r_int)*self.K):
+                nodes_t[k] = []
+            self.nodes_t = nodes_t.reshape(timesteps+1, self.l+2*self.r_int, self.K)
+            self.nodes_t[0, ...] = self.nodes"""
+            nodes_t = np.empty((timesteps+1)*(self.l)*self.K, dtype=object)
+            for k in range((timesteps+1)*(self.l)*self.K):
+                nodes_t[k] = []
+            self.nodes_t = nodes_t.reshape(timesteps+1, self.l, self.K)
+            self.nodes_t[0, ...] = self.nodes[self.nonborder]
+        if recordN:# to be implemented
+            self.n_t = np.zeros(timesteps + 1, dtype=np.int)
+            self.n_t[0] = self.cell_density[self.nonborder].sum()
+        if recordDensity:
+            self.density_t = np.zeros([(timesteps + 1), self.dims])
+            self.density_t[0, ...] = self.density[self.nonborder]
+        if recordDensityOther:    # useful for plotting channel wise densities
+            self.resting_density_t = np.zeros([(timesteps + 1), self.dims])
+            self.resting_density_t[0, ...] = self.resting_density[self.nonborder]
+            self.moving_density_t = np.zeros([(timesteps + 1), self.dims])
+            self.moving_density_t[0, ...] = self.moving_density[self.nonborder]
+
+        for t in range(1, timesteps + 1):
+            self.timestep()
+            if record: #to be implemented
+                self.nodes_t[t, ...] = self.nodes[self.nonborder]
+            if recordN:# to be implemented
+                self.n_t[t] = self.cell_density[self.nonborder].sum()
+            if recordDensity:
+                self.density_t[t, ...] = self.density[self.nonborder]
+            if recordDensityOther:
+                self.resting_density_t[t, ...] = self.resting_density[self.nonborder]
+                self.moving_density_t[t, ...] = self.moving_density[self.nonborder]
+            if showprogress:
+                update_progress(1.0 * t / timesteps)
+                
+    def calc_max_label(self):
+        # to be implemented
+        self.maxlabel = [len(value)-1 for key, value in self.props.items()][0]
+
+    def calc_prop_mean(self, nodes=None, props=None, propname=None):
+        #can this be optimised further?
+        mean_prop = np.ones(self.l)*(-1000) #had some problems with np.nan so I am using -1000
+        counter = 0
+        for node in nodes:
+            cells = sum(node,[])
+            if(cells!=[]):
+                nodeprops = np.array(itemgetter(*cells)(props[propname]))
+                mean_prop[counter]=nodeprops.mean()
+            counter+=1
+        return mean_prop
+    
+    def calc_prop_mean_spatiotemp(self, nodes_t=None, props=None):
+        if nodes_t is None:
+            nodes_t = self.nodes_t
+        if props is None:
+            props = self.props
+        tmax, l, _ = nodes_t.shape
+        for key in self.props:
+            self.mean_prop_t[key] = np.zeros([tmax,l])
+            #self.mean_prop_vel_t[key] = np.zeros([tmax,l])
+            #self.mean_prop_rest_t[key] = np.zeros([tmax,l])
+            for t in range(tmax):
+                self.mean_prop_t[key][t] = self.calc_prop_mean(propname=key, props=props, nodes=nodes_t[t])
+                #self.mean_prop_vel_t[key][t] = self.calc_prop_mean(propname=key, props=props, nodes=nodes_t[t][...,0:(self.K-1)])
+                #self.mean_prop_rest_t[key][t] = self.calc_prop_mean(propname=key, props=props, nodes=nodes_t[t][...,(self.K-1):])
+
+
+                
+
+            

@@ -1,6 +1,6 @@
 import matplotlib.ticker as mticker
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
+from copy import deepcopy
 try:
     from base import *
 except ModuleNotFoundError:
@@ -218,7 +218,130 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         plt.sca(ax)
         return plot
 
+class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
+    interactions = ['go_or_grow']
+    
+    def propagation(self):
+        """
+        :return:
+        """
+        newnodes = deepcopy(self.nodes)
 
+        # prop. to the left
+        newnodes[1:, 0] = self.nodes[:-1, 1]
+
+        # prop. to the right
+        newnodes[:-1, 1] = self.nodes[1:, 0]
+
+        self.nodes = deepcopy(newnodes)
+
+    def apply_pbc(self):
+        #to be implemented
+        self.nodes[:self.r_int, :] = self.nodes[-2 * self.r_int:-self.r_int, :]
+        self.nodes[-self.r_int:, :] = self.nodes[self.r_int:2 * self.r_int, :]
+
+    def apply_rbc(self):
+        self.nodes[self.r_int - 1, 1] = self.nodes[self.r_int - 1, 1] + self.nodes[self.r_int - 1, 0]
+        self.nodes[-self.r_int, 0] =  self.nodes[-self.r_int, 0] + self.nodes[-self.r_int, 1]
+        self.nodes[self.r_int - 1, 0] = []
+        self.nodes[-self.r_int, 1] = []
+        
+
+    def apply_abc(self):
+        # to be checked
+        self.nodes[:self.r_int, :] = []
+        self.nodes[-self.r_int:, :] = []
+    
+    def set_dims(self, dims=None, nodes=None):
+        if nodes is not None:
+            self.l, self.K = nodes.shape
+            self.restchannels = 1
+            self.dims = self.l,
+            return
+
+        elif dims is None:
+            dims = 100
+
+        if isinstance(dims, int):
+            self.l = dims
+
+        else:
+            self.l = dims[0]
+           
+        self.dims = self.l
+        self.restchannels = 1
+        self.K = 3
+        
+    def init_nodes(self, ini_channel_pop=None, nodes=None, nodes_filled=None, **kwargs):
+        if(nodes_filled): #nodes_filled is number of nodes to fill, ini_channel_pop is number of 
+            oldnodes = np.empty((self.l+2*self.r_int)*self.K, dtype=object)
+            #oldnodes[0:self.K] = [],[],[]
+            #oldnodes[-self.K:] = [],[],[]
+            for k in range((self.l+2*self.r_int)*self.K):
+                oldnodes[k] = []
+            for n in range(nodes_filled):
+                for c in range(self.K):
+                    oldnodes[self.K+n*self.K+c] = [ini_channel_pop*(n*self.K+c+1)+j-ini_channel_pop+1 for j in range(ini_channel_pop)]
+            #for n in range(self.l*self.K 
+            self.nodes = oldnodes.reshape((self.l+2*self.r_int,self.K))
+            print(self.nodes)
+            self.maxlabel = nodes_filled*self.K*ini_channel_pop
+            
+            
+            
+    def plot_density(self, density_t=None, cmap='hot_r', channel_type='all', **kwargs):
+        if(channel_type == 'all'):
+            if density_t is None:
+                density_t = self.density_t
+        elif(channel_type == 'rest'):
+            if density_t is None:
+                density_t = self.resting_density_t
+        elif(channel_type == 'velocity'):
+            if density_t is None:
+                density_t = self.moving_density_t
+        tmax = density_t.shape[0]
+        fig, ax = self.setup_figure(tmax, **kwargs)
+        cmap = cmap_discretize(cmap, 1+self.capacity)
+        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=self.capacity, cmap=cmap, aspect = 'auto')
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size=.3, pad=0.1)
+        cbar = colorbar_index(ncolors=1+self.capacity, cmap=cmap, use_gridspec=True, cax=cax)
+        cbar.set_label('Particle number $n$')
+        plt.sca(ax)
+        return plot
+    
+    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', channeltype='all', **kwargs):
+        if nodes_t is None:
+            nodes_t = self.nodes_t
+        """
+        if props is None:
+            props = self.props
+
+        if propname is None:
+            propname = next(iter(props))
+        """
+        if(self.mean_prop_t=={}):
+            self.calc_prop_mean_spatiotemp()
+        #make some changes to the next few lines to remove redundancy    
+        tmax, l, _ = nodes_t.shape
+        fig, ax = self.setup_figure(tmax, **kwargs)
+        #mean_prop_t = np.zeros([tmax, l])
+        if(channeltype == 'all'):
+            mean_prop_t = self.mean_prop_t[propname]
+        #elif(channeltype == 'velocity'):
+        #    mean_prop_t = self.mean_prop_vel_t[propname]
+        #elif(channeltype == 'rest'):   
+        #    mean_prop_t = self.mean_prop_rest_t[propname]
+
+        masked_mean_prop_t = np.ma.masked_where(mean_prop_t==-1000, mean_prop_t)
+        plot = plt.imshow(masked_mean_prop_t, interpolation='none', cmap=cmap, aspect = 'auto')
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size=0.3, pad=0.1)
+        cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
+        cbar.set_label(r'Property ${}$'.format(propname))
+        plt.sca(ax)
+        return plot
+    
 if __name__ == '__main__':
     l = 100
     restchannels = 2
