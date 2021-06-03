@@ -58,7 +58,8 @@ def birthdeath(lgca):
     """
     # death process
     dying = (npr.random(size=lgca.nodes.shape) < lgca.r_d) & lgca.occupied
-    # lgca.update_dynamic_fields()
+    lgca.nodes[dying] = 0
+    lgca.update_dynamic_fields()
     # birth
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
                (lgca.cell_density[lgca.nonborder] < lgca.K)
@@ -84,7 +85,7 @@ def birthdeath(lgca):
 
         lgca.nodes[coord] = node
 
-    lgca.nodes[dying] = 0
+
     lgca.update_dynamic_fields()
     randomwalk(lgca)
 
