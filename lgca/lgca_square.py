@@ -44,11 +44,16 @@ class LGCA_Square(LGCA_base):
         self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels
 
-    def init_nodes(self, density=0.1, nodes=None):
+    def init_nodes(self, density=0.1, nodes=None, **kwargs):
         self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.bool)
-        if nodes is None:
+        if 'hom' in kwargs:
+            hom = kwargs['hom']
+        else:
+            hom = None
+        if nodes is None and hom:
+            self.homogeneous_random_reset(density)
+        elif nodes is None:
             self.random_reset(density)
-
         else:
             self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(np.bool)
 
