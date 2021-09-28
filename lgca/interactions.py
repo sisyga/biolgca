@@ -339,10 +339,43 @@ def go_or_grow(lgca):
         j_2 = npr.binomial(M2[coord], 1 - tanh_switch(rho, kappa=lgca.kappa, theta=lgca.theta))
         n_mxy += j_2 - j_1
         n_rxy += j_1 - j_2
+        #print(coord)
+        #print(n_mxy, n_rxy)
         n_mxy -= npr.binomial(n_mxy * np.heaviside(n_mxy, 0), lgca.r_d)
         n_rxy -= npr.binomial(n_rxy * np.heaviside(n_rxy, 0), lgca.r_d)
         M = min([n_rxy, lgca.restchannels - n_rxy])
         n_rxy += npr.binomial(M * np.heaviside(M, 0), lgca.r_b)
+
+        v_channels = [1] * n_mxy + [0] * (lgca.velocitychannels - n_mxy)
+        v_channels = npr.permutation(v_channels)
+        r_channels = np.zeros(lgca.restchannels)
+        r_channels[:n_rxy] = 1
+        node = np.hstack((v_channels, r_channels))
+        #print(n_mxy, n_rxy)
+        lgca.nodes[coord] = node
+
+
+def go_or_rest(lgca):
+    """
+    interactions of the go-or-grow model without birth and death, i.e. only the switch and random walk.
+    """
+    relevant = lgca.cell_density[lgca.nonborder] > 0
+    coords = [a[relevant] for a in lgca.nonborder]
+    n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
+    n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
+    M1 = np.minimum(n_m, lgca.restchannels - n_r)
+    M2 = np.minimum(n_r, lgca.velocitychannels - n_m)
+    for coord in zip(*coords):
+        n = lgca.cell_density[coord]
+
+        n_mxy = n_m[coord]
+        n_rxy = n_r[coord]
+
+        rho = n / lgca.K
+        j_1 = npr.binomial(M1[coord], tanh_switch(rho, kappa=lgca.kappa, theta=lgca.theta))
+        j_2 = npr.binomial(M2[coord], 1 - tanh_switch(rho, kappa=lgca.kappa, theta=lgca.theta))
+        n_mxy += j_2 - j_1
+        n_rxy += j_1 - j_2
 
         v_channels = [1] * n_mxy + [0] * (lgca.velocitychannels - n_mxy)
         v_channels = npr.permutation(v_channels)

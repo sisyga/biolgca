@@ -133,7 +133,7 @@ class LGCA_base():
         self.set_bc(bc)
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
         self.init_coords()
-        self.init_nodes(density=density, nodes=nodes)
+        self.init_nodes(density=density, nodes=nodes, **kwargs)
         self.set_interaction(**kwargs)
         self.cell_density = self.nodes.sum(-1)
         self.apply_boundaries()
@@ -148,10 +148,10 @@ class LGCA_base():
 
     def set_interaction(self, **kwargs):
         try:
-            from .interactions import go_or_grow, birth, alignment, persistent_walk, chemotaxis, \
+            from .interactions import go_or_grow, go_or_rest, birth, alignment, persistent_walk, chemotaxis, \
                 contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium
         except:
-            from interactions import go_or_grow, birth, alignment, persistent_walk, chemotaxis, \
+            from interactions import go_or_grow, go_or_rest, birth, alignment, persistent_walk, chemotaxis, \
                 contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
@@ -167,6 +167,21 @@ class LGCA_base():
                 else:
                     self.r_b = 0.2
                     print('birth rate set to r_b = ', self.r_b)
+                if 'kappa' in kwargs:
+                    self.kappa = kwargs['kappa']
+                else:
+                    self.kappa = 5.
+                    print('switch rate set to kappa = ', self.kappa)
+                if 'theta' in kwargs:
+                    self.theta = kwargs['theta']
+                else:
+                    self.theta = 0.75
+                    print('switch threshold set to theta = ', self.theta)
+                if self.restchannels < 2:
+                    print('WARNING: not enough rest channels - system will die out!!!')
+
+            elif interaction == 'go_or_rest':
+                self.interaction = go_or_rest
                 if 'kappa' in kwargs:
                     self.kappa = kwargs['kappa']
                 else:
@@ -387,11 +402,25 @@ class LGCA_base():
 
     def random_reset(self, density):
         """
-
         :param density:
         :return:
         """
         self.nodes = npr.random(self.nodes.shape) < density
+        self.apply_boundaries()
+        self.update_dynamic_fields()
+
+    def homogeneous_random_reset(self, density):
+        """
+        :param density: target density of the lattice
+        """
+        initcells = min(int(density * self.K) + 1, self.K)
+        n_nodes = 1
+        for el in self.nodes.shape[:-1]:
+            n_nodes *=el
+        channels = [1] * initcells + [0] * (self.K - initcells)
+        channels = np.array([npr.permutation(channels) for i in range(n_nodes)])
+        self.nodes = channels.reshape(self.nodes.shape)
+
         self.apply_boundaries()
         self.update_dynamic_fields()
 
@@ -443,6 +472,7 @@ class LGCA_base():
         for t in range(1, timesteps + 1):
             #print("\nTimestep: {}".format(t))
             self.timestep()
+            #print(self.nodes.shape)
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.nonborder]
             if recordN:

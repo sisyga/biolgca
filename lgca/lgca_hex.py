@@ -28,11 +28,13 @@ class LGCA_Hex(LGCA_Square):
         self.xx, self.yy = np.meshgrid(self.x, self.y, indexing='ij')
         self.coord_pairs = list(zip(self.xx.flat, self.yy.flat))
 
+        # set all coords, including ghost cells
         self.xcoords, self.ycoords = np.meshgrid(np.arange(self.lx + 2 * self.r_int) - self.r_int,
                                                  np.arange(self.ly + 2 * self.r_int) - self.r_int, indexing='ij')
         self.xcoords = self.xcoords.astype(float)
         self.ycoords = self.ycoords.astype(float)
 
+        # shift coordinate of every other column of x by 0.5 to the right (?)
         self.xcoords[:, 1::2] += 0.5
         self.ycoords *= self.dy
         self.xcoords = self.xcoords[self.r_int:-self.r_int, self.r_int:-self.r_int]
@@ -40,6 +42,7 @@ class LGCA_Hex(LGCA_Square):
         self.nonborder = (self.xx, self.yy)
 
     def propagation(self):
+        #print(self.nodes[self.nonborder])
         newcellnodes = np.zeros(self.nodes.shape, dtype=self.nodes.dtype)
         newcellnodes[..., 6:] = self.nodes[..., 6:]
 
@@ -65,6 +68,7 @@ class LGCA_Hex(LGCA_Square):
         newcellnodes[1:, :-1:2, 5] = self.nodes[:-1, 1::2, 5]
         newcellnodes[:, 1:-1:2, 5] = self.nodes[:, 2::2, 5]
 
+        #(newcellnodes[self.nonborder])
         self.nodes = newcellnodes
         return self.nodes
 
