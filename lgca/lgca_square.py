@@ -640,7 +640,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
     """
     interactions = ['dd_alignment', 'di_alignment', 'go_or_grow']
 
-    def set_dims(self, dims=None, nodes=None, restchannels=0, capacity=None):
+    def set_dims(self, dims=None, nodes=None, restchannels=None, capacity=None):
         """
         Set the dimensions of the instance according to given values. Sets self.l, self.K, self.dims and self.restchannels
         :param dims: desired lattice size (int or array-like)
@@ -651,15 +651,22 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         if nodes is not None:
             self.lx, self.ly, self.K = nodes.shape
             # set number of rest channels to <= 1 because >1 cells are allowed per channel
-            if restchannels > 1:
-                self.restchannels = 1
-            elif 0 <= restchannels <= 1:
-                self.restchannels = restchannels
-            # for now, raise Exception if format of nodes does no fit
-            # (To Do: just sum the cells in surplus rest channels in init_nodes and print a warning)
-            if self.K - self.restchannels > self.velocitychannels:
-                raise Exception('Only one resting channel allowed, \
-                 but {} resting channels specified!'.format(self.K - self.velocitychannels))
+            if restchannels is not None:
+                if restchannels > 1:
+                    self.restchannels = 1
+                elif 0 <= restchannels <= 1:
+                    self.restchannels = restchannels
+                # for now, raise Exception if format of nodes does no fit
+                # (To Do: just sum the cells in surplus rest channels in init_nodes and print a warning)
+                if self.K - self.velocitychannels > self.restchannels:
+                    raise Exception('{} resting channels announced, but {} resting channels specified!'.format(restchannels, self.K - self.velocitychannels))
+            else:
+                if self.K - self.velocitychannels <= 1:
+                    self.restchannels = self.K - self.velocitychannels
+                else:
+                    raise Exception(
+                        'Only one resting channels allowed, but {} resting channels specified!'.format(self.K - self.velocitychannels))
+
             self.dims = self.lx, self.ly
             return
 
@@ -983,7 +990,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         Update "fields" that store important variables to compute other dynamic steps.
         """
         self.cell_density = self.nodes.sum(-1)
-        self.eff_dens = self.nodes[self.nonborder].sum()/(self.capacity * self.lx * self.ly)
+        #self.eff_dens = self.nodes[self.nonborder].sum()/(self.capacity * self.lx * self.ly)
 
 
 if __name__ == '__main__':

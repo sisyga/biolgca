@@ -790,7 +790,7 @@ class LGCA_noVE_base(LGCA_base):
     """
     Base class for LGCA without volume exclusion.
     """
-    def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, hom=None, bc='periodic', capacity=None, **kwargs):
+    def __init__(self, nodes=None, dims=None, restchannels=None, density=0.1, hom=None, bc='periodic', capacity=None, **kwargs):
         """
         Initialize class instance.
         :param nodes: np.ndarray initial configuration set manually
