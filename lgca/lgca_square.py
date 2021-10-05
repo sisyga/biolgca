@@ -638,7 +638,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
     """
     2D square version of an LGCA without volume exclusion.
     """
-    interactions = ['dd_alignment', 'di_alignment', 'go_or_grow']
+    interactions = ['dd_alignment', 'di_alignment', 'go_or_grow', 'go_or_rest']
 
     def set_dims(self, dims=None, nodes=None, restchannels=None, capacity=None):
         """
@@ -670,20 +670,33 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
             self.dims = self.lx, self.ly
             return
 
-        elif dims is None:
-            dims = (50, 50)
-
-        try:
-            self.lx, self.ly = dims
-        except TypeError:
+        elif isinstance(dims, tuple):
+            if len(dims)==2:
+                self.lx, self.ly = dims
+            elif len(dims)>2:
+                self.lx, self.ly = dims[0], dims[1]
+                print("Dimensions provided with too many values! " +str(dims))
+            else:
+                self.lx, self.ly = dims[0], dims[0]
+                print("Dimensions provided as tuple "+str(dims)+", but only one value for 2D lattice!")
+        elif isinstance(dims, int):
             self.lx, self.ly = dims, dims
+        else:
+            self.lx, self.ly = (50, 50)
+            if dims is None:
+                print("Dimensions set to default 50x50.")
+            else:
+                print("Dimensions provided in wrong format, must be tuple of 2 elements or integer.")
         self.dims = self.lx, self.ly
 
         # set number of rest channels to <= 1 because >1 cells are allowed per channel
-        if restchannels > 1:
-            self.restchannels = 1
-        elif 0 <= restchannels <= 1:
-            self.restchannels = restchannels
+        if restchannels is not None:
+            if restchannels > 1:
+                self.restchannels = 1
+            elif 0 <= restchannels <= 1:
+                self.restchannels = restchannels
+        else:
+            self.restchannels = 0
         self.K = self.velocitychannels + self.restchannels
 
         if capacity is not None:
@@ -697,22 +710,34 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
         if nodes is None:
             if hom:
-                self.homogeneous_random_reset(density)
+                self.homogeneous_random_reset(density) #TODO: does this work in 2D?
             else:
                 self.random_reset(density)
         else:
             self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(np.uint)
 
-    def nb_sum(self, qty):
+    def nb_sum(self, qty, addCenter=False):
+        """
+        Calculate sum of values in neighboring lattice sites of each lattice site.
+        :param qty: ndarray in which neighboring values have to be added
+                    first dimension indexes lattice sites
+        :param addCenter: toggle adding central value
+        :return: sum as ndarray
+        """
         sum = np.zeros(qty.shape)
+        # shift to left padding 0 and add to shift to the right padding 0
         sum[:-1, ...] += qty[1:, ...]
         sum[1:, ...] += qty[:-1, ...]
+        # add shift up padding 0 and shift down padding 0
         sum[:, :-1, ...] += qty[:, 1:, ...]
         sum[:, 1:, ...] += qty[:, :-1, ...]
+        # add central value
+        if addCenter:
+            sum += qty
         return sum
 
     def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
-                     edgecolor='None', cbar=True):
+                     edgecolor='None', cbar=True):  # TODO: is this different and needed?
         if density is None:
             density = self.cell_density[self.nonborder]
 
@@ -767,10 +792,9 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
                 cbar.set_ticklabels(labels[0::stride] + [labels[-1]])
         return fig, pc, cmap
 
-    def plot_flux(self, nodes=None, figindex=None, figsize=None, tight_layout=True, edgecolor='None', cbar=True):
+    def plot_flux(self, nodes=None, figindex=None, figsize=None, tight_layout=True, edgecolor='None', cbar=True):  # TODO: is this different and needed?
         if nodes is None:
             nodes = self.nodes[self.nonborder]
-
         if nodes.dtype != 'bool':
             nodes = nodes.astype('bool')
 
@@ -805,7 +829,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
             cbar.set_ticks(np.arange(self.velocitychannels) * 360 / self.velocitychannels)
         return fig, pc, cmap
 
-    def animate_flow(self, nodes_t=None, figindex=None, figsize=None, interval=200, tight_layout=True, cmap='viridis'):
+    def animate_flow(self, nodes_t=None, figindex=None, figsize=None, interval=200, tight_layout=True, cmap='viridis'):  # TODO: is this different and needed?
         if nodes_t is None:
             nodes_t = self.nodes_t
 
@@ -826,7 +850,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         return ani
 
     def animate_flux(self, nodes_t=None, figindex=None, figsize=None, interval=200, tight_layout=True,
-                     edgecolor='None', cbar=True):
+                     edgecolor='None', cbar=True): # TODO: is this different and needed?
         if nodes_t is None:
             nodes_t = self.nodes_t
 
@@ -857,7 +881,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         return ani
 
     def animate_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis', interval=200, vmax=None,
-                        tight_layout=True, edgecolor='None'):
+                        tight_layout=True, edgecolor='None'): # TODO: is this different and needed?
         if density_t is None:
             density_t = self.dens_t
 
@@ -878,7 +902,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         ani = animation.FuncAnimation(fig, update, interval=interval, frames=density_t.shape[0])
         return ani
 
-    def calc_polar_alignment_parameter(self):
+    def calc_polar_alignment_parameter(self): # TODO: is this different and needed?
         """
         Calculates the magnitude of the normalized total average direction vector of the whole lattice
         :return: Total lattice alignment parameter from 0 (no alignment) to 1 (complete alignment)
@@ -913,7 +937,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         return magnitude
 
    # @property
-    def calc_mean_alignment(self):
+    def calc_mean_alignment(self): # TODO: is this different and needed?
         """
         Calculate magnitude of the sum of all local (neighboring) normalized direction vectors for every cell in the lattice.
         :return: Local alignment parameter: ranging from -1 (antiparallel alignment), through 0, (no alignment) to 1 (parallel alignment)
@@ -960,7 +984,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
 
 
 
-    def calc_entropy(self):
+    def calc_entropy(self): # TODO: is this different and needed?
         """
         Calculate entropy of the lattice.
         :return: entropy according to information theory as scalar
@@ -972,7 +996,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         return -np.multiply(rel_freq, a).sum()
 
 
-    def calc_normalized_entropy(self):
+    def calc_normalized_entropy(self): # TODO: is this different and needed?
         """
         Calculate order parameter of the lattice normalized to maximal possible entropy.
         :return: 1 - normalized entropy as scalar
@@ -990,7 +1014,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         Update "fields" that store important variables to compute other dynamic steps.
         """
         self.cell_density = self.nodes.sum(-1)
-        #self.eff_dens = self.nodes[self.nonborder].sum()/(self.capacity * self.lx * self.ly)
+        self.eff_dens = self.nodes[self.nonborder].sum()/(self.capacity * self.lx * self.ly)
 
 
 if __name__ == '__main__':

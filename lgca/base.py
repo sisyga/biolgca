@@ -449,7 +449,7 @@ class LGCA_base():
             self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
             self.nodes_t[0, ...] = self.nodes[self.nonborder]
         if recordN:
-            self.n_t = np.zeros(timesteps + 1, dtype=np.int) #TODO: make it long - pull through!
+            self.n_t = np.zeros(timesteps + 1, dtype=np.int)
             self.n_t[0] = self.cell_density[self.nonborder].sum()
         if recorddens:
             self.dens_t = np.zeros((timesteps + 1,) + self.dims)
@@ -811,17 +811,15 @@ class LGCA_noVE_base(LGCA_base):
         self.update_dynamic_fields()
         self.ve = False
         self.apply_boundaries()
-        print("Density: " + str(density))
-        print(kwargs)
 
 
     def set_interaction(self, **kwargs):
         # choose neighborhood
-        if 'exclude_center' in kwargs:
-            try:
-                from .nove_interactions import dd_alignment, di_alignment
-            except:
-                from nove_interactions import dd_alignment, di_alignment
+        if 'exclude_center' in kwargs and kwargs['exclude_center']:
+                try:
+                    from .nove_interactions import dd_alignment, di_alignment
+                except:
+                    from nove_interactions import dd_alignment, di_alignment
         else:
             try:
                 from .nove_interactions_wcenter import dd_alignment, di_alignment, go_or_grow, go_or_rest
@@ -930,7 +928,7 @@ class LGCA_noVE_base(LGCA_base):
         self.nodes = draw1
         self.apply_boundaries()
         self.update_dynamic_fields()
-        print("Required density: {}, Achieved density: {}".format(density, self.eff_dens))
+        print("Required density: {:.3f}, Achieved density: {:.3f}".format(density, self.eff_dens))
 
     def homogeneous_random_reset(self, density):
         """
@@ -942,6 +940,4 @@ class LGCA_noVE_base(LGCA_base):
         self.nodes = npr.multinomial(initcells, [1 / self.K] * self.K, size=self.nodes.shape[:-1])
         self.apply_boundaries()
         self.update_dynamic_fields()
-        print("Required density: {}, Achieved density: {}".format(density, self.eff_dens))
-
-
+        print("Required density: {:.3f}, Achieved density: {:.3f}".format(density, self.eff_dens))
