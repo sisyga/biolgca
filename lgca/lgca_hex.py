@@ -191,8 +191,16 @@ class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
 
 class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
 
-    def nb_sum(self, qty):
+    def nb_sum(self, qty, addCenter=False):
+        """
+        Calculate sum of values in neighboring lattice sites of each lattice site.
+        :param qty: ndarray in which neighboring values have to be added
+                    first dimension indexes lattice sites
+        :param addCenter: toggle adding central value
+        :return: sum as ndarray
+        """
         sum = np.zeros(qty.shape)
+        # shift to left padding 0 and add to shift to the right padding 0
         sum[:-1, ...] += qty[1:, ...]
         sum[1:, ...] += qty[:-1, ...]
         sum[:, 1::2, ...] += qty[:, :-1:2, ...]
@@ -203,10 +211,12 @@ class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
         sum[:-1, 1:-1:2, ...] += qty[1:, 2::2, ...]
         sum[1:, :-1:2, ...] += qty[:-1, 1::2, ...]
         sum[:, 1:-1:2, ...] += qty[:, 2::2, ...]
+        # add central value
+        if addCenter:
+            sum += qty
         return sum
 
-
-    def init_coords(self):
+    def init_coords(self): # TODO: is this different and needed?
         if self.ly % 2 != 0:
             print('Warning: uneven number of rows; only use for plotting - boundary conditions do not work!')
         self.x = np.arange(self.lx) + self.r_int
@@ -225,7 +235,7 @@ class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
         self.ycoords = self.ycoords[self.r_int:-self.r_int, self.r_int:-self.r_int]
         self.nonborder = (self.xx, self.yy)
 
-    def calc_polar_alignment_parameter(self):
+    def calc_polar_alignment_parameter(self): # TODO: is this different and needed?
 
         sumx = 0
         sumy = 0
@@ -256,15 +266,15 @@ class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
 
 
 
-    def nbofnodes(self):
+    def nbofnodes(self): # TODO: is this different and needed?
         return self.nodes[self.nonborder].sum()
 
-    def vectorsum(self):
+    def vectorsum(self): # TODO: is this different and needed?
         return self.calc_flux(self.nodes)[self.nonborder].sum()
 
 
 
-    def calc_mean_alignment(self):
+    def calc_mean_alignment(self): # TODO: is this different and needed?
 
 
 
@@ -301,7 +311,7 @@ class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
         return tot / d.sum()
 
 
-    def calc_entropy(self):
+    def calc_entropy(self): # TODO: is this different and needed?
         """
         Calculate entropy of the lattice.
         :return: entropy according to information theory as scalar
@@ -313,7 +323,7 @@ class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
         return -np.multiply(rel_freq, a).sum()
 
 
-    def calc_normalized_entropy(self):
+    def calc_normalized_entropy(self): # TODO: is this different and needed?
         """
         Calculate entropy of the lattice normalized to maximal possible entropy.
         :return: normalized entropy as scalar

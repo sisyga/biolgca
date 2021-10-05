@@ -28,7 +28,6 @@ class LGCA_1D(LGCA_base):
 
         if isinstance(dims, int):
             self.l = dims
-
         else:
             self.l = dims[0]
 
@@ -247,9 +246,9 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
     """
     1D version of an LGCA without volume exclusion.
     """
-    interactions = ['dd_alignment', 'di_alignment', 'go_or_grow']
+    interactions = ['dd_alignment', 'di_alignment', 'go_or_grow', 'go_or_rest']
 
-    def set_dims(self, dims=None, nodes=None, restchannels=0, capacity=None):
+    def set_dims(self, dims=None, nodes=None, restchannels=None, capacity=None):
         """
         Set the dimensions of the instance according to given values. Sets self.l, self.K, self.dims and self.restchannels
         :param dims: desired lattice size (int or array-like)
@@ -282,10 +281,13 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         self.dims = self.l,
 
         # set number of rest channels to <= 1 because >1 cells are allowed per channel
-        if restchannels > 1:
-            self.restchannels = 1
-        elif 0 <= restchannels <= 1:
-            self.restchannels = restchannels
+        if restchannels is not None:
+            if restchannels > 1:
+                self.restchannels = 1
+            elif 0 <= restchannels <= 1:
+                self.restchannels = restchannels
+        else:
+            self.restchannels = 0
         self.K = self.velocitychannels + self.restchannels
 
         if capacity is not None:
@@ -343,14 +345,14 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         # create plot with color bar, axis labels, title and layout
         plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=max_part_per_cell, cmap=cmap)
         # plot slice with an x-offset
-        if offset_x is not None:
+        if offset_x is not None and isinstance(offset_x, int):
             fig.canvas.draw() # otherwise the list will be empty
             labels = [item.get_text() for item in ax.get_xticklabels()]
             for i in range(len(labels)):
                 labels[i] = str(int(float(labels[i].strip().replace("−", "-")))+offset_x) #replace long dash by minus
             ax.set_xticklabels(labels)
         # plot slice with a y-offset
-        if offset_t is not None:
+        if offset_t is not None and isinstance(offset_t, int):
             fig.canvas.draw() # otherwise the list will be empty
             labels = [item.get_text() for item in ax.get_yticklabels()]
             for i in range(len(labels)):
@@ -366,7 +368,7 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         return plot
 
 
-    def plot_flux(self, nodes_t=None, figindex=None, figsize=None):
+    def plot_flux(self, nodes_t=None, figindex=None, figsize=None): # TODO: is this different and needed?
         """
         Create a plot showing the main direction of particles per lattice site.
         :param nodes_t: particles per velocity channel at lattice site
@@ -405,23 +407,23 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         plt.tight_layout()
         return plot
 
-    # def nb_sum(self, qty, addSelf):
-    #      """
-    #      Calculate sum of values in neighboring lattice sites of each lattice site.
-    #      :param qty: ndarray in which neighboring values have to be added
-    #                  first dimension indexes lattice sites
-    #      :param addSelf: toggle adding central value
-    #      :return: sum as ndarray
-    #      """
-    #      sum = np.zeros(qty.shape)
-    #      # shift to left padding 0 and add to shift to the right padding 0
-    #      sum[:-1, ...] += qty[1:, ...]
-    #      sum[1:, ...] += qty[:-1, ...]
-    #      # add central value
-    #      if addSelf:
-    #         sum += qty
-    #      # used for summing up fluxes
-    #      return sum
+    def nb_sum(self, qty, addCenter=False):
+         """
+         Calculate sum of values in neighboring lattice sites of each lattice site.
+         :param qty: ndarray in which neighboring values have to be added
+                     first dimension indexes lattice sites
+         :param addCenter: toggle adding central value
+         :return: sum as ndarray
+         """
+         sum = np.zeros(qty.shape)
+         # shift to left padding 0 and add to shift to the right padding 0
+         sum[:-1, ...] += qty[1:, ...]
+         sum[1:, ...] += qty[:-1, ...]
+         # add central value
+         if addCenter:
+            sum += qty
+         # used for summing up fluxes
+         return sum
 
     def calc_entropy(self):
         """
