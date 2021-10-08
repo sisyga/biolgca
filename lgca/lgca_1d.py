@@ -69,8 +69,8 @@ class LGCA_1D(LGCA_base):
         self.nodes[-self.r_int:, :] = self.nodes[self.r_int:2 * self.r_int, :]
 
     def apply_rbc(self):
-        self.nodes[self.r_int, 0] += self.nodes[self.r_int - 1, 1]
-        self.nodes[-self.r_int - 1, 1] += self.nodes[-self.r_int, 0]
+        self.nodes[self.r_int, 0] += self.nodes[self.r_int-1, 1]
+        self.nodes[-self.r_int-1, 1] += self.nodes[-self.r_int, 0]
         self.apply_abc()
 
     def apply_abc(self):
@@ -119,14 +119,14 @@ class LGCA_1D(LGCA_base):
         ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         ax.spines['top'].set_visible(True)
         ax.spines['right'].set_visible(True)
-        ax.yaxis.set_ticks_position('both')
-        ax.xaxis.set_ticks_position('both')
+        ax.yaxis.set_ticks_position('left')
         ax.set_autoscale_on(False)
         ax.xaxis.set_label_position('top')
         ax.xaxis.tick_top()
         return fig, ax
 
-    def plot_density(self, density_t=None, cmap='hot_r', vmax='auto', colorbarwidth=0.03, **kwargs):
+    def plot_density(self, density_t=None, cmap='hot_r', vmax='auto', colorbarwidth=0.03,
+                     cbarlabel='Particle number $n$', **kwargs):
         if density_t is None:
             density_t = self.dens_t
 
@@ -144,7 +144,7 @@ class LGCA_1D(LGCA_base):
         plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=vmax, cmap=cmap)
         cbar = colorbar_index(ncolors=1 + vmax, cmap=cmap, use_gridspec=True, cax=cax)
 
-        cbar.set_label('Particle number $n$')
+        cbar.set_label(cbarlabel)
         plt.sca(ax)
         return plot
 
@@ -196,7 +196,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             nodes_t = nodes.astype('bool')
         LGCA_1D.plot_flux(self, nodes_t, **kwargs)
 
-    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', **kwargs):
+    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', cbarlabel=None, **kwargs):
         if nodes_t is None:
             nodes_t = self.nodes_t
 
@@ -214,12 +214,15 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size=0.3, pad=0.1)
         cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
-        cbar.set_label(r'Property ${}$'.format(propname))
+        if cbarlabel is None:
+            cbar.set_label(r'Property ${}$'.format(propname))
+        else:
+            cbar.set_label(cbarlabel)
         plt.sca(ax)
         return plot
 
 class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
-    interactions = ['go_or_grow']
+    interactions = ['go_or_grow', 'birthdeath']
     
     def propagation(self):
         """
@@ -240,11 +243,17 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         self.nodes[:self.r_int, :] = self.nodes[-2 * self.r_int:-self.r_int, :]
         self.nodes[-self.r_int:, :] = self.nodes[self.r_int:2 * self.r_int, :]
 
-    def apply_rbc(self):
-        self.nodes[self.r_int - 1, 1] = self.nodes[self.r_int - 1, 1] + self.nodes[self.r_int - 1, 0]
-        self.nodes[-self.r_int, 0] =  self.nodes[-self.r_int, 0] + self.nodes[-self.r_int, 1]
-        self.nodes[self.r_int - 1, 0] = []
+    def apply_rbc_wrong(self): # i think this was incorrect
+        self.nodes[self.r_int-1, 1] = self.nodes[self.r_int-1, 1] + self.nodes[self.r_int-1, 0]
+        self.nodes[-self.r_int, 0] = self.nodes[-self.r_int, 0] + self.nodes[-self.r_int, 1]
+        self.nodes[self.r_int-1, 0] = []
         self.nodes[-self.r_int, 1] = []
+
+    def apply_rbc(self):
+        self.nodes[self.r_int, 0] = self.nodes[self.r_int, 0] + self.nodes[self.r_int - 1, 1]
+        self.nodes[-self.r_int - 1, 1] = self.nodes[-self.r_int - 1, 1] + self.nodes[-self.r_int, 0]
+        self.nodes[self.r_int - 1, 1] = []
+        self.nodes[-self.r_int, 0] = []
         
 
     def apply_abc(self):

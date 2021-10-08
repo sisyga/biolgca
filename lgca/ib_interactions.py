@@ -1,4 +1,4 @@
-from random import choices
+from random import choices, random
 import numpy as np
 from numpy import random as npr
 from scipy.stats import truncnorm
@@ -58,8 +58,6 @@ def birthdeath(lgca):
     """
     # death process
     dying = (npr.random(size=lgca.nodes.shape) < lgca.r_d) & lgca.occupied
-    lgca.nodes[dying] = 0
-    lgca.update_dynamic_fields()
     # birth
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
                (lgca.cell_density[lgca.nonborder] < lgca.K)
@@ -81,11 +79,14 @@ def birthdeath(lgca):
                 lgca.maxlabel += 1
                 node[ind] = lgca.maxlabel
                 r_b = lgca.props['r_b'][label]
-                lgca.props['r_b'].append(float(trunc_gauss(0, lgca.a_max, r_b, sigma=lgca.std)))
+                if random() < lgca.pm:
+                    lgca.props['r_b'].append(float(trunc_gauss(0, lgca.a_max, r_b, sigma=lgca.std)))
+                else:
+                    lgca.props['r_b'].append(r_b)
 
         lgca.nodes[coord] = node
 
-
+    lgca.nodes[dying] = 0
     lgca.update_dynamic_fields()
     randomwalk(lgca)
 

@@ -1,4 +1,4 @@
-from random import choices
+from random import choices, random, shuffle
 import numpy as np
 from numpy import random as npr
 from scipy.stats import truncnorm
@@ -21,7 +21,32 @@ def birth(lgca):
     temp = 1
     
 def birthdeath(lgca):
-    temp = 1
+    relevant = (lgca.density[lgca.nonborder] > 0)
+    coords = [a[relevant] for a in lgca.nonborder]
+    for coord in zip(*coords):
+        node = deepcopy(lgca.nodes[coord])
+        density = sum(map(len, node))
+        rho = density / lgca.capacity
+        cells = [cell for channel in node for cell in channel]
+
+        for channel in node:
+            for cell in channel:
+                if random() < lgca.r_d:
+                    cells.remove(cell)
+
+                r_b = lgca.props['r_b'][cell]
+                if random() < r_b * (1 - rho):
+                    cells.append(len(lgca.props['r_b']))
+                    lgca.props['r_b'].append(float(trunc_gauss(0, lgca.a_max, r_b, sigma=lgca.std)))
+
+        channeldist = npr.multinomial(len(cells), [1./lgca.K] * lgca.K).cumsum()
+        shuffle(cells)
+        newnode = [cells[:channeldist[0]]] + [cells[i:j] for i,j in zip(channeldist[:-1], channeldist[1:])]
+        # for cell in cells:
+        #     newnode[npr.randint(lgca.K)].append(cell)
+
+        lgca.nodes[coord] = deepcopy(newnode)
+
 
 def go_or_grow(lgca):
     relevant = (lgca.density[lgca.nonborder] > 0)
@@ -31,8 +56,9 @@ def go_or_grow(lgca):
         density = 0
         for channel in node:
             for cell in channel:
-                if(npr.random() <= lgca.r_d):
+                if npr.random() <= lgca.r_d:
                     channel.remove(cell)
+
             density += len(channel)
         rho = density/lgca.capacity
 
@@ -51,7 +77,7 @@ def go_or_grow(lgca):
                         restcells.append(len(lgca.props["kappa"]))
                         lgca.props['kappa'].append(npr.normal(loc=lgca.props['kappa'][cell], scale=lgca.kappa_std))
                         lgca.props['theta'].append(trunc_gauss(0,1,mu=lgca.props['theta'][cell],sigma=lgca.theta_std))
-            ch_counter +=1
+            ch_counter += 1
             
         node = [[],[],restcells]
         for cell in velcells:
