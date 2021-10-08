@@ -725,7 +725,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
         self.set_dims(dims=dims, nodes=nodes)
         
         self.init_coords()
-        self.init_nodes(ini_channel_pop=ini_channel_pop, nodes=nodes,nodes_filled=nodes_filled, **kwargs)
+        self.init_nodes(ini_channel_pop=ini_channel_pop, nodes=nodes, nodes_filled=nodes_filled, **kwargs)
         self.set_interaction(**kwargs)
        
         #self.apply_boundaries()  -> Harish to Simon: is this really needed? If yes why?
@@ -856,7 +856,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
             self.nodes_t = nodes_t.reshape(timesteps+1, self.l+2*self.r_int, self.K)
             self.nodes_t[0, ...] = self.nodes"""
             nodes_t = np.empty((timesteps+1)*(self.l)*self.K, dtype=object)
-            for k in range((timesteps+1)*(self.l)*self.K):
+            for k in range((timesteps+1)*self.l*self.K):
                 nodes_t[k] = []
             self.nodes_t = nodes_t.reshape(timesteps+1, self.l, self.K)
             self.nodes_t[0, ...] = self.nodes[self.nonborder]
@@ -864,8 +864,8 @@ class BOSON_IBLGCA_base(IBLGCA_base):
             self.n_t = np.zeros(timesteps + 1, dtype=np.int)
             self.n_t[0] = self.cell_density[self.nonborder].sum()
         if recordDensity:
-            self.density_t = np.zeros([(timesteps + 1), self.dims])
-            self.density_t[0, ...] = self.density[self.nonborder]
+            self.dens_t = np.zeros([(timesteps + 1), self.dims])
+            self.dens_t[0, ...] = self.density[self.nonborder]
         if recordDensityOther:    # useful for plotting channel wise densities
             self.resting_density_t = np.zeros([(timesteps + 1), self.dims])
             self.resting_density_t[0, ...] = self.resting_density[self.nonborder]
@@ -879,7 +879,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
             if recordN:# to be implemented
                 self.n_t[t] = self.cell_density[self.nonborder].sum()
             if recordDensity:
-                self.density_t[t, ...] = self.density[self.nonborder]
+                self.dens_t[t, ...] = self.density[self.nonborder]
             if recordDensityOther:
                 self.resting_density_t[t, ...] = self.resting_density[self.nonborder]
                 self.moving_density_t[t, ...] = self.moving_density[self.nonborder]
@@ -892,14 +892,14 @@ class BOSON_IBLGCA_base(IBLGCA_base):
 
     def calc_prop_mean(self, nodes=None, props=None, propname=None):
         #can this be optimised further?
-        mean_prop = np.ones(self.l)*(-1000) #had some problems with np.nan so I am using -1000
+        mean_prop = np.ones(self.l)* (-1000) #had some problems with np.nan so I am using -1000
         counter = 0
         for node in nodes:
-            cells = sum(node,[])
-            if(cells!=[]):
+            cells = sum(node, [])
+            if cells != []:
                 nodeprops = np.array(itemgetter(*cells)(props[propname]))
-                mean_prop[counter]=nodeprops.mean()
-            counter+=1
+                mean_prop[counter] = nodeprops.mean()
+            counter += 1
         return mean_prop
     
     def calc_prop_mean_spatiotemp(self, nodes_t=None, props=None):
@@ -917,7 +917,43 @@ class BOSON_IBLGCA_base(IBLGCA_base):
                 #self.mean_prop_vel_t[key][t] = self.calc_prop_mean(propname=key, props=props, nodes=nodes_t[t][...,0:(self.K-1)])
                 #self.mean_prop_rest_t[key][t] = self.calc_prop_mean(propname=key, props=props, nodes=nodes_t[t][...,(self.K-1):])
 
+        return self.mean_prop_t
 
-                
+
+    def plot_prop_timecourse(self, nodes_t=None, props=None, propname=None, figindex=None, figsize=None, **kwargs):
+        """
+        Plot the time evolution of the cell property 'propname'
+        :param nodes_t:
+        :param props:
+        :param propname:
+        :param figindex:
+        :param figsize:
+        :param kwargs: keyword arguments for the matplotlib.plot command
+        :return:
+        """
+
+        if nodes_t is None:
+            nodes_t = self.nodes_t
+
+        prop = self.get_prop(nodes=nodes_t, props=props, propname=propname)
+        occupied = nodes_t.astype(bool)
+        mask = 1 - occupied
+        prop = np.ma.array(prop, mask=mask)
+        tocollapse = tuple(range(1, prop.ndim))
+        mean_prop_t = np.mean(prop, axis=tocollapse)
+        std_mean_prop_t = np.std(prop, axis=tocollapse, ddof=1) / np.sqrt(np.sum(occupied, axis=tocollapse))
+        plt.figure(num=figindex, figsize=figsize)
+        tmax = nodes_t.shape[0]
+
+        yerr = std_mean_prop_t
+        x = np.arange(tmax)
+        y = mean_prop_t
+
+        plt.xlabel('$t$')
+        plt.ylabel('${}$'.format(propname))
+        plt.title('Time course of the cell property')
+        line = plt.plot(x, y, **kwargs)
+        errors = plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True, interpolate=True)
+        return line, errors
 
             
