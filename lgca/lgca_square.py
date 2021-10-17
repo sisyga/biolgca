@@ -451,7 +451,7 @@ class LGCA_Square(LGCA_base):
         if K > 1:
             cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
         else:
-            cmap = plt.cm.ScalarMappable(cmap=cmap)
+            cmap = plt.cm.ScalarMappable(cmap=cmap) #why?
         cmap.set_array(density)
         polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
                                    orientation=self.orientation, facecolor=c, edgecolor=edgecolor)
@@ -668,6 +668,10 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
                         'Only one resting channels allowed, but {} resting channels specified!'.format(self.K - self.velocitychannels))
 
             self.dims = self.lx, self.ly
+            if capacity is not None:
+                self.capacity = capacity
+            else:
+                self.capacity = self.K
             return
 
         elif isinstance(dims, tuple):
@@ -710,7 +714,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
         if nodes is None:
             if hom:
-                self.homogeneous_random_reset(density) #TODO: does this work in 2D?
+                self.homogeneous_random_reset(density)
             else:
                 self.random_reset(density)
         else:
@@ -737,7 +741,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         return sum
 
     def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
-                     edgecolor='None', cbar=True):  # TODO: is this different and needed?
+                     edgecolor='None', cbar=True):
         if density is None:
             density = self.cell_density[self.nonborder]
 
@@ -752,11 +756,20 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
         cmap = plt.cm.get_cmap(cmap)
         cmap.set_under(alpha=0.0)
+        cmap_scaled = False
 
-        if K > 1:
-            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N)) #gives me problems for density>256
+        if 1 < K <= cmap.N:
+            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
+        elif K > 1:
+            cmap_scaled = True
+            scaling_factor = K / cmap.N
+            min_dis = int(K / cmap.N)
+            max_loc = 1 / (K % cmap.N/cmap.N)
+            nbins = cmap.N
+            density = density/scaling_factor
+            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(cmap.N + 1), cmap.N))
         else:
-            cmap = plt.cm.ScalarMappable(cmap=cmap)
+            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.Normalize(vmin=1e-6, vmax=1))
         cmap.set_array(density)
 
         polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
@@ -766,9 +779,16 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         ax.add_collection(pc)
 
         if cbar:
-            cbar = fig.colorbar(cmap, extend='min', use_gridspec=True)
+            if K <= 1:
+                # requires extra treatment because there is only one colour
+                cbar = fig.colorbar(cmap, extend='min', use_gridspec=True, boundaries=[0,0.5,1], values=[0,1])
+            else:
+                cbar = fig.colorbar(cmap, extend='min', use_gridspec=True)
             cbar.set_label('Particle number $n$')
-            ncolors = K
+            if cmap_scaled:
+                ncolors = nbins
+            else:
+                ncolors = max(1,K)
             # set a numbering interval for high densities (e.g. 5-10-15-20)
             if ncolors > 101:
                 stride = 10
@@ -778,79 +798,39 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
                 stride = 2
             else:
                 stride = 1
-            ticks = np.linspace(1, ncolors+1, 2 * ncolors + 1)[1::2]
-            labels = list(np.arange(1,ncolors+1,1))
+            if K <= 1:
+                # requires extra treatment because there is only one colour
+                ticks = np.array([0.75])
+            else:
+                ticks = np.arange(1,ncolors+1,1) + 0.5 #ticks = np.linspace(1, ncolors+1, 2 * ncolors + 1)[1::2]
+            if cmap_scaled:
+                indices = np.arange(1, nbins + 2)
+                #high_label = np.floor(indices * scaling_factor - 1e-6)
+                #high_label = np.delete(high_label, 0).astype(int)
+                #high_label[-1] = K
+                low_label = np.ceil(indices * scaling_factor - 1e-6)
+                low_label = np.roll(low_label, 1)
+                low_label = np.delete(low_label, 0).astype(int)
+                #labels = [str(low) + "-" + str(high) for index, low, high in zip(indices, low_label, high_label)]
+                labels = list(low_label)
+            else:
+                labels = list(np.arange(1,ncolors+1,1))
+            # if max label comes up automatically, leave it as it is
             if ticks[-1] == ticks[0::stride][-1]:
                 cbar.set_ticks(ticks[0::stride])
                 cbar.set_ticklabels(labels[0::stride])
-                print(ticks[0::stride], labels[0::stride])
+            # if max label is too close to last strided label, leave the latter out
             elif stride > 1 and ticks[-1] != ticks[0::stride][-1] and ticks[-1] - ticks[0::stride][-1] < stride / 2:
                 cbar.set_ticks(list(ticks[0::stride][:-1]) + [ticks[-1]])
                 cbar.set_ticklabels(labels[0::stride][:-1] + [labels[-1]])
+            # if there is enough space, just add the max label
             else:
                 cbar.set_ticks(list(ticks[0::stride]) + [ticks[-1]])
                 cbar.set_ticklabels(labels[0::stride] + [labels[-1]])
         return fig, pc, cmap
 
-    def plot_flux(self, nodes=None, figindex=None, figsize=None, tight_layout=True, edgecolor='None', cbar=True):  # TODO: is this different and needed?
-        if nodes is None:
-            nodes = self.nodes[self.nonborder]
-        if nodes.dtype != 'bool':
-            nodes = nodes.astype('bool')
-
-        nodes = nodes.astype(np.int8)
-        density = nodes.sum(-1).astype(float) / self.K
-
-        if figsize is None:
-            figsize = estimate_figsize(density, cbar=True)
-
-        fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
-        cmap = plt.cm.get_cmap('hsv')
-        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.Normalize(vmin=0, vmax=360))
-
-        jx, jy = np.moveaxis(self.calc_flux(nodes), -1, 0)
-        angle = np.zeros(density.shape, dtype=complex)
-        angle.real = jx
-        angle.imag = jy
-        angle = np.angle(angle, deg=True) % 360.
-        cmap.set_array(angle)
-        angle = cmap.to_rgba(angle)
-        angle[..., -1] = np.sqrt(density)
-        angle[(jx ** 2 + jy ** 2) < 1e-6, :3] = 0.
-        polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
-                                   orientation=self.orientation, facecolor=c,
-                                   edgecolor=edgecolor)
-                    for x, y, c in zip(self.xcoords.ravel(), self.ycoords.ravel(), angle.reshape(-1, 4))]
-        pc = PatchCollection(polygons, match_original=True)
-        ax.add_collection(pc)
-        if cbar:
-            cbar = fig.colorbar(cmap, use_gridspec=True)
-            cbar.set_label('Direction of movement $(\degree)$')
-            cbar.set_ticks(np.arange(self.velocitychannels) * 360 / self.velocitychannels)
-        return fig, pc, cmap
-
-    def animate_flow(self, nodes_t=None, figindex=None, figsize=None, interval=200, tight_layout=True, cmap='viridis'):  # TODO: is this different and needed?
-        if nodes_t is None:
-            nodes_t = self.nodes_t
-
-        nodes = nodes_t.astype(float)
-        density = nodes.sum(-1)
-        jx, jy = np.moveaxis(self.calc_flux(nodes.astype(float)), -1, 0)
-
-        fig, plot, cmap = self.plot_flow(nodes[0], figindex=figindex, figsize=figsize, tight_layout=tight_layout,
-                                         cmap=cmap)
-        title = plt.title('Time $k =$0')
-
-        def update(n):
-            title.set_text('Time $k =${}'.format(n))
-            plot.set_UVC(jx[n], jy[n], cmap.to_rgba(density[n]))
-            return plot, title
-
-        ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
-        return ani
-
     def animate_flux(self, nodes_t=None, figindex=None, figsize=None, interval=200, tight_layout=True,
-                     edgecolor='None', cbar=True): # TODO: is this different and needed?
+                     edgecolor='None', cbar=True):
         if nodes_t is None:
             nodes_t = self.nodes_t
 
@@ -865,9 +845,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         fig, pc, cmap = self.plot_flux(nodes=nodes[0], figindex=figindex, figsize=figsize, tight_layout=tight_layout,
                                        edgecolor=edgecolor, cbar=cbar)
         angle = cmap.to_rgba(angle[None, ...])[0]
-        angle[..., -1] = np.sign(density)
-
-        # angle[..., -1] = 1
+        angle[..., -1] = np.sign(density) #TODO is this difference important?
 
         angle[(jx ** 2 + jy ** 2) < 1e-6, :3] = 0.
         title = plt.title('Time $k =$ 0')
@@ -881,7 +859,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         return ani
 
     def animate_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis', interval=200, vmax=None,
-                        tight_layout=True, edgecolor='None'): # TODO: is this different and needed?
+                        tight_layout=True, edgecolor='None'):
         if density_t is None:
             density_t = self.dens_t
 
@@ -902,7 +880,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         ani = animation.FuncAnimation(fig, update, interval=interval, frames=density_t.shape[0])
         return ani
 
-    def calc_polar_alignment_parameter(self): # TODO: is this different and needed?
+    def calc_polar_alignment_parameter(self): # TODO
         """
         Calculates the magnitude of the normalized total average direction vector of the whole lattice
         :return: Total lattice alignment parameter from 0 (no alignment) to 1 (complete alignment)
@@ -937,7 +915,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         return magnitude
 
    # @property
-    def calc_mean_alignment(self): # TODO: is this different and needed?
+    def calc_mean_alignment(self): # TODO
         """
         Calculate magnitude of the sum of all local (neighboring) normalized direction vectors for every cell in the lattice.
         :return: Local alignment parameter: ranging from -1 (antiparallel alignment), through 0, (no alignment) to 1 (parallel alignment)
@@ -984,7 +962,7 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
 
 
 
-    def calc_entropy(self): # TODO: is this different and needed?
+    def calc_entropy(self): # TODO
         """
         Calculate entropy of the lattice.
         :return: entropy according to information theory as scalar
@@ -996,10 +974,10 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
         return -np.multiply(rel_freq, a).sum()
 
 
-    def calc_normalized_entropy(self): # TODO: is this different and needed?
+    def calc_normalized_entropy(self): # TODO
         """
-        Calculate order parameter of the lattice normalized to maximal possible entropy.
-        :return: 1 - normalized entropy as scalar
+        Calculate entropy of the lattice normalized to maximal possible entropy.
+        :return: normalized entropy as scalar
         """
 
         n_ofnodes = self.dims[0] * self.dims[1]

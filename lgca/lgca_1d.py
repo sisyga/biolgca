@@ -20,7 +20,6 @@ class LGCA_1D(LGCA_base):
             self.l, self.K = nodes.shape
             self.restchannels = self.K - self.velocitychannels
             self.dims = self.l,
-            print(type(self.dims))
             return
 
         elif dims is None:
@@ -338,7 +337,7 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
             scale = scaling
         else:
             scale = 1.0
-        max_part_per_cell = int(scale*density_t.max())
+        max_part_per_cell = int(scale * density_t.max())
         if absolute_max is not None:
             max_part_per_cell = int(absolute_max)
         cmap = cmap_discretize(cmap, max_part_per_cell + 1)
@@ -368,7 +367,7 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         return plot
 
 
-    def plot_flux(self, nodes_t=None, figindex=None, figsize=None): # TODO: is this different and needed?
+    def plot_flux(self, nodes_t=None, figindex=None, figsize=None):
         """
         Create a plot showing the main direction of particles per lattice site.
         :param nodes_t: particles per velocity channel at lattice site
@@ -391,7 +390,7 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         # 4: RGBA A=alpha: transparency
         rgba = np.zeros((tmax, l, 4))
         rgba[dens_t > 0, -1] = 1.
-        rgba[flux_t > 0, 0] = 1.
+        rgba[flux_t > 0, 0] = 1. # can I do this in ve, too?
         rgba[flux_t < 0, 2] = 1.
         rgba[flux_t == 0, :-1] = 0. # unpopulated lattice sites are white
         # set up figure

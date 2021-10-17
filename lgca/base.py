@@ -449,7 +449,7 @@ class LGCA_base():
             self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
             self.nodes_t[0, ...] = self.nodes[self.nonborder]
         if recordN:
-            self.n_t = np.zeros(timesteps + 1, dtype=np.int)
+            self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
             self.n_t[0] = self.cell_density[self.nonborder].sum()
         if recorddens:
             self.dens_t = np.zeros((timesteps + 1,) + self.dims)
@@ -806,7 +806,7 @@ class LGCA_noVE_base(LGCA_base):
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes, capacity=capacity)
         self.init_coords()
         self.init_nodes(density=density, nodes=nodes, hom=hom)
-        self.set_interaction(capacity=capacity, **kwargs)
+        self.set_interaction(**kwargs)
         #self.cell_density = self.nodes.sum(-1)
         self.update_dynamic_fields()
         self.ve = False
@@ -847,6 +847,8 @@ class LGCA_noVE_base(LGCA_base):
                     self.beta = 2.
                     print('sensitivity set to beta = ', self.beta)
             elif interaction == 'go_or_grow':
+                if self.restchannels < 1:
+                    raise RuntimeError("No rest channels ({:d}) defined, interaction cannot be performed! Set number of rest channels with restchannels keyword.".format(self.restchannels))
                 self.interaction = go_or_grow
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']
@@ -868,12 +870,12 @@ class LGCA_noVE_base(LGCA_base):
                 else:
                     self.theta = 0.75
                     print('switch threshold set to theta = ', self.theta)
-                if 'capacity' in kwargs:
-                    self.capacity = kwargs['capacity']
-                else:
-                    self.capacity = self.K
-                    print('capacity set to C = ', self.capacity)
             elif interaction == 'go_or_rest':
+                if self.restchannels < 1:
+                    raise RuntimeError(
+                        "No rest channels ({:d}) defined, interaction cannot be performed! Set number of rest channels with restchannels keyword.".format(
+                            self.restchannels))
+
                 self.interaction = go_or_rest
                 if 'kappa' in kwargs:
                     self.kappa = kwargs['kappa']
@@ -885,11 +887,6 @@ class LGCA_noVE_base(LGCA_base):
                 else:
                     self.theta = 0.75
                     print('switch threshold set to theta = ', self.theta)
-                if 'capacity' in kwargs:
-                    self.capacity = kwargs['capacity']
-                else:
-                    self.capacity = self.K
-                    print('capacity set to C = ', self.capacity)
 
             else:
                 print('interaction', kwargs['interaction'], 'is not defined! Density-dependent alignment interaction used instead.')
