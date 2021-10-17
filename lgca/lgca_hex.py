@@ -34,7 +34,7 @@ class LGCA_Hex(LGCA_Square):
         self.xcoords = self.xcoords.astype(float)
         self.ycoords = self.ycoords.astype(float)
 
-        # shift coordinate of every other column of x by 0.5 to the right (?)
+        # shift coordinate of every other column of x by 0.5 to the right
         self.xcoords[:, 1::2] += 0.5
         self.ycoords *= self.dy
         self.xcoords = self.xcoords[self.r_int:-self.r_int, self.r_int:-self.r_int]
@@ -187,8 +187,6 @@ class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
             self.maxlabel = self.nodes.max()
 
 
-
-
 class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
 
     def nb_sum(self, qty, addCenter=False):
@@ -215,128 +213,6 @@ class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
         if addCenter:
             sum += qty
         return sum
-
-    def init_coords(self): # TODO: is this different and needed?
-        if self.ly % 2 != 0:
-            print('Warning: uneven number of rows; only use for plotting - boundary conditions do not work!')
-        self.x = np.arange(self.lx) + self.r_int
-        self.y = np.arange(self.ly) + self.r_int
-        self.xx, self.yy = np.meshgrid(self.x, self.y, indexing='ij')
-        self.coord_pairs = list(zip(self.xx.flat, self.yy.flat))
-
-        self.xcoords, self.ycoords = np.meshgrid(np.arange(self.lx + 2 * self.r_int) - self.r_int,
-                                                 np.arange(self.ly + 2 * self.r_int) - self.r_int, indexing='ij')
-        self.xcoords = self.xcoords.astype(float)
-        self.ycoords = self.ycoords.astype(float)
-
-        self.xcoords[:, 1::2] += 0.5
-        self.ycoords *= self.dy
-        self.xcoords = self.xcoords[self.r_int:-self.r_int, self.r_int:-self.r_int]
-        self.ycoords = self.ycoords[self.r_int:-self.r_int, self.r_int:-self.r_int]
-        self.nonborder = (self.xx, self.yy)
-
-    def calc_polar_alignment_parameter(self): # TODO: is this different and needed?
-
-        sumx = 0
-        sumy = 0
-
-        abb = self.calc_flux(self.nodes)[self.nonborder]
-        x = len(abb)
-        y = len(abb[0])
-        z = len(abb[0][0])
-
-        for a in range(0, x):
-            for b in range(0, y):
-                for c in range(0, z):
-                    if c == 0:
-                        sumx = sumx + abb[a][b][c]
-                    if c == 1:
-                        sumy = sumy + abb[a][b][c]
-
-        cells = self.nodes[self.nonborder].sum()
-
-        sumy = sumy / cells
-        sumx = sumx / cells
-
-        magnitude = np.sqrt(sumx**2 + sumy**2)
-
-        return magnitude
-
-
-
-
-
-    def nbofnodes(self): # TODO: is this different and needed?
-        return self.nodes[self.nonborder].sum()
-
-    def vectorsum(self): # TODO: is this different and needed?
-        return self.calc_flux(self.nodes)[self.nonborder].sum()
-
-
-
-    def calc_mean_alignment(self): # TODO: is this different and needed?
-
-
-
-        no_neighbors = self.nb_sum(self.cell_density[
-                                                   self.nonborder])  # neighborhood is defined s.t. border particles don't have them
-
-        f = self.calc_flux(self.nodes[self.nonborder])
-
-        d = self.cell_density[self.nonborder]
-
-        fsum = self.nb_sum(f)
-
-        x = len(fsum)
-        y = len(fsum[0])
-        z = len(fsum[0][0])
-
-        no_nbdiv = np.where(no_neighbors > 0, no_neighbors, 1)
-
-        for a in range(0, x):
-            for b in range(0, y):
-                for c in range(0, z):
-                    fsum[a][b][c] = (fsum[a][b][c]) / no_nbdiv[a][b]
-
-        dot_p = []
-
-        for a in range(0, x):
-            for b in range(0, y):
-                dot_p.append(np.dot(fsum[a][b], f[a][b]))
-
-        tot = 0
-        for i in range(0, len(dot_p)):
-            tot = tot + dot_p[i]
-
-        return tot / d.sum()
-
-
-    def calc_entropy(self): # TODO: is this different and needed?
-        """
-        Calculate entropy of the lattice.
-        :return: entropy according to information theory as scalar
-        """
-        # calculate relative frequencies
-        rel_freq = self.nodes[self.nonborder].sum(-1)/self.nodes[self.nonborder].sum()
-        # empty lattice sites are not considered in the sum
-        a = np.where(rel_freq > 0, np.log(rel_freq), 0)
-        return -np.multiply(rel_freq, a).sum()
-
-
-    def calc_normalized_entropy(self): # TODO: is this different and needed?
-        """
-        Calculate entropy of the lattice normalized to maximal possible entropy.
-        :return: normalized entropy as scalar
-        """
-        n_ofnodes = self.dims[0] * self.dims[1]
-        smax = np.log(n_ofnodes)
-
-        self.smax = smax
-
-        return 1 - self.calc_entropy()/smax
-
-
-
 
 if __name__ == '__main__':
     lx = 200
