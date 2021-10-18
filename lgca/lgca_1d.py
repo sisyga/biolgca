@@ -274,7 +274,8 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         
 
     def init_nodes(self, ini_channel_pop=None, nodes=None, nodes_filled=None, capacity=4, **kwargs):
-        if nodes_filled is not None and ini_channel_pop is not None: #nodes_filled is number of nodes to fill, ini_channel_pop is number of
+        if nodes_filled is not None and ini_channel_pop is not None: #nodes_filled is number of nodes to fill,
+            # ini_channel_pop is number of particles to put into each node
             oldnodes = np.empty((self.l+2*self.r_int)*self.K, dtype=object)
             #oldnodes[0:self.K] = [],[],[]
             #oldnodes[-self.K:] = [],[],[]
