@@ -137,7 +137,6 @@ class LGCA_base():
         self.set_interaction(**kwargs)
         self.cell_density = self.nodes.sum(-1)
         self.apply_boundaries()
-        print("Density: " + str(density))
         print(kwargs)
 
     def set_r_int(self, r):
@@ -430,7 +429,6 @@ class LGCA_base():
         :return:
         """
         self.cell_density = self.nodes.sum(-1)
-        #cell_density ist ein array von Werten. Es wird als Summe über die Channel berechnet. (.sum(-1) summiert über die letzte Achse des Arrays).
 
     def timestep(self):
         """
@@ -458,8 +456,7 @@ class LGCA_base():
             self.ent_t = np.zeros(timesteps + 1, dtype=np.float)
             self.ent_t[0, ...] = self.calc_entropy()
             self.normEnt_t = np.zeros(timesteps + 1, dtype=np.float)
-            aux = self.calc_normalized_entropy()                 # AAAAAAAAAAAAAAAAAAAAAAa MARK
-            self.normEnt_t[0, ...] = aux[0]                         #AAAAAAAAAAAAAAAAAAAAAAA
+            self.normEnt_t[0, ...] = self.calc_normalized_entropy()
             self.polAlParam_t = np.zeros(timesteps + 1, dtype=np.float)
             self.polAlParam_t[0, ...] = self.calc_polar_alignment_parameter()
             self.meanAlign_t = np.zeros(timesteps + 1, dtype=np.float)
@@ -814,17 +811,10 @@ class LGCA_noVE_base(LGCA_base):
 
 
     def set_interaction(self, **kwargs):
-        # choose neighborhood
-        if 'exclude_center' in kwargs and kwargs['exclude_center']:
-                try:
-                    from .nove_interactions import dd_alignment, di_alignment
-                except:
-                    from nove_interactions import dd_alignment, di_alignment
-        else:
-            try:
-                from .nove_interactions_wcenter import dd_alignment, di_alignment, go_or_grow, go_or_rest
-            except:
-                from nove_interactions_wcenter import dd_alignment, di_alignment, go_or_grow, go_or_rest
+        try:
+            from .nove_interactions import dd_alignment, di_alignment, go_or_grow, go_or_rest
+        except:
+            from nove_interactions import dd_alignment, di_alignment, go_or_grow, go_or_rest
         # configure interaction
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
@@ -837,6 +827,11 @@ class LGCA_noVE_base(LGCA_base):
                 else:
                     self.beta = 2.
                     print('sensitivity set to beta = ', self.beta)
+                if 'include_center' in kwargs:
+                    self.nb_include_center = kwargs['include_center']
+                else:
+                    self.nb_include_center = False
+                    print('neighbourhood set to exclude the central node')
             # density-independent alignment rule
             elif interaction == 'di_alignment':
                 self.interaction = di_alignment
@@ -846,6 +841,11 @@ class LGCA_noVE_base(LGCA_base):
                 else:
                     self.beta = 2.
                     print('sensitivity set to beta = ', self.beta)
+                if 'include_center' in kwargs:
+                    self.nb_include_center = kwargs['include_center']
+                else:
+                    self.nb_include_center = False
+                    print('neighbourhood set to exclude the central node')
             elif interaction == 'go_or_grow':
                 if self.restchannels < 1:
                     raise RuntimeError("No rest channels ({:d}) defined, interaction cannot be performed! Set number of rest channels with restchannels keyword.".format(self.restchannels))
@@ -925,7 +925,8 @@ class LGCA_noVE_base(LGCA_base):
         self.nodes = draw1
         self.apply_boundaries()
         self.update_dynamic_fields()
-        print("Required density: {:.3f}, Achieved density: {:.3f}".format(density, self.eff_dens))
+        eff_dens = self.nodes[self.nonborder].sum()/(self.capacity * self.cell_density[self.nonborder].size)
+        print("Required density: {:.3f}, Achieved density: {:.3f}".format(density, eff_dens))
 
     def homogeneous_random_reset(self, density):
         """
@@ -937,4 +938,84 @@ class LGCA_noVE_base(LGCA_base):
         self.nodes = npr.multinomial(initcells, [1 / self.K] * self.K, size=self.nodes.shape[:-1])
         self.apply_boundaries()
         self.update_dynamic_fields()
-        print("Required density: {:.3f}, Achieved density: {:.3f}".format(density, self.eff_dens))
+        eff_dens = self.nodes[self.nonborder].sum() / (self.capacity * self.cell_density[self.nonborder].size)
+        print("Required density: {:.3f}, Achieved density: {:.3f}".format(density, eff_dens))
+
+    def calc_entropy(self, base=None):
+        """
+        Calculate entropy of the lattice.
+        :param base: base of the logarithm, defaults to capacity of the LGCA
+        :return: entropy according to information theory as scalar
+        """
+        if base is None:
+            base = self.capacity
+        # calculate relative frequencies, self.cell_density[self.nonborder].size = number of nodes
+        _, freq = np.unique(self.cell_density[self.nonborder], return_counts=True)
+        freq = freq / self.cell_density[self.nonborder].size
+        log_val = np.divide(np.log(freq), np.log(base))
+        return -np.multiply(freq, log_val).sum()
+
+    def calc_normalized_entropy(self, base=None):
+        """
+        Calculate entropy of the lattice normalized to maximal possible entropy.
+        :return: normalized entropy as scalar
+        """
+        if base is None:
+            base = self.capacity
+        # calculate maximal entropy, self.cell_density[self.nonborder].size = number of nodes
+        smax = - np.divide(np.log(1/self.cell_density[self.nonborder].size), np.log(base))
+        return 1 - self.calc_entropy(base=base)/smax
+
+    def calc_polar_alignment_parameter(self):
+        """
+        Calculate the polar alignment parameter.
+        The polar alignment parameter is a measure for global agreement of particle orientation in the lattice.
+        It is calculated as the magnitude of the sum of the velocities of all particles normalized by the number of particles.
+        :return: Polar alignment parameter of the lattice from 0 (no alignment) to 1 (complete alignment)
+        """
+        # calculate flux only for non-boundary nodes, result is a flux vector at each node position
+        flux = self.calc_flux(self.nodes[self.nonborder])
+        # calculate along which axes the lattice needs to be summed up, e.g. axes=(0) for 1D, axes=(0,1) for 2D
+        axes = tuple(np.arange(self.c.shape[0]))
+        # sum fluxes up accordingly
+        flux = np.sum(flux, axis=axes)
+        # take Euclidean norm and normalise by number of particles
+        return np.linalg.norm(flux, ord=None)/self.cell_density[self.nonborder].sum()
+
+    def calc_mean_alignment(self):
+        """
+        Calculate the mean alignment measure.
+        The mean alignment is a measure for local alignment of particle orientation in the lattice.
+        It is calculated as the agreement in direction between the ﬂux of a lattice site and the ﬂux of the director ﬁeld
+        summed up and normalized over all lattice sites.
+        :return: Local alignment parameter: ranging from -1 (antiparallel alignment), through 0 (no alignment) to 1 (parallel alignment)
+        """
+        # Calculate the director field
+        flux = self.calc_flux(self.nodes)
+        # # retrieve number of particles and reshape to combine with flux
+        norm_factor = np.where(self.cell_density > 0, self.cell_density, 1)
+        norm_factor = 1 / norm_factor
+        norm_factor = norm_factor.reshape(norm_factor.shape + (1,))
+        norm_factor = np.broadcast_to(norm_factor, flux.shape)
+        # # normalise flux at each node with number of cells in the node
+        dir_field = np.multiply(flux, norm_factor)  # max element value: 1
+        # # apply boundary conditions -
+        # #  (not clean, but this is the only application of applying bc to anything but nodes so far)
+        temp = self.nodes
+        self.nodes = dir_field
+        self.apply_boundaries()
+        dir_field = self.nodes
+        self.nodes = temp
+        # # sum fluxes over neighbours
+        dir_field = self.nb_sum(dir_field)  # max element value: no. of neighbours
+
+        # Calculate agreement between node flux and director field flux
+        alignment = np.einsum('...j,...j', dir_field, flux)
+
+        # Average over lattice
+        # # also normalise director field by no. of neighbours retrospectively -
+        # #  (computation on less elements if done here)
+        no_neighbours = self.c.shape[-1]
+        N = self.cell_density[self.nonborder].sum()
+        return alignment[self.nonborder].sum() / (no_neighbours * N)
+
