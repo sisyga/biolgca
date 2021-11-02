@@ -268,6 +268,10 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
                 raise Exception('Only one resting channel allowed, \
                  but {} resting channels specified!'.format(self.K - self.velocitychannels))
             self.dims = self.l,
+            if capacity is not None:
+                self.capacity = capacity
+            else:
+                self.capacity = self.K
             return
         # default value for dimension
         elif dims is None:
@@ -326,6 +330,10 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         # set values for unused arguments
         if density_t is None:
             density_t = self.dens_t
+            if offset_x is not None and isinstance(offset_x, int):
+                density_t = density_t[:, offset_x:]
+            if offset_t is not None and isinstance(offset_t, int):
+                density_t = density_t[offset_t:, :]
         if figsize is None:
             figsize = estimate_figsize(density_t.T, cbar=True)
 
@@ -421,65 +429,7 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
          # add central value
          if addCenter:
             sum += qty
-         # used for summing up fluxes
          return sum
-
-    def calc_entropy(self):
-        """
-        Calculate entropy of the lattice.
-        :return: entropy according to information theory as scalar
-        """
-        # calculate relative frequencies
-        rel_freq = self.nodes[self.nonborder].sum(-1)/self.nodes[self.nonborder].sum()
-        # empty lattice sites are not considered in the sum
-        a = np.where(rel_freq > 0, np.log(rel_freq), 0)
-        return -np.multiply(rel_freq, a).sum()
-
-    def calc_normalized_entropy(self):
-        """
-        Calculate entropy of the lattice normalized to maximal possible entropy.
-        :return: normalized entropy as scalar
-        """
-        smax = np.log(self.l)
-        self.smax = smax
-        return 1 - self.calc_entropy()/smax
-
-    def calc_polar_alignment_parameter(self):
-        """
-        Calculate the polar alignment parameter.
-        The polar alignment parameter is a measure for global agreement of particle orientation in the lattice.
-        It is calculated as the magnitude of the sum of the velocities of all particles normalized by the number of particles.
-        :return: polar alignment parameter as scalar
-        """
-        return np.abs(self.calc_flux(self.nodes)[self.nonborder].sum()/self.nodes[self.nonborder].sum())
-
-    def calc_mean_alignment(self):
-        """
-        Calculate the mean alignment measure.
-        The mean alignment is a measure for local alignment of particle orientation in the lattice.
-        It is calculated as the agreement in direction between the ﬂux of a lattice site and the ﬂux of the director ﬁeld
-        summed up and normalized over all lattice sites.
-        :return: mean alignment as scalar
-        """
-        # retrieve particle numbers and fluxes from instance
-        no_neighbors = self.nb_sum(np.ones(self.cell_density[self.nonborder].shape))
-        f = self.calc_flux(self.nodes[self.nonborder])
-        d = self.cell_density[self.nonborder]
-        d_div = np.where(d > 0, d, 1)
-        # calculate flux director field and normalize by number of neighbors
-        f_norm = f.flatten()/d_div
-        f_norm = self.nb_sum(f_norm)
-        f_norm = f_norm/no_neighbors
-        # calculate agreement between flux and director field flux, take mean over lattice
-        return (np.dot(f_norm, f)).sum() / d.sum() #first sum probably unnecessary
-
-
-    def update_dynamic_fields(self):
-        """
-        Update "fields" that store important variables to compute other dynamic steps.
-        """
-        self.cell_density = self.nodes.sum(-1)
-        self.eff_dens = self.nodes[self.nonborder].sum()/(self.capacity * self.l)
 
 
 if __name__ == '__main__':
