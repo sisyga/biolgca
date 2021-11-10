@@ -43,9 +43,10 @@ print(lgca.calc_polar_alignment_parameter())
 print(lgca.calc_mean_alignment())
 """
 
-lgca = get_lgca(geometry='lin', ve=False, dims=20, interaction='go_or_rest', kappa=-4, theta=0.5, restchannels=1, density=0.5)
-lgca.timeevo(50)
-lgca.plot_density()
-plt.show()
+# debug resampling tick locations for small x offsets
+lgca = get_lgca(geometry='lin', ve=False, dims=60, interaction='go_or_rest', kappa=-4, theta=0.5, restchannels=1, density=0.5)
+lgca.timeevo(20)
+#lgca.plot_density()
+#plt.show()
 lgca.plot_density(offset_t=10, offset_x=10)
 plt.show()

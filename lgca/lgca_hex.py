@@ -1,10 +1,10 @@
 try:
     from .base import *
-    from .lgca_square import LGCA_Square, IBLGCA_Square, LGCA_NoVE_2D
+    from .lgca_square import LGCA_Square, IBLGCA_Square, NoVE_LGCA_Square
 
 except ModuleNotFoundError:
     from base import *
-    from lgca_square import LGCA_Square, IBLGCA_Square
+    from lgca_square import LGCA_Square, IBLGCA_Square, NoVE_LGCA_Square
 
 
 
@@ -187,7 +187,7 @@ class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
             self.maxlabel = self.nodes.max()
 
 
-class LGCA_NoVe_HEX (LGCA_NoVE_2D, LGCA_Hex):
+class NoVE_LGCA_Hex (NoVE_LGCA_Square, LGCA_Hex):
 
     def nb_sum(self, qty, addCenter=False):
         """

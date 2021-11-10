@@ -3,7 +3,6 @@ from copy import deepcopy as copy
 
 import matplotlib.colors as mcolors
 import numpy as np
-import math
 from matplotlib import pyplot as plt
 from matplotlib.cm import ScalarMappable
 from numpy import random as npr
@@ -410,18 +409,26 @@ class LGCA_base():
 
     def homogeneous_random_reset(self, density):
         """
-        :param density: target density of the lattice
+        Distribute particles in the lattice homogeneously according to a given density: each lattice site has the same
+            number of particles, randomly distributed among channels
+        :param density: particle density in the lattice: number of particles/(dimensions * number of channels)
         """
-        initcells = min(int(density * self.K) + 1, self.K)
-        n_nodes = 1
-        for el in self.nodes.shape[:-1]:
-            n_nodes *=el
+        # find the number of particles per lattice site which is closest to the desired density
+        if int(density * self.K) == density * self.K:
+            initcells = int(density * self.K)
+        else:
+            initcells = min(int(density * self.K) + 1, self.K)
+        # create a configuration for one node with the calculated number of particles
         channels = [1] * initcells + [0] * (self.K - initcells)
+        # permutate it to fill the lattice
+        n_nodes = self.nodes[..., 0].size
         channels = np.array([npr.permutation(channels) for i in range(n_nodes)])
         self.nodes = channels.reshape(self.nodes.shape)
 
         self.apply_boundaries()
         self.update_dynamic_fields()
+        eff_dens = self.nodes[self.nonborder].sum() / (self.K * self.cell_density[self.nonborder].size)
+        print("Required density: {:.3f}, Achieved density: {:.3f}".format(density, eff_dens))
 
     def update_dynamic_fields(self):
         """Update "fields" that store important variables to compute other dynamic steps
@@ -441,7 +448,7 @@ class LGCA_base():
         self.apply_boundaries()
         self.update_dynamic_fields()
 
-    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True, recordnove=False, recordpertype=False):
+    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True, recordpertype=False):
         self.update_dynamic_fields()
         if record:
             self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
@@ -452,69 +459,47 @@ class LGCA_base():
         if recorddens:
             self.dens_t = np.zeros((timesteps + 1,) + self.dims)
             self.dens_t[0, ...] = self.cell_density[self.nonborder]
-        if recordnove:
-            self.ent_t = np.zeros(timesteps + 1, dtype=np.float)
-            self.ent_t[0, ...] = self.calc_entropy()
-            self.normEnt_t = np.zeros(timesteps + 1, dtype=np.float)
-            self.normEnt_t[0, ...] = self.calc_normalized_entropy()
-            self.polAlParam_t = np.zeros(timesteps + 1, dtype=np.float)
-            self.polAlParam_t[0, ...] = self.calc_polar_alignment_parameter()
-            self.meanAlign_t = np.zeros(timesteps + 1, dtype=np.float)
-            self.meanAlign_t[0, ...] = self.calc_mean_alignment()
         if recordpertype:
             self.velcells_t = np.zeros((timesteps + 1,) + self.dims)
             self.velcells_t[0, ...] = self.nodes[self.nonborder][..., :self.velocitychannels].sum(-1)
             self.restcells_t = np.zeros((timesteps + 1,) + self.dims)
             self.restcells_t[0, ...] = self.nodes[self.nonborder][..., self.velocitychannels:].sum(-1)
         for t in range(1, timesteps + 1):
-            #print("\nTimestep: {}".format(t))
             self.timestep()
-            #print(self.nodes.shape)
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.nonborder]
             if recordN:
                 self.n_t[t] = self.cell_density[self.nonborder].sum()
             if recorddens:
                 self.dens_t[t, ...] = self.cell_density[self.nonborder]
-            if recordnove:
-                self.ent_t[t, ...] = self.calc_entropy()
-                self.normEnt_t[t, ...] = self.calc_normalized_entropy()
-                self.polAlParam_t[t, ...] = self.calc_polar_alignment_parameter()
-                self.meanAlign_t[t, ...] = self.calc_mean_alignment()
             if recordpertype:
                 self.velcells_t[t, ...] = self.nodes[self.nonborder][..., :self.velocitychannels].sum(-1)
                 self.restcells_t[t, ...] = self.nodes[self.nonborder][..., self.velocitychannels:].sum(-1)
             if showprogress:
                 update_progress(1.0 * t / timesteps)
 
-
-    def get_nodes(self):
-        return self.nodes
-
     def print_nodes(self):
         print(self.nodes.astype(int))
 
     def calc_permutations(self):
-        #he's using a list comprehension; https://blog.teamtreehouse.com/python-single-line-loops
         self.permutations = [np.array(list(multiset_permutations([1] * n + [0] * (self.K - n))), dtype=np.int8)
-                                                                #builds list with all possible amounts of particles in an array of size self.K (velocity + resting)
+                                                                # builds list with all possible amounts of particles in
+                                                                # an array of size self.K (velocity + resting)
                                       # builds nested list with all possible permutations for this array
-                             #first dim: number of particles
-                             #second dim: all permutations for this n
+                             # first dim: number of particles
+                             # second dim: all permutations for this n
                              for n in range(self.K + 1)]
-        #-> list of all possible configurations for a lattice site
+        # -> list of all possible configurations for a lattice site
 
         self.j = [np.dot(self.c, self.permutations[n][:, :self.velocitychannels].T) for n in range(self.K + 1)]
-        #dot product between the directions and the particles in the velocity channels for each possible number of particles
-        #array of flux for each permutation for each number of particles
-        #first dim: number of particles
-        #second dim: flux vector for each permutation (directions as specified in c)
+        # dot product between the directions and the particles in the velocity channels for each possible number of particles
+        # array of flux for each permutation for each number of particles
+        # first dim: number of particles
+        # second dim: flux vector for each permutation (directions as specified in c)
 
         self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(2))[None, ...]
-        #I don't need this (I hope)
         self.si = [np.einsum('ij,jkl', self.permutations[n][:, :self.velocitychannels], self.cij) for n in
                    range(self.K + 1)]
-        #I don't need this (I hope)
 
 
 class IBLGCA_base(LGCA_base):
@@ -783,7 +768,7 @@ class IBLGCA_base(LGCA_base):
         return line, errors
 
 
-class LGCA_noVE_base(LGCA_base):
+class NoVE_LGCA_base(LGCA_base):
     """
     Base class for LGCA without volume exclusion.
     """
@@ -909,6 +894,51 @@ class LGCA_noVE_base(LGCA_base):
                 self.beta = 2.
                 print('sensitivity set to beta = ', self.beta)
 
+    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True, recordorderparams=False, recordpertype=False):
+        self.update_dynamic_fields()
+        if record:
+            self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
+            self.nodes_t[0, ...] = self.nodes[self.nonborder]
+        if recordN:
+            self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
+            self.n_t[0] = self.cell_density[self.nonborder].sum()
+        if recorddens:
+            self.dens_t = np.zeros((timesteps + 1,) + self.dims)
+            self.dens_t[0, ...] = self.cell_density[self.nonborder]
+        if recordorderparams:
+            self.ent_t = np.zeros(timesteps + 1, dtype=np.float)
+            self.ent_t[0, ...] = self.calc_entropy()
+            self.normEnt_t = np.zeros(timesteps + 1, dtype=np.float)
+            self.normEnt_t[0, ...] = self.calc_normalized_entropy()
+            self.polAlParam_t = np.zeros(timesteps + 1, dtype=np.float)
+            self.polAlParam_t[0, ...] = self.calc_polar_alignment_parameter()
+            self.meanAlign_t = np.zeros(timesteps + 1, dtype=np.float)
+            self.meanAlign_t[0, ...] = self.calc_mean_alignment()
+        if recordpertype:
+            self.velcells_t = np.zeros((timesteps + 1,) + self.dims)
+            self.velcells_t[0, ...] = self.nodes[self.nonborder][..., :self.velocitychannels].sum(-1)
+            self.restcells_t = np.zeros((timesteps + 1,) + self.dims)
+            self.restcells_t[0, ...] = self.nodes[self.nonborder][..., self.velocitychannels:].sum(-1)
+        for t in range(1, timesteps + 1):
+            #print("\nTimestep: {}".format(t))
+            self.timestep()
+            #print(self.nodes.shape)
+            if record:
+                self.nodes_t[t, ...] = self.nodes[self.nonborder]
+            if recordN:
+                self.n_t[t] = self.cell_density[self.nonborder].sum()
+            if recorddens:
+                self.dens_t[t, ...] = self.cell_density[self.nonborder]
+            if recordorderparams:
+                self.ent_t[t, ...] = self.calc_entropy()
+                self.normEnt_t[t, ...] = self.calc_normalized_entropy()
+                self.polAlParam_t[t, ...] = self.calc_polar_alignment_parameter()
+                self.meanAlign_t[t, ...] = self.calc_mean_alignment()
+            if recordpertype:
+                self.velcells_t[t, ...] = self.nodes[self.nonborder][..., :self.velocitychannels].sum(-1)
+                self.restcells_t[t, ...] = self.nodes[self.nonborder][..., self.velocitychannels:].sum(-1)
+            if showprogress:
+                update_progress(1.0 * t / timesteps)
 
     def random_reset(self, density):
         """
@@ -934,21 +964,27 @@ class LGCA_noVE_base(LGCA_base):
             number of particles, randomly distributed among the channels
         :param density: particle density in the lattice: number of particles/(dimensions*capacity)
         """
-        initcells = int(density * self.capacity)
+        # find the number of particles per lattice site which is closest to the desired density
+        if int(density * self.capacity) == density * self.capacity:
+            initcells = int(density * self.capacity)
+        else:
+            initcells = int(density * self.capacity) + 1
+        # distribute calculated number of particles among channels in the lattice
         self.nodes = npr.multinomial(initcells, [1 / self.K] * self.K, size=self.nodes.shape[:-1])
         self.apply_boundaries()
         self.update_dynamic_fields()
+        # check result
         eff_dens = self.nodes[self.nonborder].sum() / (self.capacity * self.cell_density[self.nonborder].size)
         print("Required density: {:.3f}, Achieved density: {:.3f}".format(density, eff_dens))
 
     def calc_entropy(self, base=None):
         """
         Calculate entropy of the lattice.
-        :param base: base of the logarithm, defaults to capacity of the LGCA
+        :param base: base of the logarithm, defaults to 2
         :return: entropy according to information theory as scalar
         """
         if base is None:
-            base = self.capacity
+            base = 2
         # calculate relative frequencies, self.cell_density[self.nonborder].size = number of nodes
         _, freq = np.unique(self.cell_density[self.nonborder], return_counts=True)
         freq = freq / self.cell_density[self.nonborder].size
@@ -958,10 +994,11 @@ class LGCA_noVE_base(LGCA_base):
     def calc_normalized_entropy(self, base=None):
         """
         Calculate entropy of the lattice normalized to maximal possible entropy.
+        :param base: base of the logarithm, defaults to 2
         :return: normalized entropy as scalar
         """
         if base is None:
-            base = self.capacity
+            base = 2
         # calculate maximal entropy, self.cell_density[self.nonborder].size = number of nodes
         smax = - np.divide(np.log(1/self.cell_density[self.nonborder].size), np.log(base))
         return 1 - self.calc_entropy(base=base)/smax
@@ -988,7 +1025,7 @@ class LGCA_noVE_base(LGCA_base):
         The mean alignment is a measure for local alignment of particle orientation in the lattice.
         It is calculated as the agreement in direction between the ﬂux of a lattice site and the ﬂux of the director ﬁeld
         summed up and normalized over all lattice sites.
-        :return: Local alignment parameter: ranging from -1 (antiparallel alignment), through 0 (no alignment) to 1 (parallel alignment)
+        :return: Local alignment parameter: ranging from -1 (antiparallel alignment) through 0 (no alignment) to 1 (parallel alignment)
         """
         # Calculate the director field
         flux = self.calc_flux(self.nodes)

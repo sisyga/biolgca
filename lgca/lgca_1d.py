@@ -45,15 +45,12 @@ class LGCA_1D(LGCA_base):
         elif nodes is None:
             self.random_reset(density)
         else:
-            self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.bool) #what if that doesn't fit?! it always
-            # does because set_dims has a case for that where it just copies the stuff
+            self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.bool)
 
     def init_coords(self):
-        self.nonborder = (np.arange(self.l) + self.r_int,) #tuple s.t. I can call my lattice sites "nodes[nonborder]" like this
-        # self.nonborder ist ein tuple von indices entlang der dimensionen des Gitters, deswegen das Komma. Im 1D Fall ist das Tuple dann nur von der Länge 1.
-        # Zelldichte aller Nicht-Randzellen celldens = self.cell_density[self.nonborder]
-        # Die "echten Werte" von xcoords sind 0 bis 4, aber die dazugehörigen Indizes, um die Koordinaten abzurufen sind 1 bis 5, dh xcoords[nonborder] gibt dir 0 bis 4 aus.
-        self.xcoords = np.arange(self.l + 2 * self.r_int) - self.r_int #indexing of x-coordinates starting at -r_int to l+r_int?
+        self.nonborder = (np.arange(self.l) + self.r_int,) # tuple s.t. lattice sites can be called as: nodes[nonborder]
+        # self.nonborder is a tuple of indices along the lattice dimensions to correctly index xcoords
+        self.xcoords = np.arange(self.l + 2 * self.r_int) - self.r_int # x-coordinates starting at -r_int to l+r_int
 
     def propagation(self):
         """
@@ -95,12 +92,8 @@ class LGCA_1D(LGCA_base):
         return sum
 
     def gradient(self, qty):
-        #qty: array with some function
-        #2: spacing between samples in qty TODO why 2?
         return np.gradient(qty, 2)[..., None]
-        # The ellipsis is used to slice higher-dimensional data structures.
-        # It's designed to mean at this point, insert as many full slices (:) to extend the multi-dimensional slice to all dimensions.
-        # None adds a new axis to the ndarray and keeps the whole rest unchanged
+        # None adds a new axis to the ndarray and keeps the remaining array unchanged
 
     def channel_weight(self, qty): #whatever this does
         weights = np.zeros(qty.shape + (self.velocitychannels,)) #velocity channels added as a dimension, ',' to make it a tuple to add it to the shape tuple
@@ -109,32 +102,13 @@ class LGCA_1D(LGCA_base):
         weights[1:, ..., 1] = qty[:-1, ...] #shift second dimension of qty right to put in left velocity channel
         return weights
 
-    #
-    # def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
-    #     self.update_dynamic_fields()
-    #     if record:
-    #         self.nodes_t = np.zeros((timesteps + 1, self.l, 2 + self.restchannels), dtype=self.nodes.dtype)
-    #         self.nodes_t[0, ...] = self.nodes[self.r_int:-self.r_int, ...]
-    #     if recordN:
-    #         self.n_t = np.zeros(timesteps + 1, dtype=np.int)
-    #         self.n_t[0] = self.nodes.sum()
-    #     if recorddens:
-    #         self.dens_t = np.zeros((timesteps + 1, self.l))
-    #         self.dens_t[0, ...] = self.cell_density[self.r_int:-self.r_int]
-    #     for t in range(1, timesteps + 1):
-    #         self.timestep()
-    #         if record:
-    #             self.nodes_t[t, ...] = self.nodes[self.r_int:-self.r_int]
-    #         if recordN:
-    #             self.n_t[t] = self.cell_density.sum()
-    #         if recorddens:
-    #             self.dens_t[t, ...] = self.cell_density[self.r_int:-self.r_int]
-    #         if showprogress:
-    #             update_progress(1.0 * t / timesteps)
-
     def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis_r'): #cmap='hot_r')
         if density_t is None:
-            density_t = self.dens_t
+            if self.dens_t is not None:
+                density_t = self.dens_t
+            else:
+                raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
+                                   "in past LGCA run, call lgca.timeevo with keyword recorddens=True")
         if figsize is None:
             figsize = estimate_figsize(density_t.T, cbar=True)
 
@@ -156,7 +130,11 @@ class LGCA_1D(LGCA_base):
 
     def plot_flux(self, nodes_t=None, figindex=None, figsize=None):
         if nodes_t is None:
-            nodes_t = self.nodes_t
+            if self.nodes_t is not None:
+                nodes_t = self.nodes_t
+            else:
+                raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
+                                   "in past LGCA run, call lgca.timeevo() with keyword record=True")
 
         dens_t = nodes_t.sum(-1) / nodes_t.shape[-1]
         tmax, l = dens_t.shape
@@ -241,7 +219,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         return plot
 
 
-class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
+class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
     """
     1D version of an LGCA without volume exclusion.
     """
@@ -265,7 +243,7 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
             # for now, raise Exception if format of nodes does no fit
             # (To Do: just sum the cells in surplus rest channels in init_nodes and print a warning)
             if self.K - self.restchannels > self.velocitychannels:
-                raise Exception('Only one resting channel allowed, \
+                raise RuntimeError('Only one resting channel allowed, \
                  but {} resting channels specified!'.format(self.K - self.velocitychannels))
             self.dims = self.l,
             if capacity is not None:
@@ -318,7 +296,7 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
             self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.uint)
 
 
-    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis_r', scaling=None, absolute_max=None, offset_t=None, offset_x=None):
+    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis_r', scaling=None, absolute_max=None, offset_t=0, offset_x=0):
         """
         Create a plot showing the number of particles per lattice site.
         :param density_t: particle number per lattice site (ndarray of dimension (timesteps + 1,) + self.dims)
@@ -327,12 +305,19 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         :param cmap: matplotlib color map for encoding the number of particles
         :return: plot as a matplotlib.image
         """
+        # construct conditions
+        x_has_offset = offset_x != 0 and isinstance(offset_x, int)
+        t_has_offset = offset_t != 0 and isinstance(offset_t, int)
         # set values for unused arguments
         if density_t is None:
-            density_t = self.dens_t
-            if offset_x is not None and isinstance(offset_x, int):
+            if self.dens_t is not None:
+                density_t = self.dens_t
+            else:
+                raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
+                                   "in past LGCA run, call lgca.timeevo with keyword recorddens=True")
+            if x_has_offset:
                 density_t = density_t[:, offset_x:]
-            if offset_t is not None and isinstance(offset_t, int):
+            if t_has_offset:
                 density_t = density_t[offset_t:, :]
         if figsize is None:
             figsize = estimate_figsize(density_t.T, cbar=True)
@@ -350,21 +335,13 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
             max_part_per_cell = int(absolute_max)
         cmap = cmap_discretize(cmap, max_part_per_cell + 1)
         # create plot with color bar, axis labels, title and layout
-        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=max_part_per_cell, cmap=cmap)
-        # plot slice with an x-offset
-        if offset_x is not None and isinstance(offset_x, int):
-            fig.canvas.draw() # otherwise the list will be empty
-            labels = [item.get_text() for item in ax.get_xticklabels()]
-            for i in range(len(labels)):
-                labels[i] = str(int(float(labels[i].strip().replace("−", "-")))+offset_x) #replace long dash by minus
-            ax.set_xticklabels(labels)
-        # plot slice with a y-offset
-        if offset_t is not None and isinstance(offset_t, int):
-            fig.canvas.draw() # otherwise the list will be empty
-            labels = [item.get_text() for item in ax.get_yticklabels()]
-            for i in range(len(labels)):
-                labels[i] = str(int(float(labels[i].strip().replace("−", "-")))+offset_t) #replace long dash by minus
-            ax.set_yticklabels(labels)
+        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=max_part_per_cell, cmap=cmap,
+                            extent = [offset_x-0.5, density_t.shape[1] + offset_x-0.5, density_t.shape[0] + offset_t - 0.5, offset_t-0.5])
+        loc = mticker.MaxNLocator(nbins='auto', steps=[1,2,5,10], integer=True)
+        # loc.view_limits(offset_x, density_t.shape[1]+offset_x)
+        ax.xaxis.set_major_locator(loc)
+        loc = mticker.MaxNLocator(nbins='auto', steps=[1, 2, 5, 10], integer=True)
+        ax.yaxis.set_major_locator(loc)
         cbar = colorbar_index(ncolors=max_part_per_cell + 1, cmap=cmap, use_gridspec=True)
         cbar.set_label(r'Particle number $n$')
         plt.xlabel(r'Lattice node $r \, (\varepsilon)$', )
@@ -386,7 +363,11 @@ class LGCA_noVE_1D(LGCA_1D, LGCA_noVE_base):
         """
         # set values for unused arguments
         if nodes_t is None:
-            nodes_t = self.nodes_t
+            if self.nodes_t is not None:
+                nodes_t = self.nodes_t
+            else:
+                raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
+                                   "in past LGCA run, call lgca.timeevo() with keyword record=True")
         # calculate particle density, max time and dimension values, flux
         dens_t = nodes_t.sum(-1) / nodes_t.shape[-1]
         tmax, l = dens_t.shape

@@ -3,7 +3,6 @@ import matplotlib.colors as colors
 import matplotlib.ticker as mticker
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
-import numpy as np
 
 try:
     from base import *
@@ -266,7 +265,11 @@ class LGCA_Square(LGCA_base):
 
     def animate_config(self, nodes_t=None, figindex=None, figsize=None, interval=100, tight_layout=True, grid=False):
         if nodes_t is None:
-            nodes_t = self.nodes_t
+            if self.nodes_t is not None:
+                nodes_t = self.nodes_t
+            else:
+                raise RuntimeError("Channel-wise state of the lattice required for plotting the configuration but not " +
+                                   "recorded in past LGCA run, call lgca.timeevo with keyword record=True")
 
         fig, arrows, circles, texts = self.plot_config(nodes=nodes_t[0], figindex=figindex, figsize=figsize,
                                                        tight_layout=tight_layout, grid=grid)
@@ -395,7 +398,11 @@ class LGCA_Square(LGCA_base):
 
     def animate_flow(self, nodes_t=None, figindex=None, figsize=None, interval=100, tight_layout=True, cmap='viridis'):
         if nodes_t is None:
-            nodes_t = self.nodes_t
+            if self.nodes_t is not None:
+                nodes_t = self.nodes_t
+            else:
+                raise RuntimeError("Channel-wise state of the lattice required for flow calculation but not recorded " +
+                                   "in past LGCA run, call lgca.timeevo with keyword record=True")
 
         nodes = nodes_t.astype(float)
         density = nodes.sum(-1)
@@ -515,7 +522,11 @@ class LGCA_Square(LGCA_base):
     def animate_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis', interval=500, vmax=None,
                         tight_layout=True, edgecolor='None'):
         if density_t is None:
-            density_t = self.dens_t
+            if self.dens_t is not None:
+                density_t = self.dens_t
+            else:
+                raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
+                                   "in past LGCA run, call lgca.timeevo with keyword recorddens=True")
 
         fig, pc, cmap = self.plot_density(density_t[0], figindex=figindex, figsize=figsize, cmap=cmap, vmax=vmax,
                                           tight_layout=tight_layout, edgecolor=edgecolor)
@@ -532,7 +543,11 @@ class LGCA_Square(LGCA_base):
     def animate_flux(self, nodes_t=None, figindex=None, figsize=None, interval=200, tight_layout=True,
                      edgecolor='None', cbar=True):
         if nodes_t is None:
-            nodes_t = self.nodes_t
+            if self.nodes_t is not None:
+                nodes_t = self.nodes_t
+            else:
+                raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
+                                   "in past LGCA run, call lgca.timeevo with keyword record=True")
 
         nodes = nodes_t.astype(float)
         density = nodes.sum(-1) / self.K
@@ -634,7 +649,7 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
         return fig, pc, cmap
 
 
-class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
+class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
     """
     2D square version of an LGCA without volume exclusion.
     """
@@ -832,7 +847,11 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
     def animate_flux(self, nodes_t=None, figindex=None, figsize=None, interval=200, tight_layout=True,
                      edgecolor='None', cbar=True):
         if nodes_t is None:
-            nodes_t = self.nodes_t
+            if self.nodes_t is not None:
+                nodes_t = self.nodes_t
+            else:
+                raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
+                                   "in past LGCA run, call mylgca.timeevo with keyword record=True")
 
         nodes = nodes_t.astype(float)
         density = nodes.sum(-1) / self.K
@@ -861,7 +880,11 @@ class LGCA_NoVE_2D(LGCA_Square, LGCA_noVE_base):
     def animate_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis', interval=200, vmax=None,
                         tight_layout=True, edgecolor='None'):
         if density_t is None:
-            density_t = self.dens_t
+            if self.dens_t is not None:
+                density_t = self.dens_t
+            else:
+                raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
+                                   "in past LGCA run, call lgca.timeevo with keyword recorddens=True")
 
         if vmax is not None:
             vmax_val = vmax
