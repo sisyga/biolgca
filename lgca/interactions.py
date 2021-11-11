@@ -1,5 +1,4 @@
 from bisect import bisect_left
-from math import log, exp
 from random import random
 
 import numpy as np
@@ -137,15 +136,22 @@ def alignment(lgca):
     newnodes = lgca.nodes.copy()
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
                (lgca.cell_density[lgca.nonborder] < lgca.K)
+    # gives ndarray of boolean values
     coords = [a[relevant] for a in lgca.nonborder]
-    g = lgca.calc_flux(lgca.nodes)
-    g = lgca.nb_sum(g)
+    #a is an array of numbers, array can be indexed with another array of same size with boolean specification if element
+    #should be included. Returns only the relevant elements and coords is a list here
+    g = lgca.calc_flux(lgca.nodes) #calculates flux for each lattice site
+    g = lgca.nb_sum(g) #calculates sum of flux of neighbors for each lattice site
     for coord in zip(*coords):
         n = lgca.cell_density[coord]
         permutations = lgca.permutations[n]
-        j = lgca.j[n]
+        j = lgca.j[n] #flux per permutation
         weights = np.exp(lgca.beta * np.einsum('i,ij', g[coord], j)).cumsum()
+                                    #multiply neighborhood flux with the flux for each possible permutation
+        #np.exp for probability
+        #cumsum() for cumulative distribution function
         ind = bisect_left(weights, random() * weights[-1])
+        #inverse transform sampling method
         newnodes[coord] = permutations[ind]
 
     lgca.nodes = newnodes
@@ -200,7 +206,6 @@ def aggregation(lgca):
 def wetting(lgca):
     """
     Wetting of a surface for different levels of E-cadherin
-    :param n_crit:
     :param lgca:
     :return:
     """
@@ -313,8 +318,8 @@ def go_or_grow(lgca):
         r_channels = np.zeros(lgca.restchannels)
         r_channels[:n_rxy] = 1
         node = np.hstack((v_channels, r_channels))
+        #print(n_mxy, n_rxy)
         lgca.nodes[coord] = node
-
 
 def p_binom(k, n, p):
     pb = binom_coeff(n, k) * p**k * (1 - p)**(n-k)
@@ -361,13 +366,13 @@ def leup_test(lgca):
     M1 = np.minimum(n_m, lgca.restchannels - n_r)
     M2 = np.minimum(n_r, lgca.velocitychannels - n_m)
 
-    p0 = np.divide(n_r, n, where=n>0, out=np.zeros_like(n, dtype=float))
+    p0 = np.divide(n_r, n, where=n > 0, out=np.zeros_like(n, dtype=float))
     s = s_binom(n, p0, lgca.velocitychannels)
-    p10 = np.divide(n_r+1, n, where=n>0, out=np.zeros_like(n, dtype=float))
+    p10 = np.divide(n_r + 1, n, where=n > 0, out=np.zeros_like(n, dtype=float))
     s10 = s_binom(n, p10, lgca.velocitychannels)
     ds1 = s10 - s
 
-    p01 = np.divide(n_r-1, n, where=n>0, out=np.zeros_like(n, dtype=float))
+    p01 = np.divide(n_r - 1, n, where=n > 0, out=np.zeros_like(n, dtype=float))
     s01 = s_binom(n, p01, lgca.velocitychannels)
     ds2 = s01 - s
     #
@@ -426,5 +431,35 @@ def leup_test(lgca):
         node[v_channels] = 1
         node[lgca.velocitychannels:lgca.velocitychannels + n_rxy] = 1
         # node = np.hstack((v_channels, r_channels))
+        lgca.nodes[coord] = node
+
+def go_or_rest(lgca):
+    """
+    Interactions of the go-or-grow model without birth and death, i.e. only the switch and random walk.
+    """
+    relevant = lgca.cell_density[lgca.nonborder] > 0
+    coords = [a[relevant] for a in lgca.nonborder]
+    n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
+    n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
+    M1 = np.minimum(n_m, lgca.restchannels - n_r)
+    M2 = np.minimum(n_r, lgca.velocitychannels - n_m)
+
+    for coord in zip(*coords):
+        n = lgca.cell_density[coord]
+
+        n_mxy = n_m[coord]
+        n_rxy = n_r[coord]
+
+        rho = n / lgca.K
+        j_1 = npr.binomial(M1[coord], tanh_switch(rho, kappa=lgca.kappa, theta=lgca.theta))
+        j_2 = npr.binomial(M2[coord], 1 - tanh_switch(rho, kappa=lgca.kappa, theta=lgca.theta))
+        n_mxy += j_2 - j_1
+        n_rxy += j_1 - j_2
+
+        v_channels = [1] * n_mxy + [0] * (lgca.velocitychannels - n_mxy)
+        v_channels = npr.permutation(v_channels)
+        r_channels = np.zeros(lgca.restchannels)
+        r_channels[:n_rxy] = 1
+        node = np.hstack((v_channels, r_channels))
         lgca.nodes[coord] = node
 

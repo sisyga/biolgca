@@ -45,11 +45,16 @@ class LGCA_Square(LGCA_base):
         self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels
 
-    def init_nodes(self, density=0.1, nodes=None):
+    def init_nodes(self, density=0.1, nodes=None, **kwargs):
         self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.bool)
-        if nodes is None:
+        if 'hom' in kwargs:
+            hom = kwargs['hom']
+        else:
+            hom = None
+        if nodes is None and hom:
+            self.homogeneous_random_reset(density)
+        elif nodes is None:
             self.random_reset(density)
-
         else:
             self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(np.bool)
 
@@ -288,7 +293,11 @@ class LGCA_Square(LGCA_base):
 
     def animate_config(self, nodes_t=None, interval=100, **kwargs):
         if nodes_t is None:
-            nodes_t = self.nodes_t
+            if self.nodes_t is not None:
+                nodes_t = self.nodes_t
+            else:
+                raise RuntimeError("Channel-wise state of the lattice required for plotting the configuration but not " +
+                                   "recorded in past LGCA run, call lgca.timeevo with keyword record=True")
 
         fig, arrows, circles, texts = self.plot_config(nodes=nodes_t[0], **kwargs)
         title = plt.title('Time $k =$0')
@@ -429,7 +438,11 @@ class LGCA_Square(LGCA_base):
 
     def animate_flow(self, nodes_t=None, interval=100, cbar=False, **kwargs):
         if nodes_t is None:
-            nodes_t = self.nodes_t
+            if self.nodes_t is not None:
+                nodes_t = self.nodes_t
+            else:
+                raise RuntimeError("Channel-wise state of the lattice required for flow calculation but not recorded " +
+                                   "in past LGCA run, call lgca.timeevo with keyword record=True")
 
         nodes = nodes_t.astype(float)
         density = nodes.sum(-1)
@@ -510,7 +523,7 @@ class LGCA_Square(LGCA_base):
         if K > 1:
             cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
         else:
-            cmap = plt.cm.ScalarMappable(cmap=cmap)
+            cmap = plt.cm.ScalarMappable(cmap=cmap) #why?
         cmap.set_array(density)
         polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
                                    orientation=self.orientation, facecolor=c, edgecolor=edgecolor)
@@ -580,8 +593,13 @@ class LGCA_Square(LGCA_base):
         return fig, pc, cmap
 
     def animate_density(self, density_t=None, interval=100, **kwargs):
+
         if density_t is None:
-            density_t = self.dens_t
+            if self.dens_t is not None:
+                density_t = self.dens_t
+            else:
+                raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
+                                   "in past LGCA run, call lgca.timeevo with keyword recorddens=True")
 
         fig, pc, cmap = self.plot_density(density_t[0], **kwargs)
         title = plt.title('Time $k =$0')
@@ -596,7 +614,11 @@ class LGCA_Square(LGCA_base):
 
     def animate_flux(self, nodes_t=None, interval=100, **kwargs):
         if nodes_t is None:
-            nodes_t = self.nodes_t
+            if self.nodes_t is not None:
+                nodes_t = self.nodes_t
+            else:
+                raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
+                                   "in past LGCA run, call lgca.timeevo with keyword record=True")
 
         nodes = nodes_t.astype(float)
         density = nodes.sum(-1) / self.K
@@ -651,7 +673,7 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
     Identity-based LGCA simulator class.
     """
 
-    def init_nodes(self, density=0.1, nodes=None):
+    def init_nodes(self, density=0.1, nodes=None, **kwargs):
         self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
         if nodes is None:
             self.random_reset(density)
@@ -675,6 +697,255 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
         meanprop = self.calc_prop_mean(propname=propname, props=props, nodes=nodes)
         fig, pc, cmap = self.plot_scalarfield(meanprop, mask=mask, **kwargs)
         return fig, pc, cmap
+
+
+class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
+    """
+    2D square version of an LGCA without volume exclusion.
+    """
+    interactions = ['dd_alignment', 'di_alignment', 'go_or_grow', 'go_or_rest']
+
+    def set_dims(self, dims=None, nodes=None, restchannels=None, capacity=None):
+        """
+        Set the dimensions of the instance according to given values. Sets self.l, self.K, self.dims and self.restchannels
+        :param dims: desired lattice size (int or array-like)
+        :param nodes: existing lattice to use (ndarray)
+        :param restchannels: desired number of resting channels, will be capped to 1 if >1 because of no volume exclusion
+        """
+        # set instance dimensions according to passed lattice
+        if nodes is not None:
+            self.lx, self.ly, self.K = nodes.shape
+            # set number of rest channels to <= 1 because >1 cells are allowed per channel
+            if restchannels is not None:
+                if restchannels > 1:
+                    self.restchannels = 1
+                elif 0 <= restchannels <= 1:
+                    self.restchannels = restchannels
+                # for now, raise Exception if format of nodes does no fit
+                # (To Do: just sum the cells in surplus rest channels in init_nodes and print a warning)
+                if self.K - self.velocitychannels > self.restchannels:
+                    raise Exception('{} resting channels announced, but {} resting channels specified!'.format(restchannels, self.K - self.velocitychannels))
+            else:
+                if self.K - self.velocitychannels <= 1:
+                    self.restchannels = self.K - self.velocitychannels
+                else:
+                    raise Exception(
+                        'Only one resting channels allowed, but {} resting channels specified!'.format(self.K - self.velocitychannels))
+
+            self.dims = self.lx, self.ly
+            if capacity is not None:
+                self.capacity = capacity
+            else:
+                self.capacity = self.K
+            return
+
+        elif isinstance(dims, tuple):
+            if len(dims)==2:
+                self.lx, self.ly = dims
+            elif len(dims)>2:
+                self.lx, self.ly = dims[0], dims[1]
+                print("Dimensions provided with too many values! " +str(dims))
+            else:
+                self.lx, self.ly = dims[0], dims[0]
+                print("Dimensions provided as tuple "+str(dims)+", but only one value for 2D lattice!")
+        elif isinstance(dims, int):
+            self.lx, self.ly = dims, dims
+        else:
+            self.lx, self.ly = (50, 50)
+            if dims is None:
+                print("Dimensions set to default 50x50.")
+            else:
+                print("Dimensions provided in wrong format, must be tuple of 2 elements or integer.")
+        self.dims = self.lx, self.ly
+
+        # set number of rest channels to <= 1 because >1 cells are allowed per channel
+        if restchannels is not None:
+            if restchannels > 1:
+                self.restchannels = 1
+            elif 0 <= restchannels <= 1:
+                self.restchannels = restchannels
+        else:
+            self.restchannels = 0
+        self.K = self.velocitychannels + self.restchannels
+
+        if capacity is not None:
+            self.capacity = capacity
+        else:
+            self.capacity = self.K
+
+
+
+    def init_nodes(self, density=4, nodes=None, hom=None):
+        self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
+        if nodes is None:
+            if hom:
+                self.homogeneous_random_reset(density)
+            else:
+                self.random_reset(density)
+        else:
+            self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(np.uint)
+
+    def nb_sum(self, qty, addCenter=False):
+        """
+        Calculate sum of values in neighboring lattice sites of each lattice site.
+        :param qty: ndarray in which neighboring values have to be added
+                    first dimension indexes lattice sites
+        :param addCenter: toggle adding central value
+        :return: sum as ndarray
+        """
+        sum = np.zeros(qty.shape)
+        # shift to left padding 0 and add to shift to the right padding 0
+        sum[:-1, ...] += qty[1:, ...]
+        sum[1:, ...] += qty[:-1, ...]
+        # add shift up padding 0 and shift down padding 0
+        sum[:, :-1, ...] += qty[:, 1:, ...]
+        sum[:, 1:, ...] += qty[:, :-1, ...]
+        # add central value
+        if addCenter:
+            sum += qty
+        return sum
+
+    def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
+                     edgecolor='None', cbar=True):
+        if density is None:
+            density = self.cell_density[self.nonborder]
+
+        if figsize is None:
+            figsize = estimate_figsize(density, cbar=True, dy=self.dy)
+
+        if vmax is None:
+            K = int(density.max())
+        else:
+            K = vmax
+
+        fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
+        cmap = plt.cm.get_cmap(cmap)
+        cmap.set_under(alpha=0.0)
+        cmap_scaled = False
+
+        if 1 < K <= cmap.N:
+            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
+        elif K > 1:
+            cmap_scaled = True
+            scaling_factor = K / cmap.N
+            nbins = cmap.N
+            density = density/scaling_factor
+            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(cmap.N + 1), cmap.N))
+        else:
+            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.Normalize(vmin=1e-6, vmax=1))
+        cmap.set_array(density)
+
+        polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
+                                   orientation=self.orientation, facecolor=c, edgecolor=edgecolor)
+                    for x, y, c in zip(self.xcoords.ravel(), self.ycoords.ravel(), cmap.to_rgba(density.ravel()))]
+        pc = PatchCollection(polygons, match_original=True)
+        ax.add_collection(pc)
+
+        if cbar:
+            if K <= 1:
+                # requires extra treatment because there is only one colour
+                cbar = fig.colorbar(cmap, extend='min', use_gridspec=True, boundaries=[0,0.5,1], values=[0,1])
+            else:
+                cbar = fig.colorbar(cmap, extend='min', use_gridspec=True)
+            cbar.set_label('Particle number $n$')
+            if cmap_scaled:
+                ncolors = nbins
+            else:
+                ncolors = max(1,K)
+            # set a numbering interval for high densities (e.g. 5-10-15-20)
+            if ncolors > 101:
+                stride = 10
+            elif ncolors > 51:
+                stride = 5
+            elif ncolors > 31:
+                stride = 2
+            else:
+                stride = 1
+            if K <= 1:
+                # requires extra treatment because there is only one colour
+                ticks = np.array([0.75])
+            else:
+                ticks = np.arange(1,ncolors+1,1) + 0.5
+            if cmap_scaled:
+                indices = np.arange(1, nbins + 2)
+                low_label = np.ceil(indices * scaling_factor - 1e-6)
+                low_label = np.roll(low_label, 1)
+                low_label = np.delete(low_label, 0).astype(int)
+                labels = list(low_label)
+            else:
+                labels = list(np.arange(1,ncolors+1,1))
+            # if max label comes up automatically, leave it as it is
+            if ticks[-1] == ticks[0::stride][-1]:
+                cbar.set_ticks(ticks[0::stride])
+                cbar.set_ticklabels(labels[0::stride])
+            # if max label is too close to last strided label, leave the latter out
+            elif stride > 1 and ticks[-1] != ticks[0::stride][-1] and ticks[-1] - ticks[0::stride][-1] < stride / 2:
+                cbar.set_ticks(list(ticks[0::stride][:-1]) + [ticks[-1]])
+                cbar.set_ticklabels(labels[0::stride][:-1] + [labels[-1]])
+            # if there is enough space, just add the max label
+            else:
+                cbar.set_ticks(list(ticks[0::stride]) + [ticks[-1]])
+                cbar.set_ticklabels(labels[0::stride] + [labels[-1]])
+        return fig, pc, cmap
+
+    def animate_flux(self, nodes_t=None, figindex=None, figsize=None, interval=200, tight_layout=True,
+                     edgecolor='None', cbar=True):
+        if nodes_t is None:
+            if self.nodes_t is not None:
+                nodes_t = self.nodes_t
+            else:
+                raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
+                                   "in past LGCA run, call mylgca.timeevo with keyword record=True")
+
+        nodes = nodes_t.astype(float)
+        density = nodes.sum(-1) / self.K
+        jx, jy = np.moveaxis(self.calc_flux(nodes), -1, 0)
+
+        angle = np.zeros(density.shape, dtype=complex)
+        angle.real = jx
+        angle.imag = jy
+        angle = np.angle(angle, deg=True) % 360.
+        fig, pc, cmap = self.plot_flux(nodes=nodes[0], figindex=figindex, figsize=figsize, tight_layout=tight_layout,
+                                       edgecolor=edgecolor, cbar=cbar)
+        angle = cmap.to_rgba(angle[None, ...])[0]
+        angle[..., -1] = np.sign(density)
+
+        angle[(jx ** 2 + jy ** 2) < 1e-6, :3] = 0.
+        title = plt.title('Time $k =$ 0')
+
+        def update(n):
+            title.set_text('Time $k =${}'.format(n))
+            pc.set(facecolor=angle[n, ...].reshape(-1, 4))
+            return pc, title
+
+        ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
+        return ani
+
+    def animate_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis', interval=200, vmax=None,
+                        tight_layout=True, edgecolor='None'):
+        if density_t is None:
+            if self.dens_t is not None:
+                density_t = self.dens_t
+            else:
+                raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
+                                   "in past LGCA run, call lgca.timeevo with keyword recorddens=True")
+
+        if vmax is not None:
+            vmax_val = vmax
+        else:
+            vmax_val = int(density_t.max())
+
+        fig, pc, cmap = self.plot_density(density_t[0], figindex=figindex, figsize=figsize, cmap=cmap, vmax=vmax_val,
+                                          tight_layout=tight_layout, edgecolor=edgecolor)
+        title = plt.title('Time $k =$0')
+
+        def update(n):
+            title.set_text('Time $k =${}'.format(n))
+            pc.set(facecolor=cmap.to_rgba(density_t[n, ...].ravel()))
+            return pc, title
+
+        ani = animation.FuncAnimation(fig, update, interval=interval, frames=density_t.shape[0])
+        return ani
 
 
 if __name__ == '__main__':

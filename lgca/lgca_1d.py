@@ -14,7 +14,7 @@ class LGCA_1D(LGCA_base):
     interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation', 'parameter_controlled_diffusion',
                     'random_walk', 'persistent_motion', 'birthdeath']
     velocitychannels = 2
-    c = np.array([1., -1.])[None, ...]
+    c = np.array([1., -1.])[None, ...] #directions of velocity channels; shape: (1,2)
 
     def set_dims(self, dims=None, nodes=None, restchannels=0):
         if nodes is not None:
@@ -28,7 +28,6 @@ class LGCA_1D(LGCA_base):
 
         if isinstance(dims, int):
             self.l = dims
-
         else:
             self.l = dims[0]
 
@@ -36,17 +35,23 @@ class LGCA_1D(LGCA_base):
         self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels
 
-    def init_nodes(self, density, nodes=None):
+    def init_nodes(self, density, nodes=None, **kwargs):
         self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.bool)
-        if nodes is None:
+        if 'hom' in kwargs:
+            hom = kwargs['hom']
+        else:
+            hom = None
+        if nodes is None and hom:
+            self.homogeneous_random_reset(density)
+        elif nodes is None:
             self.random_reset(density)
-
         else:
             self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.bool)
 
     def init_coords(self):
-        self.nonborder = (np.arange(self.l) + self.r_int,)
-        self.xcoords = np.arange(self.l + 2 * self.r_int) - self.r_int
+        self.nonborder = (np.arange(self.l) + self.r_int,) # tuple s.t. lattice sites can be called as: nodes[nonborder]
+        # self.nonborder is a tuple of indices along the lattice dimensions to correctly index xcoords
+        self.xcoords = np.arange(self.l + 2 * self.r_int) - self.r_int # x-coordinates starting at -r_int to l+r_int
 
     def propagation(self):
         """
@@ -69,7 +74,9 @@ class LGCA_1D(LGCA_base):
         self.nodes[-self.r_int:, :] = self.nodes[self.r_int:2 * self.r_int, :]
 
     def apply_rbc(self):
+        # left boundary cell inside domain: right channel gets added left channel from the left
         self.nodes[self.r_int, 0] += self.nodes[self.r_int - 1, 1]
+        # right boundary cell inside domain: left channel gets added right channel from the right
         self.nodes[-self.r_int - 1, 1] += self.nodes[-self.r_int, 0]
         self.apply_abc()
 
@@ -81,15 +88,19 @@ class LGCA_1D(LGCA_base):
         sum = np.zeros(qty.shape)
         sum[:-1, ...] += qty[1:, ...]
         sum[1:, ...] += qty[:-1, ...]
+        # shift to left without padding and add to shift to the right without padding
+        # sums up fluxes (in qty) of neighboring particles
         return sum
 
     def gradient(self, qty):
         return np.gradient(qty, 2)[..., None]
+        # None adds a new axis to the ndarray and keeps the remaining array unchanged
 
-    def channel_weight(self, qty):
-        weights = np.zeros(qty.shape + (self.velocitychannels,))
-        weights[:-1, ..., 0] = qty[1:, ...]
-        weights[1:, ..., 1] = qty[:-1, ...]
+    def channel_weight(self, qty): #whatever this does
+        weights = np.zeros(qty.shape + (self.velocitychannels,)) #velocity channels added as a dimension, ',' to make it a tuple to add it to the shape tuple
+        # adding tuples: a = (0,1) b = (2,3) a+b=(0, 1, 2, 3) -> indexed in the same fashion as arrays
+        weights[:-1, ..., 0] = qty[1:, ...] #shift first dimension of qty left to put in right velocity channel
+        weights[1:, ..., 1] = qty[:-1, ...] #shift second dimension of qty right to put in left velocity channel
         return weights
 
     def setup_figure(self, tmax, figindex=None, figsize=(8, 8), tight_layout=True):
@@ -128,7 +139,11 @@ class LGCA_1D(LGCA_base):
 
     def plot_density(self, density_t=None, cmap='hot_r', vmax='auto', colorbarwidth=0.03, **kwargs):
         if density_t is None:
-            density_t = self.dens_t
+            if self.dens_t is not None:
+                density_t = self.dens_t
+            else:
+                raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
+                                   "in past LGCA run, call lgca.timeevo with keyword recorddens=True")
 
         tmax = density_t.shape[0]
         fig, ax = self.setup_figure(tmax, **kwargs)
@@ -150,13 +165,17 @@ class LGCA_1D(LGCA_base):
 
     def plot_flux(self, nodes_t=None, **kwargs):
         if nodes_t is None:
-            nodes_t = self.nodes_t
+            if self.nodes_t is not None:
+                nodes_t = self.nodes_t
+            else:
+                raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
+                                   "in past LGCA run, call lgca.timeevo() with keyword record=True")
 
         dens_t = nodes_t.sum(-1) / nodes_t.shape[-1]
         tmax, l = dens_t.shape
         flux_t = nodes_t[..., 0].astype(int) - nodes_t[..., 1].astype(int)
 
-        rgba = np.zeros((tmax, l, 4))
+        rgba = np.zeros((tmax, l, 4)) #4: RGBA A=alpha: transparency
         rgba[dens_t > 0, -1] = 1.
         rgba[flux_t == 1, 0] = 1.
         rgba[flux_t == -1, 2] = 1.
@@ -178,7 +197,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
     """
     interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath']
 
-    def init_nodes(self, density, nodes=None):
+    def init_nodes(self, density, nodes=None, **kwargs):
         self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.uint)
         if nodes is None:
             self.random_reset(density)
@@ -217,6 +236,200 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         cbar.set_label(r'Property ${}$'.format(propname))
         plt.sca(ax)
         return plot
+
+
+class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
+    """
+    1D version of an LGCA without volume exclusion.
+    """
+    interactions = ['dd_alignment', 'di_alignment', 'go_or_grow', 'go_or_rest']
+
+    def set_dims(self, dims=None, nodes=None, restchannels=None, capacity=None):
+        """
+        Set the dimensions of the instance according to given values. Sets self.l, self.K, self.dims and self.restchannels
+        :param dims: desired lattice size (int or array-like)
+        :param nodes: existing lattice to use (ndarray)
+        :param restchannels: desired number of resting channels, will be capped to 1 if >1 because of no volume exclusion
+        """
+        # set instance dimensions according to passed lattice
+        if nodes is not None:
+            self.l, self.K = nodes.shape
+            # set number of rest channels to <= 1 because >1 cells are allowed per channel
+            if restchannels > 1:
+                self.restchannels = 1
+            elif 0 <= restchannels <= 1:
+                self.restchannels = restchannels
+            # for now, raise Exception if format of nodes does no fit
+            # (To Do: just sum the cells in surplus rest channels in init_nodes and print a warning)
+            if self.K - self.restchannels > self.velocitychannels:
+                raise RuntimeError('Only one resting channel allowed, \
+                 but {} resting channels specified!'.format(self.K - self.velocitychannels))
+            self.dims = self.l,
+            if capacity is not None:
+                self.capacity = capacity
+            else:
+                self.capacity = self.K
+            return
+        # default value for dimension
+        elif dims is None:
+            dims = 100,
+        # set instance dimensions according to desired size
+        if isinstance(dims, int):
+            self.l = dims
+        else:
+            self.l = dims[0]
+        self.dims = self.l,
+
+        # set number of rest channels to <= 1 because >1 cells are allowed per channel
+        if restchannels is not None:
+            if restchannels > 1:
+                self.restchannels = 1
+            elif 0 <= restchannels <= 1:
+                self.restchannels = restchannels
+        else:
+            self.restchannels = 0
+        self.K = self.velocitychannels + self.restchannels
+
+        if capacity is not None:
+            self.capacity = capacity
+        else:
+            self.capacity = self.K
+
+
+    def init_nodes(self, density, nodes=None, hom=None):
+        """
+        Initialize nodes for the instance.
+        :param density: desired particle density in the lattice: number of particles/(dimensions*number of channels)
+        :param nodes: existing lattice to use, optionally containing particles (ndarray)
+        """
+        # create lattice according to size specified earlier
+        self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.uint)
+        # if no lattice given, populate randomly
+        if nodes is None:
+            if hom:
+                self.homogeneous_random_reset(density)
+            else:
+                self.random_reset(density)
+        # if lattice given, populate lattice with given particles. Virtual lattice sites for boundary conditions not included
+        else:
+            self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.uint)
+
+
+    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis_r', scaling=None, absolute_max=None, offset_t=0, offset_x=0):
+        """
+        Create a plot showing the number of particles per lattice site.
+        :param density_t: particle number per lattice site (ndarray of dimension (timesteps + 1,) + self.dims)
+        :param figindex: number of the figure to create/activate
+        :param figsize: desired figure size
+        :param cmap: matplotlib color map for encoding the number of particles
+        :return: plot as a matplotlib.image
+        """
+        # construct conditions
+        x_has_offset = offset_x != 0 and isinstance(offset_x, int)
+        t_has_offset = offset_t != 0 and isinstance(offset_t, int)
+        # set values for unused arguments
+        if density_t is None:
+            if self.dens_t is not None:
+                density_t = self.dens_t
+            else:
+                raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
+                                   "in past LGCA run, call lgca.timeevo with keyword recorddens=True")
+            if x_has_offset:
+                density_t = density_t[:, offset_x:]
+            if t_has_offset:
+                density_t = density_t[offset_t:, :]
+        if figsize is None:
+            figsize = estimate_figsize(density_t.T, cbar=True)
+
+        # set up figure
+        fig = plt.figure(num=figindex, figsize=figsize)
+        ax = fig.add_subplot(111)
+        # set up color scaling
+        if scaling is not None:
+            scale = scaling
+        else:
+            scale = 1.0
+        max_part_per_cell = int(scale * density_t.max())
+        if absolute_max is not None:
+            max_part_per_cell = int(absolute_max)
+        cmap = cmap_discretize(cmap, max_part_per_cell + 1)
+        # create plot with color bar, axis labels, title and layout
+        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=max_part_per_cell, cmap=cmap,
+                            extent = [offset_x-0.5, density_t.shape[1] + offset_x-0.5, density_t.shape[0] + offset_t - 0.5, offset_t-0.5])
+        loc = mticker.MaxNLocator(nbins='auto', steps=[1,2,5,10], integer=True)
+        # loc.view_limits(offset_x, density_t.shape[1]+offset_x)
+        ax.xaxis.set_major_locator(loc)
+        loc = mticker.MaxNLocator(nbins='auto', steps=[1, 2, 5, 10], integer=True)
+        ax.yaxis.set_major_locator(loc)
+        cbar = colorbar_index(ncolors=max_part_per_cell + 1, cmap=cmap, use_gridspec=True)
+        cbar.set_label(r'Particle number $n$')
+        plt.xlabel(r'Lattice node $r \, (\varepsilon)$', )
+        plt.ylabel(r'Time step $k \, (\tau)$')
+        ax.xaxis.set_label_position('top')
+        ax.xaxis.tick_top()
+        plt.tight_layout()
+        return plot
+
+
+    def plot_flux(self, nodes_t=None, figindex=None, figsize=None):
+        """
+        Create a plot showing the main direction of particles per lattice site.
+        :param nodes_t: particles per velocity channel at lattice site
+                        (ndarray of dimension (timesteps + 1,) + self.dims + (self.K,))
+        :param figindex: number of the figure to create/activate
+        :param figsize: desired figure size
+        :return: plot as a matplotlib.image
+        """
+        # set values for unused arguments
+        if nodes_t is None:
+            if self.nodes_t is not None:
+                nodes_t = self.nodes_t
+            else:
+                raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
+                                   "in past LGCA run, call lgca.timeevo() with keyword record=True")
+        # calculate particle density, max time and dimension values, flux
+        dens_t = nodes_t.sum(-1) / nodes_t.shape[-1]
+        tmax, l = dens_t.shape
+        flux_t = nodes_t[..., 0].astype(int) - nodes_t[..., 1].astype(int)
+        if figsize is None:
+            figsize = estimate_figsize(dens_t.T)
+
+        # encode flux as RGBA values
+        # 4: RGBA A=alpha: transparency
+        rgba = np.zeros((tmax, l, 4))
+        rgba[dens_t > 0, -1] = 1.
+        rgba[flux_t > 0, 0] = 1. # can I do this in ve, too?
+        rgba[flux_t < 0, 2] = 1.
+        rgba[flux_t == 0, :-1] = 0. # unpopulated lattice sites are white
+        # set up figure
+        fig = plt.figure(num=figindex, figsize=figsize)
+        ax = fig.add_subplot(111)
+        # create plot with axis labels, title and layout
+        plot = ax.imshow(rgba, interpolation='None', origin='upper')
+        plt.xlabel(r'Lattice node $r \, [\varepsilon]$', )
+        plt.ylabel(r'Time step $k \, [\tau]$')
+        ax.xaxis.set_label_position('top')
+        ax.xaxis.set_ticks_position('top')
+        ax.xaxis.tick_top()
+        plt.tight_layout()
+        return plot
+
+    def nb_sum(self, qty, addCenter=False):
+         """
+         Calculate sum of values in neighboring lattice sites of each lattice site.
+         :param qty: ndarray in which neighboring values have to be added
+                     first dimension indexes lattice sites
+         :param addCenter: toggle adding central value
+         :return: sum as ndarray
+         """
+         sum = np.zeros(qty.shape)
+         # shift to left padding 0 and add to shift to the right padding 0
+         sum[:-1, ...] += qty[1:, ...]
+         sum[1:, ...] += qty[:-1, ...]
+         # add central value
+         if addCenter:
+            sum += qty
+         return sum
 
 
 if __name__ == '__main__':

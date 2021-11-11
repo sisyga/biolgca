@@ -1,10 +1,9 @@
 try:
     from base import *
-    from lgca_square import LGCA_Square, IBLGCA_Square
-
+    from lgca_square import LGCA_Square, IBLGCA_Square, NoVE_LGCA_Square
 except ModuleNotFoundError:
     from .base import *
-    from .lgca_square import LGCA_Square, IBLGCA_Square
+    from .lgca_square import LGCA_Square, IBLGCA_Square, NoVE_LGCA_Square
 
 
 class LGCA_Hex(LGCA_Square):
@@ -27,11 +26,13 @@ class LGCA_Hex(LGCA_Square):
         self.xx, self.yy = np.meshgrid(self.x, self.y, indexing='ij')
         self.coord_pairs = list(zip(self.xx.flat, self.yy.flat))
 
+        # set all coords, including ghost cells
         self.xcoords, self.ycoords = np.meshgrid(np.arange(self.lx + 2 * self.r_int) - self.r_int,
                                                  np.arange(self.ly + 2 * self.r_int) - self.r_int, indexing='ij')
         self.xcoords = self.xcoords.astype(float)
         self.ycoords = self.ycoords.astype(float)
 
+        # shift coordinate of every other column of x by 0.5 to the right
         self.xcoords[:, 1::2] += 0.5
         self.ycoords *= self.dy
         self.xcoords = self.xcoords[self.r_int:-self.r_int, self.r_int:-self.r_int]
@@ -39,6 +40,7 @@ class LGCA_Hex(LGCA_Square):
         self.nonborder = (self.xx, self.yy)
 
     def propagation(self):
+        #print(self.nodes[self.nonborder])
         newcellnodes = np.zeros(self.nodes.shape, dtype=self.nodes.dtype)
         newcellnodes[..., 6:] = self.nodes[..., 6:]
 
@@ -64,6 +66,7 @@ class LGCA_Hex(LGCA_Square):
         newcellnodes[1:, :-1:2, 5] = self.nodes[:-1, 1::2, 5]
         newcellnodes[:, 1:-1:2, 5] = self.nodes[:, 2::2, 5]
 
+        #(newcellnodes[self.nonborder])
         self.nodes = newcellnodes
         return self.nodes
 
@@ -172,7 +175,7 @@ class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
     Identity-based LGCA simulator class.
     """
 
-    def init_nodes(self, density=0.1, nodes=None):
+    def init_nodes(self, density=0.1, nodes=None, **kwargs):
         self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
         if nodes is None:
             self.random_reset(density)
@@ -181,6 +184,33 @@ class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
             self.nodes[self.nonborder] = nodes.astype(np.uint)
             self.maxlabel = self.nodes.max()
 
+
+class NoVE_LGCA_Hex (NoVE_LGCA_Square, LGCA_Hex):
+
+    def nb_sum(self, qty, addCenter=False):
+        """
+        Calculate sum of values in neighboring lattice sites of each lattice site.
+        :param qty: ndarray in which neighboring values have to be added
+                    first dimension indexes lattice sites
+        :param addCenter: toggle adding central value
+        :return: sum as ndarray
+        """
+        sum = np.zeros(qty.shape)
+        # shift to left padding 0 and add to shift to the right padding 0
+        sum[:-1, ...] += qty[1:, ...]
+        sum[1:, ...] += qty[:-1, ...]
+        sum[:, 1::2, ...] += qty[:, :-1:2, ...]
+        sum[1:, 2::2, ...] += qty[:-1, 1:-1:2, ...]
+        sum[:-1, 1::2, ...] += qty[1:, :-1:2, ...]
+        sum[:, 2::2, ...] += qty[:, 1:-1:2, ...]
+        sum[:, :-1:2, ...] += qty[:, 1::2, ...]
+        sum[:-1, 1:-1:2, ...] += qty[1:, 2::2, ...]
+        sum[1:, :-1:2, ...] += qty[:-1, 1::2, ...]
+        sum[:, 1:-1:2, ...] += qty[:, 2::2, ...]
+        # add central value
+        if addCenter:
+            sum += qty
+        return sum
 
 if __name__ == '__main__':
     lx = 50
