@@ -5,3 +5,5 @@ lgca/__pycache__
 lgca/.idea/
 lgca/base.pyc
 .gitignore
+tests/__pycache__
+tests/.pytest_cache

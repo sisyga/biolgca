@@ -12,7 +12,7 @@ class LGCA_1D(LGCA_base):
     1D version of an LGCA.
     """
     interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation', 'parameter_controlled_diffusion',
-                    'random_walk', 'persistent_motion', 'birthdeath']
+                    'random_walk', 'persistent_motion', 'birthdeath', 'only_propagation']
     velocitychannels = 2
     c = np.array([1., -1.])[None, ...] #directions of velocity channels; shape: (1,2)
 
@@ -139,7 +139,7 @@ class LGCA_1D(LGCA_base):
 
     def plot_density(self, density_t=None, cmap='hot_r', vmax='auto', colorbarwidth=0.03, **kwargs):
         if density_t is None:
-            if self.dens_t is not None:
+            if hasattr(self, 'dens_t'):
                 density_t = self.dens_t
             else:
                 raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
@@ -165,7 +165,7 @@ class LGCA_1D(LGCA_base):
 
     def plot_flux(self, nodes_t=None, **kwargs):
         if nodes_t is None:
-            if self.nodes_t is not None:
+            if hasattr(self, 'nodes_t'):
                 nodes_t = self.nodes_t
             else:
                 raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
@@ -253,45 +253,47 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         """
         # set instance dimensions according to passed lattice
         if nodes is not None:
-            self.l, self.K = nodes.shape
+            try:
+                self.l, self.K = nodes.shape
+            except ValueError as e:
+                raise ValueError("Node shape does not match the 1D geometry! Shape must be (x,channels)") from e
             # set number of rest channels to <= 1 because >1 cells are allowed per channel
-            if restchannels > 1:
-                self.restchannels = 1
-            elif 0 <= restchannels <= 1:
-                self.restchannels = restchannels
             # for now, raise Exception if format of nodes does no fit
             # (To Do: just sum the cells in surplus rest channels in init_nodes and print a warning)
-            if self.K - self.restchannels > self.velocitychannels:
-                raise RuntimeError('Only one resting channel allowed, \
-                 but {} resting channels specified!'.format(self.K - self.velocitychannels))
-            self.dims = self.l,
-            if capacity is not None:
-                self.capacity = capacity
+            if self.K - self.velocitychannels > 1:
+                raise RuntimeError('Only one resting channel allowed, '+
+                 'but {} resting channels specified!'.format(self.K - self.velocitychannels))
+            elif self.K < self.velocitychannels:
+                raise RuntimeError('Not enough channels specified for the chosen geometry! Required: {}, provided: {}'.format(
+                    self.velocitychannels, self.K))
             else:
-                self.capacity = self.K
-            return
-        # default value for dimension
-        elif dims is None:
-            dims = 100,
-        # set instance dimensions according to desired size
-        if isinstance(dims, int):
-            self.l = dims
+                self.restchannels = self.K - self.velocitychannels
+        # set instance dimensions according to required dimensions
+        elif dims is not None:
+            if isinstance(dims, int):
+                self.l = dims
+            else:
+                self.l = dims[0]
+        # set default value for dimension
         else:
-            self.l = dims[0]
+            self.l = 100
         self.dims = self.l,
 
         # set number of rest channels to <= 1 because >1 cells are allowed per channel
-        if restchannels is not None:
+        if nodes is None and restchannels is not None:
             if restchannels > 1:
                 self.restchannels = 1
             elif 0 <= restchannels <= 1:
                 self.restchannels = restchannels
-        else:
+        elif nodes is None:
             self.restchannels = 0
         self.K = self.velocitychannels + self.restchannels
 
+        # set capacity according to keyword or specified resting channels
         if capacity is not None:
             self.capacity = capacity
+        elif restchannels is not None and restchannels > 1:
+            self.capacity = self.velocitychannels + restchannels
         else:
             self.capacity = self.K
 
@@ -315,7 +317,7 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
             self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.uint)
 
 
-    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis_r', scaling=None, absolute_max=None, offset_t=0, offset_x=0):
+    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis_r', relative_max=None, absolute_max=None, offset_t=0, offset_x=0):
         """
         Create a plot showing the number of particles per lattice site.
         :param density_t: particle number per lattice site (ndarray of dimension (timesteps + 1,) + self.dims)
@@ -329,7 +331,7 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         t_has_offset = offset_t != 0 and isinstance(offset_t, int)
         # set values for unused arguments
         if density_t is None:
-            if self.dens_t is not None:
+            if hasattr(self, 'dens_t'):
                 density_t = self.dens_t
             else:
                 raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
@@ -345,8 +347,8 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         fig = plt.figure(num=figindex, figsize=figsize)
         ax = fig.add_subplot(111)
         # set up color scaling
-        if scaling is not None:
-            scale = scaling
+        if relative_max is not None:
+            scale = relative_max
         else:
             scale = 1.0
         max_part_per_cell = int(scale * density_t.max())
@@ -355,9 +357,8 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         cmap = cmap_discretize(cmap, max_part_per_cell + 1)
         # create plot with color bar, axis labels, title and layout
         plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=max_part_per_cell, cmap=cmap,
-                            extent = [offset_x-0.5, density_t.shape[1] + offset_x-0.5, density_t.shape[0] + offset_t - 0.5, offset_t-0.5])
+                            extent =[offset_x-0.5, density_t.shape[1] + offset_x-0.5, density_t.shape[0] + offset_t - 0.5, offset_t-0.5])
         loc = mticker.MaxNLocator(nbins='auto', steps=[1,2,5,10], integer=True)
-        # loc.view_limits(offset_x, density_t.shape[1]+offset_x)
         ax.xaxis.set_major_locator(loc)
         loc = mticker.MaxNLocator(nbins='auto', steps=[1, 2, 5, 10], integer=True)
         ax.yaxis.set_major_locator(loc)
@@ -382,7 +383,7 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         """
         # set values for unused arguments
         if nodes_t is None:
-            if self.nodes_t is not None:
+            if hasattr(self, 'nodes_t'):
                 nodes_t = self.nodes_t
             else:
                 raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
@@ -408,6 +409,8 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         plot = ax.imshow(rgba, interpolation='None', origin='upper')
         plt.xlabel(r'Lattice node $r \, [\varepsilon]$', )
         plt.ylabel(r'Time step $k \, [\tau]$')
+        ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
+        ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         ax.xaxis.set_label_position('top')
         ax.xaxis.set_ticks_position('top')
         ax.xaxis.tick_top()

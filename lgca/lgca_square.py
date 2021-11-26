@@ -17,7 +17,8 @@ class LGCA_Square(LGCA_base):
     2D version of a LGCA on the square lattice.
     """
     interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation',
-                    'random_walk', 'excitable_medium', 'nematic', 'persistant_motion', 'chemotaxis', 'contact_guidance']
+                    'random_walk', 'excitable_medium', 'nematic', 'persistant_motion', 'chemotaxis', 'contact_guidance', \
+                    'only_propagation']
     velocitychannels = 4
     cix = np.array([1, 0, -1, 0], dtype=float)
     ciy = np.array([0, 1, 0, -1], dtype=float)
@@ -223,7 +224,9 @@ class LGCA_Square(LGCA_base):
         plt.xlabel('$x \\; (\\varepsilon)$')
         plt.ylabel('$y \\; (\\varepsilon)$')
         ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
-        ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
+        ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins='auto', steps=[2*self.dy, 5*self.dy, 10*self.dy]))
+        ax.yaxis.set_major_formatter(lambda x, pos: (int(x/self.dy)))
+        #ax.yaxis.set_major_locator(mticker.MultipleLocator(base=self.dy))
         ax.spines['top'].set_visible(True)
         ax.spines['right'].set_visible(True)
         ax.yaxis.set_ticks_position('both')
@@ -293,7 +296,7 @@ class LGCA_Square(LGCA_base):
 
     def animate_config(self, nodes_t=None, interval=100, **kwargs):
         if nodes_t is None:
-            if self.nodes_t is not None:
+            if hasattr(self, 'nodes_t'):
                 nodes_t = self.nodes_t
             else:
                 raise RuntimeError("Channel-wise state of the lattice required for plotting the configuration but not " +
@@ -438,7 +441,7 @@ class LGCA_Square(LGCA_base):
 
     def animate_flow(self, nodes_t=None, interval=100, cbar=False, **kwargs):
         if nodes_t is None:
-            if self.nodes_t is not None:
+            if hasattr(self, 'nodes_t'):
                 nodes_t = self.nodes_t
             else:
                 raise RuntimeError("Channel-wise state of the lattice required for flow calculation but not recorded " +
@@ -595,7 +598,7 @@ class LGCA_Square(LGCA_base):
     def animate_density(self, density_t=None, interval=100, **kwargs):
 
         if density_t is None:
-            if self.dens_t is not None:
+            if hasattr(self, 'dens_t'):
                 density_t = self.dens_t
             else:
                 raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
@@ -614,7 +617,7 @@ class LGCA_Square(LGCA_base):
 
     def animate_flux(self, nodes_t=None, interval=100, **kwargs):
         if nodes_t is None:
-            if self.nodes_t is not None:
+            if hasattr(self, 'nodes_t'):
                 nodes_t = self.nodes_t
             else:
                 raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
@@ -714,65 +717,59 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
         """
         # set instance dimensions according to passed lattice
         if nodes is not None:
-            self.lx, self.ly, self.K = nodes.shape
+            try:
+                self.lx, self.ly, self.K = nodes.shape
+            except ValueError as e:
+                raise ValueError("Node shape does not match the 2D geometry! Shape must be (x,y,channels)") from e
             # set number of rest channels to <= 1 because >1 cells are allowed per channel
-            if restchannels is not None:
-                if restchannels > 1:
-                    self.restchannels = 1
-                elif 0 <= restchannels <= 1:
-                    self.restchannels = restchannels
                 # for now, raise Exception if format of nodes does no fit
                 # (To Do: just sum the cells in surplus rest channels in init_nodes and print a warning)
-                if self.K - self.velocitychannels > self.restchannels:
-                    raise Exception('{} resting channels announced, but {} resting channels specified!'.format(restchannels, self.K - self.velocitychannels))
+            if self.K - self.velocitychannels > 1:
+                raise RuntimeError('Only one resting channel allowed, but {} resting channels specified!'.format(self.K - self.velocitychannels))
+            elif self.K < self.velocitychannels:
+                raise RuntimeError('Not enough channels specified for the chosen geometry! Required: {}, provided: {}'.format(
+                    self.velocitychannels, self.K))
             else:
-                if self.K - self.velocitychannels <= 1:
-                    self.restchannels = self.K - self.velocitychannels
+                self.restchannels = self.K - self.velocitychannels
+        # set instance dimensions according to required dimensions
+        elif dims is not None:
+            if isinstance(dims, tuple):
+                if len(dims) == 2:
+                    self.lx, self.ly = dims
+                elif len(dims) > 2:
+                    self.lx, self.ly = dims[0], dims[1]
+                    print("Dimensions provided with too many values! " + str(dims))
                 else:
-                    raise Exception(
-                        'Only one resting channels allowed, but {} resting channels specified!'.format(self.K - self.velocitychannels))
-
-            self.dims = self.lx, self.ly
-            if capacity is not None:
-                self.capacity = capacity
+                    self.lx, self.ly = dims[0], dims[0]
+                    print("Dimensions provided as tuple " + str(dims) + ", but only one value for 2D lattice!")
+            elif isinstance(dims, int):
+                self.lx, self.ly = dims, dims
             else:
-                self.capacity = self.K
-            return
-
-        elif isinstance(dims, tuple):
-            if len(dims)==2:
-                self.lx, self.ly = dims
-            elif len(dims)>2:
-                self.lx, self.ly = dims[0], dims[1]
-                print("Dimensions provided with too many values! " +str(dims))
-            else:
-                self.lx, self.ly = dims[0], dims[0]
-                print("Dimensions provided as tuple "+str(dims)+", but only one value for 2D lattice!")
-        elif isinstance(dims, int):
-            self.lx, self.ly = dims, dims
+                self.lx, self.ly = (50, 50)
+                print("Dimensions provided in wrong format, must be tuple of 2 elements or integer. Dimensions set to default 50x50.")
+        # set default for dimension
         else:
             self.lx, self.ly = (50, 50)
-            if dims is None:
-                print("Dimensions set to default 50x50.")
-            else:
-                print("Dimensions provided in wrong format, must be tuple of 2 elements or integer.")
+            print("Dimensions set to default 50x50.")
         self.dims = self.lx, self.ly
 
         # set number of rest channels to <= 1 because >1 cells are allowed per channel
-        if restchannels is not None:
+        if nodes is None and restchannels is not None:
             if restchannels > 1:
                 self.restchannels = 1
             elif 0 <= restchannels <= 1:
                 self.restchannels = restchannels
-        else:
+        elif nodes is None:
             self.restchannels = 0
         self.K = self.velocitychannels + self.restchannels
 
+        # set capacity according to keyword or specified resting channels
         if capacity is not None:
             self.capacity = capacity
+        elif restchannels is not None and restchannels > 1:
+            self.capacity = self.velocitychannels + restchannels
         else:
             self.capacity = self.K
-
 
 
     def init_nodes(self, density=4, nodes=None, hom=None):
@@ -891,7 +888,7 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
     def animate_flux(self, nodes_t=None, figindex=None, figsize=None, interval=200, tight_layout=True,
                      edgecolor='None', cbar=True):
         if nodes_t is None:
-            if self.nodes_t is not None:
+            if hasattr(self, 'nodes_t'):
                 nodes_t = self.nodes_t
             else:
                 raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
@@ -924,7 +921,7 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
     def animate_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis', interval=200, vmax=None,
                         tight_layout=True, edgecolor='None'):
         if density_t is None:
-            if self.dens_t is not None:
+            if hasattr(self, 'dens_t'):
                 density_t = self.dens_t
             else:
                 raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
