@@ -463,3 +463,6 @@ def go_or_rest(lgca):
         node = np.hstack((v_channels, r_channels))
         lgca.nodes[coord] = node
 
+def only_propagation(lgca):
+    return
+

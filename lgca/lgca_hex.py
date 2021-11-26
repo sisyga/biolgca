@@ -169,6 +169,12 @@ class LGCA_Hex(LGCA_Square):
         sum[:, 1:-1:2, ...] += qty[:, 2::2, ...]
         return sum
 
+    def setup_figure(self, figindex=None, figsize=(8, 8), tight_layout=True):
+        fig, ax = super(LGCA_Hex, self).setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
+        plt.gca()
+        plt.xlabel('$x$')
+        plt.ylabel('$y$')
+        return fig, ax
 
 class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
     """

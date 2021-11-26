@@ -58,7 +58,7 @@ def colorbar_index(ncolors, cmap, use_gridspec=False, cax=None):
     mappable = ScalarMappable(cmap=cmap)
     mappable.set_array([])
     mappable.set_clim(-0.5, ncolors + 0.5)
-    colorbar = plt.colorbar(mappable, use_gridspec=use_gridspec)
+    colorbar = plt.colorbar(mappable, use_gridspec=use_gridspec, cax=cax)
     ticks = np.linspace(-0.5, ncolors + 0.5, 2 * ncolors + 1)[1::2]
     labels = list(range(ncolors))
     if ticks[-1] == ticks[0::stride][-1]:
@@ -147,10 +147,12 @@ class LGCA_base():
     def set_interaction(self, **kwargs):
         try:
             from .interactions import go_or_grow, go_or_rest, birth, alignment, persistent_walk, chemotaxis, \
-                contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium
+                contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium, \
+                only_propagation
         except:
             from interactions import go_or_grow, go_or_rest, birth, alignment, persistent_walk, chemotaxis, \
-                contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium
+                contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium, \
+                only_propagation
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
             if interaction == 'go_or_grow':
@@ -363,6 +365,9 @@ class LGCA_base():
                 else:
                     self.N = 50
                     print('repetition of fast reaction set to N = ', self.N)
+
+            elif interaction == 'only_propagation':
+                self.interaction = only_propagation
 
             else:
                 print('interaction', kwargs['interaction'], 'is not defined! Random walk used instead.')
@@ -809,8 +814,10 @@ class NoVE_LGCA_base(LGCA_base):
     def set_interaction(self, **kwargs):
         try:
             from .nove_interactions import dd_alignment, di_alignment, go_or_grow, go_or_rest
+            from .interactions import only_propagation
         except:
             from nove_interactions import dd_alignment, di_alignment, go_or_grow, go_or_rest
+            from interactions import only_propagation
         # configure interaction
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
@@ -883,6 +890,9 @@ class NoVE_LGCA_base(LGCA_base):
                 else:
                     self.theta = 0.75
                     print('switch threshold set to theta = ', self.theta)
+
+            elif interaction == 'only_propagation':
+                self.interaction = only_propagation
 
             else:
                 print('interaction', kwargs['interaction'], 'is not defined! Density-dependent alignment interaction used instead.')
