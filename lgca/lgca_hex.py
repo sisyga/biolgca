@@ -180,15 +180,8 @@ class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
     """
     Identity-based LGCA simulator class.
     """
-
-    def init_nodes(self, density=0.1, nodes=None, **kwargs):
-        self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
-        if nodes is None:
-            self.random_reset(density)
-
-        else:
-            self.nodes[self.nonborder] = nodes.astype(np.uint)
-            self.maxlabel = self.nodes.max()
+    interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath', 'birthdeath_discrete',
+                    'only_propagation']
 
 
 class NoVE_LGCA_Hex (NoVE_LGCA_Square, LGCA_Hex):

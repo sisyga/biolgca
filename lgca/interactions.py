@@ -1,4 +1,5 @@
 from bisect import bisect_left
+from math import log, exp
 from random import random
 
 import numpy as np
@@ -318,7 +319,6 @@ def go_or_grow(lgca):
         r_channels = np.zeros(lgca.restchannels)
         r_channels[:n_rxy] = 1
         node = np.hstack((v_channels, r_channels))
-        #print(n_mxy, n_rxy)
         lgca.nodes[coord] = node
 
 def p_binom(k, n, p):
@@ -465,4 +465,3 @@ def go_or_rest(lgca):
 
 def only_propagation(lgca):
     return
-

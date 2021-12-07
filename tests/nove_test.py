@@ -1,9 +1,312 @@
-try:
-    from classical_test import *
-except ModuleNotFoundError:
-    from .classical_test import *
+import numpy as np
+import pytest
+import copy
 
-class Test_LGCA_NoVE(Test_LGCA_classical):
+from lgca import get_lgca
+try:
+    from common_test import T_LGCA_Common
+    from classical_test import Test_LGCA_classical as T_LGCA_classical  # rename to avoid duplicate execution of these tests
+except ModuleNotFoundError:
+    from .common_test import T_LGCA_Common
+    from .classical_test import Test_LGCA_classical as T_LGCA_classical  # rename to avoid duplicate execution of these tests
+
+com = T_LGCA_Common
+
+
+@pytest.fixture
+def nodes_1d_rbound():
+    # fixtures for 1D boundary conditions
+    # right
+    nodes = np.zeros((com.xdim_1d, com.b_1d + 1))
+    nodes[-1, 0] = 2  # particles that cross boundary
+    nodes[-1, 2] = 1  # resting reference particle
+    nodes[2, 0] = 3  # moving reference particles
+    return nodes
+
+
+@pytest.fixture
+def out_1d_rbound(nodes_1d_rbound):
+    # fixtures for 1D boundary conditions
+    # common part of expected output right
+    expected_output = np.zeros(nodes_1d_rbound.shape)
+    expected_output[-1, 2] = 1  # resting reference particle
+    expected_output[3, 0] = 3  # moving reference particles
+    return expected_output
+
+
+@pytest.fixture
+def nodes_1d_lbound():
+    # fixtures for 1D boundary conditions
+    # left
+    nodes = np.zeros((com.xdim_1d, com.b_1d + 1))
+    nodes[0, 1] = 2  # particles that cross boundary
+    nodes[0, 2] = 1  # resting reference particle
+    nodes[2, 1] = 3  # moving reference particles
+    return nodes
+
+
+@pytest.fixture
+def out_1d_lbound(nodes_1d_lbound):
+    # fixtures for 1D boundary conditions
+    # common part of expected output right
+    expected_output = np.zeros(nodes_1d_lbound.shape)
+    expected_output[1, 1] = 3  # moving reference particles
+    expected_output[0, 2] = 1  # resting reference particle
+    return expected_output
+
+
+@pytest.fixture
+def nodes_sq_rbound():
+    # fixtures for 2D square boundary conditions
+    # right
+    nodes = np.zeros((3, 4, com.b_square + 1))
+    nodes[-1, 3, 0] = 1  # particles that cross boundary
+    nodes[-1, 2, 0] = 2  # particles that cross boundary
+    nodes[-1, 1, 0] = 3  # particles that cross boundary
+    nodes[-1, 0, 0] = 4  # particles that cross boundary
+    nodes[0, 1, 0] = 5  # moving reference particles
+    nodes[-1, 1, 4] = 6  # resting reference particles
+    return nodes
+
+
+@pytest.fixture
+def out_sq_rbound(nodes_sq_rbound):
+    # fixtures for 2D square boundary conditions
+    # common part of expected output right
+    expected_output = np.zeros(nodes_sq_rbound.shape)
+    expected_output[-1, 1, 4] = 6  # resting reference particles
+    expected_output[1, 1, 0] = 5  # moving reference particles
+    return expected_output
+
+
+@pytest.fixture
+def nodes_sq_lbound():
+    # fixtures for 2D square boundary conditions
+    # left
+    nodes = np.zeros((3, 4, com.b_square + 1))
+    nodes[0, 3, 2] = 1  # particles that cross boundary
+    nodes[0, 2, 2] = 2  # particles that cross boundary
+    nodes[0, 1, 2] = 3  # particles that cross boundary
+    nodes[0, 0, 2] = 4  # particles that cross boundary
+    nodes[0, 1, 4] = 6  # resting reference particles
+    nodes[2, 1, 2] = 5  # moving reference particles
+    return nodes
+
+
+@pytest.fixture
+def out_sq_lbound(nodes_sq_lbound):
+    # fixtures for 2D square boundary conditions
+    # common part of expected output left
+    expected_output = np.zeros(nodes_sq_lbound.shape)
+    expected_output[0, 1, 4] = 6  # resting reference particles
+    expected_output[1, 1, 2] = 5  # moving reference particles
+    return expected_output
+
+
+@pytest.fixture
+def nodes_sq_tbound():
+    # fixtures for 2D square boundary conditions
+    # top
+    nodes = np.zeros((3, 4, com.b_square + 1))
+    nodes[0, -1, 1] = 1  # particles that cross boundary
+    nodes[1, -1, 1] = 2  # particles that cross boundary
+    nodes[2, -1, 1] = 3  # particles that cross boundary
+    nodes[1, -1, 4] = 5  # resting reference particles
+    nodes[1, 1, 1] = 4  # moving reference particles
+    return nodes
+
+
+@pytest.fixture
+def out_sq_tbound(nodes_sq_tbound):
+    # fixtures for 2D square boundary conditions
+    # common part of expected output top
+    expected_output = np.zeros(nodes_sq_tbound.shape)
+    expected_output[1, -1, 4] = 5  # resting reference particles
+    expected_output[1, 2, 1] = 4  # moving reference particles
+    return expected_output
+
+
+@pytest.fixture
+def nodes_sq_bbound():
+    # fixtures for 2D square boundary conditions
+    # bottom
+    nodes = np.zeros((3, 4, com.b_square + 1))
+    nodes[0, 0, 3] = 1  # particles that cross boundary
+    nodes[1, 0, 3] = 2  # particles that cross boundary
+    nodes[2, 0, 3] = 3  # particles that cross boundary
+    nodes[1, 0, 4] = 5  # resting reference particles
+    nodes[1, 2, 3] = 4  # moving reference particles
+    return nodes
+
+
+@pytest.fixture
+def out_sq_bbound(nodes_sq_bbound):
+    # fixtures for 2D square boundary conditions
+    # common part of expected output bottom
+    expected_output = np.zeros(nodes_sq_bbound.shape)
+    expected_output[1, 0, 4] = 5  # resting reference particles
+    expected_output[1, 1, 3] = 4  # moving reference particles
+    return expected_output
+
+
+@pytest.fixture
+def nodes_hex_rbound():
+    # fixtures for 2D hex boundary conditions
+    # right
+    nodes = np.zeros((4, 6, com.b_hex + 1))
+    nodes[-1, :, 0] = np.arange(1, 7)  # particles that cross boundary
+    nodes[1, 2, 0] = 7  # moving reference particles
+    nodes[-1, 2, 6] = 8  # resting reference particles
+    nodes[-1, 1, 6] = 9  # resting reference particles
+    return nodes
+
+
+@pytest.fixture
+def out_hex_rbound(nodes_hex_rbound):
+    # fixtures for 2D hex boundary conditions
+    # common part of expected output right
+    expected_output = np.zeros(nodes_hex_rbound.shape)
+    expected_output[2, 2, 0] = 7  # moving reference particles
+    expected_output[-1, 2, 6] = 8  # resting reference particles
+    expected_output[-1, 1, 6] = 9  # resting reference particles
+    return expected_output
+
+
+@pytest.fixture
+def nodes_hex_trbound():
+    # fixtures for 2D hex boundary conditions
+    # top right
+    nodes = np.zeros((4, 6, com.b_hex + 1))
+    nodes[-1, :, 1] = np.arange(1, 7)  # particles on the boundary
+    nodes[0, -1, 1] = 7  # particles that cross boundary
+    nodes[1, -1, 1] = 8  # particles that cross boundary
+    nodes[0, 3, 1] = 9  # moving reference particles
+    nodes[-1, 4, 6] = 12  # resting reference particles
+    nodes[-1, -1, 6] = 11  # resting reference particles
+    nodes[-2, -1, 6] = 10  # resting reference particles
+    return nodes
+
+
+@pytest.fixture
+def out_hex_trbound(nodes_hex_trbound):
+    # fixtures for 2D hex boundary conditions
+    # common part of expected output top right
+    expected_output = np.zeros(nodes_hex_trbound.shape)
+    expected_output[-1, -2, 1] = 4  # particles that do not cross boundary
+    expected_output[-1, 2, 1] = 2  # particles that do not cross boundary
+    expected_output[0, 4, 1] = 9  # moving reference particles
+    expected_output[-1, 4, 6] = 12  # resting reference particles
+    expected_output[-1, -1, 6] = 11  # resting reference particles
+    expected_output[-2, -1, 6] = 10  # resting reference particles
+    return expected_output
+
+
+@pytest.fixture
+def nodes_hex_tlbound():
+    # fixtures for 2D hex boundary conditions
+    # top left
+    nodes = np.zeros((4, 6, com.b_hex + 1))
+    nodes[0, :, 2] = np.arange(1, 7)  # particles at boundary
+    nodes[1, -1, 2] = 7  # particle that crosses boundary
+    nodes[-1, -1, 2] = 8  # particle that crosses boundary
+    nodes[-1, 2, 2] = 9  # moving reference particles
+    nodes[0, -1, 6] = 11  # resting reference particles
+    nodes[1, -1, 6] = 10  # resting reference particles
+    nodes[0, -2, 6] = 12  # resting reference particles
+    return nodes
+
+
+@pytest.fixture
+def out_hex_tlbound(nodes_hex_tlbound):
+    # fixtures for 2D hex boundary conditions
+    # common part of expected output top left
+    expected_output = np.zeros(nodes_hex_tlbound.shape)
+    expected_output[0, 1::2, 2] = np.array([1, 3, 5])  # particles that do not cross boundary
+    expected_output[-1, 3, 2] = 9  # moving reference particles
+    expected_output[0, -1, 6] = 11  # resting reference particles
+    expected_output[1, -1, 6] = 10  # resting reference particles
+    expected_output[0, -2, 6] = 12  # resting reference particles
+    return expected_output
+
+
+@pytest.fixture
+def nodes_hex_lbound():
+    # fixtures for 2D hex boundary conditions
+    # left
+    nodes = np.zeros((4, 6, com.b_hex + 1))
+    nodes[0, :, 3] = np.arange(1, 7)  # particles that cross boundary
+    nodes[2, 2, 3] = 7  # moving reference particles
+    nodes[0, 2, 6] = 8  # resting reference particles
+    nodes[0, 1, 6] = 9  # resting reference particles
+    return nodes
+
+
+@pytest.fixture
+def out_hex_lbound(nodes_hex_lbound):
+    # fixtures for 2D hex boundary conditions
+    # common part of expected output left
+    expected_output = np.zeros(nodes_hex_lbound.shape)
+    expected_output[1, 2, 3] = 7  # moving reference particles
+    expected_output[0, 2, 6] = 8  # resting reference particles
+    expected_output[0, 1, 6] = 9  # resting reference particles
+    return expected_output
+
+
+@pytest.fixture
+def nodes_hex_blbound():
+    # fixtures for 2D hex boundary conditions
+    # bottom left
+    nodes = np.zeros((4, 6, com.b_hex + 1))
+    nodes[0, :, 4] = np.arange(1, 7)  # particles on boundary
+    nodes[-2:, 0, 4] = np.array([7, 8])  # particles that cross boundary
+    nodes[-1, 2, 4] = 9  # moving reference particles
+    nodes[0, 0, 6] = 11  # resting reference particles
+    nodes[1, 0, 6] = 12  # resting reference particles
+    nodes[0, 1, 6] = 10  # resting reference particles
+    return nodes
+
+
+@pytest.fixture
+def out_hex_blbound(nodes_hex_blbound):
+    # fixtures for 2D hex boundary conditions
+    # common part of expected output bottom left
+    expected_output = np.zeros(nodes_hex_blbound.shape)
+    expected_output[0, 1, 4] = 3  # particles that do not cross boundary
+    expected_output[0, 3, 4] = 5  # particles that do not cross boundary
+    expected_output[-1, 1, 4] = 9  # moving reference particles
+    expected_output[0, 0, 6] = 11  # resting reference particles
+    expected_output[1, 0, 6] = 12  # resting reference particles
+    expected_output[0, 1, 6] = 10  # resting reference particles
+    return expected_output
+
+
+@pytest.fixture
+def nodes_hex_brbound():
+    # fixtures for 2D hex boundary conditions
+    # bottom right
+    nodes = np.zeros((4, 6, com.b_hex + 1))
+    nodes[-1, :, 5] = np.arange(1, 7)  # particles on boundary
+    nodes[0, 0, 5] = 7  # particle that crosses boundary
+    nodes[1, 0, 5] = 8  # particle that crosses boundary
+    nodes[0, 3, 5] = 9  # moving reference particle
+    nodes[-2:, 0, 6] = np.array([10, 11])  # resting reference particles
+    nodes[-1, 1, 6] = 12  # resting reference particles
+    return nodes
+
+
+@pytest.fixture
+def out_hex_brbound(nodes_hex_brbound):
+    # fixtures for 2D hex boundary conditions
+    # common part of expected output bottom right
+    expected_output = np.zeros(nodes_hex_brbound.shape)
+    expected_output[-1, 0::2, 5] = np.array([2, 4, 6])  # particles that do not cross boundary
+    expected_output[0, 2, 5] = 9  # moving reference particles
+    expected_output[-2:, 0, 6] = np.array([10, 11])  # resting reference particles
+    expected_output[-1, 1, 6] = 12  # resting reference particles
+    return expected_output
+
+
+class Test_LGCA_NoVE(T_LGCA_Common):
     """
         Class for testing LGCA without volume exclusion (not identity-based).
         * propagation
@@ -12,7 +315,12 @@ class Test_LGCA_NoVE(Test_LGCA_classical):
     """
 
     com = T_LGCA_Common
-    gen = Test_LGCA_General
+    ve = False
+    ib = False
+    # reuse absorbing boundary condition tests from classical LGCA
+    test_abc_1d = T_LGCA_classical.test_abc_1d
+    test_abc_square = T_LGCA_classical.test_abc_square
+    test_abc_hex = T_LGCA_classical.test_abc_hex
 
     @pytest.mark.parametrize("geom,dims", [
         ('lin', (com.xdim_1d,)),
@@ -58,15 +366,6 @@ class Test_LGCA_NoVE(Test_LGCA_classical):
         lgca_6.timeevo(timesteps=2, recordorderparams=True, recorddens=False, showprogress=False)
         assert hasattr(lgca_6, 'ent_t') and hasattr(lgca_6, 'normEnt_t') and hasattr(lgca_6, 'polAlParam_t') \
                and hasattr(lgca_6, 'meanAlign_t'), "Does not record order parameters"
-
-    def t_propagation_template(self, geom, nodes, expected_output, bc='pbc'):
-        # check that propagation and rest channels work: all particles should move into one node within one timestep
-        lgca = get_lgca(geometry=geom, ve=False, nodes=nodes, bc=bc, interaction='only_propagation')
-        lgca.timeevo(timesteps=1, recorddens=False, showprogress=False)
-
-        assert lgca.nodes[lgca.nonborder].sum() == expected_output.sum(), "Particles appear or disappear"
-        assert np.array_equal(lgca.nodes[lgca.nonborder],
-                              expected_output), "Node configuration after propagation not correct"
 
     def test_propagation(self):
         # 1D
@@ -121,9 +420,9 @@ class Test_LGCA_NoVE(Test_LGCA_classical):
         self.t_propagation_template('hex', nodes, expected_output)
 
     @pytest.mark.parametrize("geom,nodes,b", [
-        ('lin', gen.nodes_nove_1d, com.b_1d),
-        ('square', gen.nodes_nove_square, com.b_square),
-        ('hex', gen.nodes_nove_hex, com.b_hex)
+        ('lin', com.nodes_nove_1d, com.b_1d),
+        ('square', com.nodes_nove_square, com.b_square),
+        ('hex', com.nodes_nove_hex, com.b_hex)
     ])
     def test_getlgca_capacity(self, geom, nodes, b):
         # lattice setup test with capacity: capacity defines how density is calculated
@@ -144,3 +443,160 @@ class Test_LGCA_NoVE(Test_LGCA_classical):
         assert lgca.capacity == b+restchannels, "Capacity not correctly calculated from provided geometry and rest channels"
         lgca = get_lgca(geometry=geom, ve=False, density=density, hom=True, restchannels=restchannels, interaction='only_propagation')
         assert lgca.capacity == b+restchannels, "Capacity not correctly calculated from provided geometry and rest channels"
+
+    def test_characteristics(self):
+        # volume exclusion does not have to be checked here
+        pass
+
+    def test_pbc_1d(self, nodes_1d_rbound, out_1d_rbound, nodes_1d_lbound, out_1d_lbound):
+        # check periodic boundary conditions in 1D
+        # right boundary
+        out_1d_rbound[0, 0] = 2  # particles that cross boundary
+        self.t_propagation_template('lin', nodes_1d_rbound, out_1d_rbound, bc='pbc')
+
+        # left boundary
+        out_1d_lbound[-1, 1] = 2  # particles that cross boundary
+        self.t_propagation_template('lin', nodes_1d_lbound, out_1d_lbound, bc='pbc')
+
+    def test_rbc_1d(self, nodes_1d_rbound, out_1d_rbound, nodes_1d_lbound, out_1d_lbound):
+        # check reflecting boundary conditions in 1D
+        # right boundary
+        out_1d_rbound[-1, 1] = 2  # particle that crosses boundary
+        self.t_propagation_template('lin', nodes_1d_rbound, out_1d_rbound, bc='rbc')
+
+        # left boundary
+        out_1d_lbound[0, 0] = 2  # particle that crosses boundary
+        self.t_propagation_template('lin', nodes_1d_lbound, out_1d_lbound, bc='rbc')
+
+    def test_pbc_square(self, nodes_sq_rbound, out_sq_rbound, nodes_sq_lbound, out_sq_lbound,
+                        nodes_sq_tbound, out_sq_tbound, nodes_sq_bbound, out_sq_bbound):
+        # check periodic boundary conditions in 2D square
+        # right boundary
+        out_sq_rbound[0, 3, 0] = 1  # particles that cross boundary
+        out_sq_rbound[0, 2, 0] = 2  # particles that cross boundary
+        out_sq_rbound[0, 1, 0] = 3  # particles that cross boundary
+        out_sq_rbound[0, 0, 0] = 4  # particles that cross boundary
+        self.t_propagation_template('square', nodes_sq_rbound, out_sq_rbound, bc='pbc')
+
+        # left boundary
+        out_sq_lbound[-1, 3, 2] = 1  # particles that cross boundary
+        out_sq_lbound[-1, 2, 2] = 2  # particles that cross boundary
+        out_sq_lbound[-1, 1, 2] = 3  # particles that cross boundary
+        out_sq_lbound[-1, 0, 2] = 4  # particles that cross boundary
+        self.t_propagation_template('square', nodes_sq_lbound, out_sq_lbound, bc='pbc')
+
+        # top boundary
+        out_sq_tbound[0, 0, 1] = 1  # particles that cross boundary
+        out_sq_tbound[1, 0, 1] = 2  # particles that cross boundary
+        out_sq_tbound[2, 0, 1] = 3  # particles that cross boundary
+        self.t_propagation_template('square', nodes_sq_tbound, out_sq_tbound, bc='pbc')
+
+        # bottom boundary
+        out_sq_bbound[0, -1, 3] = 1  # particles that cross boundary
+        out_sq_bbound[1, -1, 3] = 2  # particles that cross boundary
+        out_sq_bbound[2, -1, 3] = 3  # particles that cross boundary
+        self.t_propagation_template('square', nodes_sq_bbound, out_sq_bbound, bc='pbc')
+
+    def test_rbc_square(self, nodes_sq_rbound, out_sq_rbound, nodes_sq_lbound, out_sq_lbound,
+                        nodes_sq_tbound, out_sq_tbound, nodes_sq_bbound, out_sq_bbound):
+        # check reflecting boundary conditions in 2D square
+        # right boundary
+        out_sq_rbound[-1, 3, 2] = 1  # particles that cross boundary
+        out_sq_rbound[-1, 2, 2] = 2  # particles that cross boundary
+        out_sq_rbound[-1, 1, 2] = 3  # particles that cross boundary
+        out_sq_rbound[-1, 0, 2] = 4  # particles that cross boundary
+        self.t_propagation_template('square', nodes_sq_rbound, out_sq_rbound, bc='rbc')
+
+        # left boundary
+        out_sq_lbound[0, 3, 0] = 1  # particles that cross boundary
+        out_sq_lbound[0, 2, 0] = 2  # particles that cross boundary
+        out_sq_lbound[0, 1, 0] = 3  # particles that cross boundary
+        out_sq_lbound[0, 0, 0] = 4  # particles that cross boundary
+        self.t_propagation_template('square', nodes_sq_lbound, out_sq_lbound, bc='rbc')
+
+        # top boundary
+        out_sq_tbound[0, -1, 3] = 1  # particles that cross boundary
+        out_sq_tbound[1, -1, 3] = 2  # particles that cross boundary
+        out_sq_tbound[2, -1, 3] = 3  # particles that cross boundary
+        self.t_propagation_template('square', nodes_sq_tbound, out_sq_tbound, bc='rbc')
+
+        # bottom boundary
+        out_sq_bbound[0, 0, 1] = 1  # particles that cross boundary
+        out_sq_bbound[1, 0, 1] = 2  # particles that cross boundary
+        out_sq_bbound[2, 0, 1] = 3  # particles that cross boundary
+        self.t_propagation_template('square', nodes_sq_bbound, out_sq_bbound, bc='rbc')
+
+    def test_pbc_hex(self, nodes_hex_rbound, out_hex_rbound, nodes_hex_trbound, out_hex_trbound,
+                     nodes_hex_tlbound, out_hex_tlbound, nodes_hex_lbound, out_hex_lbound,
+                     nodes_hex_blbound, out_hex_blbound, nodes_hex_brbound, out_hex_brbound):
+        # check periodic boundary conditions in 2D square
+        # right boundary
+        out_hex_rbound[0, :, 0] = np.arange(1, 7)  # particles that cross boundary
+        self.t_propagation_template('hex', nodes_hex_rbound, out_hex_rbound, bc='pbc')
+
+        # top right boundary
+        out_hex_trbound[0, 1::2, 1] = np.array([1, 3, 5])  # particles that cross boundary
+        out_hex_trbound[-1, 0, 1] = 6
+        out_hex_trbound[0, 0, 1] = 7
+        out_hex_trbound[1, 0, 1] = 8
+        self.t_propagation_template('hex', nodes_hex_trbound, out_hex_trbound, bc='pbc')
+
+        # top left boundary
+        out_hex_tlbound[-1, 2::2, 2] = np.array([2, 4])  # particles that cross boundary
+        out_hex_tlbound[-1, 0, 2] = 6
+        out_hex_tlbound[0, 0, 2] = 7
+        out_hex_tlbound[-2, 0, 2] = 8
+        self.t_propagation_template('hex', nodes_hex_tlbound, out_hex_tlbound, bc='pbc')
+
+        # left boundary
+        out_hex_lbound[-1, :, 3] = np.arange(1, 7)  # particles that cross boundary
+        self.t_propagation_template('hex', nodes_hex_lbound, out_hex_lbound, bc='pbc')
+
+        # bottom left boundary
+        out_hex_blbound[-1, 0::2, 4] = np.array([2, 4, 6])  # particles that cross boundary
+        out_hex_blbound[-2:, -1, 4] = np.array([7, 8])
+        out_hex_blbound[0, -1, 4] = 1
+        self.t_propagation_template('hex', nodes_hex_blbound, out_hex_blbound, bc='pbc')
+
+        # bottom right boundary
+        out_hex_brbound[0, 1::2, 5] = np.array([3, 5, 1])  # particles that cross boundary
+        out_hex_brbound[1, -1, 5] = 7
+        out_hex_brbound[2, -1, 5] = 8
+        self.t_propagation_template('hex', nodes_hex_brbound, out_hex_brbound, bc='pbc')
+
+    def test_rbc_hex(self, nodes_hex_rbound, out_hex_rbound, nodes_hex_trbound, out_hex_trbound,
+                     nodes_hex_tlbound, out_hex_tlbound, nodes_hex_lbound, out_hex_lbound,
+                     nodes_hex_blbound, out_hex_blbound, nodes_hex_brbound, out_hex_brbound):
+        # check periodic boundary conditions in 2D square
+        # right boundary
+        out_hex_rbound[-1, :, 3] = np.arange(1, 7)  # particles that cross boundary
+        self.t_propagation_template('hex', nodes_hex_rbound, out_hex_rbound, bc='rbc')
+
+        # top right boundary
+        out_hex_trbound[-1, 0::2, 4] = np.array([1, 3, 5])  # particles that cross boundary
+        out_hex_trbound[0, -1, 4] = 7
+        out_hex_trbound[1, -1, 4] = 8
+        out_hex_trbound[-1, -1, 4] = 6
+        self.t_propagation_template('hex', nodes_hex_trbound, out_hex_trbound, bc='rbc')
+
+        # top left boundary
+        out_hex_tlbound[0, 1::2, 5] = np.array([2, 4, 6])  # particles that cross boundary
+        out_hex_tlbound[1, -1, 5] = 7
+        out_hex_tlbound[-1, -1, 5] = 8
+        self.t_propagation_template('hex', nodes_hex_tlbound, out_hex_tlbound, bc='rbc')
+
+        # left boundary
+        out_hex_lbound[0, :, 0] = np.arange(1, 7)  # particles that cross boundary
+        self.t_propagation_template('hex', nodes_hex_lbound, out_hex_lbound, bc='rbc')
+
+        # bottom left boundary
+        out_hex_blbound[0, 1::2, 1] = np.array([2, 4, 6])  # particles that cross boundary
+        out_hex_blbound[0, 0, 1] = 1
+        out_hex_blbound[-2:, 0, 1] = np.array([7, 8])
+        self.t_propagation_template('hex', nodes_hex_blbound, out_hex_blbound, bc='rbc')
+
+        # bottom right boundary
+        out_hex_brbound[-1, 0::2, 2] = np.array([1, 3, 5])  # particles that cross boundary
+        out_hex_brbound[0, 0, 2] = 7
+        out_hex_brbound[1, 0, 2] = 8
+        self.t_propagation_template('hex', nodes_hex_brbound, out_hex_brbound, bc='rbc')

@@ -9,7 +9,7 @@ except ImportError:
     from interactions import tanh_switch
 
 
-def randomwalk(lgca):
+def random_walk(lgca):
     relevant = lgca.cell_density[lgca.nonborder] > 0
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
@@ -48,7 +48,7 @@ def birth(lgca):
                 lgca.props['r_b'].append(float(trunc_gauss(0, lgca.a_max, r_b, sigma=lgca.std)))
 
         lgca.nodes[coord] = node
-    randomwalk(lgca)
+    random_walk(lgca)
 
 
 def birthdeath(lgca):
@@ -85,7 +85,7 @@ def birthdeath(lgca):
 
     lgca.nodes[dying] = 0
     lgca.update_dynamic_fields()
-    randomwalk(lgca)
+    random_walk(lgca)
 
 def birthdeath_discrete(lgca):
     """
@@ -127,7 +127,7 @@ def birthdeath_discrete(lgca):
 
     lgca.nodes[dying] = 0
     lgca.update_dynamic_fields()
-    randomwalk(lgca)
+    random_walk(lgca)
 
 def go_or_grow(lgca):
     """
@@ -142,7 +142,6 @@ def go_or_grow(lgca):
     # birth
     lgca.update_dynamic_fields()  # routinely update
     n_m = lgca.occupied[..., :lgca.velocitychannels].sum(-1)  # number of cells in rest channels for each node
-    #   .sum(-1) ? specifies dimension, -1 -> 1 dimension ? SIMON: .sum(-1) sums over the last axis (= sum over channels!)
     n_r = lgca.occupied[..., lgca.velocitychannels:].sum(-1)  # -"- velocity -"-
     relevant = (lgca.cell_density[lgca.nonborder] > 0)  # only nodes that are not empty
     coords = [a[relevant] for a in lgca.nonborder]

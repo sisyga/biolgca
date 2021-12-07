@@ -99,9 +99,9 @@ def cmap_discretize(cmap, N):
 def estimate_figsize(array, x=8., cbar=False, dy=1.):
     lx, ly = array.shape
     if cbar:
-        y = min([abs(x * ly /lx - 1), 8.])
+        y = min([abs(x * ly /lx - 1), 10.])
     else:
-        y = min([x * ly / lx, 8.])
+        y = min([x * ly / lx, 10.])
     y *= dy
     figsize = (x, y)
     return figsize
@@ -133,9 +133,8 @@ class LGCA_base():
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
         self.init_coords()
         self.init_nodes(density=density, nodes=nodes, **kwargs)
+        self.update_dynamic_fields()
         self.set_interaction(**kwargs)
-        self.cell_density = self.nodes.sum(-1)
-        self.apply_boundaries()
         print(kwargs)
 
     def set_r_int(self, r):
@@ -243,12 +242,12 @@ class LGCA_base():
                         ry = self.ycoords - y_source
                         r = np.sqrt(rx ** 2 + ry ** 2)
                         self.concentration = np.exp(-2 * r / self.ly)
-                        self.g = self.gradient(np.pad(self.concentration, 1, 'constant'))
+                        self.g = self.gradient(np.pad(self.concentration, 1, 'reflect'))
                     else:
                         source = npr.normal(self.l / 2, 1)
                         r = abs(self.xcoords - source)
                         self.concentration = np.exp(-2 * r / self.l)
-                        self.g = self.gradient(np.pad(self.concentration, 1, 'constant'))
+                        self.g = self.gradient(np.pad(self.concentration, 1, 'reflect'))
                         self.g /= self.g.max()
 
             elif interaction == 'contact_guidance':
@@ -525,15 +524,17 @@ class IBLGCA_base(LGCA_base):
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
         self.init_coords()
         self.init_nodes(density=density, nodes=nodes)
+        self.maxlabel = self.nodes.max()
+        self.update_dynamic_fields()
         self.set_interaction(**kwargs)
-        self.cell_density = self.nodes.sum(-1)
-        self.apply_boundaries()
 
     def set_interaction(self, **kwargs):
         try:
-            from .ib_interactions import randomwalk, birth, birthdeath, birthdeath_discrete, go_or_grow
+            from .ib_interactions import random_walk, birth, birthdeath, birthdeath_discrete, go_or_grow
+            from .interactions import only_propagation
         except ImportError:
-            from ib_interactions import randomwalk, birth, birthdeath, birthdeath_discrete, go_or_grow
+            from ib_interactions import random_walk, birth, birthdeath, birthdeath_discrete, go_or_grow
+            from interactions import only_propagation
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
             if interaction is 'birth':
@@ -544,6 +545,16 @@ class IBLGCA_base(LGCA_base):
                     self.r_b = 0.2
                     print('birth rate set to r_b = ', self.r_b)
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+                if 'std' in kwargs:
+                    self.std = kwargs['std']
+                else:
+                    self.std = 0.01
+                    print('standard deviation set to = ', self.std)
+                if 'a_max' in kwargs:
+                    self.a_max = kwargs['a_max']
+                else:
+                    self.a_max = 1.
+                    print('Max. birth rate set to a_max =', self.a_max)
 
             elif interaction is 'birthdeath':
                 self.interaction = birthdeath
@@ -664,6 +675,9 @@ class IBLGCA_base(LGCA_base):
             elif interaction is 'random_walk':
                 self.interaction = random_walk
 
+            elif interaction == 'only_propagation':
+                self.interaction = only_propagation
+
             else:
                 print('keyword', interaction, 'is not defined! Random walk used instead.')
                 self.interaction = random_walk
@@ -693,8 +707,6 @@ class IBLGCA_base(LGCA_base):
         occupied = npr.random(self.dims + (self.K,)) < density
         self.nodes[self.nonborder] = self.convert_bool_to_ib(occupied)
         self.apply_boundaries()
-        self.maxlabel = self.nodes.max()
-        self.update_dynamic_fields()
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
         self.update_dynamic_fields()
@@ -704,7 +716,7 @@ class IBLGCA_base(LGCA_base):
             # self.props_t = [copy(self.props)]  # this is mostly useless, just use self.props of the last time step
         if recordN:
             self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
-            self.n_t[0] = self.cell_density[self.nonbroder].sum()
+            self.n_t[0] = self.cell_density[self.nonborder].sum()
         if recorddens:
             self.dens_t = np.zeros((timesteps + 1,) + self.dims)
             self.dens_t[0, ...] = self.cell_density[self.nonborder]
@@ -804,12 +816,8 @@ class NoVE_LGCA_base(LGCA_base):
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes, capacity=capacity)
         self.init_coords()
         self.init_nodes(density=density, nodes=nodes, hom=hom)
-        self.set_interaction(**kwargs)
-        #self.cell_density = self.nodes.sum(-1)
         self.update_dynamic_fields()
-        self.ve = False
-        self.apply_boundaries()
-
+        self.set_interaction(**kwargs)
 
     def set_interaction(self, **kwargs):
         try:
