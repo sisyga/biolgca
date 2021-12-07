@@ -5,6 +5,7 @@ from matplotlib.collections import PatchCollection
 from matplotlib.colors import Normalize
 from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import warnings
 
 try:
     from base import *
@@ -17,7 +18,7 @@ class LGCA_Square(LGCA_base):
     2D version of a LGCA on the square lattice.
     """
     interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation',
-                    'random_walk', 'excitable_medium', 'nematic', 'persistant_motion', 'chemotaxis', 'contact_guidance', \
+                    'random_walk', 'excitable_medium', 'nematic', 'persistant_motion', 'chemotaxis', 'contact_guidance',
                     'only_propagation']
     velocitychannels = 4
     cix = np.array([1, 0, -1, 0], dtype=float)
@@ -58,6 +59,7 @@ class LGCA_Square(LGCA_base):
             self.random_reset(density)
         else:
             self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(np.bool)
+            self.apply_boundaries()
 
     def init_coords(self):
         self.x = np.arange(self.lx) + self.r_int
@@ -134,20 +136,20 @@ class LGCA_Square(LGCA_base):
 
     def apply_inflowbc(self):
         """
-        Boundary condition for a inflow from x=0, y=:, with reflecting boundary conditions along the y-axis and periodic
+        Boundary condition for an inflow from x=0, y=:, with reflecting boundary conditions along the y-axis and periodic
         boundaries along the x-axis. Nodes at (x=0, y) are set to a homogeneous state with a constant average density
         given by the attribute 0 <= self.inflow <= 1.
         If there is no such attribute, the nodes are filled with the maximum density.
         :return:
         """
+        self.apply_rbcx()
+
         if hasattr(self, 'inflow'):
-            self.nodes[:, self.r_int, ...] = npr.random(self.nodes[0].shape) < self.inflow
-
+            self.nodes[self.r_int, ...] = npr.random(self.nodes[0].shape) < self.inflow
         else:
-            self.nodes[:, self.r_int, ...] = 1
+            self.nodes[self.r_int, ...] = 1
 
-        self.apply_rbc()
-        # self.apply_pbcy()
+        self.apply_pbcy()
 
     def nb_sum(self, qty):
         sum = np.zeros(qty.shape)
@@ -158,7 +160,7 @@ class LGCA_Square(LGCA_base):
         return sum
 
     def gradient(self, qty):
-        return np.moveaxis(np.asarray(np.gradient(qty, 2)), 0, -1)
+        return np.moveaxis(np.asarray(np.gradient(qty, 0.5)), 0, -1)
 
     def channel_weight(self, qty):
         weights = np.zeros(qty.shape + (self.velocitychannels,))
@@ -224,9 +226,14 @@ class LGCA_Square(LGCA_base):
         plt.xlabel('$x \\; (\\varepsilon)$')
         plt.ylabel('$y \\; (\\varepsilon)$')
         ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
-        ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins='auto', steps=[2*self.dy, 5*self.dy, 10*self.dy]))
+        if self.dy >= 1:
+            minstep = self.dy
+            integer = True
+        else:
+            minstep = 1
+            integer = False
+        ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[minstep, 2*self.dy, 5*self.dy, 10*self.dy], integer=integer))
         ax.yaxis.set_major_formatter(lambda x, pos: (int(x/self.dy)))
-        #ax.yaxis.set_major_locator(mticker.MultipleLocator(base=self.dy))
         ax.spines['top'].set_visible(True)
         ax.spines['right'].set_visible(True)
         ax.yaxis.set_ticks_position('both')
@@ -234,7 +241,7 @@ class LGCA_Square(LGCA_base):
         ax.set_autoscale_on(False)
         return fig, ax
 
-    def plot_config(self, nodes=None, figsize=None, grid=False, ec='none', **kwargs):
+    def plot_config(self, nodes=None, figsize=None, grid=False, ec='none', rel_arrowlen=0.6, **kwargs):
         r_circle = self.r_poly * 0.25
         # bbox_props = dict(boxstyle="Circle,pad=0.3", fc="white", ec="k", lw=1.5)
         bbox_props = None
@@ -261,16 +268,16 @@ class LGCA_Square(LGCA_base):
         for i in range(self.velocitychannels):
             cx = self.c[0, i] * 0.5
             cy = self.c[1, i] * 0.5
-            arrows += [FancyArrowPatch((x, y), (x + cx, y + cy), mutation_scale=.3, fc=colors[occ], ec=ec, lw=lw_arrow)
-                       for x, y, occ in zip(xx.ravel(), yy.ravel(), occupied[..., i].ravel())]
+            arrows += [FancyArrowPatch((x + cx*(1-rel_arrowlen), y + cy*(1-rel_arrowlen)), (x + cx, y + cy), mutation_scale=.3, fc=colors[occ], ec=ec, lw=lw_arrow)
+                   for x, y, occ in zip(xx.ravel(), yy.ravel(), occupied[..., i].ravel())]
 
         arrows = PatchCollection(arrows, match_original=True)
         ax.add_collection(arrows)
 
         if self.restchannels > 0:
-            circles = [Circle(xy=(x, y), radius=r_circle, fc='white', ec='k', lw=lw_circle * bool(n), visible=bool(n))
-                       for x, y, n in
-                       zip(xx.ravel(), yy.ravel(), nodes[..., self.velocitychannels:].sum(-1).ravel())]
+            circles = [Circle(xy=(x, y), radius=r_circle, fc=colors[occ], ec='k', lw=lw_circle * occ, fill=False)
+                       for x, y, occ in
+                       zip(xx.ravel(), yy.ravel(), nodes[..., self.velocitychannels:].sum(-1).ravel().astype(bool))]
             texts = [ax.text(x, y - 0.5 * r_circle, str(n), ha='center', va='baseline', fontsize=fontsize,
                              fontname='sans-serif', fontweight='bold', bbox=bbox_props, visible=bool(n))
                      for x, y, n in zip(xx.ravel(), yy.ravel(), occupied[..., self.velocitychannels:].sum(-1).ravel())]
@@ -299,7 +306,7 @@ class LGCA_Square(LGCA_base):
             if hasattr(self, 'nodes_t'):
                 nodes_t = self.nodes_t
             else:
-                raise RuntimeError("Channel-wise state of the lattice required for plotting the configuration but not " +
+                raise RuntimeError("Channel-wise state of the lattice required for plotting the configuration but not "+
                                    "recorded in past LGCA run, call lgca.timeevo with keyword record=True")
 
         fig, arrows, circles, texts = self.plot_config(nodes=nodes_t[0], **kwargs)
@@ -376,15 +383,17 @@ class LGCA_Square(LGCA_base):
             ani = animation.FuncAnimation(fig, update, interval=interval)
             return ani
 
-    def live_animate_density(self, interval=100, **kwargs):
+    def live_animate_density(self, interval=100, channels=slice(None), **kwargs):
 
-        fig, pc, cmap = self.plot_density(**kwargs)
+        fig, pc, cmap = self.plot_density(channels=channels, **kwargs)
         title = plt.title('Time $k =$0')
 
         def update(n):
             self.timestep()
             title.set_text('Time $k =${}'.format(n))
-            pc.set(facecolor=cmap.to_rgba(self.cell_density[self.nonborder].ravel()))
+            nodes = self.nodes[self.nonborder].astype('bool')  # makes it work for IBLGCA and doesn't hurt here
+            dens = nodes[..., channels].sum(-1)
+            pc.set(facecolor=cmap.to_rgba(dens.ravel()))
             return pc, title
 
         ani = animation.FuncAnimation(fig, update, interval=interval)
@@ -410,9 +419,10 @@ class LGCA_Square(LGCA_base):
         if figsize is None:
             figsize = estimate_figsize(density, cbar=True)
 
-        fig, ax = self.setup_figure(**kwargs)
+        fig, ax = self.setup_figure(figsize=figsize, **kwargs)
         ax.set_aspect('equal')
-        plot = plt.quiver(xx, yy, jx, jy, density.ravel(), pivot='mid', angles='xy', scale_units='xy', scale=1./self.r_poly)
+        plot = plt.quiver(xx, yy, jx, jy, density.ravel(), pivot='mid', angles='xy', scale_units='xy',
+                          scale=1./self.r_poly, minlength=0.)
 
         if cbar:
             plot.set_cmap(cmap)
@@ -454,7 +464,6 @@ class LGCA_Square(LGCA_base):
         fig, plot = self.plot_flow(nodes[0], cbar=cbar, **kwargs)
         title = plt.title('Time $k =$0')
 
-
         def update(n):
             title.set_text('Time $k =${}'.format(n))
             plot.set_UVC(jx[n], jy[n], density[n])
@@ -494,7 +503,8 @@ class LGCA_Square(LGCA_base):
         polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly, alpha=v,
                                    orientation=self.orientation, facecolor=c, edgecolor=edgecolor)
                     for x, y, c, v in
-                    zip(self.xcoords.ravel(), self.ycoords.ravel(), cmap.to_rgba(field.ravel()), mask.ravel().astype(float))]
+                    zip(self.xcoords.ravel(), self.ycoords.ravel(), cmap.to_rgba(field.ravel()),
+                        mask.ravel().astype(float))]
         pc = PatchCollection(polygons, match_original=True)
         ax.add_collection(pc)
         if cbar:
@@ -506,10 +516,11 @@ class LGCA_Square(LGCA_base):
 
         return fig, pc, cmap
 
-    def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
-                     edgecolor='None', cbar=True):
+    def plot_density(self, density=None, channels=slice(None), figindex=None, figsize=None, tight_layout=True,
+                     cmap='viridis', vmax=None, edgecolor='None', cbar=True, cbarlabel='Particle number $n$'):
         if density is None:
-            density = self.cell_density[self.nonborder]
+            nodes = self.nodes[self.nonborder]
+            density = nodes[..., channels].sum(-1)
 
         if figsize is None:
             figsize = estimate_figsize(density, cbar=True, dy=self.dy)
@@ -526,7 +537,7 @@ class LGCA_Square(LGCA_base):
         if K > 1:
             cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
         else:
-            cmap = plt.cm.ScalarMappable(cmap=cmap) #why?
+            cmap = plt.cm.ScalarMappable(cmap=cmap)
         cmap.set_array(density)
         polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
                                    orientation=self.orientation, facecolor=c, edgecolor=edgecolor)
@@ -537,7 +548,7 @@ class LGCA_Square(LGCA_base):
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("right", size="5%", pad=0.1)
             cbar = fig.colorbar(cmap, extend='min', use_gridspec=True, cax=cax)
-            cbar.set_label('Particle number $n$')
+            cbar.set_label(cbarlabel)
             cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[1::2])
             cbar.set_ticklabels(1 + np.arange(K))
             plt.sca(ax)
@@ -547,10 +558,13 @@ class LGCA_Square(LGCA_base):
     def plot_vectorfield(self, x, y, vfx, vfy, figindex=None, figsize=None, tight_layout=True, cmap='viridis'):
         l = np.sqrt(vfx ** 2 + vfy ** 2)
 
+        if figsize is None:
+            figsize = estimate_figsize(x, cbar=True)
+
         fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
         ax.set_aspect('equal')
-        plot = plt.quiver(x, y, vfx, vfy, l, cmap=cmap, pivot='mid', angles='xy', scale_units='xy', scale=1,
-                          width=0.007, norm=colors.Normalize(vmin=0, vmax=1))
+        plot = plt.quiver(x, y, vfx, vfy, l, cmap=cmap, pivot='mid', angles='xy', scale_units='xy',
+                          scale=1./self.r_poly, norm=colors.Normalize(vmin=0, vmax=1), minlength=0.)
         return fig, plot
 
     def plot_flux(self, nodes=None, figindex=None, figsize=None, tight_layout=True, edgecolor='None', cbar=True):
@@ -589,17 +603,28 @@ class LGCA_Square(LGCA_base):
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("right", size="5%", pad=0.1)
             cbar = fig.colorbar(cmap, use_gridspec=True, cax=cax)
-            cbar.set_label('Direction of movement $(\degree)$')
+            cbar.set_label('Direction of flux')
             cbar.set_ticks(np.arange(self.velocitychannels) * 360 / self.velocitychannels)
+            cbar.set_ticklabels(['${} \degree$'.format(int(i)) for i in
+                                 np.arange(self.velocitychannels) * 360 / self.velocitychannels])
             plt.sca(ax)
 
         return fig, pc, cmap
 
-    def animate_density(self, density_t=None, interval=100, **kwargs):
+    def animate_density(self, density_t=None, interval=100, channels=slice(None), repeat=True, **kwargs):
 
         if density_t is None:
             if hasattr(self, 'dens_t'):
-                density_t = self.dens_t
+                if channels == slice(None):
+                    density_t = self.dens_t
+                else:
+                    if hasattr(self, 'nodes_t'):
+                        nodes_t = self.nodes_t[..., channels]
+                        density_t = nodes_t.sum(-1)
+                    else:
+                        raise RuntimeError(
+                            "Channel-wise state of the lattice required for density plotting for required channels only " +
+                            "but not recorded in past LGCA run, call lgca.timeevo with keyword record=True")
             else:
                 raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
                                    "in past LGCA run, call lgca.timeevo with keyword recorddens=True")
@@ -612,7 +637,7 @@ class LGCA_Square(LGCA_base):
             pc.set(facecolor=cmap.to_rgba(density_t[n, ...].ravel()))
             return pc, title
 
-        ani = animation.FuncAnimation(fig, update, interval=interval, frames=density_t.shape[0])
+        ani = animation.FuncAnimation(fig, update, interval=interval, frames=density_t.shape[0], repeat=repeat)
         return ani
 
     def animate_flux(self, nodes_t=None, interval=100, **kwargs):
@@ -633,7 +658,7 @@ class LGCA_Square(LGCA_base):
         angle = np.angle(angle, deg=True) % 360.
         fig, pc, cmap = self.plot_flux(nodes=nodes[0], **kwargs)
         angle = cmap.to_rgba(angle[None, ...])[0]
-        angle[..., -1] = np.sign(density)  # np.sqrt(density)
+        angle[..., -1] = np.sign(density)
         angle[(jx ** 2 + jy ** 2) < 1e-6, :3] = 0.5
         title = plt.title('Time $k =$ 0')
 
@@ -671,10 +696,13 @@ class LGCA_Square(LGCA_base):
         ani = animation.FuncAnimation(fig, update, interval=interval)
         return ani
 
+
 class IBLGCA_Square(IBLGCA_base, LGCA_Square):
     """
     Identity-based LGCA simulator class.
     """
+    interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath', 'birthdeath_discrete',
+                    'only_propagation']
 
     def init_nodes(self, density=0.1, nodes=None, **kwargs):
         self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
@@ -683,7 +711,7 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
 
         else:
             self.nodes[self.nonborder] = nodes.astype(np.uint)
-            self.maxlabel = self.nodes.max()
+            self.apply_boundaries()
 
     def plot_prop_spatial(self, nodes=None, props=None, propname=None, **kwargs):
         if nodes is None:
@@ -701,6 +729,21 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
         fig, pc, cmap = self.plot_scalarfield(meanprop, mask=mask, **kwargs)
         return fig, pc, cmap
 
+    def plot_density(self, density=None, channels=slice(None), **kwargs):
+        # needs to be overridden because of the sum of channels if no density is provided
+        if density is None:
+            nodes = self.nodes[self.nonborder].astype('bool')
+            density = nodes[..., channels].sum(-1)
+
+        fig, pc, cmap = LGCA_Square.plot_density(self, density=density, channels=channels, **kwargs)
+        return fig, pc, cmap
+
+    def animate_config(self, nodes_t=None, interval=100, **kwargs):
+        warnings.warn("Config animation not available for IBLGCA yet.")
+
+    def live_animate_config(self, interval=100, **kwargs):
+        warnings.warn("Live config animation not available for IBLGCA yet.")
+
 
 class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
     """
@@ -714,6 +757,7 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
         :param dims: desired lattice size (int or array-like)
         :param nodes: existing lattice to use (ndarray)
         :param restchannels: desired number of resting channels, will be capped to 1 if >1 because of no volume exclusion
+        :param capacity: reference value for density calculation. If number of cells = capacity, density = 1.0
         """
         # set instance dimensions according to passed lattice
         if nodes is not None:
@@ -771,7 +815,6 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
         else:
             self.capacity = self.K
 
-
     def init_nodes(self, density=4, nodes=None, hom=None):
         self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
         if nodes is None:
@@ -781,6 +824,7 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
                 self.random_reset(density)
         else:
             self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(np.uint)
+            self.apply_boundaries()
 
     def nb_sum(self, qty, addCenter=False):
         """
@@ -803,9 +847,11 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
         return sum
 
     def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
-                     edgecolor='None', cbar=True):
+                     edgecolor='None', cbar=True, cbarlabel='Particle number $n$', channels=slice(None)):
+
         if density is None:
-            density = self.cell_density[self.nonborder]
+            nodes = self.nodes[self.nonborder]
+            density = nodes[..., channels].sum(-1)
 
         if figsize is None:
             figsize = estimate_figsize(density, cbar=True, dy=self.dy)
@@ -844,7 +890,7 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
                 cbar = fig.colorbar(cmap, extend='min', use_gridspec=True, boundaries=[0,0.5,1], values=[0,1])
             else:
                 cbar = fig.colorbar(cmap, extend='min', use_gridspec=True)
-            cbar.set_label('Particle number $n$')
+            cbar.set_label(cbarlabel)
             if cmap_scaled:
                 ncolors = nbins
             else:
@@ -943,6 +989,20 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
 
         ani = animation.FuncAnimation(fig, update, interval=interval, frames=density_t.shape[0])
         return ani
+
+    def live_animate_density(self, interval=100, channels=slice(None), **kwargs):
+        # colourbar update is an issue
+        warnings.warn("Live density animation not available for LGCA without volume exclusion yet.")
+
+    def plot_config(self, nodes=None, figsize=None, grid=False, ec='none', rel_arrowlen=0.6, **kwargs):
+        warnings.warn("Config plot not available for LGCA without volume exclusion yet.")
+
+    def animate_config(self, nodes_t=None, interval=100, **kwargs):
+        warnings.warn("Config animation not available for LGCA without volume exclusion yet.")
+
+    def live_animate_config(self, interval=100, **kwargs):
+        warnings.warn("Live config animation not available for LGCA without volume exclusion yet.")
+
 
 
 if __name__ == '__main__':

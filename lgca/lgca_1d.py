@@ -47,6 +47,7 @@ class LGCA_1D(LGCA_base):
             self.random_reset(density)
         else:
             self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.bool)
+            self.apply_boundaries()
 
     def init_coords(self):
         self.nonborder = (np.arange(self.l) + self.r_int,) # tuple s.t. lattice sites can be called as: nodes[nonborder]
@@ -93,14 +94,18 @@ class LGCA_1D(LGCA_base):
         return sum
 
     def gradient(self, qty):
-        return np.gradient(qty, 2)[..., None]
+        return np.gradient(qty, 0.5)[..., None]
         # None adds a new axis to the ndarray and keeps the remaining array unchanged
 
-    def channel_weight(self, qty): #whatever this does
-        weights = np.zeros(qty.shape + (self.velocitychannels,)) #velocity channels added as a dimension, ',' to make it a tuple to add it to the shape tuple
-        # adding tuples: a = (0,1) b = (2,3) a+b=(0, 1, 2, 3) -> indexed in the same fashion as arrays
-        weights[:-1, ..., 0] = qty[1:, ...] #shift first dimension of qty left to put in right velocity channel
-        weights[1:, ..., 1] = qty[:-1, ...] #shift second dimension of qty right to put in left velocity channel
+    def channel_weight(self, qty):
+        """
+        Calculate weights for channels in interactions depending on a field qty
+        :param qty: scalar field with the same shape as self.cell_density
+        :return: weights, shaped like self.nodes, type float
+        """
+        weights = np.zeros(qty.shape + (self.velocitychannels,))
+        weights[:-1, ..., 0] = qty[1:, ...]
+        weights[1:, ..., 1] = qty[:-1, ...]
         return weights
 
     def setup_figure(self, tmax, figindex=None, figsize=(8, 8), tight_layout=True):
@@ -177,9 +182,9 @@ class LGCA_1D(LGCA_base):
 
         rgba = np.zeros((tmax, l, 4)) #4: RGBA A=alpha: transparency
         rgba[dens_t > 0, -1] = 1.
-        rgba[flux_t == 1, 0] = 1.
-        rgba[flux_t == -1, 2] = 1.
-        rgba[flux_t == 0, :-1] = 0.
+        rgba[flux_t > 0, 0] = 1.
+        rgba[flux_t < 0, 2] = 1.
+        rgba[flux_t == 0, :-1] = 0.  # unpopulated lattice sites are white
         fix, ax = self.setup_figure(tmax, **kwargs)
         plot = ax.imshow(rgba, interpolation='None', origin='upper')
         plt.xlabel(r'Lattice node $r \, (\varepsilon)$', )
@@ -195,22 +200,25 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
     """
     1D version of an identity-based LGCA.
     """
-    interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath']
+    interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath', 'birthdeath_discrete', 'only_propagation']
 
     def init_nodes(self, density, nodes=None, **kwargs):
         self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.uint)
         if nodes is None:
             self.random_reset(density)
-            self.maxlabel = self.nodes.max()
 
         else:
-            occ = nodes > 0
-            self.nodes[self.r_int:-self.r_int] = self.convert_bool_to_ib(occ)
-            self.maxlabel = self.nodes.max()
+            self.nodes[self.nonborder] = nodes.astype(np.uint)
+            self.apply_boundaries()
 
     def plot_flux(self, nodes_t=None, **kwargs):
         if nodes_t is None:
-            nodes_t = self.nodes_t.astype('bool')
+            if hasattr(self, 'nodes_t'):
+                nodes_t = self.nodes_t.astype('bool')
+            else:
+                raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
+                                   "in past LGCA run, call lgca.timeevo() with keyword record=True")
+
         if nodes_t.dtype != 'bool':
             nodes_t = nodes.astype('bool')
         LGCA_1D.plot_flux(self, nodes_t, **kwargs)
@@ -297,7 +305,6 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         else:
             self.capacity = self.K
 
-
     def init_nodes(self, density, nodes=None, hom=None):
         """
         Initialize nodes for the instance.
@@ -315,7 +322,7 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         # if lattice given, populate lattice with given particles. Virtual lattice sites for boundary conditions not included
         else:
             self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.uint)
-
+            self.apply_boundaries()
 
     def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis_r', relative_max=None, absolute_max=None, offset_t=0, offset_x=0):
         """
@@ -371,51 +378,50 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         plt.tight_layout()
         return plot
 
-
-    def plot_flux(self, nodes_t=None, figindex=None, figsize=None):
-        """
-        Create a plot showing the main direction of particles per lattice site.
-        :param nodes_t: particles per velocity channel at lattice site
-                        (ndarray of dimension (timesteps + 1,) + self.dims + (self.K,))
-        :param figindex: number of the figure to create/activate
-        :param figsize: desired figure size
-        :return: plot as a matplotlib.image
-        """
-        # set values for unused arguments
-        if nodes_t is None:
-            if hasattr(self, 'nodes_t'):
-                nodes_t = self.nodes_t
-            else:
-                raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
-                                   "in past LGCA run, call lgca.timeevo() with keyword record=True")
-        # calculate particle density, max time and dimension values, flux
-        dens_t = nodes_t.sum(-1) / nodes_t.shape[-1]
-        tmax, l = dens_t.shape
-        flux_t = nodes_t[..., 0].astype(int) - nodes_t[..., 1].astype(int)
-        if figsize is None:
-            figsize = estimate_figsize(dens_t.T)
-
-        # encode flux as RGBA values
-        # 4: RGBA A=alpha: transparency
-        rgba = np.zeros((tmax, l, 4))
-        rgba[dens_t > 0, -1] = 1.
-        rgba[flux_t > 0, 0] = 1. # can I do this in ve, too?
-        rgba[flux_t < 0, 2] = 1.
-        rgba[flux_t == 0, :-1] = 0. # unpopulated lattice sites are white
-        # set up figure
-        fig = plt.figure(num=figindex, figsize=figsize)
-        ax = fig.add_subplot(111)
-        # create plot with axis labels, title and layout
-        plot = ax.imshow(rgba, interpolation='None', origin='upper')
-        plt.xlabel(r'Lattice node $r \, [\varepsilon]$', )
-        plt.ylabel(r'Time step $k \, [\tau]$')
-        ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
-        ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
-        ax.xaxis.set_label_position('top')
-        ax.xaxis.set_ticks_position('top')
-        ax.xaxis.tick_top()
-        plt.tight_layout()
-        return plot
+    # def plot_flux(self, nodes_t=None, figindex=None, figsize=None):
+    #     """
+    #     Create a plot showing the main direction of particles per lattice site.
+    #     :param nodes_t: particles per velocity channel at lattice site
+    #                     (ndarray of dimension (timesteps + 1,) + self.dims + (self.K,))
+    #     :param figindex: number of the figure to create/activate
+    #     :param figsize: desired figure size
+    #     :return: plot as a matplotlib.image
+    #     """
+    #     # set values for unused arguments
+    #     if nodes_t is None:
+    #         if hasattr(self, 'nodes_t'):
+    #             nodes_t = self.nodes_t
+    #         else:
+    #             raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
+    #                                "in past LGCA run, call lgca.timeevo() with keyword record=True")
+    #     # calculate particle density, max time and dimension values, flux
+    #     dens_t = nodes_t.sum(-1) / nodes_t.shape[-1]
+    #     tmax, l = dens_t.shape
+    #     flux_t = nodes_t[..., 0].astype(int) - nodes_t[..., 1].astype(int)
+    #     if figsize is None:
+    #         figsize = estimate_figsize(dens_t.T)
+    #
+    #     # encode flux as RGBA values
+    #     # 4: RGBA A=alpha: transparency
+    #     rgba = np.zeros((tmax, l, 4))
+    #     rgba[dens_t > 0, -1] = 1.
+    #     rgba[flux_t > 0, 0] = 1.  # can I do this in ve, too?
+    #     rgba[flux_t < 0, 2] = 1.
+    #     rgba[flux_t == 0, :-1] = 0.  # unpopulated lattice sites are white
+    #     # set up figure
+    #     fig = plt.figure(num=figindex, figsize=figsize)
+    #     ax = fig.add_subplot(111)
+    #     # create plot with axis labels, title and layout
+    #     plot = ax.imshow(rgba, interpolation='None', origin='upper')
+    #     plt.xlabel(r'Lattice node $r \, [\varepsilon]$', )
+    #     plt.ylabel(r'Time step $k \, [\tau]$')
+    #     ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
+    #     ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
+    #     ax.xaxis.set_label_position('top')
+    #     ax.xaxis.set_ticks_position('top')
+    #     ax.xaxis.tick_top()
+    #     plt.tight_layout()
+    #     return plot
 
     def nb_sum(self, qty, addCenter=False):
          """
