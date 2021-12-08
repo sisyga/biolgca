@@ -6,6 +6,7 @@ import time
 import lgca
 import numpy
 import numpy.random
+import os.path as path
 import random
 import uuid
 
@@ -21,20 +22,25 @@ class Simulation(object):
 		numpy.random.seed(seed)
 		
 		logging.info("starting simulation %s with seed %d", str(uu), seed)
+		start = time.time()
 		l = lgca.get_lgca(ib=True, geometry='lin', interaction='passenger_mutations', bc='reflecting',
 										variation=False, density=1, dims=self.dim, restchannels=self.rc, pop={1: 1})
 		l.timeevo(timesteps=self.steps, recordMut=True)
+		logging.info('completed simulation %s in %s', str(uu), '{:5.3f} minutes'.format((time.time() - start)/60))
 		
-		logging.info('completed simulation %s', str(uu))
 		if self.save_dir != None:
 			self.save_data(l, uu)
 
 	def save_data(self, l, uu):
-		prefix = self.save_dir + str(2 * self.dim + self.dim * self.rc) + str(self.dim) + "_mut_" + str(uu)
-		logging.info("saving data with prefix '%s'", prefix)
+		prefix = path.join(self.save_dir, str(2 * self.dim + self.dim * self.rc) + str(self.dim) + "_mut_" + str(uu))
+		logging.info("saving data from simulation %s", str(uu))
+		logging.debug("writing '%s_tree.npy'", prefix)
 		numpy.save(prefix  + '_tree',       l.tree_manager.tree)
+		logging.debug("writing '%s_families.npy'", prefix)
 		numpy.save(prefix  + '_families',   l.props['lab_m'])
+		logging.debug("writing '%s_offsprings.npy'", prefix)
 		numpy.save(prefix  + '_offsprings', l.offsprings)
+		logging.debug("writing '%s_Parameter.npz'", prefix)
 		numpy.savez(prefix + '_Parameter',  density=l.density, restchannels=l.restchannels, dimension=l.l, kappa=l.K, rb=l.r_b, rd=l.r_d, rm=l.r_m, m=l.r_int)
 
 def rand_int():
@@ -57,14 +63,23 @@ def main(args):
 	logging.basicConfig(format='%(asctime)s [PID%(process)d] %(name)s - %(levelname)s: %(message)s',
 											level=logging.DEBUG if args.v else logging.INFO)
 
+	# check output dir
+	out_dir = path.abspath(args.o) if not args.o is None else None
+	if out_dir is None:
+		logging.warn("DATA WON'T BE SAVED! (set option -o/--output-dir to do so)")
+	elif not(path.exists(out_dir) and path.isdir(out_dir)):
+		logging.error("Output directory doesn't exist: %s", out_dir)
+		sys.exit(1)
+
+	# work
 	logging.info("simulation parameters: dim=%d, rc=%d, steps=%d", args.d, args.r, args.t)
 	logging.info("starting %d concurrent simulations", args.n)
 	start = time.time()
 	with multiprocessing.Pool() as pool:
-
-		pool.map(Simulation(args.d, args.r, args.t, save_dir=args.o),
+		pool.map(Simulation(args.d, args.r, args.t, save_dir=out_dir),
 						 [(uuid.uuid4(), rand_int()) for _ in range(args.n)])
 
+	# wrap up
 	logging.info('all threads completed in {:5.3f} minutes'.format((time.time() - start)/60))
 
 main(sys.argv[1:])
