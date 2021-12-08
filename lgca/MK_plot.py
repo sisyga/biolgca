@@ -1,5 +1,3 @@
-import pickle
-import statistics as stat
 from lgca.lgca_1d import *
 import pickle
 import statistics as stat
@@ -18,7 +16,6 @@ def plot01(save_file=[], ALL=[], p_start=0.5, p_end=1, img_x=[-1, 2], img_y=[-16
     size_b = len(ALL['b'])
     size_d = len(ALL['bd'])
     size_c = len(ALL['rest'])
-    size_f = len(ALL['fix'])
     size_run = ALL['runs']
 
     m_k = np.zeros((size_c * size_b * size_d))
@@ -41,14 +38,11 @@ def plot01(save_file=[], ALL=[], p_start=0.5, p_end=1, img_x=[-1, 2], img_y=[-16
                     T = ALL['data'][run][i].props_t[-1]['theta']
 
                 KAPPAS.extend(K[int(len(K) * p_start):int(len(K) * p_end)])
-                # print(len(KAPPAS))
                 THETAS.extend(T[int(len(T) * p_start):int(len(K) * p_end)])
             m_k[i] = stat.median(KAPPAS)
             m_t[i] = stat.median(THETAS)
             plt.subplot(size_b, size_d, rd + 1)
-            # plt.hist2d(THETAS[int(-len(THETAS)/2):],KAPPAS[int(-len(KAPPAS)/2):], range=((-1,2),(-16,16)), bins=25)
             plt.hist2d(THETAS, KAPPAS, bins=100, range=(img_x, img_y), )
-            # plt.hist2d(THETAS[-1000:], KAPPAS[-1000:], range=((-2, 3), (-16, 16)), bins=25)
             if run == size_run - 1:
                 plt.plot([-1, 2], [0, 0])
                 plt.plot([-1, 2], [-8, -8], ls='--', c=[0.1, 0, 0])
@@ -71,7 +65,6 @@ def plot01(save_file=[], ALL=[], p_start=0.5, p_end=1, img_x=[-1, 2], img_y=[-16
                     plt.xticks([])
                     plt.yticks([])
 
-                # plt.plot(np.arange(len(lgcalist[i].dens_t)), np.array(lgcalist[i].dens_t).mean(-1))
     plt.figure(size_c)
     plt.subplot(1, 2, 1)
     plt.plot(m_t)
@@ -81,27 +74,6 @@ def plot01(save_file=[], ALL=[], p_start=0.5, p_end=1, img_x=[-1, 2], img_y=[-16
 
 
 plot01(save_file='S02_CURRENT.pkl', img_x=[-2, 3])
-
-"""
-lgca2.plot_prop_timecourse(propname='kappa')
-lgca2.plot_prop_timecourse(propname='theta')
-plt.show()
-"""
-
-"""
-#lgca2.plot_prop_spatial()
-#plt.show()
-#
-plt.figure
-plt.plot(lgca2.props_t[1]['theta'][:])
-plt.show()
-plt.figure
-plt.plot(lgca2.props_t[100]['theta'][lgca2.nodes_t])
-
-#plt.ylabel('$\\kappa$')
-#plt.savefig('gng_mean_alpha.png', dpi=600)
-plt.show()
-"""
 
 # plot for _channel files
 """
