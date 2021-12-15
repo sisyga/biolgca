@@ -200,7 +200,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
     """
     1D version of an identity-based LGCA.
     """
-    interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath', 'birthdeath_discrete', 'only_propagation']
+    interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath', 'birthdeath_discrete', 'only_propagation', 'go_and_grow_mutations']
 
     def init_nodes(self, density, nodes=None, **kwargs):
         self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.uint)
@@ -424,42 +424,18 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
     #     return plot
 
     def nb_sum(self, qty, addCenter=False):
-         """
-         Calculate sum of values in neighboring lattice sites of each lattice site.
-         :param qty: ndarray in which neighboring values have to be added
-                     first dimension indexes lattice sites
-         :param addCenter: toggle adding central value
-         :return: sum as ndarray
-         """
-         sum = np.zeros(qty.shape)
-         # shift to left padding 0 and add to shift to the right padding 0
-         sum[:-1, ...] += qty[1:, ...]
-         sum[1:, ...] += qty[:-1, ...]
-         # add central value
-         if addCenter:
-            sum += qty
-         return sum
-
-
-if __name__ == '__main__':
-    l = 100
-    restchannels = 2
-    n_channels = restchannels + 2
-    nodes = np.zeros((l, n_channels))
-    nodes[0] = 1
-
-    system = IBLGCA_1D(bc='reflect', dims=100, interaction='birthdeath', density=0.1, restchannels=2, r_b=0.1, std=0.005,
-                       nodes=nodes)
-    system.timeevo(timesteps=100, record=True)
-    print(system.nodes_t[0].shape)
-    print(system.get_prop(system.nodes_t[0]).shape)
-    # system.plot_prop()
-    # system.plot_density(figindex=1)
-    # props = np.array(system.props['kappa'])[system.nodes[system.nodes > 0]]
-    # print(np.mean(props))
-    # system.plot_prop_timecourse()
-    # plt.ylabel('$\kappa$')
-    system.plot_density()
-    #system.plot_prop_spatial()
-    # system.plot_prop_timecourse()
-    plt.show()
+        """
+        Calculate sum of values in neighboring lattice sites of each lattice site.
+        :param qty: ndarray in which neighboring values have to be added
+                  first dimension indexes lattice sites
+        :param addCenter: toggle adding central value
+        :return: sum as ndarray
+        """
+        sum = np.zeros(qty.shape)
+        # shift to left padding 0 and add to shift to the right padding 0
+        sum[:-1, ...] += qty[1:, ...]
+        sum[1:, ...] += qty[:-1, ...]
+        # add central value
+        if addCenter:
+           sum += qty
+        return sum

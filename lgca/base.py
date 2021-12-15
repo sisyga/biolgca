@@ -530,14 +530,16 @@ class IBLGCA_base(LGCA_base):
 
     def set_interaction(self, **kwargs):
         try:
-            from .ib_interactions import random_walk, birth, birthdeath, birthdeath_discrete, go_or_grow
+            from .ib_interactions import random_walk, birth, birthdeath, birthdeath_discrete, go_or_grow, \
+                go_and_grow_mutations
             from .interactions import only_propagation
         except ImportError:
-            from ib_interactions import random_walk, birth, birthdeath, birthdeath_discrete, go_or_grow
+            from ib_interactions import random_walk, birth, birthdeath, birthdeath_discrete, go_or_grow, \
+                go_and_grow_mutations
             from interactions import only_propagation
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
-            if interaction is 'birth':
+            if interaction == 'birth':
                 self.interaction = birth
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
@@ -556,7 +558,7 @@ class IBLGCA_base(LGCA_base):
                     self.a_max = 1.
                     print('Max. birth rate set to a_max =', self.a_max)
 
-            elif interaction is 'birthdeath':
+            elif interaction == 'birthdeath' or interaction == 'go_and_grow':
                 self.interaction = birthdeath
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
@@ -581,7 +583,13 @@ class IBLGCA_base(LGCA_base):
                     self.a_max = 1.
                     print('Max. birth rate set to a_max =', self.a_max)
 
-            elif interaction is 'birthdeath_discrete':
+                birthdeath.track_inheritance = False
+                if 'track_inheritance' in kwargs:
+                    if kwargs['track_inheritance']:
+                        birthdeath.track_inheritance = True
+                        self.init_families(type='heterogeneous', mutation=False)
+
+            elif interaction == 'birthdeath_discrete':
                 self.interaction = birthdeath_discrete
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
@@ -613,7 +621,7 @@ class IBLGCA_base(LGCA_base):
                     self.pmut = 0.1
                     print('Mutation probability set to p_mut =', self.pmut)
 
-            elif interaction is 'go_or_grow':
+            elif interaction == 'go_or_grow':
                 self.interaction = go_or_grow
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']
@@ -634,7 +642,6 @@ class IBLGCA_base(LGCA_base):
                 else:
                     self.kappa = [5.] * self.maxlabel
                     print('switch rate set to kappa = ', self.kappa[0])
-                # self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
                 self.props.update(kappa=[0.] + self.kappa)
                 if 'theta' in kwargs:
                     theta = kwargs['theta']
@@ -645,43 +652,62 @@ class IBLGCA_base(LGCA_base):
                 else:
                     self.theta = [0.75] * self.maxlabel
                     print('switch threshold set to theta = ', self.theta[0])
-                # MK:
-                self.props.update(theta=[0.] + self.theta)  # * self.maxlabel)
+                self.props.update(theta=[0.] + self.theta)
+                if 'kappa_std' in kwargs:
+                    self.kappa_std = kwargs['kappa_std']
+                else:
+                    self.kappa_std = 0.2
+                    print('Standard deviation for kappa mutation set to ', self.kappa_std)
+                if 'theta_std' in kwargs:
+                    self.theta_std = kwargs['theta_std']
+                else:
+                    self.theta_std = 0.05
+                    print('Standard deviation for theta mutation set to ', self.theta_std)
+
                 if self.restchannels < 2:
                     print('WARNING: not enough rest channels - system will die out!!!')
 
-            elif interaction is 'go_and_grow':
-                self.interaction = birth
-                if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
-                else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
-
-                if 'std' in kwargs:
-                    self.std = kwargs['std']
-                else:
-                    self.std = 0.01
-                    print('standard deviation set to = ', self.std)
-
-                if 'a_max' in kwargs:
-                    self.a_max = kwargs['a_max']
-                else:
-                    self.a_max = 1.
-                    print('Max. birth rate set to a_max =', self.a_max)
-
-                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
-
-            elif interaction is 'random_walk':
+            elif interaction == 'random_walk':
                 self.interaction = random_walk
 
             elif interaction == 'only_propagation':
                 self.interaction = only_propagation
 
+            elif interaction == 'go_and_grow_mutations':
+                self.interaction = go_and_grow_mutations
+                if 'effect' in kwargs:
+                    self.effect = kwargs['effect']
+                else:
+                    self.effect = 'passenger_mutation'
+                    print('fitness effect set to passenger mutation, rb=const.')
+                if 'r_int' in kwargs:
+                    self.set_r_int(kwargs['r_int'])
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                else:
+                    self.r_b = 0.5
+                    print('birth rate set to r_b = ', self.r_b)
+                if 'r_m' in kwargs:
+                    self.r_m = kwargs['r_m']
+                else:
+                    self.r_m = 0.001
+                    print('mutation rate set to r_m = ', self.r_m)
+                if 'r_d' in kwargs:
+                    self.r_d = kwargs['r_d']
+                else:
+                    self.r_d = 0.02
+                    print('death rate set to r_d = ', self.r_d)
+                self.init_families(type='homogeneous', mutation=True)
+                if self.effect == 'driver_mutation':
+                    self.family_props.update(r_b=[0] + [self.r_b] * self.maxfamily)
+                    if 'fitness_increase' in kwargs:
+                        self.fitness_increase = kwargs['fitness_increase']
+                    else:
+                        self.fitness_increase = 1.1
+                        print('fitness increase for driver mutations set to ', self.fitness_increase)
             else:
                 print('keyword', interaction, 'is not defined! Random walk used instead.')
                 self.interaction = random_walk
-
         else:
             self.interaction = random_walk
 
@@ -795,6 +821,21 @@ class IBLGCA_base(LGCA_base):
         errors = plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True, interpolate=True)
         return line, errors
 
+    def init_families(self, type='homogeneous', mutation=True):
+        if type == 'homogeneous':
+            families = [0] + [1] * self.maxlabel
+            self.props.update(family=families)
+            if mutation:
+                self.family_props = {}  # properties of families
+                self.family_props.update(ancestor=[0, 0])
+                self.maxfamily = 1
+        elif type == 'heterogeneous':
+            families = list(np.arange(self.maxlabel+1))
+            self.props.update(family=families)
+            if mutation:
+                self.family_props = {}  # properties of families
+                self.family_props.update(ancestor=[0] * (self.maxlabel + 1))
+                self.maxfamily = self.maxlabel
 
 class NoVE_LGCA_base(LGCA_base):
     """

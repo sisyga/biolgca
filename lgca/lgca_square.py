@@ -702,7 +702,7 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
     Identity-based LGCA simulator class.
     """
     interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath', 'birthdeath_discrete',
-                    'only_propagation']
+                    'only_propagation', 'go_and_grow_mutations']
 
     def init_nodes(self, density=0.1, nodes=None, **kwargs):
         self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
@@ -1003,25 +1003,3 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
     def live_animate_config(self, interval=100, **kwargs):
         warnings.warn("Live config animation not available for LGCA without volume exclusion yet.")
 
-
-
-if __name__ == '__main__':
-    lx = 50
-    ly = lx
-    restchannels = 4
-    nodes = np.zeros((lx, ly, 4 + restchannels))
-    nodes[0] = 1
-    lgca = IBLGCA_Square(restchannels=restchannels, lx=lx, ly=ly, bc='refl', nodes=nodes,
-                         interaction='go_and_grow', r_b=0.1, std=0.01)
-    # lgca.timeevo(200, record=True)
-    # lgca.plot_prop_spatial(propname='r_b', cbarlabel='$r_b$')
-    # print(lgca.cell_density[lgca.nonborder])
-    # ani = lgca.animate_flow(interval=50)
-    # ani = lgca.animate_flux(interval=100)
-    # ani = lgca.animate_density(interval=10)
-    # ani = lgca.live_animate_flux()
-    ani = lgca.live_animate_density()
-    # lgca.plot_flux()
-    # lgca.plot_density()
-    # lgca.plot_config(grid=True)
-    plt.show()
