@@ -1,5 +1,4 @@
 from bisect import bisect_left
-from math import log, exp
 from random import random
 
 import numpy as np
@@ -62,6 +61,7 @@ def birthdeath(lgca):
     death = npr.random(lgca.nodes.shape) < lgca.r_d
     ds = (1 - lgca.nodes) * birth - lgca.nodes * death
     np.add(lgca.nodes, ds, out=lgca.nodes, casting='unsafe')
+    lgca.update_dynamic_fields()
     random_walk(lgca)
 
 

@@ -1,5 +1,4 @@
 import sys
-from copy import deepcopy as copy
 
 import matplotlib.colors as mcolors
 import numpy as np
@@ -7,6 +6,8 @@ from matplotlib import pyplot as plt
 from matplotlib.cm import ScalarMappable
 from numpy import random as npr
 from sympy.utilities.iterables import multiset_permutations
+from copy import copy, deepcopy
+from lgca.plots import muller_plot
 
 pi2 = 2 * np.pi
 plt.style.use('default')
@@ -144,12 +145,7 @@ class LGCA_base():
         self.update_dynamic_fields()
 
     def set_interaction(self, **kwargs):
-        try:
-            from .interactions import go_or_grow, go_or_rest, birth, alignment, persistent_walk, chemotaxis, \
-                contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium, \
-                only_propagation
-        except:
-            from interactions import go_or_grow, go_or_rest, birth, alignment, persistent_walk, chemotaxis, \
+        from lgca.interactions import go_or_grow, go_or_rest, birth, alignment, persistent_walk, chemotaxis, \
                 contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium, \
                 only_propagation
         if 'interaction' in kwargs:
@@ -501,6 +497,12 @@ class LGCA_base():
         self.si = [np.einsum('ij,jkl', self.permutations[n][:, :self.velocitychannels], self.cij) for n in
                    range(self.K + 1)]
 
+    def total_population(self):
+        """
+        Calculate the total population of cells in the lattice.
+        :returns: numpy.int32 total population size
+        """
+        return self.cell_density[self.nonborder].sum()
 
 class IBLGCA_base(LGCA_base):
     """
@@ -529,14 +531,9 @@ class IBLGCA_base(LGCA_base):
         self.set_interaction(**kwargs)
 
     def set_interaction(self, **kwargs):
-        try:
-            from .ib_interactions import random_walk, birth, birthdeath, birthdeath_discrete, go_or_grow, \
-                go_and_grow_mutations
-            from .interactions import only_propagation
-        except ImportError:
-            from ib_interactions import random_walk, birth, birthdeath, birthdeath_discrete, go_or_grow, \
-                go_and_grow_mutations
-            from interactions import only_propagation
+        from lgca.ib_interactions import random_walk, birth, birthdeath, birthdeath_discrete, go_or_grow, \
+            go_and_grow_mutations
+        from lgca.interactions import only_propagation
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
             if interaction == 'birth':
@@ -734,7 +731,7 @@ class IBLGCA_base(LGCA_base):
         self.nodes[self.nonborder] = self.convert_bool_to_ib(occupied)
         self.apply_boundaries()
 
-    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
+    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True, recordfampop=False):
         self.update_dynamic_fields()
         if record:
             self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
@@ -746,6 +743,21 @@ class IBLGCA_base(LGCA_base):
         if recorddens:
             self.dens_t = np.zeros((timesteps + 1,) + self.dims)
             self.dens_t[0, ...] = self.cell_density[self.nonborder]
+        if recordfampop:
+            from lgca.ib_interactions import go_and_grow_mutations
+            # this needs to include all interactions that can increase the number of recorded families!
+            if self.interaction == go_and_grow_mutations:
+                # if mutations are allowed, this is a list because it will be ragged due to increasing family numbers
+                self.fam_pop_t = [self.calc_family_pop_alive()]
+                is_mutating = True
+            else:
+                if 'family' not in self.props:
+                    raise RuntimeError("Interaction does not deal with families, "
+                                       "family population can therefore not be recorded.")
+                # otherwise standard procedure
+                self.fam_pop_t = np.zeros((timesteps + 1, self.maxfamily+1))
+                self.fam_pop_t[0, ...] = self.calc_family_pop_alive()
+                is_mutating = False
         for t in range(1, timesteps + 1):
             self.timestep()
             if record:
@@ -755,8 +767,21 @@ class IBLGCA_base(LGCA_base):
                 self.n_t[t] = self.cell_density[self.nonborder].sum()
             if recorddens:
                 self.dens_t[t, ...] = self.cell_density[self.nonborder]
+            if recordfampop:
+                if is_mutating:
+                    # append to the ragged nested list
+                    self.fam_pop_t.append(self.calc_family_pop_alive())
+                else:
+                    # standard procedure
+                    try:
+                        self.fam_pop_t[t, ...] = self.calc_family_pop_alive()
+                    except ValueError as e:
+                        raise ValueError("Number of families has increased, interaction must be included in the case " +
+                                         "distinction for the recordfampop keyword in the IBLGCA base timeevo function!") from e
             if showprogress:
                 update_progress(1.0 * t / timesteps)
+        if recordfampop and is_mutating:
+            self.straighten_family_populations()
 
     def calc_flux(self, nodes):
         if nodes.dtype != 'bool':
@@ -828,6 +853,7 @@ class IBLGCA_base(LGCA_base):
             if mutation:
                 self.family_props = {}  # properties of families
                 self.family_props.update(ancestor=[0, 0])
+                self.family_props.update(descendants=[[1], []])
                 self.maxfamily = 1
         elif type == 'heterogeneous':
             families = list(np.arange(self.maxlabel+1))
@@ -835,7 +861,423 @@ class IBLGCA_base(LGCA_base):
             if mutation:
                 self.family_props = {}  # properties of families
                 self.family_props.update(ancestor=[0] * (self.maxlabel + 1))
+                self.family_props.update(descendants=[families[1:]])
+                for i in range(self.maxlabel):
+                    self.family_props['descendants'].append([])
                 self.maxfamily = self.maxlabel
+
+    def calc_family_pop_alive(self):
+        """
+        Calculate how many cells of each family are alive.
+        :returns: np.ndarray fam_pop_array - array of family population counts indexed by family ID
+        """
+        if 'family' not in self.props:
+            raise RuntimeError("Family properties are not recorded by the LGCA, choose suitable interaction.")
+
+        cells_alive = self.nodes[self.nonborder][
+            np.where(self.nodes[self.nonborder] > 0)]  # indices of live cells # nonborder needed for uniqueness
+        cell_fam = np.array(self.props['family'])  # convert for indexing
+        cell_fam_alive = cell_fam[cells_alive.astype(np.int)]  # filter family array for families of live cells
+        fam_alive, fam_pop = np.unique(cell_fam_alive, return_counts=True)  # count number of cells for each family
+        # transform into array with population entry for all families that ever existed
+        fam_pop_array = np.zeros(self.maxfamily+1, dtype=int)
+        fam_pop_array[fam_alive] = fam_pop
+        return fam_pop_array
+        # alternative: look up family for each live cell, then do unique on those altered nodes
+
+    def straighten_family_populations(self):
+        """
+        Utility for the timeevo method. Straighten out the ragged family population record over time
+        in the presence of mutations.
+        """
+        for pop_arr in self.fam_pop_t:
+            if len(pop_arr) < self.maxfamily + 1:
+                pop_arr.resize(self.maxfamily + 1, refcheck=False)
+        self.fam_pop_t = np.array(self.fam_pop_t)
+
+    @staticmethod
+    def propagate_pop_to_parents(pop_t, ancestor):
+        """
+        Propagate family population to all ancestors.
+        :param pop_t: np.ndarray of shape (timesteps, families) that holds the population of each family for all timesteps
+        :param ancestor: list of length families + 1 with each family's parent (initially existing families have 0)
+        :returns: np.ndarray cum_pop_t - family populations over time summed up to all ancestors recursively, cum_pop_t[:, 0]
+                  holds total population over time
+        """
+        cum_pop_t = deepcopy(pop_t)
+        # turn list around to traverse tree in reverse, leverage that parents always have lower indices than children
+        ancestor_reverse = np.flip(ancestor)
+        indices_reverse = np.flip(np.arange(len(ancestor)))
+        for ind, el in zip(indices_reverse, ancestor_reverse):
+            # don't sum elements with themselves (relevant for 0)
+            if ind != el:
+                cum_pop_t[:, el] += cum_pop_t[:, ind]
+        return cum_pop_t
+
+    def muller_plot(self, t_start_index=None, t_slice=slice(None), prop=None, cutoff_abs=None, cutoff_rel=None, **kwargs):
+        """
+        Draw a Muller plot from the LGCA simulation data (runtime, family tree, recorded family populations).
+        :param t_start_index first number to appear on the x axis
+        :param t_slice slice, which parts of the simulation time to consider for the plot
+        :param prop: key of the dictionary lgca.family_props - colour the area for each family according to
+                     this family property. If None, colour area according to family identity.
+        :param cutoff_abs exclude families that never exceeded this population size in absolute numbers
+        :param cutoff_rel exclude families that never exceeded this population size,
+                          expressed as a fraction of the total population
+        cutoff_rel takes precedence over cutoff_abs
+        :param kwargs: keyword arguments to further style the plot drawn by lgca.plots.muller_plot
+        :returns: (fig, ax, ret) fig = matplotlib figure handle, ax = Muller plot axis handle,
+                                 ret = handle of legend, handle of colourbar or None. The separate colourbar axis handle
+                                 can be retrieved as ret.ax
+        """
+        # prepare content arguments for plot function from LGCA data
+        root_ID = 0
+        parent_list = self.family_props['ancestor']
+        children_nlist = self.family_props['descendants']
+        # slice and adjust time axis
+        if type(t_slice) != slice:
+            raise TypeError("'t_slice' must be slice object to index the time dimension")
+        if not hasattr(self, 'fam_pop_t'):
+            raise AttributeError(
+                "LGCA simulation must have been run with lgca.timeevo(recordfampop=True) before to draw a Muller plot.")
+        if cutoff_rel or cutoff_abs:
+            fam_pop_t = self.filter_family_population_t(cutoff_abs=cutoff_abs, cutoff_rel=cutoff_rel)
+        else:
+            fam_pop_t = self.fam_pop_t
+        cum_pop_t = self.propagate_pop_to_parents(fam_pop_t[t_slice], parent_list)
+        if t_start_index is None:
+            if t_slice.start is not None:
+                t_start_index = t_slice.start
+            else:
+                t_start_index = 0
+        timeline = np.arange(cum_pop_t.shape[0]) + t_start_index
+
+        # choose drawing mode depending on keyword arguments
+        if 'facecolour' not in kwargs:
+            # colour by family identity
+            if prop is None:
+                kwargs['facecolour'] = 'identity'
+
+            # colour by family property value
+            else:
+                prop_values = self.family_props[prop]
+                if 'facecolour_map' in kwargs:
+                    print("If the families should be coloured according to "+str(prop) +
+                          ", facecolour mapping is done by the LGCA - 'facecolour_map' ignored")
+                kwargs['facecolour'] = 'property'
+                kwargs['facecolour_map'] = prop_values
+                if 'legend_title' not in kwargs:
+                    kwargs['legend_title'] = prop
+        # else: drawing mode determined by user
+
+        # plot
+        return muller_plot(root_ID, cum_pop_t, children_nlist, parent_list, timeline, **kwargs)
+
+    def total_population_t(self, cutoff_abs=None, cutoff_rel=None):
+        """
+        Calculate the total population of cells at each simulation step.  Requires a previous timeevo with recordfampop=True.
+        :param cutoff_abs exclude families that never exceeded this population size in absolute numbers
+        :param cutoff_rel exclude families that never exceeded this population size,
+                          expressed as a fraction of the total population
+        cutoff_rel takes precedence over cutoff_abs
+        :returns: np.ndarray of shape timesteps+1, number of cells at each timestep
+        """
+        if not hasattr(self, 'fam_pop_t'):
+            raise AttributeError("LGCA simulation must have been run with lgca.timeevo(recordfampop=True) before "
+                                 "to calculate this.")
+        # filter families below cutoff
+        fam_pop_t = self.filter_family_population_t(cutoff_abs=cutoff_abs, cutoff_rel=cutoff_rel)
+        # fam_pop_t is of shape (timesteps + 1, number of families)
+        # summing of population values along the family dimension yields total population
+        return fam_pop_t.sum(-1)
+
+    def num_families_total(self):
+        """
+        Calculate how many families there are in total, including extinct ones.
+        :returns: int - number of families
+        """
+        return len(self.family_props['ancestor'])-1  # subtract placeholder 0 family
+
+    def num_families_total_t(self, cutoff_abs=None, cutoff_rel=None):
+        """
+        Calculate how many families there are in total, including extinct ones.
+        :param cutoff_abs exclude families that never exceeded this population size in absolute numbers
+        :param cutoff_rel exclude families that never exceeded this population size,
+                          expressed as a fraction of the total population
+        cutoff_rel takes precedence over cutoff_abs
+        :returns: np.ndarray of shape timesteps+1, number of families at each timestep
+        """
+        # filter families below cutoff
+        fam_pop_t = self.filter_family_population_t(cutoff_abs=cutoff_abs, cutoff_rel=cutoff_rel)
+        # remove all-zero families
+        empty_family_ind = np.where(np.all(fam_pop_t == 0, axis=0))[0]
+        fam_filtered = np.delete(fam_pop_t, empty_family_ind, axis=1)
+        # highest index of live family = total families that existed until this point - extinct families
+        # obtain family indices for each timestep
+        fam_indices = np.arange(fam_filtered.shape[1]).reshape(1, fam_filtered.shape[1])
+        fam_indices_t = np.repeat(fam_indices, fam_filtered.shape[0], axis=0)
+        # helper array to indicate existence of a family at a timestep
+        fam_indicator_t = copy(fam_filtered)
+        fam_indicator_t[fam_filtered > 0] = 1
+        # find family alive at each timestep with the highest ID and add 1 for number of families
+        max_fam_alive_t = np.amax(np.multiply(fam_indices_t+1, fam_indicator_t), axis=1)
+        # propagate maximum value forward in time to account for died out families with high indices
+        fam_total_t = [max_fam_alive_t[0]]
+        for i in range(len(max_fam_alive_t) - 1):
+            if max_fam_alive_t[i + 1] >= fam_total_t[i]:
+                fam_total_t.append(max_fam_alive_t[i+1])
+            else:
+                fam_total_t.append(fam_total_t[i])
+        return np.array(fam_total_t)
+
+    def filter_family_population_t(self, cutoff_abs=None, cutoff_rel=None):
+        """
+        Mask out families from lgca.fam_pop_t that never exceeded the given threshold.
+        :param cutoff_abs exclude families that never exceeded this population size in absolute numbers
+        :param cutoff_rel exclude families that never exceeded this population size,
+                          expressed as a fraction of the total population
+        cutoff_rel takes precedence over cutoff_abs
+        :returns np.ndarray of shape (timesteps + 1, families + 1) with all population values for
+                 too small families set to 0. Original lgca.fam_pop_t if both parameters are None.
+        """
+        if cutoff_rel:
+            fam_pop_t = copy(self.fam_pop_t)
+            # calculate fraction of the total population for each family at all timesteps
+            total_pop = fam_pop_t.sum(-1)
+            rel_fam_pop = np.divide(fam_pop_t.transpose(), total_pop)  # transpose to align time axis
+            rel_fam_pop = rel_fam_pop.transpose()  # transpose back to match with fam_pop_t again
+            # obtain positions of families in the array that have never exceeded the threshold
+            small_family_pos = ~ np.any(rel_fam_pop >= cutoff_rel, axis=0)
+
+        elif cutoff_abs:
+            fam_pop_t = copy(self.fam_pop_t)
+            # obtain positions of families in the array that have never exceeded the threshold
+            small_family_pos = ~ np.any(fam_pop_t >= cutoff_abs, axis=0)
+
+        else:
+            return self.fam_pop_t
+
+        # filter them out
+        fam_pop_t[:, small_family_pos] = 0
+
+        return fam_pop_t
+
+    def num_families_alive(self):
+        """
+        Calculate how many families are alive.
+        :returns: int - number of families
+        """
+        cell_fam_alive = self.list_families_alive()  # list all live family IDs
+        return len(cell_fam_alive)
+
+    def num_families_alive_t(self, cutoff_abs=None, cutoff_rel=None):
+        """
+        Calculate how many families have been alive at each simulation step. Requires a previous timeevo with recordfampop=True.
+        :param cutoff_abs exclude families that never exceeded this population size in absolute numbers
+        :param cutoff_rel exclude families that never exceeded this population size,
+                          expressed as a fraction of the total population
+        cutoff_rel takes precedence over cutoff_abs
+        :returns: np.ndarray of shape timesteps+1, number of families at each timestep
+        """
+        if not hasattr(self, 'fam_pop_t'):
+            raise AttributeError("LGCA simulation must have been run with lgca.timeevo(recordfampop=True) before "
+                                 "to calculate this.")
+
+        # filter families below cutoff
+        fam_pop_t = self.filter_family_population_t(cutoff_abs=cutoff_abs, cutoff_rel=cutoff_rel)
+
+        # fam_pop_t is of shape (timesteps + 1, number of families)
+        # filter which families are alive at which timestep
+        # result is an array of Booleans
+        # summing along the family dimension yields the sum of living families
+        return (fam_pop_t > 0).sum(-1)
+
+    def list_families_alive(self):
+        """
+        Calculate which families are alive.
+        :returns: np.ndarray - array of family IDs in ascending order
+        """
+        cells_alive = self.nodes[self.nonborder][
+            np.where(self.nodes[self.nonborder] > 0)]  # indices of live cells # nonborder needed for uniqueness
+        cell_fam = np.array(self.props['family'])  # convert for indexing
+        cell_fam_alive = cell_fam[cells_alive.astype(np.int)]  # filter family array for families of live cells
+        return np.unique(cell_fam_alive) # remove duplicate entries
+
+    def calc_family_generations(self):
+        """
+        Calculate which generation each family belongs to, i.e. how many mutations have occurred. The list is
+        returned and stored in lgca.family_props['generation'].
+        :returns: list - family generations indexed by family ID, helper root family = generation 0,
+                  families at init = generation 1
+        """
+        # check if it has been calculated and is up to date
+        num_families = self.num_families_total()
+        if 'generation' in self.family_props:
+            if len(self.family_props['generation']) == num_families:
+                return self.family_props['generation']
+        # if not, initialise the property and fill it
+        self.family_props['generation'] = list(np.zeros(num_families+1))
+        self.recurse_generation(0, 0)
+        return self.family_props['generation']
+
+    def recurse_generation(self, fam_ID, gen):
+        """
+        Utility for calculating the generation of each family. Recursively updates the entries in
+        self.family_props['generation'].
+        """
+        # update generation for this family
+        self.family_props['generation'][fam_ID] = gen
+        # update children generations with increased counter
+        gen += 1
+        for desc in self.family_props['descendants'][fam_ID]:
+            self.recurse_generation(desc, gen)
+
+    def calc_generation_pop(self):
+        """
+        Calculate the current population per family generation.
+        :returns: np.ndarray of cell numbers per generation, indexed by generation (helper root family is generation 0,
+                  families present at initialisation are generation 1)
+        """
+        # if it has not been done or is not up to date, calculate generation of each family
+        self.calc_family_generations()
+
+        # initialise result array
+        max_generation = np.array(self.family_props['generation']).max()
+        generations_pop = np.zeros(max_generation+1, dtype=int)
+
+        # filter living families by generation to add their population to the right array element
+        fam_pop = self.calc_family_pop_alive()
+        fam_generation = np.array([self.family_props['generation'][fam_ID] for fam_ID in range(len(fam_pop))])
+        for gen in range(len(generations_pop)):
+            generations_pop[gen] = fam_pop[fam_generation == gen].sum()
+        return generations_pop
+
+    def calc_generation_pop_t(self, cutoff_abs=None, cutoff_rel=None):
+        """
+        Calculate the population per family generation at each simulation step. Requires a previous timeevo with recordfampop=True.
+        :param cutoff_abs exclude families that never exceeded this population size in absolute numbers
+        :param cutoff_rel exclude families that never exceeded this population size,
+                          expressed as a fraction of the total population
+        cutoff_rel takes precedence over cutoff_abs
+        :returns: np.ndarray of shape (timesteps+1,generations+1) cell numbers per generation at each timestep
+                  (helper root family is generation 0, families present at initialisation are generation 1)
+        """
+        # check existence of self.fam_pop_t
+        if not hasattr(self, 'fam_pop_t'):
+            raise AttributeError("LGCA simulation must have been run with lgca.timeevo(recordfampop=True) before "
+                                 "to calculate this.")
+
+        # if it has not been done or is not up to date, calculate generation of each family
+        self.calc_family_generations()
+
+        # initialise result array of shape (timesteps+1,generations+1)
+        max_generation = np.array(self.family_props['generation']).max()
+        generations_pop_t = np.zeros((self.fam_pop_t.shape[0], max_generation + 1), dtype=int)
+
+        # filter families with population cutoff
+        fam_pop_t = self.filter_family_population_t(cutoff_abs=cutoff_abs, cutoff_rel=cutoff_rel)
+        num_families = fam_pop_t.shape[1]
+        # filter families by generation to add their population to the right array element
+        fam_generation = np.array([self.family_props['generation'][fam_ID] for fam_ID in range(num_families)])
+        for gen in range(generations_pop_t.shape[1]):
+            generations_pop_t[:, gen] += fam_pop_t[:, fam_generation == gen].sum(-1)
+        return generations_pop_t
+
+    def propagate_ancestor_to_descendants(self):
+        """
+        Traverse family tree to find the families that were initialised in the beginning of the simulation
+        ("initial ancestors") and which families originally descend from them, including the 2nd, 3rd, ... generations
+        :returns: list of initial ancestors indexed by family ID. The helper root family and initial ancestors will have
+                  0, all others their ancestor's family ID
+        """
+        # check if it has been calculated and is up to date
+        num_families = self.num_families_total()
+        if 'init_ancestor' in self.family_props:
+            if len(self.family_props['init_ancestor']) == num_families:
+                return self.family_props['init_ancestor']
+        # if not, initialise the property and fill it
+        self.family_props['init_ancestor'] = list(np.zeros(num_families + 1))
+        # check each family's ancestor, going up the tree from the root
+        for fam_ID, ancestor in enumerate(self.family_props['ancestor']):
+            if fam_ID == 0:
+                continue
+            # all initial families have ancestor == 0 - their ID is the initial ancestor of the children
+            if ancestor == 0:
+                anc = fam_ID
+            # otherwise, propagate own initial ancestor to children
+            else:
+                anc = self.family_props['init_ancestor'][fam_ID]
+            # propagation step
+            for child_fam_ID in self.family_props['descendants'][fam_ID]:
+                self.family_props['init_ancestor'][child_fam_ID] = anc
+
+        return self.family_props['init_ancestor']
+
+    def calc_init_families_pop(self):
+        """
+        Calculate the current population per family that was initialised in the beginning of the simulation
+        ("initial ancestor") and their descendants.
+        :returns: (np.ndarray init_families_pop, np.ndarray init_ancestor_IDs)
+                  init_families_pop: population per initial family
+                  init_ancestor_IDs: family ID corresponding to each position in init_families_pop
+        """
+        # calculate population per family and initial family they descend from
+        fam_pop = self.calc_family_pop_alive()
+        init_ancestors = np.array(self.propagate_ancestor_to_descendants())
+        # clip for indexing in case a late family already died out
+        init_ancestors_alive = np.resize(init_ancestors, len(fam_pop))
+        # initialise
+        init_ancestor_IDs = np.arange(len(init_ancestors_alive))[init_ancestors_alive == 0][1:]  # ignore helper root family
+        init_families_pop = np.zeros(len(init_ancestor_IDs), dtype=int)
+        # filter living families by initial ancestor to add their population to the right array element
+        for pos, init_fam in enumerate(init_ancestor_IDs):
+            init_families_pop[pos] = fam_pop[init_ancestors_alive == init_fam].sum()
+            # add population of ancestor itself
+            init_families_pop[pos] += fam_pop[init_fam]
+        return init_families_pop, init_ancestor_IDs
+
+    def calc_init_families_pop_t(self, cutoff_abs=None, cutoff_rel=None):
+        """
+        Calculate the current population per family that was initialised in the beginning of the simulation
+        ("initial ancestor") and their descendants at each simulation step. Requires a previous timeevo with recordfampop=True.
+        :param cutoff_abs exclude families that never exceeded this population size in absolute numbers
+        :param cutoff_rel exclude families that never exceeded this population size,
+                          expressed as a fraction of the total population
+        cutoff_rel takes precedence over cutoff_abs
+        :returns: (np.ndarray init_families_pop, np.ndarray init_ancestor_IDs)
+                  init_families_pop: of shape (timesteps+1,number of initial families +1) population per initial family at each timestep
+                  init_ancestor_IDs: family ID corresponding to each position on the family dimension in init_families_pop
+        """
+        # check existence of self.fam_pop_t
+        if not hasattr(self, 'fam_pop_t'):
+            raise AttributeError("LGCA simulation must have been run with lgca.timeevo(recordfampop=True) before "
+                                 "to calculate this.")
+
+        # calculate population per family and initial family they descend from
+        init_ancestors = np.array(self.propagate_ancestor_to_descendants())
+
+        # initialise
+        init_ancestor_IDs = np.arange(len(init_ancestors))[init_ancestors == 0][1:]  # ignore helper root family
+        init_families_pop_t = np.zeros((self.fam_pop_t.shape[0], len(init_ancestor_IDs)), dtype=int)
+        # filter families with population cutoff
+        fam_pop_t = self.filter_family_population_t(cutoff_abs=cutoff_abs, cutoff_rel=cutoff_rel)
+        # filter living families by initial ancestor to add their population to the right array element
+        for pos, init_fam in enumerate(init_ancestor_IDs):
+            init_families_pop_t[:, pos] = fam_pop_t[:, init_ancestors == init_fam].sum(-1)
+            # add population of ancestor itself
+            init_families_pop_t[:, pos] += fam_pop_t[:, init_fam]
+        return init_families_pop_t, init_ancestor_IDs
+
+
+    def propagate_family_prop_to_cells(self, prop:str):
+        """
+        Propagate a family property down to all cells that belong to the family. Uses contents of
+        lgca.family_props[prop] to create a new cell property lgca.props[prop]
+        :param prop: str, key of the family property
+        """
+        self.props[prop] = [self.family_props[prop][fam] for fam in self.props['family']]
+
+
 
 class NoVE_LGCA_base(LGCA_base):
     """
@@ -861,12 +1303,8 @@ class NoVE_LGCA_base(LGCA_base):
         self.set_interaction(**kwargs)
 
     def set_interaction(self, **kwargs):
-        try:
-            from .nove_interactions import dd_alignment, di_alignment, go_or_grow, go_or_rest
-            from .interactions import only_propagation
-        except:
-            from nove_interactions import dd_alignment, di_alignment, go_or_grow, go_or_rest
-            from interactions import only_propagation
+        from lgca.nove_interactions import dd_alignment, di_alignment, go_or_grow, go_or_rest
+        from lgca.interactions import only_propagation
         # configure interaction
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']

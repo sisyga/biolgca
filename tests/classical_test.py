@@ -4,10 +4,7 @@ import copy
 import warnings
 
 from lgca import get_lgca
-try:
-    from common_test import T_LGCA_Common
-except ModuleNotFoundError:
-    from .common_test import T_LGCA_Common
+from tests.common_test import T_LGCA_Common
 
 com = T_LGCA_Common
 
