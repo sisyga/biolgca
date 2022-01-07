@@ -7,11 +7,7 @@ from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import warnings
 
-try:
-    from base import *
-except ModuleNotFoundError:
-    from .base import *
-
+from lgca.base import *
 
 class LGCA_Square(LGCA_base):
     """
@@ -1002,4 +998,3 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
 
     def live_animate_config(self, interval=100, **kwargs):
         warnings.warn("Live config animation not available for LGCA without volume exclusion yet.")
-

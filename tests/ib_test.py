@@ -21,20 +21,12 @@ def matching_import(pattern, module, globals):
 from lgca import get_lgca
 # import other test modules for fixture and function reuse
 # CAUTION: they need to be renamed and lose the "Test" prefix so that pytest does not executes these tests again
-try:
-    from common_test import T_LGCA_Common
-    from nove_test import Test_LGCA_NoVE as T_LGCA_NoVE  # rename to avoid duplicate execution of these tests
-    from classical_test import Test_LGCA_classical as T_LGCA_classical
-    import nove_test
-    matching_import("^nodes_", nove_test, globals())
-    matching_import("^out_", nove_test, globals())
-except ModuleNotFoundError:
-    from .common_test import T_LGCA_Common
-    from .nove_test import Test_LGCA_NoVE as T_LGCA_NoVE  # rename to avoid duplicate execution of these tests
-    from .classical_test import Test_LGCA_classical as T_LGCA_classical
-    import nove_test
-    matching_import("^nodes_", nove_test, globals())
-    matching_import("^out_", nove_test, globals())
+from tests.common_test import T_LGCA_Common
+from tests.nove_test import Test_LGCA_NoVE as T_LGCA_NoVE  # rename to avoid duplicate execution of these tests
+from tests.classical_test import Test_LGCA_classical as T_LGCA_classical
+import tests.nove_test
+matching_import("^nodes_", tests.nove_test, globals())
+matching_import("^out_", tests.nove_test, globals())
 
 com = T_LGCA_Common
 

@@ -1,10 +1,8 @@
 import numpy as np
 import numpy.random as npr
 
-try:
-    from .interactions import tanh_switch
-except ImportError:
-    from interactions import tanh_switch
+from lgca.interactions import tanh_switch
+
 
 def dd_alignment(lgca):
     """

@@ -3,12 +3,8 @@ import pytest
 import copy
 
 from lgca import get_lgca
-try:
-    from common_test import T_LGCA_Common
-    from classical_test import Test_LGCA_classical as T_LGCA_classical  # rename to avoid duplicate execution of these tests
-except ModuleNotFoundError:
-    from .common_test import T_LGCA_Common
-    from .classical_test import Test_LGCA_classical as T_LGCA_classical  # rename to avoid duplicate execution of these tests
+from tests.common_test import T_LGCA_Common
+from tests.classical_test import Test_LGCA_classical as T_LGCA_classical  # rename to avoid duplicate execution of these tests
 
 com = T_LGCA_Common
 

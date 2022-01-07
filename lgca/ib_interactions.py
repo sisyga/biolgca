@@ -3,10 +3,7 @@ import numpy as np
 from numpy import random as npr
 from scipy.stats import truncnorm
 
-try:
-    from .interactions import tanh_switch
-except ImportError:
-    from interactions import tanh_switch
+from lgca.interactions import tanh_switch
 
 
 def random_walk(lgca):
@@ -102,7 +99,6 @@ def birthdeath(lgca):
                     fam = lgca.props['family'][label]
                     lgca.props['family'].append(fam)
         lgca.nodes[coord] = node
-    lgca.update_dynamic_fields()
     random_walk(lgca)
 
 def birthdeath_discrete(lgca):
@@ -143,8 +139,6 @@ def birthdeath_discrete(lgca):
 
         lgca.nodes[coord] = node
 
-
-    lgca.update_dynamic_fields()
     random_walk(lgca)
 
 def go_or_grow(lgca):
@@ -265,10 +259,13 @@ def go_and_grow_mutations(lgca):
                         lgca.family_props['r_b'].append(lgca.family_props['r_b'][fam] * lgca.fitness_increase)
                     # register ancestor of the new family
                     lgca.family_props['ancestor'].append(fam)
+                    # record new family as child of the old one
+                    lgca.family_props['descendants'][fam].append(lgca.maxfamily)
+                    # create empty children list for the new family
+                    lgca.family_props['descendants'].append([])
                 else:
                     # record family of new cell = family of mother cell
                     lgca.props['family'].append(fam)
         lgca.nodes[coord] = node
 
-    lgca.update_dynamic_fields()
     random_walk(lgca)

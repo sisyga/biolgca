@@ -1,9 +1,5 @@
-try:
-    from base import *
-    from lgca_square import LGCA_Square, IBLGCA_Square, NoVE_LGCA_Square
-except ModuleNotFoundError:
-    from .base import *
-    from .lgca_square import LGCA_Square, IBLGCA_Square, NoVE_LGCA_Square
+from lgca.base import *
+from lgca.lgca_square import LGCA_Square, IBLGCA_Square, NoVE_LGCA_Square
 
 
 class LGCA_Hex(LGCA_Square):
