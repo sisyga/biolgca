@@ -1,11 +1,18 @@
+# biolgca is a Python package for simulating different kinds of lattice-gas
+# cellular automata (LGCA) in the biological context.
+# Copyright (C) 2018-2022 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.
+# The full license notice is found in the file lgca/__init__.py.
+
 import matplotlib.animation as animation
 import matplotlib.colors as colors
 import matplotlib.ticker as mticker
 from matplotlib.collections import PatchCollection
 from matplotlib.colors import Normalize
 from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
+from matplotlib import cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import warnings
+from copy import copy
 
 from lgca.base import *
 
@@ -421,22 +428,27 @@ class LGCA_Square(LGCA_base):
                           scale=1./self.r_poly, minlength=0.)
 
         if cbar:
-            plot.set_cmap(cmap)
-            cmap = plot.get_cmap()
-            plot.set_clim([1, K])
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="5%", pad=0.1)
+            cmap = copy(cm.get_cmap(cmap))
             cmap.set_under(alpha=0.0)
+            plot.set_cmap(cmap)
+            # cmap = plot.get_cmap()
+            plot.set_clim([1, K])
             mappable = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
             mappable.set_array(np.arange(K))
-            cbar = fig.colorbar(mappable, extend='min', use_gridspec=True)
+            cbar = fig.colorbar(mappable, extend='min', use_gridspec=True, cax=cax)
             cbar.set_label('Particle number $n$')
-            cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[1::2])
-            cbar.set_ticklabels(1 + np.arange(K))
-
+            cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[3::2])
+            cax.yaxis.set_major_formatter(lambda x, pos: (int(x - 0.5)))
+            # cbar.set_ticklabels(1 + np.arange(K)) # np.arange(K+1)
+            plt.sca(ax)
         else:
-            plot.set_cmap('Greys')
-            plot.set_clim([0, 1])
-            cmap = plot.get_cmap()
+            cmap = copy(cm.get_cmap('Greys'))
             cmap.set_under(alpha=0.0)
+            plot.set_cmap(cmap)
+            # cmap = plot.get_cmap()
+            plot.set_clim([0, 1])
 
             # cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(1), cmap.N))
             # cmap.set_array(np.arange(1))
@@ -528,7 +540,7 @@ class LGCA_Square(LGCA_base):
             K = vmax
 
         fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
-        cmap = plt.cm.get_cmap(cmap)
+        cmap = copy(cm.get_cmap(cmap))  # do not modify a globally registered colormap in matplotlib > 3.3.2
         cmap.set_under(alpha=0.0)
         if K > 1:
             cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
@@ -545,8 +557,9 @@ class LGCA_Square(LGCA_base):
             cax = divider.append_axes("right", size="5%", pad=0.1)
             cbar = fig.colorbar(cmap, extend='min', use_gridspec=True, cax=cax)
             cbar.set_label(cbarlabel)
-            cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[1::2])
-            cbar.set_ticklabels(1 + np.arange(K))
+            cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[3::2])
+            cax.yaxis.set_major_formatter(lambda x, pos: (int(x - 0.5)))
+            #cbar.set_ticklabels(1 + np.arange(K)) # np.arange(K+1)
             plt.sca(ax)
 
         return fig, pc, cmap
@@ -858,7 +871,7 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
             K = vmax
 
         fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
-        cmap = plt.cm.get_cmap(cmap)
+        cmap = copy(cm.get_cmap(cmap))  # do not modify a globally registered colormap in matplotlib > 3.3.2
         cmap.set_under(alpha=0.0)
         cmap_scaled = False
 

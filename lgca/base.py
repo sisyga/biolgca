@@ -1,3 +1,12 @@
+# biolgca is a Python package for simulating different kinds of lattice-gas
+# cellular automata (LGCA) in the biological context.
+# Copyright (C) 2018-2022 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.
+# The full license notice is found in the file lgca/__init__.py.
+
+"""
+This is the documentation for base.py.
+"""
+
 import sys
 
 import matplotlib.colors as mcolors
@@ -479,8 +488,8 @@ class LGCA_base():
 
     def calc_permutations(self):
         self.permutations = [np.array(list(multiset_permutations([1] * n + [0] * (self.K - n))), dtype=np.int8)
-                                                                # builds list with all possible amounts of particles in
-                                                                # an array of size self.K (velocity + resting)
+                                                                # builds list with all possible configurations of
+                                                                # particles in an array of size self.K (velocity + resting)
                                       # builds nested list with all possible permutations for this array
                              # first dim: number of particles
                              # second dim: all permutations for this n
@@ -896,7 +905,7 @@ class IBLGCA_base(LGCA_base):
         self.fam_pop_t = np.array(self.fam_pop_t)
 
     @staticmethod
-    def propagate_pop_to_parents(pop_t, ancestor):
+    def propagate_pop_to_parents(pop_t, ancestor:list):
         """
         Propagate family population to all ancestors.
         :param pop_t: np.ndarray of shape (timesteps, families) that holds the population of each family for all timesteps
@@ -1268,7 +1277,6 @@ class IBLGCA_base(LGCA_base):
             init_families_pop_t[:, pos] += fam_pop_t[:, init_fam]
         return init_families_pop_t, init_ancestor_IDs
 
-
     def propagate_family_prop_to_cells(self, prop:str):
         """
         Propagate a family property down to all cells that belong to the family. Uses contents of
@@ -1277,6 +1285,19 @@ class IBLGCA_base(LGCA_base):
         """
         self.props[prop] = [self.family_props[prop][fam] for fam in self.props['family']]
 
+    def add_family(self, ancestor_fam:int):
+        """
+        Create a new family and register it in the family tree.
+        :param ancestor_fam family that the new one descends from
+        """
+        # add new family
+        self.maxfamily += 1
+        # register ancestor of the new family
+        self.family_props['ancestor'].append(ancestor_fam)
+        # record new family as child of the old one
+        self.family_props['descendants'][ancestor_fam].append(self.maxfamily)
+        # create empty children list for the new family
+        self.family_props['descendants'].append([])
 
 
 class NoVE_LGCA_base(LGCA_base):
