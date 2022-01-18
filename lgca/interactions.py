@@ -1,3 +1,8 @@
+# biolgca is a Python package for simulating different kinds of lattice-gas
+# cellular automata (LGCA) in the biological context.
+# Copyright (C) 2018-2022 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.
+# The full license notice is found in the file lgca/__init__.py.
+
 from bisect import bisect_left
 from random import random
 
@@ -6,12 +11,20 @@ import numpy.random as npr
 from scipy.special import binom as binom_coeff
 
 
-def disarrange(a, axis=-1):
+def disarrange(a: np.ndarray, axis=-1):
     """
-    Shuffle `a` in-place along the given axis.
+    Shuffle a in-place along the given axis.
 
-    Apply numpy.random.shuffle to the given axis of `a`.
-    Each one-dimensional slice is shuffled independently.
+    Apply numpy.random.shuffle to the given axis of a. Each one-dimensional
+    slice is shuffled independently.
+
+    Parameters
+    ----------
+    a : numpy.ndarray
+        The array to shuffle
+    axis : int, optional, default: -1
+           Along which axis to shuffle `a`. The default is -1, which implies the
+           last axis.
     """
     b = a.swapaxes(axis, -1)
     # Shuffle `b` in-place along the last axis.  `b` is a view of `a`,
@@ -24,6 +37,7 @@ def disarrange(a, axis=-1):
 
 def tanh_switch(rho, kappa=5., theta=0.8):
     return 0.5 * (1 + np.tanh(kappa * (rho - theta)))
+
 
 def ent_prod(x):
     return x * np.log(x, where=x > 0, out=np.zeros_like(x, dtype=float))
@@ -139,20 +153,20 @@ def alignment(lgca):
                (lgca.cell_density[lgca.nonborder] < lgca.K)
     # gives ndarray of boolean values
     coords = [a[relevant] for a in lgca.nonborder]
-    #a is an array of numbers, array can be indexed with another array of same size with boolean specification if element
-    #should be included. Returns only the relevant elements and coords is a list here
-    g = lgca.calc_flux(lgca.nodes) #calculates flux for each lattice site
-    g = lgca.nb_sum(g) #calculates sum of flux of neighbors for each lattice site
+    # a is an array of numbers, array can be indexed with another array of same size with boolean specification if element
+    # should be included. Returns only the relevant elements and coords is a list here
+    g = lgca.calc_flux(lgca.nodes)  # calculates flux for each lattice site
+    g = lgca.nb_sum(g)  # calculates sum of flux of neighbors for each lattice site
     for coord in zip(*coords):
         n = lgca.cell_density[coord]
         permutations = lgca.permutations[n]
-        j = lgca.j[n] #flux per permutation
+        j = lgca.j[n]  # flux per permutation
         weights = np.exp(lgca.beta * np.einsum('i,ij', g[coord], j)).cumsum()
-                                    #multiply neighborhood flux with the flux for each possible permutation
-        #np.exp for probability
-        #cumsum() for cumulative distribution function
+        # multiply neighborhood flux with the flux for each possible permutation
+        # np.exp for probability
+        # cumsum() for cumulative distribution function
         ind = bisect_left(weights, random() * weights[-1])
-        #inverse transform sampling method
+        # inverse transform sampling method
         newnodes[coord] = permutations[ind]
 
     lgca.nodes = newnodes
@@ -185,8 +199,12 @@ def nematic(lgca):
 
 def aggregation(lgca):
     """
-    Rearrangement step for aggregation interaction
-    :return:
+    Aggregation interaction.
+
+    Parameters
+    ----------
+    lgca: LGCA_1D or LGCA_Square or LGCA_Hex
+          LGCA instance that the interaction is applied to
     """
     newnodes = lgca.nodes.copy()
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
@@ -203,6 +221,7 @@ def aggregation(lgca):
         newnodes[coord] = permutations[ind]
 
     lgca.nodes = newnodes
+
 
 def wetting(lgca):
     """
@@ -236,8 +255,8 @@ def wetting(lgca):
         j = lgca.j[n]
         j_nb = g[coord]
         weights = np.exp(
-             lgca.beta * (j_nb[0] * j[0] + j_nb[1] * j[1]) / lgca.velocitychannels / 2
-            + lgca.beta * resting[coord] * restc  #* np.clip(1 - restc / lgca.rho_0 / 2, a_min=0, a_max=None) * 2
+            lgca.beta * (j_nb[0] * j[0] + j_nb[1] * j[1]) / lgca.velocitychannels / 2
+            + lgca.beta * resting[coord] * restc  # * np.clip(1 - restc / lgca.rho_0 / 2, a_min=0, a_max=None) * 2
             + lgca.beta * np.einsum('i,ij', g_adh[coord], j)
             # + lgca.alpha * np.einsum('i,ij', g_subs[coord], j)
             + restc * lgca.ecm[coord]
@@ -321,10 +340,12 @@ def go_or_grow(lgca):
         node = np.hstack((v_channels, r_channels))
         lgca.nodes[coord] = node
 
+
 def p_binom(k, n, p):
-    pb = binom_coeff(n, k) * p**k * (1 - p)**(n-k)
-    pb[n<k] = 0.
+    pb = binom_coeff(n, k) * p ** k * (1 - p) ** (n - k)
+    pb[n < k] = 0.
     return pb
+
 
 def s_binom(n, p0, kmax):
     n = n[..., None]
@@ -332,6 +353,7 @@ def s_binom(n, p0, kmax):
     k = np.arange(kmax + 1)
     p = p_binom(k, n, p0)
     return -ent_prod(p).sum(-1)
+
 
 def leup_test(lgca):
     """
@@ -343,8 +365,10 @@ def leup_test(lgca):
         n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
         n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
         birth = np.zeros_like(lgca.nodes)
-        birth[..., lgca.velocitychannels:] = npr.random(n_r.shape + (lgca.restchannels, )) < lgca.r_b * n_r[..., None] / lgca.restchannels
-        death = npr.random(birth.shape) < lgca.r_d * (n_m[..., None] / lgca.velocitychannels + n_r[..., None] / lgca.restchannels) / 2
+        birth[..., lgca.velocitychannels:] = npr.random(n_r.shape + (lgca.restchannels,)) < lgca.r_b * n_r[
+            ..., None] / lgca.restchannels
+        death = npr.random(birth.shape) < lgca.r_d * (
+                n_m[..., None] / lgca.velocitychannels + n_r[..., None] / lgca.restchannels) / 2
         ds = (1 - lgca.nodes) * birth - lgca.nodes * death
         np.add(lgca.nodes, ds, out=lgca.nodes, casting='unsafe')
         lgca.update_dynamic_fields()
@@ -433,6 +457,7 @@ def leup_test(lgca):
         # node = np.hstack((v_channels, r_channels))
         lgca.nodes[coord] = node
 
+
 def go_or_rest(lgca):
     """
     Interactions of the go-or-grow model without birth and death, i.e. only the switch and random walk.
@@ -462,6 +487,7 @@ def go_or_rest(lgca):
         r_channels[:n_rxy] = 1
         node = np.hstack((v_channels, r_channels))
         lgca.nodes[coord] = node
+
 
 def only_propagation(lgca):
     return

@@ -1,3 +1,8 @@
+# biolgca is a Python package for simulating different kinds of lattice-gas
+# cellular automata (LGCA) in the biological context.
+# Copyright (C) 2018-2022 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.
+# The full license notice is found in the file lgca/__init__.py.
+
 import numpy as np
 import random
 from itertools import cycle
@@ -253,7 +258,7 @@ def draw_wedges(ax, family, cum_pop_t, children_nlist, timeline, facecolour_map,
 
     # draw the wedge
     ax.fill_between(clipped_timeline, clipped_bottom, clipped_values, facecolor=fc,
-                    edgecolor=ec, alpha=1.0, zorder=level, label=lab, lw=0.7)  # plot frequency
+                    edgecolor=ec, alpha=1.0, zorder=level, label=lab, lw=lw)  # plot frequency
 
     # recurse if family has children to draw smaller wedges over this wedge
     if children_nlist[family]:

@@ -1,3 +1,12 @@
+# biolgca is a Python package for simulating different kinds of lattice-gas
+# cellular automata (LGCA) in the biological context.
+# Copyright (C) 2018-2022 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.
+# The full license notice is found in the file lgca/__init__.py.
+
+"""
+This is the docstring for the interactions of the identity-based LGCA.
+"""
+
 from random import choices
 import numpy as np
 from numpy import random as npr
@@ -250,19 +259,15 @@ def go_and_grow_mutations(lgca):
 
                 mutation = npr.random() < lgca.r_m
                 if mutation:
-                    # add new family
-                    lgca.maxfamily += 1
+                    # add new family from the mother's family
+                    # this increases lgca.maxfamily +=1 and manages the family tree
+                    lgca.add_family(fam)
+                    # record family of new cell = new family
                     lgca.props['family'].append(int(lgca.maxfamily))
 
                     if lgca.effect == 'driver_mutation':
                         # give the new family an rb: rb of mother cell's family * fitness increase
                         lgca.family_props['r_b'].append(lgca.family_props['r_b'][fam] * lgca.fitness_increase)
-                    # register ancestor of the new family
-                    lgca.family_props['ancestor'].append(fam)
-                    # record new family as child of the old one
-                    lgca.family_props['descendants'][fam].append(lgca.maxfamily)
-                    # create empty children list for the new family
-                    lgca.family_props['descendants'].append([])
                 else:
                     # record family of new cell = family of mother cell
                     lgca.props['family'].append(fam)
