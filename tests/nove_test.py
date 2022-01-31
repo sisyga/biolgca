@@ -440,9 +440,37 @@ class Test_LGCA_NoVE(T_LGCA_Common):
         lgca = get_lgca(geometry=geom, ve=False, density=density, hom=True, restchannels=restchannels, interaction='only_propagation')
         assert lgca.capacity == b+restchannels, "Capacity not correctly calculated from provided geometry and rest channels"
 
-    def test_characteristics(self):
-        # volume exclusion does not have to be checked here
-        pass
+    @pytest.mark.parametrize("geom,nodes", [
+        ('lin', com.nodes_nove_1d),
+        ('square', com.nodes_nove_square),
+        ('hex', com.nodes_nove_hex)
+    ])
+    def test_characteristics(self, geom, nodes):
+        # volume exclusion does not have to be checked here, uniqueness neither
+        # let interactions run for 50 timesteps to check attribute reference problems
+        print("Starting characteristics test")
+        ref_lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib)
+        vchannels_mapping = {'lin':com.b_1d, 'square':com.b_square, 'hex':com.b_hex}
+        for interaction in ref_lgca.interactions:
+            print(interaction)
+            # prevent velocity channel-only rules from crashing - quick fix
+            if interaction == 'dd_alignment' or interaction == 'di_alignment':
+                nodes_vonly = nodes[..., :vchannels_mapping[geom]]
+                print('mapping', vchannels_mapping[geom])
+                print('shape', nodes_vonly.shape)
+                # test all boundary conditions in case of abuse of border nodes
+                self.t_characteristics(geom, nodes_vonly, interaction, 'pbc')
+                self.t_characteristics(geom, nodes_vonly, interaction, 'rbc')
+                self.t_characteristics(geom, nodes_vonly, interaction, 'abc')
+            else:
+                # test all boundary conditions in case of abuse of border nodes
+                self.t_characteristics(geom, nodes, interaction, 'pbc')
+                self.t_characteristics(geom, nodes, interaction, 'rbc')
+                self.t_characteristics(geom, nodes, interaction, 'abc')
+
+    def t_characteristics(self, geom, nodes, interaction, bc):
+        lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib, nodes=nodes, interaction=interaction, bc=bc)
+        lgca.timeevo(timesteps=50, recorddens=False, record=False, showprogress=False)
 
     def test_pbc_1d(self, nodes_1d_rbound, out_1d_rbound, nodes_1d_lbound, out_1d_lbound):
         # check periodic boundary conditions in 1D

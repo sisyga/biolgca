@@ -51,23 +51,28 @@ lgca.plot_flux()
 ```
 ![Alignment interaction](docs/images/alignment_small.png)
 #### Live simulation and density profile
+
 ```python
 from lgca import get_lgca
+
 # specify the excitable medium interaction with interaction parameter N=20
 # LGCA geometry: 20 resting channels and reflecting boundary conditions
 lgca = get_lgca(interaction='excitable_medium', restchannels=20, N=20, bc='refl')
 # initialise a custom lattice configuration
 lgca.nodes[...] = 0
-lgca.nodes[:lgca.lx//2, :, :lgca.velocitychannels] = 1  # 6 moving particles per node in the left half of the lattice
-lgca.nodes[:, :lgca.ly//2, lgca.velocitychannels:] = 1  # 6 resting particles per node in the lower half of the lattice
+lgca.nodes[:lgca.lx // 2, :, :lgca.velocitychannels] = 1  # 6 moving particles per node in the left half of the lattice
+lgca.nodes[:, :lgca.ly // 2,
+lgca.velocitychannels:] = 1  # 6 resting particles per node in the lower half of the lattice
 # view a live simulation: density profile of the velocity channels only
 lgca.live_animate_density(channels=slice(0, lgca.velocitychannels), vmax=lgca.velocitychannels)
 # the following image results from stopping the simulation after k=87 timesteps
 ```
 ![Excitable media](docs/images/excitable_medium_small.png)
 #### Identity-based LGCA and 1D plots
+
 ```python
 from lgca import get_lgca
+
 # identity-based LGCA: each cell can have own properties
 # specify the "Go and grow" interaction: cancer cells proliferate and migrate,
 # where the birth rate mutates
@@ -76,7 +81,7 @@ lgca = get_lgca(interaction='go_and_grow', ib=True, geometry='lin', restchannels
 # initialise a custom lattice configuration
 lgca.nodes[...] = 0
 lgca.update_dynamic_fields()
-lgca.nodes[lgca.dims[0]//2, :] = 1  # 1 fully filled node at the center
+lgca.nodes[lgca.dims[0] // 2, :] = 1  # 1 fully filled node at the center
 # simulate for 200 timesteps and record the full lattice configuration
 lgca.timeevo(timesteps=200, record=True)
 # plot cell density to see the tumour growth over time
@@ -96,7 +101,7 @@ pip install matplotlib==3.3.2 numpy pytest scipy sympy
 (On Windows, a terminal that understands `pip` out of the box can be opened in Anaconda in the 
 "Environments" tab, clicking on the triangle next to the environment's name.)
 
-If you want to add code to the package you should also install `pytest`.
+If you want to add code to the package you should also install `pytest` and `sphinx`.
 
 #### Installation
 `biolgca` does not have a package distribution yet. To use it, clone (or unzip the download of) 

@@ -51,7 +51,7 @@ class LGCA_Square(LGCA_base):
         self.K = self.velocitychannels + self.restchannels
 
     def init_nodes(self, density=0.1, nodes=None, **kwargs):
-        self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.bool)
+        self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=bool)
         if 'hom' in kwargs:
             hom = kwargs['hom']
         else:
@@ -61,7 +61,7 @@ class LGCA_Square(LGCA_base):
         elif nodes is None:
             self.random_reset(density)
         else:
-            self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(np.bool)
+            self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(bool)
             self.apply_boundaries()
 
     def init_coords(self):
@@ -614,7 +614,7 @@ class LGCA_Square(LGCA_base):
             cbar = fig.colorbar(cmap, use_gridspec=True, cax=cax)
             cbar.set_label('Direction of flux')
             cbar.set_ticks(np.arange(self.velocitychannels) * 360 / self.velocitychannels)
-            cbar.set_ticklabels(['${} \degree$'.format(int(i)) for i in
+            cbar.set_ticklabels([r'${} \degree$'.format(int(i)) for i in
                                  np.arange(self.velocitychannels) * 360 / self.velocitychannels])
             plt.sca(ax)
 

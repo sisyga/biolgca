@@ -155,25 +155,27 @@ class Test_LGCA_IB(T_LGCA_Common):
             # test all boundary conditions in case of abuse of border nodes
             self.t_characteristics(geom, nodes, interaction, 'pbc')
             self.t_characteristics(geom, nodes, interaction, 'rbc')
+            self.t_characteristics(geom, nodes, interaction, 'abc')
 
     def t_characteristics(self, geom, nodes, interaction, bc):
         lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib, nodes=nodes, interaction=interaction, bc=bc)
         lgca.timeevo(timesteps=100, recorddens=False, record=True, showprogress=False)
-        if lgca.nodes[lgca.nonborder].max() == 0 and lgca.nodes_t[0].max() != 0:
+        if lgca.nodes[lgca.nonborder].max() == 0 and lgca.nodes_t[0].max() != 0 and bc != 'abc':
             warnings.warn("System died out in " + str(interaction))
-        else:
-            for i in range(101):  # check throughout time evolution
-                # uniqueness principle
-                if lgca.nodes_t[i].min() == 0:  # 0 can occur more than once
+        for i in range(101):  # check throughout time evolution
+            # uniqueness principle
+            if lgca.nodes_t[i].min() == 0:  # 0 can occur more than once
+                if not lgca.nodes_t[i].max() == 0:
+                    # if only 0 occurs in this timestep, uniqueness is fulfilled, so only check the rest
                     assert np.unique(lgca.nodes_t[i], return_counts=True)[1][1:].max() <= 1, \
                         "Uniqueness principle is broken"
-                else:  # if 0 does not occur, all IDs have to be unique
-                    assert np.unique(lgca.nodes_t[i], return_counts=True)[1].max() <= 1, \
-                        "Uniqueness principle is broken"
-                # check ID updates: max can be smaller if a particle died
-                assert lgca.nodes.max() <= lgca.maxlabel, "IDs not updated correctly"
-                # check property updates
-                if lgca.props == {}:
-                    continue
-                for propname in lgca.props.keys():
-                    assert len(lgca.props[propname]) == lgca.maxlabel + 1, "Properties not updated for all particles"
+            else:  # if 0 does not occur, all IDs have to be unique
+                assert np.unique(lgca.nodes_t[i], return_counts=True)[1].max() <= 1, \
+                    "Uniqueness principle is broken"
+            # check ID updates: max can be smaller if a particle died
+            assert lgca.nodes.max() <= lgca.maxlabel, "IDs not updated correctly"
+            # check property updates
+            if lgca.props == {}:
+                continue
+            for propname in lgca.props.keys():
+                assert len(lgca.props[propname]) == lgca.maxlabel + 1, "Properties not updated for all particles"

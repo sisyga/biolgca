@@ -561,10 +561,11 @@ class Test_LGCA_classical(T_LGCA_Common):
             # test all boundary conditions in case of abuse of border nodes
             self.t_characteristics(geom, nodes, interaction, 'pbc')
             self.t_characteristics(geom, nodes, interaction, 'rbc')
+            self.t_characteristics(geom, nodes, interaction, 'abc')
 
     def t_characteristics(self, geom, nodes, interaction, bc):
         lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib, nodes=nodes, interaction=interaction, bc=bc)
         lgca.timeevo(timesteps=100, recorddens=False, record=True, showprogress=False)
         assert np.max(lgca.nodes_t.astype(int)) <= 1, "Volume exclusion principle is not respected"
-        if lgca.nodes_t[-1].max() == 0 and lgca.nodes_t[0].max() != 0:
+        if lgca.nodes_t[-1].max() == 0 and lgca.nodes_t[0].max() != 0 and bc!='abc':
             warnings.warn("System died out in " + str(interaction))
