@@ -19,7 +19,8 @@ def dd_alignment(lgca):
     coords = [a[relevant] for a in lgca.nonborder]
     # calculate director field
     g = lgca.calc_flux(lgca.nodes)  # flux for each lattice site
-    g = lgca.nb_sum(g, addCenter=lgca.nb_include_center)  # sum of flux of neighbors for each lattice site
+    g = lgca.nb_sum(g, addCenter=lgca.interaction_params['nb_include_center'])
+    # sum of flux of neighbors for each lattice site
 
 
     # loop through lattice sites and reassign particle directions
@@ -27,7 +28,7 @@ def dd_alignment(lgca):
         # number of particles
         n = lgca.cell_density[coord]
         # calculate transition probabilities for directions
-        weights = np.exp(lgca.beta * np.einsum('i,ij', g[coord], lgca.c))
+        weights = np.exp(lgca.interaction_params['beta'] * np.einsum('i,ij', g[coord], lgca.c))
 
         z = weights.sum()
         # to prevent divisions by zero if the weight is zero
@@ -57,19 +58,19 @@ def di_alignment(lgca):
     coords = [a[relevant] for a in lgca.nonborder]
     # calculate director field
     g = lgca.calc_flux(lgca.nodes)  # flux for each lattice site
-    g = lgca.nb_sum(g, addCenter=lgca.nb_include_center)  # sum of flux of neighbors for each lattice site
+    g = lgca.nb_sum(g, addCenter=lgca.interaction_params['nb_include_center'])  # sum of flux of neighbors for each lattice site
 
     # normalize director field by number of neighbors
-    nsum = lgca.nb_sum(lgca.cell_density, addCenter=lgca.nb_include_center)[None, ...]
+    nsum = lgca.nb_sum(lgca.cell_density, addCenter=lgca.interaction_params['nb_include_center'])[..., None]
     np.maximum(nsum, 1, out=nsum)   # avoid dividing by zero later
-    g = g / nsum.T
+    g = g / nsum
 
     # loop through lattice sites and reassign particle directions
     for coord in zip(*coords):
         # number of particles
         n = lgca.cell_density[coord]
         # calculate transition probabilities for directions
-        weights = np.exp(lgca.beta * np.einsum('i,ij', g[coord], lgca.c))
+        weights = np.exp(lgca.interaction_params['beta'] * np.einsum('i,ij', g[coord], lgca.c))
         z = weights.sum()
         # avoid division by zero if weights is zero
         aux = np.nan_to_num(z)
@@ -103,17 +104,19 @@ def go_or_grow(lgca):
         rho = n / lgca.capacity
 
         # phenotypic switch
-        j_1 = npr.binomial(n_mxy, tanh_switch(rho, kappa=lgca.kappa, theta=lgca.theta))
-        j_2 = npr.binomial(n_rxy, 1 - tanh_switch(rho, kappa=lgca.kappa, theta=lgca.theta))
+        j_1 = npr.binomial(n_mxy, tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
+                                              theta=lgca.interaction_params['theta']))
+        j_2 = npr.binomial(n_rxy, 1 - tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
+                                                  theta=lgca.interaction_params['theta']))
         n_mxy += j_2 - j_1
         n_rxy += j_1 - j_2
 
         # death
-        n_mxy -= npr.binomial(n_mxy * np.heaviside(n_mxy, 0), lgca.r_d)
-        n_rxy -= npr.binomial(n_rxy * np.heaviside(n_rxy, 0), lgca.r_d)
+        n_mxy -= npr.binomial(n_mxy * np.heaviside(n_mxy, 0), lgca.interaction_params['r_d'])
+        n_rxy -= npr.binomial(n_rxy * np.heaviside(n_rxy, 0), lgca.interaction_params['r_d'])
 
         # birth
-        n_rxy += npr.binomial(n_rxy * np.heaviside(n_rxy, 0), np.maximum(lgca.r_b*(1-rho), 0))
+        n_rxy += npr.binomial(n_rxy * np.heaviside(n_rxy, 0), np.maximum(lgca.interaction_params['r_b']*(1-rho), 0))
 
         # reorientation
         v_channels = npr.multinomial(n_mxy, [1/lgca.velocitychannels]*lgca.velocitychannels)
@@ -142,8 +145,10 @@ def go_or_rest(lgca):
         rho = n / lgca.capacity
 
         # phenotypic switch
-        j_1 = npr.binomial(n_mxy, tanh_switch(rho, kappa=lgca.kappa, theta=lgca.theta))
-        j_2 = npr.binomial(n_rxy, 1 - tanh_switch(rho, kappa=lgca.kappa, theta=lgca.theta))
+        j_1 = npr.binomial(n_mxy, tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
+                                              theta=lgca.interaction_params['theta']))
+        j_2 = npr.binomial(n_rxy, 1 - tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
+                                                  theta=lgca.interaction_params['theta']))
         n_mxy += j_2 - j_1
         n_rxy += j_1 - j_2
 

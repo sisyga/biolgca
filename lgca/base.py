@@ -4,11 +4,19 @@
 # The full license notice is found in the file lgca/__init__.py.
 
 """
-This is the documentation for base.py.
+Abstract base classes. These classes define properties and structure of the LGCA
+types/subclasses and specify geometry-independent LGCA behavior.
+They cannot be used to simulate.
+
+Supported LGCA types:
+
+- classical LGCA (:py:class:`LGCA_base`)
+- identity-based LGCA (:py:class:`IBLGCA_base`)
+- LGCA without volume exclusion (:py:class:`NoVE_LGCA_base`)
 """
 
 import sys
-
+from abc import ABC, abstractmethod
 import matplotlib.colors as mcolors
 import numpy as np
 from matplotlib import pyplot as plt
@@ -17,46 +25,79 @@ from numpy import random as npr
 from sympy.utilities.iterables import multiset_permutations
 from copy import copy, deepcopy
 from lgca.plots import muller_plot
+import warnings
 
-pi2 = 2 * np.pi
+# configure matplotlib style
 plt.style.use('default')
 
+def update_progress(progress: float):
+    """
+    Update the progress bar on the standard output.
 
-def update_progress(progress):
+    Writes progress strings like ``"[####----] 50%"`` to the standard output, replacing
+    the currently active line. Used in :py:func:`LGCA_base.timeevo`.
+
+    Parameters
+    -----------
+    progress : float
+        Fraction of the work done. A value <0 indicates a halt of the process.
+        Values >=1 are interpreted as a finished process.
+
     """
-    Simple progress bar update.
-    :param progress: float. Fraction of the work done, to update bar.
-    :return:
-    """
-    barLength = 20  # Modify this to change the length of the progress bar
+    # Modify this to change the length of the progress bar in signs
+    barLength = 20
+    # determine the status from the progress input
     status = ""
     if isinstance(progress, int):
         progress = float(progress)
     if not isinstance(progress, float):
         progress = 0
-        status = "error: progress var must be float\r\n"
+        status = "Progress variable must be float\r\n"
     if progress < 0:
         progress = 0
         status = "Halt...\r\n"
     if progress >= 1:
         progress = 1
         status = "Done...\r\n"
+    # assemble the string to print
+    # \r carriage return causes it to overwrite the line each time it is updated
     block = int(round(barLength * progress))
     text = "\rProgress: [{0}] {1}% {2}".format("#" * block + "-" * (barLength - block), round(progress * 100, 1),
                                                status)
+    # print to standard output
     sys.stdout.write(text)
     sys.stdout.flush()
 
 
-def colorbar_index(ncolors, cmap, use_gridspec=False, cax=None):
-    """Return a discrete colormap with n colors from the continuous colormap cmap and add correct tick labels
-
-    :param ncolors: number of colors of the colormap
-    :param cmap: continuous colormap to create discrete colormap from
-    :param use_gridspec: optional, use option for colorbar
-    :return: colormap instance
+def colorbar_index(ncolors: int, cmap, use_gridspec: bool=False, cax=None):
     """
+    Create a colorbar with `ncolors` colors.
+
+    Builds a discrete colormap with `ncolors` colors from the near-continuous colormap `cmap`,
+    adds it to the axis `cax` and draws tick labels in the center of each color. If
+    ncolors is high, some labels are omitted to avoid cluttering.
+
+    .. note:: To Do: Implement the label stride with Locator and Formatter instead.
+
+    Parameters
+    ----------
+    ncolors : int
+        Desired number of colors for the discretized colormap.
+    cmap : str or :py:class:`matplotlib.colors.Colormap`
+        Near-continuous colormap to create discrete colormap from, e.g. ``matplotlib.cm.jet`` or ``'jet'``.
+    use_gridspec : bool, optional
+        Passed on to :py:func:`matplotlib.pyplot.colorbar`.
+    cax : :py:class:`matplotlib.axes.Axes` object, optional
+        Axis into which the colorbar will be drawn.
+
+    Returns
+    -------
+    colorbar : :py:class:`matplotlib.colorbar.Colorbar`
+        Colorbar instance.
+    """
+    # discretize the colormap
     cmap = cmap_discretize(cmap, ncolors)
+    # stride the colorbar labels to avoid cluttering for many colors
     if ncolors > 101:
         stride = 10
     elif ncolors > 51:
@@ -64,49 +105,105 @@ def colorbar_index(ncolors, cmap, use_gridspec=False, cax=None):
     elif ncolors > 31:
         stride = 2
     else:
-        stride=1
+        stride = 1
+    # map colors to values
     mappable = ScalarMappable(cmap=cmap)
     mappable.set_array([])
     mappable.set_clim(-0.5, ncolors + 0.5)
+    # create colorbar
     colorbar = plt.colorbar(mappable, use_gridspec=use_gridspec, cax=cax)
+    # set ticklabels to the center of respective color and support label stride
     ticks = np.linspace(-0.5, ncolors + 0.5, 2 * ncolors + 1)[1::2]
     labels = list(range(ncolors))
+    # if last strided label is the maximum label, plot all strided labels
     if ticks[-1] == ticks[0::stride][-1]:
         colorbar.set_ticks(ticks[0::stride])
         colorbar.set_ticklabels(labels[0::stride])
+    # if last strided label is different from the maximum label by less than half the stride:
+    # only plot strided labels up to the second last and the maximum label
     elif stride > 1 and ticks[-1] != ticks[0::stride][-1] and ticks[-1] - ticks[0::stride][-1] < stride/2:
         colorbar.set_ticks(list(ticks[0::stride][:-1]) + [ticks[-1]])
         colorbar.set_ticklabels(labels[0::stride][:-1] + [labels[-1]])
+    # otherwise plot all strided labels and the maximum label
     else:
         colorbar.set_ticks(list(ticks[0::stride]) + [ticks[-1]])
         colorbar.set_ticklabels(labels[0::stride] + [labels[-1]])
     return colorbar
 
 
-def cmap_discretize(cmap, N):
-    """Return a discrete colormap from the continuous colormap cmap.
-
-        cmap: colormap instance, eg. cm.jet.
-        N: number of colors.
-
-        Example
-            x = resize(arange(100), (5,100))
-            djet = cmap_discretize(cm.jet, 5)
-           imshow(x, cmap=djet)
+def cmap_discretize(cmap, N: int):
     """
+    Downsample the near-continuous colormap `cmap` to the number of colors `N`.
+
+    Parameters
+    ----------
+    cmap : str or :py:class:`matplotlib.colors.Colormap`
+        Colormap to be discretized, e.g. ``matplotlib.cm.jet`` or ``'jet'``.
+    N : int
+        Number of colors of the new colormap.
+
+    Returns
+    -------
+    :py:class:`matplotlib.colors.LinearSegmentedColormap`
+        Discretized colormap with `N` colors.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import matplotlib.cm as cm
+    >>> import matplotlib.pyplot as plt
+    >>> x = np.resize(np.arange(100), (5,20))
+    >>> # discretize jet colormap
+    >>> djet = cmap_discretize(cm.jet, 5)
+    >>> # show color limits
+    >>> plt.imshow(x, cmap=djet)
+
+    The name of the colormap is updated to ``cmap.name + '_N'``:
+
+    >>> djet.name
+    'jet_5'
+
+    """
+    # see https://matplotlib.org/stable/tutorials/colors/colormap-manipulation.html#creating-linear-segmented-colormaps
+    # for details
     if type(cmap) == str:
         cmap = plt.get_cmap(cmap)
+    # create anchor points and fill them with colors from the colormap
     colors_i = np.concatenate((np.linspace(0, 1., N), (0., 0., 0., 0.)))
     colors_rgba = cmap(colors_i)
+    # index rgba values according to discretization
     indices = np.linspace(0, 1., N + 1)
     cdict = {}
     for ki, key in enumerate(('red', 'green', 'blue')):
         cdict[key] = [(indices[i], colors_rgba[i - 1, ki], colors_rgba[i, ki]) for i in range(N + 1)]
-
+    # create new linear segmented colormap
     return plt.matplotlib.colors.LinearSegmentedColormap(cmap.name + "_%d" % N, cdict, 1024)
 
 
-def estimate_figsize(array, x=8., cbar=False, dy=1.):
+def estimate_figsize(array, x: float=8., cbar: bool=False, dy: float=1.):
+    """
+    .. deprecated:: 1.0
+        :py:func:`estimate_figsize` will be removed in biolgca 1.0, it is replaced
+        by the default value for the figure size in :py:func:`setup_figure` of the
+        respective LGCA object.
+
+    Parameters
+    ----------
+    array : :py:class:`numpy.ndarray`
+        Array holding the data to be plotted.
+    x : float, default=8.0
+        Desired x dimension of the figure. Used to scale the y dimension.
+    cbar : bool, optional
+        If the figure will contain a colorbar.
+    dy : float, default=1.0
+        Scale of a unit in the y direction as compared to the x direction.
+
+    Returns
+    -------
+    figsize : tuple(float, float)
+        Optimal figure size.
+
+    """
     lx, ly = array.shape
     if cbar:
         y = min([abs(x * ly /lx - 1), 10.])
@@ -121,12 +218,60 @@ def calc_nematic_tensor(v):
     return np.einsum('...i,...j->...ij', v, v) - 0.5 * np.diag(np.ones(2))[None, ...]
 
 
-class LGCA_base():
+class LGCA_base(ABC):
     """
     Base class for a lattice-gas. Not meant to be used alone!
     """
-    interactions = [
-        'This is only a helper class, it cannot simulate! Use one the following classes: \n LGCA_1D, LGCA_SQUARE, LGCA_HEX']
+
+    @property
+    @abstractmethod
+    def interactions(self) -> list:
+        """List of interactions for this LGCA class."""
+        # This is only a helper class, it cannot simulate! Use one the following classes:
+        # LGCA_1D, LGCA_Square, LGCA_Hex
+
+        # ... notation as of https://stackoverflow.com/a/58321197
+        ...
+
+    @property
+    @abstractmethod
+    def velocitychannels(self) -> int:
+        """Number of velocity channels."""
+        ...
+
+    @property
+    @abstractmethod
+    def c(self) -> np.ndarray:
+        """Array of the velocity channel vectors."""
+        ...
+
+    @abstractmethod
+    def set_dims(self, dims=None, nodes=None, restchannels=0):
+        ...
+
+    @abstractmethod
+    def init_coords(self):
+        ...
+
+    @abstractmethod
+    def init_nodes(self, density, nodes=None, **kwargs):
+        ...
+
+    @abstractmethod
+    def gradient(qty):
+        ...
+
+    def apply_pbc(self):
+        raise NotImplementedError("Periodic boundary conditions not yet implemented for class "+str(self.__class__)+".")
+
+    def apply_rbc(self):
+        raise NotImplementedError("Reflecting boundary conditions not yet implemented for class "+str(self.__class__)+".")
+
+    def apply_abc(self):
+        raise NotImplementedError("Absorbing boundary conditions not yet implemented for class "+str(self.__class__)+".")
+
+    def apply_inflowbc(self):
+        raise NotImplementedError("Inflow boundary conditions not yet implemented for class "+str(self.__class__)+".")
 
     def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', **kwargs):
         """
@@ -144,6 +289,7 @@ class LGCA_base():
         self.init_coords()
         self.init_nodes(density=density, nodes=nodes, **kwargs)
         self.update_dynamic_fields()
+        self.interaction_params = {}
         self.set_interaction(**kwargs)
         print(kwargs)
 
@@ -162,83 +308,83 @@ class LGCA_base():
             if interaction == 'go_or_grow':
                 self.interaction = go_or_grow
                 if 'r_d' in kwargs:
-                    self.r_d = kwargs['r_d']
+                    self.interaction_params['r_d'] = kwargs['r_d']
                 else:
-                    self.r_d = 0.01
-                    print('death rate set to r_d = ', self.r_d)
+                    self.interaction_params['r_d'] = 0.01
+                    print('death rate set to r_d = ', self.interaction_params['r_d'])
                 if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
+                    self.interaction_params['r_b'] = kwargs['r_b']
                 else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
+                    self.interaction_params['r_b'] = 0.2
+                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
                 if 'kappa' in kwargs:
-                    self.kappa = kwargs['kappa']
+                    self.interaction_params['kappa'] = kwargs['kappa']
                 else:
-                    self.kappa = 5.
-                    print('switch rate set to kappa = ', self.kappa)
+                    self.interaction_params['kappa'] = 5.
+                    print('switch rate set to kappa = ', self.interaction_params['kappa'])
                 if 'theta' in kwargs:
-                    self.theta = kwargs['theta']
+                    self.interaction_params['theta'] = kwargs['theta']
                 else:
-                    self.theta = 0.75
-                    print('switch threshold set to theta = ', self.theta)
+                    self.interaction_params['theta'] = 0.75
+                    print('switch threshold set to theta = ', self.interaction_params['theta'])
                 if self.restchannels < 2:
-                    print('WARNING: not enough rest channels - system will die out!!!')
+                    print('WARNING: not enough rest channels - system will die out!')
 
             elif interaction == 'go_or_rest':
                 self.interaction = go_or_rest
                 if 'kappa' in kwargs:
-                    self.kappa = kwargs['kappa']
+                    self.interaction_params['kappa'] = kwargs['kappa']
                 else:
-                    self.kappa = 5.
-                    print('switch rate set to kappa = ', self.kappa)
+                    self.interaction_params['kappa'] = 5.
+                    print('switch rate set to kappa = ', self.interaction_params['kappa'])
                 if 'theta' in kwargs:
-                    self.theta = kwargs['theta']
+                    self.interaction_params['theta'] = kwargs['theta']
                 else:
-                    self.theta = 0.75
-                    print('switch threshold set to theta = ', self.theta)
+                    self.interaction_params['theta'] = 0.75
+                    print('switch threshold set to theta = ', self.interaction_params['theta'])
                 if self.restchannels < 2:
                     print('WARNING: not enough rest channels - system will die out!!!')
 
             elif interaction == 'go_and_grow':
                 self.interaction = birth
                 if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
+                    self.interaction_params['r_b'] = kwargs['r_b']
                 else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
+                    self.interaction_params['r_b'] = 0.2
+                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
 
             elif interaction == 'alignment':
                 self.interaction = alignment
                 self.calc_permutations()
 
                 if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
+                    self.interaction_params['beta'] = kwargs['beta']
                 else:
-                    self.beta = 2.
-                    print('sensitivity set to beta = ', self.beta)
+                    self.interaction_params['beta'] = 2.
+                    print('sensitivity set to beta = ', self.interaction_params['beta'])
 
             elif interaction == 'persistent_motion':
                 self.interaction = persistent_walk
                 self.calc_permutations()
 
                 if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
+                    self.interaction_params['beta'] = kwargs['beta']
                 else:
-                    self.beta = 2.
-                    print('sensitivity set to beta = ', self.beta)
+                    self.interaction_params['beta'] = 2.
+                    print('sensitivity set to beta = ', self.interaction_params['beta'])
 
             elif interaction == 'chemotaxis':
                 self.interaction = chemotaxis
                 self.calc_permutations()
 
                 if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
+                    self.interaction_params['beta'] = kwargs['beta']
                 else:
-                    self.beta = 5.
-                    print('sensitivity set to beta = ', self.beta)
+                    self.interaction_params['beta'] = 5.
+                    print('sensitivity set to beta = ', self.interaction_params['beta'])
 
                 if 'gradient' in kwargs:
-                    self.g = kwargs['gradient']
+                    self.interaction_params['gradient_field'] = kwargs['gradient']
                 else:
                     if self.velocitychannels > 2:
                         x_source = npr.normal(self.xcoords.mean(), 1)
@@ -247,30 +393,30 @@ class LGCA_base():
                         ry = self.ycoords - y_source
                         r = np.sqrt(rx ** 2 + ry ** 2)
                         self.concentration = np.exp(-2 * r / self.ly)
-                        self.g = self.gradient(np.pad(self.concentration, 1, 'reflect'))
+                        self.interaction_params['gradient_field'] = self.gradient(np.pad(self.concentration, 1, 'reflect'))
                     else:
                         source = npr.normal(self.l / 2, 1)
                         r = abs(self.xcoords - source)
                         self.concentration = np.exp(-2 * r / self.l)
-                        self.g = self.gradient(np.pad(self.concentration, 1, 'reflect'))
-                        self.g /= self.g.max()
+                        self.interaction_params['gradient_field'] = self.gradient(np.pad(self.concentration, 1, 'reflect'))
+                        self.interaction_params['gradient_field'] /= self.interaction_params['gradient_field'].max()
 
             elif interaction == 'contact_guidance':
                 self.interaction = contact_guidance
                 self.calc_permutations()
 
                 if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
+                    self.interaction_params['beta'] = kwargs['beta']
                 else:
-                    self.beta = 2.
-                    print('sensitivity set to beta = ', self.beta)
+                    self.interaction_params['beta'] = 2.
+                    print('sensitivity set to beta = ', self.interaction_params['beta'])
 
                 if 'director' in kwargs:
-                    self.g = kwargs['director']
+                    self.interaction_params['gradient_field'] = kwargs['director']
                 else:
-                    self.g = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, 2))
-                    self.g[..., 0] = 1
-                    self.guiding_tensor = calc_nematic_tensor(self.g)
+                    self.interaction_params['gradient_field'] = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, 2))
+                    self.interaction_params['gradient_field'][..., 0] = 1
+                    self.guiding_tensor = calc_nematic_tensor(self.interaction_params['gradient_field'])
                 if self.velocitychannels < 4:
                     print('WARNING: NEMATIC INTERACTION UNDEFINED IN 1D!')
 
@@ -279,20 +425,20 @@ class LGCA_base():
                 self.calc_permutations()
 
                 if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
+                    self.interaction_params['beta'] = kwargs['beta']
                 else:
-                    self.beta = 2.
-                    print('sensitivity set to beta = ', self.beta)
+                    self.interaction_params['beta'] = 2.
+                    print('sensitivity set to beta = ', self.interaction_params['beta'])
 
             elif interaction == 'aggregation':
                 self.interaction = aggregation
                 self.calc_permutations()
 
                 if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
+                    self.interaction_params['beta'] = kwargs['beta']
                 else:
-                    self.beta = 2.
-                    print('sensitivity set to beta = ', self.beta)
+                    self.interaction_params['beta'] = 2.
+                    print('sensitivity set to beta = ', self.interaction_params['beta'])
 
             elif interaction == 'wetting':
                 self.interaction = wetting
@@ -300,29 +446,28 @@ class LGCA_base():
                 self.set_r_int(2)
 
                 if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
+                    self.interaction_params['beta'] = kwargs['beta']
                 else:
-                    self.beta = 2.
-                    print('adhesion sensitivity set to beta = ', self.beta)
+                    self.interaction_params['beta'] = 2.
+                    print('adhesion sensitivity set to beta = ', self.interaction_params['beta'])
 
                 if 'alpha' in kwargs:
-                    self.alpha = kwargs['alpha']
+                    self.interaction_params['alpha'] = kwargs['alpha']
                 else:
-                    self.alpha = 2.
-                    print('substrate sensitivity set to alpha = ', self.alpha)
+                    self.interaction_params['alpha'] = 2.
+                    print('substrate sensitivity set to alpha = ', self.interaction_params['alpha'])
 
                 if 'gamma' in kwargs:
-                    self.gamma = kwargs['gamma']
+                    self.interaction_params['gamma'] = kwargs['gamma']
                 else:
-                    self.gamma = 2.
-                    print('pressure sensitivity set to gamma = ', self.gamma)
+                    self.interaction_params['gamma'] = 2.
+                    print('pressure sensitivity set to gamma = ', self.interaction_params['gamma'])
 
                 if 'rho_0' in kwargs:
-                    self.rho_0 = kwargs['rho_0']
+                    self.interaction_params['rho_0'] = kwargs['rho_0']
                 else:
-                    self.rho_0 = self.restchannels // 2
-                self.n_crit = (self.velocitychannels + 1) * self.rho_0
-
+                    self.interaction_params['rho_0'] = self.restchannels // 2
+                self.n_crit = (self.velocitychannels + 1) * self.interaction_params['rho_0']
 
             elif interaction == 'random_walk':
                 self.interaction = random_walk
@@ -330,45 +475,45 @@ class LGCA_base():
             elif interaction == 'birth':
                 self.interaction = birth
                 if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
+                    self.interaction_params['r_b'] = kwargs['r_b']
                 else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
+                    self.interaction_params['r_b'] = 0.2
+                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
 
             elif interaction == 'birthdeath':
                 self.interaction = birthdeath
                 if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
+                    self.interaction_params['r_b'] = kwargs['r_b']
                 else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
+                    self.interaction_params['r_b'] = 0.2
+                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
 
                 if 'r_d' in kwargs:
-                    self.r_d = kwargs['r_d']
+                    self.interaction_params['r_d'] = kwargs['r_d']
                 else:
-                    self.r_d = 0.05
-                    print('death rate set to r_d = ', self.r_d)
+                    self.interaction_params['r_d'] = 0.05
+                    print('death rate set to r_d = ', self.interaction_params['r_d'])
 
             elif interaction == 'excitable_medium':
                 self.interaction = excitable_medium
                 if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
+                    self.interaction_params['beta'] = kwargs['beta']
 
                 else:
-                    self.beta = .05
-                    print('alignment sensitivity set to beta = ', self.beta)
+                    self.interaction_params['beta'] = .05
+                    print('alignment sensitivity set to beta = ', self.interaction_params['beta'])
 
                 if 'alpha' in kwargs:
-                    self.alpha = kwargs['alpha']
+                    self.interaction_params['alpha'] = kwargs['alpha']
                 else:
-                    self.alpha = 1.
-                    print('aggregation sensitivity set to alpha = ', self.alpha)
+                    self.interaction_params['alpha'] = 1.
+                    print('aggregation sensitivity set to alpha = ', self.interaction_params['alpha'])
 
                 if 'N' in kwargs:
-                    self.N = kwargs['N']
+                    self.interaction_params['N'] = kwargs['N']
                 else:
-                    self.N = 50
-                    print('repetition of fast reaction set to N = ', self.N)
+                    self.interaction_params['N'] = 50
+                    print('repetition of fast reaction set to N = ', self.interaction_params['N'])
 
             elif interaction == 'only_propagation':
                 self.interaction = only_propagation
@@ -396,9 +541,9 @@ class LGCA_base():
             self.apply_boundaries = self.apply_pbc
 
     def calc_flux(self, nodes):
+        # 1st+ dim: lattice sites, last dim: channels
+        # dot product between c vectors and actual configuration of site
         return np.einsum('ij,...j', self.c, nodes[..., :self.velocitychannels])
-        #1st dim: lattice sites
-        #2nd dim: dot product between c vectors and actual configuration of site
 
     def get_interactions(self):
         print(self.interactions)
@@ -513,7 +658,8 @@ class LGCA_base():
         """
         return self.cell_density[self.nonborder].sum()
 
-class IBLGCA_base(LGCA_base):
+
+class IBLGCA_base(LGCA_base, ABC):
     """
     Base class for identity-based LGCA.
     """
@@ -537,6 +683,7 @@ class IBLGCA_base(LGCA_base):
         self.init_nodes(density=density, nodes=nodes)
         self.maxlabel = self.nodes.max()
         self.update_dynamic_fields()
+        self.interaction_params = {}
         self.set_interaction(**kwargs)
 
     def set_interaction(self, **kwargs):
@@ -548,127 +695,129 @@ class IBLGCA_base(LGCA_base):
             if interaction == 'birth':
                 self.interaction = birth
                 if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
+                    self.interaction_params['r_b'] = kwargs['r_b']
                 else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
-                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+                    self.interaction_params['r_b'] = 0.2
+                    print('Birth rate set to r_b =', self.interaction_params['r_b'])
+                self.props.update(r_b=[0.] + [self.interaction_params['r_b']] * self.maxlabel)
                 if 'std' in kwargs:
-                    self.std = kwargs['std']
+                    self.interaction_params['std'] = kwargs['std']
                 else:
-                    self.std = 0.01
-                    print('standard deviation set to = ', self.std)
+                    self.interaction_params['std'] = 0.01
+                    print('Standard deviation set to std =', self.interaction_params['std'])
                 if 'a_max' in kwargs:
-                    self.a_max = kwargs['a_max']
+                    self.interaction_params['a_max'] = kwargs['a_max']
                 else:
-                    self.a_max = 1.
-                    print('Max. birth rate set to a_max =', self.a_max)
+                    self.interaction_params['a_max'] = 1.
+                    print('Max. birth rate set to a_max =', self.interaction_params['a_max'])
 
             elif interaction == 'birthdeath' or interaction == 'go_and_grow':
                 self.interaction = birthdeath
                 if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
+                    self.interaction_params['r_b'] = kwargs['r_b']
                 else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
-                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+                    self.interaction_params['r_b'] = 0.2
+                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+                self.props.update(r_b=[0.] + [self.interaction_params['r_b']] * self.maxlabel)
                 if 'r_d' in kwargs:
-                    self.r_d = kwargs['r_d']
+                    self.interaction_params['r_d'] = kwargs['r_d']
                 else:
-                    self.r_d = 0.02
-                    print('death rate set to r_d = ', self.r_d)
+                    self.interaction_params['r_d'] = 0.02
+                    print('death rate set to r_d = ', self.interaction_params['r_d'])
 
                 if 'std' in kwargs:
-                    self.std = kwargs['std']
+                    self.interaction_params['std'] = kwargs['std']
                 else:
-                    self.std = 0.01
-                    print('standard deviation set to = ', self.std)
+                    self.interaction_params['std'] = 0.01
+                    print('standard deviation set to = ', self.interaction_params['std'])
                 if 'a_max' in kwargs:
-                    self.a_max = kwargs['a_max']
+                    self.interaction_params['a_max'] = kwargs['a_max']
                 else:
-                    self.a_max = 1.
-                    print('Max. birth rate set to a_max =', self.a_max)
+                    self.interaction_params['a_max'] = 1.
+                    print('Max. birth rate set to a_max =', self.interaction_params['a_max'])
 
-                birthdeath.track_inheritance = False
                 if 'track_inheritance' in kwargs:
-                    if kwargs['track_inheritance']:
-                        birthdeath.track_inheritance = True
-                        self.init_families(type='heterogeneous', mutation=False)
+                    self.interaction_params['track_inheritance'] = kwargs['track_inheritance']
+                else:
+                    self.interaction_params['track_inheritance'] = False
+                    print('Family relationships not tracked.')
+                if self.interaction_params['track_inheritance']:
+                    self.init_families(type='heterogeneous', mutation=False)
 
             elif interaction == 'birthdeath_discrete':
                 self.interaction = birthdeath_discrete
                 if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
+                    self.interaction_params['r_b'] = kwargs['r_b']
                 else:
-                    self.r_b = 0.2
-                    print('Birth rate set to r_b = ', self.r_b)
+                    self.interaction_params['r_b'] = 0.2
+                    print('Birth rate set to r_b = ', self.interaction_params['r_b'])
 
-                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+                self.props.update(r_b=[0.] + [self.interaction_params['r_b']] * self.maxlabel)
                 if 'r_d' in kwargs:
-                    self.r_d = kwargs['r_d']
+                    self.interaction_params['r_d'] = kwargs['r_d']
                 else:
-                    self.r_d = 0.02
-                    print('Death rate set to r_d = ', self.r_d)
+                    self.interaction_params['r_d'] = 0.02
+                    print('Death rate set to r_d = ', self.interaction_params['r_d'])
 
                 if 'drb' in kwargs:
-                    self.drb = kwargs['drb']
+                    self.interaction_params['drb'] = kwargs['drb']
                 else:
-                    self.drb = 0.01
-                    print('Delta r_b set to = ', self.drb)
+                    self.interaction_params['drb'] = 0.01
+                    print('Delta r_b set to = ', self.interaction_params['drb'])
                 if 'a_max' in kwargs:
-                    self.a_max = kwargs['a_max']
+                    self.interaction_params['a_max'] = kwargs['a_max']
                 else:
-                    self.a_max = 1.
-                    print('Max. birth rate set to a_max =', self.a_max)#
+                    self.interaction_params['a_max'] = 1.
+                    print('Max. birth rate set to a_max =', self.interaction_params['a_max'])
 
                 if 'pmut' in kwargs:
-                    self.pmut = kwargs['pmut']
+                    self.interaction_params['pmut'] = kwargs['pmut']
                 else:
-                    self.pmut = 0.1
-                    print('Mutation probability set to p_mut =', self.pmut)
+                    self.interaction_params['pmut'] = 0.1
+                    print('Mutation probability set to p_mut =', self.interaction_params['pmut'])
 
             elif interaction == 'go_or_grow':
                 self.interaction = go_or_grow
                 if 'r_d' in kwargs:
-                    self.r_d = kwargs['r_d']
+                    self.interaction_params['r_d'] = kwargs['r_d']
                 else:
-                    self.r_d = 0.01
-                    print('death rate set to r_d = ', self.r_d)
+                    self.interaction_params['r_d'] = 0.01
+                    print('death rate set to r_d = ', self.interaction_params['r_d'])
                 if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
+                    self.interaction_params['r_b'] = kwargs['r_b']
                 else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
+                    self.interaction_params['r_b'] = 0.2
+                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
                 if 'kappa' in kwargs:
                     kappa = kwargs['kappa']
                     try:
-                        self.kappa = list(kappa)
+                        self.interaction_params['kappa'] = list(kappa)
                     except TypeError:
-                        self.kappa = [kappa] * self.maxlabel
+                        self.interaction_params['kappa'] = [kappa] * self.maxlabel
                 else:
-                    self.kappa = [5.] * self.maxlabel
-                    print('switch rate set to kappa = ', self.kappa[0])
-                self.props.update(kappa=[0.] + self.kappa)
+                    self.interaction_params['kappa'] = [5.] * self.maxlabel
+                    print('switch rate set to kappa = ', self.interaction_params['kappa'][0])
+                self.props.update(kappa=[0.] + self.interaction_params['kappa'])
                 if 'theta' in kwargs:
                     theta = kwargs['theta']
                     try:
-                        self.theta = list(theta)
+                        self.interaction_params['theta'] = list(theta)
                     except TypeError:
-                        self.theta = [theta] * self.maxlabel
+                        self.interaction_params['theta'] = [theta] * self.maxlabel
                 else:
-                    self.theta = [0.75] * self.maxlabel
-                    print('switch threshold set to theta = ', self.theta[0])
-                self.props.update(theta=[0.] + self.theta)
+                    self.interaction_params['theta'] = [0.75] * self.maxlabel
+                    print('switch threshold set to theta = ', self.interaction_params['theta'][0])
+                self.props.update(theta=[0.] + self.interaction_params['theta'])
                 if 'kappa_std' in kwargs:
-                    self.kappa_std = kwargs['kappa_std']
+                    self.interaction_params['kappa_std'] = kwargs['kappa_std']
                 else:
-                    self.kappa_std = 0.2
-                    print('Standard deviation for kappa mutation set to ', self.kappa_std)
+                    self.interaction_params['kappa_std'] = 0.2
+                    print('Standard deviation for kappa mutation set to ', self.interaction_params['kappa_std'])
                 if 'theta_std' in kwargs:
-                    self.theta_std = kwargs['theta_std']
+                    self.interaction_params['theta_std'] = kwargs['theta_std']
                 else:
-                    self.theta_std = 0.05
-                    print('Standard deviation for theta mutation set to ', self.theta_std)
+                    self.interaction_params['theta_std'] = 0.05
+                    print('Standard deviation for theta mutation set to ', self.interaction_params['theta_std'])
 
                 if self.restchannels < 2:
                     print('WARNING: not enough rest channels - system will die out!!!')
@@ -682,35 +831,36 @@ class IBLGCA_base(LGCA_base):
             elif interaction == 'go_and_grow_mutations':
                 self.interaction = go_and_grow_mutations
                 if 'effect' in kwargs:
-                    self.effect = kwargs['effect']
+                    self.interaction_params['effect'] = kwargs['effect']
                 else:
-                    self.effect = 'passenger_mutation'
+                    self.interaction_params['effect'] = 'passenger_mutation'
                     print('fitness effect set to passenger mutation, rb=const.')
                 if 'r_int' in kwargs:
                     self.set_r_int(kwargs['r_int'])
                 if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
+                    self.interaction_params['r_b'] = kwargs['r_b']
                 else:
-                    self.r_b = 0.5
-                    print('birth rate set to r_b = ', self.r_b)
+                    self.interaction_params['r_b'] = 0.5
+                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
                 if 'r_m' in kwargs:
-                    self.r_m = kwargs['r_m']
+                    self.interaction_params['r_m'] = kwargs['r_m']
                 else:
-                    self.r_m = 0.001
-                    print('mutation rate set to r_m = ', self.r_m)
+                    self.interaction_params['r_m'] = 0.001
+                    print('mutation rate set to r_m = ', self.interaction_params['r_m'])
                 if 'r_d' in kwargs:
-                    self.r_d = kwargs['r_d']
+                    self.interaction_params['r_d'] = kwargs['r_d']
                 else:
-                    self.r_d = 0.02
-                    print('death rate set to r_d = ', self.r_d)
+                    self.interaction_params['r_d'] = 0.02
+                    print('death rate set to r_d = ', self.interaction_params['r_d'])
                 self.init_families(type='homogeneous', mutation=True)
-                if self.effect == 'driver_mutation':
-                    self.family_props.update(r_b=[0] + [self.r_b] * self.maxfamily)
+                if self.interaction_params['effect'] == 'driver_mutation':
+                    self.family_props.update(r_b=[0] + [self.interaction_params['r_b']] * self.maxfamily)
                     if 'fitness_increase' in kwargs:
-                        self.fitness_increase = kwargs['fitness_increase']
+                        self.interaction_params['fitness_increase'] = kwargs['fitness_increase']
                     else:
-                        self.fitness_increase = 1.1
-                        print('fitness increase for driver mutations set to ', self.fitness_increase)
+                        self.interaction_params['fitness_increase'] = 1.1
+                        print('fitness increase for driver mutations set to ',
+                              self.interaction_params['fitness_increase'])
             else:
                 print('keyword', interaction, 'is not defined! Random walk used instead.')
                 self.interaction = random_walk
@@ -796,7 +946,7 @@ class IBLGCA_base(LGCA_base):
         if nodes.dtype != 'bool':
             nodes = nodes.astype('bool')
 
-        return np.einsum('ij,...j', self.c, nodes[..., :self.velocitychannels])
+        return super().calc_flux(nodes)
 
     def get_prop(self, nodes=None, props=None, propname=None):
         if nodes is None:
@@ -905,7 +1055,7 @@ class IBLGCA_base(LGCA_base):
         self.fam_pop_t = np.array(self.fam_pop_t)
 
     @staticmethod
-    def propagate_pop_to_parents(pop_t, ancestor:list):
+    def propagate_pop_to_parents(pop_t, ancestor: list):
         """
         Propagate family population to all ancestors.
         :param pop_t: np.ndarray of shape (timesteps, families) that holds the population of each family for all timesteps
@@ -1039,37 +1189,45 @@ class IBLGCA_base(LGCA_base):
                 fam_total_t.append(fam_total_t[i])
         return np.array(fam_total_t)
 
-    def filter_family_population_t(self, cutoff_abs=None, cutoff_rel=None):
+    def filter_family_population_t(self, fam_pop_t=None, cutoff_abs=None, cutoff_rel=None):
         """
-        Mask out families from lgca.fam_pop_t that never exceeded the given threshold.
+        Mask out families from fam_pop_t that never exceeded the given threshold.
+        :param fam_pop_t np.ndarray of shape (timesteps + 1, families + 1) holding each family's population
+                         size over time. Defaults to self.fam_pop_t
         :param cutoff_abs exclude families that never exceeded this population size in absolute numbers
         :param cutoff_rel exclude families that never exceeded this population size,
                           expressed as a fraction of the total population
         cutoff_rel takes precedence over cutoff_abs
         :returns np.ndarray of shape (timesteps + 1, families + 1) with all population values for
-                 too small families set to 0. Original lgca.fam_pop_t if both parameters are None.
+                 too small families set to 0. Original fam_pop_t if both cutoff parameters are None.
         """
+        if fam_pop_t is None:
+            if not hasattr(self, 'fam_pop_t'):
+                raise AttributeError("LGCA simulation must have been run with lgca.timeevo(recordfampop=True) before "
+                                     "in order to calculate this with keyword arg fam_pop_t=None.")
+            fam_pop_t = self.fam_pop_t
+
         if cutoff_rel:
-            fam_pop_t = copy(self.fam_pop_t)
+            fam_pop_t_filtered = copy(fam_pop_t)
             # calculate fraction of the total population for each family at all timesteps
-            total_pop = fam_pop_t.sum(-1)
-            rel_fam_pop = np.divide(fam_pop_t.transpose(), total_pop)  # transpose to align time axis
+            total_pop = fam_pop_t_filtered.sum(-1)
+            rel_fam_pop = np.divide(fam_pop_t_filtered.transpose(), total_pop)  # transpose to align time axis
             rel_fam_pop = rel_fam_pop.transpose()  # transpose back to match with fam_pop_t again
             # obtain positions of families in the array that have never exceeded the threshold
             small_family_pos = ~ np.any(rel_fam_pop >= cutoff_rel, axis=0)
 
         elif cutoff_abs:
-            fam_pop_t = copy(self.fam_pop_t)
+            fam_pop_t_filtered = copy(fam_pop_t)
             # obtain positions of families in the array that have never exceeded the threshold
-            small_family_pos = ~ np.any(fam_pop_t >= cutoff_abs, axis=0)
+            small_family_pos = ~ np.any(fam_pop_t_filtered >= cutoff_abs, axis=0)
 
         else:
-            return self.fam_pop_t
+            return fam_pop_t
 
         # filter them out
-        fam_pop_t[:, small_family_pos] = 0
+        fam_pop_t_filtered[:, small_family_pos] = 0
 
-        return fam_pop_t
+        return fam_pop_t_filtered
 
     def num_families_alive(self):
         """
@@ -1277,7 +1435,7 @@ class IBLGCA_base(LGCA_base):
             init_families_pop_t[:, pos] += fam_pop_t[:, init_fam]
         return init_families_pop_t, init_ancestor_IDs
 
-    def propagate_family_prop_to_cells(self, prop:str):
+    def propagate_family_prop_to_cells(self, prop: str):
         """
         Propagate a family property down to all cells that belong to the family. Uses contents of
         lgca.family_props[prop] to create a new cell property lgca.props[prop]
@@ -1285,11 +1443,19 @@ class IBLGCA_base(LGCA_base):
         """
         self.props[prop] = [self.family_props[prop][fam] for fam in self.props['family']]
 
-    def add_family(self, ancestor_fam:int):
+    def add_family(self, ancestor_fam: int):
         """
         Create a new family and register it in the family tree.
+        PLEASE DO NOT CALL THIS UNLESS YOU ARE WRITING AN INTERACTION FUNCTION THAT
+        DEALS WITH MUTATIONS.
         :param ancestor_fam family that the new one descends from
         """
+        if not hasattr(self, 'maxfamily') or not hasattr(self, 'family_props'):
+            raise RuntimeError("No family tracking initialized. If you are writing an interaction function, please:\n"
+                               "1) check if it deals with mutations. If not, you don't need this method.\n"
+                               "2) if so, make sure to call self.init_families(...) in self.set_interaction(...).\n"
+                               "If you are not writing an interaction function, please do not call this. It will "
+                               "compromise the state of your LGCA.")
         # add new family
         self.maxfamily += 1
         # register ancestor of the new family
@@ -1300,7 +1466,7 @@ class IBLGCA_base(LGCA_base):
         self.family_props['descendants'].append([])
 
 
-class NoVE_LGCA_base(LGCA_base):
+class NoVE_LGCA_base(LGCA_base, ABC):
     """
     Base class for LGCA without volume exclusion.
     """
@@ -1321,6 +1487,7 @@ class NoVE_LGCA_base(LGCA_base):
         self.init_coords()
         self.init_nodes(density=density, nodes=nodes, hom=hom)
         self.update_dynamic_fields()
+        self.interaction_params = {}
         self.set_interaction(**kwargs)
 
     def set_interaction(self, **kwargs):
@@ -1329,58 +1496,62 @@ class NoVE_LGCA_base(LGCA_base):
         # configure interaction
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
+            if self.restchannels > 0:
+                print('Interaction only works without restchannels and will crash.')
             # density-dependent interaction rule
             if interaction == 'dd_alignment':
                 self.interaction = dd_alignment
 
                 if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
+                    self.interaction_params['beta'] = kwargs['beta']
                 else:
-                    self.beta = 2.
-                    print('sensitivity set to beta = ', self.beta)
+                    self.interaction_params['beta'] = 2.
+                    print('sensitivity set to beta = ', self.interaction_params['beta'])
                 if 'include_center' in kwargs:
-                    self.nb_include_center = kwargs['include_center']
+                    self.interaction_params['nb_include_center'] = kwargs['include_center']
                 else:
-                    self.nb_include_center = False
+                    self.interaction_params['nb_include_center'] = False
                     print('neighbourhood set to exclude the central node')
             # density-independent alignment rule
             elif interaction == 'di_alignment':
                 self.interaction = di_alignment
+                if self.restchannels > 0:
+                    print('Interaction only works without restchannels and will crash.')
 
                 if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
+                    self.interaction_params['beta'] = kwargs['beta']
                 else:
-                    self.beta = 2.
-                    print('sensitivity set to beta = ', self.beta)
+                    self.interaction_params['beta'] = 2.
+                    print('sensitivity set to beta = ', self.interaction_params['beta'])
                 if 'include_center' in kwargs:
-                    self.nb_include_center = kwargs['include_center']
+                    self.interaction_params['nb_include_center'] = kwargs['include_center']
                 else:
-                    self.nb_include_center = False
+                    self.interaction_params['nb_include_center'] = False
                     print('neighbourhood set to exclude the central node')
             elif interaction == 'go_or_grow':
                 if self.restchannels < 1:
                     raise RuntimeError("No rest channels ({:d}) defined, interaction cannot be performed! Set number of rest channels with restchannels keyword.".format(self.restchannels))
                 self.interaction = go_or_grow
                 if 'r_d' in kwargs:
-                    self.r_d = kwargs['r_d']
+                    self.interaction_params['r_d'] = kwargs['r_d']
                 else:
-                    self.r_d = 0.01
-                    print('death rate set to r_d = ', self.r_d)
+                    self.interaction_params['r_d'] = 0.01
+                    print('death rate set to r_d = ', self.interaction_params['r_d'])
                 if 'r_b' in kwargs:
-                    self.r_b = kwargs['r_b']
+                    self.interaction_params['r_b'] = kwargs['r_b']
                 else:
-                    self.r_b = 0.2
-                    print('birth rate set to r_b = ', self.r_b)
+                    self.interaction_params['r_b'] = 0.2
+                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
                 if 'kappa' in kwargs:
-                    self.kappa = kwargs['kappa']
+                    self.interaction_params['kappa'] = kwargs['kappa']
                 else:
-                    self.kappa = 5.
-                    print('switch rate set to kappa = ', self.kappa)
+                    self.interaction_params['kappa'] = 5.
+                    print('switch rate set to kappa = ', self.interaction_params['kappa'])
                 if 'theta' in kwargs:
-                    self.theta = kwargs['theta']
+                    self.interaction_params['theta'] = kwargs['theta']
                 else:
-                    self.theta = 0.75
-                    print('switch threshold set to theta = ', self.theta)
+                    self.interaction_params['theta'] = 0.75
+                    print('switch threshold set to theta = ', self.interaction_params['theta'])
             elif interaction == 'go_or_rest':
                 if self.restchannels < 1:
                     raise RuntimeError(
@@ -1389,15 +1560,15 @@ class NoVE_LGCA_base(LGCA_base):
 
                 self.interaction = go_or_rest
                 if 'kappa' in kwargs:
-                    self.kappa = kwargs['kappa']
+                    self.interaction_params['kappa'] = kwargs['kappa']
                 else:
-                    self.kappa = 5.
-                    print('switch rate set to kappa = ', self.kappa)
+                    self.interaction_params['kappa'] = 5.
+                    print('switch rate set to kappa = ', self.interaction_params['kappa'])
                 if 'theta' in kwargs:
-                    self.theta = kwargs['theta']
+                    self.interaction_params['theta'] = kwargs['theta']
                 else:
-                    self.theta = 0.75
-                    print('switch threshold set to theta = ', self.theta)
+                    self.interaction_params['theta'] = 0.75
+                    print('switch threshold set to theta = ', self.interaction_params['theta'])
 
             elif interaction == 'only_propagation':
                 self.interaction = only_propagation
@@ -1408,20 +1579,20 @@ class NoVE_LGCA_base(LGCA_base):
                 self.interaction = dd_alignment
 
                 if 'beta' in kwargs:
-                    self.beta = kwargs['beta']
+                    self.interaction_params['beta'] = kwargs['beta']
                 else:
-                    self.beta = 2.
-                    print('sensitivity set to beta = ', self.beta)
+                    self.interaction_params['beta'] = 2.
+                    print('sensitivity set to beta = ', self.interaction_params['beta'])
         # if nothing is specified, use density-dependent interaction rule
         else:
             print('Density-dependent alignment interaction is used.')
             self.interaction = dd_alignment
 
             if 'beta' in kwargs:
-                self.beta = kwargs['beta']
+                self.interaction_params['beta'] = kwargs['beta']
             else:
-                self.beta = 2.
-                print('sensitivity set to beta = ', self.beta)
+                self.interaction_params['beta'] = 2.
+                print('sensitivity set to beta = ', self.interaction_params['beta'])
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True, recordorderparams=False, recordpertype=False):
         self.update_dynamic_fields()
@@ -1435,13 +1606,13 @@ class NoVE_LGCA_base(LGCA_base):
             self.dens_t = np.zeros((timesteps + 1,) + self.dims)
             self.dens_t[0, ...] = self.cell_density[self.nonborder]
         if recordorderparams:
-            self.ent_t = np.zeros(timesteps + 1, dtype=np.float)
+            self.ent_t = np.zeros(timesteps + 1, dtype=float)
             self.ent_t[0, ...] = self.calc_entropy()
-            self.normEnt_t = np.zeros(timesteps + 1, dtype=np.float)
+            self.normEnt_t = np.zeros(timesteps + 1, dtype=float)
             self.normEnt_t[0, ...] = self.calc_normalized_entropy()
-            self.polAlParam_t = np.zeros(timesteps + 1, dtype=np.float)
+            self.polAlParam_t = np.zeros(timesteps + 1, dtype=float)
             self.polAlParam_t[0, ...] = self.calc_polar_alignment_parameter()
-            self.meanAlign_t = np.zeros(timesteps + 1, dtype=np.float)
+            self.meanAlign_t = np.zeros(timesteps + 1, dtype=float)
             self.meanAlign_t[0, ...] = self.calc_mean_alignment()
         if recordpertype:
             self.velcells_t = np.zeros((timesteps + 1,) + self.dims)

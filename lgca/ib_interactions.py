@@ -63,7 +63,8 @@ def birth(lgca):
                 lgca.maxlabel += 1
                 node[ind] = lgca.maxlabel
                 r_b = lgca.props['r_b'][label]
-                lgca.props['r_b'].append(float(trunc_gauss(0, lgca.a_max, r_b, sigma=lgca.std)))
+                lgca.props['r_b'].append(float(trunc_gauss(0, lgca.interaction_params['a_max'], r_b,
+                                                           sigma=lgca.interaction_params['std'])))
 
         lgca.nodes[coord] = node
     random_walk(lgca)
@@ -72,10 +73,10 @@ def birth(lgca):
 def birthdeath(lgca):
     """
     Simple birth-death process with evolutionary dynamics towards a higher proliferation rate.
-    Family membership of cells can be tracked by setting birthdeath.track_inheritance = True.
+    Family membership of cells can be tracked by passing the keyword argument track_inheritance=True in get_lgca().
     """
     # death process
-    dying = (npr.random(size=lgca.nodes.shape) < lgca.r_d) & lgca.occupied
+    dying = (npr.random(size=lgca.nodes.shape) < lgca.interaction_params['r_d']) & lgca.occupied
     lgca.nodes[dying] = 0
     lgca.update_dynamic_fields()
 
@@ -93,18 +94,20 @@ def birthdeath(lgca):
         n_p = proliferating.sum()
         if n_p == 0:
             continue
-        targetchannels = npr.choice(lgca.K, size=n_p, replace=False)  # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
+        targetchannels = npr.choice(lgca.K, size=n_p, replace=False)
+        # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
         for i, label in enumerate(node[proliferating]):
             ind = targetchannels[i]
             if node[ind] == 0:
                 lgca.maxlabel += 1
                 node[ind] = lgca.maxlabel
                 r_b = lgca.props['r_b'][label]
-                if lgca.std > 0:
-                    lgca.props['r_b'].append(float(trunc_gauss(0, lgca.a_max, r_b, sigma=lgca.std)))
+                if lgca.interaction_params['std'] > 0:
+                    lgca.props['r_b'].append(float(trunc_gauss(0, lgca.interaction_params['a_max'], r_b,
+                                                               sigma=lgca.interaction_params['std'])))
                 else:
                     lgca.props['r_b'].append(r_b)
-                if birthdeath.track_inheritance:
+                if lgca.interaction_params['track_inheritance']:
                     fam = lgca.props['family'][label]
                     lgca.props['family'].append(fam)
         lgca.nodes[coord] = node
@@ -115,7 +118,7 @@ def birthdeath_discrete(lgca):
     Simple birth-death process with evolutionary dynamics towards a higher proliferation rate
     """
     # determine which cells will die
-    dying = (npr.random(size=lgca.nodes.shape) < lgca.r_d) & lgca.occupied
+    dying = (npr.random(size=lgca.nodes.shape) < lgca.interaction_params['r_d']) & lgca.occupied
     lgca.nodes[dying] = 0
     lgca.update_dynamic_fields()
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
@@ -140,11 +143,16 @@ def birthdeath_discrete(lgca):
                 lgca.maxlabel += 1
                 node[ind] = lgca.maxlabel
                 r_b = lgca.props['r_b'][label]
-                if r_b < lgca.a_max:
-                    lgca.props['r_b'].append(choices((r_b-lgca.drb, r_b+lgca.drb, r_b), weights=(lgca.pmut/2, lgca.pmut/2,
-                                                                                                 1-lgca.pmut))[0])
+                if r_b < lgca.interaction_params['a_max']:
+                    lgca.props['r_b'].append(choices((r_b-lgca.interaction_params['drb'],
+                                                      r_b+lgca.interaction_params['drb'], r_b),
+                                                     weights=(lgca.interaction_params['pmut']/2,
+                                                              lgca.interaction_params['pmut']/2,
+                                                              1-lgca.interaction_params['pmut']))[0])
                 else:
-                    lgca.props['r_b'].append(choices((r_b-lgca.drb, r_b), weights=(lgca.pmut/2, 1-lgca.pmut/2))[0])
+                    lgca.props['r_b'].append(choices((r_b-lgca.interaction_params['drb'], r_b),
+                                                     weights=(lgca.interaction_params['pmut']/2,
+                                                              1-lgca.interaction_params['pmut']/2))[0])
 
         lgca.nodes[coord] = node
 
@@ -156,7 +164,7 @@ def go_or_grow(lgca):
     """
 
     # death
-    dying = (npr.random(size=lgca.nodes.shape) < lgca.r_d) & lgca.occupied
+    dying = (npr.random(size=lgca.nodes.shape) < lgca.interaction_params['r_d']) & lgca.occupied
     lgca.nodes[dying] = 0
 
     # birth
@@ -175,7 +183,7 @@ def go_or_grow(lgca):
 
         # determine cells to switch to rest channels and cells that switch to moving state
         # kappas = np.array([lgca.props['kappa'][i] for i in node])
-        # r_s = tanh_switch(rho, kappa=kappas, theta=lgca.theta)
+        # r_s = tanh_switch(rho, kappa=kappas, theta=lgca.interaction_params['theta'])
 
         free_rest = lgca.restchannels - n_r[coord]
         free_vel = lgca.velocitychannels - n_m[coord]
@@ -198,19 +206,19 @@ def go_or_grow(lgca):
         # cells in rest channels can proliferate
         can_proliferate = npr.permutation(rest[rest > 0])[:(rest == 0).sum()]
         for cell in can_proliferate:
-            if npr.random() < lgca.r_b:
+            if npr.random() < lgca.interaction_params['r_b']:
                 lgca.maxlabel += 1
                 rest[np.where(rest == 0)[0][0]] = lgca.maxlabel
                 kappa = lgca.props['kappa'][cell]
-                if lgca.kappa_std == 0:
+                if lgca.interaction_params['kappa_std'] == 0:
                     lgca.props['kappa'].append(kappa)
                 else:
-                    lgca.props['kappa'].append(npr.normal(loc=kappa, scale=lgca.kappa_std))
+                    lgca.props['kappa'].append(npr.normal(loc=kappa, scale=lgca.interaction_params['kappa_std']))
                 theta = lgca.props['theta'][cell]
-                if lgca.theta_std == 0:
+                if lgca.interaction_params['theta_std'] == 0:
                     lgca.props['theta'].append(theta)
                 else:
-                    lgca.props['theta'].append(npr.normal(loc=theta, scale=lgca.theta_std))
+                    lgca.props['theta'].append(npr.normal(loc=theta, scale=lgca.interaction_params['theta_std']))
 
         v_channels = npr.permutation(vel)
         r_channels = npr.permutation(rest)
@@ -220,11 +228,11 @@ def go_or_grow(lgca):
 def go_and_grow_mutations(lgca):
     """
     Simple birth-death process with tracked family membership of cells. New families develop by mutations.
-    If lgca.effect == 'passenger_mutation': no change in proliferation rate, but mutations found new families
-    If lgca.effect == 'driver_mutation': evolutionary dynamics towards a higher proliferation rate
+    If lgca.interaction_params['effect'] == 'passenger_mutation': no change in proliferation rate, but mutations found new families
+    If lgca.interaction_params['effect'] == 'driver_mutation': evolutionary dynamics towards a higher proliferation rate
     """
     # dying process
-    dying = (npr.random(size=lgca.nodes.shape) < lgca.r_d) & lgca.occupied
+    dying = (npr.random(size=lgca.nodes.shape) < lgca.interaction_params['r_d']) & lgca.occupied
     lgca.nodes[dying] = 0
     lgca.update_dynamic_fields()
 
@@ -235,12 +243,12 @@ def go_and_grow_mutations(lgca):
     for coord in zip(*coords):
         node = lgca.nodes[coord]
         # choose cells that proliferate
-        if lgca.effect == 'driver_mutation':
+        if lgca.interaction_params['effect'] == 'driver_mutation':
             # use rb of family
             r_bs = np.array([lgca.family_props['r_b'][lgca.props['family'][i]] for i in node])
         else:
             # rb is constant
-            r_bs = lgca.r_b * node.astype(bool)
+            r_bs = lgca.interaction_params['r_b'] * node.astype(bool)
         proliferating = npr.random(lgca.K) < r_bs
         n_p = proliferating.sum()
         if n_p == 0:
@@ -257,7 +265,7 @@ def go_and_grow_mutations(lgca):
                 # family: lgca.props['family'][label]
                 fam = lgca.props['family'][label]
 
-                mutation = npr.random() < lgca.r_m
+                mutation = npr.random() < lgca.interaction_params['r_m']
                 if mutation:
                     # add new family from the mother's family
                     # this increases lgca.maxfamily +=1 and manages the family tree
@@ -265,9 +273,10 @@ def go_and_grow_mutations(lgca):
                     # record family of new cell = new family
                     lgca.props['family'].append(int(lgca.maxfamily))
 
-                    if lgca.effect == 'driver_mutation':
+                    if lgca.interaction_params['effect'] == 'driver_mutation':
                         # give the new family an rb: rb of mother cell's family * fitness increase
-                        lgca.family_props['r_b'].append(lgca.family_props['r_b'][fam] * lgca.fitness_increase)
+                        lgca.family_props['r_b'].append(lgca.family_props['r_b'][fam] * \
+                                                        lgca.interaction_params['fitness_increase'])
                 else:
                     # record family of new cell = family of mother cell
                     lgca.props['family'].append(fam)

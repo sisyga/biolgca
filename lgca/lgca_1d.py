@@ -38,7 +38,7 @@ class LGCA_1D(LGCA_base):
         self.K = self.velocitychannels + self.restchannels
 
     def init_nodes(self, density, nodes=None, **kwargs):
-        self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.bool)
+        self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=bool)
         if 'hom' in kwargs:
             hom = kwargs['hom']
         else:
@@ -48,7 +48,7 @@ class LGCA_1D(LGCA_base):
         elif nodes is None:
             self.random_reset(density)
         else:
-            self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.bool)
+            self.nodes[self.r_int:-self.r_int, :] = nodes.astype(bool)
             self.apply_boundaries()
 
     def init_coords(self):

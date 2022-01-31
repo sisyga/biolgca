@@ -6,6 +6,7 @@
 from lgca.base import *
 from lgca.lgca_square import LGCA_Square, IBLGCA_Square, NoVE_LGCA_Square
 
+pi2 = 2 * np.pi
 
 class LGCA_Hex(LGCA_Square):
     """
