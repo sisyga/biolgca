@@ -1,6 +1,6 @@
 import sys
 from copy import deepcopy as copy
-
+from itertools import chain
 import matplotlib.colors as mcolors
 import numpy as np
 from matplotlib import pyplot as plt
@@ -101,6 +101,7 @@ class LGCA_base():
     """
     interactions = [
         'This is only a helper class, it cannot simulate! Use one the following classes: \n LGCA_1D, LGCA_SQUARE, LGCA_HEX']
+    rng = npr.default_rng()
 
     def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', **kwargs):
         """
@@ -705,8 +706,8 @@ class IBLGCA_base(LGCA_base):
         return line, errors
 
 class BOSON_IBLGCA_base(IBLGCA_base):
-    temp2 = 2
-    def __init__(self, nodes=None, dims=None, ini_channel_pop=None, nodes_filled=None, bc='periodic', **kwargs):
+    temp2 = 2 # ???
+    def __init__(self, nodes=None, dims=None, bc='periodic', **kwargs):
         #ini_channel_pop is the inital population of a channel. This is useful when the nodes is not given
         """
         Initialize class instance.
@@ -723,9 +724,8 @@ class BOSON_IBLGCA_base(IBLGCA_base):
         self.set_bc(bc)
         
         self.set_dims(dims=dims, nodes=nodes)
-        
         self.init_coords()
-        self.init_nodes(ini_channel_pop=ini_channel_pop, nodes=nodes, nodes_filled=nodes_filled, **kwargs)
+        self.init_nodes(nodes=nodes, **kwargs)
         self.set_interaction(**kwargs)
        
         #self.apply_boundaries()  -> Harish to Simon: is this really needed? If yes why?
@@ -733,17 +733,39 @@ class BOSON_IBLGCA_base(IBLGCA_base):
         self.length_checker = np.vectorize(len)
         self.update_dynamic_fields()
         self.mean_prop_t = {}
-        self.mean_prop_vel_t = {}
+        self.mean_prop_vel_t = {}  # not sure if always needed, but let's keep it for now
         self.mean_prop_rest_t = {}
         self.calc_max_label()
         
         
     def update_dynamic_fields(self):
         self.channel_pop = self.length_checker(self.nodes) #population of a channel
-        self.density = self.channel_pop.sum(-1)  #population of a node
+        self.cell_density = self.channel_pop.sum(-1)  #population of a node
         # next two lines can be omitted if uninterested in densities of other channels
-        self.resting_density = self.channel_pop[:,-1]
-        self.moving_density = self.density - self.resting_density
+        # self.resting_density = self.channel_pop[:, -1]
+        # self.moving_density = self.cell_density - self.resting_density
+
+    def convert_int_to_ib(self, occ):
+        labels = list(range(occ.sum()))
+        tempnodes = np.empty(occ.shape, dtype=object)
+        counter = 0
+        for ind, dens in np.ndenumerate(occ):
+            tempnodes[ind] = labels[counter:counter+dens]
+            counter += dens
+
+        return tempnodes
+
+    def random_reset(self, density):
+        """
+
+        :param density:
+        :return:
+        """
+        density = self.rng.poisson(density, self.dims + (self.K,))
+        tempnodes = self.convert_int_to_ib(density)
+        self.nodes[self.nonborder] = tempnodes
+        self.maxlabel = density.sum()
+        self.update_dynamic_fields()
         
     def set_interaction(self, **kwargs):
         try:
@@ -846,7 +868,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
         else:
             self.interaction = randomwalk
 
-    def timeevo(self, timesteps=100, record=False, recordN=False, recordDensity=False, showprogress=True, recordDensityOther=False):
+    def timeevo(self, timesteps=100, record=False, recordN=False, recordDensity=False, showprogress=True):#, recordDensityOther=False):
         self.update_dynamic_fields()
         if record:#to be implemented
             """
@@ -859,36 +881,32 @@ class BOSON_IBLGCA_base(IBLGCA_base):
             for k in range((timesteps+1)*self.l*self.K):
                 nodes_t[k] = []
             self.nodes_t = nodes_t.reshape(timesteps+1, self.l, self.K)
-            self.nodes_t[0, ...] = self.nodes[self.nonborder]
+            self.nodes_t[0, ...] = copy(self.nodes[self.nonborder])
         if recordN:# to be implemented
             self.n_t = np.zeros(timesteps + 1, dtype=np.int)
             self.n_t[0] = self.cell_density[self.nonborder].sum()
         if recordDensity:
             self.dens_t = np.zeros([(timesteps + 1), self.dims])
-            self.dens_t[0, ...] = self.density[self.nonborder]
-        if recordDensityOther:    # useful for plotting channel wise densities
-            self.resting_density_t = np.zeros([(timesteps + 1), self.dims])
-            self.resting_density_t[0, ...] = self.resting_density[self.nonborder]
-            self.moving_density_t = np.zeros([(timesteps + 1), self.dims])
-            self.moving_density_t[0, ...] = self.moving_density[self.nonborder]
+            self.dens_t[0, ...] = self.cell_density[self.nonborder]
+        # if recordDensityOther:    # useful for plotting channel wise densities
+        #     self.resting_density_t = np.zeros([(timesteps + 1), self.dims])
+        #     self.resting_density_t[0, ...] = self.resting_density[self.nonborder]
+        #     self.moving_density_t = np.zeros([(timesteps + 1), self.dims])
+        #     self.moving_density_t[0, ...] = self.moving_density[self.nonborder]
 
         for t in range(1, timesteps + 1):
             self.timestep()
-            if record: #to be implemented
-                self.nodes_t[t, ...] = self.nodes[self.nonborder]
-            if recordN:# to be implemented
+            if record: #to be implemented, working?
+                self.nodes_t[t, ...] = copy(self.nodes[self.nonborder])
+            if recordN:# to be implemented, working?
                 self.n_t[t] = self.cell_density[self.nonborder].sum()
             if recordDensity:
-                self.dens_t[t, ...] = self.density[self.nonborder]
-            if recordDensityOther:
-                self.resting_density_t[t, ...] = self.resting_density[self.nonborder]
-                self.moving_density_t[t, ...] = self.moving_density[self.nonborder]
+                self.dens_t[t, ...] = self.cell_density[self.nonborder]
             if showprogress:
                 update_progress(1.0 * t / timesteps)
                 
     def calc_max_label(self):
-        # to be implemented
-        self.maxlabel = [len(value)-1 for key, value in self.props.items()][0]
+        self.maxlabel = max(chain.from_iterable(self.nodes.flat))
 
     def calc_prop_mean(self, nodes=None, props=None, propname=None):
         #can this be optimised further?
