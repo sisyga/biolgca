@@ -281,22 +281,45 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         self.restchannels = 1
         self.K = 3
         
-    def init_nodes(self, ini_channel_pop=None, nodes=None, nodes_filled=None, **kwargs):
-        if(nodes_filled): #nodes_filled is number of nodes to fill, ini_channel_pop is number of 
-            oldnodes = np.empty((self.l+2*self.r_int)*self.K, dtype=object)
-            #oldnodes[0:self.K] = [],[],[]
-            #oldnodes[-self.K:] = [],[],[]
-            for k in range((self.l+2*self.r_int)*self.K):
-                oldnodes[k] = []
-            for n in range(nodes_filled):
-                for c in range(self.K):
-                    oldnodes[self.K+n*self.K+c] = [ini_channel_pop*(n*self.K+c+1)+j-ini_channel_pop+1 for j in range(ini_channel_pop)]
-            #for n in range(self.l*self.K 
-            self.nodes = oldnodes.reshape((self.l+2*self.r_int,self.K))
-            print(self.nodes)
-            self.maxlabel = nodes_filled*self.K*ini_channel_pop
-            
-            
+    # def init_nodes(self, ini_channel_pop=None, nodes=None, nodes_filled=None, **kwargs):
+    #     if(nodes_filled): #nodes_filled is number of nodes to fill, ini_channel_pop is number of
+    #         oldnodes = np.empty((self.l+2*self.r_int)*self.K, dtype=object)
+    #         #oldnodes[0:self.K] = [],[],[]
+    #         #oldnodes[-self.K:] = [],[],[]
+    #         for k in range((self.l+2*self.r_int)*self.K):
+    #             oldnodes[k] = []
+    #         for n in range(nodes_filled):
+    #             for c in range(self.K):
+    #                 oldnodes[self.K+n*self.K+c] = [ini_channel_pop*(n*self.K+c+1)+j-ini_channel_pop+1 for j in range(ini_channel_pop)]
+    #         #for n in range(self.l*self.K
+    #         self.nodes = oldnodes.reshape((self.l+2*self.r_int,self.K))
+    #         print(self.nodes)
+    #         self.maxlabel = nodes_filled * self.K * ini_channel_pop
+
+    def init_nodes(self, density, nodes=None):
+        """
+        initialize the nodes. there are three options:
+        1) you provide only the argument "density", which should be a positive float that indicates the average number
+        of cells in each channel
+        2) you provide an array "nodes" with nodes.dtype == int,
+            where each integer determines the number of cells in each channel
+        3) you provide an array "nodes" with nodes.dtype == object, where each element is a list of unique cell labels
+        """
+        temp = np.empty((self.l + 2 * self.r_int, self.K), dtype=object)
+        temp = temp.flatten()
+        temp[:] = [[] for _ in range(len(temp))]
+        self.nodes = temp.reshape((self.l + 2 * self.r_int, self.K))
+        if nodes is None:
+            self.random_reset(density)
+
+        elif nodes.dtype == int:
+            occ = nodes
+            self.nodes[self.nonborder] = self.convert_int_to_ib(occ)
+
+        elif nodes.dtype == object:
+            self.nodes[self.nonborder] = nodes
+
+        self.calc_max_label()
             
     def plot_density(self, density_t=None, cmap='hot_r', channel_type='all', **kwargs):
         if(channel_type == 'all'):
