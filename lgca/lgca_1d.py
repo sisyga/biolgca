@@ -312,15 +312,17 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         if nodes is None:
             self.random_reset(density)
 
-        elif nodes.dtype == int:
-            occ = nodes
-            self.nodes[self.nonborder] = self.convert_int_to_ib(occ)
-
         elif nodes.dtype == object:
             self.nodes[self.nonborder] = nodes
 
+        else:
+            occ = nodes.astype(int)
+            self.nodes[self.nonborder] = self.convert_int_to_ib(occ)
+
         self.calc_max_label()
-            
+
+
+    ## continue here!
     def plot_density(self, density_t=None, cmap='hot_r', channel_type='all', **kwargs):
         if(channel_type == 'all'):
             if density_t is None:
@@ -375,14 +377,13 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         return plot
     
 if __name__ == '__main__':
-    l = 100
-    restchannels = 2
+    l = 10
+    restchannels = 1
     n_channels = restchannels + 2
     nodes = np.zeros((l, n_channels))
     nodes[0] = 1
 
-    system = IBLGCA_1D(bc='reflect', dims=100, interaction='birthdeath', density=0.1, restchannels=2, r_b=0.1, std=0.005,
-                       nodes=nodes)
+    system = BOSON_IBLGCA_1D(bc='reflect', dims=10, interaction='birthdeath', density=0.1, nodes=nodes)
     system.timeevo(timesteps=100, record=True)
     print(system.nodes_t[0].shape)
     print(system.get_prop(system.nodes_t[0]).shape)

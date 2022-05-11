@@ -458,7 +458,7 @@ class IBLGCA_base(LGCA_base):
             from ib_interactions import randomwalk, birth, birthdeath, birthdeath_discrete, go_or_grow
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
-            if interaction is 'birth':
+            if interaction == 'birth':
                 self.interaction = birth
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
@@ -467,7 +467,7 @@ class IBLGCA_base(LGCA_base):
                     print('birth rate set to r_b = ', self.r_b)
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
 
-            elif interaction is 'birthdeath':
+            elif interaction == 'birthdeath':
                 self.interaction = birthdeath
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
@@ -492,7 +492,7 @@ class IBLGCA_base(LGCA_base):
                     self.a_max = 1.
                     print('Max. birth rate set to a_max =', self.a_max)
 
-            elif interaction is 'birthdeath_discrete':
+            elif interaction == 'birthdeath_discrete':
                 self.interaction = birthdeath_discrete
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
@@ -524,7 +524,7 @@ class IBLGCA_base(LGCA_base):
                     self.pmut = 0.1
                     print('Mutation probability set to p_mut =', self.pmut)
 
-            elif interaction is 'go_or_grow':
+            elif interaction == 'go_or_grow':
                 self.interaction = go_or_grow
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']
@@ -561,7 +561,7 @@ class IBLGCA_base(LGCA_base):
                 if self.restchannels < 2:
                     print('WARNING: not enough rest channels - system will die out!!!')
 
-            elif interaction is 'go_and_grow':
+            elif interaction == 'go_and_grow':
                 self.interaction = birth
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
@@ -583,7 +583,7 @@ class IBLGCA_base(LGCA_base):
 
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
 
-            elif interaction is 'random_walk':
+            elif interaction == 'random_walk':
                 self.interaction = random_walk
 
             else:
@@ -706,8 +706,7 @@ class IBLGCA_base(LGCA_base):
         return line, errors
 
 class BOSON_IBLGCA_base(IBLGCA_base):
-    temp2 = 2 # ???
-    def __init__(self, nodes=None, dims=None, bc='periodic', **kwargs):
+    def __init__(self, nodes=None, dims=None, density=.1, bc='periodic', **kwargs):
         #ini_channel_pop is the inital population of a channel. This is useful when the nodes is not given
         """
         Initialize class instance.
@@ -725,7 +724,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
         
         self.set_dims(dims=dims, nodes=nodes)
         self.init_coords()
-        self.init_nodes(nodes=nodes, **kwargs)
+        self.init_nodes(density, nodes=nodes)
         self.set_interaction(**kwargs)
        
         #self.apply_boundaries()  -> Harish to Simon: is this really needed? If yes why?
@@ -774,7 +773,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
             from boson_ib_interactions import randomwalk, birth, birthdeath, go_or_grow
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
-            if interaction is 'birth':
+            if interaction == 'birth':
                 self.interaction = birth
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
@@ -783,7 +782,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
                     print('birth rate set to r_b = ', self.r_b)
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
 
-            elif interaction is 'birthdeath':
+            elif interaction == 'birthdeath':
                 self.interaction = birthdeath
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
@@ -808,7 +807,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
                     self.a_max = 1.
                     print('Max. birth rate set to a_max =', self.a_max)
             
-            elif interaction is 'go_or_grow':
+            elif interaction == 'go_or_grow':
                 self.interaction = go_or_grow
                 if 'capacity' in kwargs:
                     self.capacity = kwargs['capacity']
