@@ -21,7 +21,7 @@ def birth(lgca):
     temp = 1
     
 def birthdeath(lgca):
-    relevant = (lgca.density[lgca.nonborder] > 0)
+    relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
         node = deepcopy(lgca.nodes[coord])
@@ -49,7 +49,7 @@ def birthdeath(lgca):
 
 
 def go_or_grow(lgca):
-    relevant = (lgca.density[lgca.nonborder] > 0)
+    relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
         node = deepcopy(lgca.nodes[coord])
