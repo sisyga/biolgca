@@ -321,25 +321,25 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
 
         self.calc_max_label()
 
-
-    ## continue here!
     def plot_density(self, density_t=None, cmap='hot_r', channel_type='all', **kwargs):
-        if(channel_type == 'all'):
+        if channel_type == 'all':
             if density_t is None:
-                density_t = self.density_t
-        elif(channel_type == 'rest'):
+                density_t = self.dens_t
+        # other channel types are not supported yet
+        elif channel_type == 'rest':
             if density_t is None:
                 density_t = self.resting_density_t
-        elif(channel_type == 'velocity'):
+        elif channel_type == 'velocity':
             if density_t is None:
                 density_t = self.moving_density_t
         tmax = density_t.shape[0]
+        dmax = density_t.max().astype(int)
         fig, ax = self.setup_figure(tmax, **kwargs)
-        cmap = cmap_discretize(cmap, 1+self.capacity)
-        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=self.capacity, cmap=cmap, aspect = 'auto')
+        cmap = cmap_discretize(cmap, 1+dmax)
+        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=dmax, cmap=cmap, aspect='auto')
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size=.3, pad=0.1)
-        cbar = colorbar_index(ncolors=1+self.capacity, cmap=cmap, use_gridspec=True, cax=cax)
+        cbar = colorbar_index(ncolors=1+dmax, cmap=cmap, use_gridspec=True, cax=cax)
         cbar.set_label('Particle number $n$')
         plt.sca(ax)
         return plot
@@ -347,28 +347,24 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
     def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', channeltype='all', **kwargs):
         if nodes_t is None:
             nodes_t = self.nodes_t
-        """
         if props is None:
             props = self.props
-
         if propname is None:
             propname = next(iter(props))
-        """
-        if(self.mean_prop_t=={}):
+
+        if self.mean_prop_t == {}:
             self.calc_prop_mean_spatiotemp()
         #make some changes to the next few lines to remove redundancy    
         tmax, l, _ = nodes_t.shape
         fig, ax = self.setup_figure(tmax, **kwargs)
-        #mean_prop_t = np.zeros([tmax, l])
-        if(channeltype == 'all'):
+        if channeltype == 'all':
             mean_prop_t = self.mean_prop_t[propname]
         #elif(channeltype == 'velocity'):
         #    mean_prop_t = self.mean_prop_vel_t[propname]
         #elif(channeltype == 'rest'):   
         #    mean_prop_t = self.mean_prop_rest_t[propname]
 
-        masked_mean_prop_t = np.ma.masked_where(mean_prop_t==-1000, mean_prop_t)
-        plot = plt.imshow(masked_mean_prop_t, interpolation='none', cmap=cmap, aspect = 'auto')
+        plot = plt.imshow(mean_prop_t, interpolation='none', cmap=cmap, aspect='auto')
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size=0.3, pad=0.1)
         cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
@@ -384,16 +380,16 @@ if __name__ == '__main__':
     nodes[0] = 1
 
     system = BOSON_IBLGCA_1D(bc='reflect', dims=10, interaction='birthdeath', density=0.1, nodes=nodes)
-    system.timeevo(timesteps=100, record=True)
-    print(system.nodes_t[0].shape)
-    print(system.get_prop(system.nodes_t[0]).shape)
+    system.timeevo(timesteps=10, record=True)
+    # system.print_nodes()
+    # print(system.get_prop(system.nodes_t[-1]))
     # system.plot_prop()
     # system.plot_density(figindex=1)
     # props = np.array(system.props['kappa'])[system.nodes[system.nodes > 0]]
     # print(np.mean(props))
-    # system.plot_prop_timecourse()
+    system.plot_prop_timecourse()
     # plt.ylabel('$\kappa$')
-    system.plot_density()
-    #system.plot_prop_spatial()
+    # system.plot_density()
+    # system.plot_prop_spatial()
     # system.plot_prop_timecourse()
     plt.show()

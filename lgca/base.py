@@ -47,6 +47,7 @@ def colorbar_index(ncolors, cmap, use_gridspec=False, cax=None):
     :param use_gridspec: optional, use option for colorbar
     :return: colormap instance
     """
+
     cmap = cmap_discretize(cmap, ncolors)
     mappable = ScalarMappable(cmap=cmap)
     mappable.set_array([])
@@ -70,6 +71,7 @@ def cmap_discretize(cmap, N):
     """
     if type(cmap) == str:
         cmap = plt.get_cmap(cmap)
+
     colors_i = np.concatenate((np.linspace(0, 1., N), (0., 0., 0., 0.)))
     colors_rgba = cmap(colors_i)
     indices = np.linspace(0, 1., N + 1)
@@ -705,6 +707,13 @@ class IBLGCA_base(LGCA_base):
         errors = plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True, interpolate=True)
         return line, errors
 
+def list_array(dims):
+    arr = np.empty(np.prod(dims), dtype=object)
+    for k in range(np.prod(dims)):
+        arr[k] = []
+    arr = arr.reshape(dims)
+    return arr
+
 class BOSON_IBLGCA_base(IBLGCA_base):
     def __init__(self, nodes=None, dims=None, density=.1, bc='periodic', **kwargs):
         #ini_channel_pop is the inital population of a channel. This is useful when the nodes is not given
@@ -780,16 +789,22 @@ class BOSON_IBLGCA_base(IBLGCA_base):
                 else:
                     self.r_b = 0.2
                     print('birth rate set to r_b = ', self.r_b)
-                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+                self.props.update(r_b=[self.r_b] * self.maxlabel)
 
             elif interaction == 'birthdeath':
                 self.interaction = birthdeath
+                if 'capacity' in kwargs:
+                    self.capacity = kwargs['capacity']
+                else:
+                    self.capacity = 8
+                    print('capacity of channel set to ', self.capacity)
+
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
                 else:
                     self.r_b = 0.2
                     print('birth rate set to r_b = ', self.r_b)
-                self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
+                self.props.update(r_b=[self.r_b] * (self.maxlabel + 1))
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']
                 else:
@@ -844,11 +859,11 @@ class BOSON_IBLGCA_base(IBLGCA_base):
                 if 'kappa' in kwargs:
                     kappa = kwargs['kappa']
                     try:
-                        self.kappa = [0.0] + list(kappa)
+                        self.kappa = list(kappa)
                     except TypeError:
-                        self.kappa = [0.0] + [kappa] * self.maxlabel
+                        self.kappa = [kappa] * self.maxlabel
                 else:
-                    self.kappa = [0.0] + [5.] * self.maxlabel
+                    self.kappa = [5.] * self.maxlabel
                     print('switch rate set to kappa = ', self.kappa[0])
                 
                 # self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
@@ -856,18 +871,18 @@ class BOSON_IBLGCA_base(IBLGCA_base):
                 if 'theta' in kwargs:
                     theta = kwargs['theta']
                     try:
-                        self.theta = [0.0] + list(theta)
+                        self.theta = list(theta)
                     except TypeError:
-                        self.theta = [0.0] + [theta] * self.maxlabel
+                        self.theta = [theta] * self.maxlabel
                 else:
-                    self.theta = [0.0]+[0.5] * self.maxlabel
+                    self.theta = [0.5] * self.maxlabel
                     print('switch threshold set to theta = ', self.theta[0])
                 # MK:
                 self.props.update(theta=self.theta)  # * self.maxlabel)
         else:
             self.interaction = randomwalk
 
-    def timeevo(self, timesteps=100, record=False, recordN=False, recordDensity=False, showprogress=True):#, recordDensityOther=False):
+    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):#, recorddensityOther=False):
         self.update_dynamic_fields()
         if record:#to be implemented
             """
@@ -876,18 +891,18 @@ class BOSON_IBLGCA_base(IBLGCA_base):
                 nodes_t[k] = []
             self.nodes_t = nodes_t.reshape(timesteps+1, self.l+2*self.r_int, self.K)
             self.nodes_t[0, ...] = self.nodes"""
-            nodes_t = np.empty((timesteps+1)*(self.l)*self.K, dtype=object)
+            nodes_t = np.empty((timesteps+1) * self.l * self.K, dtype=object)
             for k in range((timesteps+1)*self.l*self.K):
                 nodes_t[k] = []
             self.nodes_t = nodes_t.reshape(timesteps+1, self.l, self.K)
             self.nodes_t[0, ...] = copy(self.nodes[self.nonborder])
         if recordN:# to be implemented
-            self.n_t = np.zeros(timesteps + 1, dtype=np.int)
+            self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
             self.n_t[0] = self.cell_density[self.nonborder].sum()
-        if recordDensity:
-            self.dens_t = np.zeros([(timesteps + 1), self.dims])
+        if recorddens:
+            self.dens_t = np.zeros([(timesteps + 1), *self.dims], dtype=np.uint)
             self.dens_t[0, ...] = self.cell_density[self.nonborder]
-        # if recordDensityOther:    # useful for plotting channel wise densities
+        # if recorddensityOther:    # useful for plotting channel wise densities
         #     self.resting_density_t = np.zeros([(timesteps + 1), self.dims])
         #     self.resting_density_t[0, ...] = self.resting_density[self.nonborder]
         #     self.moving_density_t = np.zeros([(timesteps + 1), self.dims])
@@ -899,7 +914,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
                 self.nodes_t[t, ...] = copy(self.nodes[self.nonborder])
             if recordN:# to be implemented, working?
                 self.n_t[t] = self.cell_density[self.nonborder].sum()
-            if recordDensity:
+            if recorddens:
                 self.dens_t[t, ...] = self.cell_density[self.nonborder]
             if showprogress:
                 update_progress(1.0 * t / timesteps)
@@ -907,16 +922,27 @@ class BOSON_IBLGCA_base(IBLGCA_base):
     def calc_max_label(self):
         self.maxlabel = max(chain.from_iterable(self.nodes.flat))
 
+    def get_prop(self, nodes=None, props=None, propname=None):
+        if nodes is None:
+            nodes = self.nodes[self.nonborder]
+
+        if props is None:
+            props = self.props
+
+        if propname is None:
+            propname = next(iter(self.props))
+
+        prop = np.array(props[propname])
+        proparray = prop[nodes.sum()]
+        return proparray
+
     def calc_prop_mean(self, nodes=None, props=None, propname=None):
-        #can this be optimised further?
-        mean_prop = np.ones(self.l)* (-1000) #had some problems with np.nan so I am using -1000
-        counter = 0
-        for node in nodes:
-            cells = sum(node, [])
-            if cells != []:
-                nodeprops = np.array(itemgetter(*cells)(props[propname]))
-                mean_prop[counter] = nodeprops.mean()
-            counter += 1
+        mean_prop = np.ma.masked_all(*self.dims)
+        for ind, cells in np.ndenumerate(nodes.sum(-1)):
+            if cells:
+                nodeprops = np.array(props[propname])[cells]
+                mean_prop[ind] = nodeprops.mean()
+                mean_prop.mask[ind] = 0
         return mean_prop
     
     def calc_prop_mean_spatiotemp(self, nodes_t=None, props=None):
@@ -926,7 +952,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
             props = self.props
         tmax, l, _ = nodes_t.shape
         for key in self.props:
-            self.mean_prop_t[key] = np.zeros([tmax,l])
+            self.mean_prop_t[key] = np.ma.masked_all((tmax, *self.dims))
             #self.mean_prop_vel_t[key] = np.zeros([tmax,l])
             #self.mean_prop_rest_t[key] = np.zeros([tmax,l])
             for t in range(tmax):
@@ -952,16 +978,11 @@ class BOSON_IBLGCA_base(IBLGCA_base):
         if nodes_t is None:
             nodes_t = self.nodes_t
 
-        prop = self.get_prop(nodes=nodes_t, props=props, propname=propname)
-        occupied = nodes_t.astype(bool)
-        mask = 1 - occupied
-        prop = np.ma.array(prop, mask=mask)
-        tocollapse = tuple(range(1, prop.ndim))
-        mean_prop_t = np.mean(prop, axis=tocollapse)
-        std_mean_prop_t = np.std(prop, axis=tocollapse, ddof=1) / np.sqrt(np.sum(occupied, axis=tocollapse))
+        prop_t = [self.get_prop(nodes, props=props, propname=propname) for nodes in nodes_t]
+        mean_prop_t = np.array([np.mean(prop) if len(prop) > 0 else np.nan for prop in prop_t])
+        std_mean_prop_t = np.array([np.std(prop, ddof=1) / np.sqrt(len(prop)) if len(prop) > 0 else np.nan for prop in prop_t])
         plt.figure(num=figindex, figsize=figsize)
         tmax = nodes_t.shape[0]
-
         yerr = std_mean_prop_t
         x = np.arange(tmax)
         y = mean_prop_t
