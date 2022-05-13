@@ -7,37 +7,10 @@ from matplotlib import pyplot as plt
 from matplotlib.cm import ScalarMappable
 from numpy import random as npr
 from sympy.utilities.iterables import multiset_permutations
-from operator import itemgetter
+from tqdm import tqdm
 
 pi2 = 2 * np.pi
 plt.style.use('default')
-
-
-def update_progress(progress):
-    """
-    Simple progress bar update.
-    :param progress: float. Fraction of the work done, to update bar.
-    :return:
-    """
-    barLength = 20  # Modify this to change the length of the progress bar
-    status = ""
-    if isinstance(progress, int):
-        progress = float(progress)
-    if not isinstance(progress, float):
-        progress = 0
-        status = "error: progress var must be float\r\n"
-    if progress < 0:
-        progress = 0
-        status = "Halt...\r\n"
-    if progress >= 1:
-        progress = 1
-        status = "Done...\r\n"
-    block = int(round(barLength * progress))
-    text = "\rProgress: [{0}] {1}% {2}".format("#" * block + "-" * (barLength - block), round(progress * 100, 1),
-                                               status)
-    sys.stdout.write(text)
-    sys.stdout.flush()
-
 
 def colorbar_index(ncolors, cmap, use_gridspec=False, cax=None):
     """Return a discrete colormap with n colors from the continuous colormap cmap and add correct tick labels
@@ -406,7 +379,7 @@ class LGCA_base():
         if recorddens:
             self.dens_t = np.zeros((timesteps + 1,) + self.dims)
             self.dens_t[0, ...] = self.cell_density[self.nonborder]
-        for t in range(1, timesteps + 1):
+        for t in tqdm(iterable=range(1, timesteps + 1), disable=1-showprogress):
             self.timestep()
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.nonborder]
@@ -414,8 +387,6 @@ class LGCA_base():
                 self.n_t[t] = self.cell_density[self.nonborder].sum()
             if recorddens:
                 self.dens_t[t, ...] = self.cell_density[self.nonborder]
-            if showprogress:
-                update_progress(1.0 * t / timesteps)
 
     def calc_permutations(self):
         self.permutations = [np.array(list(multiset_permutations([1] * n + [0] * (self.K - n))), dtype=np.int8)
@@ -632,7 +603,7 @@ class IBLGCA_base(LGCA_base):
         if recorddens:
             self.dens_t = np.zeros((timesteps + 1,) + self.dims)
             self.dens_t[0, ...] = self.cell_density[self.nonborder]
-        for t in range(1, timesteps + 1):
+        for t in tqdm(iterable=range(1, timesteps + 1), disable=1-showprogress):
             self.timestep()
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.nonborder]
@@ -641,8 +612,6 @@ class IBLGCA_base(LGCA_base):
                 self.n_t[t] = self.cell_density[self.nonborder].sum()
             if recorddens:
                 self.dens_t[t, ...] = self.cell_density[self.nonborder]
-            if showprogress:
-                update_progress(1.0 * t / timesteps)
 
     def calc_flux(self, nodes):
         if nodes.dtype != 'bool':
@@ -729,6 +698,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
         """
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
         self.props = {}
+        self.length_checker = np.vectorize(len)
         self.set_bc(bc)
         
         self.set_dims(dims=dims, nodes=nodes)
@@ -738,7 +708,6 @@ class BOSON_IBLGCA_base(IBLGCA_base):
        
         #self.apply_boundaries()  -> Harish to Simon: is this really needed? If yes why?
         #vectorising len function
-        self.length_checker = np.vectorize(len)
         self.update_dynamic_fields()
         self.mean_prop_t = {}
         self.mean_prop_vel_t = {}  # not sure if always needed, but let's keep it for now
@@ -908,7 +877,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
         #     self.moving_density_t = np.zeros([(timesteps + 1), self.dims])
         #     self.moving_density_t[0, ...] = self.moving_density[self.nonborder]
 
-        for t in range(1, timesteps + 1):
+        for t in tqdm(iterable=range(1, timesteps + 1), disable=1-showprogress):
             self.timestep()
             if record: #to be implemented, working?
                 self.nodes_t[t, ...] = copy(self.nodes[self.nonborder])
@@ -916,8 +885,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
                 self.n_t[t] = self.cell_density[self.nonborder].sum()
             if recorddens:
                 self.dens_t[t, ...] = self.cell_density[self.nonborder]
-            if showprogress:
-                update_progress(1.0 * t / timesteps)
+
                 
     def calc_max_label(self):
         self.maxlabel = max(chain.from_iterable(self.nodes.flat))
@@ -977,6 +945,12 @@ class BOSON_IBLGCA_base(IBLGCA_base):
 
         if nodes_t is None:
             nodes_t = self.nodes_t
+
+        if props is None:
+            props = self.props
+
+        if propname is None:
+            propname = next(iter(self.props))
 
         prop_t = [self.get_prop(nodes, props=props, propname=propname) for nodes in nodes_t]
         mean_prop_t = np.array([np.mean(prop) if len(prop) > 0 else np.nan for prop in prop_t])

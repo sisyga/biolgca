@@ -277,7 +277,7 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         else:
             self.l = dims[0]
            
-        self.dims = self.l
+        self.dims = self.l,
         self.restchannels = 1
         self.K = 3
         
@@ -336,7 +336,7 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         dmax = density_t.max().astype(int)
         fig, ax = self.setup_figure(tmax, **kwargs)
         cmap = cmap_discretize(cmap, 1+dmax)
-        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=dmax, cmap=cmap, aspect='auto')
+        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=dmax, cmap=cmap, aspect='equal')
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size=.3, pad=0.1)
         cbar = colorbar_index(ncolors=1+dmax, cmap=cmap, use_gridspec=True, cax=cax)
@@ -364,7 +364,7 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         #elif(channeltype == 'rest'):   
         #    mean_prop_t = self.mean_prop_rest_t[propname]
 
-        plot = plt.imshow(mean_prop_t, interpolation='none', cmap=cmap, aspect='auto')
+        plot = plt.imshow(mean_prop_t, interpolation='none', cmap=cmap, aspect='equal')
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size=0.3, pad=0.1)
         cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
@@ -373,23 +373,23 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         return plot
     
 if __name__ == '__main__':
-    l = 10
+    l = 100
     restchannels = 1
     n_channels = restchannels + 2
     nodes = np.zeros((l, n_channels))
     nodes[0] = 1
 
-    system = BOSON_IBLGCA_1D(bc='reflect', dims=10, interaction='birthdeath', density=0.1, nodes=nodes)
-    system.timeevo(timesteps=10, record=True)
+    system = BOSON_IBLGCA_1D(bc='reflect', dims=100, interaction='birthdeath', density=0.1)
+    system.timeevo(timesteps=100, record=True, showprogress=1)
     # system.print_nodes()
     # print(system.get_prop(system.nodes_t[-1]))
     # system.plot_prop()
     # system.plot_density(figindex=1)
     # props = np.array(system.props['kappa'])[system.nodes[system.nodes > 0]]
     # print(np.mean(props))
-    system.plot_prop_timecourse()
+    # system.plot_prop_timecourse()
     # plt.ylabel('$\kappa$')
     # system.plot_density()
-    # system.plot_prop_spatial()
+    system.plot_prop_spatial()
     # system.plot_prop_timecourse()
     plt.show()

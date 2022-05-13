@@ -15,54 +15,78 @@ def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
     return truncnorm(a, b, loc=mu, scale=sigma).rvs(size)
 
 def randomwalk(lgca):
-    temp = 1
+    relevant = (lgca.cell_density[lgca.nonborder] > 0)
+    coords = [a[relevant] for a in lgca.nonborder]
+    for coord in zip(*coords):
+        node = deepcopy(lgca.nodes[coord])
+        cells = node.sum()
+
+        channeldist = npr.multinomial(len(cells), [1./lgca.K] * lgca.K).cumsum()
+        shuffle(cells)
+        newnode = [cells[:channeldist[0]]] + [cells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
+
+        lgca.nodes[coord] = deepcopy(newnode)
     
 def birth(lgca):
-    temp = 1
+    relevant = (lgca.cell_density[lgca.nonborder] > 0)
+    coords = [a[relevant] for a in lgca.nonborder]
+    for coord in zip(*coords):
+        node = deepcopy(lgca.nodes[coord])
+        density = lgca.cell_density[coord]
+        rho = density / lgca.capacity
+        cells = node.sum()
+
+        for cell in cells:
+            r_b = lgca.props['r_b'][cell]
+            if random() < r_b * (1 - rho):
+                lgca.maxlabel += 1
+                cells.append(lgca.maxlabel)
+                lgca.props['r_b'].append(float(trunc_gauss(0, lgca.a_max, r_b, sigma=lgca.std)))
+
+        channeldist = npr.multinomial(len(cells), [1./lgca.K] * lgca.K).cumsum()
+        shuffle(cells)
+        newnode = [cells[:channeldist[0]]] + [cells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
+
+        lgca.nodes[coord] = deepcopy(newnode)
     
 def birthdeath(lgca):
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
         node = deepcopy(lgca.nodes[coord])
-        density = sum(map(len, node))
+        density = lgca.cell_density[coord]
         rho = density / lgca.capacity
-        cells = [cell for channel in node for cell in channel]
+        cells = node.sum()
 
-        for channel in node:
-            for cell in channel:
-                if random() < lgca.r_d:
-                    cells.remove(cell)
+        for cell in cells:
+            if random() < lgca.r_d:
+                cells.remove(cell)
 
-                r_b = lgca.props['r_b'][cell]
-                if random() < r_b * (1 - rho):
-                    cells.append(len(lgca.props['r_b']))
-                    lgca.props['r_b'].append(float(trunc_gauss(0, lgca.a_max, r_b, sigma=lgca.std)))
+            r_b = lgca.props['r_b'][cell]
+            if random() < r_b * (1 - rho):
+                lgca.maxlabel += 1
+                cells.append(lgca.maxlabel)
+                lgca.props['r_b'].append(float(trunc_gauss(0, lgca.a_max, r_b, sigma=lgca.std)))
 
         channeldist = npr.multinomial(len(cells), [1./lgca.K] * lgca.K).cumsum()
         shuffle(cells)
-        newnode = [cells[:channeldist[0]]] + [cells[i:j] for i,j in zip(channeldist[:-1], channeldist[1:])]
-        # for cell in cells:
-        #     newnode[npr.randint(lgca.K)].append(cell)
+        newnode = [cells[:channeldist[0]]] + [cells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
 
         lgca.nodes[coord] = deepcopy(newnode)
 
-
+# continue here!
 def go_or_grow(lgca):
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
         node = deepcopy(lgca.nodes[coord])
-        density = 0
-        for channel in node:
-            for cell in channel:
-                if npr.random() <= lgca.r_d:
-                    channel.remove(cell)
+        density = lgca.cell_density[coord]
+        rho = density / lgca.capacity
+        cells = node.sum()
+        for cell in cells:
+            if random() < lgca.r_d:
+                channel.remove(cell)
 
-            density += len(channel)
-        rho = density/lgca.capacity
-
-        #lgca.maxlabel=len(lgca.props["kappa"])       
         velcells = []
         restcells = []
         ch_counter = 0
