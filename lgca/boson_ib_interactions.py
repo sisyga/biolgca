@@ -74,7 +74,6 @@ def birthdeath(lgca):
 
         lgca.nodes[coord] = deepcopy(newnode)
 
-# continue here!
 def go_or_grow(lgca):
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
@@ -82,13 +81,26 @@ def go_or_grow(lgca):
         node = deepcopy(lgca.nodes[coord])
         density = lgca.cell_density[coord]
         rho = density / lgca.capacity
-        cells = node.sum()
-        for cell in cells:
-            if random() < lgca.r_d:
-                channel.remove(cell)
-
+        cells = np.array(node.sum())
+        # R1: cell death
+        cells = cells[npr.random(density) < lgca.r_d]
+        if cells.size == 0:
+            lgca.nodes[coord] = [[] for _ in range(lgca.K)]
+            continue
+        # R2: switch (using old density, as switching happens faster than death)
         velcells = []
         restcells = []
+        for cell in cells:
+            if random() < tanh_switch(rho=rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell]):
+                restcells.append(cell)
+            else:
+                velcells.append(cell)
+
+        # R3: birth
+        rho = len(cells) / lgca.capacity  # update density after deaths for birth
+        for cell in restcells:
+            if random() < lgca.r_b * (1 - rho):
+                #  continue here
         ch_counter = 0
         for channel in node:
             for cell in channel:
