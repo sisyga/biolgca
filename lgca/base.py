@@ -991,7 +991,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
         ids = [id for id in nodes.sum()]
         propvals1, propvals2 = [props[propname1][id] for id in ids], [props[propname2][id] for id in ids]
         # plt.figure(num=figindex, figsize=figsize)
-        sns.jointplot(x=propvals1, y=propvals2, marginal_ticks=True, kind='hist')
+        sns.jointplot(x=propvals1, y=propvals2, marginal_ticks=True, kind='hist', **kwargs)
         plt.xlabel('{}'.format(propname1))
         plt.ylabel('{}'.format(propname2))
             

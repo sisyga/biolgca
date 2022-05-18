@@ -353,22 +353,21 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         return plot
     
 if __name__ == '__main__':
-    l = 200
+    l = 100
     restchannels = 1
     n_channels = restchannels + 2
     nodes = np.zeros((l, n_channels))
-    nodes[...] = 2
+    nodes[...] = 3
 
     system = BOSON_IBLGCA_1D(bc='rbc', dims=l, interaction='go_or_grow', density=1.5, restchannels=1, theta=.25, kappa=0,
-                             r_d=0.05, r_b=0.25, theta_std=1e-6, nodes=nodes)
+                             r_d=0.05, r_b=0.25, theta_std=1e-6, nodes=nodes, capacity=9)
     print(system.cell_density[system.nonborder].sum(), system.maxlabel, max(system.nodes.sum()), len(system.props['theta']), len(system.props['kappa']))
-    system.timeevo(timesteps=100, record=True, showprogress=1)
+    system.timeevo(timesteps=10000, record=True, showprogress=1)
     # system.timestep()
     print(system.cell_density[system.nonborder].sum(), system.maxlabel, max(system.nodes.sum()), len(system.props['theta']), len(system.props['kappa']))
     # system.plot_density(figindex=0)
     # system.plot_prop_spatial(figindex=1)
     system.plot_prop_timecourse(figindex=2)
-    system.plot_prop_2dhist(figindex=3, extent=(min(system.get_prop(propname='kappa')), max(system.get_prop(propname='kappa')), 0, 1),
-                            gridsize=round(system.cell_density[system.nonborder].sum() ** 0.5))
-    print(system.get_prop(propname='kappa'), system.get_prop(propname='theta'))
+    system.plot_prop_2dhist(figindex=3, cmap='viridis')
+    # print(system.get_prop(propname='kappa'), system.get_prop(propname='theta'))
     plt.show()
