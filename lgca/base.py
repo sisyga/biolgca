@@ -1,4 +1,3 @@
-import sys
 from copy import deepcopy as copy
 from itertools import chain
 import matplotlib.colors as mcolors
@@ -518,18 +517,16 @@ class IBLGCA_base(LGCA_base):
                 else:
                     self.kappa = [5.] * self.maxlabel
                     print('switch rate set to kappa = ', self.kappa[0])
-                # self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
                 self.props.update(kappa=[0.] + self.kappa)
                 if 'theta' in kwargs:
                     theta = kwargs['theta']
-                    try:
-                        self.theta = list(theta)
-                    except TypeError:
+                    if not hasattr(theta, '__iter__'):
                         self.theta = [theta] * self.maxlabel
+                    else:
+                        self.theta = list(theta)
                 else:
                     self.theta = [0.75] * self.maxlabel
                     print('switch threshold set to theta = ', self.theta[0])
-                # MK:
                 self.props.update(theta=[0.] + self.theta)  # * self.maxlabel)
                 if self.restchannels < 2:
                     print('WARNING: not enough rest channels - system will die out!!!')
@@ -557,14 +554,14 @@ class IBLGCA_base(LGCA_base):
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
 
             elif interaction == 'random_walk':
-                self.interaction = random_walk
+                self.interaction = randomwalk
 
             else:
                 print('keyword', interaction, 'is not defined! Random walk used instead.')
-                self.interaction = random_walk
+                self.interaction = randomwalk
 
         else:
-            self.interaction = random_walk
+            self.interaction = randomwalk
 
     def update_dynamic_fields(self):
         """Update "fields" that store important variables to compute other dynamic steps
@@ -684,7 +681,7 @@ def list_array(dims):
     return arr
 
 class BOSON_IBLGCA_base(IBLGCA_base):
-    def __init__(self, nodes=None, dims=None, density=.1, bc='periodic', **kwargs):
+    def __init__(self, nodes=None, dims=None, density=.1, restchannels=0, bc='periodic', **kwargs):
         #ini_channel_pop is the inital population of a channel. This is useful when the nodes is not given
         """
         Initialize class instance.
@@ -701,7 +698,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
         self.length_checker = np.vectorize(len)
         self.set_bc(bc)
         
-        self.set_dims(dims=dims, nodes=nodes)
+        self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
         self.init_coords()
         self.init_nodes(density, nodes=nodes)
         self.set_interaction(**kwargs)
@@ -774,6 +771,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
                     self.r_b = 0.2
                     print('birth rate set to r_b = ', self.r_b)
                 self.props.update(r_b=[self.r_b] * (self.maxlabel + 1))
+
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']
                 else:
@@ -798,56 +796,52 @@ class BOSON_IBLGCA_base(IBLGCA_base):
                 else:
                     self.capacity = 8
                     print('capacity of channel set to ', self.capacity)
-                    
+
                 if 'kappa_std' in kwargs:
                     self.kappa_std = kwargs['kappa_std']
                 else:
                     self.kappa_std = 0.2
-                    print('capacity of channel set to ', self.kappa_std)
+                    print('std of kappa set to', self.kappa_std)
                     
                 if 'theta_std' in kwargs:
                     self.theta_std = kwargs['theta_std']
                 else:
                     self.theta_std = 0.05
-                    print('capacity of channel set to ', self.theta_std)
-                    
+                    print('std of theta set to', self.theta_std)
+
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']
-                    print('death rate set to r_d = ', self.r_d)
                 else:
                     self.r_d = 0.01
                     print('death rate set to r_d = ', self.r_d)
                     
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
-                    print('birth rate set to r_b = ', self.r_b)
                 else:
                     self.r_b = 0.2
                     print('birth rate set to r_b = ', self.r_b)
                     
                 if 'kappa' in kwargs:
                     kappa = kwargs['kappa']
-                    try:
+                    if hasattr(kappa, '__iter__'):
                         self.kappa = list(kappa)
-                    except TypeError:
-                        self.kappa = [kappa] * self.maxlabel
+                    else:
+                        self.kappa = [kappa] * (self.maxlabel + 1)
                 else:
-                    self.kappa = [5.] * self.maxlabel
+                    self.kappa = [5.] * (self.maxlabel + 1)
                     print('switch rate set to kappa = ', self.kappa[0])
                 
-                # self.props.update(kappa=[0.] + [self.kappa] * self.maxlabel)
                 self.props.update(kappa=self.kappa)
                 if 'theta' in kwargs:
                     theta = kwargs['theta']
-                    try:
+                    if hasattr(theta, '__iter__'):
                         self.theta = list(theta)
-                    except TypeError:
-                        self.theta = [theta] * self.maxlabel
+                    else:
+                        self.theta = [theta] * (self.maxlabel + 1)
                 else:
-                    self.theta = [0.5] * self.maxlabel
+                    self.theta = [0.5] * (self.maxlabel + 1)
                     print('switch threshold set to theta = ', self.theta[0])
-                # MK:
-                self.props.update(theta=self.theta)  # * self.maxlabel)
+                self.props.update(theta=self.theta)
         else:
             self.interaction = randomwalk
 
@@ -905,10 +899,12 @@ class BOSON_IBLGCA_base(IBLGCA_base):
         return proparray
 
     def calc_prop_mean(self, nodes=None, props=None, propname=None):
-        mean_prop = np.ma.masked_all(*self.dims)
-        for ind, cells in np.ndenumerate(nodes.sum(-1)):
-            if cells:
-                nodeprops = np.array(props[propname])[cells]
+        cells = nodes.sum(-1)
+        mean_prop = np.ma.masked_all(cells.shape)
+        proparray = np.array(props[propname])
+        for ind, loccells in np.ndenumerate(cells):
+            if loccells:
+                nodeprops = proparray[loccells]
                 mean_prop[ind] = nodeprops.mean()
                 mean_prop.mask[ind] = 0
         return mean_prop
@@ -923,8 +919,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
             self.mean_prop_t[key] = np.ma.masked_all((tmax, *self.dims))
             #self.mean_prop_vel_t[key] = np.zeros([tmax,l])
             #self.mean_prop_rest_t[key] = np.zeros([tmax,l])
-            for t in range(tmax):
-                self.mean_prop_t[key][t] = self.calc_prop_mean(propname=key, props=props, nodes=nodes_t[t])
+            self.mean_prop_t[key] = self.calc_prop_mean(propname=key, props=props, nodes=nodes_t)
                 #self.mean_prop_vel_t[key][t] = self.calc_prop_mean(propname=key, props=props, nodes=nodes_t[t][...,0:(self.K-1)])
                 #self.mean_prop_rest_t[key][t] = self.calc_prop_mean(propname=key, props=props, nodes=nodes_t[t][...,(self.K-1):])
 
@@ -968,4 +963,35 @@ class BOSON_IBLGCA_base(IBLGCA_base):
         errors = plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True, interpolate=True)
         return line, errors
 
+    def plot_prop_hist(self, nodes=None, props=None, propname=None, figindex=None, figsize=None, **kwargs):
+        if nodes is None:
+            nodes = self.nodes
+        if props is None:
+            props = self.props
+        if propname is None:
+            propname = next(iter(props))
+
+        propvals = [props[propname][id] for id in nodes.sum()]
+        plt.figure(num=figindex, figsize=figsize)
+        plt.hist(propvals, **kwargs)
+        plt.xlabel('{}'.format(propname))
+        plt.ylabel('Count')
+
+    def plot_prop_2dhist(self, nodes=None, props=None, propnames=None, figindex=None, figsize=None, **kwargs):
+        import seaborn as sns
+        if nodes is None:
+            nodes = self.nodes
+        if props is None:
+            props = self.props
+        if propnames is None:
+            names = iter(props)
+            propname1 = next(names)
+            propname2 = next(names)
+
+        ids = [id for id in nodes.sum()]
+        propvals1, propvals2 = [props[propname1][id] for id in ids], [props[propname2][id] for id in ids]
+        # plt.figure(num=figindex, figsize=figsize)
+        sns.jointplot(x=propvals1, y=propvals2, marginal_ticks=True, kind='hist')
+        plt.xlabel('{}'.format(propname1))
+        plt.ylabel('{}'.format(propname2))
             

@@ -3,6 +3,9 @@ def get_lgca(geometry='hex', ib=False, ve=False, **kwargs):
         if geometry in ['1d', 'lin', 'linear']:
             from .lgca_1d import BOSON_IBLGCA_1D
             return BOSON_IBLGCA_1D(**kwargs)
+        else:
+            print('Other geometries are not implemented yet!')
+            return
         
     elif ib:
         if geometry in ['1d', 'lin', 'linear']:

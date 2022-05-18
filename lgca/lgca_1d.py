@@ -239,32 +239,27 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         self.nodes = deepcopy(newnodes)
 
     def apply_pbc(self):
-        #to be implemented
         self.nodes[:self.r_int, :] = self.nodes[-2 * self.r_int:-self.r_int, :]
         self.nodes[-self.r_int:, :] = self.nodes[self.r_int:2 * self.r_int, :]
-
-    def apply_rbc_wrong(self): # i think this was incorrect
-        self.nodes[self.r_int-1, 1] = self.nodes[self.r_int-1, 1] + self.nodes[self.r_int-1, 0]
-        self.nodes[-self.r_int, 0] = self.nodes[-self.r_int, 0] + self.nodes[-self.r_int, 1]
-        self.nodes[self.r_int-1, 0] = []
-        self.nodes[-self.r_int, 1] = []
 
     def apply_rbc(self):
         self.nodes[self.r_int, 0] = self.nodes[self.r_int, 0] + self.nodes[self.r_int - 1, 1]
         self.nodes[-self.r_int - 1, 1] = self.nodes[-self.r_int - 1, 1] + self.nodes[-self.r_int, 0]
         self.nodes[self.r_int - 1, 1] = []
         self.nodes[-self.r_int, 0] = []
-        
 
     def apply_abc(self):
-        # to be checked
-        self.nodes[:self.r_int, :] = []
-        self.nodes[-self.r_int:, :] = []
+        for channel in self.nodes[:self.r_int].flat:
+            channel.clear()
+
+        for channel in self.nodes[-self.r_int:].flat:
+            channel.clear()
+
     
-    def set_dims(self, dims=None, nodes=None):
+    def set_dims(self, dims=None, nodes=None, restchannels=0):
         if nodes is not None:
             self.l, self.K = nodes.shape
-            self.restchannels = 1
+            self.restchannels = self.K - self.velocitychannels
             self.dims = self.l,
             return
 
@@ -278,23 +273,8 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
             self.l = dims[0]
            
         self.dims = self.l,
-        self.restchannels = 1
-        self.K = 3
-        
-    # def init_nodes(self, ini_channel_pop=None, nodes=None, nodes_filled=None, **kwargs):
-    #     if(nodes_filled): #nodes_filled is number of nodes to fill, ini_channel_pop is number of
-    #         oldnodes = np.empty((self.l+2*self.r_int)*self.K, dtype=object)
-    #         #oldnodes[0:self.K] = [],[],[]
-    #         #oldnodes[-self.K:] = [],[],[]
-    #         for k in range((self.l+2*self.r_int)*self.K):
-    #             oldnodes[k] = []
-    #         for n in range(nodes_filled):
-    #             for c in range(self.K):
-    #                 oldnodes[self.K+n*self.K+c] = [ini_channel_pop*(n*self.K+c+1)+j-ini_channel_pop+1 for j in range(ini_channel_pop)]
-    #         #for n in range(self.l*self.K
-    #         self.nodes = oldnodes.reshape((self.l+2*self.r_int,self.K))
-    #         print(self.nodes)
-    #         self.maxlabel = nodes_filled * self.K * ini_channel_pop
+        self.restchannels = restchannels
+        self.K = self.velocitychannels + restchannels
 
     def init_nodes(self, density, nodes=None):
         """
@@ -354,7 +334,7 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
 
         if self.mean_prop_t == {}:
             self.calc_prop_mean_spatiotemp()
-        #make some changes to the next few lines to remove redundancy    
+
         tmax, l, _ = nodes_t.shape
         fig, ax = self.setup_figure(tmax, **kwargs)
         if channeltype == 'all':
@@ -373,23 +353,22 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         return plot
     
 if __name__ == '__main__':
-    l = 100
+    l = 200
     restchannels = 1
     n_channels = restchannels + 2
     nodes = np.zeros((l, n_channels))
-    nodes[0] = 1
+    nodes[...] = 2
 
-    system = BOSON_IBLGCA_1D(bc='reflect', dims=100, interaction='birthdeath', density=0.1)
+    system = BOSON_IBLGCA_1D(bc='rbc', dims=l, interaction='go_or_grow', density=1.5, restchannels=1, theta=.25, kappa=0,
+                             r_d=0.05, r_b=0.25, theta_std=1e-6, nodes=nodes)
+    print(system.cell_density[system.nonborder].sum(), system.maxlabel, max(system.nodes.sum()), len(system.props['theta']), len(system.props['kappa']))
     system.timeevo(timesteps=100, record=True, showprogress=1)
-    # system.print_nodes()
-    # print(system.get_prop(system.nodes_t[-1]))
-    # system.plot_prop()
-    # system.plot_density(figindex=1)
-    # props = np.array(system.props['kappa'])[system.nodes[system.nodes > 0]]
-    # print(np.mean(props))
-    # system.plot_prop_timecourse()
-    # plt.ylabel('$\kappa$')
-    # system.plot_density()
-    system.plot_prop_spatial()
-    # system.plot_prop_timecourse()
+    # system.timestep()
+    print(system.cell_density[system.nonborder].sum(), system.maxlabel, max(system.nodes.sum()), len(system.props['theta']), len(system.props['kappa']))
+    # system.plot_density(figindex=0)
+    # system.plot_prop_spatial(figindex=1)
+    system.plot_prop_timecourse(figindex=2)
+    system.plot_prop_2dhist(figindex=3, extent=(min(system.get_prop(propname='kappa')), max(system.get_prop(propname='kappa')), 0, 1),
+                            gridsize=round(system.cell_density[system.nonborder].sum() ** 0.5))
+    print(system.get_prop(propname='kappa'), system.get_prop(propname='theta'))
     plt.show()
