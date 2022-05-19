@@ -505,7 +505,7 @@ class LGCA_Square(LGCA_base):
             K = vmax
 
         fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
-        cmap = plt.cm.get_cmap(cmap)
+        cmap = plt.cm.get_cmap(cmap).copy()
         cmap.set_under(alpha=0.0)
         if K > 1:
             cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
@@ -676,24 +676,83 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
         fig, pc, cmap = self.plot_scalarfield(meanprop, mask=mask, **kwargs)
         return fig, pc, cmap
 
+class BOSON_IBLGCA_Square(BOSON_IBLGCA_base, IBLGCA_Square):
+    """Identity-based lgca without volume exclusion on the square lattice.
+    """
+    def init_nodes(self, density=0.1, nodes=None):
+        self.nodes = get_arr_of_empty_lists((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K))
+        if nodes is None:
+            self.random_reset(density)
+
+        elif nodes.dtype == object:
+            self.nodes[self.nonborder] = nodes.astype(np.uint)
+
+        else:
+            occ = nodes.astype(int)
+            self.nodes[self.nonborder] = self.convert_int_to_ib(occ)
+
+        self.calc_max_label()
+
+    def propagation(self):
+        """
+
+        :return:
+        """
+        newnodes = get_arr_of_empty_lists(self.nodes.shape)
+        # resting particles stay
+        newnodes[..., 4:] = self.nodes[..., 4:]
+
+        # prop. to the right
+        newnodes[1:, :, 0] = self.nodes[:-1, :, 0]
+
+        # prop. to the left
+        newnodes[:-1, :, 2] = self.nodes[1:, :, 2]
+
+        # prop. upwards
+        newnodes[:, 1:, 1] = self.nodes[:, :-1, 1]
+
+        # prop. downwards
+        newnodes[:, :-1, 3] = self.nodes[:, 1:, 3]
+
+        self.nodes = newnodes
+
+    def apply_rbcx(self):
+        self.nodes[self.r_int, :, 0] = self.nodes[self.r_int, :, 0] + self.nodes[self.r_int - 1, :, 2]
+        self.nodes[-self.r_int - 1, :, 2] = self.nodes[-self.r_int - 1, :, 2] + self.nodes[-self.r_int, :, 0]
+        self.apply_abcx()
+
+    def apply_rbcy(self):
+        self.nodes[:, self.r_int, 1] = self.nodes[:, self.r_int, 1] + self.nodes[:, self.r_int - 1, 3]
+        self.nodes[:, -self.r_int - 1, 3] = self.nodes[:, -self.r_int - 1, 3] + self.nodes[:, -self.r_int, 1]
+        self.apply_abcy()
+
+    def apply_abcx(self):
+        self.nodes[:self.r_int, ...] = get_arr_of_empty_lists(self.nodes[:self.r_int, ...].shape)
+        self.nodes[-self.r_int:, ...] = get_arr_of_empty_lists(self.nodes[-self.r_int:, ...].shape)
+
+    def apply_abcy(self):
+        self.nodes[:, :self.r_int, :] = get_arr_of_empty_lists(self.nodes[:, :self.r_int, :].shape)
+        self.nodes[:, -self.r_int:, :] = get_arr_of_empty_lists(self.nodes[:, -self.r_int:, :].shape)
+
+
 
 if __name__ == '__main__':
     lx = 50
     ly = lx
-    restchannels = 4
+    restchannels = 1
     nodes = np.zeros((lx, ly, 4 + restchannels))
     nodes[0] = 1
-    lgca = IBLGCA_Square(restchannels=restchannels, lx=lx, ly=ly, bc='refl', nodes=nodes,
-                         interaction='go_and_grow', r_b=0.1, std=0.01)
-    # lgca.timeevo(200, record=True)
+    lgca = LGCA_Square(restchannels=restchannels, lx=lx, ly=ly, bc='rbc', nodes=nodes,
+                         interaction='random walk', r_b=0.1, std=0.01)
+    lgca.timeevo(50, record=True)
     # lgca.plot_prop_spatial(propname='r_b', cbarlabel='$r_b$')
     # print(lgca.cell_density[lgca.nonborder])
     # ani = lgca.animate_flow(interval=50)
     # ani = lgca.animate_flux(interval=100)
     # ani = lgca.animate_density(interval=10)
     # ani = lgca.live_animate_flux()
-    ani = lgca.live_animate_density()
+    # ani = lgca.live_animate_density()
     # lgca.plot_flux()
-    # lgca.plot_density()
+    lgca.plot_density(cbar=True)
     # lgca.plot_config(grid=True)
     plt.show()

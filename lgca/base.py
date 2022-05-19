@@ -673,14 +673,17 @@ class IBLGCA_base(LGCA_base):
         errors = plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True, interpolate=True)
         return line, errors
 
-def list_array(dims):
-    arr = np.empty(np.prod(dims), dtype=object)
-    for k in range(np.prod(dims)):
-        arr[k] = []
-    arr = arr.reshape(dims)
-    return arr
+
+ufunclist = np.frompyfunc(list, 0, 1)
+
+
+def get_arr_of_empty_lists(dims):
+    return ufunclist(np.empty(dims, dtype=object))
+
 
 class BOSON_IBLGCA_base(IBLGCA_base):
+    interactions = ['go_or_grow', 'birthdeath']
+
     def __init__(self, nodes=None, dims=None, density=.1, restchannels=0, bc='periodic', **kwargs):
         #ini_channel_pop is the inital population of a channel. This is useful when the nodes is not given
         """
@@ -715,9 +718,6 @@ class BOSON_IBLGCA_base(IBLGCA_base):
     def update_dynamic_fields(self):
         self.channel_pop = self.length_checker(self.nodes) #population of a channel
         self.cell_density = self.channel_pop.sum(-1)  #population of a node
-        # next two lines can be omitted if uninterested in densities of other channels
-        # self.resting_density = self.channel_pop[:, -1]
-        # self.moving_density = self.cell_density - self.resting_density
 
     def convert_int_to_ib(self, occ):
         labels = list(range(occ.sum()))
@@ -748,6 +748,8 @@ class BOSON_IBLGCA_base(IBLGCA_base):
             from boson_ib_interactions import randomwalk, birth, birthdeath, go_or_grow
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
+            if interaction in ('random walk', 'random_walk', 'diffusion'):
+                self.interaction = randomwalk
             if interaction == 'birth':
                 self.interaction = birth
                 if 'r_b' in kwargs:
@@ -845,37 +847,27 @@ class BOSON_IBLGCA_base(IBLGCA_base):
         else:
             self.interaction = randomwalk
 
-    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):#, recorddensityOther=False):
+    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, recordchanneldens=True,
+                showprogress=True):
         self.update_dynamic_fields()
-        if record:#to be implemented
-            """
-            nodes_t = np.empty((timesteps+1)*(self.l+2*self.r_int)*self.K, dtype=object)
-            for k in range((timesteps+1)*(self.l+2*self.r_int)*self.K):
-                nodes_t[k] = []
-            self.nodes_t = nodes_t.reshape(timesteps+1, self.l+2*self.r_int, self.K)
-            self.nodes_t[0, ...] = self.nodes"""
-            nodes_t = np.empty((timesteps+1) * self.l * self.K, dtype=object)
-            for k in range((timesteps+1)*self.l*self.K):
-                nodes_t[k] = []
-            self.nodes_t = nodes_t.reshape(timesteps+1, self.l, self.K)
+        if record:
+            self.nodes_t = get_arr_of_empty_lists((timesteps+1,) + self.dims + (self.K,))
             self.nodes_t[0, ...] = copy(self.nodes[self.nonborder])
-        if recordN:# to be implemented
+        if recordN:
             self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
             self.n_t[0] = self.cell_density[self.nonborder].sum()
         if recorddens:
-            self.dens_t = np.zeros([(timesteps + 1), *self.dims], dtype=np.uint)
+            self.dens_t = np.zeros((timesteps + 1,) + self.dims, dtype=np.uint)
             self.dens_t[0, ...] = self.cell_density[self.nonborder]
-        # if recorddensityOther:    # useful for plotting channel wise densities
-        #     self.resting_density_t = np.zeros([(timesteps + 1), self.dims])
-        #     self.resting_density_t[0, ...] = self.resting_density[self.nonborder]
-        #     self.moving_density_t = np.zeros([(timesteps + 1), self.dims])
-        #     self.moving_density_t[0, ...] = self.moving_density[self.nonborder]
+        if recordchanneldens:
+            self.channel_pop_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=np.uint)
+            self.channel_pop_t[0, ...] = self.channel_pop[self.nonborder]
 
         for t in tqdm(iterable=range(1, timesteps + 1), disable=1-showprogress):
             self.timestep()
-            if record: #to be implemented, working?
+            if record:
                 self.nodes_t[t, ...] = copy(self.nodes[self.nonborder])
-            if recordN:# to be implemented, working?
+            if recordN:
                 self.n_t[t] = self.cell_density[self.nonborder].sum()
             if recorddens:
                 self.dens_t[t, ...] = self.cell_density[self.nonborder]
@@ -965,7 +957,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
 
     def plot_prop_hist(self, nodes=None, props=None, propname=None, figindex=None, figsize=None, **kwargs):
         if nodes is None:
-            nodes = self.nodes
+            nodes = self.nodes[self.nonborder]
         if props is None:
             props = self.props
         if propname is None:
@@ -980,7 +972,7 @@ class BOSON_IBLGCA_base(IBLGCA_base):
     def plot_prop_2dhist(self, nodes=None, props=None, propnames=None, figindex=None, figsize=None, **kwargs):
         import seaborn as sns
         if nodes is None:
-            nodes = self.nodes
+            nodes = self.nodes[self.nonborder]
         if props is None:
             props = self.props
         if propnames is None:
