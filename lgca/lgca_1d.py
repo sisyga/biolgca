@@ -46,6 +46,8 @@ class LGCA_1D(LGCA_base):
 
     def init_coords(self):
         self.nonborder = (np.arange(self.l) + self.r_int,)
+        self.border = np.ones(self.l + 2 * self.r_int, dtype=bool)
+        self.border[self.nonborder] = 0
         self.xcoords = np.arange(self.l + 2 * self.r_int) - self.r_int
 
     def propagation(self):
@@ -222,13 +224,11 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         return plot
 
 class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
-    interactions = ['go_or_grow', 'birthdeath']
-    
     def propagation(self):
         """
         :return:
         """
-        newnodes = deepcopy(self.nodes)
+        newnodes = get_arr_of_empty_lists(self.nodes.shape)
 
         # prop. to the left
         newnodes[1:, 0] = self.nodes[:-1, 1]
@@ -236,45 +236,20 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
         # prop. to the right
         newnodes[:-1, 1] = self.nodes[1:, 0]
 
-        self.nodes = deepcopy(newnodes)
+        #resting cells stay
+        newnodes[:, -1] = self.nodes[:, -1]
 
-    def apply_pbc(self):
-        self.nodes[:self.r_int, :] = self.nodes[-2 * self.r_int:-self.r_int, :]
-        self.nodes[-self.r_int:, :] = self.nodes[self.r_int:2 * self.r_int, :]
+        self.nodes = newnodes
 
     def apply_rbc(self):
         self.nodes[self.r_int, 0] = self.nodes[self.r_int, 0] + self.nodes[self.r_int - 1, 1]
         self.nodes[-self.r_int - 1, 1] = self.nodes[-self.r_int - 1, 1] + self.nodes[-self.r_int, 0]
-        self.nodes[self.r_int - 1, 1] = []
-        self.nodes[-self.r_int, 0] = []
+        self.apply_abc()
 
     def apply_abc(self):
-        for channel in self.nodes[:self.r_int].flat:
-            channel.clear()
-
-        for channel in self.nodes[-self.r_int:].flat:
-            channel.clear()
-
-    
-    def set_dims(self, dims=None, nodes=None, restchannels=0):
-        if nodes is not None:
-            self.l, self.K = nodes.shape
-            self.restchannels = self.K - self.velocitychannels
-            self.dims = self.l,
-            return
-
-        elif dims is None:
-            dims = 100
-
-        if isinstance(dims, int):
-            self.l = dims
-
-        else:
-            self.l = dims[0]
-           
-        self.dims = self.l,
-        self.restchannels = restchannels
-        self.K = self.velocitychannels + restchannels
+        self.nodes[self.border] = get_arr_of_empty_lists(self.nodes[self.border].shape)
+        # for channel in self.nodes[self.border].flat:
+        #     channel.clear()
 
     def init_nodes(self, density, nodes=None):
         """
@@ -285,10 +260,7 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
             where each integer determines the number of cells in each channel
         3) you provide an array "nodes" with nodes.dtype == object, where each element is a list of unique cell labels
         """
-        temp = np.empty((self.l + 2 * self.r_int, self.K), dtype=object)
-        temp = temp.flatten()
-        temp[:] = [[] for _ in range(len(temp))]
-        self.nodes = temp.reshape((self.l + 2 * self.r_int, self.K))
+        self.nodes = get_arr_of_empty_lists(((self.l + 2 * self.r_int, self.K)))
         if nodes is None:
             self.random_reset(density)
 
@@ -300,31 +272,8 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
             self.nodes[self.nonborder] = self.convert_int_to_ib(occ)
 
         self.calc_max_label()
-
-    def plot_density(self, density_t=None, cmap='hot_r', channel_type='all', **kwargs):
-        if channel_type == 'all':
-            if density_t is None:
-                density_t = self.dens_t
-        # other channel types are not supported yet
-        elif channel_type == 'rest':
-            if density_t is None:
-                density_t = self.resting_density_t
-        elif channel_type == 'velocity':
-            if density_t is None:
-                density_t = self.moving_density_t
-        tmax = density_t.shape[0]
-        dmax = density_t.max().astype(int)
-        fig, ax = self.setup_figure(tmax, **kwargs)
-        cmap = cmap_discretize(cmap, 1+dmax)
-        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=dmax, cmap=cmap, aspect='equal')
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size=.3, pad=0.1)
-        cbar = colorbar_index(ncolors=1+dmax, cmap=cmap, use_gridspec=True, cax=cax)
-        cbar.set_label('Particle number $n$')
-        plt.sca(ax)
-        return plot
     
-    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', channeltype='all', **kwargs):
+    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', cbarlabel=None, **kwargs):
         if nodes_t is None:
             nodes_t = self.nodes_t
         if props is None:
@@ -337,37 +286,37 @@ class BOSON_IBLGCA_1D(BOSON_IBLGCA_base, IBLGCA_1D):
 
         tmax, l, _ = nodes_t.shape
         fig, ax = self.setup_figure(tmax, **kwargs)
-        if channeltype == 'all':
-            mean_prop_t = self.mean_prop_t[propname]
-        #elif(channeltype == 'velocity'):
-        #    mean_prop_t = self.mean_prop_vel_t[propname]
-        #elif(channeltype == 'rest'):   
-        #    mean_prop_t = self.mean_prop_rest_t[propname]
+        mean_prop_t = self.mean_prop_t[propname]
 
         plot = plt.imshow(mean_prop_t, interpolation='none', cmap=cmap, aspect='equal')
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size=0.3, pad=0.1)
         cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
-        cbar.set_label(r'Property ${}$'.format(propname))
+        if cbarlabel is None:
+            cbar.set_label(r'Property ${}$'.format(propname))
+        else:
+            cbar.set_label(cbarlabel)
         plt.sca(ax)
         return plot
     
 if __name__ == '__main__':
-    l = 100
+    l = 5
+    capacity = 10
     restchannels = 1
     n_channels = restchannels + 2
     nodes = np.zeros((l, n_channels))
-    nodes[...] = 3
+    nodes[...] = 1
 
-    system = BOSON_IBLGCA_1D(bc='rbc', dims=l, interaction='go_or_grow', density=1.5, restchannels=1, theta=.25, kappa=0,
-                             r_d=0.05, r_b=0.25, theta_std=1e-6, nodes=nodes, capacity=9)
-    print(system.cell_density[system.nonborder].sum(), system.maxlabel, max(system.nodes.sum()), len(system.props['theta']), len(system.props['kappa']))
-    system.timeevo(timesteps=10000, record=True, showprogress=1)
+    system = BOSON_IBLGCA_1D(bc='abc', dims=l, interaction='random_walk', density=1.5, restchannels=1, theta=.25, kappa=0,
+                             r_d=0.05, r_b=0.25, theta_std=1e-6, nodes=nodes, capacity=capacity)
+    print(system.cell_density[system.nonborder].sum(), system.maxlabel, max(system.nodes.sum()))#, len(system.props['theta']), len(system.props['kappa']))
+    system.timeevo(timesteps=25, record=True, showprogress=1)
     # system.timestep()
-    print(system.cell_density[system.nonborder].sum(), system.maxlabel, max(system.nodes.sum()), len(system.props['theta']), len(system.props['kappa']))
-    # system.plot_density(figindex=0)
+    # print(system.cell_density[system.nonborder].sum(), system.maxlabel, max(system.nodes.sum()))#, len(system.props['theta']), len(system.props['kappa']))
+    system.plot_density(figindex=0)
+    # system.plot_flux()
     # system.plot_prop_spatial(figindex=1)
-    system.plot_prop_timecourse(figindex=2)
-    system.plot_prop_2dhist(figindex=3, cmap='viridis')
+    # system.plot_prop_timecourse(figindex=2)
+    # system.plot_prop_2dhist(figindex=3, cmap='viridis')
     # print(system.get_prop(propname='kappa'), system.get_prop(propname='theta'))
     plt.show()

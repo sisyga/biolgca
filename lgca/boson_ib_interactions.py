@@ -20,7 +20,7 @@ def randomwalk(lgca):
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
-        node = deepcopy(lgca.nodes[coord])
+        node = lgca.nodes[coord]
         cells = node.sum()
 
         channeldist = npr.multinomial(len(cells), [1. / lgca.K] * lgca.K).cumsum()
@@ -88,8 +88,8 @@ def go_or_grow(lgca):
         rho = density / lgca.capacity
         cells = np.array(node.sum())
         # R1: cell death
-        tobekilled = npr.random(size=density) < lgca.r_d
-        cells = cells[np.logical_not(tobekilled)]
+        tobekilled = npr.random(size=density) < 1. - lgca.r_d
+        cells = cells[tobekilled]
         if cells.size == 0:
             lgca.nodes[coord] = [[] for _ in range(lgca.K)]
             continue
