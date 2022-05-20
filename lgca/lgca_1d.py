@@ -441,3 +441,81 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         if addCenter:
            sum += qty
         return sum
+
+
+class NoVE_IBLGCA_1D(NoVE_LGCA_base, NoVE_LGCA_1D):
+    def propagation(self):
+        """
+        :return:
+        """
+        newnodes = get_arr_of_empty_lists(self.nodes.shape)
+
+        # prop. to the left
+        newnodes[1:, 0] = self.nodes[:-1, 1]
+
+        # prop. to the right
+        newnodes[:-1, 1] = self.nodes[1:, 0]
+
+        # resting cells stay
+        newnodes[:, -1] = self.nodes[:, -1]
+
+        self.nodes = newnodes
+
+    def apply_rbc(self):
+        self.nodes[self.r_int, 0] = self.nodes[self.r_int, 0] + self.nodes[self.r_int - 1, 1]
+        self.nodes[-self.r_int - 1, 1] = self.nodes[-self.r_int - 1, 1] + self.nodes[-self.r_int, 0]
+        self.apply_abc()
+
+    def apply_abc(self):
+        self.nodes[self.border] = get_arr_of_empty_lists(self.nodes[self.border].shape)
+        # for channel in self.nodes[self.border].flat:
+        #     channel.clear()
+
+    def init_nodes(self, density, nodes=None):
+        """
+        initialize the nodes. there are three options:
+        1) you provide only the argument "density", which should be a positive float that indicates the average number
+        of cells in each channel
+        2) you provide an array "nodes" with nodes.dtype == int,
+            where each integer determines the number of cells in each channel
+        3) you provide an array "nodes" with nodes.dtype == object, where each element is a list of unique cell labels
+        """
+        self.nodes = get_arr_of_empty_lists(((self.l + 2 * self.r_int, self.K)))
+        if nodes is None:
+            self.random_reset(density)
+
+        elif nodes.dtype == object:
+            self.nodes[self.nonborder] = nodes
+
+        else:
+            occ = nodes.astype(int)
+            self.nodes[self.nonborder] = self.convert_int_to_ib(occ)
+
+        self.calc_max_label()
+
+    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', cbarlabel=None, **kwargs):
+        if nodes_t is None:
+            nodes_t = self.nodes_t
+        if props is None:
+            props = self.props
+        if propname is None:
+            propname = next(iter(props))
+
+        if self.mean_prop_t == {}:
+            self.calc_prop_mean_spatiotemp()
+
+        tmax, l, _ = nodes_t.shape
+        fig, ax = self.setup_figure(tmax, **kwargs)
+        mean_prop_t = self.mean_prop_t[propname]
+
+        plot = plt.imshow(mean_prop_t, interpolation='none', cmap=cmap, aspect='equal')
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size=0.3, pad=0.1)
+        cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
+        if cbarlabel is None:
+            cbar.set_label(r'Property ${}$'.format(propname))
+        else:
+            cbar.set_label(cbarlabel)
+        plt.sca(ax)
+        return plot
+

@@ -114,7 +114,7 @@ def get_lgca(geometry: str='hex', ib: bool=False, ve: bool=True, **kwargs):
     Progress: [####################] 100% Done...
 
     """
-    if not ve:
+    if not ve and not ib:
         if geometry in ['1d', '1D', 'lin', 'linear']:
             from lgca.lgca_1d import NoVE_LGCA_1D
             return NoVE_LGCA_1D(**kwargs, ve=ve)
@@ -131,7 +131,7 @@ def get_lgca(geometry: str='hex', ib: bool=False, ve: bool=True, **kwargs):
             raise ValueError("Geometry specification is unknown. Try: '1d', '1D', 'lin', "
                              "'linear', 'square', 'sq', 'rect', 'rectangular', 'hex', 'hx' or 'hexagonal'.")
 
-    if ib:
+    if ib and ve:
         if geometry in ['1d', '1D', 'lin', 'linear']:
             from lgca.lgca_1d import IBLGCA_1D
             return IBLGCA_1D(**kwargs)
@@ -143,6 +143,23 @@ def get_lgca(geometry: str='hex', ib: bool=False, ve: bool=True, **kwargs):
         elif geometry in ['hex', 'hx', 'hexagonal']:
             from lgca.lgca_hex import IBLGCA_Hex
             return IBLGCA_Hex(**kwargs)
+
+        else:
+            raise ValueError("Geometry specification is unknown. Try: '1d', 'lin', "
+                             "'linear', 'square', 'sq', 'rect', 'rectangular', 'hex', 'hx' or 'hexagonal'.")
+
+    if not ve and ib:
+        if geometry in ['1d', '1D', 'lin', 'linear']:
+            from lgca.lgca_1d import NoVE_IBLGCA_1D
+            return NoVE_IBLGCA_1D(**kwargs)
+
+        elif geometry in ['square', 'sq', 'rect', 'rectangular']:
+            from lgca.lgca_square import NoVE_IBLGCA_Square
+            return NoVE_IBLGCA_Square(**kwargs)
+
+        elif geometry in ['hex', 'hx', 'hexagonal']:
+            from lgca.lgca_hex import NoVE_IBLGCA_Hex
+            return NoVE_IBLGCA_Hex(**kwargs)
 
         else:
             raise ValueError("Geometry specification is unknown. Try: '1d', 'lin', "
