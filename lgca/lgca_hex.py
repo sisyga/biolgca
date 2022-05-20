@@ -1,11 +1,12 @@
-try:
-    from base import *
-    from lgca_square import LGCA_Square, IBLGCA_Square
+# biolgca is a Python package for simulating different kinds of lattice-gas
+# cellular automata (LGCA) in the biological context.
+# Copyright (C) 2018-2022 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.
+# The full license notice is found in the file lgca/__init__.py.
 
-except ModuleNotFoundError:
-    from .base import *
-    from .lgca_square import LGCA_Square, IBLGCA_Square
+from lgca.base import *
+from lgca.lgca_square import LGCA_Square, IBLGCA_Square, NoVE_LGCA_Square
 
+pi2 = 2 * np.pi
 
 class LGCA_Hex(LGCA_Square):
     """
@@ -27,11 +28,13 @@ class LGCA_Hex(LGCA_Square):
         self.xx, self.yy = np.meshgrid(self.x, self.y, indexing='ij')
         self.coord_pairs = list(zip(self.xx.flat, self.yy.flat))
 
+        # set all coords, including ghost cells
         self.xcoords, self.ycoords = np.meshgrid(np.arange(self.lx + 2 * self.r_int) - self.r_int,
                                                  np.arange(self.ly + 2 * self.r_int) - self.r_int, indexing='ij')
         self.xcoords = self.xcoords.astype(float)
         self.ycoords = self.ycoords.astype(float)
 
+        # shift coordinate of every other column of x by 0.5 to the right
         self.xcoords[:, 1::2] += 0.5
         self.ycoords *= self.dy
         self.xcoords = self.xcoords[self.r_int:-self.r_int, self.r_int:-self.r_int]
@@ -39,6 +42,7 @@ class LGCA_Hex(LGCA_Square):
         self.nonborder = (self.xx, self.yy)
 
     def propagation(self):
+        #print(self.nodes[self.nonborder])
         newcellnodes = np.zeros(self.nodes.shape, dtype=self.nodes.dtype)
         newcellnodes[..., 6:] = self.nodes[..., 6:]
 
@@ -64,6 +68,7 @@ class LGCA_Hex(LGCA_Square):
         newcellnodes[1:, :-1:2, 5] = self.nodes[:-1, 1::2, 5]
         newcellnodes[:, 1:-1:2, 5] = self.nodes[:, 2::2, 5]
 
+        #(newcellnodes[self.nonborder])
         self.nodes = newcellnodes
         return self.nodes
 
@@ -166,57 +171,44 @@ class LGCA_Hex(LGCA_Square):
         sum[:, 1:-1:2, ...] += qty[:, 2::2, ...]
         return sum
 
+    def setup_figure(self, figindex=None, figsize=(8, 8), tight_layout=True):
+        fig, ax = super(LGCA_Hex, self).setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
+        plt.gca()
+        plt.xlabel('$x$')
+        plt.ylabel('$y$')
+        return fig, ax
 
 class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
     """
     Identity-based LGCA simulator class.
     """
-
-    def init_nodes(self, density=0.1, nodes=None):
-        self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
-        if nodes is None:
-            self.random_reset(density)
-
-        else:
-            self.nodes[self.nonborder] = nodes.astype(np.uint)
-            self.maxlabel = self.nodes.max()
+    interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath', 'birthdeath_discrete',
+                    'only_propagation']
 
 
-if __name__ == '__main__':
-    lx = 50
-    ly = lx
-    restchannels = 0
-    nodes = np.zeros((lx, ly, 6 + restchannels))
-    nodes[0] = 1
-    # lgca = LGCA_Hex(restchannels=restchannels, dims=(lx, ly), density=0.5 / (6 + restchannels), bc='pbc',
-    #                 interaction='wetting', beta=20., gamma=10)
-    lgca = IBLGCA_Hex(nodes=nodes, interaction='go_and_grow', bc='refl', r_b=0.1)
-    # lgca.set_interaction('contact_guidance', beta=2)
-    # cProfile.run('lgca.timeevo(timesteps=1000)')
-    lgca.timeevo(timesteps=100, record=True)
-    # ani = lgca.animate_flow(interval=500)
-    # ani = lgca.animate_flux(interval=50)
-    # ani = lgca.animate_density(interval=50)
-    lgca.plot_prop_spatial()
-    plt.show()
+class NoVE_LGCA_Hex (NoVE_LGCA_Square, LGCA_Hex):
 
-    # l = 50
-    # l_spheroid = 2
-    # dims = (l, l)
-    # tmax = 100
-    # restc = 3
-    # rho_0 = 3
-    # nodes = np.zeros((l, l, restc + 6), dtype=bool)
-    # nodes[..., :l_spheroid, -rho_0:] = 1
-    # lgca = get_lgca(geometry='hex', interaction='wetting', beta=10., gamma=5., bc='rbc', density=0, restchannels=restc,
-    #                 nodes=nodes, rho_0=rho_0)
-    # lgca.r_b = .05
-    # lgca.spheroid = np.zeros_like(lgca.cell_density, dtype=bool)
-    # lgca.spheroid[lgca.r_int:-lgca.r_int, :lgca.r_int + l_spheroid] = 1
-    # lgca.ecm = 1 - lgca.spheroid.astype(float)
-    # lgca.ecm *= 0.
-    # lgca.timestep()
-    # lgca.timeevo(12, record=True)
-    # lgca.plot_flow(cbar=False)
-    # ani = lgca.live_animate_flow(cbar=False)
-    # plt.show()
+    def nb_sum(self, qty, addCenter=False):
+        """
+        Calculate sum of values in neighboring lattice sites of each lattice site.
+        :param qty: ndarray in which neighboring values have to be added
+                    first dimension indexes lattice sites
+        :param addCenter: toggle adding central value
+        :return: sum as ndarray
+        """
+        sum = np.zeros(qty.shape)
+        # shift to left padding 0 and add to shift to the right padding 0
+        sum[:-1, ...] += qty[1:, ...]
+        sum[1:, ...] += qty[:-1, ...]
+        sum[:, 1::2, ...] += qty[:, :-1:2, ...]
+        sum[1:, 2::2, ...] += qty[:-1, 1:-1:2, ...]
+        sum[:-1, 1::2, ...] += qty[1:, :-1:2, ...]
+        sum[:, 2::2, ...] += qty[:, 1:-1:2, ...]
+        sum[:, :-1:2, ...] += qty[:, 1::2, ...]
+        sum[:-1, 1:-1:2, ...] += qty[1:, 2::2, ...]
+        sum[1:, :-1:2, ...] += qty[:-1, 1::2, ...]
+        sum[:, 1:-1:2, ...] += qty[:, 2::2, ...]
+        # add central value
+        if addCenter:
+            sum += qty
+        return sum
