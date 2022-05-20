@@ -1011,3 +1011,62 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
 
     def live_animate_config(self, interval=100, **kwargs):
         warnings.warn("Live config animation not available for LGCA without volume exclusion yet.")
+
+
+class NoVE_IBLGCA_Square(NoVE_IBLGCA_base, NoVE_LGCA_Square):
+    """Identity-based lgca without volume exclusion on the square lattice.
+    """
+    def init_nodes(self, density=0.1, nodes=None):
+        self.nodes = get_arr_of_empty_lists((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K))
+        if nodes is None:
+            self.random_reset(density)
+
+        elif nodes.dtype == object:
+            self.nodes[self.nonborder] = nodes.astype(np.uint)
+
+        else:
+            occ = nodes.astype(int)
+            self.nodes[self.nonborder] = self.convert_int_to_ib(occ)
+
+        self.calc_max_label()
+
+    def propagation(self):
+        """
+
+        :return:
+        """
+        newnodes = get_arr_of_empty_lists(self.nodes.shape)
+        # resting particles stay
+        newnodes[..., 4:] = self.nodes[..., 4:]
+
+        # prop. to the right
+        newnodes[1:, :, 0] = self.nodes[:-1, :, 0]
+
+        # prop. to the left
+        newnodes[:-1, :, 2] = self.nodes[1:, :, 2]
+
+        # prop. upwards
+        newnodes[:, 1:, 1] = self.nodes[:, :-1, 1]
+
+        # prop. downwards
+        newnodes[:, :-1, 3] = self.nodes[:, 1:, 3]
+
+        self.nodes = newnodes
+
+    def apply_rbcx(self):
+        self.nodes[self.r_int, :, 0] = self.nodes[self.r_int, :, 0] + self.nodes[self.r_int - 1, :, 2]
+        self.nodes[-self.r_int - 1, :, 2] = self.nodes[-self.r_int - 1, :, 2] + self.nodes[-self.r_int, :, 0]
+        self.apply_abcx()
+
+    def apply_rbcy(self):
+        self.nodes[:, self.r_int, 1] = self.nodes[:, self.r_int, 1] + self.nodes[:, self.r_int - 1, 3]
+        self.nodes[:, -self.r_int - 1, 3] = self.nodes[:, -self.r_int - 1, 3] + self.nodes[:, -self.r_int, 1]
+        self.apply_abcy()
+
+    def apply_abcx(self):
+        self.nodes[:self.r_int, ...] = get_arr_of_empty_lists(self.nodes[:self.r_int, ...].shape)
+        self.nodes[-self.r_int:, ...] = get_arr_of_empty_lists(self.nodes[-self.r_int:, ...].shape)
+
+    def apply_abcy(self):
+        self.nodes[:, :self.r_int, :] = get_arr_of_empty_lists(self.nodes[:, :self.r_int, :].shape)
+        self.nodes[:, -self.r_int:, :] = get_arr_of_empty_lists(self.nodes[:, -self.r_int:, :].shape)
