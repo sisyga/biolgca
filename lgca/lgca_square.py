@@ -271,8 +271,9 @@ class LGCA_Square(LGCA_base):
         for i in range(self.velocitychannels):
             cx = self.c[0, i] * 0.5
             cy = self.c[1, i] * 0.5
-            arrows += [FancyArrowPatch((x + cx*(1-rel_arrowlen), y + cy*(1-rel_arrowlen)), (x + cx, y + cy), mutation_scale=.3, fc=colors[occ], ec=ec, lw=lw_arrow)
-                   for x, y, occ in zip(xx.ravel(), yy.ravel(), occupied[..., i].ravel())]
+            arrows += [FancyArrowPatch((x + cx*(1-rel_arrowlen), y + cy*(1-rel_arrowlen)), (x + cx, y + cy),
+                                       mutation_scale=.3, fc=colors[occ], ec=ec, lw=lw_arrow)
+                       for x, y, occ in zip(xx.ravel(), yy.ravel(), occupied[..., i].ravel())]
 
         arrows = PatchCollection(arrows, match_original=True)
         ax.add_collection(arrows)
@@ -505,14 +506,19 @@ class LGCA_Square(LGCA_base):
             field = field[self.nonborder]
 
         if mask is None:
-            mask = np.ones_like(field, dtype=bool)
+            if hasattr(field, 'mask'):
+                mask = field.mask
+
+            else: mask = np.zeros_like(field, dtype=bool)
+
+
         cmap = plt.cm.get_cmap(cmap)
         cmap = plt.cm.ScalarMappable(cmap=cmap, norm=Normalize(vmin=vmin, vmax=vmax))
         polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly, alpha=v,
                                    orientation=self.orientation, facecolor=c, edgecolor=edgecolor)
                     for x, y, c, v in
                     zip(self.xcoords.ravel(), self.ycoords.ravel(), cmap.to_rgba(field.ravel()),
-                        mask.ravel().astype(float))]
+                        1 - mask.ravel().astype(float))]
         pc = PatchCollection(polygons, match_original=True)
         ax.add_collection(pc)
         if cbar:
@@ -580,8 +586,8 @@ class LGCA_Square(LGCA_base):
         if nodes is None:
             nodes = self.nodes[self.nonborder]
 
-        if nodes.dtype != 'bool':
-            nodes = nodes.astype('bool')
+        # if nodes.dtype != 'bool':
+        #     nodes = nodes.astype('bool')
 
         nodes = nodes.astype(np.int8)
         density = nodes.sum(-1).astype(float) / self.K
@@ -1070,3 +1076,47 @@ class NoVE_IBLGCA_Square(NoVE_IBLGCA_base, NoVE_LGCA_Square):
     def apply_abcy(self):
         self.nodes[:, :self.r_int, :] = get_arr_of_empty_lists(self.nodes[:, :self.r_int, :].shape)
         self.nodes[:, -self.r_int:, :] = get_arr_of_empty_lists(self.nodes[:, -self.r_int:, :].shape)
+
+    def plot_density(self, density=None, channels=slice(None), **kwargs):
+        if density is None:
+            nodes = self.nodes[self.nonborder]
+            density = self.length_checker(nodes[..., channels].sum(-1))
+
+        return NoVE_LGCA_Square.plot_density(self, density=density, **kwargs)
+
+    def plot_flux(self, nodes=None, **kwargs):
+        if nodes is None:
+            if hasattr(self, 'nodes'):
+                nodes = self.length_checker(self.nodes[self.nonborder])
+            else:
+                raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
+                                   "in past LGCA run, call mylgca.timeevo with keyword record=True")
+
+        return NoVE_LGCA_Square.plot_flux(self, nodes=nodes, **kwargs)
+
+    def animate_flux(self, nodes_t=None, **kwargs):
+        if nodes_t is None:
+            if hasattr(self, 'nodes_t'):
+                nodes = self.length_checker(self.nodes_t)
+            else:
+                raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
+                                   "in past LGCA run, call mylgca.timeevo with keyword record=True")
+
+        return NoVE_LGCA_Square.animate_flux(self, nodes_t=nodes, **kwargs)
+
+    def plot_prop_spatial(self, nodes=None, props=None, propname=None, **kwargs):
+        if nodes is None:
+            nodes = self.nodes[self.nonborder]
+        if props is None:
+            props = self.props
+        if propname is None:
+            propname = next(iter(props))
+
+        if self.mean_prop_t == {}:
+            self.calc_prop_mean_spatiotemp()
+
+        mean_prop = self.mean_prop_t[propname][-1]
+        if 'cbarlabel' not in kwargs:
+            kwargs.update({'cbarlabel': str(propname)})
+        return super().plot_scalarfield(mean_prop, **kwargs)
+

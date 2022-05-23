@@ -36,7 +36,7 @@ def birth(lgca):
     for coord in zip(*coords):
         node = deepcopy(lgca.nodes[coord])
         density = lgca.cell_density[coord]
-        rho = density / lgca.capacity
+        rho = density / lgca.interaction_params['capacity']
         cells = node.sum()
 
         for cell in cells:
@@ -59,11 +59,11 @@ def birthdeath(lgca):
     for coord in zip(*coords):
         node = deepcopy(lgca.nodes[coord])
         density = lgca.cell_density[coord]
-        rho = density / lgca.capacity
+        rho = density / lgca.interaction_params['capacity']
         cells = node.sum()
 
         for cell in cells:
-            if random() < lgca.r_d:
+            if random() < lgca.interaction_params['r_d']:
                 cells.remove(cell)
 
             r_b = lgca.props['r_b'][cell]
@@ -85,10 +85,10 @@ def go_or_grow(lgca):
     for coord in zip(*coords):
         node = deepcopy(lgca.nodes[coord])
         density = lgca.cell_density[coord]
-        rho = density / lgca.capacity
+        rho = density / lgca.interaction_params['capacity']
         cells = np.array(node.sum())
         # R1: cell death
-        tobekilled = npr.random(size=density) < 1. - lgca.r_d
+        tobekilled = npr.random(size=density) < 1. - lgca.interaction_params['r_d']
         cells = cells[tobekilled]
         if cells.size == 0:
             lgca.nodes[coord] = [[] for _ in range(lgca.K)]
@@ -103,13 +103,13 @@ def go_or_grow(lgca):
                 velcells.append(cell)
 
         # R3: birth
-        rho = len(cells) / lgca.capacity  # update density after deaths for birth
+        rho = len(cells) / lgca.interaction_params['capacity']  # update density after deaths for birth
         for cell in restcells:
-            if random() < lgca.r_b * (1 - rho):
+            if random() < lgca.interaction_params['r_b'] * (1 - rho):
                 lgca.maxlabel += 1
                 restcells.append(lgca.maxlabel)
-                lgca.props['kappa'].append(npr.normal(loc=lgca.props['kappa'][cell], scale=lgca.kappa_std))
-                lgca.props['theta'].append(float(trunc_gauss(0, 1, mu=lgca.props['theta'][cell], sigma=lgca.theta_std)))
+                lgca.props['kappa'].append(npr.normal(loc=lgca.props['kappa'][cell], scale=lgca.interaction_params['kappa_std']))
+                lgca.props['theta'].append(float(trunc_gauss(0, 1, mu=lgca.props['theta'][cell], sigma=lgca.interaction_params['theta_std'])))
 
         node = [[] for _ in range(lgca.velocitychannels)]
         node.append(restcells)

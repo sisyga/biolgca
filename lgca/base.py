@@ -1456,8 +1456,8 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         # configure interaction
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
-            if self.restchannels > 0:
-                print('Interaction only works without restchannels and will crash.')
+            # if self.restchannels > 0:  # what is happening here
+            #     print('Interaction only works without restchannels and will crash.')
             # density-dependent interaction rule
             if interaction == 'dd_alignment':
                 self.interaction = dd_alignment
@@ -1742,7 +1742,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base):
         self.props = {}
         self.length_checker = np.vectorize(len)
         self.set_bc(bc)
-
+        self.interaction_params = {}
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
         self.init_coords()
         self.init_nodes(density, nodes=nodes)
@@ -1752,8 +1752,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base):
         # vectorising len function
         self.update_dynamic_fields()
         self.mean_prop_t = {}
-        self.mean_prop_vel_t = {}  # not sure if always needed, but let's keep it for now
-        self.mean_prop_rest_t = {}
+        # self.mean_prop_vel_t = {}  # not sure if always needed, but let's keep it for now
+        # self.mean_prop_rest_t = {}
         self.calc_max_label()
 
 
@@ -1776,7 +1776,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base):
         Distribute particles in the lattice according to a given density; can yield different cell numbers per lattice site
         :param density: particle density in the lattice: average number of particles per channel
         """
-        density = self.rng.poisson(density, self.dims + (self.K,))
+        density = npr.poisson(lam=density, size=self.dims + (self.K,))
         tempnodes = self.convert_int_to_ib(density)
         self.nodes[self.nonborder] = tempnodes
         self.maxlabel = density.sum()
@@ -1789,7 +1789,9 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base):
             interaction = kwargs['interaction']
             if interaction in ('random walk', 'random_walk', 'diffusion'):
                 self.interaction = randomwalk
-            if interaction == 'birth':
+            elif interaction == 'only_propagation':
+                self.interaction = only_propagation
+            elif interaction == 'birth':
                 self.interaction = birth
                 if 'r_b' in kwargs:
                     self.interaction_params['r_b'] = kwargs['r_b']
@@ -1953,7 +1955,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base):
             nodes_t = self.nodes_t
         if props is None:
             props = self.props
-        tmax, l, _ = nodes_t.shape
+        tmax = nodes_t.shape[0]
         for key in self.props:
             self.mean_prop_t[key] = np.ma.masked_all((tmax, *self.dims))
             # self.mean_prop_vel_t[key] = np.zeros([tmax,l])
