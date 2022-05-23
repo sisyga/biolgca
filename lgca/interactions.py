@@ -497,4 +497,4 @@ def go_or_rest(lgca):
 
 
 def only_propagation(lgca):
-    return
+    pass
