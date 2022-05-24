@@ -21,6 +21,8 @@ import matplotlib.colors as mcolors
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.cm import ScalarMappable
+import matplotlib.colors as colors
+from matplotlib import cm
 from numpy import random as npr
 from sympy.utilities.iterables import multiset_permutations
 from copy import copy, deepcopy
@@ -176,6 +178,78 @@ def estimate_figsize(array, x: float=8., cbar: bool=False, dy: float=1.):
     y *= dy
     figsize = (x, y)
     return figsize
+
+
+def get_cmap(density, vmax=None, cmap='viridis', cbar=True, cbarlabel=''):
+    if vmax is None:
+        K = int(density.max())
+    else:
+        K = vmax
+
+    cmap = copy(cm.get_cmap(cmap))  # do not modify a globally registered colormap in matplotlib > 3.3.2
+    cmap.set_under(alpha=0.0)
+    cmap_scaled = False
+
+    if 1 < K <= cmap.N:
+        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
+    elif K > 1:
+        cmap_scaled = True
+        scaling_factor = K / cmap.N
+        nbins = cmap.N
+        density = density / scaling_factor
+        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(cmap.N + 1), cmap.N))
+    else:
+        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.Normalize(vmin=1e-6, vmax=1))
+    cmap.set_array(density)
+
+    if not cbar:
+        return cmap
+
+    if K <= 1:
+        # requires extra treatment because there is only one colour
+        cbar = plt.colorbar(cmap, extend='min', use_gridspec=True, boundaries=[0, 0.5, 1], values=[0, 1])
+    else:
+        cbar = plt.colorbar(cmap, extend='min', use_gridspec=True)
+    cbar.set_label(cbarlabel)
+    if cmap_scaled:
+        ncolors = nbins
+    else:
+        ncolors = max(1, K)
+    # set a numbering interval for high densities (e.g. 5-10-15-20)
+    if ncolors > 101:
+        stride = 10
+    elif ncolors > 51:
+        stride = 5
+    elif ncolors > 31:
+        stride = 2
+    else:
+        stride = 1
+    if K <= 1:
+        # requires extra treatment because there is only one colour
+        ticks = np.array([0.75])
+    else:
+        ticks = np.arange(1, ncolors + 1, 1) + 0.5
+    if cmap_scaled:
+        indices = np.arange(1, nbins + 2)
+        low_label = np.ceil(indices * scaling_factor - 1e-6)
+        low_label = np.roll(low_label, 1)
+        low_label = np.delete(low_label, 0).astype(int)
+        labels = list(low_label)
+    else:
+        labels = list(np.arange(1, ncolors + 1, 1))
+    # if max label comes up automatically, leave it as it is
+    if ticks[-1] == ticks[0::stride][-1]:
+        cbar.set_ticks(ticks[0::stride])
+        cbar.set_ticklabels(labels[0::stride])
+    # if max label is too close to last strided label, leave the latter out
+    elif stride > 1 and ticks[-1] != ticks[0::stride][-1] and ticks[-1] - ticks[0::stride][-1] < stride / 2:
+        cbar.set_ticks(list(ticks[0::stride][:-1]) + [ticks[-1]])
+        cbar.set_ticklabels(labels[0::stride][:-1] + [labels[-1]])
+    # if there is enough space, just add the max label
+    else:
+        cbar.set_ticks(list(ticks[0::stride]) + [ticks[-1]])
+        cbar.set_ticklabels(labels[0::stride] + [labels[-1]])
+    return cmap
 
 
 def calc_nematic_tensor(v):
@@ -1718,7 +1792,6 @@ class NoVE_LGCA_base(LGCA_base, ABC):
 
 ufunclist = np.frompyfunc(list, 0, 1)
 
-
 def get_arr_of_empty_lists(dims):
     return ufunclist(np.empty(dims, dtype=object))
 
@@ -1834,6 +1907,10 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base):
 
             elif interaction == 'go_or_grow':
                 self.interaction = go_or_grow
+                try:
+                    assert self.restchannels > 0
+                except AssertionError:
+                    print('There must be exactly one rest channel for this interaction to work!')
                 if 'capacity' in kwargs:
                     self.interaction_params['capacity'] = kwargs['capacity']
                 else:

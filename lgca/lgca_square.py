@@ -6,6 +6,7 @@
 import matplotlib.animation as animation
 import matplotlib.colors as colors
 import matplotlib.ticker as mticker
+import numpy as np
 from matplotlib.collections import PatchCollection
 from matplotlib.colors import Normalize
 from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
@@ -871,27 +872,14 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
         if figsize is None:
             figsize = estimate_figsize(density, cbar=True, dy=self.dy)
 
-        if vmax is None:
-            K = int(density.max())
-        else:
-            K = vmax
-
         fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
-        cmap = copy(cm.get_cmap(cmap))  # do not modify a globally registered colormap in matplotlib > 3.3.2
-        cmap.set_under(alpha=0.0)
-        cmap_scaled = False
 
-        if 1 < K <= cmap.N:
-            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
-        elif K > 1:
-            cmap_scaled = True
-            scaling_factor = K / cmap.N
-            nbins = cmap.N
-            density = density/scaling_factor
-            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(cmap.N + 1), cmap.N))
+        if cbar:
+            cmap, cbar = get_cmap(density, cmap=cmap, cbarlabel=cbarlabel)
+
         else:
-            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.Normalize(vmin=1e-6, vmax=1))
-        cmap.set_array(density)
+            cmap = get_cmap(density, cmap=cmap, cbarlabel=cbarlabel)
+
 
         polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
                                    orientation=self.orientation, facecolor=c, edgecolor=edgecolor)
@@ -899,51 +887,6 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
         pc = PatchCollection(polygons, match_original=True)
         ax.add_collection(pc)
 
-        if cbar:
-            if K <= 1:
-                # requires extra treatment because there is only one colour
-                cbar = fig.colorbar(cmap, extend='min', use_gridspec=True, boundaries=[0,0.5,1], values=[0,1])
-            else:
-                cbar = fig.colorbar(cmap, extend='min', use_gridspec=True)
-            cbar.set_label(cbarlabel)
-            if cmap_scaled:
-                ncolors = nbins
-            else:
-                ncolors = max(1,K)
-            # set a numbering interval for high densities (e.g. 5-10-15-20)
-            if ncolors > 101:
-                stride = 10
-            elif ncolors > 51:
-                stride = 5
-            elif ncolors > 31:
-                stride = 2
-            else:
-                stride = 1
-            if K <= 1:
-                # requires extra treatment because there is only one colour
-                ticks = np.array([0.75])
-            else:
-                ticks = np.arange(1,ncolors+1,1) + 0.5
-            if cmap_scaled:
-                indices = np.arange(1, nbins + 2)
-                low_label = np.ceil(indices * scaling_factor - 1e-6)
-                low_label = np.roll(low_label, 1)
-                low_label = np.delete(low_label, 0).astype(int)
-                labels = list(low_label)
-            else:
-                labels = list(np.arange(1,ncolors+1,1))
-            # if max label comes up automatically, leave it as it is
-            if ticks[-1] == ticks[0::stride][-1]:
-                cbar.set_ticks(ticks[0::stride])
-                cbar.set_ticklabels(labels[0::stride])
-            # if max label is too close to last strided label, leave the latter out
-            elif stride > 1 and ticks[-1] != ticks[0::stride][-1] and ticks[-1] - ticks[0::stride][-1] < stride / 2:
-                cbar.set_ticks(list(ticks[0::stride][:-1]) + [ticks[-1]])
-                cbar.set_ticklabels(labels[0::stride][:-1] + [labels[-1]])
-            # if there is enough space, just add the max label
-            else:
-                cbar.set_ticks(list(ticks[0::stride]) + [ticks[-1]])
-                cbar.set_ticklabels(labels[0::stride] + [labels[-1]])
         return fig, pc, cmap
 
     def animate_flux(self, nodes_t=None, figindex=None, figsize=None, interval=200, tight_layout=True,
@@ -1009,11 +952,99 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
         # colourbar update is an issue
         warnings.warn("Live density animation not available for LGCA without volume exclusion yet.")
 
-    def plot_config(self, nodes=None, figsize=None, grid=False, ec='none', rel_arrowlen=0.6, **kwargs):
-        warnings.warn("Config plot not available for LGCA without volume exclusion yet.")
+    def plot_config(self, nodes=None, figsize=None, grid=False, ec='none', rel_arrowlen=0.6, cmap='viridis', cbar=True,
+                    cbarlabel='Particle number $n$', **kwargs):
+        r_circle = self.r_poly * 0.25
+        # bbox_props = dict(boxstyle="Circle,pad=0.3", fc="white", ec="k", lw=1.5)
+        bbox_props = None
+        if nodes is None:
+            nodes = self.nodes[self.nonborder]
+
+        density = nodes.sum(-1)
+        if figsize is None:
+            figsize = estimate_figsize(density, cbar=False, dy=self.dy)
+
+        fig, ax = self.setup_figure(figsize=figsize, **kwargs)
+
+        xx, yy = self.xcoords, self.ycoords
+        x1, y1 = ax.transData.transform((0, 1.5 * r_circle))
+        x2, y2 = ax.transData.transform((1.5 * r_circle, 0))
+        dpx = np.mean([abs(x2 - x1), abs(y2 - y1)])
+        fontsize = dpx * 72. / fig.dpi
+        lw_circle = fontsize / 5
+        lw_arrow = 0.5 * lw_circle
+
+        # colors = 'none', 'k'
+        cmap = get_cmap(density, vmax=nodes.max(), cmap=cmap, cbar=cbar, cbarlabel=cbarlabel)
+        arrows = []
+        for i in range(self.velocitychannels):
+            cx = self.c[0, i] * 0.5
+            cy = self.c[1, i] * 0.5
+            arrows += [FancyArrowPatch((x + cx * (1 - rel_arrowlen), y + cy * (1 - rel_arrowlen)), (x + cx, y + cy),
+                                       mutation_scale=.3, fc=c, ec=ec, lw=lw_arrow)
+                       for x, y, c in zip(xx.ravel(), yy.ravel(), cmap.to_rgba(nodes[..., i].ravel()))]
+
+        arrows = PatchCollection(arrows, match_original=True)
+        ax.add_collection(arrows)
+
+        if self.restchannels > 0:
+            circles = [Circle(xy=(x, y), radius=r_circle, fc=c, ec='k', lw=0, fill=True) for x, y, c in
+                       zip(xx.ravel(), yy.ravel(), cmap.to_rgba(nodes[..., self.velocitychannels:].sum(-1).ravel()))]
+            circles = PatchCollection(circles, match_original=True)
+            ax.add_collection(circles)
+
+        else:
+            circles = []
+
+        if grid:
+            polygons = [
+                RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly, lw=lw_arrow,
+                               orientation=self.orientation, facecolor='None', edgecolor='k')
+                for x, y in zip(self.xcoords.ravel(), self.ycoords.ravel())]
+            ax.add_collection(PatchCollection(polygons, match_original=True))
+
+        else:
+            ymin = -0.5 * self.c[1, 1]
+            ymax = self.ycoords.max() + 0.5 * self.c[1, 1]
+            plt.ylim(ymin, ymax)
+
+        return fig, arrows, circles, cmap
 
     def animate_config(self, nodes_t=None, interval=100, **kwargs):
-        warnings.warn("Config animation not available for LGCA without volume exclusion yet.")
+        if nodes_t is None:
+            if hasattr(self, 'nodes_t'):
+                nodes_t = self.nodes_t
+            else:
+                raise RuntimeError(
+                    "Channel-wise state of the lattice required for plotting the configuration but not " +
+                    "recorded in past LGCA run, call lgca.timeevo with keyword record=True")
+
+        tmax = nodes_t.shape[0]
+        fig, arrows, circles, cmap = self.plot_config(nodes=nodes_t[0], **kwargs)
+        title = plt.title('Time $k =$0')
+        arrow_color = cmap.to_rgba(np.moveaxis(nodes_t[..., :self.velocitychannels], -1, 1)[None, ...]).reshape(tmax, -1, 4)
+
+        if self.restchannels:
+            circle_color = cmap.to_rgba(nodes_t[..., self.velocitychannels:].sum(-1)[None, ...]).reshape(tmax, -1, 4)
+
+            def update(n):
+                title.set_text('Time $k =${}'.format(n))
+                arrows.set(color=arrow_color[n])
+                circles.set(facecolor=circle_color[n])
+                return arrows, circles, title
+
+            ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
+            return ani
+
+        else:
+            def update(n):
+                title.set_text('Time $k =${}'.format(n))
+                arrows.set(color=arrow_color[n])
+                return arrows, title
+
+            ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
+            return ani
+
 
     def live_animate_config(self, interval=100, **kwargs):
         warnings.warn("Live config animation not available for LGCA without volume exclusion yet.")
@@ -1082,7 +1113,7 @@ class NoVE_IBLGCA_Square(NoVE_IBLGCA_base, NoVE_LGCA_Square):
             nodes = self.nodes[self.nonborder]
             density = self.length_checker(nodes[..., channels].sum(-1))
 
-        return NoVE_LGCA_Square.plot_density(self, density=density, **kwargs)
+        return super().plot_density(density=density, **kwargs)
 
     def plot_flux(self, nodes=None, **kwargs):
         if nodes is None:
@@ -1092,7 +1123,27 @@ class NoVE_IBLGCA_Square(NoVE_IBLGCA_base, NoVE_LGCA_Square):
                 raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
                                    "in past LGCA run, call mylgca.timeevo with keyword record=True")
 
-        return NoVE_LGCA_Square.plot_flux(self, nodes=nodes, **kwargs)
+        return super().plot_flux(nodes=nodes, **kwargs)
+
+    def plot_config(self, nodes=None, **kwargs):
+        if nodes is None:
+            if hasattr(self, 'nodes'):
+                nodes = self.length_checker(self.nodes[self.nonborder])
+            else:
+                raise RuntimeError("Channel-wise state of the lattice required for config calculation but not recorded " +
+                                   "in past LGCA run, call mylgca.timeevo with keyword record=True")
+
+        return super().plot_config(nodes=nodes, **kwargs)
+
+    def animate_config(self, nodes_t=None, **kwargs):
+        if nodes_t is None:
+            if hasattr(self, 'nodes_t'):
+                nodes = self.length_checker(self.nodes_t)
+            else:
+                raise RuntimeError("Channel-wise state of the lattice required for config calculation but not recorded " +
+                                   "in past LGCA run, call mylgca.timeevo with keyword record=True")
+
+        return super().animate_config(nodes_t=nodes, **kwargs)
 
     def animate_flux(self, nodes_t=None, **kwargs):
         if nodes_t is None:
@@ -1102,7 +1153,7 @@ class NoVE_IBLGCA_Square(NoVE_IBLGCA_base, NoVE_LGCA_Square):
                 raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
                                    "in past LGCA run, call mylgca.timeevo with keyword record=True")
 
-        return NoVE_LGCA_Square.animate_flux(self, nodes_t=nodes, **kwargs)
+        return super().animate_flux(nodes_t=nodes, **kwargs)
 
     def plot_prop_spatial(self, nodes=None, props=None, propname=None, **kwargs):
         if nodes is None:
@@ -1118,5 +1169,6 @@ class NoVE_IBLGCA_Square(NoVE_IBLGCA_base, NoVE_LGCA_Square):
         mean_prop = self.mean_prop_t[propname][-1]
         if 'cbarlabel' not in kwargs:
             kwargs.update({'cbarlabel': str(propname)})
+
         return super().plot_scalarfield(mean_prop, **kwargs)
 
