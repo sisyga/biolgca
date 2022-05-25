@@ -8,6 +8,28 @@ import numpy.random as npr
 
 from lgca.interactions import tanh_switch
 
+def random_walk(lgca):
+    """
+    Rearrangement step for random walk interaction
+    """
+    newnodes = lgca.nodes.copy()
+    # filter for nodes that are not virtual border lattice sites
+    relevant = (lgca.cell_density[lgca.nonborder] > 0)
+    coords = [a[relevant] for a in lgca.nonborder]
+
+    weights = np.ones(lgca.K)
+    weights /= lgca.K
+
+    # loop through lattice sites and reassign particle directions
+    for coord in zip(*coords):
+        # number of particles
+        n = lgca.cell_density[coord]
+        # reassign particle directions
+        sample = npr.multinomial(n, weights,)
+
+        newnodes[coord] = sample
+
+    lgca.nodes = newnodes
 
 def dd_alignment(lgca):
     """
