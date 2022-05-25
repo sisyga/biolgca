@@ -125,7 +125,7 @@ def get_lgca(geometry: str='hex', ib: bool=False, ve: bool=True, **kwargs):
 
         elif geometry in ['hex', 'hx', 'hexagonal']:
             from lgca.lgca_hex import NoVE_LGCA_Hex
-            return NoVE_LGCA_Hex (**kwargs)
+            return NoVE_LGCA_Hex(**kwargs)
 
         else:
             raise ValueError("Geometry specification is unknown. Try: '1d', '1D', 'lin', "

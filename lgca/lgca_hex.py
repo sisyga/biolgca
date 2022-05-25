@@ -4,7 +4,7 @@
 # The full license notice is found in the file lgca/__init__.py.
 
 from lgca.base import *
-from lgca.lgca_square import LGCA_Square, IBLGCA_Square, NoVE_LGCA_Square
+from lgca.lgca_square import LGCA_Square, IBLGCA_Square, NoVE_LGCA_Square, NoVE_IBLGCA_Square
 
 pi2 = 2 * np.pi
 
@@ -178,6 +178,7 @@ class LGCA_Hex(LGCA_Square):
         plt.ylabel('$y$')
         return fig, ax
 
+
 class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
     """
     Identity-based LGCA simulator class.
@@ -186,7 +187,7 @@ class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
                     'only_propagation']
 
 
-class NoVE_LGCA_Hex (NoVE_LGCA_Square, LGCA_Hex):
+class NoVE_LGCA_Hex(NoVE_LGCA_Square, LGCA_Hex):
 
     def nb_sum(self, qty, addCenter=False):
         """
@@ -212,3 +213,65 @@ class NoVE_LGCA_Hex (NoVE_LGCA_Square, LGCA_Hex):
         if addCenter:
             sum += qty
         return sum
+
+
+class NoVE_IBLGCA_Hex(NoVE_IBLGCA_Square, LGCA_Hex):
+
+    def propagation(self):
+        newcellnodes = get_arr_of_empty_lists(self.nodes.shape)
+        newcellnodes[..., 6:] = self.nodes[..., 6:]
+
+        # prop in 0-direction
+        newcellnodes[1:, :, 0] = self.nodes[:-1, :, 0]
+
+        # prop in 1-direction
+        newcellnodes[:, 1::2, 1] = self.nodes[:, :-1:2, 1]
+        newcellnodes[1:, 2::2, 1] = self.nodes[:-1, 1:-1:2, 1]
+
+        # prop in 2-direction
+        newcellnodes[:-1, 1::2, 2] = self.nodes[1:, :-1:2, 2]
+        newcellnodes[:, 2::2, 2] = self.nodes[:, 1:-1:2, 2]
+
+        # prop in 3-direction
+        newcellnodes[:-1, :, 3] = self.nodes[1:, :, 3]
+
+        # prop in 4-direction
+        newcellnodes[:, :-1:2, 4] = self.nodes[:, 1::2, 4]
+        newcellnodes[:-1, 1:-1:2, 4] = self.nodes[1:, 2::2, 4]
+
+        # prop in 5-direction
+        newcellnodes[1:, :-1:2, 5] = self.nodes[:-1, 1::2, 5]
+        newcellnodes[:, 1:-1:2, 5] = self.nodes[:, 2::2, 5]
+
+        self.nodes = newcellnodes
+        return self.nodes
+
+    def apply_rbcx(self):
+        # left boundary
+        self.nodes[self.r_int, :, 0] = self.nodes[self.r_int - 1, :, 3] + self.nodes[self.r_int, :, 0]
+        self.nodes[self.r_int, 2:-1:2, 1] = self.nodes[self.r_int - 1, 1:-2:2, 4] + self.nodes[self.r_int, 2:-1:2, 1]
+        self.nodes[self.r_int, 2:-1:2, 5] = self.nodes[self.r_int - 1, 3::2, 2] + self.nodes[self.r_int, 2:-1:2, 5]
+
+        # right boundary
+        self.nodes[-self.r_int - 1, :, 3] = self.nodes[-self.r_int, :, 0] + self.nodes[-self.r_int - 1, :, 3]
+        self.nodes[-self.r_int - 1, 1:-1:2, 4] = self.nodes[-self.r_int, 2::2, 1] + self.nodes[-self.r_int - 1, 1:-1:2, 4]
+        self.nodes[-self.r_int - 1, 1:-1:2, 2] = self.nodes[-self.r_int, :-2:2, 5] + self.nodes[-self.r_int - 1, 1:-1:2, 2]
+
+        self.apply_abcx()
+
+    def apply_rbcy(self):
+        lx, ly, _ = self.nodes.shape
+
+        # lower boundary
+        self.nodes[(1 - (self.r_int % 2)):, self.r_int, 1] = self.nodes[:lx - (1 - (self.r_int % 2)), self.r_int - 1,
+            4] + self.nodes[(1 - (self.r_int % 2)):, self.r_int, 1]
+        self.nodes[:lx - (self.r_int % 2), self.r_int, 2] = self.nodes[(self.r_int % 2):, self.r_int - 1,
+            5] + self.nodes[:lx - (self.r_int % 2), self.r_int, 2]
+
+        # upper boundary
+        self.nodes[:lx - ((ly - 1 - self.r_int) % 2), -self.r_int - 1, 4] = self.nodes[((ly - 1 - self.r_int) % 2):,
+            -self.r_int, 1] + self.nodes[:lx - ((ly - 1 - self.r_int) % 2), -self.r_int - 1, 4]
+        self.nodes[(1 - ((ly - 1 - self.r_int) % 2)):, -self.r_int - 1, 5] = self.nodes[:lx - (1 - ((ly - 1 - self.r_int) % 2)),
+            -self.r_int, 2] + self.nodes[(1 - ((ly - 1 - self.r_int) % 2)):, -self.r_int - 1, 5]
+        self.apply_abcy()
+

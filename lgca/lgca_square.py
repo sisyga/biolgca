@@ -252,10 +252,8 @@ class LGCA_Square(LGCA_base):
         if nodes is None:
             nodes = self.nodes[self.nonborder]
 
-        occupied = nodes.astype('bool')
-        density = occupied.sum(-1)
         if figsize is None:
-            figsize = estimate_figsize(density, cbar=False, dy=self.dy)
+            figsize = estimate_figsize(nodes[..., -1], cbar=False, dy=self.dy)
 
         fig, ax = self.setup_figure(figsize=figsize, **kwargs)
 
@@ -267,25 +265,24 @@ class LGCA_Square(LGCA_base):
         lw_circle = fontsize / 5
         lw_arrow = 0.5 * lw_circle
 
-        colors = 'none', 'k'
         arrows = []
         for i in range(self.velocitychannels):
             cx = self.c[0, i] * 0.5
             cy = self.c[1, i] * 0.5
             arrows += [FancyArrowPatch((x + cx*(1-rel_arrowlen), y + cy*(1-rel_arrowlen)), (x + cx, y + cy),
-                                       mutation_scale=.3, fc=colors[occ], ec=ec, lw=lw_arrow)
-                       for x, y, occ in zip(xx.ravel(), yy.ravel(), occupied[..., i].ravel())]
+                                       mutation_scale=.3, fc='k', ec=ec, lw=lw_arrow, alpha=occ)
+                       for x, y, occ in zip(xx.ravel(), yy.ravel(), nodes[..., i].astype(float).ravel())]
 
         arrows = PatchCollection(arrows, match_original=True)
         ax.add_collection(arrows)
 
         if self.restchannels > 0:
-            circles = [Circle(xy=(x, y), radius=r_circle, fc=colors[occ], ec='k', lw=lw_circle * occ, fill=False)
+            circles = [Circle(xy=(x, y), radius=r_circle, fc='white', ec='k', lw=lw_circle, fill=True, alpha=occ)
                        for x, y, occ in
-                       zip(xx.ravel(), yy.ravel(), nodes[..., self.velocitychannels:].sum(-1).ravel().astype(bool))]
+                       zip(xx.ravel(), yy.ravel(), nodes[..., self.velocitychannels:].sum(-1).ravel().astype(bool).astype(float))]
             texts = [ax.text(x, y - 0.5 * r_circle, str(n), ha='center', va='baseline', fontsize=fontsize,
-                             fontname='sans-serif', fontweight='bold', bbox=bbox_props, visible=bool(n))
-                     for x, y, n in zip(xx.ravel(), yy.ravel(), occupied[..., self.velocitychannels:].sum(-1).ravel())]
+                             fontname='sans-serif', fontweight='bold', bbox=bbox_props, alpha=float(bool(n)))
+                     for x, y, n in zip(xx.ravel(), yy.ravel(), nodes[..., self.velocitychannels:].sum(-1).ravel())]
             circles = PatchCollection(circles, match_original=True)
             ax.add_collection(circles)
 
@@ -316,25 +313,25 @@ class LGCA_Square(LGCA_base):
 
         fig, arrows, circles, texts = self.plot_config(nodes=nodes_t[0], **kwargs)
         title = plt.title('Time $k =$0')
-        arrow_color = np.zeros(nodes_t[..., :self.velocitychannels].shape + (4,))
-        arrow_color = arrow_color.reshape(nodes_t.shape[0], -1, 4)
-        arrow_color[..., -1] = np.moveaxis(nodes_t[..., :self.velocitychannels], -1, 1).reshape(nodes_t.shape[0], -1)
+        arrow_color = np.zeros(nodes_t[..., :self.velocitychannels].shape)
+        arrow_color = arrow_color.reshape(nodes_t.shape[0], -1)
+        arrow_color = np.moveaxis(nodes_t[..., :self.velocitychannels], -1, 1).reshape(nodes_t.shape[0], -1)
 
         if self.restchannels:
-            circle_color = np.zeros(nodes_t[..., 0].shape + (4,))
-            circle_color = circle_color.reshape(nodes_t.shape[0], -1, 4)
-            circle_color[..., -1] = np.any(nodes_t[..., self.velocitychannels:], axis=-1).reshape(nodes_t.shape[0], -1)
-            circle_fcolor = np.ones(circle_color.shape)
-            circle_fcolor[..., -1] = circle_color[..., -1]
+            circle_color = np.zeros(nodes_t[..., 0].shape)
+            circle_color = circle_color.reshape(nodes_t.shape[0], -1)
+            circle_color = np.any(nodes_t[..., self.velocitychannels:], axis=-1).reshape(nodes_t.shape[0], -1).astype(float)
+            # circle_fcolor = np.ones(circle_color.shape)
+            # circle_fcolor[..., -1] = circle_color[..., -1]
             resting_t = nodes_t[..., self.velocitychannels:].sum(-1).reshape(nodes_t.shape[0], -1)
 
             def update(n):
                 title.set_text('Time $k =${}'.format(n))
-                arrows.set(color=arrow_color[n])
-                circles.set(edgecolor=circle_color[n], facecolor=circle_fcolor[n])
+                arrows.set(alpha=arrow_color[n])
+                circles.set(alpha=circle_color[n])
                 for text, i in zip(texts, resting_t[n]):
                     text.set_text(str(i))
-                    text.set(alpha=bool(i))
+                    text.set(alpha=bool(i), visible=bool(i))
                 return arrows, circles, texts, title
 
             ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
@@ -343,7 +340,7 @@ class LGCA_Square(LGCA_base):
         else:
             def update(n):
                 title.set_text('Time $k =${}'.format(n))
-                arrows.set(color=arrow_color[n])
+                arrows.set(alpha=arrow_color[n])
                 return arrows, title
 
             ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
@@ -353,21 +350,19 @@ class LGCA_Square(LGCA_base):
         fig, arrows, circles, texts = self.plot_config(**kwargs)
         title = plt.title('Time $k =$0')
         nodes = self.nodes[self.nonborder]
-        arrow_color = np.zeros(nodes[..., :self.velocitychannels].ravel().shape + (4,))
+        arrow_color = np.zeros(nodes[..., :self.velocitychannels].ravel().shape)
         if self.restchannels:
-            circle_color = np.zeros(nodes[..., 0].ravel().shape + (4,))
-            circle_fcolor = np.ones(circle_color.shape)
+            circle_color = np.zeros(nodes[..., 0].ravel().shape)
 
             def update(n):
                 self.timestep()
-                nodes = self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int]
-                arrow_color[:, -1] = np.moveaxis(nodes[..., :self.velocitychannels], -1, 0).ravel()
-                circle_color[:, -1] = np.any(nodes[..., self.velocitychannels:], axis=-1).ravel()
-                circle_fcolor[:, -1] = circle_color[:, -1]
+                nodes = self.nodes[self.nonborder]
+                arrow_color = np.moveaxis(nodes[..., :self.velocitychannels], -1, 0).ravel().astype(float)
+                circle_color = np.any(nodes[..., self.velocitychannels:], axis=-1).ravel().astype(float)
                 resting_t = nodes[..., self.velocitychannels:].sum(-1).ravel()
                 title.set_text('Time $k =${}'.format(n))
-                arrows.set(color=arrow_color)
-                circles.set(edgecolor=circle_color, facecolor=circle_fcolor)
+                arrows.set(alpha=arrow_color)
+                circles.set(alpha=circle_color)
                 for text, i in zip(texts, resting_t):
                     text.set_text(str(i))
                     text.set(alpha=bool(i))
@@ -379,10 +374,10 @@ class LGCA_Square(LGCA_base):
         else:
             def update(n):
                 self.timestep()
-                nodes = self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int]
-                arrow_color[:, -1] = np.moveaxis(nodes[..., :self.velocitychannels], -1, 0).ravel()
+                nodes = self.nodes[self.nonborder]
+                arrow_color= np.moveaxis(nodes[..., :self.velocitychannels], -1, 0).ravel().astype(float)
                 title.set_text('Time $k =${}'.format(n))
-                arrows.set(color=arrow_color)
+                arrows.set(alpha=arrow_color)
                 return arrows, title
 
             ani = animation.FuncAnimation(fig, update, interval=interval)
@@ -755,10 +750,50 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
         return fig, pc, cmap
 
     def animate_config(self, nodes_t=None, interval=100, **kwargs):
-        warnings.warn("Config animation not available for IBLGCA yet.")
+        if nodes_t is None:
+            nodes_t = self.nodes_t.astype(bool)
+
+        return super().animate_config(nodes_t=nodes_t, interval=interval, **kwargs)
+
+    def plot_config(self, nodes=None, **kwargs):
+        if nodes is None:
+            nodes = self.occupied[self.nonborder]
+
+        return super().plot_config(nodes=nodes, **kwargs)
 
     def live_animate_config(self, interval=100, **kwargs):
-        warnings.warn("Live config animation not available for IBLGCA yet.")
+        fig, arrows, circles, texts = self.plot_config(**kwargs)
+        title = plt.title('Time $k =$0')
+        nodes = self.occupied[self.nonborder]
+        if self.restchannels:
+            def update(n):
+                self.timestep()
+                nodes = self.occupied[self.nonborder]
+                arrow_color = np.moveaxis(nodes[..., :self.velocitychannels], -1, 0).ravel().astype(float)
+                circle_color = np.any(nodes[..., self.velocitychannels:], axis=-1).ravel().astype(float)
+                resting_t = nodes[..., self.velocitychannels:].sum(-1).ravel()
+                title.set_text('Time $k =${}'.format(n))
+                arrows.set(alpha=arrow_color)
+                circles.set(alpha=circle_color)
+                for text, i in zip(texts, resting_t):
+                    text.set_text(str(i))
+                    text.set(alpha=bool(i))
+                return arrows, circles, texts, title
+
+            ani = animation.FuncAnimation(fig, update, interval=interval)
+            return ani
+
+        else:
+            def update(n):
+                self.timestep()
+                nodes = self.occupied[self.nonborder]
+                arrow_color = np.moveaxis(nodes[..., :self.velocitychannels], -1, 0).ravel().astype(float)
+                title.set_text('Time $k =${}'.format(n))
+                arrows.set(alpha=arrow_color)
+                return arrows, title
+
+            ani = animation.FuncAnimation(fig, update, interval=interval)
+            return ani
 
 
 class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
@@ -874,11 +909,8 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
 
         fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
 
-        if cbar:
-            cmap, cbar = get_cmap(density, cmap=cmap, cbarlabel=cbarlabel)
 
-        else:
-            cmap = get_cmap(density, cmap=cmap, cbarlabel=cbarlabel)
+        cmap = get_cmap(density, cmap=cmap, cbarlabel=cbarlabel)
 
 
         polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
@@ -953,7 +985,7 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
         warnings.warn("Live density animation not available for LGCA without volume exclusion yet.")
 
     def plot_config(self, nodes=None, figsize=None, grid=False, ec='none', rel_arrowlen=0.6, cmap='viridis', cbar=True,
-                    cbarlabel='Particle number $n$', **kwargs):
+                    cbarlabel='Particle number $n$', vmax=None, **kwargs):
         r_circle = self.r_poly * 0.25
         # bbox_props = dict(boxstyle="Circle,pad=0.3", fc="white", ec="k", lw=1.5)
         bbox_props = None
@@ -975,7 +1007,8 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
         lw_arrow = 0.5 * lw_circle
 
         # colors = 'none', 'k'
-        cmap = get_cmap(density, vmax=nodes.max(), cmap=cmap, cbar=cbar, cbarlabel=cbarlabel)
+        vmax = nodes.max() if vmax is None else vmax
+        cmap = get_cmap(density, vmax=vmax, cmap=cmap, cbar=cbar, cbarlabel=cbarlabel)
         arrows = []
         for i in range(self.velocitychannels):
             cx = self.c[0, i] * 0.5
@@ -1020,7 +1053,7 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
                     "recorded in past LGCA run, call lgca.timeevo with keyword record=True")
 
         tmax = nodes_t.shape[0]
-        fig, arrows, circles, cmap = self.plot_config(nodes=nodes_t[0], **kwargs)
+        fig, arrows, circles, cmap = self.plot_config(nodes=nodes_t[0], vmax=nodes_t.max(), **kwargs)
         title = plt.title('Time $k =$0')
         arrow_color = cmap.to_rgba(np.moveaxis(nodes_t[..., :self.velocitychannels], -1, 1)[None, ...]).reshape(tmax, -1, 4)
 

@@ -236,7 +236,7 @@ def get_cmap(density, vmax=None, cmap='viridis', cbar=True, cbarlabel=''):
         low_label = np.delete(low_label, 0).astype(int)
         labels = list(low_label)
     else:
-        labels = list(np.arange(1, ncolors + 1, 1))
+        labels = list(np.arange(1, ncolors + 1, 1, dtype=int))
     # if max label comes up automatically, leave it as it is
     if ticks[-1] == ticks[0::stride][-1]:
         cbar.set_ticks(ticks[0::stride])
@@ -1525,15 +1525,17 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         self.set_interaction(**kwargs)
 
     def set_interaction(self, **kwargs):
-        from lgca.nove_interactions import dd_alignment, di_alignment, go_or_grow, go_or_rest
+        from lgca.nove_interactions import dd_alignment, di_alignment, go_or_grow, go_or_rest, random_walk
         from lgca.interactions import only_propagation
         # configure interaction
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
             # if self.restchannels > 0:  # what is happening here
             #     print('Interaction only works without restchannels and will crash.')
+            if interaction == 'random_walk':
+                self.interaction = random_walk
             # density-dependent interaction rule
-            if interaction == 'dd_alignment':
+            elif interaction == 'dd_alignment':
                 self.interaction = dd_alignment
 
                 if 'beta' in kwargs:
@@ -1915,7 +1917,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base):
                     self.interaction_params['capacity'] = kwargs['capacity']
                 else:
                     self.interaction_params['capacity'] = 8
-                    print('capacity of channel set to ', self.interaction_params['capacity'])
+                    print('node capacity set to ', self.interaction_params['capacity'])
 
                 if 'kappa_std' in kwargs:
                     self.interaction_params['kappa_std'] = kwargs['kappa_std']
