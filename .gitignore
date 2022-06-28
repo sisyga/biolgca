@@ -12,3 +12,4 @@ docs/Makefile
 docs/build/*
 docs/source/*
 .gitignore
+__pycache__
