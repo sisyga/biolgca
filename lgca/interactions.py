@@ -3,6 +3,10 @@
 # Copyright (C) 2018-2022 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.
 # The full license notice is found in the file lgca/__init__.py.
 
+"""
+Interaction functions and helper functions for classical LGCA with volume exclusion.
+"""
+
 from bisect import bisect_left
 from random import random
 
@@ -215,7 +219,7 @@ def aggregation(lgca):
                (lgca.cell_density[lgca.nonborder] < lgca.K)
     coords = [a[relevant] for a in lgca.nonborder]
 
-    g = np.asarray(lgca.gradient(lgca.cell_density))
+    g = np.asarray(lgca.gradient(lgca.cell_density))  # np.asarray not needed
     for coord in zip(*coords):
         n = lgca.cell_density[coord]
         permutations = lgca.permutations[n]
