@@ -43,7 +43,7 @@ def get_lgca(geometry: str='hex', ib: bool=False, ve: bool=True, **kwargs):
 
     Parameters
     ----------
-    geometry : {'hex', 'square', 'lin'}
+    geometry : {'hex', 'square', 'lin'}, default='hex'
         Lattice geometry. Supported are 1D, 2D square and 2D hexagonal lattices.
 
         Aliases: 1D: ``'1D', '1d', 'linear'``; 2D square: ``'sq', 'rect', 'rectangular'``;
