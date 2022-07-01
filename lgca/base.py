@@ -1025,7 +1025,14 @@ class IBLGCA_base(LGCA_base, ABC):
         tocollapse = tuple(range(1, prop.ndim))
         mean_prop_t = np.mean(prop, axis=tocollapse)
         std_mean_prop_t = np.std(prop, axis=tocollapse, ddof=1) / np.sqrt(np.sum(occupied, axis=tocollapse))
-        plt.figure(num=figindex, figsize=figsize)
+        if figindex is None:
+            fig = plt.gcf()
+            fig.set_size_inches(figsize)
+
+        else:
+            fig = plt.figure(num=figindex)
+            fig.set_size_inches(figsize)
+
         tmax = nodes_t.shape[0]
 
         yerr = std_mean_prop_t
