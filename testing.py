@@ -30,3 +30,4 @@ lgca.plot_prop_spatial()
 # ani = lgca.live_animate_config(interval=500, grid=True)
 # ani = lgca.animate_flux()
 plt.show()
+
