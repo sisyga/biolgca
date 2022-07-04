@@ -1027,10 +1027,11 @@ class IBLGCA_base(LGCA_base, ABC):
         std_mean_prop_t = np.std(prop, axis=tocollapse, ddof=1) / np.sqrt(np.sum(occupied, axis=tocollapse))
         if figindex is None:
             fig = plt.gcf()
-            fig.set_size_inches(figsize)
 
         else:
             fig = plt.figure(num=figindex)
+
+        if figsize is not None:
             fig.set_size_inches(figsize)
 
         tmax = nodes_t.shape[0]
@@ -1805,7 +1806,7 @@ def get_arr_of_empty_lists(dims):
     return ufunclist(np.empty(dims, dtype=object))
 
 
-class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base):
+class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     interactions = ['go_or_grow', 'birthdeath', 'randomwalk']
 
     def __init__(self, nodes=None, dims=None, density=.1, restchannels=0, bc='periodic', **kwargs):
@@ -2078,7 +2079,15 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base):
         mean_prop_t = np.array([np.mean(prop) if len(prop) > 0 else np.nan for prop in prop_t])
         std_mean_prop_t = np.array \
             ([np.std(prop, ddof=1) / np.sqrt(len(prop)) if len(prop) > 0 else np.nan for prop in prop_t])
-        plt.figure(num=figindex, figsize=figsize)
+        if figindex is None:
+            fig = plt.gcf()
+
+        else:
+            fig = plt.figure(num=figindex)
+
+        if figsize is not None:
+            fig.set_size_inches(figsize)
+
         tmax = nodes_t.shape[0]
         yerr = std_mean_prop_t
         x = np.arange(tmax)
