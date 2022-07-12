@@ -260,6 +260,7 @@ class LGCA_base(ABC):
     """
     Base class for a lattice-gas. Not meant to be used alone!
     """
+    rng = npr.default_rng()  # random number generator. would be better to initialize with init and keywords
 
     @property
     @abstractmethod
