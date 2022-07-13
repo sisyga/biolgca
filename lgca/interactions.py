@@ -2,6 +2,7 @@ from bisect import bisect_left
 from math import log, exp
 from random import random
 
+import soc_functions
 import numpy as np
 import numpy.random as npr
 from scipy.special import binom as binom_coeff
