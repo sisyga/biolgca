@@ -150,6 +150,89 @@ def alignment(lgca):
 
     lgca.nodes = newnodes
 
+def alignment_soc(lgca):
+    """
+    Interaction rule has two components. First set of correlations are defined for nodes that meet the criteria required to perfom
+    the soc interaction. the additinoal parts with the coord are to eliminate those nodes that meet the criteria but do not have an
+    agent going against the majority.
+    The first for loop perfoms the soc interaction. then the fluxes are updated and the second for loop perfoms the alignment interaction.
+    Initilalises nodal, neighbourhood flux and correlations between them for each node
+    """
+
+    newnodes = lgca.nodes.copy()
+    g = lgca.calc_flux(lgca.nodes)
+    ng = lgca.nb_sum(g)
+    cell_nb_sum=lgca.nb_sum(lgca.nodes)
+    c=lgca.c
+    correlations=np.multiply(g[:,:,0],(ng[:,:,0]/6))+np.multiply(g[:,:,1],(ng[:,:,1]/6))
+    coord0l=[]
+    coord0r=[]
+    coord1l=[]
+    coord1r=[]
+ 
+    relevant2 =(correlations[lgca.nonborder]>0.66) & (correlations[lgca.nonborder]<0.9) & (lgca.cell_density[lgca.nonborder] > 0) & \
+                (lgca.cell_density[lgca.nonborder] < lgca.K)  
+               
+               
+    coords2 = [a[relevant2] for a in lgca.nonborder]
+
+    for coord in zip(*coords2):
+        n = lgca.cell_density[coord]
+        permutations = lgca.permutations[n]
+        j = lgca.j[n]  
+        current_sum = cell_nb_sum[coord]
+        ng_coord=ng[coord]/6   
+        dot1=np.einsum('i,ij',ng_coord,c)
+        s_nb=np.where(current_sum!=0,1,0)
+        [index1]=np.where(dot1==np.max(dot1))
+        c_theta_min=c[:,index1]
+        dot2=np.einsum('i,ij',c_theta_min.sum(axis=1),c)
+        dots_nb=dot2*s_nb
+        H1=np.where(lgca.gamma<=np.min(dots_nb[s_nb!=0]),0,1)
+    
+        if H1==1:
+            [index2]=np.where(dots_nb.round(5)==np.min(dots_nb[s_nb!=0].round(5)))
+            [index3]=np.where(s_nb==0)
+            index=np.array(list(set(index2).difference(index3)))
+            c_theta_max=c[:,index]
+            c_theta_max_sum=np.sum(c_theta_max,axis=1)
+
+            weights=np.exp(lgca.alpha * np.einsum('i,ij', c_theta_max_sum*H1, j)).cumsum()
+            ind = bisect_left(weights, random() * weights[-1])
+            newnodes[coord] = permutations[ind]
+        
+            coord1l=coord1l+[coord[0]]
+            coord1r=coord1r+[coord[1]]
+        else:
+            coord0l=coord0l+[coord[0]]
+            coord0r=coord0r+[coord[1]]
+        
+        lgca.nodes = newnodes
+        g1 = lgca.calc_flux(lgca.nodes)
+        ng1 = lgca.nb_sum(g1)
+
+
+        lgca.transitions=len(coord1l)
+        coords3app=[coord0l,coord0r]  
+ 
+        relevant3= ((correlations[lgca.nonborder]<=0.66) | (correlations[lgca.nonborder]>=0.9)) & (lgca.cell_density[lgca.nonborder] > 0) & \
+               (lgca.cell_density[lgca.nonborder] < lgca.K)       
+               
+        coords3 = [a[relevant3] for a in lgca.nonborder]
+ 
+        if len(coords3app[0])!=0:   
+            coords3[0]=np.append(coords3[0],coord0l)    
+            coords3[1]=np.append(coords3[1],coord0r)      
+  
+        for coord in zip(*coords3): 
+            n = lgca.cell_density[coord]
+            permutations = lgca.permutations[n]
+            j = lgca.j[n]
+            weights = np.exp(lgca.beta * np.einsum('i,ij', ng1[coord], j)).cumsum()
+            ind = bisect_left(weights, random() * weights[-1])
+            newnodes[coord] = permutations[ind]
+
+        lgca.nodes = newnodes
 
 def nematic(lgca):
     """
