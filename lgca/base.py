@@ -1666,9 +1666,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
             self.restcells_t = np.zeros((timesteps + 1,) + self.dims)
             self.restcells_t[0, ...] = self.nodes[self.nonborder][..., self.velocitychannels:].sum(-1)
         for t in tqdm(iterable=range(1, timesteps + 1), disable=1-showprogress):
-            #print("\nTimestep: {}".format(t))
             self.timestep()
-            #print(self.nodes.shape)
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.nonborder]
             if recordN:
@@ -1992,7 +1990,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
             self.channel_pop_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=np.uint)
             self.channel_pop_t[0, ...] = self.channel_pop[self.nonborder]
 
-        for t in tqdm(iterable=range(1, timesteps + 1), disable= 1 -showprogress):
+        for t in tqdm(iterable=range(1, timesteps + 1), disable=1-showprogress):
             self.timestep()
             if record:
                 self.nodes_t[t, ...] = copy(self.nodes[self.nonborder])
