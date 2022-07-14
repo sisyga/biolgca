@@ -412,7 +412,32 @@ class LGCA_base():
                 self.dens_t[t, ...] = self.cell_density[self.nonborder]
             if showprogress:
                 update_progress(1.0 * t / timesteps)
-
+    
+    def timeevo2(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
+        self.update_dynamic_fields()
+        if record:
+            self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
+            self.nodes_t[0, ...] = self.nodes[self.nonborder]
+            self.transitions_t = np.zeros((timesteps + 1,), dtype=int)
+            self.transitions_t[0, ...] = self.transitions            
+        if recordN:
+            self.n_t = np.zeros(timesteps + 1, dtype=np.int)
+            self.n_t[0] = self.cell_density[self.nonborder].sum()
+        if recorddens:
+            self.dens_t = np.zeros((timesteps + 1,) + self.dims)
+            self.dens_t[0, ...] = self.cell_density[self.nonborder]
+        for t in range(1, timesteps + 1):
+            self.timestep()
+            if record:
+                self.nodes_t[t, ...] = self.nodes[self.nonborder]
+                self.transitions_t[t,...]=self.transitions
+            if recordN:
+                self.n_t[t] = self.cell_density[self.nonborder].sum()
+            if recorddens:
+                self.dens_t[t, ...] = self.cell_density[self.nonborder]
+            if showprogress:
+                update_progress(1.0 * t / timesteps)  
+    
     def calc_permutations(self):
         self.permutations = [np.array(list(multiset_permutations([1] * n + [0] * (self.K - n))), dtype=np.int8)
                              for n in range(self.K + 1)]
