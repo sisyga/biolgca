@@ -178,7 +178,23 @@ class LGCA_base():
                 else:
                     self.beta = 2.
                     print('sensitivity set to beta = ', self.beta)
+                
+            elif interaction == 'alignment-SOC':
+                self.interaction = alignment-SOC
+                self.calc_permutations()
 
+                if 'beta' in kwargs:
+                    self.beta = kwargs['beta']
+                else:
+                    self.beta = 2.
+                    print('sensitivity set to beta = ', self.beta)
+                    
+                if 'alpha' in kwargs:
+                    self.alpha = kwargs['alpha']
+                else:
+                    self.alpha = 20
+                    print('sensitivity set to alpha = ', self.alpha)
+                 
             elif interaction == 'persistent_motion':
                 self.interaction = persistent_walk
                 self.calc_permutations()
