@@ -70,7 +70,8 @@ def birthdeath(lgca):
             if random() < r_b * (1 - rho):
                 lgca.maxlabel += 1
                 cells.append(lgca.maxlabel)
-                lgca.props['r_b'].append(float(trunc_gauss(0, lgca.a_max, r_b, sigma=lgca.std)))
+                lgca.props['r_b'].append(float(trunc_gauss(0, lgca.interaction_params['a_max'], r_b,
+                                                           sigma=lgca.interaction_params['std'])))
 
         channeldist = npr.multinomial(len(cells), [1. / lgca.K] * lgca.K).cumsum()
         shuffle(cells)

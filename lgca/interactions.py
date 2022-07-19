@@ -48,12 +48,14 @@ def random_walk(lgca):
     Shuffle config in the last axis, modeling a random walk.
     :return:
     """
+    lgca.nodes = lgca.rng.permuted(lgca.nodes, axis=-1)
+
     # disarrange(lgca.nodes, axis=-1)
-    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-               (lgca.cell_density[lgca.nonborder] < lgca.K)
-    coords = [a[relevant] for a in lgca.nonborder]
-    for coord in zip(*coords):
-        npr.shuffle(lgca.nodes[coord])
+    # relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
+    #            (lgca.cell_density[lgca.nonborder] < lgca.K)
+    # coords = [a[relevant] for a in lgca.nonborder]
+    # for coord in zip(*coords):
+    #     npr.shuffle(lgca.nodes[coord])
 
 
 def birth(lgca):

@@ -1828,15 +1828,10 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
         self.init_coords()
         self.init_nodes(density, nodes=nodes)
-        self.set_interaction(**kwargs)
-
-        # self.apply_boundaries()  -> Harish to Simon: is this really needed? If yes why?
-        # vectorising len function
+        self.calc_max_label()
         self.update_dynamic_fields()
         self.mean_prop_t = {}
-        # self.mean_prop_vel_t = {}  # not sure if always needed, but let's keep it for now
-        # self.mean_prop_rest_t = {}
-        self.calc_max_label()
+        self.set_interaction(**kwargs)
 
 
     def update_dynamic_fields(self):
