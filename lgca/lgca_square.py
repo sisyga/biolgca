@@ -592,7 +592,7 @@ class LGCA_Square(LGCA_base):
             figsize = estimate_figsize(density, cbar=True)
 
         fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
-        cmap = plt.cm.get_cmap('hsv')
+        cmap = plt.cm.get_cmap('gist_rainbow')
         cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.Normalize(vmin=0, vmax=360))
 
         jx, jy = np.moveaxis(self.calc_flux(nodes), -1, 0)
