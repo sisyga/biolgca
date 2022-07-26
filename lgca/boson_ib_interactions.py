@@ -61,21 +61,21 @@ def birthdeath(lgca):
         density = lgca.cell_density[coord]
         rho = density / lgca.interaction_params['capacity']
         cells = node.sum()
-
+        newcells = cells.copy()
         for cell in cells:
             if random() < lgca.interaction_params['r_d']:
-                cells.remove(cell)
+                newcells.remove(cell)
 
             r_b = lgca.props['r_b'][cell]
             if random() < r_b * (1 - rho):
                 lgca.maxlabel += 1
-                cells.append(lgca.maxlabel)
+                newcells.append(lgca.maxlabel)
                 lgca.props['r_b'].append(float(trunc_gauss(0, lgca.interaction_params['a_max'], r_b,
                                                            sigma=lgca.interaction_params['std'])))
 
-        channeldist = npr.multinomial(len(cells), [1. / lgca.K] * lgca.K).cumsum()
-        shuffle(cells)
-        newnode = [cells[:channeldist[0]]] + [cells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
+        channeldist = npr.multinomial(len(newcells), [1. / lgca.K] * lgca.K).cumsum()
+        shuffle(newcells)
+        newnode = [newcells[:channeldist[0]]] + [newcells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
 
         lgca.nodes[coord] = deepcopy(newnode)
 
