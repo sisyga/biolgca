@@ -253,7 +253,19 @@ def get_cmap(density, vmax=None, cmap='viridis', cbar=True, cbarlabel=''):
 
 
 def calc_nematic_tensor(v):
-    # Todo Simon
+    """
+    Given a vector field 'v', calculate the nematic tensor at each location. This tensor can be used to calculate
+    transition probabilites or characterize order. See https://en.wikipedia.org/wiki/Liquid_crystal#Order_parameter
+    Parameters
+    ----------
+    v: :py:class:`numpy.ndarray`
+    Last two dimensions should be length 2.
+
+    Returns
+    -------
+    Array of nematic tensors.
+    If 'v' has shape (nx, ny, 2) then the array of tensors has the shape (nx, ny, 2, 2).
+    """
     return np.einsum('...i,...j->...ij', v, v) - 0.5 * np.diag(np.ones(2))[None, ...]
 
 
