@@ -2665,17 +2665,26 @@ ufunclist = np.frompyfunc(list, 0, 1)
 def get_arr_of_empty_lists(dims):
     """
     Create a numpy array of dimensions 'dims' that is filled with empty lists.
-    :param dims: tuple
-    :return: numpy array with dtype=object, filled with empty lists
+
+    Parameters
+    ----------
+    dims: tuple, corresponding to shape of the array.
+
+    Returns
+    -------
+    :py:class:`numpy.ndarray`
+
     """
     return ufunclist(np.empty(dims, dtype=object))
 
 
 class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
+    """
+    Base class for identity-based LGCA without volume exclusion.
+    """
     interactions = ['go_or_grow', 'birthdeath', 'randomwalk']
 
     def __init__(self, nodes=None, dims=None, density=.1, restchannels=0, bc='periodic', **kwargs):
-        # ini_channel_pop is the inital population of a channel. This is useful when the nodes is not given
         """
         Initialize class instance.
         :param nodes:
