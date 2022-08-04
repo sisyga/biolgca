@@ -1966,7 +1966,14 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                     self.interaction_params['theta'] = [0.5] * (self.maxlabel + 1)
                     print('switch threshold set to theta = ', self.interaction_params['theta'][0])
                 self.props.update(theta=self.interaction_params['theta'])
+
+            else:
+                print('interaction', kwargs['interaction'], 'is not defined! Random walk used instead.')
+                print('Implemented interactions:', self.interactions)
+                self.interaction = randomwalk
+
         else:
+            print('Random walk interaction is used.')
             self.interaction = randomwalk
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, recordchanneldens=False,
