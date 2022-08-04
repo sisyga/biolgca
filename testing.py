@@ -2,6 +2,7 @@ from lgca import get_lgca
 import numpy as np
 from matplotlib import pyplot as plt
 
+#test
 # geometry
 geom = 'hx'
 restchannels = 6
