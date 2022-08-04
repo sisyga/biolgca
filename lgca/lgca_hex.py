@@ -60,6 +60,8 @@ class LGCA_Hex(LGCA_Square):
     ciy = np.sin(np.arange(velocitychannels) * pi2 / velocitychannels)
     c = np.array([cix, ciy])
     # attributes to draw polygons representing the nodes
+    r_poly = 0.5 / np.cos(np.pi / velocitychannels)
+    dy = np.sin(2 * np.pi / velocitychannels)
     orientation = 0.
 
     def init_coords(self):
