@@ -285,8 +285,7 @@ class LGCA_Hex(LGCA_Square):
         newcellnodes[:, 1:-1:2, 5] = self.nodes[:, 2::2, 5]
 
         self.nodes = newcellnodes
-        # ToDo: is this still needed?
-        return self.nodes
+
 
     def _apply_rbcx(self):
         # documented in parent class
