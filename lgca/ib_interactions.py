@@ -20,10 +20,11 @@ def random_walk(lgca):
     Particles are randomly redistributed among channels with the same probability for each channel.
     In combination with deterministic propagation it produces an unbiased random walk.
     """
-    relevant = lgca.cell_density[lgca.nonborder] > 0
-    coords = [a[relevant] for a in lgca.nonborder]
-    for coord in zip(*coords):
-        npr.shuffle(lgca.nodes[coord])
+    lgca.nodes = lgca.rng.permuted(lgca.nodes, axis=-1)
+    # relevant = lgca.cell_density[lgca.nonborder] > 0
+    # coords = [a[relevant] for a in lgca.nonborder]
+    # for coord in zip(*coords):
+    #     npr.shuffle(lgca.nodes[coord])
 
 
 
@@ -75,10 +76,8 @@ def birthdeath(lgca):
     Simple birth-death process with evolutionary dynamics towards a higher proliferation rate.
     Family membership of cells can be tracked by passing the keyword argument track_inheritance=True in get_lgca().
     """
-    # death process
+    # death process, remember who will die but give them the chance to proliferate
     dying = (npr.random(size=lgca.nodes.shape) < lgca.interaction_params['r_d']) & lgca.occupied
-    lgca.nodes[dying] = 0
-    lgca.update_dynamic_fields()
 
     # birth
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
@@ -111,6 +110,9 @@ def birthdeath(lgca):
                     fam = lgca.props['family'][label]
                     lgca.props['family'].append(fam)
         lgca.nodes[coord] = node
+
+    lgca.nodes[dying] = 0
+    lgca.update_dynamic_fields()
     random_walk(lgca)
 
 def birthdeath_discrete(lgca):

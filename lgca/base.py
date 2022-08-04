@@ -13,61 +13,26 @@ Supported LGCA types:
 - classical LGCA (:py:class:`LGCA_base`)
 - identity-based LGCA (:py:class:`IBLGCA_base`)
 - LGCA without volume exclusion (:py:class:`NoVE_LGCA_base`)
+- identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_base`)
 """
 
-import sys
 from abc import ABC, abstractmethod
 import matplotlib.colors as mcolors
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.cm import ScalarMappable
+import matplotlib.colors as colors
+from matplotlib import cm
 from numpy import random as npr
 from sympy.utilities.iterables import multiset_permutations
 from copy import copy, deepcopy
 from lgca.plots import muller_plot
 import warnings
+from tqdm import tqdm
 
 # configure matplotlib style
 plt.style.use('default')
 
-
-def update_progress(progress: float):
-    """
-    Update the progress bar on the standard output.
-
-    Writes progress strings like ``"[####----] 50%"`` to the standard output, replacing
-    the currently active line. Used in :py:meth:`LGCA_base.timeevo`.
-
-    Parameters
-    -----------
-    progress : float
-        Fraction of the work done. A value <0 indicates a halt of the process.
-        Values >=1 are interpreted as a finished process.
-
-    """
-    # Modify this to change the length of the progress bar in signs
-    barLength = 20
-    # determine the status from the progress input
-    status = ""
-    if isinstance(progress, int):
-        progress = float(progress)
-    if not isinstance(progress, float):
-        progress = 0
-        status = "Progress variable must be float\r\n"
-    if progress < 0:
-        progress = 0
-        status = "Halt...\r\n"
-    if progress >= 1:
-        progress = 1
-        status = "Done...\r\n"
-    # assemble the string to print
-    # \r carriage return causes it to overwrite the line each time it is updated
-    block = int(round(barLength * progress))
-    text = "\rProgress: [{0}] {1}% {2}".format("#" * block + "-" * (barLength - block), round(progress * 100, 1),
-                                               status)
-    # print to standard output
-    sys.stdout.write(text)
-    sys.stdout.flush()
 
 
 def colorbar_index(ncolors: int, cmap, use_gridspec: bool=False, cax=None):
@@ -215,6 +180,78 @@ def estimate_figsize(array, x: float=8., cbar: bool=False, dy: float=1.):
     return figsize
 
 
+def get_cmap(density, vmax=None, cmap='viridis', cbar=True, cbarlabel=''):
+    if vmax is None:
+        K = int(density.max())
+    else:
+        K = vmax
+
+    cmap = copy(cm.get_cmap(cmap))  # do not modify a globally registered colormap in matplotlib > 3.3.2
+    cmap.set_under(alpha=0.0)
+    cmap_scaled = False
+
+    if 1 < K <= cmap.N:
+        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
+    elif K > 1:
+        cmap_scaled = True
+        scaling_factor = K / cmap.N
+        nbins = cmap.N
+        density = density / scaling_factor
+        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(cmap.N + 1), cmap.N))
+    else:
+        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.Normalize(vmin=1e-6, vmax=1))
+    cmap.set_array(density)
+
+    if not cbar:
+        return cmap
+
+    if K <= 1:
+        # requires extra treatment because there is only one colour
+        cbar = plt.colorbar(cmap, extend='min', use_gridspec=True, boundaries=[0, 0.5, 1], values=[0, 1])
+    else:
+        cbar = plt.colorbar(cmap, extend='min', use_gridspec=True)
+    cbar.set_label(cbarlabel)
+    if cmap_scaled:
+        ncolors = nbins
+    else:
+        ncolors = max(1, K)
+    # set a numbering interval for high densities (e.g. 5-10-15-20)
+    if ncolors > 101:
+        stride = 10
+    elif ncolors > 51:
+        stride = 5
+    elif ncolors > 31:
+        stride = 2
+    else:
+        stride = 1
+    if K <= 1:
+        # requires extra treatment because there is only one colour
+        ticks = np.array([0.75])
+    else:
+        ticks = np.arange(1, ncolors + 1, 1) + 0.5
+    if cmap_scaled:
+        indices = np.arange(1, nbins + 2)
+        low_label = np.ceil(indices * scaling_factor - 1e-6)
+        low_label = np.roll(low_label, 1)
+        low_label = np.delete(low_label, 0).astype(int)
+        labels = list(low_label)
+    else:
+        labels = list(np.arange(1, ncolors + 1, 1, dtype=int))
+    # if max label comes up automatically, leave it as it is
+    if ticks[-1] == ticks[0::stride][-1]:
+        cbar.set_ticks(ticks[0::stride])
+        cbar.set_ticklabels(labels[0::stride])
+    # if max label is too close to last strided label, leave the latter out
+    elif stride > 1 and ticks[-1] != ticks[0::stride][-1] and ticks[-1] - ticks[0::stride][-1] < stride / 2:
+        cbar.set_ticks(list(ticks[0::stride][:-1]) + [ticks[-1]])
+        cbar.set_ticklabels(labels[0::stride][:-1] + [labels[-1]])
+    # if there is enough space, just add the max label
+    else:
+        cbar.set_ticks(list(ticks[0::stride]) + [ticks[-1]])
+        cbar.set_ticklabels(labels[0::stride] + [labels[-1]])
+    return cmap
+
+
 def calc_nematic_tensor(v):
     # Todo Simon
     return np.einsum('...i,...j->...ij', v, v) - 0.5 * np.diag(np.ones(2))[None, ...]
@@ -321,6 +358,7 @@ class LGCA_base(ABC):
     lgca_hex.LGCA_Hex : Classical LGCA in a 2D hexagonal geometry.
 
     """
+    rng = npr.default_rng()  # random number generator. would be better to initialize with init and keywords
 
     @property
     @abstractmethod
@@ -963,7 +1001,7 @@ class LGCA_base(ABC):
             self.velcells_t[0, ...] = self.nodes[self.nonborder][..., :self.velocitychannels].sum(-1)
             self.restcells_t = np.zeros((timesteps + 1,) + self.dims)
             self.restcells_t[0, ...] = self.nodes[self.nonborder][..., self.velocitychannels:].sum(-1)
-        for t in range(1, timesteps + 1):
+        for t in tqdm(iterable=range(1, timesteps + 1), disable=1-showprogress):
             self.timestep()
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.nonborder]
@@ -974,8 +1012,6 @@ class LGCA_base(ABC):
             if recordpertype:
                 self.velcells_t[t, ...] = self.nodes[self.nonborder][..., :self.velocitychannels].sum(-1)
                 self.restcells_t[t, ...] = self.nodes[self.nonborder][..., self.velocitychannels:].sum(-1)
-            if showprogress:
-                update_progress(1.0 * t / timesteps)
 
     def calc_permutations(self):
         """
@@ -1460,7 +1496,7 @@ class IBLGCA_base(LGCA_base, ABC):
                 self.fam_pop_t = np.zeros((timesteps + 1, self.maxfamily+1))
                 self.fam_pop_t[0, ...] = self.calc_family_pop_alive()
                 is_mutating = False
-        for t in range(1, timesteps + 1):
+        for t in tqdm(iterable=range(1, timesteps + 1), disable=1-showprogress):
             self.timestep()
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.nonborder]
@@ -1481,8 +1517,6 @@ class IBLGCA_base(LGCA_base, ABC):
                         raise ValueError("Number of families has increased, interaction must be included in the case " +
                                          "distinction for the recordfampop keyword in the IBLGCA base " +
                                          "timeevo function!") from e
-            if showprogress:
-                update_progress(1.0 * t / timesteps)
         if recordfampop and is_mutating:
             self._straighten_family_populations()
 
@@ -1648,9 +1682,15 @@ class IBLGCA_base(LGCA_base, ABC):
         tocollapse = tuple(range(1, prop.ndim))
         mean_prop_t = np.mean(prop, axis=tocollapse)
         std_mean_prop_t = np.std(prop, axis=tocollapse, ddof=1) / np.sqrt(np.sum(occupied, axis=tocollapse))
+        if figindex is None:
+            fig = plt.gcf()
 
-        # set up figure
-        plt.figure(num=figindex, figsize=figsize)
+        else:
+            fig = plt.figure(num=figindex)
+
+        if figsize is not None:
+            fig.set_size_inches(figsize)
+
         tmax = nodes_t.shape[0]
         x = np.arange(tmax)
         y = mean_prop_t
@@ -2300,7 +2340,7 @@ class IBLGCA_base(LGCA_base, ABC):
         --------
         **Please do not call this unless you are writing an interaction function that deals with mutations.**
 
-        It accesses :py:attr:`self.maxfamily` and :py:attr:`self.family_props` which do not exist if 
+        It accesses :py:attr:`self.maxfamily` and :py:attr:`self.family_props` which do not exist if
         :py:meth:`self.init_families` has not been called in the LGCA initialization.
 
         """
@@ -2346,15 +2386,17 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         self.set_interaction(**kwargs)
 
     def set_interaction(self, **kwargs):
-        from lgca.nove_interactions import dd_alignment, di_alignment, go_or_grow, go_or_rest
+        from lgca.nove_interactions import dd_alignment, di_alignment, go_or_grow, go_or_rest, random_walk
         from lgca.interactions import only_propagation
         # configure interaction
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
-            if self.restchannels > 0:
-                print('Interaction only works without restchannels and will crash.')
+            # if self.restchannels > 0:  # what is happening here
+            #     print('Interaction only works without restchannels and will crash.')
+            if interaction == 'random_walk':
+                self.interaction = random_walk
             # density-dependent interaction rule
-            if interaction == 'dd_alignment':
+            elif interaction == 'dd_alignment':
                 self.interaction = dd_alignment
 
                 if 'beta' in kwargs:
@@ -2478,7 +2520,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
             self.velcells_t[0, ...] = self.nodes[self.nonborder][..., :self.velocitychannels].sum(-1)
             self.restcells_t = np.zeros((timesteps + 1,) + self.dims)
             self.restcells_t[0, ...] = self.nodes[self.nonborder][..., self.velocitychannels:].sum(-1)
-        for t in range(1, timesteps + 1):
+        for t in tqdm(iterable=range(1, timesteps + 1), disable=1-showprogress):
             self.timestep()
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.nonborder]
@@ -2494,14 +2536,12 @@ class NoVE_LGCA_base(LGCA_base, ABC):
             if recordpertype:
                 self.velcells_t[t, ...] = self.nodes[self.nonborder][..., :self.velocitychannels].sum(-1)
                 self.restcells_t[t, ...] = self.nodes[self.nonborder][..., self.velocitychannels:].sum(-1)
-            if showprogress:
-                update_progress(1.0 * t / timesteps)
 
     def random_reset(self, density):
         """
         Distribute particles in the lattice according to a given density; can yield different cell numbers per
         lattice site
-        :param density: particle density in the lattice: number of particles/(dimensions*capacity)
+        :param density: particle density in the lattice: average number of particles per channel
         """
 
         # sample from a Poisson distribution with mean=density
@@ -2617,3 +2657,380 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         no_neighbours = self.c.shape[-1]
         N = self.cell_density[self.nonborder].sum()
         return alignment[self.nonborder].sum() / (no_neighbours * N)
+
+# create a numpy universal function (ufunc) of the python function 'list'. Can be used to create an numpy array of
+# empty lists if applied to an empty array
+ufunclist = np.frompyfunc(list, 0, 1)
+
+def get_arr_of_empty_lists(dims):
+    """
+    Create a numpy array of dimensions 'dims' that is filled with empty lists.
+    :param dims: tuple
+    :return: numpy array with dtype=object, filled with empty lists
+    """
+    return ufunclist(np.empty(dims, dtype=object))
+
+
+class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
+    interactions = ['go_or_grow', 'birthdeath', 'randomwalk']
+
+    def __init__(self, nodes=None, dims=None, density=.1, restchannels=0, bc='periodic', **kwargs):
+        # ini_channel_pop is the inital population of a channel. This is useful when the nodes is not given
+        """
+        Initialize class instance.
+        :param nodes:
+        :param l:
+        :param restchannels:
+        :param density:
+        :param bc:
+        :param r_int:
+        :param kwargs:
+        """
+        self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
+        self.props = {}
+        self.length_checker = np.vectorize(len)
+        self.set_bc(bc)
+        self.interaction_params = {}
+        self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
+        self.init_coords()
+        self.init_nodes(density, nodes=nodes)
+        self.calc_max_label()
+        self.update_dynamic_fields()
+        self.mean_prop_t = {}
+        self.set_interaction(**kwargs)
+
+
+    def update_dynamic_fields(self):
+        self.channel_pop = self.length_checker(self.nodes)  # population of a channel
+        self.cell_density = self.channel_pop.sum(-1)  # population of a node
+
+    def convert_int_to_ib(self, occ):
+        """
+        Convert an array of integers representing the occupation numbers of an lgca to an array consisting of lists of
+        individual cell labels. The length of each list corresponds to the entry in 'occ'.
+        :param occ: array of occupation numbers. must match the lgca dimensions
+        :return: array, where each entry is a list of individual cell labels.
+        """
+        labels = list(range(occ.sum()))
+        tempnodes = np.empty(occ.shape, dtype=object)
+        counter = 0
+        for ind, dens in np.ndenumerate(occ):
+            tempnodes[ind] = labels[counter:counter+dens]
+            counter += dens
+
+        return tempnodes
+
+    def random_reset(self, density):
+        """
+        Distribute particles in the lattice according to a given density; can yield different cell numbers per lattice site
+        :param density: particle density in the lattice: average number of particles per channel
+        """
+        density = npr.poisson(lam=density, size=self.dims + (self.K,))
+        tempnodes = self.convert_int_to_ib(density)
+        self.nodes[self.nonborder] = tempnodes
+        self.maxlabel = density.sum()
+        self.update_dynamic_fields()
+
+    def set_interaction(self, **kwargs):
+        from lgca.nove_ib_interactions import randomwalk, birth, birthdeath, go_or_grow
+        from lgca.interactions import only_propagation
+        if 'interaction' in kwargs:
+            interaction = kwargs['interaction']
+            if interaction in ('random walk', 'random_walk', 'diffusion'):
+                self.interaction = randomwalk
+            elif interaction == 'only_propagation':
+                self.interaction = only_propagation
+            elif interaction == 'birth':
+                self.interaction = birth
+                if 'r_b' in kwargs:
+                    self.interaction_params['r_b'] = kwargs['r_b']
+                else:
+                    self.interaction_params['r_b'] = 0.2
+                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+                self.props.update(r_b=[self.interaction_params['r_b']] * self.maxlabel)
+
+            elif interaction == 'birthdeath':
+                self.interaction = birthdeath
+                if 'capacity' in kwargs:
+                    self.interaction_params['capacity'] = kwargs['capacity']
+                else:
+                    self.interaction_params['capacity'] = 8
+                    print('capacity of channel set to ', self.interaction_params['capacity'])
+
+                if 'r_b' in kwargs:
+                    self.interaction_params['r_b'] = kwargs['r_b']
+                else:
+                    self.interaction_params['r_b'] = 0.2
+                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+                self.props.update(r_b=[self.interaction_params['r_b']] * (self.maxlabel + 1))
+
+                if 'r_d' in kwargs:
+                    self.interaction_params['r_d'] = kwargs['r_d']
+                else:
+                    self.interaction_params['r_d'] = 0.02
+                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+
+                if 'std' in kwargs:
+                    self.interaction_params['std'] = kwargs['std']
+                else:
+                    self.interaction_params['std'] = 0.01
+                    print('standard deviation set to = ', self.interaction_params['std'])
+                if 'a_max' in kwargs:
+                    self.interaction_params['a_max'] = kwargs['a_max']
+                else:
+                    self.interaction_params['a_max'] = 1.
+                    print('Max. birth rate set to a_max =', self.interaction_params['a_max'])
+
+            elif interaction == 'go_or_grow':
+                self.interaction = go_or_grow
+                try:
+                    assert self.restchannels > 0
+                except AssertionError:
+                    print('There must be exactly one rest channel for this interaction to work!')
+                if 'capacity' in kwargs:
+                    self.interaction_params['capacity'] = kwargs['capacity']
+                else:
+                    self.interaction_params['capacity'] = 8
+                    print('node capacity set to ', self.interaction_params['capacity'])
+
+                if 'kappa_std' in kwargs:
+                    self.interaction_params['kappa_std'] = kwargs['kappa_std']
+                else:
+                    self.interaction_params['kappa_std'] = 0.2
+                    print('std of kappa set to', self.interaction_params['kappa_std'])
+
+                if 'theta_std' in kwargs:
+                    self.interaction_params['theta_std'] = kwargs['theta_std']
+                else:
+                    self.interaction_params['theta_std'] = 0.05
+                    print('std of theta set to', self.interaction_params['theta_std'])
+
+                if 'r_d' in kwargs:
+                    self.interaction_params['r_d'] = kwargs['r_d']
+                else:
+                    self.interaction_params['r_d'] = 0.01
+                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+
+                if 'r_b' in kwargs:
+                    self.interaction_params['r_b'] = kwargs['r_b']
+                else:
+                    self.interaction_params['r_b'] = 0.2
+                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+
+                if 'kappa' in kwargs:
+                    kappa = kwargs['kappa']
+                    if hasattr(kappa, '__iter__'):
+                        self.interaction_params['kappa'] = list(kappa)
+                    else:
+                        self.interaction_params['kappa'] = [kappa] * (self.maxlabel + 1)
+                else:
+                    self.interaction_params['kappa'] = [5.] * (self.maxlabel + 1)
+                    print('switch rate set to kappa = ', self.interaction_params['kappa'][0])
+
+                self.props.update(kappa=self.interaction_params['kappa'])
+                if 'theta' in kwargs:
+                    theta = kwargs['theta']
+                    if hasattr(theta, '__iter__'):
+                        self.interaction_params['theta'] = list(theta)
+                    else:
+                        self.interaction_params['theta'] = [theta] * (self.maxlabel + 1)
+                else:
+                    self.interaction_params['theta'] = [0.5] * (self.maxlabel + 1)
+                    print('switch threshold set to theta = ', self.interaction_params['theta'][0])
+                self.props.update(theta=self.interaction_params['theta'])
+
+            else:
+                print('interaction', kwargs['interaction'], 'is not defined! Random walk used instead.')
+                print('Implemented interactions:', self.interactions)
+                self.interaction = randomwalk
+
+        else:
+            print('Random walk interaction is used.')
+            self.interaction = randomwalk
+
+    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, recordchanneldens=False,
+                showprogress=True):
+        self.update_dynamic_fields()
+        if record:
+            self.nodes_t = get_arr_of_empty_lists((timesteps +1,) + self.dims + (self.K,))
+            self.nodes_t[0, ...] = copy(self.nodes[self.nonborder])
+        if recordN:
+            self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
+            self.n_t[0] = self.cell_density[self.nonborder].sum()
+        if recorddens:
+            self.dens_t = np.zeros((timesteps + 1,) + self.dims, dtype=np.uint)
+            self.dens_t[0, ...] = self.cell_density[self.nonborder]
+        if recordchanneldens:
+            self.channel_pop_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=np.uint)
+            self.channel_pop_t[0, ...] = self.channel_pop[self.nonborder]
+
+        for t in tqdm(iterable=range(1, timesteps + 1), disable=1-showprogress):
+            self.timestep()
+            if record:
+                self.nodes_t[t, ...] = copy(self.nodes[self.nonborder])
+            if recordN:
+                self.n_t[t] = self.cell_density[self.nonborder].sum()
+            if recorddens:
+                self.dens_t[t, ...] = self.cell_density[self.nonborder]
+
+
+    def calc_max_label(self):
+        cells = self.nodes.sum()
+        if len(cells) == 0:
+            self.maxlabel = None
+
+        else: self.maxlabel = max(cells)
+
+    def get_prop(self, nodes=None, props=None, propname=None):
+        if nodes is None:
+            nodes = self.nodes[self.nonborder]
+
+        if props is None:
+            props = self.props
+
+        if propname is None:
+            propname = next(iter(self.props))
+
+        prop = np.array(props[propname])
+        proparray = prop[nodes.sum()]
+        return proparray
+
+    def calc_prop_mean(self, nodes=None, props=None, propname=None):
+        """
+        Calculate the mean value of a property "propname" on every node, given the node configuration "nodes" and
+        the properties "props"
+        """
+        cells = nodes.sum(-1)
+        mean_prop = np.ma.masked_all(cells.shape)
+        proparray = np.array(props[propname])
+        for ind, loccells in np.ndenumerate(cells):
+            if loccells:
+                nodeprops = proparray[loccells]
+                mean_prop[ind] = nodeprops.mean()
+                mean_prop.mask[ind] = 0
+        return mean_prop
+
+    def calc_prop_mean_spatiotemp(self, nodes_t=None, props=None):
+        """
+        Given the lgca states nodes_t, calculate the mean of individual cell properties at each node for each time point.
+        :param nodes_t: Recorded node states. If omitted, use recorded state of latest timeevo.
+        :param props: dictionary of individual cell properties. If omitted, props dictionary of current instance is used
+        :return:
+        """
+        if nodes_t is None:
+            nodes_t = self.nodes_t
+        if props is None:
+            props = self.props
+        tmax = nodes_t.shape[0]
+        for key in self.props:
+            self.mean_prop_t[key] = np.ma.masked_all((tmax, *self.dims))
+            # self.mean_prop_vel_t[key] = np.zeros([tmax,l])
+            # self.mean_prop_rest_t[key] = np.zeros([tmax,l])
+            self.mean_prop_t[key] = self.calc_prop_mean(propname=key, props=props, nodes=nodes_t)
+            # self.mean_prop_vel_t[key][t] = self.calc_prop_mean(propname=key, props=props, nodes=nodes_t[t][...,0:(self.K-1)])
+            # self.mean_prop_rest_t[key][t] = self.calc_prop_mean(propname=key, props=props, nodes=nodes_t[t][...,(self.K-1):])
+
+        return self.mean_prop_t
+
+
+    def plot_prop_timecourse(self, nodes_t=None, props=None, propname=None, figindex=None, figsize=None, **kwargs):
+        """
+        Plot the time evolution of the cell property 'propname'
+        :param nodes_t:
+        :param props:
+        :param propname:
+        :param figindex:
+        :param figsize:
+        :param kwargs: keyword arguments for the matplotlib.plot command
+        :return:
+        """
+
+        if nodes_t is None:
+            nodes_t = self.nodes_t
+
+        if props is None:
+            props = self.props
+
+        if propname is None:
+            propname = next(iter(self.props))
+
+        prop_t = [self.get_prop(nodes, props=props, propname=propname) for nodes in nodes_t]
+        mean_prop_t = np.array([np.mean(prop) if len(prop) > 0 else np.nan for prop in prop_t])
+        std_mean_prop_t = np.array \
+            ([np.std(prop, ddof=1) / np.sqrt(len(prop)) if len(prop) > 0 else np.nan for prop in prop_t])
+        if figindex is None:
+            fig = plt.gcf()
+
+        else:
+            fig = plt.figure(num=figindex)
+
+        if figsize is not None:
+            fig.set_size_inches(figsize)
+
+        tmax = nodes_t.shape[0]
+        yerr = std_mean_prop_t
+        x = np.arange(tmax)
+        y = mean_prop_t
+
+        plt.xlabel('$t$')
+        plt.ylabel('${}$'.format(propname))
+        plt.title('Time course of the cell property')
+        line = plt.plot(x, y, **kwargs)
+        errors = plt.fill_between(x, y - yerr, y + yerr, alpha=0.5, antialiased=True, interpolate=True)
+        return line, errors
+
+    def plot_prop_hist(self, nodes=None, props=None, propname=None, figindex=None, figsize=None, **kwargs):
+        """
+        Plot histogram of cell property 'propname' of cells in 'nodes'. Per default, the current lgca state and the
+        first property is shown.
+        :param nodes:
+        :param props:
+        :param propname:
+        :param figindex:
+        :param figsize:
+        :param kwargs:
+        :return:
+        """
+        if nodes is None:
+            nodes = self.nodes[self.nonborder]
+        if props is None:
+            props = self.props
+        if propname is None:
+            propname = next(iter(props))
+
+        propvals = [props[propname][id] for id in nodes.sum()]
+        plt.figure(num=figindex, figsize=figsize)
+        plt.hist(propvals, **kwargs)
+        plt.xlabel('{}'.format(propname))
+        plt.ylabel('Count')
+
+    def plot_prop_2dhist(self, nodes=None, props=None, propnames=None, figindex=None, figsize=None, **kwargs):
+        """
+        Plot a 2d-histogram of two cell properties given by 'propnames' of all cells in 'nodes'. By default, the current
+        lgca state is used and the first two properties are shown.
+        :param nodes:
+        :param props:
+        :param propnames:
+        :param figindex:
+        :param figsize:
+        :param kwargs:
+        :return:
+        """
+        import seaborn as sns
+        if nodes is None:
+            nodes = self.nodes[self.nonborder]
+        if props is None:
+            props = self.props
+        if propnames is None:
+            names = iter(props)
+            propname1 = next(names)
+            propname2 = next(names)
+
+        ids = [id for id in nodes.sum()]
+        propvals1, propvals2 = [props[propname1][id] for id in ids], [props[propname2][id] for id in ids]
+        # plt.figure(num=figindex, figsize=figsize)
+        sns.jointplot(x=propvals1, y=propvals2, marginal_ticks=True, kind='hist', **kwargs)
+        plt.xlabel('{}'.format(propname1))
+        plt.ylabel('{}'.format(propname2))
+
+
