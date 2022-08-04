@@ -64,7 +64,7 @@ class LGCA_Square(LGCA_base):
                     'random_walk', 'excitable_medium', 'nematic', 'persistant_motion', 'chemotaxis', 'contact_guidance',
                     'only_propagation']
     velocitychannels = 4
-    ## build velocity channel vectors
+    # build velocity channel vectors
     cix = np.array([1, 0, -1, 0], dtype=float)
     ciy = np.array([0, 1, 0, -1], dtype=float)
     c = np.array([cix, ciy])
@@ -520,9 +520,16 @@ class LGCA_Square(LGCA_base):
     def calc_vorticity(self, nodes=None):
         """
         Calculate the vorticity of the flow field corresponding to the lgca state 'nodes'. The vorticity is used to
-        characterize rotations in a field. For more, see https://en.wikipedia.org/wiki/Vorticity
-        :param nodes: lgca state. by default it is the current state of the lgca class instance
-        :return:
+        characterize rotations in a flow field. For more, see https://en.wikipedia.org/wiki/Vorticity
+        Parameters
+        ----------
+        nodes : :py:class:`numpy.ndarray`
+
+        Returns
+        -------
+        :py:class:`numpy.ndarray` of `float`
+            Scalar field with the same shape as ``self.cell_density``.
+
         """
         if nodes is None:
             nodes = self.nodes
@@ -544,8 +551,15 @@ class LGCA_Square(LGCA_base):
         """
         Calculate the correlation between the node fluxes and the mean node flux in the neighborhood. Used to quantify
         correlated movement.
-        :param nodes:
-        :return:
+        Parameters
+        ----------
+        nodes : :py:class:`numpy.ndarray`
+
+        Returns
+        -------
+        :py:class:`numpy.ndarray` of `float`
+            Scalar field with the same shape as ``self.cell_density``.
+
         """
         if nodes is None:
             nodes = self.nodes
