@@ -11,6 +11,16 @@ except ImportError:
 
 
 def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
+    """
+    Draw random variables from a truncated Gaussian distribution. The distribution is normalized between the 'lower'
+    and 'upper' bound, hast he mean value 'mu' and the standard deviation 'sigma'.
+    :param lower: lower bound
+    :param upper: upper bound
+    :param mu: mean value
+    :param sigma: standard deviation
+    :param size: number of samples
+    :return:
+    """
     a = (lower - mu) / sigma
     b = (upper - mu) / sigma
     return truncnorm(a, b, loc=mu, scale=sigma).rvs(size)
@@ -31,6 +41,14 @@ def randomwalk(lgca):
 
 
 def birth(lgca):
+    """
+    Apply a birth step. Each cell proliferates following a logistic growth law using its individual birth rate r_b and
+    a capacity 'capacity', that is constant for all cells. Daughter cells receive an individual proliferation rate that
+    is drawn from a truncated Gaussian distribution between 0 and a_max, whose mean is equal to the mother cell's r_b,
+    with standard deviation 'std'.
+    :param lgca:
+    :return:
+    """
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
@@ -54,6 +72,14 @@ def birth(lgca):
 
 
 def birthdeath(lgca):
+    """
+    Apply a birth-death step. Each cell proliferates following a logistic growth law using its individual birth rate r_b and
+    a capacity 'capacity', that is constant for all cells. All cells die with a constant probability 'r_d'.
+    Daughter cells receive an individual proliferation rate that is drawn from a truncated Gaussian distribution between
+    0 and a_max, whose mean is equal to the mother cell's r_b, with standard deviation 'std'.
+    :param lgca:
+    :return:
+    """
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
@@ -81,6 +107,14 @@ def birthdeath(lgca):
 
 
 def go_or_grow(lgca):
+    """
+    Apply the evolutionary "go-or-grow" interaction. Cells switch from a migratory to a resting phenotype and vice versa
+    depending on their individual properties and the local cell density. Resting cells proliferate with a constant
+    proliferation rate. Each cell dies with a constant rate. Daughter cells inherit their switch properties from the
+    mother cells with some small variations given by a (truncated) Gaussian distribution.
+    :param lgca:
+    :return:
+    """
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):

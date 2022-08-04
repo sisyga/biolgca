@@ -1798,10 +1798,16 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         N = self.cell_density[self.nonborder].sum()
         return alignment[self.nonborder].sum() / (no_neighbours * N)
 
-
+# create a numpy universal function (ufunc) of the python function 'list'. Can be used to create an numpy array of
+# empty lists if applied to an empty array
 ufunclist = np.frompyfunc(list, 0, 1)
 
 def get_arr_of_empty_lists(dims):
+    """
+    Create a numpy array of dimensions 'dims' that is filled with empty lists.
+    :param dims: tuple
+    :return: numpy array with dtype=object, filled with empty lists
+    """
     return ufunclist(np.empty(dims, dtype=object))
 
 
@@ -1839,6 +1845,12 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.cell_density = self.channel_pop.sum(-1)  # population of a node
 
     def convert_int_to_ib(self, occ):
+        """
+        Convert an array of integers representing the occupation numbers of an lgca to an array consisting of lists of
+        individual cell labels. The length of each list corresponds to the entry in 'occ'.
+        :param occ: array of occupation numbers. must match the lgca dimensions
+        :return: array, where each entry is a list of individual cell labels.
+        """
         labels = list(range(occ.sum()))
         tempnodes = np.empty(occ.shape, dtype=object)
         counter = 0
@@ -1860,7 +1872,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.update_dynamic_fields()
 
     def set_interaction(self, **kwargs):
-        from lgca.boson_ib_interactions import randomwalk, birth, birthdeath, go_or_grow
+        from lgca.nove_ib_interactions import randomwalk, birth, birthdeath, go_or_grow
         from lgca.interactions import only_propagation
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
@@ -2039,6 +2051,12 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         return mean_prop
 
     def calc_prop_mean_spatiotemp(self, nodes_t=None, props=None):
+        """
+        Given the lgca states nodes_t, calculate the mean of individual cell properties at each node for each time point.
+        :param nodes_t: Recorded node states. If omitted, use recorded state of latest timeevo.
+        :param props: dictionary of individual cell properties. If omitted, props dictionary of current instance is used
+        :return:
+        """
         if nodes_t is None:
             nodes_t = self.nodes_t
         if props is None:
@@ -2102,6 +2120,17 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         return line, errors
 
     def plot_prop_hist(self, nodes=None, props=None, propname=None, figindex=None, figsize=None, **kwargs):
+        """
+        Plot histogram of cell property 'propname' of cells in 'nodes'. Per default, the current lgca state and the
+        first property is shown.
+        :param nodes:
+        :param props:
+        :param propname:
+        :param figindex:
+        :param figsize:
+        :param kwargs:
+        :return:
+        """
         if nodes is None:
             nodes = self.nodes[self.nonborder]
         if props is None:
@@ -2116,6 +2145,17 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         plt.ylabel('Count')
 
     def plot_prop_2dhist(self, nodes=None, props=None, propnames=None, figindex=None, figsize=None, **kwargs):
+        """
+        Plot a 2d-histogram of two cell properties given by 'propnames' of all cells in 'nodes'. By default, the current
+        lgca state is used and the first two properties are shown.
+        :param nodes:
+        :param props:
+        :param propnames:
+        :param figindex:
+        :param figsize:
+        :param kwargs:
+        :return:
+        """
         import seaborn as sns
         if nodes is None:
             nodes = self.nodes[self.nonborder]

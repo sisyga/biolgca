@@ -3,7 +3,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 # geometry
-geom = 'sq'
+geom = 'hx'
 restchannels = 6
 l = 20
 dims = l, l
@@ -26,12 +26,12 @@ beta = 1.2
 
 
 lgca = get_lgca(interaction='alignment', bc='periodic', density=dens, geometry=geom, dims=dims,
-                restchannels=restchannels, ve=0, ib=1, beta=beta,
+                restchannels=restchannels, ve=1, ib=1, beta=beta,
                 r_d=r_d, r_b=r_b, kappa=kappa, theta=theta)
-lgca.timeevo(50, record=1)
+# lgca.timeevo(50, record=1)
 # lgca.plot_config()
 # lgca.plot_prop_spatial()
-ani = lgca.animate_config(interval=500, grid=0)
+ani = lgca.live_animate_config(interval=500, grid=0)
 # ani = lgca.animate_flux()
 # ani = lgca.animate_density()
 # lgca.plot_flux(cbar=0)

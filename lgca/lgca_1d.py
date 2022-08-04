@@ -465,6 +465,17 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
         LGCA_1D.plot_flux(self, nodes_t, **kwargs)
 
     def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', cbarlabel=None, **kwargs):
+        """
+        Plot the spatial distribution of a cell property 'propname'. At each node, for each time step the mean value in
+        the node is shown. Empty nodes are masked.
+        :param nodes_t:
+        :param props:
+        :param propname:
+        :param cmap:
+        :param cbarlabel:
+        :param kwargs:
+        :return:
+        """
         if nodes_t is None:
             nodes_t = self.nodes_t
         if props is None:

@@ -167,6 +167,13 @@ class LGCA_Square(LGCA_base):
         return np.moveaxis(np.asarray(np.gradient(qty, 0.5)), 0, -1)
 
     def channel_weight(self, qty):
+        """
+        Return an array of shape qty.shape + velocitychannels. 'qty' should be scalar field with the same dimension
+        as the lgca lattice, so that the returned array assigns a weight to each velocity channel that is equal to the
+        value of 'qty' in the neighboring node corresponding to the velocity channel.
+        :param qty:
+        :return:
+        """
         weights = np.zeros(qty.shape + (self.velocitychannels,))
         weights[:-1, :, 0] = qty[1:, ...]
         weights[1:, :, 2] = qty[:-1, ...]
@@ -176,6 +183,12 @@ class LGCA_Square(LGCA_base):
         return weights
 
     def calc_vorticity(self, nodes=None):
+        """
+        Calculate the vorticity of the flow field corresponding to the lgca state 'nodes'. The vorticity is used to
+        characterize rotations in a field. For more, see https://en.wikipedia.org/wiki/Vorticity
+        :param nodes: lgca state. by default it is the current state of the lgca class instance
+        :return:
+        """
         if nodes is None:
             nodes = self.nodes
         if nodes.dtype != 'bool':
@@ -193,6 +206,12 @@ class LGCA_Square(LGCA_base):
         return vorticity
 
     def calc_velocity_correlation(self, nodes=None):
+        """
+        Calculate the correlation between the node fluxes and the mean node flux in the neighborhood. Used to quantify
+        correlated movement.
+        :param nodes:
+        :return:
+        """
         if nodes is None:
             nodes = self.nodes
         if nodes.dtype != 'bool':
