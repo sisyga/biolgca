@@ -300,7 +300,7 @@ class LGCA_1D(LGCA_base):
         array([0, 3, 2, 2, 3])
 
         ``lgca.cell_density`` is used as the argument `qty`. The value at each position in the resulting array is the
-        sum of the values at the neighboring positions in the source array. Note that the reduction to the non-border 
+        sum of the values at the neighboring positions in the source array. Note that the reduction to the non-border
         nodes can only be done after the sum calculation in order to preserve boundary conditions.
 
         """
@@ -504,7 +504,7 @@ class LGCA_1D(LGCA_base):
             else:
                 raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
                                    "in past LGCA run, call lgca.timeevo() with keyword record=True")
-        dens_t = nodes_t.sum(-1) / nodes_t.shape[-1]
+        dens_t = nodes_t.sum(-1)
         tmax, l = dens_t.shape
         flux_t = nodes_t[..., 0].astype(int) - nodes_t[..., 1].astype(int)
 
@@ -518,6 +518,13 @@ class LGCA_1D(LGCA_base):
         # create plot
         fig, ax = self.setup_figure(tmax, **kwargs)
         plot = ax.imshow(rgba, interpolation='None', origin='upper')
+        plt.xlabel(r'Lattice node $r \, (\varepsilon)$', )
+        plt.ylabel(r'Time step $k \, (\tau)$')
+        ax.xaxis.set_label_position('top')
+        ax.xaxis.set_ticks_position('top')
+        ax.xaxis.tick_top()
+        plt.tight_layout()
+        # color bar option is missing here
         return plot
 
 
@@ -665,7 +672,8 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
             self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.uint)
             self.apply_boundaries()
 
-    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis_r', relative_max=None, absolute_max=None, offset_t=0, offset_x=0):
+    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='hot_r', relative_max=None,
+                     absolute_max=None, offset_t=0, offset_x=0):
         """
         Create a plot showing the number of particles per lattice site.
         :param density_t: particle number per lattice site (ndarray of dimension (timesteps + 1,) + self.dims)
@@ -719,51 +727,6 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         plt.tight_layout()
         return plot
 
-    # def plot_flux(self, nodes_t=None, figindex=None, figsize=None):
-    #     """
-    #     Create a plot showing the main direction of particles per lattice site.
-    #     :param nodes_t: particles per velocity channel at lattice site
-    #                     (ndarray of dimension (timesteps + 1,) + self.dims + (self.K,))
-    #     :param figindex: number of the figure to create/activate
-    #     :param figsize: desired figure size
-    #     :return: plot as a matplotlib.image
-    #     """
-    #     # set values for unused arguments
-    #     if nodes_t is None:
-    #         if hasattr(self, 'nodes_t'):
-    #             nodes_t = self.nodes_t
-    #         else:
-    #             raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
-    #                                "in past LGCA run, call lgca.timeevo() with keyword record=True")
-    #     # calculate particle density, max time and dimension values, flux
-    #     dens_t = nodes_t.sum(-1) / nodes_t.shape[-1]
-    #     tmax, l = dens_t.shape
-    #     flux_t = nodes_t[..., 0].astype(int) - nodes_t[..., 1].astype(int)
-    #     if figsize is None:
-    #         figsize = estimate_figsize(dens_t.T)
-    #
-    #     # encode flux as RGBA values
-    #     # 4: RGBA A=alpha: transparency
-    #     rgba = np.zeros((tmax, l, 4))
-    #     rgba[dens_t > 0, -1] = 1.
-    #     rgba[flux_t > 0, 0] = 1.  # can I do this in ve, too?
-    #     rgba[flux_t < 0, 2] = 1.
-    #     rgba[flux_t == 0, :-1] = 0.  # unpopulated lattice sites are white
-    #     # set up figure
-    #     fig = plt.figure(num=figindex, figsize=figsize)
-    #     ax = fig.add_subplot(111)
-    #     # create plot with axis labels, title and layout
-    #     plot = ax.imshow(rgba, interpolation='None', origin='upper')
-    #     plt.xlabel(r'Lattice node $r \, [\varepsilon]$', )
-    #     plt.ylabel(r'Time step $k \, [\tau]$')
-    #     ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
-    #     ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
-    #     ax.xaxis.set_label_position('top')
-    #     ax.xaxis.set_ticks_position('top')
-    #     ax.xaxis.tick_top()
-    #     plt.tight_layout()
-    #     return plot
-
     def nb_sum(self, qty, addCenter=False):
         """
         Calculate sum of values in neighboring lattice sites of each lattice site.
@@ -780,3 +743,104 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         if addCenter:
            sum += qty
         return sum
+
+
+class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
+    def propagation(self):
+        """
+        :return:
+        """
+        newnodes = get_arr_of_empty_lists(self.nodes.shape)
+
+        # prop. to the left
+        newnodes[1:, 0] = self.nodes[:-1, 1]
+
+        # prop. to the right
+        newnodes[:-1, 1] = self.nodes[1:, 0]
+
+        # resting cells stay
+        newnodes[:, -1] = self.nodes[:, -1]
+
+        self.nodes = newnodes
+
+    def apply_rbc(self):
+        self.nodes[self.r_int, 0] = self.nodes[self.r_int, 0] + self.nodes[self.r_int - 1, 1]
+        self.nodes[-self.r_int - 1, 1] = self.nodes[-self.r_int - 1, 1] + self.nodes[-self.r_int, 0]
+        self.apply_abc()
+
+    def apply_abc(self):
+        self.nodes[self.border] = get_arr_of_empty_lists(self.nodes[self.border].shape)
+        # for channel in self.nodes[self.border].flat:
+        #     channel.clear()
+
+    def init_nodes(self, density, nodes=None):
+        """
+        initialize the nodes. there are three options:
+        1) you provide only the argument "density", which should be a positive float that indicates the average number
+        of cells in each channel
+        2) you provide an array "nodes" with nodes.dtype == int,
+            where each integer determines the number of cells in each channel
+        3) you provide an array "nodes" with nodes.dtype == object, where each element is a list of unique cell labels
+        """
+        self.nodes = get_arr_of_empty_lists(((self.l + 2 * self.r_int, self.K)))
+        if nodes is None:
+            self.random_reset(density)
+
+        elif nodes.dtype == object:
+            self.nodes[self.nonborder] = nodes
+
+        else:
+            occ = nodes.astype(int)
+            self.nodes[self.nonborder] = self.convert_int_to_ib(occ)
+
+        self.calc_max_label()
+
+    def plot_flux(self, nodes_t=None, **kwargs):
+        if nodes_t is None:
+            if hasattr(self, 'nodes_t'):
+                nodes_t = self.length_checker(self.nodes_t)
+            else:
+                raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
+                                   "in past LGCA run, call lgca.timeevo() with keyword record=True")
+
+        if nodes_t.dtype != 'int':
+            nodes_t = self.length_checker(self.nodes_t)
+        LGCA_1D.plot_flux(self, nodes_t, **kwargs)
+
+    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', cbarlabel=None, **kwargs):
+        """
+        Plot the spatial distribution of a cell property 'propname'. At each node, for each time step the mean value in
+        the node is shown. Empty nodes are masked.
+        :param nodes_t:
+        :param props:
+        :param propname:
+        :param cmap:
+        :param cbarlabel:
+        :param kwargs:
+        :return:
+        """
+        if nodes_t is None:
+            nodes_t = self.nodes_t
+        if props is None:
+            props = self.props
+        if propname is None:
+            propname = next(iter(props))
+
+        if self.mean_prop_t == {}:
+            self.calc_prop_mean_spatiotemp()
+
+        tmax, l, _ = nodes_t.shape
+        fig, ax = self.setup_figure(tmax, **kwargs)
+        mean_prop_t = self.mean_prop_t[propname]
+
+        plot = plt.imshow(mean_prop_t, interpolation='none', cmap=cmap, aspect='equal')
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size=0.3, pad=0.1)
+        cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
+        if cbarlabel is None:
+            cbar.set_label(r'Property ${}$'.format(propname))
+        else:
+            cbar.set_label(cbarlabel)
+        plt.sca(ax)
+        return plot
+
