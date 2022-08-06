@@ -4,9 +4,9 @@
 # The full license notice is found in the file lgca/__init__.py.
 
 """
-Classes for one-dimensional LGCA. They specify geometry-dependent LGCA behavior
-and inherit properties and structure from the respective abstract base classes.
-Objects of these classes can be used to simulate.
+Classes for one-dimensional LGCA. They specify geometry-dependent LGCA behavior 
+and inherit properties and structure from the respective abstract base classes. 
+Objects of these classes can be used to simulate. 
 
 Supported LGCA types:
 
@@ -25,7 +25,7 @@ class LGCA_1D(LGCA_base):
     """
     Classical LGCA with volume exclusion on a 1D lattice.
 
-    It holds all methods and attributes that are specific for a linear geometry. See :py:class:`lgca.base.LGCA_base` for
+    It holds all methods and attributes that are specific for a linear geometry. See :py:class:`lgca.base.LGCA_base` for 
     the documentation of inherited attributes.
 
     Attributes
@@ -50,13 +50,13 @@ class LGCA_1D(LGCA_base):
         """
         Set LGCA dimensions.
 
-        Initializes :py:attr:`self.K`, :py:attr:`self.restchannels`, :py:attr:`self.dims` and
+        Initializes :py:attr:`self.K`, :py:attr:`self.restchannels`, :py:attr:`self.dims` and 
         :py:attr:`self.l`.
 
         Parameters
         ----------
         dims : int or tuple, default=100
-            Lattice dimensions. Must match with specified geometry, everything except the first tuple element
+            Lattice dimensions. Must match with specified geometry, everything except the first tuple element 
             is ignored.
         nodes : :py:class:`numpy.ndarray`
             Custom initial lattice configuration.
@@ -93,11 +93,11 @@ class LGCA_1D(LGCA_base):
 
     def init_nodes(self, density=0.1, nodes=None, **kwargs):
         """
-        Initialize LGCA lattice configuration. Create the lattice and then assign particles to
+        Initialize LGCA lattice configuration. Create the lattice and then assign particles to 
         channels in the nodes.
 
-        Initializes :py:attr:`self.nodes`. If `nodes` is not provided, the lattice is initialized with particles
-        randomly so that the averge lattice density is `density`. For the random initialization there is a choice
+        Initializes :py:attr:`self.nodes`. If `nodes` is not provided, the lattice is initialized with particles 
+        randomly so that the averge lattice density is `density`. For the random initialization there is a choice 
         between a fixed or random number of particles per node.
 
         Parameters
@@ -105,7 +105,7 @@ class LGCA_1D(LGCA_base):
         density : float, default=0.1
             If `nodes` is None, initialize lattice randomly with this particle density.
         hom : float, default=False
-            Fill channels randomly with particle density `density`, but with an equal number of particles for each node.
+            Fill channels randomly with particle density `density`, but with an equal number of particles for each node. 
             Note that depending on :py:attr:`self.K` not all densities can be realized.
         nodes : :py:class:`numpy.ndarray`
             Custom initial lattice configuration. Dimensions: ``(self.dims[0], self.K)``.
@@ -113,7 +113,7 @@ class LGCA_1D(LGCA_base):
         See Also
         --------
         base.LGCA_base.random_reset : Initialize lattice nodes with average density `density`.
-        base.LGCA_base.homogeneous_random_reset : Initialize lattice nodes with average density `density` and a fixed number
+        base.LGCA_base.homogeneous_random_reset : Initialize lattice nodes with average density `density` and a fixed number 
             of particles per node.
         set_dims : Set LGCA dimensions.
         init_coords : Initialize LGCA coordinates.
@@ -139,7 +139,7 @@ class LGCA_1D(LGCA_base):
         """
         Initialize LGCA coordinates.
 
-        These are used to index the lattice nodes logically and programmatically (see below).
+        These are used to index the lattice nodes logically and programmatically (see below). 
         Initializes :py:attr:`self.nonborder` and :py:attr:`self.xcoords`.
 
         See Also
@@ -150,16 +150,16 @@ class LGCA_1D(LGCA_base):
 
         Notes
         --------
-        :py:attr:`self.xcoords` holds the logical coordinates of non-border nodes starting with 0. Non-border nodes
-        belong to the lattice in the mathematical definition of the LGCA, while border nodes (=shadow nodes) are only
+        :py:attr:`self.xcoords` holds the logical coordinates of non-border nodes starting with 0. Non-border nodes 
+        belong to the lattice in the mathematical definition of the LGCA, while border nodes (=shadow nodes) are only 
         included in order to implement boundary conditions.
 
         >>> lgca = get_lgca(geometry='lin', dims=3)
         >>> lgca.xcoords
         array([0., 1., 2.])
 
-        :py:attr:`self.nonborder` holds the programmatical coordinates of non-border nodes, i.e. the indices of the
-        :py:attr:`self.nodes` array where non-border nodes are stored. This is why it is a tuple: Because it
+        :py:attr:`self.nonborder` holds the programmatical coordinates of non-border nodes, i.e. the indices of the 
+        :py:attr:`self.nodes` array where non-border nodes are stored. This is why it is a tuple: Because it 
         is used to index a numpy array. All non-border lattice nodes can be called as ``self.nodes[self.nonborder]``.
 
         >>> lgca = get_lgca(geometry='lin', dims=3)  # default: periodic boundary conditions
@@ -170,18 +170,18 @@ class LGCA_1D(LGCA_base):
         >>> lgca.nodes[lgca.nonborder].sum(-1)
         array([0, 1, 0])
 
-        Summing along the last axis means summing over all channels of a node since we are interested in the geometry.
-        The first and the last element in the output of ``lgca.nodes.sum(-1)`` are the contents of the border (=shadow)
-        nodes, which reflects the interaction radius of 1. The innermost three elements are the contents of the
+        Summing along the last axis means summing over all channels of a node since we are interested in the geometry. 
+        The first and the last element in the output of ``lgca.nodes.sum(-1)`` are the contents of the border (=shadow) 
+        nodes, which reflects the interaction radius of 1. The innermost three elements are the contents of the 
         non-border nodes. Accordingly we find their indices to be:
 
         >>> lgca.nonborder
         (array([1, 2, 3]),)
 
-        In one dimension the y component of the tuple is empty.
-        Changing the interaction radius updates the shape of :py:attr:`self.nodes` by including more border (=shadow)
-        nodes. This also changes the coordinates. With an interaction radius of 3, there is 3 border nodes on each side
-        enveloping the non-border nodes whose contents remain the same. Therefore the first non-border node has the
+        In one dimension the y component of the tuple is empty. 
+        Changing the interaction radius updates the shape of :py:attr:`self.nodes` by including more border (=shadow) 
+        nodes. This also changes the coordinates. With an interaction radius of 3, there is 3 border nodes on each side 
+        enveloping the non-border nodes whose contents remain the same. Therefore the first non-border node has the 
         index 3.
 
         >>> lgca.set_r_int(3)  # change the interaction radius
@@ -201,9 +201,9 @@ class LGCA_1D(LGCA_base):
         """
         Perform the transport step of the LGCA: Move particles through the lattice according to their velocity.
 
-        Updates :py:attr:`self.nodes` such that resting particles (the contents of ``self.nodes[:, 2:]``) stay in their
-        position and particles in velocity channels (the contents of ``self.nodes[:, :2]``) are relocated according to
-        the direction of the channel they reside in. Boundary conditions are enforced later by
+        Updates :py:attr:`self.nodes` such that resting particles (the contents of ``self.nodes[:, 2:]``) stay in their 
+        position and particles in velocity channels (the contents of ``self.nodes[:, :2]``) are relocated according to 
+        the direction of the channel they reside in. Boundary conditions are enforced later by 
         :py:meth:`apply_boundaries`.
 
         See Also
@@ -222,7 +222,7 @@ class LGCA_1D(LGCA_base):
                [ True,  True, True],
                [False, False, False]])
 
-        Before propagation, three particles occupy the fourth node. One resides in the velocity channel to the right,
+        Before propagation, three particles occupy the fourth node. One resides in the velocity channel to the right, 
         one in the velocity channel to the left and one in the resting channel.
 
         >>> lgca.propagation()
@@ -236,8 +236,8 @@ class LGCA_1D(LGCA_base):
                [False, False, True],
                [ True, False, False]])
 
-        The particle with velocity 1 has moved to the right velocity channel in the fifth node. The particle in the
-        velocity channel to the left has moved to the respective channel in the third node. The resting particle stayed
+        The particle with velocity 1 has moved to the right velocity channel in the fifth node. The particle in the 
+        velocity channel to the left has moved to the respective channel in the third node. The resting particle stayed 
         in its channel in the fourth node.
 
         """
