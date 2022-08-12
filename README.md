@@ -147,6 +147,6 @@ Simon Syga: `simon.syga@tu-dresden.de`<br>
 Bianca Güttner: `bianca.guettner@nct-dresden.de`
 
 # License
-BSD 3-clause license (see LICENSE file or [online resource](https://opensource.org/licenses/BSD-3-Clause).
+BSD 3-clause license (see LICENSE file or [online resource](https://opensource.org/licenses/BSD-3-Clause)).
 
 Copyright (C) 2018-2022 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.
