@@ -96,12 +96,15 @@ lgca.plot_prop_spatial(propname='r_b')  # plot on the right
 `biolgca` heavily depends on `numpy` and `matplotlib`. To install all dependencies 
 for using the package, run this from a command line:
 ```python
-pip install matplotlib==3.3.2 numpy pytest scipy sympy
+pip install matplotlib==3.3.2 numpy scipy sympy
 ```
 (On Windows, a terminal that understands `pip` out of the box can be opened in Anaconda in the 
 "Environments" tab, clicking on the triangle next to the environment's name.)
 
-If you want to add code to the package you should also install `pytest` and `sphinx`.
+If you want to add code to the package, in order to run tests and build documentation you should also install:
+```python
+pip install pytest==6.2.5 Sphinx==4.4.0 sphinx-autodoc-typehints alabaster numpydoc
+```
 
 #### Installation
 `biolgca` does not have a package distribution yet. To use it, clone (or unzip the download of) 
