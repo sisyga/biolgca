@@ -13,7 +13,8 @@ Supported LGCA types:
 
 - classical LGCA (:py:class:`LGCA_Hex`)
 - identity-based LGCA (:py:class:`IBLGCA_Hex`)
-- LGCA without volume exclusion (:py:class:`NoVE_LGCA_Hex`)
+- classical LGCA without volume exclusion (:py:class:`NoVE_LGCA_Hex`)
+- identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_Hex`)
 """
 
 from lgca.base import *

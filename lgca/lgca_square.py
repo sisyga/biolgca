@@ -13,7 +13,8 @@ Supported LGCA types:
 
 - classical LGCA (:py:class:`LGCA_Square`)
 - identity-based LGCA (:py:class:`IBLGCA_Square`)
-- LGCA without volume exclusion (:py:class:`NoVE_LGCA_Square`)
+- classical LGCA without volume exclusion (:py:class:`NoVE_LGCA_Square`)
+- identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_Square`)
 """
 
 import matplotlib.animation as animation
