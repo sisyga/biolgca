@@ -18,7 +18,8 @@ advantages of the framework. It is under active development. The types of LGCA
 currently supported are:
 - classical LGCA (volume exclusion, all particles/cells have the same properties)
 - identity-based LGCA (volume exclusion, particles/cells can have individual properties)
-- LGCA without volume exclusion (all particles/cells have the same properties)
+- classical LGCA without volume exclusion (all particles/cells have the same properties)
+- identity-based LGCA without volume exclusion (particles/cells can have individual properties)
 
 These can be simulated in a 1D, 2D square or 2D hexagonal lattice. A [library of 
 interaction rules](./lgca/interactions.py) (documentation under construction) is already implemented. Adding a custom 

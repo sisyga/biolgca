@@ -10,6 +10,7 @@ tests/.pytest_cache
 docs/make.bat
 docs/Makefile
 docs/build/*
-docs/source/*
+docs/source/_autosummary/*
+docs/source/generated/*
 .gitignore
 __pycache__

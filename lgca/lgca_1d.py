@@ -12,7 +12,8 @@ Supported LGCA types:
 
 - classical LGCA (:py:class:`LGCA_1D`)
 - identity-based LGCA (:py:class:`IBLGCA_1D`)
-- LGCA without volume exclusion (:py:class:`NoVE_LGCA_1D`)
+- classical LGCA without volume exclusion (:py:class:`NoVE_LGCA_1D`)
+- identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_1D`)
 """
 
 import matplotlib.ticker as mticker
