@@ -21,7 +21,7 @@ currently supported are:
 - LGCA without volume exclusion (all particles/cells have the same properties)
 
 These can be simulated in a 1D, 2D square or 2D hexagonal lattice. A [library of 
-interaction rules](link to interaction docs) is already implemented. Adding a custom 
+interaction rules](./lgca/interactions.py) (documentation under construction) is already implemented. Adding a custom 
 interaction rule or customising other parts of the simulation (e.g. the interaction 
 radius) is easy.
 
@@ -131,11 +131,11 @@ lgca.timeevo(timesteps=50)
 # plot the development of the particle/cell density over time
 lgca.plot_density()
 ```
-The [Tutorial]() guides you through the argument options.
+The [Tutorial](./BioLGCA.ipynb) guides you through the argument options.
 
 # Questions/Contribute
 The structure of the package and its functionalities are detailed in the 
-[documentation](). There you also find [coding examples]().
+[documentation](). There you will also find coding examples (under construction).
 
 Issues are tracked on the [GitHub page](https://github.com/sisyga/biolgca/issues).
 We collect both bugs and feature ideas there.
@@ -144,9 +144,9 @@ For guidelines how to add code to and maintain the repo visit the [Wiki](https:/
 
 For remaining questions you can contact us via E-mail.<br>
 Simon Syga: `simon.syga@tu-dresden.de`<br>
-Bianca Güttner: `bianca.guettner@tu-dresden.de`
+Bianca Güttner: `bianca.guettner@nct-dresden.de`
 
 # License
-GPL-3.0-only: GNU General Public License version >=3
+BSD 3-clause license (see LICENSE file or [online resource](https://opensource.org/licenses/BSD-3-Clause).
 
 Copyright (C) 2018-2022 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.
