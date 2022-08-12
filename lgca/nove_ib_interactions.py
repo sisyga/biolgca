@@ -1,3 +1,12 @@
+# biolgca is a Python package for simulating different kinds of lattice-gas
+# cellular automata (LGCA) in the biological context.
+# Copyright (C) 2018-2022 Technische Universität Dresden, Germany.
+# The full license notice is found in the file lgca/__init__.py.
+
+"""
+Interaction functions and helper functions for identity-based LGCA without volume exclusion.
+"""
+
 from random import choices, random, shuffle, randrange
 import numpy as np
 from numpy import random as npr
