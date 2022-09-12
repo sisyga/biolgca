@@ -3,12 +3,8 @@ import numpy as np
 from numpy import random as npr
 from scipy.stats import truncnorm
 from copy import deepcopy
-
-try:
-    from .interactions import tanh_switch
-except ImportError:
-    from interactions import tanh_switch
-
+from numba import jit
+from lgca.interactions import tanh_switch
 
 def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
     """
@@ -23,7 +19,11 @@ def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
     """
     a = (lower - mu) / sigma
     b = (upper - mu) / sigma
-    return truncnorm(a, b, loc=mu, scale=sigma).rvs(size)
+    vals = truncnorm(a, b, loc=mu, scale=sigma).rvs(size)
+    if size != 1:
+        return vals
+    else:
+        return float(vals)
 
 
 def randomwalk(lgca):
@@ -71,7 +71,7 @@ def birth(lgca):
         lgca.nodes[coord] = deepcopy(newnode)
 
 
-def birthdeath(lgca):
+def birthdeath_nonumba(lgca):
     """
     Apply a birth-death step. Each cell proliferates following a logistic growth law using its individual birth rate r_b and
     a capacity 'capacity', that is constant for all cells. All cells die with a constant probability 'r_d'.
@@ -105,6 +105,50 @@ def birthdeath(lgca):
 
         lgca.nodes[coord] = deepcopy(newnode)
 
+def birthdeath(lgca):
+    """
+    Apply a birth-death step. Each cell proliferates following a logistic growth law using its individual birth rate r_b and
+    a capacity 'capacity', that is constant for all cells. All cells die with a constant probability 'r_d'.
+    Daughter cells receive an individual proliferation rate that is drawn from a truncated Gaussian distribution between
+    0 and a_max, whose mean is equal to the mother cell's r_b, with standard deviation 'std'.
+    :param lgca:
+    :return:
+    """
+    relevant = (lgca.cell_density[lgca.nonborder] > 0)
+    coords = [a[relevant] for a in lgca.nonborder]
+    for coord in zip(*coords):
+        node = deepcopy(lgca.nodes[coord])
+        density = lgca.cell_density[coord]
+        cells = node.sum()
+
+        lgca.nodes[coord], lgca.maxlabel, newprops = onenodebirthdeath(cells, density, lgca.props['r_b'], lgca.maxlabel,
+                                                             lgca.channel_weights, lgca.interaction_params['capacity'],
+                                                             lgca.interaction_params['r_d'])
+        newalphas = [float(trunc_gauss(0, lgca.interaction_params['a_max'], lgca.props['r_b'][cell],
+                                                           sigma=lgca.interaction_params['std'])) for cell in newprops]
+
+        lgca.props['r_b'].extend(newalphas)
+
+@jit(nopython=True)
+def onenodebirthdeath(cells, density, props, maxlabel, channel_weights, capacity, r_d):
+    rho = density / capacity
+    newcells = cells.copy()
+    newprops = []
+    for cell in cells:
+        if random() < r_d:
+            newcells.remove(cell)
+
+        r_b = props[cell]
+        if random() < r_b * (1 - rho):
+            maxlabel += 1
+            newcells.append(maxlabel)
+            newalpha = cell # trunc_gauss(0, a_max, r_b, sigma=std)
+            newprops.append(newalpha)
+
+    channeldist = npr.multinomial(len(newcells), channel_weights).cumsum()
+    npr.shuffle(newcells)
+    newnode = [newcells[:channeldist[0]]] + [newcells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
+    return newnode, maxlabel, newprops
 
 def go_or_grow(lgca):
     """

@@ -1929,6 +1929,14 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                 else:
                     self.interaction_params['a_max'] = 1.
                     print('Max. birth rate set to a_max =', self.interaction_params['a_max'])
+                if 'gamma' in kwargs:
+                    self.interaction_params['gamma'] = kwargs['gamma']
+                else:
+                    self.interaction_params['gamma'] = 0.
+                    print('Rest channel weight set to gamma =', self.interaction_params['gamma'])
+
+                Z = self.velocitychannels + np.exp(self.interaction_params['gamma'])
+                self.channel_weights = [1./Z] * self.velocitychannels + [np.exp(self.interaction_params['gamma'])/Z]
 
             elif interaction == 'go_or_grow':
                 self.interaction = go_or_grow
