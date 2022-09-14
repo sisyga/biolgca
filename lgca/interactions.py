@@ -1,10 +1,12 @@
 from bisect import bisect_left
 from math import log, exp
 from random import random
-
 import numpy as np
+from copy import copy
 import numpy.random as npr
 from scipy.special import binom as binom_coeff
+from mypackage.ECM import nb_ECM, nb_coord
+from data import DataClass
 
 
 def disarrange(a, axis=-1):
@@ -84,7 +86,7 @@ def persistent_walk(lgca):
         ind = bisect_left(weights, random() * weights[-1])
         newnodes[coord] = permutations[ind]
 
-    lgca.nodes = newnodes
+
 
 
 def chemotaxis(lgca):
@@ -92,6 +94,7 @@ def chemotaxis(lgca):
     Rearrangement step for chemotaxis to external gradient field
     :return:
     """
+
     newnodes = lgca.nodes.copy()
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
                (lgca.cell_density[lgca.nonborder] < lgca.K)
@@ -107,26 +110,238 @@ def chemotaxis(lgca):
 
     lgca.nodes = newnodes
 
+# def contact_guidance(lgca):
+#     """
+#     Rearrangement step for contact guidance interaction. Cells are guided by an external axis
+#     :return:
+#     """
+#     beta_a = 0.1
+#     scalar = lgca.scalar_field
+#
+#     newnodes = lgca.nodes.copy()
+#     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
+#                (lgca.cell_density[lgca.nonborder] < lgca.K)
+#     coords = [a[relevant] for a in lgca.nonborder]
+#
+#     g = np.asarray(lgca.gradient(lgca.cell_density))
+#
+#     for coord in zip(*coords):
+#
+#         n = lgca.cell_density[coord]
+#         for i in npr.random(n):
+#             if i <0.1:
+#                 n = n+1
+#         sni = lgca.guiding_tensor[coord]
+#         permutations = lgca.permutations[n]
+#         j = lgca.j[n]
+#         si = lgca.si[n]
+#
+#         # weights from aggregation
+#         weights_aggr = np.exp(beta_a * np.einsum('i,ij', g[coord], j)).cumsum()
+#
+#         # weights from contact guidance
+#         weights = np.exp(lgca.beta * np.einsum('ijk,jk', si, sni)).cumsum()
+#
+#         # adjustment for underlying scalarfield
+#         # get scalar from respective coords to change weights accordingly
+#
+#         scalar_adj = np.zeros(len(permutations))
+#
+#         # ugly --> to be rewritten; but works
+#         for counter, perm in enumerate(permutations):
+#
+#             y1 = scalar[((coord[1] + perm[1], coord[0]))]
+#             y2 = scalar[((coord[1] - perm[3], coord[0]))]
+#             x1 = scalar[((coord[1], coord[0] + perm[0]))]
+#             x2 = scalar[((coord[1], coord[0] - perm[2]))]
+#
+#             if scalar[((coord[1], coord[0]))] == 0:
+#                 if y1[0][0] + y2[0][0] + x1[0][0] + x2[0][0] == lgca.cell_density[coord]:
+#                     scalar_adj[counter] = 1
+#                 else:
+#                     scalar_adj[counter] = 0
+#
+#             if scalar[((coord[1], coord[0]))] != 0:
+#                 if y1[0][0] + y2[0][0] + x1[0][0] + x2[0][0] == 4:
+#                     scalar_adj[counter] = 1
+#                 else:
+#                     scalar_adj[counter] = 0
+#
+#         # adjusted weights
+#         diff = np.insert(np.diff(weights), 0 , weights[0])
+#
+#         diff_aggr = np.insert(np.diff(weights_aggr), 0 , weights_aggr[0])
+#
+#         weights_adj_1 = np.multiply(diff, diff_aggr)
+#         weights_adj = (np.multiply(weights_adj_1, scalar_adj)).cumsum()
+#         rand_ = random() * weights_adj[-1]
+#         ind = bisect_left(weights_adj, rand_)
+#
+#         newnodes[coord] = permutations[ind]
+#
+#     lgca.nodes = newnodes
 
-def contact_guidance(lgca):
+def ind_coord(ind_array, coord_array, ind):
+    list_all = []
+    for i in ind:
+        for counter, j in enumerate(ind_array):
+            if j == i:
+                index = counter
+                break
+        list_all.append(coord_array[index])
+
+    return list_all
+
+def contact_guidance(lgca, ecm, data):
     """
     Rearrangement step for contact guidance interaction. Cells are guided by an external axis
     :return:
     """
+
+    # connection, path_index = ecm.simple_percolation()
+    # paths, length, all_paths = ecm.strands_fixed_border()
+    # scalar_field_values = ecm.scalar_field[lgca.nonborder].ravel()
+    # perco = (scalar_field_values >= 0.9).astype(int)
+    # ecm.perco_ratio.append(sum(perco)/900)
+    # #+
+    # # print(connection)
+    # if connection:
+    #     ecm.p_inf.append(len(ecm.paths[path_index[0]]))
+    #     # ecm.perco_ratio.append((sum(perco)/900))
+    # else:
+    #     ecm.p_inf.append(0)
+    # # #
+    # # # ecm.list_paths_number.append(paths)
+    # # # ecm.list_paths_length.append(length)
+    # ecm.paths = all_paths
+
+    d = ecm.d
+    d_neigh = ecm.d_neigh
+
+    newscalar = copy(ecm.scalar_field)
+    newscalar2 = copy(ecm.scalar_field)
     newnodes = lgca.nodes.copy()
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
                (lgca.cell_density[lgca.nonborder] < lgca.K)
     coords = [a[relevant] for a in lgca.nonborder]
+    g = np.asarray(lgca.gradient(lgca.cell_density))
+    lgca.guiding_tensor = ecm.tensor_field
+
+    Abstand_d = []
+    # coords_all = list(zip(*coords))
+    #
+    # list_coords = ind_coord(ecm.coord_pairs, ecm.coord_pairs_hex, coords_all)
+    # array_squared = []
+    # print(list_coords)
+    #
+    # for i in list_coords:
+    #     array = np.array([i[0] - 15, i[1] - 13])
+    #     array_squared.append(np.dot(array, array))
+    #
+    # print(np.mean(array_squared))
+    #
+    # data.Abstand[data.x_counter][data.y_counter][ecm.t] = (np.mean(array_squared))
+    for coord in zip(*coords):
+
+        neigh = nb_coord(coord, lgca)
+        nb_ecm = nb_ECM(ecm.scalar_field, coord, ecm.restchannels)
+
+
+        # beta_prolif = np.exp(np.sum(nb_ecm/1.5))*lgca.r_b
+        H = 5
+        Km = 3**H
+        v0 = 1
+        v1 = 1
+        n = lgca.cell_density[coord]
+
+        beta_agg_MM = lgca.beta_agg*v0 * np.sum(nb_ecm)**H/(Km + np.sum(nb_ecm)**H)
+        prolif_MM =  lgca.r_b*v1 * np.sum(nb_ecm)**H/(Km + np.sum(nb_ecm)**H)
+        g_rate = log_growth(lgca.K, lgca.r_b,  n)
+
+        p_apop = 0.0
+
+        # if ecm.t >= 25:
+        #     p_apop = 1 - 2 * np.sum(nb_ecm) ** H / (Km + np.sum(nb_ecm) ** H)
+
+
+        # for i in npr.random(n):
+        #    if n < lgca.K:
+        if npr.random() < (g_rate):
+            if npr.random() < p_apop:
+                n -= 1
+            if npr.random() >= p_apop:
+                n += 1
+
+        sni = lgca.guiding_tensor[coord]
+        permutations = lgca.permutations[n]
+        si = lgca.si[n]
+        restc = permutations[:, lgca.velocitychannels:].sum(-1)
+        # print(coord, permutations)
+        j = lgca.j[n]
+        nbs = np.asarray(list(reversed(nb_ecm)))
+        nbs[-ecm.restchannels:] = ecm.restchannels*[0]
+        hind = np.multiply((-nbs/ecm.fc), permutations)
+
+        beta_guid = lgca.beta * ecm.vector_field[coord][2]
+        weights_adj_tot = np.exp(beta_guid * np.einsum('ijk,jk', si, sni)
+                                 + np.einsum('ij -> i', hind)
+                                 + lgca.beta_rest * restc
+                                 + beta_agg_MM * np.einsum('i,ij', g[coord], j)).cumsum()
+
+        ind = bisect_left(weights_adj_tot, random() * weights_adj_tot[-1])
+        if ecm.d != 0 or ecm.d_neigh != 0:
+            for i in neigh:
+                if i == coord:
+                    delta = - (d * n * newscalar[i])/ lgca.K
+                    newscalar2[i] += delta
+                    if newscalar2[i] <= 0:
+                        newscalar2[i] = 0
+                else:
+                    if newscalar[i] != 1:
+                        delta = (d_neigh * n* newscalar[i])/ lgca.K
+                        newscalar2[i] += delta
+                        if newscalar2[i] >= 1:
+                            newscalar2[i] = 1
+
+        newnodes[coord] = permutations[ind]
+
+        real_coord = ind_coord(lgca.coord_pairs, lgca.coord_pairs_hex, [coord])
+        data.MSD.append(np.array([real_coord[0][0], real_coord[0][1]]))
+
+    # data.tumor_vol[ecm.t] += np.sum(lgca.cell_density[lgca.nonborder])
+    ecm.t = ecm.t + 1
+    ecm.scalar_field = newscalar2
+    ecm.scalar_field_t[ecm.t] = newscalar2
+    ecm.periodic_rb()
+    ecm.tensor_update(ecm.t)
+
+    lgca.nodes = newnodes
+    # ecm.t = ecm.t + 1
+
+def contact_guidance_old(lgca):
+    """
+    Rearrangement step for contact guidance interaction. Cells are guided by an external axis
+    :return:
+    """
+
+    newnodes = lgca.nodes.copy()
+    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
+               (lgca.cell_density[lgca.nonborder] < lgca.K)
+    coords = [a[relevant] for a in lgca.nonborder]
+
+
     for coord in zip(*coords):
         n = lgca.cell_density[coord]
         sni = lgca.guiding_tensor[coord]
         permutations = lgca.permutations[n]
         si = lgca.si[n]
         weights = np.exp(lgca.beta * np.einsum('ijk,jk', si, sni)).cumsum()
-        ind = bisect_left(weights, random() * weights[-1])
+        rand_ = random() * weights[-1]
+        ind = bisect_left(weights, rand_)
         newnodes[coord] = permutations[ind]
 
     lgca.nodes = newnodes
+
 
 
 def alignment(lgca):
@@ -138,8 +353,8 @@ def alignment(lgca):
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
                (lgca.cell_density[lgca.nonborder] < lgca.K)
     coords = [a[relevant] for a in lgca.nonborder]
-    g = lgca.calc_flux(lgca.nodes)
-    g = lgca.nb_sum(g)
+    g1 = lgca.calc_flux(lgca.nodes)
+    g = lgca.nb_sum(g1)
     for coord in zip(*coords):
         n = lgca.cell_density[coord]
         permutations = lgca.permutations[n]
@@ -328,6 +543,24 @@ def s_binom(n, p0, kmax):
     p = p_binom(k, n, p0)
     return -ent_prod(p).sum(-1)
 
+
+
+
+def simplelinear(scalar):
+    return 1 - scalar
+
+def exphinderanc(scalar, crit):
+    return (np.exp(-scalar/crit))
+
+def log_func(x, c=1, ex1=1 , ex2=1, K=1):
+    return c * x**(ex1)/K * (1 - x**(ex2)/K)
+
+def log_growth(K, g, n_cells):
+    if n_cells <= K:
+        return float(g) * n_cells / K * (1 - n_cells / K)
+    else:
+        return 0
+
 def leup_test(lgca):
     """
     Go-or-grow with least-environmental uncertainty principle. cells try to minimize their entropy with the environment,
@@ -427,4 +660,6 @@ def leup_test(lgca):
         node[lgca.velocitychannels:lgca.velocitychannels + n_rxy] = 1
         # node = np.hstack((v_channels, r_channels))
         lgca.nodes[coord] = node
+
+
 
