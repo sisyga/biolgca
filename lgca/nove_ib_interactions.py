@@ -4,6 +4,7 @@ from numpy import random as npr
 from scipy.stats import truncnorm
 from copy import deepcopy
 from numba import jit
+import numba
 from lgca.interactions import tanh_switch
 
 def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
@@ -71,7 +72,7 @@ def birth(lgca):
         lgca.nodes[coord] = deepcopy(newnode)
 
 
-def birthdeath_nonumba(lgca):
+def birthdeath(lgca):
     """
     Apply a birth-death step. Each cell proliferates following a logistic growth law using its individual birth rate r_b and
     a capacity 'capacity', that is constant for all cells. All cells die with a constant probability 'r_d'.
@@ -105,7 +106,7 @@ def birthdeath_nonumba(lgca):
 
         lgca.nodes[coord] = deepcopy(newnode)
 
-def birthdeath(lgca):
+def birthdeath_numba(lgca):
     """
     Apply a birth-death step. Each cell proliferates following a logistic growth law using its individual birth rate r_b and
     a capacity 'capacity', that is constant for all cells. All cells die with a constant probability 'r_d'.
@@ -146,7 +147,7 @@ def onenodebirthdeath(cells, density, props, maxlabel, channel_weights, capacity
             newprops.append(newalpha)
 
     channeldist = npr.multinomial(len(newcells), channel_weights).cumsum()
-    npr.shuffle(newcells)
+    npr.shuffle(np.array(newcells))
     newnode = [newcells[:channeldist[0]]] + [newcells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
     return newnode, maxlabel, newprops
 
