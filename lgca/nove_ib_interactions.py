@@ -71,6 +71,71 @@ def birth(lgca):
 
         lgca.nodes[coord] = deepcopy(newnode)
 
+def evo_steric(lgca):
+    """
+    Apply a birth-death step, then cells move under steric interactions.
+    Each cell proliferates with its individual birth rate r_b following logistic growth until
+    a capacity 'capacity' is reached, that is constant for all cells.
+    All cells die with a constant probability 'r_d'.
+    During proliferation there can be a mutation on either mother or daughter cell.
+    Mutations can be beneficial (driver mutations) or deleterious to neutral (passenger mutations).
+    These mutations manifest in a changed proliferation rate.
+    :param lgca:
+    :return:
+    """
+    relevant = (lgca.cell_density[lgca.nonborder] > 0)
+    coords = [a[relevant] for a in lgca.nonborder]
+    for coord in zip(*coords):
+        node = deepcopy(lgca.nodes[coord])
+        density = lgca.cell_density[coord]
+        rho = density / lgca.interaction_params['capacity']
+        cells = node.sum()
+        newcells = cells.copy()
+        velchannelweights = -lgca.interaction_params['alpha'] * lgca.channel_weight(lgca.cell_density)
+        channelweights = np.append(velchannelweights, np.full(lgca.cell_density.shape,
+                                                              lgca.interaction_params['gamma'])[..., None], axis=-1)
+        channelprobs = np.exp(channelweights)
+        channelprobs /= np.sum(channelprobs, axis=-1)[..., None]
+        for cell in cells:
+            if random() < lgca.interaction_params['r_d']:
+                newcells.remove(cell)
+
+            # r_b = lgca.props['r_b'][cell]
+            fam = lgca.props['family'][cell]
+            r_b = lgca.family_props['r_b'][fam]
+            # mother cell: cell
+            # family: lgca.props['family'][cell]
+
+            if random() < r_b * (1 - rho):
+                lgca.maxlabel += 1
+                newcells.append(lgca.maxlabel)
+                if random() < lgca.interaction_params['r_m']:
+                    # driver mutation mother cell
+                    lgca.add_family(fam)
+                    # record family of new cell = new family
+                    lgca.props['family'].append(int(lgca.maxfamily))
+                    lgca.family_props['r_b'].append(lgca.family_props['r_b'][fam] * \
+                                                    lgca.interaction_params['fitness_increase'])
+                else:
+                    # record family of new cell = family of mother cell
+                    lgca.props['family'].append(fam)
+                # if random() < lgca.interaction_params['p_d']:
+                    # driver mutation daughter cell
+                # if random() < lgca.interaction_params['p_p']:
+                #     # passenger mutation mother cell
+                # if random() < lgca.interaction_params['p_p']:
+                #     # passenger mutation daughter cell
+
+                # lgca.props['r_b'].append(float(trunc_gauss(0, lgca.interaction_params['a_max'], r_b,
+                #                                            sigma=lgca.interaction_params['std'])))
+
+
+        channelprob = channelprobs[coord]
+        channeldist = npr.multinomial(len(newcells), channelprob).cumsum()
+        shuffle(newcells)
+        newnode = [newcells[:channeldist[0]]] + [newcells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
+
+        lgca.nodes[coord] = deepcopy(newnode)
 
 def birthdeath(lgca):
     """
@@ -100,56 +165,57 @@ def birthdeath(lgca):
                 lgca.props['r_b'].append(float(trunc_gauss(0, lgca.interaction_params['a_max'], r_b,
                                                            sigma=lgca.interaction_params['std'])))
 
-        channeldist = npr.multinomial(len(newcells), [1. / lgca.K] * lgca.K).cumsum()
+        # channeldist = npr.multinomial(len(newcells), [1. / lgca.K] * lgca.K).cumsum()
+        channeldist = npr.multinomial(len(newcells), lgca.channel_weights).cumsum()
         shuffle(newcells)
         newnode = [newcells[:channeldist[0]]] + [newcells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
 
         lgca.nodes[coord] = deepcopy(newnode)
 
-def birthdeath_numba(lgca):
-    """
-    Apply a birth-death step. Each cell proliferates following a logistic growth law using its individual birth rate r_b and
-    a capacity 'capacity', that is constant for all cells. All cells die with a constant probability 'r_d'.
-    Daughter cells receive an individual proliferation rate that is drawn from a truncated Gaussian distribution between
-    0 and a_max, whose mean is equal to the mother cell's r_b, with standard deviation 'std'.
-    :param lgca:
-    :return:
-    """
-    relevant = (lgca.cell_density[lgca.nonborder] > 0)
-    coords = [a[relevant] for a in lgca.nonborder]
-    for coord in zip(*coords):
-        node = deepcopy(lgca.nodes[coord])
-        density = lgca.cell_density[coord]
-        cells = node.sum()
-
-        lgca.nodes[coord], lgca.maxlabel, newprops = onenodebirthdeath(cells, density, lgca.props['r_b'], lgca.maxlabel,
-                                                             lgca.channel_weights, lgca.interaction_params['capacity'],
-                                                             lgca.interaction_params['r_d'])
-        newalphas = [float(trunc_gauss(0, lgca.interaction_params['a_max'], lgca.props['r_b'][cell],
-                                                           sigma=lgca.interaction_params['std'])) for cell in newprops]
-
-        lgca.props['r_b'].extend(newalphas)
-
-@jit(nopython=True)
-def onenodebirthdeath(cells, density, props, maxlabel, channel_weights, capacity, r_d):
-    rho = density / capacity
-    newcells = cells.copy()
-    newprops = []
-    for cell in cells:
-        if random() < r_d:
-            newcells.remove(cell)
-
-        r_b = props[cell]
-        if random() < r_b * (1 - rho):
-            maxlabel += 1
-            newcells.append(maxlabel)
-            newalpha = cell # trunc_gauss(0, a_max, r_b, sigma=std)
-            newprops.append(newalpha)
-
-    channeldist = npr.multinomial(len(newcells), channel_weights).cumsum()
-    npr.shuffle(np.array(newcells))
-    newnode = [newcells[:channeldist[0]]] + [newcells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
-    return newnode, maxlabel, newprops
+# def birthdeath_numba(lgca):
+#     """
+#     Apply a birth-death step. Each cell proliferates following a logistic growth law using its individual birth rate r_b and
+#     a capacity 'capacity', that is constant for all cells. All cells die with a constant probability 'r_d'.
+#     Daughter cells receive an individual proliferation rate that is drawn from a truncated Gaussian distribution between
+#     0 and a_max, whose mean is equal to the mother cell's r_b, with standard deviation 'std'.
+#     :param lgca:
+#     :return:
+#     """
+#     relevant = (lgca.cell_density[lgca.nonborder] > 0)
+#     coords = [a[relevant] for a in lgca.nonborder]
+#     for coord in zip(*coords):
+#         node = deepcopy(lgca.nodes[coord])
+#         density = lgca.cell_density[coord]
+#         cells = node.sum()
+#
+#         lgca.nodes[coord], lgca.maxlabel, newprops = onenodebirthdeath(cells, density, lgca.props['r_b'], lgca.maxlabel,
+#                                                              lgca.channel_weights, lgca.interaction_params['capacity'],
+#                                                              lgca.interaction_params['r_d'])
+#         newalphas = [float(trunc_gauss(0, lgca.interaction_params['a_max'], lgca.props['r_b'][cell],
+#                                                            sigma=lgca.interaction_params['std'])) for cell in newprops]
+#
+#         lgca.props['r_b'].extend(newalphas)
+#
+# @jit(nopython=True)
+# def onenodebirthdeath(cells, density, props, maxlabel, channel_weights, capacity, r_d):
+#     rho = density / capacity
+#     newcells = cells.copy()
+#     newprops = []
+#     for cell in cells:
+#         if random() < r_d:
+#             newcells.remove(cell)
+#
+#         r_b = props[cell]
+#         if random() < r_b * (1 - rho):
+#             maxlabel += 1
+#             newcells.append(maxlabel)
+#             newalpha = cell # trunc_gauss(0, a_max, r_b, sigma=std)
+#             newprops.append(newalpha)
+#
+#     channeldist = npr.multinomial(len(newcells), channel_weights).cumsum()
+#     npr.shuffle(np.array(newcells))
+#     newnode = [newcells[:channeldist[0]]] + [newcells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
+#     return newnode, maxlabel, newprops
 
 def go_or_grow(lgca):
     """

@@ -1822,9 +1822,9 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     """
     Base class for identity-based LGCA without volume exclusion.
     """
-    interactions = ['go_or_grow', 'birthdeath', 'randomwalk']
+    interactions = ['go_or_grow', 'birthdeath', 'randomwalk', 'steric_evolution']
 
-    def __init__(self, nodes=None, dims=None, density=.1, restchannels=0, bc='periodic', **kwargs):
+    def __init__(self, nodes=None, dims=None, density=.1, restchannels=1, bc='periodic', **kwargs):
         """
         Initialize class instance.
         :param nodes:
@@ -1856,11 +1856,13 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     def convert_int_to_ib(self, occ):
         """
         Convert an array of integers representing the occupation numbers of an lgca to an array consisting of lists of
-        individual cell labels. The length of each list corresponds to the entry in 'occ'.
+        individual cell labels, starting at 'starting_id'. The length of each list corresponds to the entry in 'occ'.
         :param occ: array of occupation numbers. must match the lgca dimensions
+        : param starting_id: int > 0
         :return: array, where each entry is a list of individual cell labels.
         """
-        labels = list(range(occ.sum()))
+        ntot = occ.sum()
+        labels = list(range(ntot))
         tempnodes = np.empty(occ.shape, dtype=object)
         counter = 0
         for ind, dens in np.ndenumerate(occ):
@@ -1881,7 +1883,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.update_dynamic_fields()
 
     def set_interaction(self, **kwargs):
-        from lgca.nove_ib_interactions import randomwalk, birth, birthdeath, go_or_grow
+        from lgca.nove_ib_interactions import randomwalk, birth, birthdeath, go_or_grow, evo_steric
         from lgca.interactions import only_propagation
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
@@ -1935,8 +1937,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                     self.interaction_params['gamma'] = 0.
                     print('Rest channel weight set to gamma =', self.interaction_params['gamma'])
 
-                Z = self.velocitychannels + np.exp(self.interaction_params['gamma'])
-                self.channel_weights = [1./Z] * self.velocitychannels + [np.exp(self.interaction_params['gamma'])/Z]
+                Z = self.velocitychannels + np.exp(self.interaction_params['gamma']) * self.restchannels
+                self.channel_weights = [1./Z] * self.velocitychannels + [np.exp(self.interaction_params['gamma'])/Z] * self.restchannels
 
             elif interaction == 'go_or_grow':
                 self.interaction = go_or_grow
@@ -1996,6 +1998,47 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                     print('switch threshold set to theta = ', self.interaction_params['theta'][0])
                 self.props.update(theta=self.interaction_params['theta'])
 
+            elif interaction == 'steric_evolution':
+                self.interaction = evo_steric
+                if 'r_b' in kwargs:
+                    self.interaction_params['r_b'] = kwargs['r_b']
+                else:
+                    self.interaction_params['r_b'] = 0.1
+                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+                if 'r_m' in kwargs:
+                    self.interaction_params['r_m'] = kwargs['r_m']
+                else:
+                    self.interaction_params['r_m'] = 1e-3
+                    print('mutation rate set to r_m = ', self.interaction_params['r_m'])
+                if 'r_d' in kwargs:
+                    self.interaction_params['r_d'] = kwargs['r_d']
+                else:
+                    self.interaction_params['r_d'] = .98 * self.interaction_params['r_b']
+                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+                if 'alpha' in kwargs:
+                    self.interaction_params['alpha'] = kwargs['alpha']
+                else:
+                    self.interaction_params['alpha'] = 2.0
+                    print('steric interaction strength set to alpha = ', self.interaction_params['alpha'])
+                if 'gamma' in kwargs:
+                    self.interaction_params['gamma'] = kwargs['gamma']
+                else:
+                    self.interaction_params['gamma'] = 3.0
+                    print('rest channel weight set to gamma = ', self.interaction_params['gamma'])
+                if 'capacity' in kwargs:
+                    self.interaction_params['capacity'] = kwargs['capacity']
+                else:
+                    self.interaction_params['capacity'] = 512
+                    print('deme capacity set to capacity = ', self.interaction_params['capacity'])
+                self.init_families(type='homogeneous', mutation=True)
+                self.props['family'][0] = 1  # there is no 'void' cell, so the cell w/ id = 0 also belongs to fam. 1
+                self.family_props.update(r_b=[0] + [self.interaction_params['r_b']] * self.maxfamily)
+                if 'fitness_increase' in kwargs:
+                    self.interaction_params['fitness_increase'] = kwargs['fitness_increase']
+                else:
+                    self.interaction_params['fitness_increase'] = 1.1
+                    print('fitness increase for driver mutations set to ',
+                          self.interaction_params['fitness_increase'])
             else:
                 print('interaction', kwargs['interaction'], 'is not defined! Random walk used instead.')
                 print('Implemented interactions:', self.interactions)
@@ -2006,7 +2049,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
             self.interaction = randomwalk
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, recordchanneldens=False,
-                showprogress=True):
+                showprogress=True, recordfampop=False):
         self.update_dynamic_fields()
         if record:
             self.nodes_t = get_arr_of_empty_lists((timesteps +1,) + self.dims + (self.K,))
@@ -2020,6 +2063,21 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         if recordchanneldens:
             self.channel_pop_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=np.uint)
             self.channel_pop_t[0, ...] = self.channel_pop[self.nonborder]
+        if recordfampop:
+            from lgca.nove_ib_interactions import evo_steric
+            # this needs to include all interactions that can increase the number of recorded families!
+            if self.interaction in [evo_steric]:
+                # if mutations are allowed, this is a list because it will be ragged due to increasing family numbers
+                self.fam_pop_t = [self.calc_family_pop_alive()]
+                is_mutating = True
+            else:
+                if 'family' not in self.props:
+                    raise RuntimeError("Interaction does not deal with families, "
+                                       "family population can therefore not be recorded.")
+                # otherwise standard procedure
+                self.fam_pop_t = np.zeros((timesteps + 1, self.maxfamily + 1))
+                self.fam_pop_t[0, ...] = self.calc_family_pop_alive()
+                is_mutating = False
 
         for t in tqdm(iterable=range(1, timesteps + 1), disable=1-showprogress):
             self.timestep()
@@ -2029,7 +2087,19 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                 self.n_t[t] = self.cell_density[self.nonborder].sum()
             if recorddens:
                 self.dens_t[t, ...] = self.cell_density[self.nonborder]
-
+            if recordfampop:
+                if is_mutating:
+                    # append to the ragged nested list
+                    self.fam_pop_t.append(self.calc_family_pop_alive())
+                else:
+                    # standard procedure
+                    try:
+                        self.fam_pop_t[t, ...] = self.calc_family_pop_alive()
+                    except ValueError as e:
+                        raise ValueError("Number of families has increased, interaction must be included in the case " +
+                                         "distinction for the recordfampop keyword in the IBLGCA base timeevo function!") from e
+        if recordfampop and is_mutating:
+            self.straighten_family_populations()
 
     def calc_max_label(self):
         cells = self.nodes.sum()
@@ -2190,4 +2260,30 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         plt.xlabel('{}'.format(propname1))
         plt.ylabel('{}'.format(propname2))
 
+    def calc_family_pop_alive(self):
+        """
+        Calculate how many cells of each family are alive.
+        :returns: np.ndarray fam_pop_array - array of family population counts indexed by family ID
+        """
+        if 'family' not in self.props:
+            raise RuntimeError("Family properties are not recorded by the LGCA, choose suitable interaction.")
 
+        cells_alive = np.array(self.nodes[self.nonborder].sum()) # indices of live cells # nonborder needed for uniqueness
+        cell_fam = np.array(self.props['family'])  # convert for indexing
+        cell_fam_alive = cell_fam[cells_alive.astype(np.int)]  # filter family array for families of live cells
+        fam_alive, fam_pop = np.unique(cell_fam_alive, return_counts=True)  # count number of cells for each family
+        # transform into array with population entry for all families that ever existed
+        fam_pop_array = np.zeros(self.maxfamily+1, dtype=int)
+        fam_pop_array[fam_alive] = fam_pop
+        return fam_pop_array
+        # alternative: look up family for each live cell, then do unique on those altered nodes
+
+    def list_families_alive(self):
+        """
+        Calculate which families are alive.
+        :returns: np.ndarray - array of family IDs in ascending order
+        """
+        cells_alive = np.array(self.nodes[self.nonborder].sum(-1))  # indices of live cells # nonborder needed for uniqueness
+        cell_fam = np.array(self.props['family'])  # convert for indexing
+        cell_fam_alive = cell_fam[cells_alive.astype(np.int)]  # filter family array for families of live cells
+        return np.unique(cell_fam_alive) # remove duplicate entries

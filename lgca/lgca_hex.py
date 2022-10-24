@@ -285,8 +285,6 @@ class LGCA_Hex(LGCA_Square):
         newcellnodes[:, 1:-1:2, 5] = self.nodes[:, 2::2, 5]
 
         self.nodes = newcellnodes
-        # ToDo: is this still needed?
-        return self.nodes
 
     def _apply_rbcx(self):
         # documented in parent class
@@ -496,7 +494,7 @@ class NoVE_LGCA_Hex(NoVE_LGCA_Square, LGCA_Hex):
         return sum
 
 
-class NoVE_IBLGCA_Hex(NoVE_IBLGCA_Square, LGCA_Hex):
+class NoVE_IBLGCA_Hex(NoVE_IBLGCA_Square, LGCA_Hex,  ):
 
     def propagation(self):
         newcellnodes = get_arr_of_empty_lists(self.nodes.shape)

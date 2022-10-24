@@ -19,11 +19,8 @@ theta = 0.5
 dens = 0.1 #starting condition
 beta = 1.2
 # time = 100
-# nodes = np.zeros(dims+(6+restchannels,), dtype=int)
-# nodes[l//2, l//2, 0] = 1
-# nodes[l//4, l//4, 0] = 1
-# nodes[l//4 * 3, l//4 * 3, 0] = 1
-setup = """
+
+# setup =
 from lgca import get_lgca
 import numpy as np
 from matplotlib import pyplot as plt
@@ -41,20 +38,22 @@ dens0 = 1 - r_d / r_b
 ts = np.linspace(0, tmax, num=101)
 K = 100
 
-l = 2
+l = 50
 dims= l, l
-lgca = get_lgca(ib=True, density=dens0*K/3, bc='reflect', interaction='birthdeath', std=sqrt(var), ve=False, capacity=K,
-                r_d=r_d, r_b=r_b, a_max=a_max, geometry='hx', dims=dims, restchannels=1)
-"""
-test_code = """lgca.timeevo(timesteps=tmax, record=True)"""
+nodes = np.zeros(dims+(6+restchannels,), dtype=int)
+nodes[l//2, l//2, -1] = 100
+lgca = get_lgca(ib=True, bc='reflect', interaction='steric_evolution', dims=dims, nodes=nodes, ve=False, geometry='hx',
+                r_m=0.01, r_b=0.01, capacity=12, gamma=3)
+# print((lgca.props['family'][99]), max(lgca.nodes.sum()))
+# test_code = lgca.timeevo(timesteps=tmax, record=True)
 
-time = timeit.repeat(setup=setup, stmt=test_code, repeat=1, number=1)
-print('exec time = {}'.format(time))
+# time = timeit.repeat(setup=setup, stmt=test_code, repeat=1, number=1)
+# print('exec time = {}'.format(time))
 
 # lgca = get_lgca(interaction='birthdeath', bc='periodic', density=dens, geometry=geom, dims=dims,
                 # restchannels=restchannels, ve=0, ib=1 , beta=beta,
                 # r_d=r_d, r_b=r_b, kappa=kappa, theta=theta)
-# lgca.timeevo(50, record=1)
+lgca.timeevo(500, recordfampop=True, record=True)
 # lgca.plot_config()
 # lgca.plot_prop_spatial()
 # lgca.plot_config(grid=1)
@@ -65,5 +64,8 @@ print('exec time = {}'.format(time))
 # plt.gca().axis('off')
 # plt.tight_layout()
 # plt.savefig('alignment_art.svg')
-# plt.show()
-
+#
+lgca.muller_plot()
+plt.show()
+lgca.plot_prop_spatial()
+plt.show()
