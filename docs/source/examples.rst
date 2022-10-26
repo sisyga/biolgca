@@ -7,7 +7,7 @@ Examples
 
 Here you find tutorials on how to get started and how to customise the LGCA simulator.
 
-Other examples show features that may be useful to you.
+Other examples show features that may be useful to you!
 
 .. toctree::
    :maxdepth: 2
