@@ -10,8 +10,7 @@ l = 6
 dims = l, l
 # model parameters
 
-r_d = 0.
-r_b = 0.
+
 kappa = 0.
 theta = 0.5
 
@@ -69,3 +68,4 @@ lgca.muller_plot()
 plt.show()
 lgca.plot_prop_spatial()
 plt.show()
+
