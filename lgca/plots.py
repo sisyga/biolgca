@@ -472,4 +472,4 @@ def muller_plot(root_ID, cum_pop_t, children_nlist, parent_list, timeline, facec
         ret = cbar
 
     plt.tight_layout()
-    return fig, ax, ret
+    return fig, ax, ret, fc_map
