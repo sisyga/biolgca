@@ -2,6 +2,10 @@ from bisect import bisect_left
 from math import log, exp
 from random import random
 
+<<<<<<< Updated upstream
+=======
+from .soc_functions import *
+>>>>>>> Stashed changes
 import numpy as np
 import numpy.random as npr
 from scipy.special import binom as binom_coeff
