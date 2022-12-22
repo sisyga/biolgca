@@ -175,7 +175,7 @@ class LGCA_Square(LGCA_base):
         set_r_int : Change the interaction radius.
 
         Notes
-        --------
+        -----
         :py:attr:`self.xcoords` and :py:attr:`self.ycoords` hold the logical coordinates of non-border nodes in x- and
         y-direction starting with 0. Non-border nodes belong to the lattice in the mathematical definition of the LGCA,
         while border nodes (=shadow nodes) are only included in order to implement boundary conditions. Note that since
@@ -279,7 +279,7 @@ class LGCA_Square(LGCA_base):
         base.LGCA_base.nodes : State of the lattice showing the structure of the ``lgca.nodes`` array.
 
         Notes
-        --------
+        -----
         >>> # set up the node configuration
         >>> nodes = np.zeros((3,3,5)).astype(bool)
         >>> nodes[1,1,:] = True
@@ -578,19 +578,19 @@ class LGCA_Square(LGCA_base):
 
     def setup_figure(self, figindex=None, figsize=(8, 8), tight_layout=True):
         """
-        Create a :py:module:`matplotlib` figure and manage basic layout.
+        Create a :py:mod:`matplotlib` figure and manage basic layout.
 
         Used by the class' plotting functions.
 
         Parameters
         ----------
         figindex : int or str, optional
-            An identifier for the figure (passed to :py:function:`matplotlib.pyplot.figure`). If it is a string, the
+            An identifier for the figure (passed to :py:func:`matplotlib.pyplot.figure`). If it is a string, the
             figure label and the window title is set to this value.
         figsize : tuple of int or tuple of float with 2 elements, default=(8,8)
             Desired figure size in inches ``(x, y)``.
         tight_layout : bool, default=True
-            If :py:method:`matplotlib.figure.Figure.tight_layout` is called for padding between and around subplots.
+            If :py:meth:`matplotlib.figure.Figure.tight_layout` is called for padding between and around subplots.
 
         Returns
         -------
@@ -948,25 +948,25 @@ class LGCA_Square(LGCA_base):
             Color map for the density values. Used to construct a discretized version of the colormap.
         colorbarwidth : float
             Width of the additional axis for the color bar, passed to
-            :py:method:`mpl_toolkits.axes_grid1.axes_divider.AxesDivider.append_axes`.
+            :py:meth:`mpl_toolkits.axes_grid1.axes_divider.AxesDivider.append_axes`.
         density : :py:class:`numpy.ndarray`, optional
             Particle density values for a lattice to plot. If set to None and a simulation has been performed
             before, the result of the simulation is plotted. Dimensions: ``self.dims``.
-        edgecolor : {:py:module:`matplotlib` color, 'None', 'auto'}, default 'None'
+        edgecolor : {:py:mod:`matplotlib` color, 'None', 'auto'}, default 'None'
             Color of the polygon edges for the lattice nodes.
         figindex : int or str, optional
-            An identifier for the figure (passed to :py:function:`matplotlib.pyplot.figure`). If it is a string, the
+            An identifier for the figure (passed to :py:func:`matplotlib.pyplot.figure`). If it is a string, the
             figure label and the window title is set to this value.
         figsize : tuple of int or tuple of float with 2 elements, default=(8,8)
             Desired figure size in inches ``(x, y)``.
         tight_layout : bool, default=True
-            If :py:method:`matplotlib.figure.Figure.tight_layout` is called for padding between and around subplots.
+            If :py:meth:`matplotlib.figure.Figure.tight_layout` is called for padding between and around subplots.
         vmax : int, optional
             Maximum density value for the color scaling. The minimum value is zero. All density values higher than
             `vmax` are drawn in the color at the end of the color bar. If None, `vmax` is set to the number of channels
             ``self.K``.
         **kwargs
-            Arguments to be passed on to :py:method:`setup_figure`.
+            Arguments to be passed on to :py:meth:`setup_figure`.
 
         Returns
         -------
