@@ -1986,7 +1986,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                     self.interaction_params['kappa'] = [5.] * (self.maxlabel + 1)
                     print('switch rate set to kappa = ', self.interaction_params['kappa'][0])
 
-                self.props.update(kappa=self.interaction_params['kappa'])
+                self.props.update(kappa=np.array(self.interaction_params['kappa']))
                 if 'theta' in kwargs:
                     theta = kwargs['theta']
                     if hasattr(theta, '__iter__'):
@@ -1996,7 +1996,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                 else:
                     self.interaction_params['theta'] = [0.5] * (self.maxlabel + 1)
                     print('switch threshold set to theta = ', self.interaction_params['theta'][0])
-                self.props.update(theta=self.interaction_params['theta'])
+                self.props.update(theta=np.array(self.interaction_params['theta']))
 
             elif interaction == 'steric_evolution':
                 self.interaction = evo_steric

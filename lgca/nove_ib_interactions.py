@@ -229,36 +229,57 @@ def go_or_grow(lgca):
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
-        node = deepcopy(lgca.nodes[coord])
+        node = lgca.nodes[coord]
         density = lgca.cell_density[coord]
         rho = density / lgca.interaction_params['capacity']
         cells = np.array(node.sum())
         # R1: cell death
-        tobekilled = npr.random(size=density) < 1. - lgca.interaction_params['r_d']
-        cells = cells[tobekilled]
+        notkilled = npr.random(size=density) < 1. - lgca.interaction_params['r_d']
+        cells = cells[notkilled]
         if cells.size == 0:
             lgca.nodes[coord] = [[] for _ in range(lgca.K)]
             continue
         # R2: switch (using old density, as switching happens faster than death)
-        velcells = []
-        restcells = []
-        for cell in cells:
-            if random() < tanh_switch(rho=rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell]):
-                restcells.append(cell)
-            else:
-                velcells.append(cell)
+        # velcells = []
+        # restcells = []
+        # for cell in cells:
+        #     if random() < tanh_switch(rho=rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell]):
+        #         restcells.append(cell)
+        #     else:
+        #         velcells.append(cell)
 
+        restcells = [cell for cell in cells if
+                     random() < tanh_switch(rho=rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell])]
+        velcells = [cell for cell in cells if cell not in restcells]
         # R3: birth
         rho = len(cells) / lgca.interaction_params['capacity']  # update density after deaths for birth
-        for cell in restcells:
-            if random() < lgca.interaction_params['r_b'] * (1 - rho):
-                lgca.maxlabel += 1
-                restcells.append(lgca.maxlabel)
-                lgca.props['kappa'].append(npr.normal(loc=lgca.props['kappa'][cell], scale=lgca.interaction_params['kappa_std']))
-                lgca.props['theta'].append(float(trunc_gauss(0, 1, mu=lgca.props['theta'][cell], sigma=lgca.interaction_params['theta_std'])))
+        n_prolif = npr.binomial(len(restcells), max(lgca.interaction_params['r_b'] * (1 - rho), 0))
+        if n_prolif > 0:
+            proliferating = npr.choice(restcells, n_prolif, replace=False)
+            lgca.maxlabel += n_prolif
+            new_cells = np.arange(lgca.maxlabel - n_prolif + 1, lgca.maxlabel + 1)
+            lgca.props['kappa'] = np.concatenate((lgca.props['kappa'],
+                                                  npr.normal(loc=lgca.props['kappa'][proliferating],
+                                                             scale=lgca.interaction_params['kappa_std'])))
+            # lgca.props['theta'] = np.concatenate((lgca.props['theta'],
+            #                                       trunc_gauss(0, 1, mu=lgca.props['theta'][proliferating],
+            #                                                   sigma=lgca.interaction_params['theta_std'])))
+            lgca.props['theta'] = np.concatenate((lgca.props['theta'],
+                                                  npr.normal(loc=lgca.props['theta'][proliferating],
+                                                            scale=lgca.interaction_params['theta_std'])))
+            restcells.extend(list(new_cells))
+        # for cell in restcells:
+        #     if random() < lgca.interaction_params['r_b'] * (1 - rho):
+        #         lgca.maxlabel += 1
+        #         restcells.append(lgca.maxlabel)
+        #         lgca.props['kappa'].append(npr.normal(loc=lgca.props['kappa'][cell], scale=lgca.interaction_params['kappa_std']))
+        #         lgca.props['theta'].append(float(trunc_gauss(0, 1, mu=lgca.props['theta'][cell], sigma=lgca.interaction_params['theta_std'])))
 
         node = [[] for _ in range(lgca.velocitychannels)]
         node.append(restcells)
+
         for cell in velcells:
             node[randrange(lgca.velocitychannels)].append(cell)
-        lgca.nodes[coord] = deepcopy(node)
+
+        lgca.nodes[coord] = node
+
