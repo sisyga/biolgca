@@ -236,7 +236,7 @@ def go_or_grow(lgca):
         # R1: cell death
         notkilled = npr.random(size=density) < 1. - lgca.interaction_params['r_d']
         cells = cells[notkilled]
-        if cells.size == 0:
+        if len(cells) == 0:
             lgca.nodes[coord] = [[] for _ in range(lgca.K)]
             continue
         # R2: switch (using old density, as switching happens faster than death)
@@ -247,10 +247,13 @@ def go_or_grow(lgca):
         #         restcells.append(cell)
         #     else:
         #         velcells.append(cell)
-
-        restcells = [cell for cell in cells if
-                     random() < tanh_switch(rho=rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell])]
-        velcells = [cell for cell in cells if cell not in restcells]
+        kappas = lgca.props['kappa'][cells]
+        thetas = lgca.props['theta'][cells]
+        switch = npr.random(len(cells)) < tanh_switch(rho=rho, kappa=kappas, theta=thetas)
+        restcells, velcells = list(cells[switch]), list(cells[~switch])
+        # restcells = [cell for cell in cells if
+        #              random() < tanh_switch(rho=rho, kappa=lgca.props['kappa'][cell], theta=lgca.props['theta'][cell])]
+        # velcells = [cell for cell in cells if cell not in restcells]
         # R3: birth
         rho = len(cells) / lgca.interaction_params['capacity']  # update density after deaths for birth
         n_prolif = npr.binomial(len(restcells), max(lgca.interaction_params['r_b'] * (1 - rho), 0))
