@@ -1883,7 +1883,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.update_dynamic_fields()
 
     def set_interaction(self, **kwargs):
-        from lgca.nove_ib_interactions import randomwalk, birth, birthdeath, go_or_grow, evo_steric
+        from lgca.nove_ib_interactions import randomwalk, birth, birthdeath, go_or_grow, evo_steric, go_or_grow_kappa
         from lgca.interactions import only_propagation
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
@@ -1997,6 +1997,54 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                     self.interaction_params['theta'] = [0.5] * (self.maxlabel + 1)
                     print('switch threshold set to theta = ', self.interaction_params['theta'][0])
                 self.props.update(theta=np.array(self.interaction_params['theta']))
+
+            elif interaction == 'go_or_grow_kappa':
+                self.interaction = go_or_grow_kappa
+                try:
+                    assert self.restchannels > 0
+                except AssertionError:
+                    print('There must be exactly one rest channel for this interaction to work!')
+                if 'capacity' in kwargs:
+                    self.interaction_params['capacity'] = kwargs['capacity']
+                else:
+                    self.interaction_params['capacity'] = 8
+                    print('node capacity set to ', self.interaction_params['capacity'])
+
+                if 'kappa_std' in kwargs:
+                    self.interaction_params['kappa_std'] = kwargs['kappa_std']
+                else:
+                    self.interaction_params['kappa_std'] = 0.2
+                    print('std of kappa set to', self.interaction_params['kappa_std'])
+
+                if 'r_d' in kwargs:
+                    self.interaction_params['r_d'] = kwargs['r_d']
+                else:
+                    self.interaction_params['r_d'] = 0.01
+                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+
+                if 'r_b' in kwargs:
+                    self.interaction_params['r_b'] = kwargs['r_b']
+                else:
+                    self.interaction_params['r_b'] = 0.2
+                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+
+                if 'kappa' in kwargs:
+                    kappa = kwargs['kappa']
+                    if hasattr(kappa, '__iter__'):
+                        self.interaction_params['kappa'] = list(kappa)
+                    else:
+                        self.interaction_params['kappa'] = [kappa] * (self.maxlabel + 1)
+                else:
+                    self.interaction_params['kappa'] = [5.] * (self.maxlabel + 1)
+                    print('switch rate set to kappa = ', self.interaction_params['kappa'][0])
+
+                self.props.update(kappa=np.array(self.interaction_params['kappa']))
+                if 'theta' in kwargs:
+                    theta = kwargs['theta']
+                    self.interaction_params['theta'] = theta
+                else:
+                    self.interaction_params['theta'] = 0.5
+                    print('switch threshold set to theta = ', self.interaction_params['theta'])
 
             elif interaction == 'steric_evolution':
                 self.interaction = evo_steric
