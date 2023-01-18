@@ -66,9 +66,9 @@ if __name__ == '__main__':
             params[i, j]['r_d'] = r_d
             params[i, j]['theta'] = t
 
-    np.savez(PATH+'params.npz', constparams=constparams, params=params)
+    np.savez(PATH+'params.npz', constparams=constparams, r_ds=r_ds, thetas=thetas)
     paramstobeiterated = preprocess(params, reps, **constparams)
-    result = multiprocess(iteration, paramstobeiterated, processes=4)
+    result = multiprocess(iteration, paramstobeiterated, processes=7)
     n_pr = np.empty(params.shape + (reps,), dtype=object)
     n_pr = postprocess(result, n_pr)
     np.save(PATH+'n_pr.npy', n_pr)
