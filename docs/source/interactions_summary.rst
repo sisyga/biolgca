@@ -1,3 +1,5 @@
+.. _interaction_chapter:
+
 Built-in Interactions
 =====================
 

@@ -13,6 +13,19 @@
    {%- endfor %}
    {% endif %}
    {% endblock %}
+   
+   {% block classes %}
+   {% if classes %}
+   .. rubric:: {{ _('Classes') }}
+
+   .. autosummary::
+      :template: custom-class-template.rst
+      :toctree:
+   {% for item in classes %}
+      {{ item }}
+   {%- endfor %}
+   {% endif %}
+   {% endblock %}
 
    {% block functions %}
    {% if functions %}
@@ -21,19 +34,6 @@
    .. autosummary::
       :toctree:
    {% for item in functions %}
-      {{ item }}
-   {%- endfor %}
-   {% endif %}
-   {% endblock %}
-
-   {% block classes %}
-   {% if classes %}
-   .. rubric:: {{ _('Classes') }}
-
-   .. autosummary::
-      :toctree:
-	  :template: custom-class-template.rst
-   {% for item in classes %}
       {{ item }}
    {%- endfor %}
    {% endif %}
