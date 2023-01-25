@@ -1,11 +1,14 @@
+********
 Tutorial
-========
+********
 
 .. note::
 
    This section is under construction.
 
 To Do: put contents of the .ipynb file here and link functions to usage guide.
+
+
 
 Retrieving the correct LGCA
 ---------------------------
@@ -17,6 +20,8 @@ Simulation
 ----------
 timestep and timeevo
 
+
+.. _adding_own_interactions:
 
 Customisation
 -------------

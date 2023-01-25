@@ -97,6 +97,10 @@ add_module_names = True  # default True
 # To Do: other HTML config https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 # alabaster customization
+# https://alabaster.readthedocs.io/en/latest/customization.html#theme-options
+# to do: github button and read the rest
 html_theme_options = {
     'fixed_sidebar' : True,
+    'logo': '../../../images/biolgca_v2.png',
 }
+#html_logo = '../images/biolgca_v2.png'
