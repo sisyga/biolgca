@@ -7,10 +7,15 @@ from tqdm import tqdm
 PATH = '.\\data\\gog\\'
 
 def iteration(args):
+    from pickle import dump
     index, kwargs = args
     lgca = get_lgca(**kwargs)
-    lgca.timeevo(kwargs['tmax'], record=True, showprogress=False, recorddens=False, recordN=False)
-    return index, lgca
+    lgca.timeevo(kwargs['tmax'], record=False, showprogress=False, recorddens=False, recordN=False)
+    data = {'nodes_t': lgca.nodes, 'kappa': lgca.props['kappa'], 'lgca_params': kwargs}
+    # save data using pickle
+    with open(kwargs['PATH'] + 'data{}.pkl'.format(index), 'wb') as f:
+        dump(data, f)
+    return
 
 
 def preprocess(variablearray, reps, **constparams):
@@ -39,36 +44,42 @@ def postprocess(result, arr):
 if __name__ == '__main__':
     restchannels = 1
     l = 1000
-    dims = l, l
+    dims = l,
     capacity = 100
-    tmax = 100
+    tmax = 1200
     kappa_max = 4
+    kappa_std = 0.05 * kappa_max
     # interaction parameters
     r_b = 1.  # initial birth rate
     # r_d = 0.5 * r_b / 2  # initial death rate
 
-    # nodes = np.zeros((l,) + (2 + restchannels,), dtype=int)
-    # nodes[l // 2, -1] = capacity
-    # kappa = np.random.random(capacity) * kappa_max * 2 - kappa_max
+    nodes = np.zeros((l,) + (2 + restchannels,), dtype=int)
+    nodes[l // 2, -1] = capacity
 
     # rhoeq = 1 - r_d / r_b
-    r_ds = np.linspace(0., .5, 3)
-    thetas = np.linspace(0, 1, 3)
+    reps = 1  # number of repetitions of for each parameter
+    r_ds = np.linspace(0., .3, 10)
+    thetas = np.linspace(0, 1, 10)
+    kappa = np.random.random(r_ds.shape + thetas.shape + (reps, capacity)) * kappa_max * 2 - kappa_max
     # lp = len(ps)
     # lk = len(ks)
-    reps = 1  # number of repetitions of for each parameter
-    constparams = {'l': l, 'ib': True, 'bc': 'reflect', 'interaction': 'go_or_grow', 've': False, 'geometry': 'lin',
-                  'capacity':capacity, 'r_b': r_b, 'tmax': tmax}
-    params = np.empty((len(r_ds), len(thetas)), dtype=object)
+
+    constparams = {'l': l, 'ib': True, 'bc': 'reflect', 'interaction': 'go_or_grow_kappa', 've': False, 'geometry': 'lin',
+                  'capacity': capacity, 'r_b': r_b, 'tmax': tmax, 'restchannels': restchannels, 'nodes': nodes,
+                   'kappa_std': kappa_std, 'PATH': PATH}
+    params = np.empty((len(r_ds), len(thetas), reps), dtype=object)
     for i, r_d in enumerate(r_ds):
         for j, t in enumerate(thetas):
-            params[i, j] = {'constparams': {**constparams}}
-            params[i, j]['r_d'] = r_d
-            params[i, j]['theta'] = t
+            for k in range(reps):
+                params[i, j, k] = {'kappa': kappa[i, j, k], 'r_d': r_d, 'theta': t}
+                params[i, j, k] = {'constparams': {**constparams}}
+                params[i, j, k]['r_d'] = r_d
+                params[i, j, k]['theta'] = t
+                params[i, j, k]['kappa'] = kappa[i, j, k]
 
     np.savez(PATH+'params.npz', constparams=constparams, r_ds=r_ds, thetas=thetas)
     paramstobeiterated = preprocess(params, reps, **constparams)
-    result = multiprocess(iteration, paramstobeiterated, processes=7)
-    n_pr = np.empty(params.shape + (reps,), dtype=object)
-    n_pr = postprocess(result, n_pr)
-    np.save(PATH+'n_pr.npy', n_pr)
+    result = multiprocess(iteration, paramstobeiterated, nodes=6)
+    # n_pr = np.empty(params.shape + (reps,), dtype=object)
+    # n_pr = postprocess(result, n_pr)
+    # np.save(PATH+'n_pr.npy', n_pr)

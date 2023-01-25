@@ -21,11 +21,11 @@ rhoeq = 1 - r_d / r_b
 # lgca = get_lgca(ib=True, bc='reflect', interaction='go_or_grow', dims=dims, nodes=nodes, ve=False, geometry='hx',
 #                 r_b=r_b, capacity=capacity, r_d=r_d, kappa=kappa, theta_std=1e-6)
 lgca = get_lgca(ib=True, bc='reflect', interaction='go_or_grow_kappa', dims=l, nodes=nodes, ve=False, geometry='lin',
-                r_b=r_b, capacity=capacity, r_d=r_d, kappa=kappa, theta=rhoeq/2)
+                r_b=r_b, capacity=capacity, r_d=r_d, kappa=kappa, theta=rhoeq/2, kappa_std=.2)
 
 print(lgca.interaction_params)
 
-lgca.timeevo(100, record=True, recordN=False)
+lgca.timeevo(1500, record=True, recordN=False)
 
 kappas = lgca.get_prop(propname='kappa')
 # anim = lgca.animate_density()
