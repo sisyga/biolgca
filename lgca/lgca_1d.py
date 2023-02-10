@@ -464,7 +464,8 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
             nodes_t = self.length_checker(self.nodes_t)
         LGCA_1D.plot_flux(self, nodes_t, **kwargs)
 
-    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', cbarlabel=None, **kwargs):
+    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', cbarlabel=None, cbar=True,
+                          **kwargs):
         """
         Plot the spatial distribution of a cell property 'propname'. At each node, for each time step the mean value in
         the node is shown. Empty nodes are masked.
@@ -491,13 +492,14 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
         mean_prop_t = self.mean_prop_t[propname]
 
         plot = plt.imshow(mean_prop_t, interpolation='none', cmap=cmap, aspect='equal')
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size=0.3, pad=0.1)
-        cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
-        if cbarlabel is None:
-            cbar.set_label(r'Property ${}$'.format(propname))
-        else:
-            cbar.set_label(cbarlabel)
+        if cbar:
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size=0.3, pad=0.1)
+            cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
+            if cbarlabel is None:
+                cbar.set_label(r'Property ${}$'.format(propname))
+            else:
+                cbar.set_label(cbarlabel)
         plt.sca(ax)
         return plot
 
