@@ -25,7 +25,7 @@ lgca = get_lgca(ib=True, bc='reflect', interaction='go_or_grow_kappa', dims=l, n
 
 print(lgca.interaction_params)
 
-lgca.timeevo(100, record=True, recordN=False)
+lgca.timeevo(1000, record=True, recordN=False)
 
 kappas = lgca.get_prop(propname='kappa')
 # anim = lgca.animate_density()
