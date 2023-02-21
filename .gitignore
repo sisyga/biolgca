@@ -13,3 +13,6 @@ docs/build/*
 docs/source/*
 .gitignore
 __pycache__
+/steric_evolution/*
+/alignment_art.svg
+/alignment_art_rainbow.svg
