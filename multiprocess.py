@@ -4,7 +4,7 @@ import numpy as np
 from lgca import get_lgca
 from tqdm import tqdm
 
-PATH = '.\\data\\gog\\'
+PATH = '.\\data\\gog\\nonlocaldensity\\'
 
 def iteration(args):
     from pickle import dump
@@ -46,7 +46,7 @@ if __name__ == '__main__':
     l = 1000
     dims = l,
     capacity = 100
-    tmax = 1200
+    tmax = 1000
     kappa_max = 4
     kappa_std = 0.05 * kappa_max
     # interaction parameters
@@ -73,9 +73,9 @@ if __name__ == '__main__':
             for k in range(reps):
                 params[i, j, k] = {'kappa': kappa[i, j, k], 'r_d': r_d, 'theta': t}
                 params[i, j, k] = {'constparams': {**constparams}}
-                # params[i, j, k]['r_d'] = r_d
-                # params[i, j, k]['theta'] = t
-                # params[i, j, k]['kappa'] = kappa[i, j, k]
+                params[i, j, k]['r_d'] = r_d
+                params[i, j, k]['theta'] = t
+                params[i, j, k]['kappa'] = kappa[i, j, k]
 
     np.savez(PATH+'params.npz', constparams=constparams, r_ds=r_ds, thetas=thetas)
     paramstobeiterated = preprocess(params, reps, **constparams)

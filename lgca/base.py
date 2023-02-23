@@ -64,9 +64,9 @@ def colorbar_index(ncolors: int, cmap, use_gridspec: bool=False, cax=None):
     # discretize the colormap
     cmap = cmap_discretize(cmap, ncolors)
     # stride the colorbar labels to avoid cluttering for many colors
-    if ncolors > 101:
+    if ncolors > 100:
         stride = 10
-    elif ncolors > 51:
+    elif ncolors > 50:
         stride = 5
     elif ncolors > 31:
         stride = 2
@@ -2157,6 +2157,10 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         else: self.maxlabel = max(cells)
 
     def get_prop(self, nodes=None, props=None, propname=None):
+        """
+        Return array of property "propname" on every node, given the lattice configuration "nodes" and the property
+        dictionary "props".
+        """
         if nodes is None:
             nodes = self.nodes[self.nonborder]
 

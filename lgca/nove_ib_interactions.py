@@ -297,10 +297,12 @@ def go_or_grow_kappa(lgca):
     """
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
+    nbdensity = lgca.nb_sum(lgca.cell_density, addCenter=True) / (lgca.velocitychannels * lgca.interaction_params['capacity']) # density of neighbors
     for coord in zip(*coords):
         node = lgca.nodes[coord]
         density = lgca.cell_density[coord]
-        rho = density / lgca.interaction_params['capacity']
+        nbdens = nbdensity[coord]
+        # rho = density / lgca.interaction_params['capacity']
         cells = np.array(node.sum())
         # R1: cell death
         notkilled = npr.random(size=density) < 1. - lgca.interaction_params['r_d']
@@ -310,7 +312,7 @@ def go_or_grow_kappa(lgca):
             continue
 
         kappas = lgca.props['kappa'][cells]
-        switch = npr.random(len(cells)) < tanh_switch(rho=rho, kappa=kappas, theta=lgca.interaction_params['theta'])
+        switch = npr.random(len(cells)) < tanh_switch(rho=nbdens, kappa=kappas, theta=lgca.interaction_params['theta'])
         restcells, velcells = list(cells[switch]), list(cells[~switch])
 
         rho = len(cells) / lgca.interaction_params['capacity']  # update density after deaths for birth
@@ -329,5 +331,72 @@ def go_or_grow_kappa(lgca):
 
         for cell in velcells:
             node[randrange(lgca.velocitychannels)].append(cell)
+
+        lgca.nodes[coord] = node
+
+def go_or_grow_kappa_chemo(lgca):
+    """
+    Apply the evolutionary "go-or-grow" interaction. Cells switch from a migratory to a resting phenotype and vice versa
+    depending on their individual properties and the local cell density. Resting cells proliferate with a constant
+    proliferation rate. Migrating cells move along the cell density gradient.
+    Each cell dies with a constant rate. Daughter cells inherit their switch properties from the
+    mother cells with some small variations given by a (truncated) Gaussian distribution.
+    :param lgca:
+    :return:
+    """
+    relevant = (lgca.cell_density[lgca.nonborder] > 0)
+    coords = [a[relevant] for a in lgca.nonborder]
+    g = lgca.gradient(lgca.cell_density / lgca.interaction_params['capacity'])  # density gradient for each lattice site
+    nbdensity = lgca.nb_sum(lgca.cell_density, addCenter=True) / (lgca.velocitychannels * lgca.interaction_params['capacity']) # density of neighbors
+    for coord in zip(*coords):
+        node = lgca.nodes[coord]
+        density = lgca.cell_density[coord]
+        nbdens = nbdensity[coord]
+        rho = density / lgca.interaction_params['capacity']
+        cells = np.array(node.sum())
+        # R1: cell death
+        notkilled = npr.random(size=density) < 1. - lgca.interaction_params['r_d']
+        cells = cells[notkilled]
+        if len(cells) == 0:
+            lgca.nodes[coord] = [[] for _ in range(lgca.K)]
+            continue
+
+        kappas = lgca.props['kappa'][cells]
+        switch = npr.random(len(cells)) < tanh_switch(rho=nbdens, kappa=kappas, theta=lgca.interaction_params['theta'])
+        restcells, velcells = list(cells[switch]), list(cells[~switch])
+
+        rho = len(cells) / lgca.interaction_params['capacity']  # update density after deaths for birth
+        n_prolif = npr.binomial(len(restcells), max(lgca.interaction_params['r_b'] * (1 - rho), 0))
+        if n_prolif > 0:
+            proliferating = npr.choice(restcells, n_prolif, replace=False)
+            lgca.maxlabel += n_prolif
+            new_cells = np.arange(lgca.maxlabel - n_prolif + 1, lgca.maxlabel + 1)
+            lgca.props['kappa'] = np.concatenate((lgca.props['kappa'],
+                                                  npr.normal(loc=lgca.props['kappa'][proliferating],
+                                                             scale=lgca.interaction_params['kappa_std'])))
+            restcells.extend(list(new_cells))
+
+        node = [[] for _ in range(lgca.velocitychannels)]
+        node.append(restcells)
+        if len(velcells) > 0:
+            gloc = g[coord]
+            weights = np.exp(lgca.interaction_params['beta'] * np.einsum('i,ij', gloc, lgca.c))
+
+            z = weights.sum()
+            weights /= z  # normalize
+            # to prevent divisions by zero if the weight is zero
+            # aux = np.nan_to_num(z)
+            # weights = np.nan_to_num(weights)
+            # weights = (weights / aux)
+            # # In case there are some rounding problems
+            # if weights.sum() > 1:
+            #     weights = (weights / weights.sum())
+
+            # reassign particle directions
+            sample = npr.multinomial(len(velcells), weights)
+            shuffle(velcells)
+            for i in range(lgca.velocitychannels):
+                node[i].extend(velcells[:sample[i]])
+                velcells = velcells[sample[i]:]
 
         lgca.nodes[coord] = node

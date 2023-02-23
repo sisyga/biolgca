@@ -357,8 +357,7 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
             figsize = estimate_figsize(density_t.T, cbar=True)
 
         # set up figure
-        fig = plt.figure(num=figindex, figsize=figsize)
-        ax = fig.add_subplot(111)
+        fig, ax = self.setup_figure(density_t.shape[0], figindex=figindex, figsize=figsize)
         # set up color scaling
         if relative_max is not None:
             scale = relative_max
@@ -367,16 +366,22 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         max_part_per_cell = int(scale * density_t.max())
         if absolute_max is not None:
             max_part_per_cell = int(absolute_max)
-        cmap = cmap_discretize(cmap, max_part_per_cell + 1)
+
+
+        cmap = cmap_discretize(cmap, max_part_per_cell+1)
         # create plot with color bar, axis labels, title and layout
         plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=max_part_per_cell, cmap=cmap,
-                            extent =[offset_x-0.5, density_t.shape[1] + offset_x-0.5, density_t.shape[0] + offset_t - 0.5, offset_t-0.5])
-        loc = mticker.MaxNLocator(nbins='auto', steps=[1,2,5,10], integer=True)
+                            extent =[offset_x-0.5, density_t.shape[1] + offset_x-0.5,
+                                     density_t.shape[0] + offset_t - 0.5, offset_t-0.5])
+        loc = mticker.MaxNLocator(nbins='auto', steps=[1, 2, 5, 10], integer=True)
         ax.xaxis.set_major_locator(loc)
         loc = mticker.MaxNLocator(nbins='auto', steps=[1, 2, 5, 10], integer=True)
         ax.yaxis.set_major_locator(loc)
-        cbar = colorbar_index(ncolors=max_part_per_cell + 1, cmap=cmap, use_gridspec=True)
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size=0.3, pad=0.1)
+        cbar = colorbar_index(ncolors=max_part_per_cell + 1, cmap=cmap, use_gridspec=True, cax=cax)
         cbar.set_label(r'Particle number $n$')
+        plt.sca(ax)
         plt.xlabel(r'Lattice node $r \, (\varepsilon)$', )
         plt.ylabel(r'Time step $k \, (\tau)$')
         ax.xaxis.set_label_position('top')
