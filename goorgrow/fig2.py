@@ -1,13 +1,44 @@
 import numpy as np
 import matplotlib.pyplot as plt
-figwidth = 5.593
-golden_ratio = 1.61803
-figsize = (figwidth, figwidth / golden_ratio)
+plt.style.use('../frontiers_style.mplstyle')
+import string
+from itertools import cycle
+
+def label_axes(fig, labels=None, loc=None, **kwargs):
+    """
+    Walks through axes and labels each.
+
+    kwargs are collected and passed to `annotate`
+
+    Parameters
+    ----------
+    fig : Figure
+         Figure object to work on
+
+    labels : iterable or None
+        iterable of strings to use to label the axes.
+        If None, lower case letters are used.
+
+    loc : len=2 tuple of floats
+        Where to put the label in axes-fraction units
+    """
+    if labels is None:
+        labels = string.ascii_uppercase
+
+    # re-use labels rather than stop labeling
+    labels = cycle(labels)
+    if loc is None:
+        loc = (-0.05, 1.15)
+    for ax, lab in zip(fig.axes, labels):
+        ax.annotate(lab, xy=loc, ha='right', weight='bold', size=10,
+                    xycoords='axes fraction',
+                    **kwargs)
+
 def tanh_switch(rho, kappa=5., theta=0.8):
     return 0.5 * (1 + np.tanh(kappa * (rho - theta)))
 
 
-fig, axes = plt.subplots(1, 2, figsize=figsize, sharex=True, sharey=True)
+fig, axes = plt.subplots(1, 2, sharex=True, sharey=True)
 
 plt.sca(axes[0])
 rho = np.linspace(0, 1, num=100)
@@ -24,10 +55,10 @@ plt.plot([theta, theta], [0, tanh_switch(theta, kappa=kappa, theta=theta)], colo
 # add a dotted horizontal line at 0.5 up to the tanh_switch function
 plt.plot([0, theta], [0.5, 0.5], color='black', linestyle='dotted')
 # add a text label at the point (theta, 0.5)
-plt.text(theta+0.025, 0.5, r'$\kappa > 0$', fontsize=12)
+plt.text(theta+0.025, 0.5, r'$\kappa > 0$', fontsize=10)
 # place text box in upper left corner
-plt.text(0.05, 0.95, r'"Go"', fontsize=12, transform=plt.gca().transAxes, verticalalignment='top')
-plt.text(0.95, 0.05, r'"Grow"', fontsize=12, transform=plt.gca().transAxes, verticalalignment='bottom',
+plt.text(0.05, 0.95, r'"Go"', fontsize=10, transform=plt.gca().transAxes, verticalalignment='top')
+plt.text(0.95, 0.05, r'"Grow"', fontsize=10, transform=plt.gca().transAxes, verticalalignment='bottom',
          horizontalalignment='right')
 
 # add a straight line indicating the gradient of the tanh_switch function at theta
@@ -42,7 +73,7 @@ plt.ylim(0, 1)
 plt.yticks([0, 0.5, 1])
 # set x ticks to 0, theta, 0.5, 1
 plt.xticks([0, theta, 0.5, 1], [0, r'$\theta$', .5, 1])
-plt.ylabel(r'Phenotypic switch probability $r_\kappa (\rho_{\mathcal{N}})$', fontsize=12)
+plt.ylabel(r'Phenotypic switch $r_\kappa (\rho_{\mathcal{N}})$', fontsize=10)
 
 plt.sca(axes[1])
 kappa = -4.
@@ -58,12 +89,13 @@ plt.plot([theta, theta], [0, tanh_switch(theta, kappa=kappa, theta=theta)], colo
 plt.plot([0, theta], [0.5, 0.5], color='black', linestyle='dotted')
 # add a text label at the point (theta, 0.5)
 
-plt.text(theta+0.025, 0.5, r'$\kappa < 0$', fontsize=12)
-plt.text(0.95, 0.95, r'"Go"', fontsize=12, transform=plt.gca().transAxes, verticalalignment='top', horizontalalignment='right')
-plt.text(0.05, 0.05, r'"Grow"', fontsize=12, transform=plt.gca().transAxes, verticalalignment='bottom')
+plt.text(theta+0.025, 0.5, r'$\kappa < 0$', fontsize=10)
+plt.text(0.95, 0.95, r'"Go"', fontsize=10, transform=plt.gca().transAxes, verticalalignment='top', horizontalalignment='right')
+plt.text(0.05, 0.05, r'"Grow"', fontsize=10, transform=plt.gca().transAxes, verticalalignment='bottom')
 plt.xlim(0, 1)
 plt.ylim(0, 1)
 
-fig.supxlabel(r'Local density $\rho_{\mathcal{N}}$', fontsize=12)
+fig.supxlabel(r'Local density $\rho_{\mathcal{N}}$', fontsize=10)
+label_axes(fig, labels=('C', 'D'))
 plt.tight_layout()
 plt.show()

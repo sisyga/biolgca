@@ -330,7 +330,7 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
             self.apply_boundaries()
 
     def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='hot_r', relative_max=None,
-                     absolute_max=None, offset_t=0, offset_x=0):
+                     absolute_max=None, offset_t=0, offset_x=0, cbarlabel=None, **kwargs):
         """
         Create a plot showing the number of particles per lattice site.
         :param density_t: particle number per lattice site (ndarray of dimension (timesteps + 1,) + self.dims)
@@ -378,9 +378,9 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         loc = mticker.MaxNLocator(nbins='auto', steps=[1, 2, 5, 10], integer=True)
         ax.yaxis.set_major_locator(loc)
         divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size=0.3, pad=0.1)
+        cax = divider.append_axes("right", size=0.2, pad=0.1)
         cbar = colorbar_index(ncolors=max_part_per_cell + 1, cmap=cmap, use_gridspec=True, cax=cax)
-        cbar.set_label(r'Particle number $n$')
+        cbar.set_label(cbarlabel)
         plt.sca(ax)
         plt.xlabel(r'Lattice node $r \, (\varepsilon)$', )
         plt.ylabel(r'Time step $k \, (\tau)$')
@@ -499,7 +499,7 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
         plot = plt.imshow(mean_prop_t, interpolation='none', cmap=cmap, aspect='equal')
         if cbar:
             divider = make_axes_locatable(ax)
-            cax = divider.append_axes("right", size=0.3, pad=0.1)
+            cax = divider.append_axes("right", size=0.2, pad=0.1)
             cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
             if cbarlabel is None:
                 cbar.set_label(r'Property ${}$'.format(propname))
