@@ -4,7 +4,7 @@ import numpy as np
 from lgca import get_lgca
 from tqdm import tqdm
 
-PATH = '.\\data\\gog\\nonlocaldensity\\'
+PATH = '.\\data\\gog\\nonlocaldensity_5more_reps\\'
 
 def iteration(args):
     from pickle import dump
@@ -43,7 +43,7 @@ def postprocess(result, arr):
 
 if __name__ == '__main__':
     restchannels = 1
-    l = 1000
+    l = 1001
     dims = l,
     capacity = 100
     tmax = 1000
@@ -57,9 +57,9 @@ if __name__ == '__main__':
     nodes[l // 2, -1] = capacity
 
     # rhoeq = 1 - r_d / r_b
-    reps = 1  # number of repetitions of for each parameter
-    r_ds = np.linspace(0., .3, 10)
-    thetas = np.linspace(0, 1, 10)
+    reps = 5  # number of repetitions of for each parameter
+    r_ds = np.linspace(0, .25, 6)
+    thetas = np.linspace(0, 1., 11)
     kappa = np.random.random(r_ds.shape + thetas.shape + (reps, capacity)) * kappa_max * 2 - kappa_max
     # lp = len(ps)
     # lk = len(ks)
@@ -78,8 +78,8 @@ if __name__ == '__main__':
                 params[i, j, k]['kappa'] = kappa[i, j, k]
 
     np.savez(PATH+'params.npz', constparams=constparams, r_ds=r_ds, thetas=thetas)
-    paramstobeiterated = preprocess(params, reps, **constparams)
-    result = multiprocess(iteration, paramstobeiterated, nodes=6)
+    paramstobeiterated = preprocess(params, 1, **constparams)  # as each repetition needs a different kappa, we need to pretend it is a different parameter, and only have one repetition
+    result = multiprocess(iteration, paramstobeiterated, nodes=7)
     # n_pr = np.empty(params.shape + (reps,), dtype=object)
     # n_pr = postprocess(result, n_pr)
     # np.save(PATH+'n_pr.npy', n_pr)
