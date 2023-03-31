@@ -11,7 +11,7 @@ def iteration(args):
     index, kwargs = args
     lgca = get_lgca(**kwargs)
     lgca.timeevo(kwargs['tmax'], record=False, showprogress=False, recorddens=False, recordN=False)
-    data = {'nodes_t': lgca.nodes, 'kappa': lgca.props['kappa'], 'lgca_params': kwargs}
+    data = {'nodes_t': lgca.nodes[lgca.nonborder], 'kappa': lgca.props['kappa'], 'lgca_params': kwargs}
     # save data using pickle
     with open(kwargs['PATH'] + 'data{}.pkl'.format(index), 'wb') as f:
         dump(data, f)
