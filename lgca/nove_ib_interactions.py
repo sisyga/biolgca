@@ -297,7 +297,7 @@ def go_or_grow_kappa(lgca):
     """
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
-    nbdensity = lgca.nb_sum(lgca.cell_density, addCenter=True) / (lgca.velocitychannels * lgca.interaction_params['capacity']) # density of neighbors
+    nbdensity = lgca.nb_sum(lgca.cell_density, addCenter=True) / ((lgca.velocitychannels+1) * lgca.interaction_params['capacity']) # average density in neighborhood
     for coord in zip(*coords):
         node = lgca.nodes[coord]
         density = lgca.cell_density[coord]
@@ -333,6 +333,109 @@ def go_or_grow_kappa(lgca):
             node[randrange(lgca.velocitychannels)].append(cell)
 
         lgca.nodes[coord] = node
+# from numba.typed import List
+# @jit(nopython=True)
+# def numba_optimized_go_or_grow_kappa_inner_loop(cells, density, nbdens, velocitychannels, capacity, r_d, r_b, theta,
+#                                                 kappa_std, props_kappa, maxlabel):
+#     notkilled = npr.random(size=density) < 1. - r_d
+#     cells = cells[notkilled]
+#     if len(cells) == 0:
+#         empty_list = List([np.int64(x) for x in range(0)])
+#         return List([empty_list for _ in range(velocitychannels + 1)]), props_kappa, maxlabel
+#
+#     kappas = props_kappa[cells]
+#     switch = npr.random(len(cells)) < tanh_switch(rho=nbdens, kappa=kappas, theta=theta)
+#     restcells, velcells = list(cells[switch]), list(cells[~switch])
+#
+#     rho = len(cells) / capacity  # update density after deaths for birth
+#     n_prolif = npr.binomial(len(restcells), max(r_b * (1 - rho), 0))
+#     if n_prolif > 0:
+#         proliferating = npr.choice(np.array(restcells, dtype=np.int64), n_prolif, replace=False)
+#         maxlabel += n_prolif
+#         new_cells = np.arange(maxlabel - n_prolif + 1, maxlabel + 1)
+#         new_props_kappa = np.array([npr.normal(loc=props_kappa[i], scale=kappa_std) for i in proliferating])
+#         props_kappa = np.concatenate((props_kappa, new_props_kappa))
+#         restcells.extend(list(new_cells))
+#
+#     node = List([List([np.int64(x) for x in range(0)]) for _ in range(velocitychannels)])
+#     node.append(List(restcells))
+#     for cell in velcells:
+#         node[randrange(velocitychannels)].append(cell)
+#
+#     return node, props_kappa, maxlabel
+
+#
+# @jit(nopython=True)
+# def numba_optimized_go_or_grow_kappa_inner_loop(cells, density, nbdens, velocitychannels, capacity, r_d, r_b, theta,
+#                                                 kappa_std, props_kappa, maxlabel):
+#     notkilled = npr.random(size=density) < 1. - r_d
+#     cells = cells[notkilled]
+#     if len(cells) == 0:
+#         return [[np.int64(x) for x in range(0)] for _ in range(velocitychannels + 1)], props_kappa, maxlabel
+#
+#     kappas = props_kappa[cells]
+#     switch = npr.random(len(cells)) < tanh_switch(rho=nbdens, kappa=kappas, theta=theta)
+#     restcells, velcells = list(cells[switch]), list(cells[~switch])
+#
+#     rho = len(cells) / capacity  # update density after deaths for birth
+#     n_prolif = npr.binomial(len(restcells), max(r_b * (1 - rho), 0))
+#     if n_prolif > 0:
+#         proliferating = npr.choice(np.array(restcells, dtype=np.int64), n_prolif, replace=False)
+#         maxlabel += n_prolif
+#         new_cells = np.arange(maxlabel - n_prolif + 1, maxlabel + 1)
+#         new_props_kappa = np.array([npr.normal(loc=props_kappa[i], scale=kappa_std) for i in proliferating])
+#         props_kappa = np.concatenate((props_kappa, new_props_kappa))
+#         restcells.extend(list(new_cells))
+#
+#     node = [[np.int64(x) for x in range(0)] for _ in range(velocitychannels)]
+#     node.append(restcells)
+#     for cell in velcells:
+#         node[randrange(velocitychannels)].append(cell)
+#
+#     return node, props_kappa, maxlabel
+
+# def go_or_grow_kappa(lgca):
+#     relevant = (lgca.cell_density[lgca.nonborder] > 0)
+#     coords = [a[relevant] for a in lgca.nonborder]
+#     nbdensity = lgca.nb_sum(lgca.cell_density, addCenter=True) / ((lgca.velocitychannels+1) * lgca.interaction_params['capacity']) # average density in neighborhood
+#     interaction_params = lgca.interaction_params
+#     capacity = interaction_params['capacity']
+#     r_d = interaction_params['r_d']
+#     r_b = interaction_params['r_b']
+#     theta = interaction_params['theta']
+#     kappa_std = interaction_params['kappa_std']
+#     ret_node = np.array(range(lgca.K), dtype=object)
+#     for coord in zip(*coords):
+#         node = lgca.nodes[coord]
+#         cells = np.array(node.sum())
+#         density = lgca.cell_density[coord]
+#         nbdens = nbdensity[coord]
+#         props_kappa = lgca.props['kappa']
+#         maxlabel = lgca.maxlabel
+#
+#         ret_node[:], props_kappa, maxlabel = numba_optimized_go_or_grow_kappa_inner_loop(
+#             cells, int(density), nbdens, lgca.velocitychannels, capacity, r_d, r_b, theta, kappa_std, props_kappa,
+#             maxlabel)
+#
+#         lgca.nodes[coord] = ret_node
+#         lgca.props['kappa'] = props_kappa
+#         lgca.maxlabel = maxlabel
+
+@jit(nopython=True)
+def tanh_switch(rho, kappa=5., theta=0.8):
+    return 0.5 * (1 + np.tanh(kappa * (rho - theta)))
+
+
+@jit(nopython=True)
+def nb_sum(qty, addCenter):
+    sum = np.zeros(qty.shape)
+    sum[:-1, ...] += qty[1:, ...]
+    sum[1:, ...] += qty[:-1, ...]
+
+    if addCenter:
+        sum += qty
+    return sum
+
 
 def go_or_grow_kappa_chemo(lgca):
     """
