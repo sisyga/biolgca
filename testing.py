@@ -1,71 +1,31 @@
-from lgca import get_lgca
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import numpy as np
-from matplotlib import pyplot as plt
 
+# Example data
+x = np.linspace(0, 10, 100)
+y1 = np.sin(x)
+y2 = np.cos(x)
 
-# geometry
-geom = 'hx'
-restchannels = 1
-l = 6
-dims = l, l
-# model parameters
+# Create a GridSpec object with 2 rows and 2 columns
+gs = gridspec.GridSpec(2, 2)
 
+# Create a figure
+fig = plt.figure()
 
-kappa = 0.
-theta = 0.5
+# Add subplots to the grid
+ax1 = fig.add_subplot(gs[0, 0])
+ax2 = fig.add_subplot(gs[0, 1])
+ax3 = fig.add_subplot(gs[1, 0])
+ax4 = fig.add_subplot(gs[1, 1])
 
-# simulation parameters
-dens = 0.1 #starting condition
-beta = 1.2
-# time = 100
+# Plot the data on the subplots
+ax1.plot(x, y1)
+ax2.plot(x, y2)
+ax3.plot(x, y1 * y2)
+ax4.plot(x, y1 + y2)
 
-# setup =
-from lgca import get_lgca
-import numpy as np
-from matplotlib import pyplot as plt
-from math import sqrt
-a_max = 1.
-a_min = 0.
-na = 401
-alpha, dalpha = np.linspace(a_min, a_max, num=na, retstep=True)
-r_d = 0.05
-r_b = 0.1
-var = 0.01**2
-tmax = 5000
-Da = var / 2
-dens0 = 1 - r_d / r_b
-ts = np.linspace(0, tmax, num=101)
-K = 100
-
-l = 50
-dims= l, l
-nodes = np.zeros(dims+(6+restchannels,), dtype=int)
-nodes[l//2, l//2, -1] = 100
-lgca = get_lgca(ib=True, bc='reflect', interaction='steric_evolution', dims=dims, nodes=nodes, ve=False, geometry='hx',
-                r_m=0.01, r_b=0.01, capacity=12, gamma=3)
-# print((lgca.props['family'][99]), max(lgca.nodes.sum()))
-# test_code = lgca.timeevo(timesteps=tmax, record=True)
-
-# time = timeit.repeat(setup=setup, stmt=test_code, repeat=1, number=1)
-# print('exec time = {}'.format(time))
-
-# lgca = get_lgca(interaction='birthdeath', bc='periodic', density=dens, geometry=geom, dims=dims,
-                # restchannels=restchannels, ve=0, ib=1 , beta=beta,
-                # r_d=r_d, r_b=r_b, kappa=kappa, theta=theta)
-lgca.timeevo(500, recordfampop=True, record=True)
-# lgca.plot_config()
-# lgca.plot_prop_spatial()
-# lgca.plot_config(grid=1)
-# ani = lgca.animate_config(interval=500, grid=1)
-# ani = lgca.live_animate_flux()
-# ani = lgca.animate_density()
-# lgca.plot_flux(cbar=0)
-# plt.gca().axis('off')
-# plt.tight_layout()
-# plt.savefig('alignment_art.svg')
-#
-lgca.muller_plot()
-plt.show()
-lgca.plot_prop_spatial()
+# Adjust layout and display the figure
+fig.tight_layout()
 plt.show()
 

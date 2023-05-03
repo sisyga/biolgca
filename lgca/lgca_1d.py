@@ -146,7 +146,7 @@ class LGCA_1D(LGCA_base):
         ax.xaxis.tick_top()
         return fig, ax
 
-    def plot_density(self, density_t=None, cmap='hot_r', vmax='auto', colorbarwidth=0.03, **kwargs):
+    def plot_density(self, density_t=None, cmap='hot_r', vmax='auto', colorbarwidth=0.03, cbar=True, **kwargs):
         if density_t is None:
             if hasattr(self, 'dens_t'):
                 density_t = self.dens_t
@@ -156,8 +156,7 @@ class LGCA_1D(LGCA_base):
 
         tmax = density_t.shape[0]
         fig, ax = self.setup_figure(tmax, **kwargs)
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size=colorbarwidth, pad=0.1)
+
         if vmax is None:
             vmax = self.K
 
@@ -166,9 +165,12 @@ class LGCA_1D(LGCA_base):
 
         cmap = cmap_discretize(cmap, 1 + vmax)
         plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=vmax, cmap=cmap)
-        cbar = colorbar_index(ncolors=1 + vmax, cmap=cmap, use_gridspec=True, cax=cax)
+        if cbar:
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size=colorbarwidth, pad=0.1)
+            cbar = colorbar_index(ncolors=1 + vmax, cmap=cmap, use_gridspec=True, cax=cax)
 
-        cbar.set_label('Particle number $n$')
+            cbar.set_label('Particle number $n$')
         plt.sca(ax)
         return plot
 
@@ -329,7 +331,7 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
             self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.uint)
             self.apply_boundaries()
 
-    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='hot_r', relative_max=None,
+    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='hot_r', relative_max=None, cbar=True,
                      absolute_max=None, offset_t=0, offset_x=0, cbarlabel=None, **kwargs):
         """
         Create a plot showing the number of particles per lattice site.
@@ -377,11 +379,12 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         ax.xaxis.set_major_locator(loc)
         loc = mticker.MaxNLocator(nbins='auto', steps=[1, 2, 5, 10], integer=True)
         ax.yaxis.set_major_locator(loc)
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size=0.2, pad=0.1)
-        cbar = colorbar_index(ncolors=max_part_per_cell + 1, cmap=cmap, use_gridspec=True, cax=cax)
-        cbar.set_label(cbarlabel)
-        plt.sca(ax)
+        if cbar:
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size=0.2, pad=0.1)
+            cbar = colorbar_index(ncolors=max_part_per_cell + 1, cmap=cmap, use_gridspec=True, cax=cax)
+            cbar.set_label(cbarlabel)
+            plt.sca(ax)
         plt.xlabel(r'Lattice node $r \, (\varepsilon)$', )
         plt.ylabel(r'Time step $k \, (\tau)$')
         ax.xaxis.set_label_position('top')
