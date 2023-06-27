@@ -1883,7 +1883,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.update_dynamic_fields()
 
     def set_interaction(self, **kwargs):
-        from lgca.nove_ib_interactions import randomwalk, birth, birthdeath, go_or_grow, evo_steric, go_or_grow_kappa
+        from lgca.nove_ib_interactions import randomwalk, birth, birthdeath, birthdeath_cancerdfe, go_or_grow, \
+            evo_steric, go_or_grow_kappa
         from lgca.interactions import only_propagation
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
@@ -1926,6 +1927,65 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                 else:
                     self.interaction_params['std'] = 0.01
                     print('standard deviation set to = ', self.interaction_params['std'])
+                if 'a_max' in kwargs:
+                    self.interaction_params['a_max'] = kwargs['a_max']
+                else:
+                    self.interaction_params['a_max'] = 1.
+                    print('Max. birth rate set to a_max =', self.interaction_params['a_max'])
+                if 'gamma' in kwargs:
+                    self.interaction_params['gamma'] = kwargs['gamma']
+                else:
+                    self.interaction_params['gamma'] = 0.
+                    print('Rest channel weight set to gamma =', self.interaction_params['gamma'])
+
+                Z = self.velocitychannels + np.exp(self.interaction_params['gamma']) * self.restchannels
+                self.channel_weights = [1./Z] * self.velocitychannels + [np.exp(self.interaction_params['gamma'])/Z] * self.restchannels
+
+            elif interaction == 'birthdeath_cancerdfe':
+                self.interaction = birthdeath_cancerdfe
+                if 'capacity' in kwargs:
+                    self.interaction_params['capacity'] = kwargs['capacity']
+                else:
+                    self.interaction_params['capacity'] = 8
+                    print('capacity of channel set to ', self.interaction_params['capacity'])
+
+                if 'r_b' in kwargs:
+                    self.interaction_params['r_b'] = kwargs['r_b']
+                else:
+                    self.interaction_params['r_b'] = 0.2
+                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+                self.props.update(r_b=[self.interaction_params['r_b']] * (self.maxlabel + 1))
+
+                if 'r_d' in kwargs:
+                    self.interaction_params['r_d'] = kwargs['r_d']
+                else:
+                    self.interaction_params['r_d'] = 0.02
+                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+
+                if 'p_d' in kwargs:
+                    self.interaction_params['p_d'] = kwargs['p_d']
+                else:
+                    self.interaction_params['p_d'] = 1.4e-5  # from macfarlane 2014
+                    print('probability of drivers set to = ', self.interaction_params['p_d'])
+
+                if 'p_p' in kwargs:
+                    self.interaction_params['p_p'] = kwargs['p_p']
+                else:
+                    self.interaction_params['p_p'] = 0.1  # from macfarlane 2014
+                    print('probability of passengers set to = ', self.interaction_params['p_p'])
+
+                if 's_d' in kwargs:
+                    self.interaction_params['s_d'] = kwargs['s_d']
+                else:
+                    self.interaction_params['s_d'] = .1 * self.interaction_params['r_b'] # from macfarlane 2014
+                    print('driver strength set to = ', self.interaction_params['s_d'])
+
+                if 's_p' in kwargs:
+                    self.interaction_params['s_p'] = kwargs['s_p']
+                else:
+                    self.interaction_params['s_p'] = .001 * self.interaction_params['r_b'] # from macfarlane 2014
+                    print('passenger strength set to = ', self.interaction_params['s_p'])
+
                 if 'a_max' in kwargs:
                     self.interaction_params['a_max'] = kwargs['a_max']
                 else:

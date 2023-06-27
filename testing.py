@@ -1,71 +1,85 @@
-from lgca import get_lgca
-import numpy as np
-from matplotlib import pyplot as plt
-
-
-# geometry
-geom = 'hx'
-restchannels = 1
-l = 6
-dims = l, l
-# model parameters
-
-
-kappa = 0.
-theta = 0.5
-
-# simulation parameters
-dens = 0.1 #starting condition
-beta = 1.2
-# time = 100
-
-# setup =
-from lgca import get_lgca
-import numpy as np
-from matplotlib import pyplot as plt
-from math import sqrt
-a_max = 1.
-a_min = 0.
-na = 401
-alpha, dalpha = np.linspace(a_min, a_max, num=na, retstep=True)
-r_d = 0.05
-r_b = 0.1
-var = 0.01**2
-tmax = 5000
-Da = var / 2
-dens0 = 1 - r_d / r_b
-ts = np.linspace(0, tmax, num=101)
-K = 100
-
-l = 50
-dims= l, l
-nodes = np.zeros(dims+(6+restchannels,), dtype=int)
-nodes[l//2, l//2, -1] = 100
-lgca = get_lgca(ib=True, bc='reflect', interaction='steric_evolution', dims=dims, nodes=nodes, ve=False, geometry='hx',
-                r_m=0.01, r_b=0.01, capacity=12, gamma=3)
-# print((lgca.props['family'][99]), max(lgca.nodes.sum()))
-# test_code = lgca.timeevo(timesteps=tmax, record=True)
-
-# time = timeit.repeat(setup=setup, stmt=test_code, repeat=1, number=1)
-# print('exec time = {}'.format(time))
-
-# lgca = get_lgca(interaction='birthdeath', bc='periodic', density=dens, geometry=geom, dims=dims,
-                # restchannels=restchannels, ve=0, ib=1 , beta=beta,
-                # r_d=r_d, r_b=r_b, kappa=kappa, theta=theta)
-lgca.timeevo(500, recordfampop=True, record=True)
-# lgca.plot_config()
-# lgca.plot_prop_spatial()
-# lgca.plot_config(grid=1)
-# ani = lgca.animate_config(interval=500, grid=1)
-# ani = lgca.live_animate_flux()
-# ani = lgca.animate_density()
-# lgca.plot_flux(cbar=0)
-# plt.gca().axis('off')
-# plt.tight_layout()
-# plt.savefig('alignment_art.svg')
+# import matplotlib.pyplot as plt
+# import matplotlib.gridspec as gridspec
+# import numpy as np
 #
-lgca.muller_plot()
-plt.show()
-lgca.plot_prop_spatial()
-plt.show()
+# # Example data
+# x = np.linspace(0, 10, 100)
+# y1 = np.sin(x)
+# y2 = np.cos(x)
+#
+# # Create a GridSpec object with 2 rows and 2 columns
+# gs = gridspec.GridSpec(2, 2)
+#
+# # Create a figure
+# fig = plt.figure()
+#
+# # Add subplots to the grid
+# ax1 = fig.add_subplot(gs[0, 0])
+# ax2 = fig.add_subplot(gs[0, 1])
+# ax3 = fig.add_subplot(gs[1, 0])
+# ax4 = fig.add_subplot(gs[1, 1])
+#
+# # Plot the data on the subplots
+# ax1.plot(x, y1)
+# ax2.plot(x, y2)
+# ax3.plot(x, y1 * y2)
+# ax4.plot(x, y1 + y2)
+#
+# # Adjust layout and display the figure
+# fig.tight_layout()
+# plt.show()
+#
 
+import numpy as np
+from scipy.integrate import solve_ivp
+import matplotlib.pyplot as plt
+
+# Constants
+m = 1.0
+s = 1.0
+x0 = 0.0  # location of the delta peak
+N = 100  # number of grid points
+t_span = (0.0, 1.0)  # time interval to solve on
+
+# Discretize the spatial domain
+x = np.linspace(0, 1, N)
+dx = x[1] - x[0]
+
+# Initial condition
+u0 = np.zeros(N)
+u0[N // 2] = 1 / dx  # a "delta function" at x0
+
+
+# Discretize the PDE
+def f(t, u):
+    # Allocate arrays for derivatives
+    du_dx = np.zeros_like(u)
+    d2u_dx2 = np.zeros_like(u)
+
+    # Compute derivatives in the interior using centered differences
+    du_dx[1:-1] = (u[2:] - u[:-2]) / (2 * dx)
+    d2u_dx2[1:-1] = (u[2:] - 2 * u[1:-1] + u[:-2]) / dx ** 2
+
+    # Compute derivatives at the boundaries using no-flux conditions
+    # Here we use the no-flux boundary condition
+    v = m * x - s / 2
+    D = x * s / 2
+
+    # For the left boundary:
+    # du_dx[0] = (v[0] * u[0] + D[0] * (u[1] - u[0]) / dx) / D[0]
+    # d2u_dx2[0] = (u[1] - u[0]) / dx ** 2  # one-sided second derivative
+
+    # For the right boundary:
+    du_dx[-1] = (-v[-1] * u[-1] + D[-1] * (u[-2] - u[-1]) / dx) / D[-1]
+    d2u_dx2[-1] = (u[-2] - u[-1]) / dx ** 2  # one-sided second derivative
+
+    return D * d2u_dx2 - v * du_dx  # d/dt u(x,t) = D * d^2/dx^2 u - v * du/dx
+
+
+# Solve the system of ODEs
+sol = solve_ivp(f, t_span, u0)
+
+# plt.plot(x, sol.y[-1])
+
+plt.show()
+# sol.y[-1] is the solution at the final time

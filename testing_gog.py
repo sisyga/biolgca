@@ -43,20 +43,20 @@ def timeevo(self, N, timesteps=100, record=False, recordN=False, recorddens=True
 
 
 restchannels = 1
-l = 1001
+l = 100
 dims = l,
-capacity = 100
+capacity = 2000
 # interaction parameters
-r_b = 1. # initial birth rate
-r_d = 0.1 # initial death rate
+r_b = .4 # initial birth rate
+r_d = 0.2 # initial death rate
 # r_b = 0 # initial birth rate
 # r_d = 0.# initial death rate
 nodes = np.zeros(dims+(6+restchannels,), dtype=int)
 # nodes[l//2, l//2, -1] = capacity
 
 nodes = np.zeros((l,)+(2+restchannels,), dtype=int)
-nodes[l//2-100:l//2+100, -1] = capacity / 10
-kappa = np.random.random(nodes.sum()) * 8. - 4
+nodes[0, -1] = capacity / 2
+# kappa = np.random.random(nodes.sum()) * 8. - 4
 
 # index = 4, 2, 0, 0
 # PATH = '.\\data\\gog\\nonlocaldensity_10reps\\'
@@ -75,9 +75,11 @@ kappa = np.random.random(nodes.sum()) * 8. - 4
 # rhoeq = 1 - r_d / r_b
 # lgca = get_lgca(ib=True, bc='reflect', interaction='go_or_grow', dims=dims, nodes=nodes, ve=False, geometry='hx',
 #                 r_b=r_b, capacity=capacity, r_d=r_d, kappa=kappa, theta_std=1e-6)
-lgca = get_lgca(ib=True, bc='reflect', interaction='go_or_grow_kappa', dims=l, nodes=nodes, ve=False, geometry='lin',
-                r_b=r_b, capacity=capacity, r_d=r_d, kappa=kappa, theta=.3, kappa_std=1)
-lgca.timeevo(300, record=True, recordN=False, recorddens=True)
+# lgca = get_lgca(ib=True, bc='reflect', interaction='go_or_grow_kappa', dims=l, nodes=nodes, ve=False, geometry='lin',
+#                 r_b=r_b, capacity=capacity, r_d=r_d, kappa=kappa, theta=.3, kappa_std=1)
+lgca = get_lgca(ib=True, bc='reflect', interaction='birthdeath_cancerdfe', dims=l, nodes=nodes, ve=False, geometry='lin',
+                capacity=capacity, r_b=r_b, r_d=r_d)
+lgca.timeevo(10000, record=True, recordN=True, recorddens=True)
 # lgca = get_lgca(**constparams, theta=theta, nodes=d['nodes_t'][1:-1])
 # lgca.props['kappa'] = d['kappa']
 # # lgca.nodes = d['nodes_t']
@@ -97,13 +99,21 @@ lgca.timeevo(300, record=True, recordN=False, recorddens=True)
 # anim = lgca.animate_density()
 # plt.plot(lgca.n_t)
 # plt.hist(kappas, bins='auto')
-plt.show()
+# plt.show()
+# plt.figure()
+# lgca.plot_prop_spatial()
+# # lgca.plot_density()
+#
 plt.figure()
-lgca.plot_prop_spatial(propname='kappa')
-# lgca.plot_density()
+# # lgca.plot_prop_spatial(propname='kappa')
+lgca.plot_density(vmax=lgca.interaction_params['capacity'])
+plt.show()
+#
+plt.figure()
+lgca.plot_prop_timecourse()
+plt.show()
 
 plt.figure()
-# lgca.plot_prop_spatial(propname='kappa')
-lgca.plot_density(vmax=lgca.interaction_params['capacity'])
+plt.plot(lgca.n_t)
 plt.show()
 

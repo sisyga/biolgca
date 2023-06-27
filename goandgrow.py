@@ -7,7 +7,7 @@ from math import sqrt
 from scipy.ndimage import laplace, convolve1d
 import seaborn as sns
 import matplotlib as mpl
-mpl.rcParams['lines.linewidth'] = 2
+# mpl.rcParams['lines.linewidth'] = 2
 
 #%%
 
