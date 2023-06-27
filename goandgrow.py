@@ -4,7 +4,7 @@ from lgca import get_lgca
 from scipy.integrate import odeint, solve_ivp
 from scipy.special import erf
 from math import sqrt
-from scipy.ndimage.filters import laplace, convolve1d
+from scipy.ndimage import laplace, convolve1d
 import seaborn as sns
 import matplotlib as mpl
 mpl.rcParams['lines.linewidth'] = 2
@@ -101,7 +101,7 @@ plt.show()
 #plt.savefig('mean_alpha.png', dpi=600)
 #%%
 plt.plot(np.arange(len(lgca.dens_t)), lgca.dens_t/lgca.K)
-plt.plot(ts, sol.sum(-1) * dalpha, label='Integral MF')
+# plt.plot(ts, sol.sum(-1) * dalpha, label='Integral MF')
 plt.plot(ts, sol2.sum(-1) * dalpha, label='Local MF')
 
 plt.title('')
@@ -112,7 +112,7 @@ plt.show()
 #%%
 bins = int(np.ceil(np.log2(lgca.occupied.sum()))+1)
 plt.hist(np.array(lgca.props['r_b'])[lgca.nodes[lgca.nodes > 0]], bins=bins, density=True, label='LGCA')
-plt.plot(alpha, sol[-1] / sol[-1].sum() / dalpha, label='Int MF')
+# plt.plot(alpha, sol[-1] / sol[-1].sum() / dalpha, label='Int MF')
 plt.plot(alpha, sol2[-1] / sol2[-1].sum() / dalpha, label='Local MF')
 plt.xlabel('$\\alpha$')
 plt.ylabel('$\\rho(\\alpha, t \\to \\infty)$')
