@@ -47,8 +47,8 @@ l = 100
 dims = l,
 capacity = 2000
 # interaction parameters
-r_b = .4 # initial birth rate
-r_d = 0.2 # initial death rate
+r_b = .5 # initial birth rate
+r_d = 0.25 # initial death rate
 # r_b = 0 # initial birth rate
 # r_d = 0.# initial death rate
 nodes = np.zeros(dims+(6+restchannels,), dtype=int)
@@ -78,8 +78,8 @@ nodes[0, -1] = capacity / 2
 # lgca = get_lgca(ib=True, bc='reflect', interaction='go_or_grow_kappa', dims=l, nodes=nodes, ve=False, geometry='lin',
 #                 r_b=r_b, capacity=capacity, r_d=r_d, kappa=kappa, theta=.3, kappa_std=1)
 lgca = get_lgca(ib=True, bc='reflect', interaction='birthdeath_cancerdfe', dims=l, nodes=nodes, ve=False, geometry='lin',
-                capacity=capacity, r_b=r_b, r_d=r_d)
-lgca.timeevo(10000, record=True, recordN=True, recorddens=True)
+                capacity=capacity, r_b=r_b, r_d=r_d, gamma=14)
+lgca.timeevo(50000, record=True, recordN=True, recorddens=True)
 # lgca = get_lgca(**constparams, theta=theta, nodes=d['nodes_t'][1:-1])
 # lgca.props['kappa'] = d['kappa']
 # # lgca.nodes = d['nodes_t']
@@ -106,12 +106,13 @@ lgca.timeevo(10000, record=True, recordN=True, recorddens=True)
 #
 plt.figure()
 # # lgca.plot_prop_spatial(propname='kappa')
-lgca.plot_density(vmax=lgca.interaction_params['capacity'])
-plt.show()
+# lgca.plot_density(vmax=lgca.interaction_params['capacity'])
+plt.plot(lgca.dens_t)
+# plt.show()
 #
-plt.figure()
-lgca.plot_prop_timecourse()
-plt.show()
+# plt.figure()
+# lgca.plot_prop_timecourse()
+# plt.show()
 
 plt.figure()
 plt.plot(lgca.n_t)
