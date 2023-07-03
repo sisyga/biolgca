@@ -1,14 +1,14 @@
-lines.linewidth: 1.5 # line width in points
+lines.linewidth: 2. # line width in points
 text.usetex : true
 font.family: sans-serif
 font.size: 10.0
 font.sans-serif: Open Sans, Computer Modern Sans Serif, DejaVu Sans, Lucida Grande, Verdana, Geneva, Lucid, Helvetica, Avant Garde, sans-serif
 # mathtext.fontset: custom
-text.latex.preamble: "\usepackage[T1]{fontenc}\usepackage{newpxtext}\usepackage{newpxmath}\usepackage[defaultsans, scale=.92]{opensans}\usepackage{amsmath}\usepackage{mathtools}\usepackage{physics}"
+text.latex.preamble: "\usepackage[cdfont=heavy,cdfont=heavybold,slantedgreek=standard]{tudscrfonts}\usepackage{physics}"
 axes.linewidth: 1. # edge line width
-axes.spines.top: True
-axes.spines.right: True
-figure.figsize: 5.64313, 8.256156
+axes.spines.top: False
+axes.spines.right: False
+figure.figsize: 5.64313, 4.128078  # 8.256156 is max text height in inches, only activate the size when saving for diss
 figure.dpi: 300
 figure.frameon: True
 hist.bins: auto
