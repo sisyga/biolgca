@@ -4,8 +4,7 @@ font.family: sans-serif
 font.size: 10.0
 font.sans-serif: Open Sans, Computer Modern Sans Serif, DejaVu Sans, Lucida Grande, Verdana, Geneva, Lucid, Helvetica, Avant Garde, sans-serif
 # mathtext.fontset: custom
-text.latex.preamble: "\usepackage[cdfont=heavy,cdfont=heavybold,slantedgreek=standard]{tudscrfonts}
-\usepackage{physics}"
+text.latex.preamble: "\usepackage[cdfont=heavy,cdfont=heavybold,slantedgreek=standard]{tudscrfonts}\usepackage{physics}"
 axes.linewidth: 1. # edge line width
 axes.spines.top: False
 axes.spines.right: False

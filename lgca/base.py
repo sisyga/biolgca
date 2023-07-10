@@ -1977,7 +1977,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                 if 's_d' in kwargs:
                     self.interaction_params['s_d'] = kwargs['s_d']
                 else:
-                    self.interaction_params['s_d'] = .1 * self.interaction_params['r_b'] # from macfarlane 2014
+                    self.interaction_params['s_d'] = .2 * self.interaction_params['r_b'] # from macfarlane 2014
                     print('driver strength set to = ', self.interaction_params['s_d'])
 
                 if 's_p' in kwargs:
