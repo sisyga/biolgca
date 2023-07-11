@@ -199,13 +199,12 @@ def birthdeath_cancerdfe(lgca):
             if random() < r_b * (1 - rho):
                 lgca.maxlabel += 1
                 newcells.append(lgca.maxlabel)
-                if random() < lgca.interaction_params['p_d']:
-                    # lgca.props['r_b'].append(float(trunc_gauss(0, lgca.interaction_params['a_max'], r_b,
-                    #                                            sigma=lgca.interaction_params['std'])))
+                if random() < lgca.interaction_params['p_p']:
+                    lgca.props['r_b'].append(max(0., r_b-float(expon.rvs(scale=lgca.interaction_params['s_p']))))
+
+                elif random() < lgca.interaction_params['p_d']:
                     lgca.props['r_b'].append(r_b+float(truncexpon.rvs(lgca.interaction_params['a_max']-r_b,
                                                                       scale=lgca.interaction_params['s_d'])))
-                elif random() < lgca.interaction_params['p_p']:
-                    lgca.props['r_b'].append(max(0., r_b-float(expon.rvs(scale=lgca.interaction_params['s_p']))))
 
                 else:
                     lgca.props['r_b'].append(r_b)
