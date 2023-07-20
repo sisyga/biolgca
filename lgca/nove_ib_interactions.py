@@ -206,12 +206,11 @@ def birthdeath_cancerdfe(lgca):
                     # lgca.props['r_b'].append(max(0., r_b-float(expon.rvs(scale=lgca.interaction_params['s_p']))))
 
                 if random() < lgca.interaction_params['p_d']:
-                    driver = float(truncexpon.rvs(lgca.interaction_params['a_max']-r_b,
-                                                  scale=lgca.interaction_params['s_d']))
+                    driver = float(expon.rvs(scale=lgca.interaction_params['s_d']))
                     # lgca.props['r_b'].append(r_b+float(truncexpon.rvs(lgca.interaction_params['a_max']-r_b,
                     #                                                   scale=lgca.interaction_params['s_d'])))
 
-                lgca.props['r_b'].append(r_b - passenger + driver)
+                lgca.props['r_b'].append(min(r_b - passenger + driver, lgca.interaction_params['a_max']))
 
 
         # channeldist = npr.multinomial(len(newcells), [1. / lgca.K] * lgca.K).cumsum()

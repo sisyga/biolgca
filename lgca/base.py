@@ -28,7 +28,7 @@ from sympy.utilities.iterables import multiset_permutations
 from copy import copy, deepcopy
 from lgca.plots import muller_plot
 import warnings
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 # configure matplotlib style
 plt.style.use('default')
@@ -1977,13 +1977,13 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                 if 's_d' in kwargs:
                     self.interaction_params['s_d'] = kwargs['s_d']
                 else:
-                    self.interaction_params['s_d'] = .2 * self.interaction_params['r_b'] # from macfarlane 2014
+                    self.interaction_params['s_d'] = .1 * self.interaction_params['r_b']  # from macfarlane 2014
                     print('driver strength set to = ', self.interaction_params['s_d'])
 
                 if 's_p' in kwargs:
                     self.interaction_params['s_p'] = kwargs['s_p']
                 else:
-                    self.interaction_params['s_p'] = .001 * self.interaction_params['r_b'] # from macfarlane 2014
+                    self.interaction_params['s_p'] = .001 * self.interaction_params['r_b']  # from macfarlane 2014
                     print('passenger strength set to = ', self.interaction_params['s_p'])
 
                 if 'a_max' in kwargs:
@@ -2293,7 +2293,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         if propname is None:
             propname = next(iter(self.props))
 
-        prop_t = [self.get_prop(nodes, props=props, propname=propname) for nodes in nodes_t]
+        proparray = np.array(props[propname])
+        prop_t = [proparray[nodes.sum()] for nodes in nodes_t]
         mean_prop_t = np.array([np.mean(prop) if len(prop) > 0 else np.nan for prop in prop_t])
         std_mean_prop_t = np.array \
             ([np.std(prop, ddof=1) / np.sqrt(len(prop)) if len(prop) > 0 else np.nan for prop in prop_t])
