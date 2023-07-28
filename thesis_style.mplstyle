@@ -8,7 +8,7 @@ text.latex.preamble: "\usepackage[cdfont=heavy,cdfont=heavybold,slantedgreek=sta
 axes.linewidth: 1. # edge line width
 axes.spines.top: False
 axes.spines.right: False
-figure.figsize: 5.64313, 4.128078  # 8.256156 is max text height in inches, only activate the size when saving for diss
+figure.figsize: 4.9, 3.5  # 8.256156 is max text height in inches, only activate the size when saving for diss
 figure.dpi: 300
 figure.frameon: True
 hist.bins: auto
