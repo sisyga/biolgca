@@ -1000,7 +1000,7 @@ class IBLGCA_base(LGCA_base, ABC):
     def calc_prop_mean(self, nodes=None, props=None, propname=None):
         prop = self.get_prop(nodes=nodes, props=props, propname=propname)
         occupied = nodes.astype(bool)
-        mask = 1 - occupied
+        mask = ~occupied
         prop = np.ma.array(prop, mask=mask)
         mean_prop = prop.mean(-1)
         return mean_prop
