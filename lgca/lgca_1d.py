@@ -230,7 +230,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             nodes_t = nodes_t.astype('bool')
         LGCA_1D.plot_flux(self, nodes_t, **kwargs)
 
-    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', **kwargs):
+    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', figkwargs={}, **kwargs):
         if nodes_t is None:
             nodes_t = self.nodes_t
 
@@ -241,10 +241,10 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             propname = next(iter(props))
 
         tmax, l, _ = nodes_t.shape
-        fig, ax = self.setup_figure(tmax, **kwargs)
+        fig, ax = self.setup_figure(tmax, **figkwargs)
         mean_prop_t = self.calc_prop_mean(propname=propname, props=props, nodes=nodes_t)
 
-        plot = plt.imshow(mean_prop_t, interpolation='none', aspect='equal', cmap=cmap)
+        plot = plt.imshow(mean_prop_t, interpolation='none', aspect='equal', cmap=cmap, **kwargs)
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size=0.3, pad=0.1)
         cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
