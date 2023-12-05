@@ -1,5 +1,5 @@
 try:
-    from base import *
+    from lgca.base import *
     from lgca_square import LGCA_Square, IBLGCA_Square
 
 except ModuleNotFoundError:
@@ -32,10 +32,12 @@ class LGCA_Hex(LGCA_Square):
         self.xcoords = self.xcoords.astype(float)
         self.ycoords = self.ycoords.astype(float)
 
+
         self.xcoords[:, 1::2] += 0.5
         self.ycoords *= self.dy
         self.xcoords = self.xcoords[self.r_int:-self.r_int, self.r_int:-self.r_int]
         self.ycoords = self.ycoords[self.r_int:-self.r_int, self.r_int:-self.r_int]
+        self.coord_pairs_hex = list(zip(self.xcoords.flat, self.ycoords.flat))
         self.nonborder = (self.xx, self.yy)
 
     def propagation(self):

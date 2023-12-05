@@ -7,9 +7,9 @@ from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 try:
-    from base import *
+    from lgca.base import *
 except ModuleNotFoundError:
-    from .base import *
+    from ..lgca.base import *
 
 
 class LGCA_Square(LGCA_base):
@@ -46,12 +46,12 @@ class LGCA_Square(LGCA_base):
         self.K = self.velocitychannels + self.restchannels
 
     def init_nodes(self, density=0.1, nodes=None):
-        self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.bool)
+        self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.bool_)
         if nodes is None:
             self.random_reset(density)
 
         else:
-            self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(np.bool)
+            self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(np.bool_)
 
     def init_coords(self):
         self.x = np.arange(self.lx) + self.r_int
@@ -393,15 +393,14 @@ class LGCA_Square(LGCA_base):
         density = nodes.sum(-1)
         xx, yy = self.xcoords, self.ycoords
         jx, jy = np.moveaxis(self.calc_flux(nodes), -1, 0)
+        print(jx, np.shape(jx))
         # jx = np.ma.masked_where(density==0, jx)  # using masked arrays would also have been possible
-
         if figsize is None:
             figsize = estimate_figsize(density, cbar=True)
 
         fig, ax = self.setup_figure(**kwargs)
         ax.set_aspect('equal')
-        plot = plt.quiver(xx, yy, jx, jy, density.ravel(), pivot='mid', angles='xy', scale_units='xy', scale=1./self.r_poly)
-
+        plot = plt.quiver(xx, yy, jx, jy, density.ravel(), pivot='mid', angles='xy', scale_units='xy', scale=1. / self.r_poly)
         if cbar:
             plot.set_cmap(cmap)
             cmap = plot.get_cmap()
@@ -523,7 +522,7 @@ class LGCA_Square(LGCA_base):
             cbar = fig.colorbar(cmap, extend='min', use_gridspec=True, cax=cax)
             cbar.set_label('Particle number $n$')
             cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[1::2])
-            cbar.set_ticklabels(1 + np.arange(K))
+            cbar.set_ticklabels(1 + np.arange(K+1))
             plt.sca(ax)
 
         return fig, pc, cmap

@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 from matplotlib.cm import ScalarMappable
 from numpy import random as npr
 from sympy.utilities.iterables import multiset_permutations
-
+from .ecm import *
 pi2 = 2 * np.pi
 plt.style.use('default')
 
@@ -220,16 +220,28 @@ class LGCA_base():
             elif interaction == 'contact_guidance':
                 self.interaction = contact_guidance
                 self.calc_permutations()
-
+                if 'r_b' in kwargs:
+                    self.r_b = kwargs['r_b']
+                if 'r_d' in kwargs:
+                    self.r_d = kwargs['r_d']
+                if 't' in kwargs:
+                    self.t = kwargs['t']
                 if 'beta' in kwargs:
                     self.beta = kwargs['beta']
                 else:
                     self.beta = 2.
                     print('sensitivity set to beta = ', self.beta)
 
+                if 'beta_agg' in kwargs:
+                    self.beta_agg = kwargs['beta_agg']
+
+                if 'beta_rest' in kwargs:
+                    self.beta_rest = kwargs['beta_rest']
+
                 if 'director' in kwargs:
                     self.g = kwargs['director']
-                else:
+
+                elif 'guiding_tensor' not in kwargs:
                     self.g = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, 2))
                     self.g[..., 0] = 1
                     self.guiding_tensor = calc_nematic_tensor(self.g)
@@ -291,6 +303,8 @@ class LGCA_base():
 
             elif interaction == 'birth':
                 self.interaction = birth
+                self.calc_permutations()
+
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
                 else:
@@ -380,7 +394,7 @@ class LGCA_base():
         """
         self.cell_density = self.nodes.sum(-1)
 
-    def timestep(self):
+    def timestep(self, ecm, data):
         """
         Update the state of the LGCA from time k to k+1.
         :return:
@@ -390,12 +404,14 @@ class LGCA_base():
         self.propagation()
         self.apply_boundaries()
         self.update_dynamic_fields()
+        # ecm.update(self)
 
-    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
+    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True, ecm=None, data= None):
         self.update_dynamic_fields()
         if record:
             self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
             self.nodes_t[0, ...] = self.nodes[self.nonborder]
+
         if recordN:
             self.n_t = np.zeros(timesteps + 1, dtype=np.int)
             self.n_t[0] = self.cell_density[self.nonborder].sum()
@@ -403,7 +419,7 @@ class LGCA_base():
             self.dens_t = np.zeros((timesteps + 1,) + self.dims)
             self.dens_t[0, ...] = self.cell_density[self.nonborder]
         for t in range(1, timesteps + 1):
-            self.timestep()
+            self.timestep(ecm, data)
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.nonborder]
             if recordN:
@@ -414,10 +430,15 @@ class LGCA_base():
                 update_progress(1.0 * t / timesteps)
 
     def calc_permutations(self):
+
+        c_t = np.array([[[ 0.86, 0. ], [0, -0.86]], [[ 0 , -0.5], [-0.5, 0]],
+                          [[ 0 , 0.5], [0.5, 0]], [[0.86, 0], [0, -0.86]],
+                          [[0, -0.5], [-0.5, 0]], [[0., 0.5], [0.5, 0]]])
+
         self.permutations = [np.array(list(multiset_permutations([1] * n + [0] * (self.K - n))), dtype=np.int8)
                              for n in range(self.K + 1)]
         self.j = [np.dot(self.c, self.permutations[n][:, :self.velocitychannels].T) for n in range(self.K + 1)]
-        self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(2))[None, ...]
+        self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(2))
         self.si = [np.einsum('ij,jkl', self.permutations[n][:, :self.velocitychannels], self.cij) for n in
                    range(self.K + 1)]
 
@@ -455,7 +476,7 @@ class IBLGCA_base(LGCA_base):
             from ib_interactions import randomwalk, birth, birthdeath, birthdeath_discrete, go_or_grow
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
-            if interaction is 'birth':
+            if interaction == 'birth':
                 self.interaction = birth
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
@@ -464,7 +485,7 @@ class IBLGCA_base(LGCA_base):
                     print('birth rate set to r_b = ', self.r_b)
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
 
-            elif interaction is 'birthdeath':
+            elif interaction == 'birthdeath':
                 self.interaction = birthdeath
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
@@ -489,7 +510,7 @@ class IBLGCA_base(LGCA_base):
                     self.a_max = 1.
                     print('Max. birth rate set to a_max =', self.a_max)
 
-            elif interaction is 'birthdeath_discrete':
+            elif interaction == 'birthdeath_discrete':
                 self.interaction = birthdeath_discrete
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
@@ -521,7 +542,7 @@ class IBLGCA_base(LGCA_base):
                     self.pmut = 0.1
                     print('Mutation probability set to p_mut =', self.pmut)
 
-            elif interaction is 'go_or_grow':
+            elif interaction == 'go_or_grow':
                 self.interaction = go_or_grow
                 if 'r_d' in kwargs:
                     self.r_d = kwargs['r_d']
@@ -558,7 +579,7 @@ class IBLGCA_base(LGCA_base):
                 if self.restchannels < 2:
                     print('WARNING: not enough rest channels - system will die out!!!')
 
-            elif interaction is 'go_and_grow':
+            elif interaction == 'go_and_grow':
                 self.interaction = birth
                 if 'r_b' in kwargs:
                     self.r_b = kwargs['r_b']
@@ -580,15 +601,15 @@ class IBLGCA_base(LGCA_base):
 
                 self.props.update(r_b=[0.] + [self.r_b] * self.maxlabel)
 
-            elif interaction is 'random_walk':
-                self.interaction = random_walk
+            elif interaction == 'random_walk':
+                self.interaction = "random_walk"
 
             else:
                 print('keyword', interaction, 'is not defined! Random walk used instead.')
-                self.interaction = random_walk
+                self.interaction = "random_walk"
 
         else:
-            self.interaction = random_walk
+            self.interaction = "random_walk"
 
     def update_dynamic_fields(self):
         """Update "fields" that store important variables to compute other dynamic steps
@@ -614,30 +635,6 @@ class IBLGCA_base(LGCA_base):
         self.apply_boundaries()
         self.maxlabel = self.nodes.max()
         self.update_dynamic_fields()
-
-    def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True):
-        self.update_dynamic_fields()
-        if record:
-            self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
-            self.nodes_t[0, ...] = self.nodes[self.nonborder]
-            # self.props_t = [copy(self.props)]  # this is mostly useless, just use self.props of the last time step
-        if recordN:
-            self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
-            self.n_t[0] = self.cell_density[self.nonbroder].sum()
-        if recorddens:
-            self.dens_t = np.zeros((timesteps + 1,) + self.dims)
-            self.dens_t[0, ...] = self.cell_density[self.nonborder]
-        for t in range(1, timesteps + 1):
-            self.timestep()
-            if record:
-                self.nodes_t[t, ...] = self.nodes[self.nonborder]
-                # self.props_t.append(copy(self.props))
-            if recordN:
-                self.n_t[t] = self.cell_density[self.nonborder].sum()
-            if recorddens:
-                self.dens_t[t, ...] = self.cell_density[self.nonborder]
-            if showprogress:
-                update_progress(1.0 * t / timesteps)
 
     def calc_flux(self, nodes):
         if nodes.dtype != 'bool':

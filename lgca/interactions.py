@@ -108,7 +108,7 @@ def chemotaxis(lgca):
     lgca.nodes = newnodes
 
 
-def contact_guidance(lgca):
+def contact_guidance(lgca, **kwargs):
     """
     Rearrangement step for contact guidance interaction. Cells are guided by an external axis
     :return:
