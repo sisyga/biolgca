@@ -110,43 +110,21 @@ def patterns(repeats=1):
     ax2.yaxis.get_label().set_color(p2.get_color())
     leg.texts[1].set_color(p2.get_color())
 
-def main():
-    lx = 20
-    ly = 20
-    K = 6
-    restchannels = 2
-    timesteps = 1
-    r_b = 0.0
-    d = 2
-    d_neigh = d/6
-    beta_agg = 0.1
-
-    beta = 10
-    beta_rest = 0
-    fc =.1
-
+def run_simulation(lx=30, ly=30, K=0, restchannels=6, timesteps=100, t=0, r_b=0.0, d=0.1, beta=100, beta_rest=0, interaction="contact_guidance"):
+    d_neigh = d / 5
     nodes = np.zeros((lx, ly, K + restchannels))
     t = 0
     data = DataClass()
-    lgca = get_lgca("hex", lx=lx, ly=ly, nodes=nodes, interaction='contact_guidance'
-                            , beta=beta, beta_agg=beta_agg, beta_rest=beta_rest, r_b=r_b)
+    lgca = get_lgca("hex", lx=lx, ly=ly, nodes=nodes, interaction=interaction,
+                    beta=beta, beta_rest=beta_rest, r_b=r_b)
 
-    ecm = Ecm(fc, lx, ly, restchannels, d, d_neigh, timesteps, t)
-    # ini_coords = initial_values(lgca, ecm)
+    ecm = Ecm(lx, ly, restchannels, d, d_neigh, timesteps, t)
     initial_values_hom(lgca, ecm)
+    lgca.timeevo(timesteps=timesteps, record=True, ecm=ecm, data=data)
     # lgca.plot_density()
-    # ecm.plot_ECM(show_tensor=True, edgecolor='black')
-    ecm.plot_ECM(show_tensor=True, edgecolor='black')
-
-    lgca.timeevo(timesteps=100, record=True, ecm=ecm, data=data)
-    lgca.plot_density()
-    ecm.plot_ECM(show_tensor=True, edgecolor='black')
-    cells_t0 = np.sum(lgca.cell_density[lgca.nonborder])
- 
+    ecm.plot_ECM()
     plt.show()
-    # if input close all plots
   
-
 if __name__ == '__main__':
-    main()
+    run_simulation(interaction="ecm_guidance")
 

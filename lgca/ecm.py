@@ -97,9 +97,8 @@ def inertia_tensor(weights):
 class Ecm(LGCA_Hex):
     dy = np.sin(2 * np.pi / 6)
     r_int = 1
-    def __init__(self,  fc, lx, ly, restchannels, d, d_neigh, timesteps, t, *args):
+    def __init__(self, lx, ly, restchannels, d, d_neigh, timesteps, t, *args):
         if len(args) == 0:
-            self.fc = fc
             self.r_int = 1
             self.random_steps = 500
             self.timesteps = timesteps
@@ -223,9 +222,10 @@ class Ecm(LGCA_Hex):
             # make sure that the values are between 0 and 1
             self.scalar_field[coord] -= self.d * cell_densities[coord]
             self.scalar_field[coord] = np.clip(self.scalar_field[coord], 0, 1)
-            for neigh in nb_coord(coord, self):
-                self.scalar_field[neigh] += self.d_neigh * cell_densities[neigh]
+            for neigh in nb_coord(coord, self)[1:7]:
+                self.scalar_field[neigh] += self.d_neigh * cell_densities[coord]  # Change here
                 self.scalar_field[neigh] = np.clip(self.scalar_field[neigh], 0, 1)
+    
     def update_dynamic_fields(self):
         for i in self.coord_pairs:
             weights = nb_ECM(self.scalar_field, i, self.restchannels)
@@ -239,7 +239,6 @@ class Ecm(LGCA_Hex):
         for i in self.coord_pairs:
             weights = nb_ECM(self.scalar_field, i, self.restchannels)
             tensor, ev, ew = inertia_tensor(weights[self.restchannels:])
-            print(self.vector_field.shape)
             self.vector_field[i] = np.array([ev[0][0], ev[0][1], max(ew)])
             self.tensor_field[i] = tensor
             if t == 0:

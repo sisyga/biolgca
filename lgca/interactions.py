@@ -38,12 +38,12 @@ def ecm_guidance(lgca, ecm):
     for coord in zip(*coords):
         n = lgca.cell_density[coord]
         grad = ecm.vector_field[coord][:2]
+        b_guid = ecm.vector_field[coord][2]
         permutations = lgca.permutations[n]
         j = lgca.j[n]
-        weights = ecm.vector_field[coord][-1] * np.exp(lgca.beta * np.einsum('i,ij', grad, j)).cumsum()
+        weights = np.exp(lgca.beta * b_guid * np.einsum('i,ij', grad, j)).cumsum()
         ind = bisect_left(weights, random() * weights[-1])
         newnodes[coord] = permutations[ind]
-
     lgca.nodes = newnodes
 
 def random_walk(lgca):

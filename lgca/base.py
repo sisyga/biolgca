@@ -406,13 +406,13 @@ class LGCA_base():
         Update the state of the LGCA from time k to k+1.
         :return:
         """
-        ecm.update_scalar_field(self.cell_density/self.K)
-        ecm.update_dynamic_fields()
         self.interaction(self, ecm)
         self.apply_boundaries()
         self.propagation()
         self.apply_boundaries()
-        self.update_dynamic_fields()
+        self.update_dynamic_fields()       
+        ecm.update_scalar_field(self.cell_density)
+        ecm.update_dynamic_fields()
 
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True, ecm=None, data= None):
