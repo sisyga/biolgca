@@ -33,7 +33,6 @@ def boundary_coord(coord : list, lx, ly):
     return new_coord
 
 def nb_ECM(values, coord, restchannels, K=6):
-    # works with periodic bc
     nb = np.zeros(K+restchannels)
     nb[-1] = values[((coord[0] + 1, coord[1]))]
     nb[-4] = values[((coord[0] - 1, coord[1]))]
@@ -51,6 +50,7 @@ def nb_ECM(values, coord, restchannels, K=6):
         nb[-6] = values[((coord[0] + 1, coord[1] - 1))]
         nb[-5] = values[((coord[0], coord[1] - 1))]
     return nb
+
 
 def nb_coord (coord, lgca):
     nb = [None] * 7
@@ -116,7 +116,7 @@ class Ecm(LGCA_Hex):
             self.vector_field_t = np.zeros((self.timesteps+1, self.lx + 2, self.ly + 2, 3))
             self.tensor_field = np.zeros((self.lx + 2, self.ly + 2, 2, 2))
             self.init_scalar()
-            self.tensor_update(t=0)
+            self.update_dynamic_fields()
             self.periodic_rb()
             self.t = t
             self.list_paths_number = []
@@ -216,10 +216,30 @@ class Ecm(LGCA_Hex):
         self.scalar_field[:, 0] = self.scalar_field[:, self.ly]
         self.scalar_field[:, self.ly+1] = self.scalar_field[:, 1]
 
+    def update_scalar_field(self, cell_densities):
+        # degrade density (self.d) in each cell and deposit (self.d_neigh) in the surrounding cells depending on the cell_den
+        assert cell_densities.shape == self.scalar_field.shape
+        for coord in self.coord_pairs: 
+            # make sure that the values are between 0 and 1
+            self.scalar_field[coord] -= self.d * cell_densities[coord]
+            self.scalar_field[coord] = np.clip(self.scalar_field[coord], 0, 1)
+            for neigh in nb_coord(coord, self):
+                self.scalar_field[neigh] += self.d_neigh * cell_densities[neigh]
+                self.scalar_field[neigh] = np.clip(self.scalar_field[neigh], 0, 1)
+    def update_dynamic_fields(self):
+        for i in self.coord_pairs:
+            weights = nb_ECM(self.scalar_field, i, self.restchannels)
+            tensor, ev, ew = inertia_tensor(weights[self.restchannels:])
+            weights = nb_ECM(self.scalar_field, i, self.restchannels)
+            tensor, ev, ew = inertia_tensor(weights[self.restchannels:])
+            self.vector_field[i] = np.array([ev[0][0], ev[0][1], max(ew)])
+            self.tensor_field[i] = tensor
+    
     def tensor_update(self, t):
         for i in self.coord_pairs:
             weights = nb_ECM(self.scalar_field, i, self.restchannels)
             tensor, ev, ew = inertia_tensor(weights[self.restchannels:])
+            print(self.vector_field.shape)
             self.vector_field[i] = np.array([ev[0][0], ev[0][1], max(ew)])
             self.tensor_field[i] = tensor
             if t == 0:

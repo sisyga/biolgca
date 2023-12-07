@@ -130,10 +130,10 @@ class LGCA_base():
     def set_interaction(self, **kwargs):
         try:
             from .interactions import go_or_grow, birth, alignment, persistent_walk, chemotaxis, \
-                contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium
+                contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium, ecm_guidance
         except:
             from interactions import go_or_grow, birth, alignment, persistent_walk, chemotaxis, \
-                contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium
+                contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium, ecm_guidance
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
             if interaction == 'go_or_grow':
@@ -247,7 +247,14 @@ class LGCA_base():
                     self.guiding_tensor = calc_nematic_tensor(self.g)
                 if self.velocitychannels < 4:
                     print('WARNING: NEMATIC INTERACTION UNDEFINED IN 1D!')
-
+            elif interaction == 'ecm_guidance':
+                self.interaction = ecm_guidance
+                self.calc_permutations()
+                if 'beta' in kwargs:
+                    self.beta = kwargs['beta']
+                else: 
+                    self.beta = 2.
+                    print('sensitivity set to beta = ', self.beta)
             elif interaction == 'nematic':
                 self.interaction = nematic
                 self.calc_permutations()
@@ -394,17 +401,19 @@ class LGCA_base():
         """
         self.cell_density = self.nodes.sum(-1)
 
-    def timestep(self, ecm, data):
+    def timestep(self, ecm):
         """
         Update the state of the LGCA from time k to k+1.
         :return:
         """
-        self.interaction(self)
+        ecm.update_scalar_field(self.cell_density/self.K)
+        ecm.update_dynamic_fields()
+        self.interaction(self, ecm)
         self.apply_boundaries()
         self.propagation()
         self.apply_boundaries()
         self.update_dynamic_fields()
-        # ecm.update(self)
+
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True, ecm=None, data= None):
         self.update_dynamic_fields()
@@ -419,7 +428,7 @@ class LGCA_base():
             self.dens_t = np.zeros((timesteps + 1,) + self.dims)
             self.dens_t[0, ...] = self.cell_density[self.nonborder]
         for t in range(1, timesteps + 1):
-            self.timestep(ecm, data)
+            self.timestep(ecm)
             if record:
                 self.nodes_t[t, ...] = self.nodes[self.nonborder]
             if recordN:

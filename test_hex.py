@@ -110,22 +110,20 @@ def patterns(repeats=1):
     ax2.yaxis.get_label().set_color(p2.get_color())
     leg.texts[1].set_color(p2.get_color())
 
-
 def main():
-
     lx = 20
     ly = 20
     K = 6
-    restchannels = 6
+    restchannels = 2
     timesteps = 1
     r_b = 0.0
-    d = 1
+    d = 2
     d_neigh = d/6
     beta_agg = 0.1
 
-    beta = 100
+    beta = 10
     beta_rest = 0
-    fc =.2
+    fc =.1
 
     nodes = np.zeros((lx, ly, K + restchannels))
     t = 0
@@ -134,23 +132,21 @@ def main():
                             , beta=beta, beta_agg=beta_agg, beta_rest=beta_rest, r_b=r_b)
 
     ecm = Ecm(fc, lx, ly, restchannels, d, d_neigh, timesteps, t)
-    ini_coords = initial_values(lgca, ecm)
+    # ini_coords = initial_values(lgca, ecm)
     initial_values_hom(lgca, ecm)
+    # lgca.plot_density()
+    # ecm.plot_ECM(show_tensor=True, edgecolor='black')
     ecm.plot_ECM(show_tensor=True, edgecolor='black')
 
-    lgca.timeevo(timesteps=10, record=True, ecm=ecm, data=data)
-    cells_t0 = np.sum(lgca.cell_density[lgca.nonborder])
-    # print(sum(sum(lgca.cell_density[lgca.nonborder])))
-    # speedup(data, lx, ly, restchannels, d, d_neigh, timesteps, t, nodes, beta_agg, beta_rest, r_b)
+    lgca.timeevo(timesteps=100, record=True, ecm=ecm, data=data)
+    lgca.plot_density()
     ecm.plot_ECM(show_tensor=True, edgecolor='black')
-    for h in lgca.coord_pairs:
-        if lgca.cell_density[h] >= 1 and h in ini_coords:
-            lgca.cell_density[h] = 0
-    # lgca.animate_density()
-    # ecm.animate_density()
-    a,b = mean_order_param(ecm, lgca)
-    print(a, b)
+    cells_t0 = np.sum(lgca.cell_density[lgca.nonborder])
+ 
     plt.show()
+    # if input close all plots
+  
+
 if __name__ == '__main__':
     main()
 

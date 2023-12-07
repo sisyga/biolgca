@@ -29,6 +29,22 @@ def tanh_switch(rho, kappa=5., theta=0.8):
 def ent_prod(x):
     return x * np.log(x, where=x > 0, out=np.zeros_like(x, dtype=float))
 
+def ecm_guidance(lgca, ecm):
+    newnodes = lgca.nodes.copy()
+    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
+               (lgca.cell_density[lgca.nonborder] < lgca.K)
+    coords = [a[relevant] for a in lgca.nonborder]
+    
+    for coord in zip(*coords):
+        n = lgca.cell_density[coord]
+        grad = ecm.vector_field[coord][:2]
+        permutations = lgca.permutations[n]
+        j = lgca.j[n]
+        weights = ecm.vector_field[coord][-1] * np.exp(lgca.beta * np.einsum('i,ij', grad, j)).cumsum()
+        ind = bisect_left(weights, random() * weights[-1])
+        newnodes[coord] = permutations[ind]
+
+    lgca.nodes = newnodes
 
 def random_walk(lgca):
     """
@@ -108,7 +124,7 @@ def chemotaxis(lgca):
     lgca.nodes = newnodes
 
 
-def contact_guidance(lgca, **kwargs):
+def contact_guidance(lgca, ecm):
     """
     Rearrangement step for contact guidance interaction. Cells are guided by an external axis
     :return:
@@ -117,15 +133,15 @@ def contact_guidance(lgca, **kwargs):
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
                (lgca.cell_density[lgca.nonborder] < lgca.K)
     coords = [a[relevant] for a in lgca.nonborder]
+    
     for coord in zip(*coords):
         n = lgca.cell_density[coord]
-        sni = lgca.guiding_tensor[coord]
+        sni = ecm.tensor_field[coord]
         permutations = lgca.permutations[n]
         si = lgca.si[n]
         weights = np.exp(lgca.beta * np.einsum('ijk,jk', si, sni)).cumsum()
         ind = bisect_left(weights, random() * weights[-1])
         newnodes[coord] = permutations[ind]
-
     lgca.nodes = newnodes
 
 
