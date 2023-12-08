@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from analysis import initial_values, initial_values_hom
-from lgca.ecm import Ecm, nb_coord
+from lgca.ecm import ECM
 from lgca import get_lgca
 from data import DataClass
 from mpl_toolkits.axes_grid1 import host_subplot
@@ -27,7 +27,7 @@ def mean_order_param(ecm, lgca):
             for x in np.arange(2, lgca.lx):
                     for y in np.arange(2, lgca.lx):
 
-                        nbs = nb_coord((x,y), lgca)
+                        nbs = ecm.nb_coord((x,y))
                         nbs_angle = []
                         angles = []
                         for i in nbs[1:]:
@@ -110,15 +110,15 @@ def patterns(repeats=1):
     ax2.yaxis.get_label().set_color(p2.get_color())
     leg.texts[1].set_color(p2.get_color())
 
-def run_simulation(lx=30, ly=30, K=0, restchannels=6, timesteps=100, t=0, r_b=0.0, d=0.1, beta=100, beta_rest=0, interaction="contact_guidance"):
-    d_neigh = d / 5
+def run_simulation(lx=30, ly=30, K=6, restchannels=0, timesteps=100, t=0, r_b=0.0, d=0.1, beta=10, beta_rest=0, interaction="contact_guidance"):
+    d_neigh = d/5
     nodes = np.zeros((lx, ly, K + restchannels))
     t = 0
     data = DataClass()
     lgca = get_lgca("hex", lx=lx, ly=ly, nodes=nodes, interaction=interaction,
                     beta=beta, beta_rest=beta_rest, r_b=r_b)
 
-    ecm = Ecm(lx, ly, restchannels, d, d_neigh, timesteps, t)
+    ecm = ECM(lx, ly, restchannels, d, d_neigh, timesteps, t)
     initial_values_hom(lgca, ecm)
     lgca.timeevo(timesteps=timesteps, record=True, ecm=ecm, data=data)
     # lgca.plot_density()
@@ -126,5 +126,5 @@ def run_simulation(lx=30, ly=30, K=0, restchannels=6, timesteps=100, t=0, r_b=0.
     plt.show()
   
 if __name__ == '__main__':
-    run_simulation(interaction="ecm_guidance")
+    run_simulation(interaction="contact_guidance")
 

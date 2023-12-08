@@ -1,5 +1,4 @@
 import random
-
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.collections import PatchCollection
@@ -16,7 +15,6 @@ from matplotlib.colors import Normalize, ListedColormap
 import copy
 import matplotlib.colors as mcolors
 
-
 def boundary_coord(coord : list, lx, ly):
     new_coord = []
     for i in coord:
@@ -31,52 +29,6 @@ def boundary_coord(coord : list, lx, ly):
         if i[0] != 0 and i[0] != lx+1 and i[1] != 0 and i[1] != ly+1:
             new_coord.append((i))
     return new_coord
-
-def nb_ECM(values, coord, restchannels, K=6):
-    nb = np.zeros(K+restchannels)
-    nb[-1] = values[((coord[0] + 1, coord[1]))]
-    nb[-4] = values[((coord[0] - 1, coord[1]))]
-    nb[0:restchannels] = values[(coord)]
-
-    if coord[1] % 2 == 0:
-        nb[-3] = values[((coord[0] - 1, coord[1] + 1))]
-        nb[-2] = values[((coord[0], coord[1] + 1))]
-        nb[-6] = values[((coord[0], coord[1] - 1))]
-        nb[-5] = values[((coord[0] - 1, coord[1] - 1))]
-
-    if coord[1] % 2 != 0:
-        nb[-3] = values[((coord[0], coord[1] + 1))]
-        nb[-2] = values[((coord[0] + 1, coord[1] + 1))]
-        nb[-6] = values[((coord[0] + 1, coord[1] - 1))]
-        nb[-5] = values[((coord[0], coord[1] - 1))]
-    return nb
-
-
-def nb_coord (coord, lgca):
-    nb = [None] * 7
-    nb[3] = (coord[0] + 1, coord[1])
-    nb[6] = (coord[0] - 1, coord[1])
-    nb[0] = (coord[0], coord[1])
-
-    if coord[1] % 2 == 0:
-        nb[1] = (coord[0], coord[1] - 1)
-        nb[2] = (coord[0] - 1, coord[1] - 1)
-        nb[4] = (coord[0] - 1, coord[1] + 1)
-        nb[5] = (coord[0], coord[1] + 1)
-
-    if coord[1] % 2 != 0:
-        nb[1] = (coord[0] + 1, coord[1] - 1)
-        nb[2] = (coord[0], coord[1] - 1)
-        nb[4] = (coord[0], coord[1] + 1)
-        nb[5] = (coord[0] + 1, coord[1] + 1)
-
-    # nb = [(np.mod(x, 20), np.mod(y, 20)) for (x,y) in nb]
-    nb = [(1, y) if x==lgca.lx+1 else (x,y) for (x,y) in nb]
-    nb = [(x, 1) if y==lgca.lx+1 else (x,y) for (x,y) in nb]
-    nb = [(lgca.lx, y) if x==0 else (x,y) for (x,y) in nb]
-    nb = [(x, lgca.lx) if y==0 else (x,y) for (x,y) in nb]
-    return nb
-
 
 def inertia_tensor(weights):
     tens = []
@@ -94,9 +46,10 @@ def inertia_tensor(weights):
     guid_tens = np.outer(ev[0], ev[0]) - 0.5 * np.diag(np.ones(2))
     return guid_tens, ev, ew
 
-class Ecm(LGCA_Hex):
+class ECM(LGCA_Hex):
     dy = np.sin(2 * np.pi / 6)
     r_int = 1
+
     def __init__(self, lx, ly, restchannels, d, d_neigh, timesteps, t, *args):
         if len(args) == 0:
             self.r_int = 1
@@ -161,6 +114,7 @@ class Ecm(LGCA_Hex):
                 else :
                     self.scalar_field[(int(x), int(y))] = 0.0
         self.scalar_field_t[0] = self.scalar_field
+    
     def init_isolated(self):
         for x in np.arange(1, self.lx + 1):
             for y in np.arange(1, self.ly + 1):
@@ -171,6 +125,7 @@ class Ecm(LGCA_Hex):
                 else :
                     self.scalar_field[(int(x), int(y))] = 0.0
         self.scalar_field_t[0] = self.scalar_field
+    
     def init_scalar_uniform(self, density_ecm =0.5):
         for x in np.arange(1, self.lx + 1):
             for y in np.arange(1, self.ly + 1):
@@ -189,12 +144,14 @@ class Ecm(LGCA_Hex):
                     self.scalar_field[(int(x), int(y))] = np.random.uniform(0.5, 1)
                 if x < (self.lx+1)/2:
                     self.scalar_field[(int(x), int(y))] = np.random.uniform(0.0, 0.5)
+    
     def init_obstacles(self):
         for x in np.arange(1, self.lx + 1):
             for y in np.arange(1, self.ly + 1):
                 index = self.coord_pairs.index((x, y))
                 (x1, y1) = self.coord_pairs_hex[index]
                 self.scalar_field[(int(x), int(y))] = 0.8*np.abs(1* np.sin((4*np.pi*x1 / (1*self.lx))) * np.sin((4*np.pi*(y1+3) / (1*self.ly))))
+    
     def init_sandwich(self):
         for x in np.arange(1, self.lx + 1):
             for y in np.arange(1, self.ly + 1):
@@ -208,6 +165,54 @@ class Ecm(LGCA_Hex):
             for y in np.arange(1, self.ly + 1):
                 self.scalar_field[(int(x), int(y))] = x/(self.lx+1)
 
+    @staticmethod
+    def mod_coord(value, max_val):
+        if value > max_val:
+            return 1
+        elif value < 1:
+            return max_val
+        return value
+
+    def nb_coord(self, coord):
+        x, y = coord
+        if y % 2 == 0:
+            # Order for even y-coordinate
+            directions = [(x + 1, y),    # Right
+                        (x, y + 1),    # Upper right
+                        (x - 1, y + 1),# Upper left
+                        (x - 1, y),    # Left
+                        (x - 1, y - 1),# Lower left
+                        (x, y - 1)]    # Lower right
+        else:
+            # Order for odd y-coordinate
+            directions = [(x + 1, y),    # Right
+                        (x + 1, y + 1),# Upper right
+                        (x, y + 1),    # Upper left
+                        (x - 1, y),    # Left
+                        (x, y - 1),    # Lower left
+                        (x + 1, y - 1)]# Lower right
+
+        nb = [(self.mod_coord(nx, self.lx), self.mod_coord(ny, self.ly)) for nx, ny in directions]
+        return nb
+    
+    def nb_ECM(self, coord, K=6):
+        nb = np.zeros(K)
+        values = self.scalar_field
+        nb[-1] = values[((coord[0] + 1, coord[1]))]
+        nb[-4] = values[((coord[0] - 1, coord[1]))]
+
+        if coord[1] % 2 == 0:
+            nb[-3] = values[((coord[0] - 1, coord[1] + 1))]
+            nb[-2] = values[((coord[0], coord[1] + 1))]
+            nb[-6] = values[((coord[0], coord[1] - 1))]
+            nb[-5] = values[((coord[0] - 1, coord[1] - 1))]
+
+        if coord[1] % 2 != 0:
+            nb[-3] = values[((coord[0], coord[1] + 1))]
+            nb[-2] = values[((coord[0] + 1, coord[1] + 1))]
+            nb[-6] = values[((coord[0] + 1, coord[1] - 1))]
+            nb[-5] = values[((coord[0], coord[1] - 1))]
+        return nb
 
     def periodic_rb(self):
         self.scalar_field[0, :] = self.scalar_field[self.lx, :]
@@ -222,29 +227,27 @@ class Ecm(LGCA_Hex):
             # make sure that the values are between 0 and 1
             self.scalar_field[coord] -= self.d * cell_densities[coord]
             self.scalar_field[coord] = np.clip(self.scalar_field[coord], 0, 1)
-            for neigh in nb_coord(coord, self)[1:7]:
+            for neigh in self.nb_coord(coord):
                 self.scalar_field[neigh] += self.d_neigh * cell_densities[coord]  # Change here
                 self.scalar_field[neigh] = np.clip(self.scalar_field[neigh], 0, 1)
     
     def update_dynamic_fields(self):
-        for i in self.coord_pairs:
-            weights = nb_ECM(self.scalar_field, i, self.restchannels)
-            tensor, ev, ew = inertia_tensor(weights[self.restchannels:])
-            weights = nb_ECM(self.scalar_field, i, self.restchannels)
-            tensor, ev, ew = inertia_tensor(weights[self.restchannels:])
-            self.vector_field[i] = np.array([ev[0][0], ev[0][1], max(ew)])
-            self.tensor_field[i] = tensor
+        for coord in self.coord_pairs:
+            weights = self.nb_ECM(coord)
+            tensor, ev, ew = inertia_tensor(weights)
+            self.vector_field[coord] = np.array([ev[0][0], ev[0][1], max(ew)])
+            self.tensor_field[coord] = tensor
     
     def tensor_update(self, t):
-        for i in self.coord_pairs:
-            weights = nb_ECM(self.scalar_field, i, self.restchannels)
-            tensor, ev, ew = inertia_tensor(weights[self.restchannels:])
-            self.vector_field[i] = np.array([ev[0][0], ev[0][1], max(ew)])
-            self.tensor_field[i] = tensor
+        for coord in self.coord_pairs:
+            weights = self.nb_ECM(coord)
+            tensor, ev, ew = inertia_tensor(weights)
+            self.vector_field[coord] = np.array([ev[0][0], ev[0][1], max(ew)])
+            self.tensor_field[coord] = tensor
             if t == 0:
-                self.vector_field_t[0][i] = self.vector_field[i]
+                self.vector_field_t[0][coord] = self.vector_field[coord]
             else:
-                self.vector_field_t[t][i] = np.array([ev[0][0], ev[0][1], max(ew)])
+                self.vector_field_t[t][coord] = np.array([ev[0][0], ev[0][1], max(ew)])
 
     def plot_ECM(self, edgecolor = None, show_tensor=False):
         r_poly = 0.5 / np.cos(np.pi / 6)
@@ -845,7 +848,6 @@ class Ecm(LGCA_Hex):
 
         anim = animation.FuncAnimation(fig, animate, interval=interval, frames=self.t)
         return anim
-
 
     def random_sites_percolation(self):
         for i in np.arange(self.random_steps):
