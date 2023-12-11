@@ -504,3 +504,10 @@ def go_or_rest(lgca):
 
 def only_propagation(lgca):
     pass
+
+def maze_formation(lgca):
+    """
+    Maze formation interaction. Contact guidance along axes defined by a scalar ECM field.
+    Degradation and formation of ecm.
+    """
+
