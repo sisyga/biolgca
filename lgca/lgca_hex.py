@@ -1,6 +1,6 @@
 # biolgca is a Python package for simulating different kinds of lattice-gas
 # cellular automata (LGCA) in the biological context.
-# Copyright (C) 2018-2022 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.
+# Copyright (C) 2018-2022 Technische Universität Dresden, Germany.
 # The full license notice is found in the file lgca/__init__.py.
 
 """
@@ -13,7 +13,8 @@ Supported LGCA types:
 
 - classical LGCA (:py:class:`LGCA_Hex`)
 - identity-based LGCA (:py:class:`IBLGCA_Hex`)
-- LGCA without volume exclusion (:py:class:`NoVE_LGCA_Hex`)
+- classical LGCA without volume exclusion (:py:class:`NoVE_LGCA_Hex`)
+- identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_Hex`)
 """
 
 from lgca.base import *
@@ -45,7 +46,7 @@ class LGCA_Hex(LGCA_Square):
 
     Warnings
     --------
-    Boundary conditions only work for hexagonal LGCA with an even number of rows. LGCA with an uneven number of rows 
+    Boundary conditions only work for hexagonal LGCA with an even number of rows. LGCA with an uneven number of rows
     should only be used for plotting.
 
     See Also
@@ -68,10 +69,10 @@ class LGCA_Hex(LGCA_Square):
         """
         Initialize LGCA coordinates.
 
-        These are used to index the lattice nodes logically and programmatically (see below). 
-        Initializes :py:attr:`self.nonborder`, :py:attr:`self.xcoords`, :py:attr:`self.ycoords` and 
+        These are used to index the lattice nodes logically and programmatically (see below).
+        Initializes :py:attr:`self.nonborder`, :py:attr:`self.xcoords`, :py:attr:`self.ycoords` and
         :py:attr:`self.coord_pairs`.
-        
+
         See Also
         --------
         set_dims : Set LGCA dimensions.
@@ -79,11 +80,11 @@ class LGCA_Hex(LGCA_Square):
         set_r_int : Change the interaction radius.
 
         Notes
-        --------
-        :py:attr:`self.xcoords` and :py:attr:`self.ycoords` hold the logical coordinates of non-border nodes in x- and 
-        y-direction starting with 0. Non-border nodes belong to the lattice in the mathematical definition of the LGCA, 
-        while border nodes (=shadow nodes) are only included in order to implement boundary conditions. The coordinate 
-        of every other row is shifted to the right by 0.5 in order to create a zig-zag boundary. 
+        -----
+        :py:attr:`self.xcoords` and :py:attr:`self.ycoords` hold the logical coordinates of non-border nodes in x- and
+        y-direction starting with 0. Non-border nodes belong to the lattice in the mathematical definition of the LGCA,
+        while border nodes (=shadow nodes) are only included in order to implement boundary conditions. The coordinate
+        of every other row is shifted to the right by 0.5 in order to create a zig-zag boundary.
         Note that since the lattice is two-dimensional, so are the coordinates.
 
         >>> lgca = get_lgca(geometry='hex', dims=2)
@@ -94,9 +95,9 @@ class LGCA_Hex(LGCA_Square):
         array([[0., 1.],
                [0., 1.]])
 
-        A column in the printout is a row in the LGCA lattice. 
-        :py:attr:`self.nonborder` holds the programmatical coordinates of non-border nodes, i.e. the indices of the 
-        :py:attr:`self.nodes` array where non-border nodes are stored. This is why it is a tuple: Because it 
+        A column in the printout is a row in the LGCA lattice.
+        :py:attr:`self.nonborder` holds the programmatical coordinates of non-border nodes, i.e. the indices of the
+        :py:attr:`self.nodes` array where non-border nodes are stored. This is why it is a tuple: Because it
         is used to index a numpy array. All non-border lattice nodes can be called as ``self.nodes[self.nonborder]``.
 
         >>> lgca = get_lgca(geometry='hex', dims=2)  # default: periodic boundary conditions
@@ -111,9 +112,9 @@ class LGCA_Hex(LGCA_Square):
         array([[0, 0],
                [0, 1]])
 
-        Summing along the last axis means summing over all channels of a node since we are interested in the geometry. 
-        The first and the last row and column in the output of ``lgca.nodes.sum(-1)`` are the contents of the border 
-        (=shadow) nodes, which reflects the interaction radius of 1. The innermost four elements are the contents of 
+        Summing along the last axis means summing over all channels of a node since we are interested in the geometry.
+        The first and the last row and column in the output of ``lgca.nodes.sum(-1)`` are the contents of the border
+        (=shadow) nodes, which reflects the interaction radius of 1. The innermost four elements are the contents of
         the non-border nodes. Accordingly we find their indices to be:
 
         >>> lgca.nonborder
@@ -122,10 +123,10 @@ class LGCA_Hex(LGCA_Square):
          array([[1, 2],
                 [1, 2]]))
 
-        The first element of the tuple is the index in x-direction, the second element the index in y-direction. 
-        Changing the interaction radius updates the shape of :py:attr:`self.nodes` by including more border (=shadow) 
-        nodes. This also changes the coordinates. With an interaction radius of 2, there is 2 border nodes on each side 
-        enveloping the non-border nodes whose contents remain the same. Therefore the first non-border node has the 
+        The first element of the tuple is the index in x-direction, the second element the index in y-direction.
+        Changing the interaction radius updates the shape of :py:attr:`self.nodes` by including more border (=shadow)
+        nodes. This also changes the coordinates. With an interaction radius of 2, there is 2 border nodes on each side
+        enveloping the non-border nodes whose contents remain the same. Therefore the first non-border node has the
         index 2 in each direction.
 
         >>> lgca.set_r_int(2)  # change the interaction radius
@@ -176,9 +177,9 @@ class LGCA_Hex(LGCA_Square):
         """
         Perform the transport step of the LGCA: Move particles through the lattice according to their velocity.
 
-        Updates :py:attr:`self.nodes` such that resting particles (the contents of ``self.nodes[:, 6:]``) stay in their 
-        position and particles in velocity channels (the contents of ``self.nodes[:, :6]``) are relocated according to 
-        the direction of the channel they reside in. Boundary conditions are enforced later by 
+        Updates :py:attr:`self.nodes` such that resting particles (the contents of ``self.nodes[:, 6:]``) stay in their
+        position and particles in velocity channels (the contents of ``self.nodes[:, :6]``) are relocated according to
+        the direction of the channel they reside in. Boundary conditions are enforced later by
         :py:meth:`apply_boundaries`.
 
         See Also
@@ -186,7 +187,7 @@ class LGCA_Hex(LGCA_Square):
         base.LGCA_base.nodes : State of the lattice showing the structure of the ``lgca.nodes`` array.
 
         Notes
-        --------
+        -----
         >>> # set up the node configuration
         >>> nodes = np.zeros((4,4,7)).astype(bool)
         >>> nodes[1,1,:] = True
@@ -218,7 +219,7 @@ class LGCA_Hex(LGCA_Square):
                 [False, False, False, False, False, False, False],
                 [False, False, False, False, False, False, False]]])
 
-        Before propagation, seven particles occupy node (1,1). It lies one node away from the bottom left of the 
+        Before propagation, seven particles occupy node (1,1). It lies one node away from the bottom left of the
         lattice. One particle resides in each velocity channel and one in the resting channel.
 
         >>> lgca.propagation()
@@ -251,11 +252,11 @@ class LGCA_Hex(LGCA_Square):
                 [False, False, False, False, False, False, False]]])
         >>> # perform lgca.plot_density() to visualise for clarity
 
-        To interpret the cell density output, note that every other row of nodes is shifted to the right. Therefore 
-        node (1,2) is positioned diagonally upwards to the right from node (1,1). There is no node straight upwards 
+        To interpret the cell density output, note that every other row of nodes is shifted to the right. Therefore
+        node (1,2) is positioned diagonally upwards to the right from node (1,1). There is no node straight upwards
         from node (1,1).
-        The particle with velocity to the right has moved to the right velocity channel in node (2,1) to the right of 
-        node (1,1) and the particles in the other velocity channels have also moved according to their direction (see 
+        The particle with velocity to the right has moved to the right velocity channel in node (2,1) to the right of
+        node (1,1) and the particles in the other velocity channels have also moved according to their direction (see
         output annotation). The resting particle stayed in its channel in node (1,1).
 
         """
@@ -285,6 +286,7 @@ class LGCA_Hex(LGCA_Square):
         newcellnodes[:, 1:-1:2, 5] = self.nodes[:, 2::2, 5]
 
         self.nodes = newcellnodes
+
 
     def _apply_rbcx(self):
         # documented in parent class
@@ -359,7 +361,7 @@ class LGCA_Hex(LGCA_Square):
         """
         Calculate weights for the velocity channels in interactions depending on a field `qty`.
 
-        The weight for the right/diagonal up right/diagonal up left/left/diagonal down left/diagonal down right 
+        The weight for the right/diagonal up right/diagonal up left/left/diagonal down left/diagonal down right
         velocity channel is given by the value of `qty` of the respective neighboring node.
 
         Parameters
@@ -393,7 +395,7 @@ class LGCA_Hex(LGCA_Square):
 
     def nb_sum(self, qty):
         """
-        For each node, sum up the contents of `qty` for the 6 nodes in the von Neumann neughborhood, excluding the 
+        For each node, sum up the contents of `qty` for the 6 nodes in the von Neumann neughborhood, excluding the
         center.
 
         `qty` is assumed to contain the value of a calculated quantity for each node in the lattice. `nb_sum` calculates
@@ -427,10 +429,10 @@ class LGCA_Hex(LGCA_Square):
                [11,  9, 10,  7]])
         >>> # perform lgca.plot_density() to visualise for clarity
 
-        ``lgca.cell_density`` is used as the argument `qty`. The value at each position in the resulting array is the 
-        sum of the values at the neighboring positions in the source array. Note that the reduction to the non-border 
-        nodes can only be done after the sum calculation in order to preserve boundary conditions. To interpret the 
-        cell density output, note that every other row of nodes is shifted to the right. Therefore node (1,1) has the 
+        ``lgca.cell_density`` is used as the argument `qty`. The value at each position in the resulting array is the
+        sum of the values at the neighboring positions in the source array. Note that the reduction to the non-border
+        nodes can only be done after the sum calculation in order to preserve boundary conditions. To interpret the
+        cell density output, note that every other row of nodes is shifted to the right. Therefore node (1,1) has the
         neighborhood (0,0), (0,1), (0,2), (1,0), (1,2) and (2,1).
 
         """
@@ -494,7 +496,7 @@ class NoVE_LGCA_Hex(NoVE_LGCA_Square, LGCA_Hex):
         return sum
 
 
-class NoVE_IBLGCA_Hex(NoVE_IBLGCA_Square, LGCA_Hex,  ):
+class NoVE_IBLGCA_Hex(NoVE_IBLGCA_Square, LGCA_Hex):
 
     def propagation(self):
         newcellnodes = get_arr_of_empty_lists(self.nodes.shape)
