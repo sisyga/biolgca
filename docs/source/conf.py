@@ -10,13 +10,14 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
+import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
-import pathlib
+#import pathlib
 import sys
-sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
+sys.path.insert(0, os.path.abspath('../..'))
+#sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
 
 
 # -- Project information -----------------------------------------------------
@@ -78,6 +79,8 @@ html_style = 'css/methods.css'
 # configured like https://github.com/JamesALeedham/Sphinx-Autosummary-Recursion/
 autosummary_generate = True  # Turn on sphinx.ext.autosummary
 autosummary_imported_members = False  # Do not include imported members
+autodoc_mock_imports = ["matplotlib", "sympy", "mpl_toolkits"]
+
 #autoclass_content = "both"  # Add __init__ doc (ie. params) to class summaries
 html_show_sourcelink = False  # Remove 'view source code' from top of page (for html, not python)
 autodoc_inherit_docstrings = True  # If no docstring, inherit from base class
@@ -94,6 +97,10 @@ add_module_names = True  # default True
 # To Do: other HTML config https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 # alabaster customization
+# https://alabaster.readthedocs.io/en/latest/customization.html#theme-options
+# to do: github button and read the rest
 html_theme_options = {
     'fixed_sidebar' : True,
+    'logo': '../../../images/biolgca_v2.png',
 }
+#html_logo = '../images/biolgca_v2.png'

@@ -80,7 +80,7 @@ class LGCA_Hex(LGCA_Square):
         set_r_int : Change the interaction radius.
 
         Notes
-        --------
+        -----
         :py:attr:`self.xcoords` and :py:attr:`self.ycoords` hold the logical coordinates of non-border nodes in x- and 
         y-direction starting with 0. Non-border nodes belong to the lattice in the mathematical definition of the LGCA, 
         while border nodes (=shadow nodes) are only included in order to implement boundary conditions. The coordinate 
@@ -187,7 +187,7 @@ class LGCA_Hex(LGCA_Square):
         base.LGCA_base.nodes : State of the lattice showing the structure of the ``lgca.nodes`` array.
 
         Notes
-        --------
+        -----
         >>> # set up the node configuration
         >>> nodes = np.zeros((4,4,7)).astype(bool)
         >>> nodes[1,1,:] = True
