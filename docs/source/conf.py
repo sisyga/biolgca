@@ -68,7 +68,7 @@ html_theme = 'alabaster'
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static/']
+html_static_path = ['_static/', '../images/']
 #html_css_files = ['css/custom.css']
 html_style = 'css/methods.css'
 
@@ -101,6 +101,6 @@ add_module_names = True  # default True
 # to do: github button and read the rest
 html_theme_options = {
     'fixed_sidebar' : True,
-    'logo': '_static/biolgca_v2.png',
+    'logo': '../images/biolgca_v2.png',
 }
 #html_logo = '../images/biolgca_v2.png'
