@@ -22,7 +22,7 @@ sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
 # -- Project information -----------------------------------------------------
 
 project = 'BIO-LGCA'
-copyright = '2022, Technische Universität Dresden'
+copyright = '2024, TUD Dresden University of Technology'
 author = 'Simon Syga, Bianca Güttner'
 
 # The full version, including alpha/beta/rc tags
