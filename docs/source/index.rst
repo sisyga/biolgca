@@ -160,7 +160,7 @@ License
 
 BSD 3-clause license (see LICENSE file or `online resource <https://opensource.org/licenses/BSD-3-Clause>`_).
 
-Copyright (C) 2018-2022 Technische Universität Dresden.
+Copyright (C) 2018-2024 Technische Universität Dresden.
 
 
 .. toctree::
