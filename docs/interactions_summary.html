@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+    <title>Built-in Interactions &#8212; BIO-LGCA 0.1 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b3523f8e" />
+    <link rel="stylesheet" type="text/css" href="_static/css/methods.css" />
+    <script src="_static/documentation_options.js?v=2709fde1"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Examples" href="examples.html" />
+    <link rel="prev" title="Lattice geometries" href="lattice_geometries.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  <div class="document">
+    
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">BIO-LGCA</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="user_guide.html">User Guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="lgca_types.html">Types of LGCA</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lattice_geometries.html">Lattice geometries</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Built-in Interactions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#interactions-for-classical-lgca">Interactions for classical LGCA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#interactions-for-identity-based-lgca">Interactions for identity-based LGCA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#interactions-for-lgca-without-volume-exclusion">Interactions for LGCA without volume exclusion</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="full_api.html">API Reference</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  <li><a href="user_guide.html">User Guide</a><ul>
+      <li>Previous: <a href="lattice_geometries.html" title="previous chapter">Lattice geometries</a></li>
+      <li>Next: <a href="examples.html" title="next chapter">Examples</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="built-in-interactions">
+<h1>Built-in Interactions<a class="headerlink" href="#built-in-interactions" title="Link to this heading">¶</a></h1>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This section is under construction.</p>
+</div>
+<p>Interactions specify the behaviour of the LGCA. A timestep consists of an interaction step followed by a propagation step.</p>
+<p>To specify your own interaction function, please see the tutorial (source code -&gt; BioLGCA.ipynb, dedicated page planned). Built-in interactions can be found below.</p>
+<section id="interactions-for-classical-lgca">
+<h2>Interactions for classical LGCA<a class="headerlink" href="#interactions-for-classical-lgca" title="Link to this heading">¶</a></h2>
+<p>Interaction functions and helper functions for classical LGCA with volume exclusion.</p>
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.interactions.</span></span><span class="sig-name descname"><span class="pre">aggregation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Aggregation interaction.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>lgca: LGCA_1D or LGCA_Square or LGCA_Hex</strong></dt><dd><p>LGCA instance that the interaction is applied to</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.interactions.</span></span><span class="sig-name descname"><span class="pre">alignment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Rearrangement step for alignment interaction
+:return:</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.interactions.</span></span><span class="sig-name descname"><span class="pre">birth</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Simple birth process coupled to a random walk
+:return:</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.interactions.</span></span><span class="sig-name descname"><span class="pre">birthdeath</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Simple birth-death process coupled to a random walk
+:return:</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.interactions.</span></span><span class="sig-name descname"><span class="pre">chemotaxis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Rearrangement step for chemotaxis to external gradient field
+:return:</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.interactions.</span></span><span class="sig-name descname"><span class="pre">contact_guidance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Rearrangement step for contact guidance interaction. Cells are guided by an external axis
+:return:</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.interactions.</span></span><span class="sig-name descname"><span class="pre">disarrange</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Shuffle a in-place along the given axis.</p>
+<p>Apply numpy.random.shuffle to the given axis of a. Each one-dimensional
+slice is shuffled independently.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>a</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>The array to shuffle</p>
+</dd>
+<dt><strong>axis</strong><span class="classifier">int, optional, default: -1</span></dt><dd><p>Along which axis to shuffle <cite>a</cite>. The default is -1, which implies the
+last axis.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.interactions.</span></span><span class="sig-name descname"><span class="pre">excitable_medium</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Model for an excitable medium based on Barkley’s PDE model.
+:return:</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.interactions.</span></span><span class="sig-name descname"><span class="pre">go_or_grow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>interactions of the go-or-grow model.
+:return:</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.interactions.</span></span><span class="sig-name descname"><span class="pre">go_or_rest</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Interactions of the go-or-grow model without birth and death, i.e. only the switch and random walk.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.interactions.</span></span><span class="sig-name descname"><span class="pre">leup_test</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Go-or-grow with least-environmental uncertainty principle. cells try to minimize their entropy with the environment,
+by changing their state between moving and resting. resting cells can proliferate. all cells die at a constant rate.
+:return:</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.interactions.</span></span><span class="sig-name descname"><span class="pre">nematic</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Rearrangement step for nematic interaction
+:return:</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.interactions.</span></span><span class="sig-name descname"><span class="pre">persistent_walk</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Rearrangement step for persistent motion (alignment with yourlgca)
+:return:</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.interactions.</span></span><span class="sig-name descname"><span class="pre">random</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">/</span></span></em><span class="sig-paren">)</span></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.interactions.</span></span><span class="sig-name descname"><span class="pre">random_walk</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Shuffle config in the last axis, modeling a random walk.
+:return:</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.interactions.</span></span><span class="sig-name descname"><span class="pre">wetting</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Wetting of a surface for different levels of E-cadherin
+:type lgca: 
+:param lgca:
+:return:</p>
+</dd></dl>
+
+</section>
+<section id="interactions-for-identity-based-lgca">
+<h2>Interactions for identity-based LGCA<a class="headerlink" href="#interactions-for-identity-based-lgca" title="Link to this heading">¶</a></h2>
+<p>Interaction functions and helper functions for identity-based LGCA with volume exclusion.</p>
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.ib_interactions.</span></span><span class="sig-name descname"><span class="pre">birth</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Simple birth process</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.ib_interactions.</span></span><span class="sig-name descname"><span class="pre">birthdeath</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Simple birth-death process with evolutionary dynamics towards a higher proliferation rate.
+Family membership of cells can be tracked by passing the keyword argument track_inheritance=True in get_lgca().</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.ib_interactions.</span></span><span class="sig-name descname"><span class="pre">birthdeath_discrete</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Simple birth-death process with evolutionary dynamics towards a higher proliferation rate</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.ib_interactions.</span></span><span class="sig-name descname"><span class="pre">go_and_grow_mutations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Simple birth-death process with tracked family membership of cells. New families develop by mutations.
+If lgca.interaction_params[‘effect’] == ‘passenger_mutation’: no change in proliferation rate, but mutations found new families
+If lgca.interaction_params[‘effect’] == ‘driver_mutation’: evolutionary dynamics towards a higher proliferation rate</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.ib_interactions.</span></span><span class="sig-name descname"><span class="pre">go_or_grow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>interactions of the go-or-grow model. formulation too complex for 1d, but to be generalized.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.ib_interactions.</span></span><span class="sig-name descname"><span class="pre">random_walk</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Particles are randomly redistributed among channels with the same probability for each channel.
+In combination with deterministic propagation it produces an unbiased random walk.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.ib_interactions.</span></span><span class="sig-name descname"><span class="pre">trunc_gauss</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lower</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">upper</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mu</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigma</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Sample from a truncated Gaussian distribution.
+:type lower: 
+:param lower: lower limit of truncation
+:type upper: 
+:param upper: upper limit of truncation
+:type mu: 
+:param mu: mean of the distribution
+:type sigma: 
+:param sigma: standard deviation of the distribution
+:type size: 
+:param size: desired sample size
+:returns: (array) of size size, samples from the described truncated Gaussian</p>
+</dd></dl>
+
+</section>
+<section id="interactions-for-lgca-without-volume-exclusion">
+<h2>Interactions for LGCA without volume exclusion<a class="headerlink" href="#interactions-for-lgca-without-volume-exclusion" title="Link to this heading">¶</a></h2>
+<p>Interaction functions and helper functions for LGCA without volume exclusion.</p>
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.nove_interactions.</span></span><span class="sig-name descname"><span class="pre">dd_alignment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Rearrangement step for density-dependent alignment interaction including the central lattice site.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.nove_interactions.</span></span><span class="sig-name descname"><span class="pre">di_alignment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Rearrangement step for density-independent alignment interaction including the central lattice site.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.nove_interactions.</span></span><span class="sig-name descname"><span class="pre">go_or_grow</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>interactions (switch, reorientation, birth, death) of the go-or-grow model for volume exclusion free LGCA</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.nove_interactions.</span></span><span class="sig-name descname"><span class="pre">go_or_rest</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>interactions (switch, reorientation) of the go-or-rest model for volume exclusion free LGCA
+go-or-rest is a go-or-grow model without birth and death</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">lgca.nove_interactions.</span></span><span class="sig-name descname"><span class="pre">random_walk</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lgca</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Rearrangement step for random walk interaction</p>
+</dd></dl>
+
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+    <div class="clearer"></div>
+  </div>
+    <div class="footer">
+      &copy;2024, TUD Dresden University of Technology.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
