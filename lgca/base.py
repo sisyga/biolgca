@@ -59,6 +59,7 @@ def colorbar_index(ncolors: int, cmap, use_gridspec: bool=False, cax=None):
     -------
     colorbar : :py:class:`matplotlib.colorbar.Colorbar`
         Colorbar instance.
+
     """
     # discretize the colormap
     cmap = cmap_discretize(cmap, ncolors)
@@ -364,9 +365,9 @@ class LGCA_base(ABC):
 
     See Also
     --------
-    lgca_1d.LGCA_1D : Classical LGCA in a 1D geometry.
-    lgca_square.LGCA_Square : Classical LGCA in a 2D square geometry.
-    lgca_hex.LGCA_Hex : Classical LGCA in a 2D hexagonal geometry.
+    lgca.lgca_1d.LGCA_1D : Classical LGCA in a 1D geometry.
+    lgca.lgca_square.LGCA_Square : Classical LGCA in a 2D square geometry.
+    lgca.lgca_hex.LGCA_Hex : Classical LGCA in a 2D hexagonal geometry.
 
     """
     rng = npr.default_rng()  # random number generator. would be better to initialize with init and keywords
@@ -1176,9 +1177,9 @@ class IBLGCA_base(LGCA_base, ABC):
 
     See Also
     --------
-    lgca_1d.IBLGCA_1D : Identity-based LGCA in a 1D geometry.
-    lgca_square.IBLGCA_Square : Identity-based LGCA in a 2D square geometry.
-    lgca_hex.IBLGCA_Hex : Identity-based LGCA in a 2D hexagonal geometry.
+    lgca.lgca_1d.IBLGCA_1D : Identity-based LGCA in a 1D geometry.
+    lgca.lgca_square.IBLGCA_Square : Identity-based LGCA in a 2D square geometry.
+    lgca.lgca_hex.IBLGCA_Hex : Identity-based LGCA in a 2D hexagonal geometry.
 
     """
 
@@ -1817,7 +1818,7 @@ class IBLGCA_base(LGCA_base, ABC):
             Record of each family's parent (initially existing families have 0), length: ``num_families + 1``.
 
         Returns
-        --------
+        -------
         cum_pop_t : :py:class:`numpy.ndarray`
             Family populations over time summed up to all ancestors recursively, cum_pop_t[:, 0] holds total
             population over time.

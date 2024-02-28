@@ -150,7 +150,7 @@ class LGCA_1D(LGCA_base):
         set_r_int : Change the interaction radius.
 
         Notes
-        --------
+        -----
         :py:attr:`self.xcoords` holds the logical coordinates of non-border nodes starting with 0. Non-border nodes 
         belong to the lattice in the mathematical definition of the LGCA, while border nodes (=shadow nodes) are only 
         included in order to implement boundary conditions.
@@ -212,7 +212,7 @@ class LGCA_1D(LGCA_base):
         base.LGCA_base.nodes : State of the lattice showing the structure of the ``lgca.nodes`` array.
 
         Notes
-        --------
+        -----
         >>> lgca = get_lgca(geometry='lin', density=0.1, dims=5, restchannels=1)
         >>> lgca.cell_density[lgca.nonborder]
         array([0, 0, 0, 3, 0])
@@ -342,19 +342,19 @@ class LGCA_1D(LGCA_base):
 
     def setup_figure(self, tmax, figindex=None, figsize=(8, 8), tight_layout=True):
         """
-        Create a :py:module:`matplotlib` figure and manage basic layout.
+        Create a :py:mod:`matplotlib` figure and manage basic layout.
 
         Used by the class' plotting functions.
 
         Parameters
         ----------
         figindex : int or str, optional
-            An identifier for the figure (passed to :py:function:`matplotlib.pyplot.figure`). If it is a string, the
+            An identifier for the figure (passed to :py:func:`matplotlib.pyplot.figure`). If it is a string, the
             figure label and the window title is set to this value.
         figsize : tuple of int or tuple of float with 2 elements, default=(8,8)
             Desired figure size in inches ``(x, y)``.
         tight_layout : bool, default=True
-            If :py:method:`matplotlib.figure.Figure.tight_layout` is called for padding between and around subplots.
+            If :py:meth:`matplotlib.figure.Figure.tight_layout` is called for padding between and around subplots.
         tmax : int or float
             Maximum simulation time to plot in order to scale the y axis.
 
@@ -416,10 +416,10 @@ class LGCA_1D(LGCA_base):
         Parameters
         ----------
         cmap : str or :py:class:`matplotlib.colors.Colormap`
-            Color map for the density values. Passed on to :py:function:`lgca.base.cmap_discretize`.
+            Color map for the density values. Passed on to :py:func:`lgca.base.cmap_discretize`.
         colorbarwidth : float
             Width of the additional axis for the color bar, passed to
-            :py:method:`mpl_toolkits.axes_grid1.axes_divider.AxesDivider.append_axes`.
+            :py:meth:`mpl_toolkits.axes_grid1.axes_divider.AxesDivider.append_axes`.
         density_t : :py:class:`numpy.ndarray`, optional
             Particle density values for a lattice over time to plot. If set to None and a simulation has been performed
             before, the result of the simulation is plotted. Dimensions: ``(timesteps + 1,) + self.dims``.
@@ -428,7 +428,7 @@ class LGCA_1D(LGCA_base):
             `vmax` are drawn in the color at the end of the color bar. If None, `vmax` is set to the number of channels
             ``self.K``. 'auto' sets it to the maximum value found in `density_t`.
         **kwargs
-            Arguments to be passed on to :py:method:`setup_figure`.
+            Arguments to be passed on to :py:meth:`setup_figure`.
 
         Returns
         -------
@@ -485,7 +485,7 @@ class LGCA_1D(LGCA_base):
             simulation has been performed before with ``record=True``, the result of the simulation is plotted.
             Dimensions: ``(timesteps + 1,) + self.dims + (self.K,)``.
         **kwargs
-            Arguments to be passed on to :py:method:`setup_figure`.
+            Arguments to be passed on to :py:meth:`setup_figure`.
 
         Returns
         -------
@@ -731,6 +731,7 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
     def nb_sum(self, qty, addCenter=False):
         """
         Calculate sum of values in neighboring lattice sites of each lattice site.
+
         :param qty: ndarray in which neighboring values have to be added
                   first dimension indexes lattice sites
         :param addCenter: toggle adding central value

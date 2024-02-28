@@ -7,8 +7,6 @@ lgca/base.pyc
 .gitignore
 tests/__pycache__
 tests/.pytest_cache
-docs/make.bat
-docs/Makefile
 docs/build/*
 docs/source/_autosummary/*
 docs/source/generated/*
