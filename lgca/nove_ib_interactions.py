@@ -305,46 +305,58 @@ def go_or_grow_kappa(lgca):
     depending on their individual properties and the local cell density. Resting cells proliferate with a constant
     proliferation rate. Each cell dies with a constant rate. Daughter cells inherit their switch properties from the
     mother cells with some small variations given by a (truncated) Gaussian distribution.
-    :param lgca:
-    :return:
+
+    :param lgca: The lattice-gas cellular automata object.
+    :return: None. The function modifies the lgca object in-place.
     """
+    # Identify the relevant cells (those with non-zero density)
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
+    # Calculate the average density in the neighborhood
     nbdensity = lgca.nb_sum(lgca.cell_density, addCenter=True) / ((lgca.velocitychannels+1) * lgca.interaction_params['capacity']) # average density in neighborhood
     for coord in zip(*coords):
         node = lgca.nodes[coord]
         density = lgca.cell_density[coord]
         nbdens = nbdensity[coord]
         # rho = density / lgca.interaction_params['capacity']
+        # Get the list of cells at the current node
         cells = np.array(node.sum())
         # R1: cell death
+        # Determine which cells survive
         notkilled = npr.random(size=density) < 1. - lgca.interaction_params['r_d']
         cells = cells[notkilled]
+        # If all cells at the current node died, continue to the next node
         if len(cells) == 0:
             lgca.nodes[coord] = [[] for _ in range(lgca.K)]
             continue
 
+        # Determine which cells switch phenotype based on their individual properties and the local cell density
         kappas = lgca.props['kappa'][cells]
         switch = npr.random(len(cells)) < tanh_switch(rho=nbdens, kappa=kappas, theta=lgca.interaction_params['theta'])
         restcells, velcells = list(cells[switch]), list(cells[~switch])
-
+        # Update the density after deaths for birth
         rho = len(cells) / lgca.interaction_params['capacity']  # update density after deaths for birth
+        # Determine the number of proliferating cells
         n_prolif = npr.binomial(len(restcells), max(lgca.interaction_params['r_b'] * (1 - rho), 0))
+        # If there are proliferating cells, generate new cells
         if n_prolif > 0:
             proliferating = npr.choice(restcells, n_prolif, replace=False)
             lgca.maxlabel += n_prolif
             new_cells = np.arange(lgca.maxlabel - n_prolif + 1, lgca.maxlabel + 1)
+            # Update the kappa properties of the new cells
             lgca.props['kappa'] = np.concatenate((lgca.props['kappa'],
                                                   npr.normal(loc=lgca.props['kappa'][proliferating],
                                                              scale=lgca.interaction_params['kappa_std'])))
+            # Add the new cells to the list of resting cells
             restcells.extend(list(new_cells))
 
+        # Initialize the node with empty channels and add the resting cells
         node = [[] for _ in range(lgca.velocitychannels)]
         node.append(restcells)
-
+        # Assign the migrating cells to random velocity channels
         for cell in velcells:
             node[randrange(lgca.velocitychannels)].append(cell)
-
+        # Update the node in the lgca object
         lgca.nodes[coord] = node
 
 
