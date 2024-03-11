@@ -1,0 +1,21 @@
+lines.linewidth: 2.               # line width in points
+font.family:  sans-serif
+font.size: 10.0
+font.sans-serif: Arial, DejaVu Sans, Computer Modern Sans Serif, Lucida Grande, Verdana, Geneva, Lucid, Helvetica, Avant Garde, sans-serif
+mathtext.fontset: cm
+axes.linewidth:     1.    # edge line width
+axes.spines.top:    True
+axes.spines.right:  True
+figure.figsize:     5.593, 3.457
+figure.dpi:         300  
+figure.frameon:     True
+hist.bins: auto
+savefig.dpi:       600
+savefig.facecolor: none
+savefig.edgecolor: none
+savefig.bbox:      tight
+savefig.transparent: True
+svg.fonttype: none
+
+
+

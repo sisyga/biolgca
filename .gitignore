@@ -1,0 +1,14 @@
+lgca/__pycache__/*
+lgca/__pycache__
+.idea/
+.ipynb_checkpoints/
+lgca/.idea/
+lgca/base.pyc
+.gitignore
+tests/__pycache__
+tests/.pytest_cache
+docs/build/*
+docs/source/_autosummary/*
+docs/source/generated/*
+.gitignore
+__pycache__
