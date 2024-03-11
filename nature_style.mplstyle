@@ -1,0 +1,23 @@
+lines.linewidth: 1.               # line width in points
+font.family:  sans-serif
+font.size: 7.0
+font.sans-serif: Arial, Computer Modern Sans Serif, Lucida Grande, Verdana, Geneva, Lucid, Helvetica, Avant Garde,  DejaVu Sans, sans-serif
+mathtext.fontset: cm
+axes.linewidth:     1.    # edge line width
+axes.spines.top:    True
+axes.spines.right:  True
+figure.figsize:     3.464567, 2.141265
+# 1 column figs: width = 88 mm x 130-220 mm; 3,464567 in x 5,11811-8,661417 in
+# 2 column figs: width = 180 mm x 185-225 mm; 7,086614 in x 8,858268 in
+figure.dpi:         300  
+figure.frameon:     True
+hist.bins: auto
+savefig.dpi:       600
+savefig.facecolor: none
+savefig.edgecolor: none
+savefig.bbox:      tight
+savefig.transparent: True
+svg.fonttype: none
+
+
+
