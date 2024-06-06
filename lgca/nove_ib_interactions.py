@@ -356,8 +356,9 @@ def go_or_grow_kappa(lgca):
         # Assign the migrating cells to random velocity channels
         for cell in velcells:
             node[randrange(lgca.velocitychannels)].append(cell)
+
         # Update the node in the lgca object
-        lgca.nodes[coord] = node
+        lgca.nodes[coord] = deepcopy(node)
 
 
 @jit(nopython=True)
