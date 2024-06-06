@@ -181,7 +181,7 @@ def estimate_figsize(array, x: float=8., cbar: bool=False, dy: float=1.):
     return figsize
 
 
-def get_cmap(density, vmax=None, cmap='viridis', cbar=True, cbarlabel=''):
+def get_cmap(density, ax=None, vmax=None, cmap='viridis', cbar=True, cbarlabel=''):
     if vmax is None:
         K = int(density.max())
     else:
@@ -208,9 +208,9 @@ def get_cmap(density, vmax=None, cmap='viridis', cbar=True, cbarlabel=''):
 
     if K <= 1:
         # requires extra treatment because there is only one colour
-        cbar = plt.colorbar(cmap, extend='min', use_gridspec=True, boundaries=[0, 0.5, 1], values=[0, 1])
+        cbar = plt.colorbar(cmap, ax=ax, extend='min', use_gridspec=True, boundaries=[0, 0.5, 1], values=[0, 1])
     else:
-        cbar = plt.colorbar(cmap, extend='min', use_gridspec=True)
+        cbar = plt.colorbar(cmap, ax=ax, extend='min', use_gridspec=True)
     cbar.set_label(cbarlabel)
     if cmap_scaled:
         ncolors = nbins

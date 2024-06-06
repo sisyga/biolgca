@@ -527,7 +527,7 @@ class NoVE_IBLGCA_Hex(NoVE_IBLGCA_Square, LGCA_Hex):
         self.nodes = newcellnodes
         return self.nodes
 
-    def apply_rbcx(self):
+    def _apply_rbcx(self):
         # left boundary
         self.nodes[self.r_int, :, 0] = self.nodes[self.r_int - 1, :, 3] + self.nodes[self.r_int, :, 0]
         self.nodes[self.r_int, 2:-1:2, 1] = self.nodes[self.r_int - 1, 1:-2:2, 4] + self.nodes[self.r_int, 2:-1:2, 1]
@@ -538,9 +538,9 @@ class NoVE_IBLGCA_Hex(NoVE_IBLGCA_Square, LGCA_Hex):
         self.nodes[-self.r_int - 1, 1:-1:2, 4] = self.nodes[-self.r_int, 2::2, 1] + self.nodes[-self.r_int - 1, 1:-1:2, 4]
         self.nodes[-self.r_int - 1, 1:-1:2, 2] = self.nodes[-self.r_int, :-2:2, 5] + self.nodes[-self.r_int - 1, 1:-1:2, 2]
 
-        self.apply_abcx()
+        self._apply_abcx()
 
-    def apply_rbcy(self):
+    def _apply_rbcy(self):
         lx, ly, _ = self.nodes.shape
 
         # lower boundary
@@ -554,5 +554,5 @@ class NoVE_IBLGCA_Hex(NoVE_IBLGCA_Square, LGCA_Hex):
             -self.r_int, 1] + self.nodes[:lx - ((ly - 1 - self.r_int) % 2), -self.r_int - 1, 4]
         self.nodes[(1 - ((ly - 1 - self.r_int) % 2)):, -self.r_int - 1, 5] = self.nodes[:lx - (1 - ((ly - 1 - self.r_int) % 2)),
             -self.r_int, 2] + self.nodes[(1 - ((ly - 1 - self.r_int) % 2)):, -self.r_int - 1, 5]
-        self.apply_abcy()
+        self._apply_abcy()
 
