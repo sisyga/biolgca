@@ -4,9 +4,9 @@
 # The full license notice is found in the file lgca/__init__.py.
 
 """
-Classes for one-dimensional LGCA. They specify geometry-dependent LGCA behavior 
-and inherit properties and structure from the respective abstract base classes. 
-Objects of these classes can be used to simulate. 
+Classes for one-dimensional LGCA. They specify geometry-dependent LGCA behavior
+and inherit properties and structure from the respective abstract base classes.
+Objects of these classes can be used to simulate.
 
 Supported LGCA types:
 
@@ -26,7 +26,7 @@ class LGCA_1D(LGCA_base):
     """
     Classical LGCA with volume exclusion on a 1D lattice.
 
-    It holds all methods and attributes that are specific for a linear geometry. See :py:class:`lgca.base.LGCA_base` for 
+    It holds all methods and attributes that are specific for a linear geometry. See :py:class:`lgca.base.LGCA_base` for
     the documentation of inherited attributes.
 
     Attributes
@@ -45,19 +45,19 @@ class LGCA_1D(LGCA_base):
     interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation', 'parameter_controlled_diffusion',
                     'random_walk', 'persistent_motion', 'birthdeath', 'only_propagation']
     velocitychannels = 2
-    c = np.array([1., -1.])[None, ...]  # directions of velocity channels; shape: (1,2)
+    c = np.array([1., -1.])[None, ...] #directions of velocity channels; shape: (1,2)
 
     def set_dims(self, dims=None, nodes=None, restchannels=0):
         """
         Set LGCA dimensions.
 
-        Initializes :py:attr:`self.K`, :py:attr:`self.restchannels`, :py:attr:`self.dims` and 
+        Initializes :py:attr:`self.K`, :py:attr:`self.restchannels`, :py:attr:`self.dims` and
         :py:attr:`self.l`.
 
         Parameters
         ----------
         dims : int or tuple, default=100
-            Lattice dimensions. Must match with specified geometry, everything except the first tuple element 
+            Lattice dimensions. Must match with specified geometry, everything except the first tuple element
             is ignored.
         nodes : :py:class:`numpy.ndarray`
             Custom initial lattice configuration.
@@ -94,11 +94,11 @@ class LGCA_1D(LGCA_base):
 
     def init_nodes(self, density=0.1, nodes=None, **kwargs):
         """
-        Initialize LGCA lattice configuration. Create the lattice and then assign particles to 
+        Initialize LGCA lattice configuration. Create the lattice and then assign particles to
         channels in the nodes.
 
-        Initializes :py:attr:`self.nodes`. If `nodes` is not provided, the lattice is initialized with particles 
-        randomly so that the averge lattice density is `density`. For the random initialization there is a choice 
+        Initializes :py:attr:`self.nodes`. If `nodes` is not provided, the lattice is initialized with particles
+        randomly so that the averge lattice density is `density`. For the random initialization there is a choice
         between a fixed or random number of particles per node.
 
         Parameters
@@ -106,7 +106,7 @@ class LGCA_1D(LGCA_base):
         density : float, default=0.1
             If `nodes` is None, initialize lattice randomly with this particle density.
         hom : float, default=False
-            Fill channels randomly with particle density `density`, but with an equal number of particles for each node. 
+            Fill channels randomly with particle density `density`, but with an equal number of particles for each node.
             Note that depending on :py:attr:`self.K` not all densities can be realized.
         nodes : :py:class:`numpy.ndarray`
             Custom initial lattice configuration. Dimensions: ``(self.dims[0], self.K)``.
@@ -114,7 +114,7 @@ class LGCA_1D(LGCA_base):
         See Also
         --------
         base.LGCA_base.random_reset : Initialize lattice nodes with average density `density`.
-        base.LGCA_base.homogeneous_random_reset : Initialize lattice nodes with average density `density` and a fixed number 
+        base.LGCA_base.homogeneous_random_reset : Initialize lattice nodes with average density `density` and a fixed number
             of particles per node.
         set_dims : Set LGCA dimensions.
         init_coords : Initialize LGCA coordinates.
@@ -140,7 +140,7 @@ class LGCA_1D(LGCA_base):
         """
         Initialize LGCA coordinates.
 
-        These are used to index the lattice nodes logically and programmatically (see below). 
+        These are used to index the lattice nodes logically and programmatically (see below).
         Initializes :py:attr:`self.nonborder` and :py:attr:`self.xcoords`.
 
         See Also
@@ -151,16 +151,16 @@ class LGCA_1D(LGCA_base):
 
         Notes
         -----
-        :py:attr:`self.xcoords` holds the logical coordinates of non-border nodes starting with 0. Non-border nodes 
-        belong to the lattice in the mathematical definition of the LGCA, while border nodes (=shadow nodes) are only 
+        :py:attr:`self.xcoords` holds the logical coordinates of non-border nodes starting with 0. Non-border nodes
+        belong to the lattice in the mathematical definition of the LGCA, while border nodes (=shadow nodes) are only
         included in order to implement boundary conditions.
 
         >>> lgca = get_lgca(geometry='lin', dims=3)
         >>> lgca.xcoords
         array([0., 1., 2.])
 
-        :py:attr:`self.nonborder` holds the programmatical coordinates of non-border nodes, i.e. the indices of the 
-        :py:attr:`self.nodes` array where non-border nodes are stored. This is why it is a tuple: Because it 
+        :py:attr:`self.nonborder` holds the programmatical coordinates of non-border nodes, i.e. the indices of the
+        :py:attr:`self.nodes` array where non-border nodes are stored. This is why it is a tuple: Because it
         is used to index a numpy array. All non-border lattice nodes can be called as ``self.nodes[self.nonborder]``.
 
         >>> lgca = get_lgca(geometry='lin', dims=3)  # default: periodic boundary conditions
@@ -171,18 +171,18 @@ class LGCA_1D(LGCA_base):
         >>> lgca.nodes[lgca.nonborder].sum(-1)
         array([0, 1, 0])
 
-        Summing along the last axis means summing over all channels of a node since we are interested in the geometry. 
-        The first and the last element in the output of ``lgca.nodes.sum(-1)`` are the contents of the border (=shadow) 
-        nodes, which reflects the interaction radius of 1. The innermost three elements are the contents of the 
+        Summing along the last axis means summing over all channels of a node since we are interested in the geometry.
+        The first and the last element in the output of ``lgca.nodes.sum(-1)`` are the contents of the border (=shadow)
+        nodes, which reflects the interaction radius of 1. The innermost three elements are the contents of the
         non-border nodes. Accordingly we find their indices to be:
 
         >>> lgca.nonborder
         (array([1, 2, 3]),)
 
-        In one dimension the y component of the tuple is empty. 
-        Changing the interaction radius updates the shape of :py:attr:`self.nodes` by including more border (=shadow) 
-        nodes. This also changes the coordinates. With an interaction radius of 3, there is 3 border nodes on each side 
-        enveloping the non-border nodes whose contents remain the same. Therefore the first non-border node has the 
+        In one dimension the y component of the tuple is empty.
+        Changing the interaction radius updates the shape of :py:attr:`self.nodes` by including more border (=shadow)
+        nodes. This also changes the coordinates. With an interaction radius of 3, there is 3 border nodes on each side
+        enveloping the non-border nodes whose contents remain the same. Therefore the first non-border node has the
         index 3.
 
         >>> lgca.set_r_int(3)  # change the interaction radius
@@ -202,9 +202,9 @@ class LGCA_1D(LGCA_base):
         """
         Perform the transport step of the LGCA: Move particles through the lattice according to their velocity.
 
-        Updates :py:attr:`self.nodes` such that resting particles (the contents of ``self.nodes[:, 2:]``) stay in their 
-        position and particles in velocity channels (the contents of ``self.nodes[:, :2]``) are relocated according to 
-        the direction of the channel they reside in. Boundary conditions are enforced later by 
+        Updates :py:attr:`self.nodes` such that resting particles (the contents of ``self.nodes[:, 2:]``) stay in their
+        position and particles in velocity channels (the contents of ``self.nodes[:, :2]``) are relocated according to
+        the direction of the channel they reside in. Boundary conditions are enforced later by
         :py:meth:`apply_boundaries`.
 
         See Also
@@ -223,7 +223,7 @@ class LGCA_1D(LGCA_base):
                [ True,  True, True],
                [False, False, False]])
 
-        Before propagation, three particles occupy the fourth node. One resides in the velocity channel to the right, 
+        Before propagation, three particles occupy the fourth node. One resides in the velocity channel to the right,
         one in the velocity channel to the left and one in the resting channel.
 
         >>> lgca.propagation()
@@ -237,8 +237,8 @@ class LGCA_1D(LGCA_base):
                [False, False, True],
                [ True, False, False]])
 
-        The particle with velocity 1 has moved to the right velocity channel in the fifth node. The particle in the 
-        velocity channel to the left has moved to the respective channel in the third node. The resting particle stayed 
+        The particle with velocity 1 has moved to the right velocity channel in the fifth node. The particle in the
+        velocity channel to the left has moved to the respective channel in the third node. The resting particle stayed
         in its channel in the fourth node.
 
         """
@@ -408,7 +408,7 @@ class LGCA_1D(LGCA_base):
 
         return fig, ax
 
-    def plot_density(self, density_t=None, cmap='hot_r', vmax='auto', colorbarwidth=0.03, **kwargs):
+    def plot_density(self, density_t=None, cmap='hot_r', vmax='auto', colorbarwidth=0.03, cbar=True, **kwargs):
         """
         Plot particle density over time. X axis: 1D lattice, y axis: time. A color bar on the right side shows the
         color coding of density values. Empty nodes are white.
@@ -453,21 +453,22 @@ class LGCA_1D(LGCA_base):
         tmax = density_t.shape[0]
         fig, ax = self.setup_figure(tmax, **kwargs)
 
-        # prepare axis for colour bar
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size=colorbarwidth, pad=0.1)
-
-        # colour scaling
         if vmax is None:
             vmax = self.K
+
         elif vmax == 'auto':
             vmax = int(density_t.max())
+
         cmap = cmap_discretize(cmap, 1 + vmax)
 
         # create plot
         plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=vmax, cmap=cmap)
-        cbar = colorbar_index(ncolors=1 + vmax, cmap=cmap, use_gridspec=True, cax=cax)
-        cbar.set_label('Particle number $n$')
+        if cbar:
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size=colorbarwidth, pad=0.1)
+            cbar = colorbar_index(ncolors=1 + vmax, cmap=cmap, use_gridspec=True, cax=cax)
+
+            cbar.set_label('Particle number $n$')
         plt.sca(ax)
         return plot
 
@@ -572,7 +573,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             nodes_t = nodes_t.astype('bool')
         LGCA_1D.plot_flux(self, nodes_t, **kwargs)
 
-    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', **kwargs):
+    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', figkwargs={}, **kwargs):
         if nodes_t is None:
             nodes_t = self.nodes_t
 
@@ -583,10 +584,10 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             propname = next(iter(props))
 
         tmax, l, _ = nodes_t.shape
-        fig, ax = self.setup_figure(tmax, **kwargs)
+        fig, ax = self.setup_figure(tmax, **figkwargs)
         mean_prop_t = self.calc_prop_mean(propname=propname, props=props, nodes=nodes_t)
 
-        plot = plt.imshow(mean_prop_t, interpolation='none', aspect='equal', cmap=cmap)
+        plot = plt.imshow(mean_prop_t, interpolation='none', aspect='equal', cmap=cmap, **kwargs)
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size=0.3, pad=0.1)
         cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
@@ -673,8 +674,8 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
             self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.uint)
             self.apply_boundaries()
 
-    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='hot_r', relative_max=None,
-                     absolute_max=None, offset_t=0, offset_x=0):
+    def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='hot_r', relative_max=None, cbar=True,
+                     absolute_max=None, offset_t=0, offset_x=0, cbarlabel=None, **kwargs):
         """
         Create a plot showing the number of particles per lattice site.
         :param density_t: particle number per lattice site (ndarray of dimension (timesteps + 1,) + self.dims)
@@ -701,8 +702,7 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
             figsize = estimate_figsize(density_t.T, cbar=True)
 
         # set up figure
-        fig = plt.figure(num=figindex, figsize=figsize)
-        ax = fig.add_subplot(111)
+        fig, ax = self.setup_figure(density_t.shape[0], figindex=figindex, figsize=figsize)
         # set up color scaling
         if relative_max is not None:
             scale = relative_max
@@ -711,16 +711,23 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         max_part_per_cell = int(scale * density_t.max())
         if absolute_max is not None:
             max_part_per_cell = int(absolute_max)
-        cmap = cmap_discretize(cmap, max_part_per_cell + 1)
+
+
+        cmap = cmap_discretize(cmap, max_part_per_cell+1)
         # create plot with color bar, axis labels, title and layout
         plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=max_part_per_cell, cmap=cmap,
-                            extent =[offset_x-0.5, density_t.shape[1] + offset_x-0.5, density_t.shape[0] + offset_t - 0.5, offset_t-0.5])
-        loc = mticker.MaxNLocator(nbins='auto', steps=[1,2,5,10], integer=True)
+                            extent =[offset_x-0.5, density_t.shape[1] + offset_x-0.5,
+                                     density_t.shape[0] + offset_t - 0.5, offset_t-0.5])
+        loc = mticker.MaxNLocator(nbins='auto', steps=[1, 2, 5, 10], integer=True)
         ax.xaxis.set_major_locator(loc)
         loc = mticker.MaxNLocator(nbins='auto', steps=[1, 2, 5, 10], integer=True)
         ax.yaxis.set_major_locator(loc)
-        cbar = colorbar_index(ncolors=max_part_per_cell + 1, cmap=cmap, use_gridspec=True)
-        cbar.set_label(r'Particle number $n$')
+        if cbar:
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size=0.2, pad=0.1)
+            cbar = colorbar_index(ncolors=max_part_per_cell + 1, cmap=cmap, use_gridspec=True, cax=cax)
+            cbar.set_label(cbarlabel)
+            plt.sca(ax)
         plt.xlabel(r'Lattice node $r \, (\varepsilon)$', )
         plt.ylabel(r'Time step $k \, (\tau)$')
         ax.xaxis.set_label_position('top')
@@ -809,7 +816,8 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
             nodes_t = self.length_checker(self.nodes_t)
         LGCA_1D.plot_flux(self, nodes_t, **kwargs)
 
-    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', cbarlabel=None, **kwargs):
+    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', cbarlabel=None, cbar=True,
+                          figkwargs={}, **kwargs):
         """
         Plot the spatial distribution of a cell property 'propname'. At each node, for each time step the mean value in
         the node is shown. Empty nodes are masked.
@@ -832,17 +840,18 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
             self.calc_prop_mean_spatiotemp()
 
         tmax, l, _ = nodes_t.shape
-        fig, ax = self.setup_figure(tmax, **kwargs)
+        fig, ax = self.setup_figure(tmax, **figkwargs)
         mean_prop_t = self.mean_prop_t[propname]
 
-        plot = plt.imshow(mean_prop_t, interpolation='none', cmap=cmap, aspect='equal')
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size=0.3, pad=0.1)
-        cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
-        if cbarlabel is None:
-            cbar.set_label(r'Property ${}$'.format(propname))
-        else:
-            cbar.set_label(cbarlabel)
+        plot = plt.imshow(mean_prop_t, interpolation='none', cmap=cmap, aspect='equal', **kwargs)
+        if cbar:
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size=0.2, pad=0.1)
+            cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
+            if cbarlabel is None:
+                cbar.set_label(r'Property ${}$'.format(propname))
+            else:
+                cbar.set_label(cbarlabel)
         plt.sca(ax)
         return plot
 

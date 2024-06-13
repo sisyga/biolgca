@@ -22,6 +22,8 @@ def disarrange(a: np.ndarray, axis=-1):
     Apply numpy.random.shuffle to the given axis of a. Each one-dimensional
     slice is shuffled independently.
 
+    THIS IS A LEGACY FUNCTION, USE THE RANDOM WALK FUNCTION INSTEAD FOR A MORE EFFICIENT IMPLEMENTATION!
+
     Parameters
     ----------
     a : numpy.ndarray
