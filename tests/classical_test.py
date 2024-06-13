@@ -493,7 +493,7 @@ class Test_LGCA_classical(T_LGCA_Common):
     def test_rbc_hex(self, nodes_hex_rbound, out_hex_rbound, nodes_hex_trbound, out_hex_trbound,
                      nodes_hex_tlbound, out_hex_tlbound, nodes_hex_lbound, out_hex_lbound,
                      nodes_hex_blbound, out_hex_blbound, nodes_hex_brbound, out_hex_brbound):
-        # check periodic boundary conditions in 2D square
+        # check periodic boundary conditions in hexagonal lattice
         # right boundary
         out_hex_rbound[-1, :, 3] = 1  # particles that cross boundary
         self.t_propagation_template('hex', nodes_hex_rbound, out_hex_rbound, bc='rbc')
@@ -529,7 +529,7 @@ class Test_LGCA_classical(T_LGCA_Common):
     def test_abc_hex(self, nodes_hex_rbound, out_hex_rbound, nodes_hex_trbound, out_hex_trbound,
                      nodes_hex_tlbound, out_hex_tlbound, nodes_hex_lbound, out_hex_lbound,
                      nodes_hex_blbound, out_hex_blbound, nodes_hex_brbound, out_hex_brbound):
-        # check periodic boundary conditions in 2D square
+        # check periodic boundary conditions in hexagonal lattice
         # right boundary
         self.t_propagation_template('hex', nodes_hex_rbound, out_hex_rbound, bc='abc')
 
