@@ -442,3 +442,77 @@ def go_or_grow_kappa_chemo(lgca):
                 velcells = velcells[sample[i]:]
 
         lgca.nodes[coord] = node
+
+def go_or_grow_glioblastoma(lgca):
+    """
+    Apply the evolutionary "go-or-grow" interaction. Cells switch from a migratory to a resting phenotype and vice versa
+    depending on their individual properties and the local cell density. Resting cells proliferate with a clone-dependent
+    proliferation rate. Each cell dies with a constant rate. Daughter cells inherit their properties from the
+    mother cells.
+    If there's a mutation, the switch parameters change with some variations given by a (truncated) Gaussian distribution,
+    and the proliferation rate changes given a simple distribution of fitness effects.
+
+    :param lgca: The lattice-gas cellular automata object.
+    :return: None. The function modifies the lgca object in-place.
+    """
+    # Identify the relevant cells (those with non-zero density)
+    relevant = (lgca.cell_density[lgca.nonborder] > 0)
+    coords = [a[relevant] for a in lgca.nonborder]
+    # Calculate the average density in the neighborhood
+    nbdensity = lgca.nb_sum(lgca.cell_density, addCenter=True) / ((lgca.velocitychannels+1) * lgca.interaction_params['capacity']) # average density in neighborhood
+    for coord in zip(*coords):
+        node = lgca.nodes[coord]
+        density = lgca.cell_density[coord]
+        nbdens = nbdensity[coord]
+        # Get the list of cells at the current node
+        cells = np.array(node.sum())
+        # R1: cell death
+        # Determine which cells survive
+        notkilled = npr.random(size=density) < 1. - lgca.interaction_params['r_d']
+        cells = cells[notkilled]
+        # If all cells at the current node died, continue to the next node
+        if len(cells) == 0:
+            lgca.nodes[coord] = [[] for _ in range(lgca.K)]
+            continue
+
+        # Determine which cells switch phenotype based on their individual properties and the local cell density
+        fams = lgca.props['family'][cells]
+        kappas = [lgca.family_props['kappa'][i] for i in fams]
+        switch = npr.random(len(cells)) < tanh_switch(rho=nbdens, kappa=kappas, theta=lgca.interaction_params['theta'])
+        restcells, velcells = list(cells[switch]), list(cells[~switch])
+        # Update the density after deaths for birth
+        rho = len(cells) / lgca.interaction_params['capacity']  # update density after deaths for birth
+        # Determine the number of proliferating cells
+        newcells = []
+        for cell in restcells:
+            fam = lgca.props['family'][cell]
+            r_b = lgca.family_props['r_b'][fam]
+            # mother cell: cell
+            # family: lgca.props['family'][cell]
+
+            if random() < r_b * (1 - rho):
+                lgca.maxlabel += 1
+                newcells.append(lgca.maxlabel)
+                if random() < lgca.interaction_params['r_m']:   # check if a mutation happens
+                    # driver mutation mother cell
+                    lgca.add_family(fam)
+                    # record family of new cell = new family
+                    lgca.props['family'].append(int(lgca.maxfamily))
+                    lgca.family_props['r_b'].append(lgca.family_props['r_b'][fam] * \
+                                                    lgca.interaction_params['fitness_increase'])
+                    lgca.family_props['kappa'].append(float(npr.normal(loc=lgca.family_props['kappa'][fam],
+                                                             scale=lgca.interaction_params['kappa_std'])))
+                else:
+                    # record family of new cell = family of mother cell
+                    lgca.props['family'].append(fam)
+            restcells.extend(newcells)
+
+        # Initialize the node with empty channels and add the resting cells
+        node = [[] for _ in range(lgca.velocitychannels)]
+        node.append(restcells)
+        # Assign the migrating cells to random velocity channels
+        for cell in velcells:
+            node[randrange(lgca.velocitychannels)].append(cell)
+
+        # Update the node in the lgca object
+        lgca.nodes[coord] = deepcopy(node)
