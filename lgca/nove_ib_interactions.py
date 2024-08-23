@@ -293,6 +293,7 @@ def go_or_grow(lgca):
 
         node = [[] for _ in range(lgca.velocitychannels)]
         node.append(restcells)
+
         for cell in velcells:
             node[randrange(lgca.velocitychannels)].append(cell)
 

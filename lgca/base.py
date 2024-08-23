@@ -34,6 +34,7 @@ from tqdm.auto import tqdm
 plt.style.use('default')
 
 
+
 def colorbar_index(ncolors: int, cmap, use_gridspec: bool=False, cax=None):
     """
     Create a colorbar with `ncolors` colors.
