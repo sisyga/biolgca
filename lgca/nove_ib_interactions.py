@@ -477,9 +477,9 @@ def go_or_grow_glioblastoma(lgca):
             continue
 
         # Determine which cells switch phenotype based on their individual properties and the local cell density
-        fams = lgca.props['family'][cells]
+        fams = [lgca.props['family'][i] for i in cells]
         kappas = [lgca.family_props['kappa'][i] for i in fams]
-        switch = npr.random(len(cells)) < tanh_switch(rho=nbdens, kappa=kappas, theta=lgca.interaction_params['theta'])
+        switch = npr.random(len(cells)) < tanh_switch(rho=nbdens, kappa=np.array(kappas), theta=lgca.interaction_params['theta'])
         restcells, velcells = list(cells[switch]), list(cells[~switch])
         # Update the density after deaths for birth
         rho = len(cells) / lgca.interaction_params['capacity']  # update density after deaths for birth
@@ -506,7 +506,7 @@ def go_or_grow_glioblastoma(lgca):
                 else:
                     # record family of new cell = family of mother cell
                     lgca.props['family'].append(fam)
-            restcells.extend(newcells)
+        restcells.extend(newcells)
 
         # Initialize the node with empty channels and add the resting cells
         node = [[] for _ in range(lgca.velocitychannels)]
