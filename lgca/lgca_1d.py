@@ -265,7 +265,7 @@ class LGCA_1D(LGCA_base):
         self.nodes[self.r_int, 0] += self.nodes[self.r_int - 1, 1]
         # right boundary cell inside domain: left channel gets added right channel from the right
         self.nodes[-self.r_int - 1, 1] += self.nodes[-self.r_int, 0]
-        self.apply_abc()
+        self._apply_abc()
 
     def apply_abc(self):
         # documented in parent class
@@ -778,9 +778,11 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
         self.apply_abc()
 
     def apply_abc(self):
-        self.nodes[self.border] = get_arr_of_empty_lists(self.nodes[self.border].shape)
-        # for channel in self.nodes[self.border].flat:
-        #     channel.clear()
+        """
+        Apply absorbing boundary conditions to the 1D lattice, removing all particles at the boundaries.
+        """
+        self.nodes[:self.r_int] = get_arr_of_empty_lists(self.nodes[:self.r_int].shape)
+        self.nodes[-self.r_int:] = get_arr_of_empty_lists(self.nodes[-self.r_int:].shape)
 
     def init_nodes(self, density, nodes=None):
         """
