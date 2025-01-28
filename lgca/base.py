@@ -526,7 +526,7 @@ class LGCA_base(ABC):
         raise NotImplementedError("Reflecting boundary conditions not yet implemented for class " +
                                   str(self.__class__)+".")
 
-    def apply_abc(self):
+    def apply_pbc(self):
         """
         Apply absorbing boundary conditions.
 
@@ -849,9 +849,9 @@ class LGCA_base(ABC):
             periodic: ``'pbc'``.
 
         """
-        if bc in ['absorbing', 'absorb', 'abs', 'abc']:
+        if bc in ['absorbing', 'absorb', 'abs', 'abc', 'fixed']:
             self.apply_boundaries = self.apply_abc
-        elif bc in ['reflecting', 'reflect', 'refl', 'rbc']:
+        elif bc in ['reflecting', 'reflect', 'refl', 'rbc', 'no_flux', 'noflux']:
             self.apply_boundaries = self.apply_rbc
         elif bc in ['periodic', 'pbc']:
             self.apply_boundaries = self.apply_pbc
@@ -2713,6 +2713,9 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.length_checker = np.vectorize(len)
         self.set_bc(bc)
         self.interaction_params = {}
+        if restchannels != 1:
+            restchannels = 1
+            warnings.warn("There can only be one rest channel in this LGCA class. Setting to 1 to prevent issues")
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
         self.init_coords()
         self.init_nodes(density, nodes=nodes)
@@ -2765,17 +2768,9 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                 self.interaction = randomwalk
             elif interaction == 'only_propagation':
                 self.interaction = only_propagation
-            elif interaction == 'birth':
-                self.interaction = birth
-                if 'r_b' in kwargs:
-                    self.interaction_params['r_b'] = kwargs['r_b']
-                else:
-                    self.interaction_params['r_b'] = 0.2
-                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
-                self.props.update(r_b=[self.interaction_params['r_b']] * self.maxlabel)
 
-            elif interaction == 'birthdeath':
-                self.interaction = birthdeath
+            elif interaction in ('birth', 'birthdeath'):
+                self.interaction = birthdeath if interaction == 'birthdeath' else birth
                 if 'capacity' in kwargs:
                     self.interaction_params['capacity'] = kwargs['capacity']
                 else:
@@ -2791,9 +2786,12 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
 
                 if 'r_d' in kwargs:
                     self.interaction_params['r_d'] = kwargs['r_d']
+                    if interaction == 'birth':
+                        warnings.warn("Death rate defined but not used in birth interaction.")
                 else:
-                    self.interaction_params['r_d'] = 0.02
-                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+                    if interaction == 'birthdeath':
+                        self.interaction_params['r_d'] = 0.02
+                        print('death rate set to r_d = ', self.interaction_params['r_d'])
 
                 if 'std' in kwargs:
                     self.interaction_params['std'] = kwargs['std']
