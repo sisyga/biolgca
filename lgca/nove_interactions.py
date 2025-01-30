@@ -8,8 +8,6 @@ Interaction functions and helper functions for LGCA without volume exclusion.
 """
 
 import numpy as np
-import numpy.random as npr
-
 from lgca.interactions import tanh_switch
 
 def random_walk(lgca):
@@ -29,7 +27,7 @@ def random_walk(lgca):
         # number of particles
         n = lgca.cell_density[coord]
         # reassign particle directions
-        sample = npr.multinomial(n, weights,)
+        sample = lgca.rng.multinomial(n, weights,)
 
         newnodes[coord] = sample
 
@@ -66,7 +64,7 @@ def dd_alignment(lgca):
             weights = (weights / weights.sum())
 
         # reassign particle directions
-        sample = npr.multinomial(n, weights,)
+        sample = lgca.rng.multinomial(n, weights,)
 
         newnodes[coord] = sample
 
@@ -107,7 +105,7 @@ def di_alignment(lgca):
             weights = (weights / weights.sum())
 
         # reassign particle directions
-        sample = npr.multinomial(n, weights, )
+        sample = lgca.rng.multinomial(n, weights, )
 
         newnodes[coord] = sample
 
@@ -130,22 +128,22 @@ def go_or_grow(lgca):
         rho = n / lgca.capacity
 
         # phenotypic switch
-        j_1 = npr.binomial(n_mxy, tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
+        j_1 = lgca.rng.binomial(n_mxy, tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
                                               theta=lgca.interaction_params['theta']))
-        j_2 = npr.binomial(n_rxy, 1 - tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
+        j_2 = lgca.rng.binomial(n_rxy, 1 - tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
                                                   theta=lgca.interaction_params['theta']))
         n_mxy += j_2 - j_1
         n_rxy += j_1 - j_2
 
         # death
-        n_mxy -= npr.binomial(n_mxy * np.heaviside(n_mxy, 0), lgca.interaction_params['r_d'])
-        n_rxy -= npr.binomial(n_rxy * np.heaviside(n_rxy, 0), lgca.interaction_params['r_d'])
+        n_mxy -= lgca.rng.binomial(n_mxy * np.heaviside(n_mxy, 0), lgca.interaction_params['r_d'])
+        n_rxy -= lgca.rng.binomial(n_rxy * np.heaviside(n_rxy, 0), lgca.interaction_params['r_d'])
 
         # birth
-        n_rxy += npr.binomial(n_rxy * np.heaviside(n_rxy, 0), np.maximum(lgca.interaction_params['r_b']*(1-rho), 0))
+        n_rxy += lgca.rng.binomial(n_rxy * np.heaviside(n_rxy, 0), np.maximum(lgca.interaction_params['r_b']*(1-rho), 0))
 
         # reorientation
-        v_channels = npr.multinomial(n_mxy, [1/lgca.velocitychannels]*lgca.velocitychannels)
+        v_channels = lgca.rng.multinomial(n_mxy, [1/lgca.velocitychannels]*lgca.velocitychannels)
 
         # add resting cells and assign new content of node at the end of interaction step
         r_channels = np.array([n_rxy])
@@ -171,15 +169,15 @@ def go_or_rest(lgca):
         rho = n / lgca.capacity
 
         # phenotypic switch
-        j_1 = npr.binomial(n_mxy, tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
+        j_1 = lgca.rng.binomial(n_mxy, tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
                                               theta=lgca.interaction_params['theta']))
-        j_2 = npr.binomial(n_rxy, 1 - tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
+        j_2 = lgca.rng.binomial(n_rxy, 1 - tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
                                                   theta=lgca.interaction_params['theta']))
         n_mxy += j_2 - j_1
         n_rxy += j_1 - j_2
 
         # reorientation
-        v_channels = npr.multinomial(n_mxy, [1/lgca.velocitychannels]*lgca.velocitychannels)
+        v_channels = lgca.rng.multinomial(n_mxy, [1/lgca.velocitychannels]*lgca.velocitychannels)
 
         # add resting cells and assign new content of node at the end of interaction step
         r_channels = np.array([n_rxy])
