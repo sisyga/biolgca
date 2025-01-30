@@ -1,11 +1,11 @@
 # biolgca is a Python package for simulating different kinds of lattice-gas
 # cellular automata (LGCA) in the biological context.
-# Copyright (C) 2018-2022 Technische Universität Dresden, Germany.
+# Copyright (C) 2018-2024 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.
 # The full license notice is found in the file lgca/__init__.py.
 
 """
-Abstract base classes. These classes define properties and structure of the LGCA 
-types/subclasses and specify geometry-independent LGCA behavior. 
+Abstract base classes. These classes define properties and structure of the LGCA
+types/subclasses and specify geometry-independent LGCA behavior.
 They cannot be used to simulate.
 
 Supported LGCA types:
@@ -28,7 +28,7 @@ from sympy.utilities.iterables import multiset_permutations
 from copy import copy, deepcopy
 from lgca.plots import muller_plot
 import warnings
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 # configure matplotlib style
 plt.style.use('default')
@@ -38,9 +38,9 @@ def colorbar_index(ncolors: int, cmap, use_gridspec: bool=False, cax=None):
     """
     Create a colorbar with `ncolors` colors.
 
-    Builds a discrete colormap with `ncolors` colors from the near-continuous colormap `cmap`, 
-    adds it to the axis `cax` and draws tick labels in the center of each color. If 
-    ncolors is high, some labels are omitted to avoid cluttering. 
+    Builds a discrete colormap with `ncolors` colors from the near-continuous colormap `cmap`,
+    adds it to the axis `cax` and draws tick labels in the center of each color. If
+    ncolors is high, some labels are omitted to avoid cluttering.
 
     .. note:: To Do: Implement the label stride with Locator and Formatter instead.
 
@@ -149,9 +149,9 @@ def cmap_discretize(cmap, N: int):
 def estimate_figsize(array, x: float=8., cbar: bool=False, dy: float=1.):
     """
     .. deprecated:: 1.0
-        :py:func:`estimate_figsize` will be removed in biolgca 1.0, it is replaced 
-        by the default value for the figure size in :py:meth:`setup_figure` of the 
-        respective LGCA object. 
+        :py:func:`estimate_figsize` will be removed in biolgca 1.0, it is replaced
+        by the default value for the figure size in :py:meth:`setup_figure` of the
+        respective LGCA object.
 
     Parameters
     ----------
@@ -180,7 +180,7 @@ def estimate_figsize(array, x: float=8., cbar: bool=False, dy: float=1.):
     return figsize
 
 
-def get_cmap(density, vmax=None, cmap='viridis', cbar=True, cbarlabel=''):
+def get_cmap(density, ax=None, vmax=None, cmap='viridis', cbar=True, cbarlabel=''):
     if vmax is None:
         K = int(density.max())
     else:
@@ -207,9 +207,9 @@ def get_cmap(density, vmax=None, cmap='viridis', cbar=True, cbarlabel=''):
 
     if K <= 1:
         # requires extra treatment because there is only one colour
-        cbar = plt.colorbar(cmap, extend='min', use_gridspec=True, boundaries=[0, 0.5, 1], values=[0, 1])
+        cbar = plt.colorbar(cmap, ax=ax, extend='min', use_gridspec=True, boundaries=[0, 0.5, 1], values=[0, 1])
     else:
-        cbar = plt.colorbar(cmap, extend='min', use_gridspec=True)
+        cbar = plt.colorbar(cmap, ax=ax, extend='min', use_gridspec=True)
     cbar.set_label(cbarlabel)
     if cmap_scaled:
         ncolors = nbins
@@ -271,23 +271,23 @@ def calc_nematic_tensor(v):
 
 class LGCA_base(ABC):
     """
-    Abstract base class for classical LGCA with volume exclusion. 
+    Abstract base class for classical LGCA with volume exclusion.
 
-    It holds all methods and attributes that are common for all geometries. 
-    Cannot simulate on its own. 
-    If you want to use it, instantiate one of the geometry-specific derived classes. 
+    It holds all methods and attributes that are common for all geometries.
+    Cannot simulate on its own.
+    If you want to use it, instantiate one of the geometry-specific derived classes.
 
     Parameters
     ----------
     bc : {'absorbing', 'reflecting', 'periodic', 'inflow'}, default='periodic'
-        Boundary conditions. Not all bc are supported in all geometries (yet). 
+        Boundary conditions. Not all bc are supported in all geometries (yet).
 
-        Aliases: absorbing: ``'absorb', 'abs', 'abc'``; reflecting: ``'reflect', 'refl', 'rbc'``; 
+        Aliases: absorbing: ``'absorb', 'abs', 'abc'``; reflecting: ``'reflect', 'refl', 'rbc'``;
         periodic: ``'pbc'``.
     density : float, default=0.1
         If `nodes` is None, initialize lattice randomly with this particle density.
     dims : tuple or int
-        Lattice dimensions. Must match with specified geometry. An integer for a 2D geometry is interpreted as 
+        Lattice dimensions. Must match with specified geometry. An integer for a 2D geometry is interpreted as
         ``(dims, dims)``.
     nodes : :py:class:`numpy.ndarray`
         Custom initial lattice configuration.
@@ -302,23 +302,23 @@ class LGCA_base(ABC):
         Function implementing the boundary conditions.
     c
     cell_density : :py:class:`numpy.ndarray`
-        Number of particles at each lattice node in the current LGCA state. Computed field. Dimensions: 
+        Number of particles at each lattice node in the current LGCA state. Computed field. Dimensions:
         :py:attr:`lgca.dims`.
     cij : :py:class:`numpy.ndarray`
-        Nematic tensor. Element-wise multiplication of neighborhood vectors with themselves. Computed from the geometry. 
-        Dimensions: 
-        ``(lgca.c.shape[1], lgca.c.shape[0], lgca.c.shape[0})``. First dimension: neighborhood vector, second and 
-        third dimension: combination of x and y components of the vector as 
-        ``[[cix*cix, cix*ciy], [ciy*cix, ciy*ciy]]``. 
+        Nematic tensor. Element-wise multiplication of neighborhood vectors with themselves. Computed from the geometry.
+        Dimensions:
+        ``(lgca.c.shape[1], lgca.c.shape[0], lgca.c.shape[0})``. First dimension: neighborhood vector, second and
+        third dimension: combination of x and y components of the vector as
+        ``[[cix*cix, cix*ciy], [ciy*cix, ciy*ciy]]``.
     concentration
         Internal variable for the chemotaxis interaction.
     dens_t : :py:class:`numpy.ndarray`
-        Number of particles at each lattice node for all timesteps in the previous simulation. 
-        Only available after a simulation performed with ``timeevo(recorddens=True)``. 
-        Dimensions: ``(timesteps,) + lgca.dims``. 
+        Number of particles at each lattice node for all timesteps in the previous simulation.
+        Only available after a simulation performed with ``timeevo(recorddens=True)``.
+        Dimensions: ``(timesteps,) + lgca.dims``.
     dims : tuple
-        Lattice dimensions/size of the lattice as ``(xdim,)`` (1D LGCA) or ``(xdim, ydim)`` (2D LGCA), 
-        excluding shadow nodes on the border. 
+        Lattice dimensions/size of the lattice as ``(xdim,)`` (1D LGCA) or ``(xdim, ydim)`` (2D LGCA),
+        excluding shadow nodes on the border.
     guiding_tensor
         Internal variable for the contact_guidance interaction.
     interaction : callable
@@ -331,35 +331,35 @@ class LGCA_base(ABC):
     n_crit
         Internal variable for the wetting interaction.
     n_t : :py:class:`numpy.ndarray`
-        Sum of particles in the lattice for all timesteps in the previous simulation. 
-        Only available after a simulation performed with ``timeevo(recordN=True)``. Dimensions: ``(timesteps,)``. 
+        Sum of particles in the lattice for all timesteps in the previous simulation.
+        Only available after a simulation performed with ``timeevo(recordN=True)``. Dimensions: ``(timesteps,)``.
     nodes : :py:class:`numpy.ndarray`
-        State of the lattice, configuration of all channels. Dimensions: ``(lgca.l + 2*lgca.r_int, lgca.K)`` 
-        (in 1D LGCA) or ``(lgca.lx + 2*lgca.r_int, lgca.ly + 2*lgca.r_int, lgca.K)``. Includes shadow nodes 
-        on all borders for implementing boundary conditions. 
+        State of the lattice, configuration of all channels. Dimensions: ``(lgca.l + 2*lgca.r_int, lgca.K)``
+        (in 1D LGCA) or ``(lgca.lx + 2*lgca.r_int, lgca.ly + 2*lgca.r_int, lgca.K)``. Includes shadow nodes
+        on all borders for implementing boundary conditions.
     nodes_t : :py:class:`numpy.ndarray`
-        Full lattice configuration of non-border nodes for all timesteps in the previous simulation. 
-        Only available after a simulation performed with ``timeevo(record=True)``. 
-        Dimensions: ``(timesteps,) + lgca.dims + (K,)``. 
+        Full lattice configuration of non-border nodes for all timesteps in the previous simulation.
+        Only available after a simulation performed with ``timeevo(record=True)``.
+        Dimensions: ``(timesteps,) + lgca.dims + (K,)``.
     nonborder : tuple of :py:class:`numpy.ndarray`
-        Indices of non-border nodes in the :py:attr:`lgca.nodes` array as ``(x-indices,)`` (in 1D LGCA) or 
-        ``(x-indices, y-indices)`` (in 2D LGCA), i.e. all nodes excluding shadow nodes for boundary conditions. 
-        Both arrays x-indices and y-indices have the dimensions :py:attr:`lgca.dims`. 
+        Indices of non-border nodes in the :py:attr:`lgca.nodes` array as ``(x-indices,)`` (in 1D LGCA) or
+        ``(x-indices, y-indices)`` (in 2D LGCA), i.e. all nodes excluding shadow nodes for boundary conditions.
+        Both arrays x-indices and y-indices have the dimensions :py:attr:`lgca.dims`.
     permutations : list of :py:class:`numpy.ndarray`
-        All possible configurations for a lattice site with :py:attr:`lgca.K` channels. Dimensions: 
-        ``(lgca.K + 1, n, lgca.K)``. n is the number of possible permutations for the 
-        node if x channels are occupied, where x is given by the first dimension. 
+        All possible configurations for a lattice site with :py:attr:`lgca.K` channels. Dimensions:
+        ``(lgca.K + 1, n, lgca.K)``. n is the number of possible permutations for the
+        node if x channels are occupied, where x is given by the first dimension.
     r_int : int, default=1
         Interaction radius. Must be at least 1 to handle propagation.
     restchannels : int
         Number of resting channels.
     si : list of :py:class:`numpy.ndarray`
-        Nematic tensor for all possible node configurations, obtained from :py:attr:`lgca.permutations` and 
-        :py:attr:`py.cij`. Dimensions: ``(lgca.K + 1, n, len(lgca.c), len(lgca.c))``. n is the number of possible 
-        permutations for the node if x channels are occupied, where x is given by the first dimension. 
+        Nematic tensor for all possible node configurations, obtained from :py:attr:`lgca.permutations` and
+        :py:attr:`py.cij`. Dimensions: ``(lgca.K + 1, n, len(lgca.c), len(lgca.c))``. n is the number of possible
+        permutations for the node if x channels are occupied, where x is given by the first dimension.
     velcells_t, restcells_t : :py:class:`numpy.ndarray`
-        Sum of particles in velocity/rest channels, respectively, for all timesteps in the previous simulation. 
-        Only available after a simulation performed with ``timeevo(recordpertype=True)``. 
+        Sum of particles in velocity/rest channels, respectively, for all timesteps in the previous simulation.
+        Only available after a simulation performed with ``timeevo(recordpertype=True)``.
         Dimensions: ``(timesteps,) + lgca.dims``.
     velocitychannels
 
@@ -370,7 +370,6 @@ class LGCA_base(ABC):
     lgca.lgca_hex.LGCA_Hex : Classical LGCA in a 2D hexagonal geometry.
 
     """
-    rng = npr.default_rng()  # random number generator. would be better to initialize with init and keywords
 
     @property
     @abstractmethod
@@ -391,17 +390,17 @@ class LGCA_base(ABC):
     @property
     @abstractmethod
     def c(self) -> np.ndarray:
-        """(Class attribute.) Array of the velocity channel vectors. Dimensions: ``(dims, lgca.velocitychannels)``, 
+        """(Class attribute.) Array of the velocity channel vectors. Dimensions: ``(dims, lgca.velocitychannels)``,
         where dims is 1 or 2 depending on the geometry."""
         ...
 
     @abstractmethod
     def set_dims(self, dims=None, nodes=None, restchannels=0):
         """
-        Set LGCA dimensions. In the implementation, set :py:attr:`self.K`, :py:attr:`self.restchannels` 
+        Set LGCA dimensions. In the implementation, set :py:attr:`self.K`, :py:attr:`self.restchannels`
         and :py:attr:`self.dims` to meaningful and consistent values.
 
-        Must match what is done in :py:meth:`init_coords` and :py:meth:`init_nodes`. 
+        Must match what is done in :py:meth:`init_coords` and :py:meth:`init_nodes`.
         For arguments and attribute types see :py:class:`lgca.base.LGCA_base`.
         """
         ...
@@ -409,11 +408,11 @@ class LGCA_base(ABC):
     @abstractmethod
     def init_coords(self):
         """
-        Initialize LGCA coordinates. These are used to index the lattice nodes. In the implementation, 
-        set :py:attr:`self.nonborder`, :py:attr:`self.xcoords`, :py:attr:`self.ycoords`, 
+        Initialize LGCA coordinates. These are used to index the lattice nodes. In the implementation,
+        set :py:attr:`self.nonborder`, :py:attr:`self.xcoords`, :py:attr:`self.ycoords`,
         and :py:attr:`self.coord_pairs` to meaningful and consistent values.
 
-        Must match what is done in :py:meth:`set_dims` and :py:meth:`init_nodes`. 
+        Must match what is done in :py:meth:`set_dims` and :py:meth:`init_nodes`.
         For the attribute types see :py:class:`lgca.base.LGCA_base`.
         """
         ...
@@ -421,10 +420,10 @@ class LGCA_base(ABC):
     @abstractmethod
     def init_nodes(self, density, nodes=None, **kwargs):
         """
-        Initialize LGCA lattice configuration. Create the lattice and then assign particles to 
+        Initialize LGCA lattice configuration. Create the lattice and then assign particles to
         channels in the nodes. In the implementation, set :py:attr:`self.nodes`.
 
-        Must match what is done in :py:meth:`set_dims` and :py:meth:`init_coords`. 
+        Must match what is done in :py:meth:`set_dims` and :py:meth:`init_coords`.
         For arguments and attribute types see :py:class:`lgca.base.LGCA_base`.
         """
         ...
@@ -437,29 +436,29 @@ class LGCA_base(ABC):
         Parameters
         ----------
         qty : :py:class:`numpy.ndarray`
-            Quantity to take the gradient of. Needs to have the same number of dimensions as :py:attr:`self.nodes`. 
+            Quantity to take the gradient of. Needs to have the same number of dimensions as :py:attr:`self.nodes`.
             If ``qty.shape == self.nodes.shape[:-1]`` the result can be indexed with the LGCA coordinates (see example).
 
         Returns
         -------
         :py:class:`numpy.ndarray`
-            Computed gradient. Dimensions: ``qty.shape + (len(self.c),)``. If ``self`` and ``qty`` are 2D arrays, 
-            ``gradient(qty)[...,0]`` is the gradient in x direction and ``gradient(qty)[...,1]`` the gradient in 
+            Computed gradient. Dimensions: ``qty.shape + (len(self.c),)``. If ``self`` and ``qty`` are 2D arrays,
+            ``gradient(qty)[...,0]`` is the gradient in x direction and ``gradient(qty)[...,1]`` the gradient in
             y direction.
 
         Notes
         -----
-        The gradient is calculated using :py:func:`numpy.gradient()` with stepwidth h=0.5 
-        (s.t. no normalization takes place). 
-        It is computed as the central finite difference with equidistant support points and supports one-sided 
+        The gradient is calculated using :py:func:`numpy.gradient()` with stepwidth h=0.5
+        (s.t. no normalization takes place).
+        It is computed as the central finite difference with equidistant support points and supports one-sided
         differences at the boundaries.
 
-        In most cases this yields the simple difference between the two closest array elements in the given direction. 
+        In most cases this yields the simple difference between the two closest array elements in the given direction.
         For example, the gradient at position 1 of ``np.array([1, 2, 4])`` would be (4 - 1)/(2 * 0.5) = 3.
 
         Examples
         --------
-        If the input quantity has the same x (and y) dimensions as the LGCA's nodes, the gradient at each node 
+        If the input quantity has the same x (and y) dimensions as the LGCA's nodes, the gradient at each node
         position can be accessed the same way as the node itself.
 
         >>> from lgca import get_lgca
@@ -484,14 +483,14 @@ class LGCA_base(ABC):
         >>>         print("Gradient at index", coord, "is ", grad[coord])
         >>>         print("Configuration at index ", coord, " is ", lgca.nodes[coord],
         >>>               ", with cell density ", lgca.cell_density[coord])
-        Gradient at index (1, 3) is  [3. 0.] 
-        Configuration at index  (1, 3)  is  [False False False  True] , with cell density  1 
+        Gradient at index (1, 3) is  [3. 0.]
+        Configuration at index  (1, 3)  is  [False False False  True] , with cell density  1
 
-        The first element of the gradient holds the gradient in x direction, the second element the gradient in 
-        y direction. Note that ``(1, 3)`` is the index corresponding to a logical non-border coordinate ``(0, 2)`` 
-        if the interaction radius is 1. This is relevant for defining a custom field qty: Only the field values at 
-        non-border indices will be "felt" by the particles in the LGCA if the interaction is defined accordingly, 
-        but border nodes can be used to specify the field's boundary conditions. 
+        The first element of the gradient holds the gradient in x direction, the second element the gradient in
+        y direction. Note that ``(1, 3)`` is the index corresponding to a logical non-border coordinate ``(0, 2)``
+        if the interaction radius is 1. This is relevant for defining a custom field qty: Only the field values at
+        non-border indices will be "felt" by the particles in the LGCA if the interaction is defined accordingly,
+        but border nodes can be used to specify the field's boundary conditions.
 
         The gradient in x direction is 3 = (3 - 0)/1. In y direction it is 0 = (1 - 1)/1.
 
@@ -503,7 +502,7 @@ class LGCA_base(ABC):
         """
         Perform the transport step of the LGCA: Move particles through the lattice according to their velocity.
 
-        Propagate the particles by updating :py:attr:`self.nodes`, respecting the geometry. 
+        Propagate the particles by updating :py:attr:`self.nodes`, respecting the geometry.
         Boundary conditions are enforced later by :py:meth:`apply_boundaries`.
         """
         ...
@@ -526,7 +525,7 @@ class LGCA_base(ABC):
         raise NotImplementedError("Reflecting boundary conditions not yet implemented for class " +
                                   str(self.__class__)+".")
 
-    def apply_abc(self):
+    def apply_pbc(self):
         """
         Apply absorbing boundary conditions.
 
@@ -544,9 +543,10 @@ class LGCA_base(ABC):
         """
         raise NotImplementedError("Inflow boundary conditions not yet implemented for class "+str(self.__class__)+".")
 
-    def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', **kwargs):
+    def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', seed=None, **kwargs):
         """ Initialize class instance. See class docstring."""
         self.r_int: int = 1  # Interaction radius. Must be at least 1 to handle propagation.
+        self.rng = npr.default_rng(seed=seed)
         # set boundary conditions, set self.apply_boundaries
         self.set_bc(bc)
 
@@ -590,8 +590,8 @@ class LGCA_base(ABC):
         """
         Set the interaction rule and respective needed parameters.
 
-        Set :py:attr:`self.interaction` and possibly add entries in :py:attr:`self.interaction_params`. 
-        Do not use this to specify a custom interaction. In order to do this (as of now), :py:attr:`self.interaction` 
+        Set :py:attr:`self.interaction` and possibly add entries in :py:attr:`self.interaction_params`.
+        Do not use this to specify a custom interaction. In order to do this (as of now), :py:attr:`self.interaction`
         and :py:attr:`self.interaction_params` must be manipulated directly from an external script.
 
         Parameters
@@ -836,22 +836,22 @@ class LGCA_base(ABC):
         """
         Set the boundary conditions.
 
-        Selects a method which is called every timestep to enforce boundary conditions. 
-        The methods to select from are implemented in the derived classes. The chosen one is assigned to 
+        Selects a method which is called every timestep to enforce boundary conditions.
+        The methods to select from are implemented in the derived classes. The chosen one is assigned to
         :py:meth:`self.apply_boundaries`.
 
         Parameters
         ----------
         bc : {'absorbing', 'reflecting', 'periodic', 'inflow'}
-            Boundary conditions. Not all bc are supported in all geometries (yet). 
+            Boundary conditions. Not all bc are supported in all geometries (yet).
 
-            Aliases: absorbing: ``'absorb', 'abs', 'abc'``; reflecting: ``'reflect', 'refl', 'rbc'``; 
+            Aliases: absorbing: ``'absorb', 'abs', 'abc'``; reflecting: ``'reflect', 'refl', 'rbc'``;
             periodic: ``'pbc'``.
 
         """
-        if bc in ['absorbing', 'absorb', 'abs', 'abc']:
+        if bc in ['absorbing', 'absorb', 'abs', 'abc', 'fixed']:
             self.apply_boundaries = self.apply_abc
-        elif bc in ['reflecting', 'reflect', 'refl', 'rbc']:
+        elif bc in ['reflecting', 'reflect', 'refl', 'rbc', 'no_flux', 'noflux']:
             self.apply_boundaries = self.apply_rbc
         elif bc in ['periodic', 'pbc']:
             self.apply_boundaries = self.apply_pbc
@@ -865,14 +865,14 @@ class LGCA_base(ABC):
         """
         Calculate the flux vector for all lattice sites in `nodes`.
 
-        The elements of the flux vectors are computed as the dot product between the LGCA's neighborhood vectors and 
+        The elements of the flux vectors are computed as the dot product between the LGCA's neighborhood vectors and
         the velocity channel configuration in `nodes`.
 
         Parameters
         ----------
         nodes : :py:class:`numpy.ndarray`
-            Lattice configuration to compute the flux for. Must have more than or the same number of 
-            dimensions as :py:attr:`self.nodes` and ``nodes.shape[-1] >= self.velocitychannels``. 
+            Lattice configuration to compute the flux for. Must have more than or the same number of
+            dimensions as :py:attr:`self.nodes` and ``nodes.shape[-1] >= self.velocitychannels``.
             Is typically :py:attr:`self.nodes`.
 
         Returns
@@ -896,16 +896,16 @@ class LGCA_base(ABC):
 
     def random_reset(self, density):
         """
-        Initialize lattice nodes with average density `density`. Channels are occupied at random and nodes can 
+        Initialize lattice nodes with average density `density`. Channels are occupied at random and nodes can
         have different particle numbers.
 
-        For each channel a random number is drawn. If it is lower than `density`, the channel is filled, 
+        For each channel a random number is drawn. If it is lower than `density`, the channel is filled,
         otherwise it stays empty.
 
         Parameters
         ----------
         density : float
-            Desired average particle density of the lattice. 
+            Desired average particle density of the lattice.
             ``density = total_number_of_particles / (number_of_nodes * number_of_channels_per_node)``.
 
         See Also
@@ -919,18 +919,18 @@ class LGCA_base(ABC):
 
     def homogeneous_random_reset(self, density):
         """
-        Initialize lattice nodes with average density `density`. Channels are occupied at random and all nodes 
+        Initialize lattice nodes with average density `density`. Channels are occupied at random and all nodes
         have the same particle number.
 
-        The particle number per node that matches `density` most closely is determined. The configuration for one 
+        The particle number per node that matches `density` most closely is determined. The configuration for one
         node with this number of particles is then permutated to fill the lattice.
 
 
         Parameters
         ----------
         density : float
-            Desired average density of the lattice. 
-            ``density = total_number_of_particles / (number_of_nodes * number_of_channels_per_node)``. 
+            Desired average density of the lattice.
+            ``density = total_number_of_particles / (number_of_nodes * number_of_channels_per_node)``.
             Here also: ``density = number_of_particles_per_node / number_of_channels_per_node``.
 
         See Also
@@ -978,7 +978,7 @@ class LGCA_base(ABC):
         """
         Perform a simulation of the LGCA for `timesteps` timesteps.
 
-        Different quantities can be recorded during the simulation, e.g. the total number of particles at each 
+        Different quantities can be recorded during the simulation, e.g. the total number of particles at each
         timestep. They are stored in LGCA attributes.
 
         Parameters
@@ -992,7 +992,7 @@ class LGCA_base(ABC):
         recordN : bool, default=False
             Record the total number of particles in the lattice for each timestep in :py:attr:`self.n_t`.
         recordpertype : bool, default=False
-            Record the number of particles in velocity channels/resting channels at each lattice site for 
+            Record the number of particles in velocity channels/resting channels at each lattice site for
             each timestep in :py:attr:`self.velcells_t` and :py:attr:`self.restcells_t`, respectively.
         showprogress : bool, default=True
             Show a simple progress bar with a percentage of performed timesteps in the standard output.
@@ -1027,11 +1027,11 @@ class LGCA_base(ABC):
 
     def calc_permutations(self):
         """
-        Precompute quantities that only depend on the geometry and lattice definition, but not on the current 
+        Precompute quantities that only depend on the geometry and lattice definition, but not on the current
         configuration, for reuse in interaction functions. This speeds up concerned interactions.
 
-        Currently computed quantities are a list of all possible node configurations (:py:attr:`self.permutations`), 
-        the flux for each possible node configuration (:py:attr:`self.j`), all nematic tensor possibilities 
+        Currently computed quantities are a list of all possible node configurations (:py:attr:`self.permutations`),
+        the flux for each possible node configuration (:py:attr:`self.j`), all nematic tensor possibilities
         (:py:attr:`self.cij`) and the nematic tensor for all possible node configurations (:py:attr:`self.si`).
 
         """
@@ -1183,9 +1183,10 @@ class IBLGCA_base(LGCA_base, ABC):
 
     """
 
-    def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', **kwargs):
+    def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', seed=None, **kwargs):
         """ Initialize class instance. See class docstring."""
         self.r_int = 1  # Interaction radius. Must be at least 1 to handle propagation.
+        self.rng = npr.default_rng(seed=seed)
         # set boundary conditions, set self.apply_boundaries
         self.set_bc(bc)
 
@@ -1643,7 +1644,7 @@ class IBLGCA_base(LGCA_base, ABC):
         prop = self.get_prop(nodes=nodes, props=props, propname=propname)
         # mask out empty lattice sites
         occupied = nodes.astype(bool)
-        mask = 1 - occupied
+        mask = ~occupied
         prop = np.ma.array(prop, mask=mask)
         # calculate mean within each node
         mean_prop = prop.mean(-1)
@@ -2376,7 +2377,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
     """
     Base class for LGCA without volume exclusion.
     """
-    def __init__(self, nodes=None, dims=None, restchannels=None, density=0.1, hom=None, bc='periodic', capacity=None,
+    def __init__(self, nodes=None, dims=None, restchannels=None, density=0.1, hom=None, bc='periodic', seed=None, capacity=None,
                  **kwargs):
         """
         Initialize class instance.
@@ -2389,6 +2390,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         """
 
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
+        self.rng = npr.default_rng(seed=seed)
         self.set_bc(bc)
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes, capacity=capacity)
         self.init_coords()
@@ -2411,6 +2413,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
                     raise RuntimeError("Rest channels ({:d}) defined, interaction will crash! Set number of"
                                        " rest channels to 0 with restchannels keyword.".format(self.restchannels))
                 self.interaction = dd_alignment
+
                 if 'beta' in kwargs:
                     self.interaction_params['beta'] = kwargs['beta']
                 else:
@@ -2694,9 +2697,9 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     """
     Base class for identity-based LGCA without volume exclusion.
     """
-    interactions = ['go_or_grow', 'birthdeath', 'randomwalk']
+    interactions = ['go_or_grow', 'birthdeath', 'randomwalk', 'steric_evolution']
 
-    def __init__(self, nodes=None, dims=None, density=.1, restchannels=0, bc='periodic', **kwargs):
+    def __init__(self, nodes=None, dims=None, density=.1, restchannels=1, bc='periodic', seed=None, **kwargs):
         """
         Initialize class instance.
         :param nodes:
@@ -2708,10 +2711,14 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         :param kwargs:
         """
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
+        self.rng = npr.default_rng(seed=seed)
         self.props = {}
         self.length_checker = np.vectorize(len)
         self.set_bc(bc)
         self.interaction_params = {}
+        if restchannels != 1:
+            restchannels = 1
+            warnings.warn("There can only be one rest channel in this LGCA class. Setting to 1 to prevent issues")
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
         self.init_coords()
         self.init_nodes(density, nodes=nodes)
@@ -2728,11 +2735,13 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     def convert_int_to_ib(self, occ):
         """
         Convert an array of integers representing the occupation numbers of an lgca to an array consisting of lists of
-        individual cell labels. The length of each list corresponds to the entry in 'occ'.
+        individual cell labels, starting at 'starting_id'. The length of each list corresponds to the entry in 'occ'.
         :param occ: array of occupation numbers. must match the lgca dimensions
+        : param starting_id: int > 0
         :return: array, where each entry is a list of individual cell labels.
         """
-        labels = list(range(occ.sum()))
+        ntot = occ.sum()
+        labels = list(range(ntot))
         tempnodes = np.empty(occ.shape, dtype=object)
         counter = 0
         for ind, dens in np.ndenumerate(occ):
@@ -2753,7 +2762,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.update_dynamic_fields()
 
     def set_interaction(self, **kwargs):
-        from lgca.nove_ib_interactions import randomwalk, birth, birthdeath, go_or_grow
+        from lgca.nove_ib_interactions import randomwalk, birth, birthdeath, birthdeath_cancerdfe, go_or_grow, \
+            evo_steric, go_or_grow_kappa
         from lgca.interactions import only_propagation
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
@@ -2761,17 +2771,52 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                 self.interaction = randomwalk
             elif interaction == 'only_propagation':
                 self.interaction = only_propagation
-            elif interaction == 'birth':
-                self.interaction = birth
+
+            elif interaction in ('birth', 'birthdeath'):
+                self.interaction = birthdeath if interaction == 'birthdeath' else birth
+                if 'capacity' in kwargs:
+                    self.interaction_params['capacity'] = kwargs['capacity']
+                else:
+                    self.interaction_params['capacity'] = 8
+                    print('capacity of channel set to ', self.interaction_params['capacity'])
+
                 if 'r_b' in kwargs:
                     self.interaction_params['r_b'] = kwargs['r_b']
                 else:
                     self.interaction_params['r_b'] = 0.2
                     print('birth rate set to r_b = ', self.interaction_params['r_b'])
-                self.props.update(r_b=[self.interaction_params['r_b']] * self.maxlabel)
+                self.props.update(r_b=[self.interaction_params['r_b']] * (self.maxlabel + 1))
 
-            elif interaction == 'birthdeath':
-                self.interaction = birthdeath
+                if 'r_d' in kwargs:
+                    self.interaction_params['r_d'] = kwargs['r_d']
+                    if interaction == 'birth':
+                        warnings.warn("Death rate defined but not used in birth interaction.")
+                else:
+                    if interaction == 'birthdeath':
+                        self.interaction_params['r_d'] = 0.02
+                        print('death rate set to r_d = ', self.interaction_params['r_d'])
+
+                if 'std' in kwargs:
+                    self.interaction_params['std'] = kwargs['std']
+                else:
+                    self.interaction_params['std'] = 0.01
+                    print('standard deviation set to = ', self.interaction_params['std'])
+                if 'a_max' in kwargs:
+                    self.interaction_params['a_max'] = kwargs['a_max']
+                else:
+                    self.interaction_params['a_max'] = 1.
+                    print('Max. birth rate set to a_max =', self.interaction_params['a_max'])
+                if 'gamma' in kwargs:
+                    self.interaction_params['gamma'] = kwargs['gamma']
+                else:
+                    self.interaction_params['gamma'] = 0.
+                    print('Rest channel weight set to gamma =', self.interaction_params['gamma'])
+
+                Z = self.velocitychannels + np.exp(self.interaction_params['gamma']) * self.restchannels
+                self.channel_weights = [1./Z] * self.velocitychannels + [np.exp(self.interaction_params['gamma'])/Z] * self.restchannels
+
+            elif interaction == 'birthdeath_cancerdfe':
+                self.interaction = birthdeath_cancerdfe
                 if 'capacity' in kwargs:
                     self.interaction_params['capacity'] = kwargs['capacity']
                 else:
@@ -2791,16 +2836,43 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                     self.interaction_params['r_d'] = 0.02
                     print('death rate set to r_d = ', self.interaction_params['r_d'])
 
-                if 'std' in kwargs:
-                    self.interaction_params['std'] = kwargs['std']
+                if 'p_d' in kwargs:
+                    self.interaction_params['p_d'] = kwargs['p_d']
                 else:
-                    self.interaction_params['std'] = 0.01
-                    print('standard deviation set to = ', self.interaction_params['std'])
+                    self.interaction_params['p_d'] = 1.4e-5  # from macfarlane 2014
+                    print('probability of drivers set to = ', self.interaction_params['p_d'])
+
+                if 'p_p' in kwargs:
+                    self.interaction_params['p_p'] = kwargs['p_p']
+                else:
+                    self.interaction_params['p_p'] = 0.1  # from macfarlane 2014
+                    print('probability of passengers set to = ', self.interaction_params['p_p'])
+
+                if 's_d' in kwargs:
+                    self.interaction_params['s_d'] = kwargs['s_d']
+                else:
+                    self.interaction_params['s_d'] = .1 * self.interaction_params['r_b']  # from macfarlane 2014
+                    print('driver strength set to = ', self.interaction_params['s_d'])
+
+                if 's_p' in kwargs:
+                    self.interaction_params['s_p'] = kwargs['s_p']
+                else:
+                    self.interaction_params['s_p'] = .001 * self.interaction_params['r_b']  # from macfarlane 2014
+                    print('passenger strength set to = ', self.interaction_params['s_p'])
+
                 if 'a_max' in kwargs:
                     self.interaction_params['a_max'] = kwargs['a_max']
                 else:
                     self.interaction_params['a_max'] = 1.
                     print('Max. birth rate set to a_max =', self.interaction_params['a_max'])
+                if 'gamma' in kwargs:
+                    self.interaction_params['gamma'] = kwargs['gamma']
+                else:
+                    self.interaction_params['gamma'] = 0.
+                    print('Rest channel weight set to gamma =', self.interaction_params['gamma'])
+
+                Z = self.velocitychannels + np.exp(self.interaction_params['gamma']) * self.restchannels
+                self.channel_weights = [1./Z] * self.velocitychannels + [np.exp(self.interaction_params['gamma'])/Z] * self.restchannels
 
             elif interaction == 'go_or_grow':
                 self.interaction = go_or_grow
@@ -2848,7 +2920,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                     self.interaction_params['kappa'] = [5.] * (self.maxlabel + 1)
                     print('switch rate set to kappa = ', self.interaction_params['kappa'][0])
 
-                self.props.update(kappa=self.interaction_params['kappa'])
+                self.props.update(kappa=np.array(self.interaction_params['kappa']))
                 if 'theta' in kwargs:
                     theta = kwargs['theta']
                     if hasattr(theta, '__iter__'):
@@ -2858,8 +2930,97 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                 else:
                     self.interaction_params['theta'] = [0.5] * (self.maxlabel + 1)
                     print('switch threshold set to theta = ', self.interaction_params['theta'][0])
-                self.props.update(theta=self.interaction_params['theta'])
+                self.props.update(theta=np.array(self.interaction_params['theta']))
 
+            elif interaction == 'go_or_grow_kappa':
+                self.interaction = go_or_grow_kappa
+                try:
+                    assert self.restchannels > 0
+                except AssertionError:
+                    print('There must be exactly one rest channel for this interaction to work!')
+                if 'capacity' in kwargs:
+                    self.interaction_params['capacity'] = kwargs['capacity']
+                else:
+                    self.interaction_params['capacity'] = 8
+                    print('node capacity set to ', self.interaction_params['capacity'])
+
+                if 'kappa_std' in kwargs:
+                    self.interaction_params['kappa_std'] = kwargs['kappa_std']
+                else:
+                    self.interaction_params['kappa_std'] = 0.2
+                    print('std of kappa set to', self.interaction_params['kappa_std'])
+
+                if 'r_d' in kwargs:
+                    self.interaction_params['r_d'] = kwargs['r_d']
+                else:
+                    self.interaction_params['r_d'] = 0.01
+                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+
+                if 'r_b' in kwargs:
+                    self.interaction_params['r_b'] = kwargs['r_b']
+                else:
+                    self.interaction_params['r_b'] = 0.2
+                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+
+                if 'kappa' in kwargs:
+                    kappa = kwargs['kappa']
+                    if hasattr(kappa, '__iter__'):
+                        self.interaction_params['kappa'] = list(kappa)
+                    else:
+                        self.interaction_params['kappa'] = [kappa] * (self.maxlabel + 1)
+                else:
+                    self.interaction_params['kappa'] = [5.] * (self.maxlabel + 1)
+                    print('switch rate set to kappa = ', self.interaction_params['kappa'][0])
+
+                self.props.update(kappa=np.array(self.interaction_params['kappa']))
+                if 'theta' in kwargs:
+                    theta = kwargs['theta']
+                    self.interaction_params['theta'] = theta
+                else:
+                    self.interaction_params['theta'] = 0.5
+                    print('switch threshold set to theta = ', self.interaction_params['theta'])
+
+            elif interaction == 'steric_evolution':
+                self.interaction = evo_steric
+                if 'r_b' in kwargs:
+                    self.interaction_params['r_b'] = kwargs['r_b']
+                else:
+                    self.interaction_params['r_b'] = 0.1
+                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+                if 'r_m' in kwargs:
+                    self.interaction_params['r_m'] = kwargs['r_m']
+                else:
+                    self.interaction_params['r_m'] = 1e-3
+                    print('mutation rate set to r_m = ', self.interaction_params['r_m'])
+                if 'r_d' in kwargs:
+                    self.interaction_params['r_d'] = kwargs['r_d']
+                else:
+                    self.interaction_params['r_d'] = .98 * self.interaction_params['r_b']
+                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+                if 'alpha' in kwargs:
+                    self.interaction_params['alpha'] = kwargs['alpha']
+                else:
+                    self.interaction_params['alpha'] = 2.0
+                    print('steric interaction strength set to alpha = ', self.interaction_params['alpha'])
+                if 'gamma' in kwargs:
+                    self.interaction_params['gamma'] = kwargs['gamma']
+                else:
+                    self.interaction_params['gamma'] = 3.0
+                    print('rest channel weight set to gamma = ', self.interaction_params['gamma'])
+                if 'capacity' in kwargs:
+                    self.interaction_params['capacity'] = kwargs['capacity']
+                else:
+                    self.interaction_params['capacity'] = 512
+                    print('deme capacity set to capacity = ', self.interaction_params['capacity'])
+                self.init_families(type='homogeneous', mutation=True)
+                self.props['family'][0] = 1  # there is no 'void' cell, so the cell w/ id = 0 also belongs to fam. 1
+                self.family_props.update(r_b=[0] + [self.interaction_params['r_b']] * self.maxfamily)
+                if 'fitness_increase' in kwargs:
+                    self.interaction_params['fitness_increase'] = kwargs['fitness_increase']
+                else:
+                    self.interaction_params['fitness_increase'] = 1.1
+                    print('fitness increase for driver mutations set to ',
+                          self.interaction_params['fitness_increase'])
             else:
                 print('interaction', kwargs['interaction'], 'is not defined! Random walk used instead.')
                 print('Implemented interactions:', self.interactions)
@@ -2870,7 +3031,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
             self.interaction = randomwalk
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, recordchanneldens=False,
-                showprogress=True):
+                showprogress=True, recordfampop=False):
         self.update_dynamic_fields()
         if record:
             self.nodes_t = get_arr_of_empty_lists((timesteps +1,) + self.dims + (self.K,))
@@ -2884,6 +3045,21 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         if recordchanneldens:
             self.channel_pop_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=np.uint)
             self.channel_pop_t[0, ...] = self.channel_pop[self.nonborder]
+        if recordfampop:
+            from lgca.nove_ib_interactions import evo_steric
+            # this needs to include all interactions that can increase the number of recorded families!
+            if self.interaction in [evo_steric]:
+                # if mutations are allowed, this is a list because it will be ragged due to increasing family numbers
+                self.fam_pop_t = [self.calc_family_pop_alive()]
+                is_mutating = True
+            else:
+                if 'family' not in self.props:
+                    raise RuntimeError("Interaction does not deal with families, "
+                                       "family population can therefore not be recorded.")
+                # otherwise standard procedure
+                self.fam_pop_t = np.zeros((timesteps + 1, self.maxfamily + 1))
+                self.fam_pop_t[0, ...] = self.calc_family_pop_alive()
+                is_mutating = False
 
         for t in tqdm(iterable=range(1, timesteps + 1), disable=1-showprogress):
             self.timestep()
@@ -2893,7 +3069,19 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                 self.n_t[t] = self.cell_density[self.nonborder].sum()
             if recorddens:
                 self.dens_t[t, ...] = self.cell_density[self.nonborder]
-
+            if recordfampop:
+                if is_mutating:
+                    # append to the ragged nested list
+                    self.fam_pop_t.append(self.calc_family_pop_alive())
+                else:
+                    # standard procedure
+                    try:
+                        self.fam_pop_t[t, ...] = self.calc_family_pop_alive()
+                    except ValueError as e:
+                        raise ValueError("Number of families has increased, interaction must be included in the case " +
+                                         "distinction for the recordfampop keyword in the IBLGCA base timeevo function!") from e
+        if recordfampop and is_mutating:
+            self.straighten_family_populations()
 
     def calc_max_label(self):
         cells = self.nodes.sum()
@@ -2903,6 +3091,10 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         else: self.maxlabel = max(cells)
 
     def get_prop(self, nodes=None, props=None, propname=None):
+        """
+        Return array of property "propname" on every node, given the lattice configuration "nodes" and the property
+        dictionary "props".
+        """
         if nodes is None:
             nodes = self.nodes[self.nonborder]
 
@@ -2975,7 +3167,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         if propname is None:
             propname = next(iter(self.props))
 
-        prop_t = [self.get_prop(nodes, props=props, propname=propname) for nodes in nodes_t]
+        proparray = np.array(props[propname])
+        prop_t = [proparray[nodes.sum()] for nodes in nodes_t]
         mean_prop_t = np.array([np.mean(prop) if len(prop) > 0 else np.nan for prop in prop_t])
         std_mean_prop_t = np.array \
             ([np.std(prop, ddof=1) / np.sqrt(len(prop)) if len(prop) > 0 else np.nan for prop in prop_t])
@@ -3054,4 +3247,30 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         plt.xlabel('{}'.format(propname1))
         plt.ylabel('{}'.format(propname2))
 
+    def calc_family_pop_alive(self):
+        """
+        Calculate how many cells of each family are alive.
+        :returns: np.ndarray fam_pop_array - array of family population counts indexed by family ID
+        """
+        if 'family' not in self.props:
+            raise RuntimeError("Family properties are not recorded by the LGCA, choose suitable interaction.")
 
+        cells_alive = np.array(self.nodes[self.nonborder].sum()) # indices of live cells # nonborder needed for uniqueness
+        cell_fam = np.array(self.props['family'])  # convert for indexing
+        cell_fam_alive = cell_fam[cells_alive.astype(np.int)]  # filter family array for families of live cells
+        fam_alive, fam_pop = np.unique(cell_fam_alive, return_counts=True)  # count number of cells for each family
+        # transform into array with population entry for all families that ever existed
+        fam_pop_array = np.zeros(self.maxfamily+1, dtype=int)
+        fam_pop_array[fam_alive] = fam_pop
+        return fam_pop_array
+        # alternative: look up family for each live cell, then do unique on those altered nodes
+
+    def list_families_alive(self):
+        """
+        Calculate which families are alive.
+        :returns: np.ndarray - array of family IDs in ascending order
+        """
+        cells_alive = np.array(self.nodes[self.nonborder].sum(-1))  # indices of live cells # nonborder needed for uniqueness
+        cell_fam = np.array(self.props['family'])  # convert for indexing
+        cell_fam_alive = cell_fam[cells_alive.astype(np.int)]  # filter family array for families of live cells
+        return np.unique(cell_fam_alive) # remove duplicate entries

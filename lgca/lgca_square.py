@@ -630,8 +630,8 @@ class LGCA_Square(LGCA_base):
         ax.set_aspect('equal')
 
         # label axes, set tick positions and adjust their appearance
-        plt.xlabel('$x \\; (\\varepsilon)$')
-        plt.ylabel('$y \\; (\\varepsilon)$')
+        plt.xlabel('$x$')
+        plt.ylabel('$y$')
         ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         if self.dy >= 1:
             minstep = self.dy
@@ -1038,9 +1038,6 @@ class LGCA_Square(LGCA_base):
         if nodes is None:
             nodes = self.nodes[self.nonborder]
 
-        # if nodes.dtype != 'bool':
-        #     nodes = nodes.astype('bool')
-
         nodes = nodes.astype(np.int8)
         density = nodes.sum(-1).astype(float) / self.K
 
@@ -1361,12 +1358,12 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
             density = nodes[..., channels].sum(-1)
 
         if figsize is None:
-            figsize = estimate_figsize(density, cbar=True, dy=self.dy)
+            figsize = estimate_figsize(density, cbar=cbar, dy=self.dy)
 
         fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
 
 
-        cmap = get_cmap(density, cmap=cmap, cbarlabel=cbarlabel)
+        cmap = get_cmap(density, ax=ax, cmap=cmap, cbarlabel=cbarlabel, cbar=cbar)
 
 
         polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
@@ -1579,21 +1576,21 @@ class NoVE_IBLGCA_Square(NoVE_IBLGCA_base, NoVE_LGCA_Square):
 
         self.nodes = newnodes
 
-    def apply_rbcx(self):
+    def _apply_rbcx(self):
         self.nodes[self.r_int, :, 0] = self.nodes[self.r_int, :, 0] + self.nodes[self.r_int - 1, :, 2]
         self.nodes[-self.r_int - 1, :, 2] = self.nodes[-self.r_int - 1, :, 2] + self.nodes[-self.r_int, :, 0]
-        self.apply_abcx()
+        self._apply_abcx()
 
-    def apply_rbcy(self):
+    def _apply_rbcy(self):
         self.nodes[:, self.r_int, 1] = self.nodes[:, self.r_int, 1] + self.nodes[:, self.r_int - 1, 3]
         self.nodes[:, -self.r_int - 1, 3] = self.nodes[:, -self.r_int - 1, 3] + self.nodes[:, -self.r_int, 1]
-        self.apply_abcy()
+        self._apply_abcy()
 
-    def apply_abcx(self):
+    def _apply_abcx(self):
         self.nodes[:self.r_int, ...] = get_arr_of_empty_lists(self.nodes[:self.r_int, ...].shape)
         self.nodes[-self.r_int:, ...] = get_arr_of_empty_lists(self.nodes[-self.r_int:, ...].shape)
 
-    def apply_abcy(self):
+    def _apply_abcy(self):
         self.nodes[:, :self.r_int, :] = get_arr_of_empty_lists(self.nodes[:, :self.r_int, :].shape)
         self.nodes[:, -self.r_int:, :] = get_arr_of_empty_lists(self.nodes[:, -self.r_int:, :].shape)
 
