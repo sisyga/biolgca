@@ -265,7 +265,7 @@ class LGCA_1D(LGCA_base):
         self.nodes[self.r_int, 0] += self.nodes[self.r_int - 1, 1]
         # right boundary cell inside domain: left channel gets added right channel from the right
         self.nodes[-self.r_int - 1, 1] += self.nodes[-self.r_int, 0]
-        self._apply_abc()
+        self.apply_abc()
 
     def apply_abc(self):
         # documented in parent class

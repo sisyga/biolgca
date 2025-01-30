@@ -370,7 +370,6 @@ class LGCA_base(ABC):
     lgca.lgca_hex.LGCA_Hex : Classical LGCA in a 2D hexagonal geometry.
 
     """
-    rng = npr.default_rng()  # random number generator. would be better to initialize with init and keywords
 
     @property
     @abstractmethod
@@ -544,9 +543,10 @@ class LGCA_base(ABC):
         """
         raise NotImplementedError("Inflow boundary conditions not yet implemented for class "+str(self.__class__)+".")
 
-    def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', **kwargs):
+    def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', seed=None, **kwargs):
         """ Initialize class instance. See class docstring."""
         self.r_int: int = 1  # Interaction radius. Must be at least 1 to handle propagation.
+        self.rng = npr.default_rng(seed=seed)
         # set boundary conditions, set self.apply_boundaries
         self.set_bc(bc)
 
@@ -1183,9 +1183,10 @@ class IBLGCA_base(LGCA_base, ABC):
 
     """
 
-    def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', **kwargs):
+    def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', seed=None, **kwargs):
         """ Initialize class instance. See class docstring."""
         self.r_int = 1  # Interaction radius. Must be at least 1 to handle propagation.
+        self.rng = npr.default_rng(seed=seed)
         # set boundary conditions, set self.apply_boundaries
         self.set_bc(bc)
 
@@ -2376,7 +2377,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
     """
     Base class for LGCA without volume exclusion.
     """
-    def __init__(self, nodes=None, dims=None, restchannels=None, density=0.1, hom=None, bc='periodic', capacity=None,
+    def __init__(self, nodes=None, dims=None, restchannels=None, density=0.1, hom=None, bc='periodic', seed=None, capacity=None,
                  **kwargs):
         """
         Initialize class instance.
@@ -2389,6 +2390,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         """
 
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
+        self.rng = npr.default_rng(seed=seed)
         self.set_bc(bc)
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes, capacity=capacity)
         self.init_coords()
@@ -2697,7 +2699,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     """
     interactions = ['go_or_grow', 'birthdeath', 'randomwalk', 'steric_evolution']
 
-    def __init__(self, nodes=None, dims=None, density=.1, restchannels=1, bc='periodic', **kwargs):
+    def __init__(self, nodes=None, dims=None, density=.1, restchannels=1, bc='periodic', seed=None, **kwargs):
         """
         Initialize class instance.
         :param nodes:
@@ -2709,6 +2711,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         :param kwargs:
         """
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
+        self.rng = npr.default_rng(seed=seed)
         self.props = {}
         self.length_checker = np.vectorize(len)
         self.set_bc(bc)

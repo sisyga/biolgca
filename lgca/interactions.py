@@ -8,10 +8,7 @@ Interaction functions and helper functions for classical LGCA with volume exclus
 """
 
 from bisect import bisect_left
-from random import random
-
 import numpy as np
-import numpy.random as npr
 from scipy.special import binom as binom_coeff
 
 
@@ -56,20 +53,12 @@ def random_walk(lgca):
     """
     lgca.nodes = lgca.rng.permuted(lgca.nodes, axis=-1)
 
-    # disarrange(lgca.nodes, axis=-1)
-    # relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-    #            (lgca.cell_density[lgca.nonborder] < lgca.K)
-    # coords = [a[relevant] for a in lgca.nonborder]
-    # for coord in zip(*coords):
-    #     npr.shuffle(lgca.nodes[coord])
-
-
 def birth(lgca):
     """
     Simple birth process coupled to a random walk
     :return:
     """
-    birth = npr.random(lgca.nodes.shape) < lgca.interaction_params['r_b'] * lgca.cell_density[..., None] / lgca.K
+    birth = lgca.rng.random(lgca.nodes.shape) < lgca.interaction_params['r_b'] * lgca.cell_density[..., None] / lgca.K
     np.add(lgca.nodes, (1 - lgca.nodes) * birth, out=lgca.nodes, casting='unsafe')
     random_walk(lgca)
 
@@ -79,8 +68,8 @@ def birthdeath(lgca):
     Simple birth-death process coupled to a random walk
     :return:
     """
-    birth = npr.random(lgca.nodes.shape) < lgca.interaction_params['r_b'] * lgca.cell_density[..., None] / lgca.K
-    death = npr.random(lgca.nodes.shape) < lgca.interaction_params['r_d']
+    birth = lgca.rng.random(lgca.nodes.shape) < lgca.interaction_params['r_b'] * lgca.cell_density[..., None] / lgca.K
+    death = lgca.rng.random(lgca.nodes.shape) < lgca.interaction_params['r_d']
     ds = (1 - lgca.nodes) * birth - lgca.nodes * death
     np.add(lgca.nodes, ds, out=lgca.nodes, casting='unsafe')
     lgca.update_dynamic_fields()
@@ -103,7 +92,7 @@ def persistent_walk(lgca):
         permutations = lgca.permutations[n]
         j = lgca.j[n]
         weights = np.exp(lgca.interaction_params['beta'] * np.einsum('i,ij', g[coord], j)).cumsum()
-        ind = bisect_left(weights, random() * weights[-1])
+        ind = bisect_left(weights, lgca.rng.random() * weights[-1])
         newnodes[coord] = permutations[ind]
 
     lgca.nodes = newnodes
@@ -126,7 +115,7 @@ def chemotaxis(lgca):
         weights = np.exp(lgca.interaction_params['beta'] * np.einsum('i,ij',
                                                                      lgca.interaction_params['gradient_field'][coord],
                                                                      j)).cumsum()
-        ind = bisect_left(weights, random() * weights[-1])
+        ind = bisect_left(weights, lgca.rng.random() * weights[-1])
         newnodes[coord] = permutations[ind]
 
     lgca.nodes = newnodes
@@ -147,7 +136,7 @@ def contact_guidance(lgca):
         permutations = lgca.permutations[n]
         si = lgca.si[n]
         weights = np.exp(lgca.interaction_params['beta'] * np.einsum('ijk,jk', si, sni)).cumsum()
-        ind = bisect_left(weights, random() * weights[-1])
+        ind = bisect_left(weights, lgca.rng.random() * weights[-1])
         newnodes[coord] = permutations[ind]
 
     lgca.nodes = newnodes
@@ -175,7 +164,7 @@ def alignment(lgca):
         # multiply neighborhood flux with the flux for each possible permutation
         # np.exp for probability
         # cumsum() for cumulative distribution function
-        ind = bisect_left(weights, random() * weights[-1])
+        ind = bisect_left(weights, lgca.rng.random() * weights[-1])
         # inverse transform sampling method
         newnodes[coord] = permutations[ind]
 
@@ -201,7 +190,7 @@ def nematic(lgca):
         permutations = lgca.permutations[n]
         si = lgca.si[n]
         weights = np.exp(lgca.interaction_params['beta'] * np.einsum('ijk,jk', si, sni)).cumsum()
-        ind = bisect_left(weights, random() * weights[-1])
+        ind = bisect_left(weights, lgca.rng.random() * weights[-1])
         newnodes[coord] = permutations[ind]
 
     lgca.nodes = newnodes
@@ -227,7 +216,7 @@ def aggregation(lgca):
         permutations = lgca.permutations[n]
         j = lgca.j[n]
         weights = np.exp(lgca.interaction_params['beta'] * np.einsum('i,ij', g[coord], j)).cumsum()
-        ind = bisect_left(weights, random() * weights[-1])
+        ind = bisect_left(weights, lgca.rng.random() * weights[-1])
         newnodes[coord] = permutations[ind]
 
     lgca.nodes = newnodes
@@ -239,7 +228,7 @@ def wetting(lgca):
     :return:
     """
     if hasattr(lgca, 'spheroid'):
-        birth = npr.random(lgca.nodes[lgca.spheroid].shape) < lgca.interaction_params['r_b']
+        birth = lgca.rng.random(lgca.nodes[lgca.spheroid].shape) < lgca.interaction_params['r_b']
         ds = (1 - lgca.nodes[lgca.spheroid]) * birth
         lgca.nodes[lgca.spheroid, :] = np.add(lgca.nodes[lgca.spheroid, :], ds, casting='unsafe')
         lgca.update_dynamic_fields()
@@ -273,7 +262,7 @@ def wetting(lgca):
             + restc * lgca.ecm[coord]
             + lgca.interaction_params['gamma'] * np.einsum('i,ij', g_pressure[coord], j)
         ).cumsum()
-        ind = bisect_left(weights, random() * weights[-1])
+        ind = bisect_left(weights, lgca.rng.random() * weights[-1])
         newnodes[coord] = permutations[ind]
 
     lgca.nodes = newnodes
@@ -293,11 +282,11 @@ def excitable_medium(lgca):
     p_xm = rho_x ** 3 + rho_x * (rho_y + lgca.interaction_params['beta']) / lgca.interaction_params['alpha']
     p_yp = rho_x
     p_ym = rho_y
-    dn_y = (npr.random(n_y.shape) < p_yp).astype(np.int8)
-    dn_y -= npr.random(n_y.shape) < p_ym
+    dn_y = (lgca.rng.random(n_y.shape) < p_yp).astype(np.int8)
+    dn_y -= lgca.rng.random(n_y.shape) < p_ym
     for _ in range(lgca.interaction_params['N']):
-        dn_x = (npr.random(n_x.shape) < p_xp).astype(np.int8)
-        dn_x -= npr.random(n_x.shape) < p_xm
+        dn_x = (lgca.rng.random(n_x.shape) < p_xp).astype(np.int8)
+        dn_x -= lgca.rng.random(n_x.shape) < p_xm
         n_x += dn_x
         rho_x = n_x / lgca.velocitychannels
         p_xp = rho_x ** 2 * (1 + (rho_y + lgca.interaction_params['beta']) / lgca.interaction_params['alpha'])
@@ -335,19 +324,19 @@ def go_or_grow(lgca):
         n_rxy = n_r[coord]
 
         rho = n / lgca.K
-        j_1 = npr.binomial(M1[coord], tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
+        j_1 = lgca.rng.binomial(M1[coord], tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
                                                   theta=lgca.interaction_params['theta']))
-        j_2 = npr.binomial(M2[coord], 1 - tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
+        j_2 = lgca.rng.binomial(M2[coord], 1 - tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
                                                       theta=lgca.interaction_params['theta']))
         n_mxy += j_2 - j_1
         n_rxy += j_1 - j_2
-        n_mxy -= npr.binomial(n_mxy, lgca.interaction_params['r_d'])
-        n_rxy -= npr.binomial(n_rxy, lgca.interaction_params['r_d'])
+        n_mxy -= lgca.rng.binomial(n_mxy, lgca.interaction_params['r_d'])
+        n_rxy -= lgca.rng.binomial(n_rxy, lgca.interaction_params['r_d'])
         M = min([n_rxy, lgca.restchannels - n_rxy])
-        n_rxy += npr.binomial(M, lgca.interaction_params['r_b'])
+        n_rxy += lgca.rng.binomial(M, lgca.interaction_params['r_b'])
 
         v_channels = [1] * n_mxy + [0] * (lgca.velocitychannels - n_mxy)
-        v_channels = npr.permutation(v_channels)
+        v_channels = lgca.rng.permutation(v_channels)
         r_channels = np.zeros(lgca.restchannels)
         r_channels[:n_rxy] = 1
         node = np.hstack((v_channels, r_channels))
@@ -378,9 +367,9 @@ def leup_test(lgca):
         n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
         n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
         birth = np.zeros_like(lgca.nodes)
-        birth[..., lgca.velocitychannels:] = npr.random(n_r.shape + (lgca.restchannels,)) \
+        birth[..., lgca.velocitychannels:] = lgca.rng.random(n_r.shape + (lgca.restchannels,)) \
                                              < lgca.interaction_params['r_b'] * n_r[..., None] / lgca.restchannels
-        death = npr.random(birth.shape) < lgca.interaction_params['r_d'] * (
+        death = lgca.rng.random(birth.shape) < lgca.interaction_params['r_d'] * (
                 n_m[..., None] / lgca.velocitychannels + n_r[..., None] / lgca.restchannels) / 2
         ds = (1 - lgca.nodes) * birth - lgca.nodes * death
         np.add(lgca.nodes, ds, out=lgca.nodes, casting='unsafe')
@@ -389,8 +378,8 @@ def leup_test(lgca):
     # if lgca.interaction_params['r_b'] > 0: # or lgca.interaction_params['r_d'] > 0:
     #     n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
     #     n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
-    #     birth = npr.random(lgca.nodes.shape) < lgca.interaction_params['r_b'] * n_r[..., None] / lgca.restchannels
-    #     death = npr.random(birth.shape) < lgca.interaction_params['r_d'] * (n_r[..., None] / lgca.restchannels + n_m[..., None] / lgca.velocitychannels)
+    #     birth = lgca.rng.random(lgca.nodes.shape) < lgca.interaction_params['r_b'] * n_r[..., None] / lgca.restchannels
+    #     death = lgca.rng.random(birth.shape) < lgca.interaction_params['r_d'] * (n_r[..., None] / lgca.restchannels + n_m[..., None] / lgca.velocitychannels)
     #     ds = (1 - lgca.nodes) * birth - lgca.nodes * death
     #     np.add(lgca.nodes, ds, out=lgca.nodes, casting='unsafe')
     #     lgca.update_dynamic_fields()
@@ -422,7 +411,7 @@ def leup_test(lgca):
     p2 = 1 / (1 + np.exp(lgca.interaction_params['beta'] * ds2))
     p2[M2 == 0] = 0.
     try:
-        j_1 = npr.binomial(M1, p1)
+        j_1 = lgca.rng.binomial(M1, p1)
 
     except:
         print('Error!')
@@ -430,7 +419,7 @@ def leup_test(lgca):
         print(M1[ind], p1[ind])
 
     try:
-        j_2 = npr.binomial(M2, p2)
+        j_2 = lgca.rng.binomial(M2, p2)
 
     except:
         print('Error!')
@@ -454,14 +443,14 @@ def leup_test(lgca):
         # ds2 = (s - ent_prod(n_rxy-1) - ent_prod(n_mxy+1)) / n
         # p2 = 1 / (1 + exp(lgca.interaction_params['beta'] * ds2))
         #
-        # j_1 = npr.binomial(M1[coord], p1)
-        # j_2 = npr.binomial(M2[coord], p2)
+        # j_1 = lgca.rng.binomial(M1[coord], p1)
+        # j_2 = lgca.rng.binomial(M2[coord], p2)
         # n_mxy += j_2 - j_1
         # n_rxy += j_1 - j_2
-        v_channels = npr.choice(lgca.velocitychannels, n_mxy, replace=False)
+        v_channels = lgca.rng.choice(lgca.velocitychannels, n_mxy, replace=False)
 
         # v_channels = [1] * n_mxy + [0] * (lgca.velocitychannels - n_mxy)
-        # v_channels = npr.permutation(v_channels)
+        # v_channels = lgca.rng.permutation(v_channels)
         # r_channels = np.zeros(lgca.restchannels)
         # r_channels[:n_rxy] = 1
         node = np.zeros(lgca.K, dtype='bool')
@@ -489,15 +478,15 @@ def go_or_rest(lgca):
         n_rxy = n_r[coord]
 
         rho = n / lgca.K
-        j_1 = npr.binomial(M1[coord], tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
+        j_1 = lgca.rng.binomial(M1[coord], tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
                                                   theta=lgca.interaction_params['theta']))
-        j_2 = npr.binomial(M2[coord], 1 - tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
+        j_2 = lgca.rng.binomial(M2[coord], 1 - tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
                                                       theta=lgca.interaction_params['theta']))
         n_mxy += j_2 - j_1
         n_rxy += j_1 - j_2
 
         v_channels = [1] * n_mxy + [0] * (lgca.velocitychannels - n_mxy)
-        v_channels = npr.permutation(v_channels)
+        v_channels = lgca.rng.permutation(v_channels)
         r_channels = np.zeros(lgca.restchannels)
         r_channels[:n_rxy] = 1
         node = np.hstack((v_channels, r_channels))

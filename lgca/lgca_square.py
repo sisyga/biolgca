@@ -630,8 +630,8 @@ class LGCA_Square(LGCA_base):
         ax.set_aspect('equal')
 
         # label axes, set tick positions and adjust their appearance
-        plt.xlabel('$x \\; (\\varepsilon)$')
-        plt.ylabel('$y \\; (\\varepsilon)$')
+        plt.xlabel('$x$')
+        plt.ylabel('$y$')
         ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         if self.dy >= 1:
             minstep = self.dy
