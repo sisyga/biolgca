@@ -1038,10 +1038,10 @@ class LGCA_base(ABC):
         # list of all possible configurations for a lattice site
         self.permutations = [np.array(list(multiset_permutations([1] * n + [0] * (self.K - n))), dtype=np.int8)
                              for n in range(self.K + 1)]
-                                                                # builds list with one configuration for particle number
-                                                                # n in an array of size self.K (velocity + resting)
-                                      # builds list with all possible permutations for this array
-                             # for all possible particle numbers in an array of size self.K (velocity + resting)
+        # builds list with one configuration for particle number
+        # n in an array of size self.K (velocity + resting)
+        # builds list with all possible permutations for this array
+        # for all possible particle numbers in an array of size self.K (velocity + resting)
         # first dim: number of particles
         # second dim: all permutations for this n
         # third dim: channels

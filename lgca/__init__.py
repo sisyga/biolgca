@@ -174,10 +174,11 @@ def get_lgca(geometry: str='hex', ib: bool=False, ve: bool=True, **kwargs):
             from lgca.lgca_hex import LGCA_Hex
             return LGCA_Hex(**kwargs)
 
-        elif geometry in ['cubic', 'cb', '3D', '3d']:
+        elif geometry in ['cubic', 'cb']:
             from lgca.lgca_cubic import LGCA_Cubic
             return LGCA_Cubic(**kwargs)
 
         else:
             raise ValueError("Geometry specification is unknown. Try: '1d', 'lin', "
-                             "'linear', 'square', 'sq', 'rect', 'rectangular', 'hex', 'hx' or 'hexagonal'.")
+                             "'linear', 'square', 'sq', 'rect', 'rectangular', 'hex', 'hx',  'hexagonal', "
+                             "'cubic', or 'cb'.")
