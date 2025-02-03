@@ -181,7 +181,7 @@ def nematic(lgca):
                (lgca.cell_density[lgca.nonborder] < lgca.K)
     coords = [a[relevant] for a in lgca.nonborder]
 
-    s = np.einsum('ijk,klm', lgca.nodes[..., :lgca.velocitychannels], lgca.cij)
+    s = np.einsum('...k,klm', lgca.nodes[..., :lgca.velocitychannels], lgca.cij)
     sn = lgca.nb_sum(s)
 
     for coord in zip(*coords):

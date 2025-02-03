@@ -1053,8 +1053,8 @@ class LGCA_base(ABC):
         # first dim: number of particles
         # second dim: flux vector for each permutation (directions as specified in c)
 
-        # element-wise multiplication of neighborhood vectors with themselves
-        self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(2))[None, ...]
+        # element-wise multiplication of neighborhood vectors with themselves minus .5 * identity matrix to get nematic tensor
+        self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(self.c.shape[0]))[None, ...]
         # 1st dim: neighborhood vector
         # 2nd and 3rd dim: combination of x and y components of the vector as [[xx, xy], [yx, yy]]
 
