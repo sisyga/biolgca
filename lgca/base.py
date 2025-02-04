@@ -688,22 +688,35 @@ class LGCA_base(ABC):
                 if 'gradient' in kwargs:
                     self.interaction_params['gradient_field'] = kwargs['gradient']
                 else:
-                    if self.velocitychannels > 2:
-                        x_source = npr.normal(self.xcoords.mean(), 1)
-                        y_source = npr.normal(self.ycoords.mean(), 1)
+                    if len(self.dims) == 2:
+                        x_source = self.xcoords.mean()
+                        y_source = self.ycoords.mean()
                         rx = self.xcoords - x_source
                         ry = self.ycoords - y_source
                         r = np.sqrt(rx ** 2 + ry ** 2)
                         self.concentration = np.exp(-2 * r / self.ly)
                         self.interaction_params['gradient_field'] = self.gradient(np.pad(self.concentration, 1,
                                                                                          'reflect'))
-                    else:
-                        source = npr.normal(self.l / 2, 1)
+                    elif len(self.dims) == 1:
+                        source = self.l / 2
                         r = abs(self.xcoords - source)
                         self.concentration = np.exp(-2 * r / self.l)
                         self.interaction_params['gradient_field'] = self.gradient(np.pad(self.concentration, 1,
                                                                                          'reflect'))
                         self.interaction_params['gradient_field'] /= self.interaction_params['gradient_field'].max()
+
+                    elif len(self.dims) == 3:
+                        x_source = self.xcoords.mean()
+                        y_source = self.ycoords.mean()
+                        z_source = self.zcoords.mean()
+                        rx = self.xcoords - x_source
+                        ry = self.ycoords - y_source
+                        rz = self.zcoords - z_source
+                        r = np.sqrt(rx ** 2 + ry ** 2 + rz ** 2)
+                        self.concentration = np.exp(-2 * r / self.ly)
+                        self.interaction_params['gradient_field'] = self.gradient(np.pad(self.concentration, 1,
+                                                                                         'reflect'))
+
 
             elif interaction == 'contact_guidance':
                 self.interaction = contact_guidance

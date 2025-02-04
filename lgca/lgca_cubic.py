@@ -260,9 +260,13 @@ class LGCA_Cubic(LGCA_base):
         weights[:, :, 1:, 5] = qty[:, :, :-1, ...]
         return weights
 
+    def set_up_mayavi_fig(self):
+        fig = mlab.figure(bgcolor=(1, 1, 1), size=(800, 800))
+        return fig
+
     def setup_mayavi_scene(self):
         # Use the current figure if available, otherwise create a new one.
-        fig = mlab.gcf() if mlab.gcf() is not None else mlab.figure(bgcolor=(1, 1, 1), size=(800, 800))
+        fig = mlab.gcf() if mlab.gcf() is not None else mlab.figure(bgcolor=(1, 1, 1), size=(1000, 1000))
         # Add an outline and axes to the current figure
         mlab.outline(color=(0, 0, 0), extent=[0, self.lx, 0, self.ly, 0, self.lz], opacity=0.6, line_width=1)
         axes = mlab.axes(nb_labels=5, xlabel='X', ylabel='Y', zlabel='Z', color=(0, 0, 0),
@@ -306,7 +310,7 @@ class LGCA_Cubic(LGCA_base):
         u = flux[..., 0]
         v = flux[..., 1]
         w = flux[..., 2]
-        fig = mlab.figure(bgcolor=(1, 1, 1), size=(800, 800))
+        fig = self.set_up_mayavi_fig()
 
         quiver = mlab.quiver3d(x, y, z, u, v, w,
                                mode='arrow', color=(0, 0, 0),
@@ -321,7 +325,7 @@ class LGCA_Cubic(LGCA_base):
             mlab.colorbar(title='Flux Magnitude', orientation='vertical')
         return quiver, scatter
 
-    def plot_density_surface(self, density=None, colormap='viridis', opacity=0.5, cbar=True, **kwargs):
+    def plot_density(self, density=None, colormap='viridis', opacity=0.5, cbar=True, **kwargs):
         """
         Plot a 3D surface based on the local density using a specified threshold using Mayavi.
 
@@ -348,14 +352,17 @@ class LGCA_Cubic(LGCA_base):
         x = self.xcoords
         y = self.ycoords
         z = self.zcoords
+        fig = self.set_up_mayavi_fig()
 
         contour = mlab.contour3d(x, y, z, density, opacity=opacity, colormap=colormap, contours=self.K+1,
-                                 vmin=0, vmax=self.K, **kwargs)
+                                 vmin=0, vmax=self.K, figure=fig, **kwargs)
         fig = self.setup_mayavi_scene()
         mlab.title('Density Surface', size=0.4, color=(0, 0, 0))
         if cbar:
-            colorbar = mlab.colorbar(title='Density', orientation='vertical', nb_labels=self.K + 1, label_fmt='%.0f',
-                                     nb_colors=self.K + 1)
+            num_levels = self.K + 1
+            colorbar = mlab.colorbar(title='Density', orientation='vertical', nb_colors=num_levels,
+                                     nb_labels=num_levels,
+                                     label_fmt='%.0f')
             colorbar.label_text_property.color = (0, 0, 0)
             colorbar.title_text_property.color = (0, 0, 0)
             # reduce the size of the colorbar labels
@@ -364,21 +371,111 @@ class LGCA_Cubic(LGCA_base):
             colorbar.label_text_property.bold = False
             colorbar.label_text_property.vertical_justification = 'centered'
 
-            # Assume self.K defines the number of discrete levels
-            num_levels = self.K + 1  # Including zero or background
+        return fig, contour
 
-            # Create colorbar
-            colorbar = mlab.colorbar(title='Density', orientation='vertical',
-                                     nb_labels=num_levels, label_fmt='%.0f', nb_colors=num_levels)
+    def plot_scalarfield(self, field, mask=None, colormap='viridis', opacity=0.5, cbar=True, cbarlabel='Scalar field',
+                         vmin=None, vmax=None, **kwargs):
+        """
+        Plot a 3D scalar field using Mayavi.
+        Parameters
+        ----------
+        field
+        mask
+        colormap
+        opacity
+        cbar
+        kwargs
 
-            # Adjust text properties
-            colorbar.label_text_property.color = (0, 0, 0)
-            colorbar.title_text_property.color = (0, 0, 0)
-            colorbar.label_text_property.font_size = 14
-            colorbar.label_text_property.bold = False
-        return contour
+        Returns
+        -------
 
-    def animate_density_surface(self, density_t=None, threshold=0.5, colormap='viridis', opacity=0.5, cbar=True,
+        """
+        try:
+            assert field.shape == self.dims
+
+        except AssertionError:
+            field = field[self.nonborder]
+
+        if mask is None:
+            if hasattr(field, 'mask'):
+                mask = field.mask
+
+            else: mask = np.zeros_like(field, dtype=bool)
+
+        x = self.xcoords
+        y = self.ycoords
+        z = self.zcoords
+        fig = self.set_up_mayavi_fig()
+
+        contour = mlab.contour3d(x, y, z, field, opacity=opacity, colormap=colormap, vmin=vmin, vmax=vmax, **kwargs)
+        fig = self.setup_mayavi_scene()
+        if cbar:
+            mlab.colorbar(title=cbarlabel, orientation='vertical')
+
+        return fig, contour, colormap
+
+    def plot_config(self, nodes=None, colormap='viridis', **kwargs):
+        if nodes is None:
+            nodes = self.nodes[self.nonborder]
+
+        # create new array for x, y, z coordinates with shape (dims, K) from shape (dims)
+        x = np.repeat(self.xcoords[..., None], self.velocitychannels, axis=-1)
+        y = np.repeat(self.ycoords[..., None], self.velocitychannels, axis=-1)
+        z = np.repeat(self.zcoords[..., None], self.velocitychannels, axis=-1)
+
+        u = .5 * self.c[None, None, None, 0] * nodes[..., :self.velocitychannels]
+        v = .5 * self.c[None, None, None, 1] * nodes[..., :self.velocitychannels]
+        w = .5 * self.c[None, None, None, 2] * nodes[..., :self.velocitychannels]
+
+        fig = self.set_up_mayavi_fig()
+        quiver = mlab.quiver3d(x, y, z, u, v, w,
+                               mode='arrow', color=(0, 0, 0), scale_factor=1,
+                               opacity=.5, figure=fig, **kwargs)
+
+
+        if self.restchannels > 0:
+            rest = nodes[..., self.velocitychannels:].sum(axis=-1) / self.restchannels
+            scatter = mlab.points3d(self.xcoords, self.ycoords, self.zcoords, rest, scale_factor=.5, scale_mode='scalar',
+                                    colormap=colormap, opacity=.5, figure=fig, vmin=0, vmax=1,
+                                    color=(0.7, 0.7, 0.7))
+
+        else:
+            scatter = None
+        fig = self.setup_mayavi_scene()
+        mlab.title('Configuration', size=0.4, color=(0, 0, 0))
+
+        return fig, quiver, scatter,
+
+    def animate_config(self, nodes_t=None, interval=100, **kwargs):
+        if nodes_t is None:
+            if hasattr(self, 'nodes_t'):
+                nodes_t = self.nodes_t
+            else:
+                raise RuntimeError("Channel-wise state of the lattice required for plotting the configuration but not "+
+                                   "recorded in past LGCA run, call lgca.timeevo with keyword record=True")
+
+        fig, quiver, scatter = self.plot_config(nodes=nodes_t[0], **kwargs)
+        mlab.title('Time 0', size=0.4, color=(0, 0, 0))
+        u = .5 * self.c[None, None, None, None,  0] * nodes_t[..., :self.velocitychannels]
+        v = .5 * self.c[None, None, None, None, 1] * nodes_t[..., :self.velocitychannels]
+        w = .5 * self.c[None, None, None, None, 2] * nodes_t[..., :self.velocitychannels]
+
+        rest = nodes_t[..., self.velocitychannels:].sum(axis=-1) / self.restchannels
+        @mlab.animate(delay=interval)
+        def anim():
+            for i in range(nodes_t.shape[0]):
+
+                quiver.mlab_source.set(u=u[i], v=v[i], w=w[i])
+                if self.restchannels > 0:
+                    scatter.mlab_source.set(scalars=rest[i])
+                mlab.title(f'Time {i}', size=0.4)
+                yield
+
+        anim()
+        mlab.show()
+
+
+    def animate_density(self, density_t=None, colormap='viridis', opacity=0.5, cbar=True,
                                        interval=100, **kwargs):
         """
         Animate the density surface over time using Mayavi.
@@ -408,8 +505,8 @@ class LGCA_Cubic(LGCA_base):
             else:
                 raise RuntimeError("Density time series not found. Ensure to record density during simulation.")
 
-        contour = self.plot_density_surface(density=density_t[0], colormap=colormap, opacity=opacity, cbar=cbar, **kwargs)
-        mlab.title('Time 0', size=0.4)
+        fig, contour = self.plot_density(density=density_t[0], colormap=colormap, opacity=opacity, cbar=cbar, **kwargs)
+        mlab.title('Time 0', size=0.4, color=(0, 0, 0))
         @mlab.animate(delay=interval)
         def anim():
             for i in range(density_t.shape[0]):
@@ -454,7 +551,7 @@ class LGCA_Cubic(LGCA_base):
         time_steps = flux_t.shape[0]
         scatter_sizes = (1 - np.sign(np.linalg.norm(flux_t, axis=-1))) * self.dens_t / self.K
 
-        quiver, scatter = self.plot_flux(nodes=nodes_t[0], scale_factor=scale_factor, opacity=opacity, cbar=cbar, **kwargs)
+        fig, quiver, scatter = self.plot_flux(nodes=nodes_t[0], scale_factor=scale_factor, opacity=opacity, cbar=cbar, **kwargs)
         mlab.title('Flux at Time 0', size=0.4)
         @mlab.animate(delay=interval)
         def anim():
@@ -491,7 +588,7 @@ class LGCA_Cubic(LGCA_base):
         """
         nodes = self.nodes[self.nonborder]
 
-        quiver, scatter = self.plot_flux(nodes=nodes, scale_factor=scale_factor, opacity=opacity, cbar=cbar, **kwargs)
+        fig, quiver, scatter = self.plot_flux(nodes=nodes, scale_factor=scale_factor, opacity=opacity, cbar=cbar, **kwargs)
         def update_plot():
             while True:
                 yield
@@ -518,7 +615,7 @@ class LGCA_Cubic(LGCA_base):
         anim()
         mlab.show()
 
-    def live_animate_density_surface(self, **kwargs):
+    def live_animate_density(self, **kwargs):
         """
         Live plot a 3D density surface based on a specified threshold using Mayavi.
 
@@ -537,8 +634,7 @@ class LGCA_Cubic(LGCA_base):
         -------
         None
         """
-        fig = mlab.figure(bgcolor=(1, 1, 1), size=(800, 800))
-        contour = self.plot_density_surface(**kwargs)
+        fig, contour = self.plot_density(**kwargs)
         # def update():
         #     while True:
         #         yield
@@ -557,28 +653,76 @@ class LGCA_Cubic(LGCA_base):
         anim()
         mlab.show()
 
+
+class IBLGCA_Cubic(IBLGCA_base, LGCA_Cubic):
+    """
+    Identity-based LGCA simulator class for a 3D cubic lattice.
+    """
+    interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath', 'birthdeath_discrete',
+                    'only_propagation', 'go_and_grow_mutations']
+
+    def init_nodes(self, density=0.1, nodes=None, **kwargs):
+        """
+        Initialize the lattice for IBLGCA.
+        """
+        self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.lz + 2 * self.r_int, self.K),
+                              dtype=np.uint)
+        if nodes is None:
+            self.random_reset(density)
+        else:
+            self.nodes[self.nonborder] = nodes.astype(np.uint)
+            self.apply_boundaries()
+
+    def plot_prop_spatial(self, nodes=None, props=None, propname=None, **kwargs):
+        """
+        Plot spatial distribution of a property.
+        """
+        if nodes is None:
+            nodes = self.nodes[self.nonborder]
+
+        if props is None:
+            props = self.props
+
+        if propname is None:
+            propname = list(props)[0]
+
+        mask = np.any(nodes, axis=-1)
+        meanprop = self.calc_prop_mean(propname=propname, props=props, nodes=nodes)
+        fig, pc, cmap = self.plot_scalarfield(meanprop, mask=mask, **kwargs)
+        return fig, pc, cmap
+
+    def plot_density(self, density=None, **kwargs):
+        """
+        Plot particle density in the lattice.
+        """
+        if density is None:
+            self.update_dynamic_fields()
+            density = self.cell_density[self.nonborder]
+
+        fig, contour = LGCA_Cubic.plot_density(self, density=density, **kwargs)
+        return fig, contour
+
+
 if __name__ == "__main__":
     # Initialize LGCA on a 3D cubic lattice
     from __init__ import get_lgca
     L = 50
     nodes = np.zeros((L, L, L, 12), dtype=bool)
     nodes[L//2, L//2, L//2, :] = True
-    lgca = get_lgca(geometry='cubic', interaction='birth',  nodes=nodes)
-    # lgca.timeevo(timesteps=100, record=True)
+    lgca = get_lgca(geometry='cubic', interaction='chemotaxis', dims=50)
+    # lgca.timeevo(timesteps=50, record=True)
 
 
     # Plot flux using Mayavi
     # lgca.plot_flux()
     #
-    # # Plot density surface with threshold using Mayavi
-    # lgca.plot_density_surface_mayavi(threshold=5, colormap='viridis')
-    #
-    # # Animate density surface
-    # lgca.animate_density_surface_mayavi(density_t=lgca.dens_t, threshold=5, colormap='viridis')
-    #
     # Animate flux
     # lgca.animate_flux()
     # lgca.live_animate_flux()
-    # lgca.plot_density_surface()
-    # lgca.animate_density_surface()
-    lgca.live_animate_density_surface()
+    # lgca.plot_density()
+    # lgca.animate_density()
+    lgca.live_animate_density()
+    # lgca.plot_prop_spatial()
+    # lgca.plot_config()
+    # lgca.animate_config()
+    # mlab.show()
