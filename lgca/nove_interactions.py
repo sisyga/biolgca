@@ -43,7 +43,10 @@ def dd_alignment(lgca):
     coords = [a[relevant] for a in lgca.nonborder]
     # calculate director field
     g = lgca.calc_flux(lgca.nodes)  # flux for each lattice site
-    g = lgca.nb_sum(g, addCenter=lgca.interaction_params['nb_include_center'])
+    if lgca.interaction_params['nb_include_center']:
+        g += lgca.nb_sum(g)
+    else:
+        g = lgca.nb_sum(g)
     # sum of flux of neighbors for each lattice site
 
 
@@ -82,10 +85,14 @@ def di_alignment(lgca):
     coords = [a[relevant] for a in lgca.nonborder]
     # calculate director field
     g = lgca.calc_flux(lgca.nodes)  # flux for each lattice site
-    g = lgca.nb_sum(g, addCenter=lgca.interaction_params['nb_include_center'])  # sum of flux of neighbors for each lattice site
+    if lgca.interaction_params['nb_include_center']:
+        g += lgca.nb_sum(g)
+        nsum = lgca.nb_sum(lgca.cell_density)[..., None] + lgca.cell_density[..., None]     # normalize director field by number of neighbors
 
-    # normalize director field by number of neighbors
-    nsum = lgca.nb_sum(lgca.cell_density, addCenter=lgca.interaction_params['nb_include_center'])[..., None]
+    else:
+        g = lgca.nb_sum(g)
+        nsum = lgca.nb_sum(lgca.cell_density)[..., None]
+
     np.maximum(nsum, 1, out=nsum)   # avoid dividing by zero later
     g = g / nsum
 

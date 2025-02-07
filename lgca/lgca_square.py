@@ -1330,26 +1330,6 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
             self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(np.uint)
             self.apply_boundaries()
 
-    def nb_sum(self, qty, addCenter=False):
-        """
-        Calculate sum of values in neighboring lattice sites of each lattice site.
-        :param qty: ndarray in which neighboring values have to be added
-                    first dimension indexes lattice sites
-        :param addCenter: toggle adding central value
-        :return: sum as ndarray
-        """
-        sum = np.zeros(qty.shape)
-        # shift to left padding 0 and add to shift to the right padding 0
-        sum[:-1, ...] += qty[1:, ...]
-        sum[1:, ...] += qty[:-1, ...]
-        # add shift up padding 0 and shift down padding 0
-        sum[:, :-1, ...] += qty[:, 1:, ...]
-        sum[:, 1:, ...] += qty[:, :-1, ...]
-        # add central value
-        if addCenter:
-            sum += qty
-        return sum
-
     def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
                      edgecolor='None', cbar=True, cbarlabel='Particle number $n$', channels=slice(None)):
 
@@ -1545,7 +1525,7 @@ class NoVE_IBLGCA_Square(NoVE_IBLGCA_base, NoVE_LGCA_Square):
             self.random_reset(density)
 
         elif nodes.dtype == object:
-            self.nodes[self.nonborder] = nodes.astype(np.uint)
+            self.nodes[self.nonborder] = nodes
 
         else:
             occ = nodes.astype(int)

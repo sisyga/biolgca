@@ -123,9 +123,15 @@ def get_lgca(geometry: str='hex', ib: bool=False, ve: bool=True, **kwargs):
             from lgca.lgca_hex import NoVE_LGCA_Hex
             return NoVE_LGCA_Hex(**kwargs)
 
+        elif geometry in ['cubic', 'cb']:
+            from lgca.lgca_cubic import NoVE_LGCA_Cubic
+            return NoVE_LGCA_Cubic(**kwargs)
+
         else:
-            raise ValueError("Geometry specification is unknown. Try: '1d', '1D', 'lin', "
-                             "'linear', 'square', 'sq', 'rect', 'rectangular', 'hex', 'hx' or 'hexagonal'.")
+            raise ValueError("Geometry specification is unknown. Try: '1d', 'lin', "
+                             "'linear', 'square', 'sq', 'rect', 'rectangular', 'hex', 'hx',  'hexagonal', "
+                             "'cubic', or 'cb'.")
+
 
     if ib and ve:
         if geometry in ['1d', '1D', 'lin', 'linear']:
@@ -140,9 +146,14 @@ def get_lgca(geometry: str='hex', ib: bool=False, ve: bool=True, **kwargs):
             from lgca.lgca_hex import IBLGCA_Hex
             return IBLGCA_Hex(**kwargs)
 
+        elif geometry in ['cubic', 'cb']:
+            from lgca.lgca_cubic import IBLGCA_Cubic
+            return IBLGCA_Cubic(**kwargs)
+
         else:
             raise ValueError("Geometry specification is unknown. Try: '1d', 'lin', "
-                             "'linear', 'square', 'sq', 'rect', 'rectangular', 'hex', 'hx' or 'hexagonal'.")
+                             "'linear', 'square', 'sq', 'rect', 'rectangular', 'hex', 'hx',  'hexagonal', "
+                             "'cubic', or 'cb'.")
 
     if not ve and ib:
         if geometry in ['1d', '1D', 'lin', 'linear']:
@@ -157,9 +168,15 @@ def get_lgca(geometry: str='hex', ib: bool=False, ve: bool=True, **kwargs):
             from lgca.lgca_hex import NoVE_IBLGCA_Hex
             return NoVE_IBLGCA_Hex(**kwargs)
 
+        elif geometry in ['cubic', 'cb']:
+            from lgca.lgca_cubic import NoVE_IBLGCA_Cubic
+            return NoVE_IBLGCA_Cubic(**kwargs)
+
         else:
             raise ValueError("Geometry specification is unknown. Try: '1d', 'lin', "
-                             "'linear', 'square', 'sq', 'rect', 'rectangular', 'hex', 'hx' or 'hexagonal'.")
+                             "'linear', 'square', 'sq', 'rect', 'rectangular', 'hex', 'hx',  'hexagonal', "
+                             "'cubic', or 'cb'.")
+
 
     else:
         if geometry in ['1d', '1D', 'lin', 'linear']:
