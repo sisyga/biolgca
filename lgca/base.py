@@ -2390,7 +2390,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
     """
     Base class for LGCA without volume exclusion.
     """
-    def __init__(self, nodes=None, dims=None, restchannels=None, density=0.1, hom=None, bc='periodic', seed=None, capacity=None,
+    def __init__(self, nodes=None, dims=None, restchannels=1, density=0.1, hom=None, bc='periodic', seed=None, capacity=None,
                  **kwargs):
         """
         Initialize class instance.
@@ -2511,16 +2511,32 @@ class NoVE_LGCA_base(LGCA_base, ABC):
                 else:
                     self.interaction_params['beta'] = 2.
                     print('sensitivity set to beta = ', self.interaction_params['beta'])
+
+                if 'include_center' in kwargs:
+                    self.interaction_params['nb_include_center'] = kwargs['include_center']
+                else:
+                    self.interaction_params['nb_include_center'] = False
+                    print('neighbourhood set to exclude the central node')
+
         # if nothing is specified, use density-dependent interaction rule
         else:
             print('Density-dependent alignment interaction is used.')
             self.interaction = dd_alignment
+
+            if self.restchannels > 0:
+                raise RuntimeError("Rest channels ({:d}) defined, interaction will crash! Set number of"
+                                   " rest channels to 0 with restchannels keyword.".format(self.restchannels))
 
             if 'beta' in kwargs:
                 self.interaction_params['beta'] = kwargs['beta']
             else:
                 self.interaction_params['beta'] = 2.
                 print('sensitivity set to beta = ', self.interaction_params['beta'])
+            if 'include_center' in kwargs:
+                self.interaction_params['nb_include_center'] = kwargs['include_center']
+            else:
+                self.interaction_params['nb_include_center'] = False
+                print('neighbourhood set to exclude the central node')
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True,
                 recordorderparams=False, recordpertype=False):
@@ -2748,9 +2764,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     def convert_int_to_ib(self, occ):
         """
         Convert an array of integers representing the occupation numbers of an lgca to an array consisting of lists of
-        individual cell labels, starting at 'starting_id'. The length of each list corresponds to the entry in 'occ'.
+        individual cell labels, starting at 0. The length of each list corresponds to the entry in 'occ'.
         :param occ: array of occupation numbers. must match the lgca dimensions
-        : param starting_id: int > 0
         :return: array, where each entry is a list of individual cell labels.
         """
         ntot = occ.sum()

@@ -470,12 +470,11 @@ class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
 
 class NoVE_LGCA_Hex(NoVE_LGCA_Square, LGCA_Hex):
 
-    def nb_sum(self, qty, addCenter=False):
+    def nb_sum(self, qty):
         """
         Calculate sum of values in neighboring lattice sites of each lattice site.
         :param qty: ndarray in which neighboring values have to be added
                     first dimension indexes lattice sites
-        :param addCenter: toggle adding central value
         :return: sum as ndarray
         """
         sum = np.zeros(qty.shape)
@@ -490,9 +489,7 @@ class NoVE_LGCA_Hex(NoVE_LGCA_Square, LGCA_Hex):
         sum[:-1, 1:-1:2, ...] += qty[1:, 2::2, ...]
         sum[1:, :-1:2, ...] += qty[:-1, 1::2, ...]
         sum[:, 1:-1:2, ...] += qty[:, 2::2, ...]
-        # add central value
-        if addCenter:
-            sum += qty
+
         return sum
 
 
