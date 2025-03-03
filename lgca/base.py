@@ -371,7 +371,6 @@ class LGCA_base(ABC):
     lgca.lgca_hex.LGCA_Hex : Classical LGCA in a 2D hexagonal geometry.
 
     """
-    rng = npr.default_rng()  # random number generator. would be better to initialize with init and keywords
 
     @property
     @abstractmethod
@@ -527,7 +526,7 @@ class LGCA_base(ABC):
         raise NotImplementedError("Reflecting boundary conditions not yet implemented for class " +
                                   str(self.__class__)+".")
 
-    def apply_abc(self):
+    def apply_pbc(self):
         """
         Apply absorbing boundary conditions.
 
@@ -545,9 +544,10 @@ class LGCA_base(ABC):
         """
         raise NotImplementedError("Inflow boundary conditions not yet implemented for class "+str(self.__class__)+".")
 
-    def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', **kwargs):
+    def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', seed=None, **kwargs):
         """ Initialize class instance. See class docstring."""
         self.r_int: int = 1  # Interaction radius. Must be at least 1 to handle propagation.
+        self.rng = npr.default_rng(seed=seed)
         # set boundary conditions, set self.apply_boundaries
         self.set_bc(bc)
 
@@ -689,22 +689,35 @@ class LGCA_base(ABC):
                 if 'gradient' in kwargs:
                     self.interaction_params['gradient_field'] = kwargs['gradient']
                 else:
-                    if self.velocitychannels > 2:
-                        x_source = npr.normal(self.xcoords.mean(), 1)
-                        y_source = npr.normal(self.ycoords.mean(), 1)
+                    if len(self.dims) == 2:
+                        x_source = self.xcoords.mean()
+                        y_source = self.ycoords.mean()
                         rx = self.xcoords - x_source
                         ry = self.ycoords - y_source
                         r = np.sqrt(rx ** 2 + ry ** 2)
                         self.concentration = np.exp(-2 * r / self.ly)
                         self.interaction_params['gradient_field'] = self.gradient(np.pad(self.concentration, 1,
                                                                                          'reflect'))
-                    else:
-                        source = npr.normal(self.l / 2, 1)
+                    elif len(self.dims) == 1:
+                        source = self.l / 2
                         r = abs(self.xcoords - source)
                         self.concentration = np.exp(-2 * r / self.l)
                         self.interaction_params['gradient_field'] = self.gradient(np.pad(self.concentration, 1,
                                                                                          'reflect'))
                         self.interaction_params['gradient_field'] /= self.interaction_params['gradient_field'].max()
+
+                    elif len(self.dims) == 3:
+                        x_source = self.xcoords.mean()
+                        y_source = self.ycoords.mean()
+                        z_source = self.zcoords.mean()
+                        rx = self.xcoords - x_source
+                        ry = self.ycoords - y_source
+                        rz = self.zcoords - z_source
+                        r = np.sqrt(rx ** 2 + ry ** 2 + rz ** 2)
+                        self.concentration = np.exp(-2 * r / self.ly)
+                        self.interaction_params['gradient_field'] = self.gradient(np.pad(self.concentration, 1,
+                                                                                         'reflect'))
+
 
             elif interaction == 'contact_guidance':
                 self.interaction = contact_guidance
@@ -850,9 +863,9 @@ class LGCA_base(ABC):
             periodic: ``'pbc'``.
 
         """
-        if bc in ['absorbing', 'absorb', 'abs', 'abc']:
+        if bc in ['absorbing', 'absorb', 'abs', 'abc', 'fixed']:
             self.apply_boundaries = self.apply_abc
-        elif bc in ['reflecting', 'reflect', 'refl', 'rbc']:
+        elif bc in ['reflecting', 'reflect', 'refl', 'rbc', 'no_flux', 'noflux']:
             self.apply_boundaries = self.apply_rbc
         elif bc in ['periodic', 'pbc']:
             self.apply_boundaries = self.apply_pbc
@@ -1039,10 +1052,10 @@ class LGCA_base(ABC):
         # list of all possible configurations for a lattice site
         self.permutations = [np.array(list(multiset_permutations([1] * n + [0] * (self.K - n))), dtype=np.int8)
                              for n in range(self.K + 1)]
-                                                                # builds list with one configuration for particle number
-                                                                # n in an array of size self.K (velocity + resting)
-                                      # builds list with all possible permutations for this array
-                             # for all possible particle numbers in an array of size self.K (velocity + resting)
+        # builds list with one configuration for particle number
+        # n in an array of size self.K (velocity + resting)
+        # builds list with all possible permutations for this array
+        # for all possible particle numbers in an array of size self.K (velocity + resting)
         # first dim: number of particles
         # second dim: all permutations for this n
         # third dim: channels
@@ -1054,8 +1067,8 @@ class LGCA_base(ABC):
         # first dim: number of particles
         # second dim: flux vector for each permutation (directions as specified in c)
 
-        # element-wise multiplication of neighborhood vectors with themselves
-        self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(2))[None, ...]
+        # element-wise multiplication of neighborhood vectors with themselves minus .5 * identity matrix to get nematic tensor
+        self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(self.c.shape[0]))[None, ...]
         # 1st dim: neighborhood vector
         # 2nd and 3rd dim: combination of x and y components of the vector as [[xx, xy], [yx, yy]]
 
@@ -1184,9 +1197,10 @@ class IBLGCA_base(LGCA_base, ABC):
 
     """
 
-    def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', **kwargs):
+    def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', seed=None, **kwargs):
         """ Initialize class instance. See class docstring."""
         self.r_int = 1  # Interaction radius. Must be at least 1 to handle propagation.
+        self.rng = npr.default_rng(seed=seed)
         # set boundary conditions, set self.apply_boundaries
         self.set_bc(bc)
 
@@ -2377,7 +2391,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
     """
     Base class for LGCA without volume exclusion.
     """
-    def __init__(self, nodes=None, dims=None, restchannels=None, density=0.1, hom=None, bc='periodic', capacity=None,
+    def __init__(self, nodes=None, dims=None, restchannels=1, density=0.1, hom=None, bc='periodic', seed=None, capacity=None,
                  **kwargs):
         """
         Initialize class instance.
@@ -2390,6 +2404,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         """
 
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
+        self.rng = npr.default_rng(seed=seed)
         self.set_bc(bc)
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes, capacity=capacity)
         self.init_coords()
@@ -2497,16 +2512,32 @@ class NoVE_LGCA_base(LGCA_base, ABC):
                 else:
                     self.interaction_params['beta'] = 2.
                     print('sensitivity set to beta = ', self.interaction_params['beta'])
+
+                if 'include_center' in kwargs:
+                    self.interaction_params['nb_include_center'] = kwargs['include_center']
+                else:
+                    self.interaction_params['nb_include_center'] = False
+                    print('neighbourhood set to exclude the central node')
+
         # if nothing is specified, use density-dependent interaction rule
         else:
             print('Density-dependent alignment interaction is used.')
             self.interaction = dd_alignment
+
+            if self.restchannels > 0:
+                raise RuntimeError("Rest channels ({:d}) defined, interaction will crash! Set number of"
+                                   " rest channels to 0 with restchannels keyword.".format(self.restchannels))
 
             if 'beta' in kwargs:
                 self.interaction_params['beta'] = kwargs['beta']
             else:
                 self.interaction_params['beta'] = 2.
                 print('sensitivity set to beta = ', self.interaction_params['beta'])
+            if 'include_center' in kwargs:
+                self.interaction_params['nb_include_center'] = kwargs['include_center']
+            else:
+                self.interaction_params['nb_include_center'] = False
+                print('neighbourhood set to exclude the central node')
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True,
                 recordorderparams=False, recordpertype=False):
@@ -2698,7 +2729,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     """
     interactions = ['go_or_grow', 'birthdeath', 'randomwalk', 'steric_evolution']
 
-    def __init__(self, nodes=None, dims=None, density=.1, restchannels=1, bc='periodic', **kwargs):
+    def __init__(self, nodes=None, dims=None, density=.1, restchannels=1, bc='periodic', seed=None, **kwargs):
         """
         Initialize class instance.
         :param nodes:
@@ -2710,10 +2741,14 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         :param kwargs:
         """
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
+        self.rng = npr.default_rng(seed=seed)
         self.props = {}
         self.length_checker = np.vectorize(len)
         self.set_bc(bc)
         self.interaction_params = {}
+        if restchannels != 1:
+            restchannels = 1
+            warnings.warn("There can only be one rest channel in this LGCA class. Setting to 1 to prevent issues")
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
         self.init_coords()
         self.init_nodes(density, nodes=nodes)
@@ -2730,9 +2765,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     def convert_int_to_ib(self, occ):
         """
         Convert an array of integers representing the occupation numbers of an lgca to an array consisting of lists of
-        individual cell labels, starting at 'starting_id'. The length of each list corresponds to the entry in 'occ'.
+        individual cell labels, starting at 0. The length of each list corresponds to the entry in 'occ'.
         :param occ: array of occupation numbers. must match the lgca dimensions
-        : param starting_id: int > 0
         :return: array, where each entry is a list of individual cell labels.
         """
         ntot = occ.sum()
@@ -2766,17 +2800,9 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                 self.interaction = randomwalk
             elif interaction == 'only_propagation':
                 self.interaction = only_propagation
-            elif interaction == 'birth':
-                self.interaction = birth
-                if 'r_b' in kwargs:
-                    self.interaction_params['r_b'] = kwargs['r_b']
-                else:
-                    self.interaction_params['r_b'] = 0.2
-                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
-                self.props.update(r_b=[self.interaction_params['r_b']] * self.maxlabel)
 
-            elif interaction == 'birthdeath':
-                self.interaction = birthdeath
+            elif interaction in ('birth', 'birthdeath'):
+                self.interaction = birthdeath if interaction == 'birthdeath' else birth
                 if 'capacity' in kwargs:
                     self.interaction_params['capacity'] = kwargs['capacity']
                 else:
@@ -2792,9 +2818,12 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
 
                 if 'r_d' in kwargs:
                     self.interaction_params['r_d'] = kwargs['r_d']
+                    if interaction == 'birth':
+                        warnings.warn("Death rate defined but not used in birth interaction.")
                 else:
-                    self.interaction_params['r_d'] = 0.02
-                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+                    if interaction == 'birthdeath':
+                        self.interaction_params['r_d'] = 0.02
+                        print('death rate set to r_d = ', self.interaction_params['r_d'])
 
                 if 'std' in kwargs:
                     self.interaction_params['std'] = kwargs['std']

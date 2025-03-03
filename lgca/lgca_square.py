@@ -62,7 +62,7 @@ class LGCA_Square(LGCA_base):
     """
     # set class attributes
     interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation',
-                    'random_walk', 'excitable_medium', 'nematic', 'persistant_motion', 'chemotaxis', 'contact_guidance',
+                    'random_walk', 'excitable_medium', 'nematic', 'persistent_motion', 'chemotaxis', 'contact_guidance',
                     'only_propagation']
     velocitychannels = 4
     # build velocity channel vectors
@@ -481,7 +481,7 @@ class LGCA_Square(LGCA_base):
         nodes can only be done after the sum calculation in order to preserve boundary conditions.
 
         """
-        sum = np.zeros(qty.shape)
+        sum = np.zeros_like(qty)
         sum[:-1, ...] += qty[1:, ...]
         sum[1:, ...] += qty[:-1, ...]
         sum[:, :-1, ...] += qty[:, 1:, ...]
@@ -630,8 +630,8 @@ class LGCA_Square(LGCA_base):
         ax.set_aspect('equal')
 
         # label axes, set tick positions and adjust their appearance
-        plt.xlabel('$x \\; (\\varepsilon)$')
-        plt.ylabel('$y \\; (\\varepsilon)$')
+        plt.xlabel('$x$')
+        plt.ylabel('$y$')
         ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         if self.dy >= 1:
             minstep = self.dy
@@ -1330,26 +1330,6 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
             self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(np.uint)
             self.apply_boundaries()
 
-    def nb_sum(self, qty, addCenter=False):
-        """
-        Calculate sum of values in neighboring lattice sites of each lattice site.
-        :param qty: ndarray in which neighboring values have to be added
-                    first dimension indexes lattice sites
-        :param addCenter: toggle adding central value
-        :return: sum as ndarray
-        """
-        sum = np.zeros(qty.shape)
-        # shift to left padding 0 and add to shift to the right padding 0
-        sum[:-1, ...] += qty[1:, ...]
-        sum[1:, ...] += qty[:-1, ...]
-        # add shift up padding 0 and shift down padding 0
-        sum[:, :-1, ...] += qty[:, 1:, ...]
-        sum[:, 1:, ...] += qty[:, :-1, ...]
-        # add central value
-        if addCenter:
-            sum += qty
-        return sum
-
     def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
                      edgecolor='None', cbar=True, cbarlabel='Particle number $n$', channels=slice(None)):
 
@@ -1545,7 +1525,7 @@ class NoVE_IBLGCA_Square(NoVE_IBLGCA_base, NoVE_LGCA_Square):
             self.random_reset(density)
 
         elif nodes.dtype == object:
-            self.nodes[self.nonborder] = nodes.astype(np.uint)
+            self.nodes[self.nonborder] = nodes
 
         else:
             occ = nodes.astype(int)
