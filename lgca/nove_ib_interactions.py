@@ -340,18 +340,6 @@ def go_or_grow_kappa(lgca):
 def tanh_switch(rho, kappa=5., theta=0.8):
     return 0.5 * (1 + np.tanh(kappa * (rho - theta)))
 
-
-@jit(nopython=True)
-def nb_sum(qty, addCenter):
-    sum = np.zeros(qty.shape)
-    sum[:-1, ...] += qty[1:, ...]
-    sum[1:, ...] += qty[:-1, ...]
-
-    if addCenter:
-        sum += qty
-    return sum
-
-
 def go_or_grow_kappa_chemo(lgca):
     """
     Apply the evolutionary "go-or-grow" interaction. Cells switch from a migratory to a resting phenotype and vice versa
