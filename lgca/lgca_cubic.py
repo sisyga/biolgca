@@ -1410,7 +1410,7 @@ if __name__ == "__main__":
     L = 50
     nodes = np.zeros((L, L, L, 7), dtype=int)
     nodes[L//2, L//2, L//2, -1] = 10
-    lgca = get_lgca(ib=False, ve=True, geometry='cubic', interaction='alignment', dims=50, density=0.05, beta=3)
+    lgca = get_lgca(ib=False, ve=True, geometry='cubic', interaction='go_or_grow', dims=50, density=0.05, beta=1, )
     lgca.timeevo(timesteps=100, record=True)
 
 
