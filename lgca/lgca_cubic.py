@@ -1278,12 +1278,17 @@ class NoVE_IBLGCA_Cubic(NoVE_IBLGCA_base, LGCA_Cubic):
             (self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.lz + 2 * self.r_int, self.K))
         if nodes is None:
             self.random_reset(density)
+            self.calc_max_label()
         elif nodes.dtype == object:
             self.nodes[self.nonborder] = nodes
+            self.calc_max_label()
         else:
             occ = nodes.astype(int)
+            ntot = occ.sum()
             self.nodes[self.nonborder] = self.convert_int_to_ib(occ)
-        self.calc_max_label()
+            self.maxlabel = ntot - 1 if ntot > 0 else None
+
+
 
     def propagation(self):
         """

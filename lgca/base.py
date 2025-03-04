@@ -2762,7 +2762,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.channel_pop = self.length_checker(self.nodes)  # population of a channel
         self.cell_density = self.channel_pop.sum(-1)  # population of a node
 
-    def convert_int_to_ib(self, occ):
+    def convert_int_to_ib_old(self, occ):
         """
         Convert an array of integers representing the occupation numbers of an lgca to an array consisting of lists of
         individual cell labels, starting at 0. The length of each list corresponds to the entry in 'occ'.
@@ -2771,13 +2771,38 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         """
         ntot = occ.sum()
         labels = list(range(ntot))
-        tempnodes = np.empty(occ.shape, dtype=object)
+        # tempnodes = np.empty(occ.shape, dtype=object)
+        tempnodes = get_arr_of_empty_lists(occ.shape)
         counter = 0
         for ind, dens in np.ndenumerate(occ):
+            if dens == 0: continue
             tempnodes[ind] = labels[counter:counter+dens]
             counter += dens
 
         return tempnodes
+
+    def convert_int_to_ib(self, nodes):
+        """
+        Convert an array of integers representing the occupation numbers of an lgca to an array consisting of lists of
+        individual cell labels, starting at 0. The length of each list corresponds to the entry in 'occ'.
+        :param occ: array of occupation numbers. must match the lgca dimensions
+        :return: array, where each entry is a list of individual cell labels.
+        """
+        # Create empty lists array once
+        result = get_arr_of_empty_lists(nodes.shape)
+
+        # Find occupied positions to avoid iterating through every cell
+        occupied = np.nonzero(nodes)
+        max_label = -1
+        # Process only occupied positions
+        for idx in zip(*occupied):
+            count = nodes[idx]
+            if count > 0:
+                # Append particle IDs directly
+                result[idx].extend(range(max_label + 1, max_label + 1 + count))
+                max_label += count
+
+        return result
 
     def random_reset(self, density):
         """
