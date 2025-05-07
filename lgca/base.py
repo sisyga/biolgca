@@ -16,22 +16,24 @@ Supported LGCA types:
 - identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_base`)
 """
 
+import warnings
 from abc import ABC, abstractmethod
-import matplotlib.colors as mcolors
+from copy import copy, deepcopy
+
+import matplotlib.colors as colors
 import numpy as np
+from matplotlib import cm
 from matplotlib import pyplot as plt
 from matplotlib.cm import ScalarMappable
-import matplotlib.colors as colors
-from matplotlib import cm
 from numpy import random as npr
 from sympy.utilities.iterables import multiset_permutations
-from copy import copy, deepcopy
-from lgca.plots import muller_plot
-import warnings
 from tqdm.auto import tqdm
 
+from lgca.plots import muller_plot
+
+
 # configure matplotlib style
-plt.style.use('default')
+# plt.style.use('default')
 
 
 def colorbar_index(ncolors: int, cmap, use_gridspec: bool=False, cax=None):
