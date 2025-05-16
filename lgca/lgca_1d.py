@@ -759,7 +759,7 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
         """
         :return:
         """
-        newnodes = get_arr_of_empty_lists(self.nodes.shape)
+        newnodes = self.get_arr_of_empty_lists()
 
         # prop. to the left
         newnodes[1:, 0] = self.nodes[:-1, 1]
@@ -793,7 +793,7 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
             where each integer determines the number of cells in each channel
         3) you provide an array "nodes" with nodes.dtype == object, where each element is a list of unique cell labels
         """
-        self.nodes = get_arr_of_empty_lists(((self.l + 2 * self.r_int, self.K)))
+        self.nodes = self.get_arr_of_empty_lists()
         if nodes is None:
             self.random_reset(density)
 

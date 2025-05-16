@@ -494,9 +494,8 @@ class NoVE_LGCA_Hex(NoVE_LGCA_Square, LGCA_Hex):
 
 
 class NoVE_IBLGCA_Hex(NoVE_IBLGCA_Square, LGCA_Hex):
-
     def propagation(self):
-        newcellnodes = get_arr_of_empty_lists(self.nodes.shape)
+        newcellnodes = self.get_arr_of_empty_lists()
         newcellnodes[..., 6:] = self.nodes[..., 6:]
 
         # prop in 0-direction
