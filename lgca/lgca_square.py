@@ -18,15 +18,18 @@ Supported LGCA types:
 """
 
 import matplotlib.animation as animation
+import matplotlib.colors as colors
 import matplotlib.ticker as mticker
 import numpy as np
 from matplotlib.collections import PatchCollection
 from matplotlib.colors import Normalize
 from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
+from matplotlib import cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import warnings
+from copy import copy
 
 from lgca.base import *
-
 
 class LGCA_Square(LGCA_base):
     """
@@ -1517,7 +1520,7 @@ class NoVE_IBLGCA_Square(NoVE_IBLGCA_base, NoVE_LGCA_Square):
     """Identity-based lgca without volume exclusion on the square lattice.
     """
     def init_nodes(self, density=0.1, nodes=None):
-        self.nodes = self.get_arr_of_empty_lists()
+        self.nodes = get_arr_of_empty_lists((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K))
         if nodes is None:
             self.random_reset(density)
 
@@ -1535,7 +1538,7 @@ class NoVE_IBLGCA_Square(NoVE_IBLGCA_base, NoVE_LGCA_Square):
 
         :return:
         """
-        newnodes = self.get_arr_of_empty_lists()
+        newnodes = get_arr_of_empty_lists(self.nodes.shape)
         # resting particles stay
         newnodes[..., 4:] = self.nodes[..., 4:]
 

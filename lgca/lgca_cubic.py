@@ -1,3 +1,5 @@
+from lgca.base import *
+from mayavi import mlab
 from mayavi import mlab
 
 from lgca.base import *
@@ -1275,7 +1277,8 @@ class NoVE_IBLGCA_Cubic(NoVE_IBLGCA_base, LGCA_Cubic):
         """
         Initialize the lattice nodes for NoVE_IBLGCA.
         """
-        self.nodes = self.get_arr_of_empty_lists()
+        self.nodes = get_arr_of_empty_lists(
+            (self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.lz + 2 * self.r_int, self.K))
         if nodes is None:
             self.random_reset(density)
         elif nodes.dtype == object:
@@ -1289,7 +1292,7 @@ class NoVE_IBLGCA_Cubic(NoVE_IBLGCA_base, LGCA_Cubic):
         """
         Perform the transport step of the LGCA: Move particles through the lattice according to their velocity.
         """
-        newnodes = self.get_arr_of_empty_lists()
+        newnodes = get_arr_of_empty_lists(self.nodes.shape)
         newnodes[..., self.velocitychannels:] = self.nodes[..., self.velocitychannels:]
 
         newnodes[1:, :, :, 0] = self.nodes[:-1, :, :, 0]
@@ -1403,13 +1406,14 @@ class NoVE_IBLGCA_Cubic(NoVE_IBLGCA_base, LGCA_Cubic):
         return super().plot_scalarfield(mean_prop, **kwargs)
 
 
+
 if __name__ == "__main__":
     # Initialize LGCA on a 3D cubic lattice
     from lgca import get_lgca
     L = 50
     nodes = np.zeros((L, L, L, 7), dtype=int)
     nodes[L//2, L//2, L//2, -1] = 10
-    lgca = get_lgca(ib=False, ve=True, geometry='cubic', interaction='go_or_grow', dims=50, density=0.05, beta=1)
+    lgca = get_lgca(ib=False, ve=True, geometry='cubic', interaction='go_or_grow', dims=50, density=0.05, beta=1, )
     lgca.timeevo(timesteps=100, record=True)
 
 
