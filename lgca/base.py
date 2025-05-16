@@ -22,6 +22,7 @@ from copy import copy, deepcopy
 
 import matplotlib.colors as colors
 import numpy as np
+import ragged as rg
 from matplotlib import cm
 from matplotlib import pyplot as plt
 from matplotlib.cm import ScalarMappable
@@ -2706,11 +2707,11 @@ class NoVE_LGCA_base(LGCA_base, ABC):
 
 # create a numpy universal function (ufunc) of the python function 'list'. Can be used to create an numpy array of
 # empty lists if applied to an empty array
-ufunclist = np.frompyfunc(list, 0, 1)
-
+# ufunclist = np.frompyfunc(list, 0, 1)
+#
 def get_arr_of_empty_lists(dims):
     """
-    Create a numpy array of dimensions 'dims' that is filled with empty lists.
+    Create a ragged array of dimensions 'dims' that is filled with empty lists.
 
     Parameters
     ----------
@@ -2718,10 +2719,17 @@ def get_arr_of_empty_lists(dims):
 
     Returns
     -------
-    :py:class:`numpy.ndarray`
+    :py:class:`ragged.ndarray`
 
     """
-    return ufunclist(np.empty(dims, dtype=object))
+
+    def build(remaining):
+        if not remaining:
+            return []
+        return [build(remaining[1:]) for _ in range(remaining[0])]
+
+    empty_array = rg.array(build(dims))
+    return empty_array
 
 
 class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
@@ -2779,6 +2787,26 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
             counter += dens
 
         return tempnodes
+
+    def create_arr_of_empty_lists(self):
+        """
+        Create an array of empty lists with the same shape as the nodes array.
+        :return: array of empty lists
+        """
+        # create new tuple where every entry is dims[i] + 2 * self.r_int
+        dims_full = tuple([self.dims[i] + 2 * self.r_int for i in range(len(self.dims))])
+        dims_full = dims_full + (self.K,)
+        self.empty_array = get_arr_of_empty_lists(dims_full)
+        return rg.asarray(self.empty_array, copy=True)
+
+    def get_arr_of_empty_lists(self):
+        """
+        Get an array of empty lists with the same shape as the nodes array.
+        :return: array of empty lists
+        """
+        if not hasattr(self, 'empty_array'):
+            self.empty_array = self.create_arr_of_empty_lists()
+        return rg.asarray(self.empty_array, copy=True)
 
     def random_reset(self, density):
         """
