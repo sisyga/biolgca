@@ -16,23 +16,24 @@ Supported LGCA types:
 - identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_base`)
 """
 
+import warnings
 from abc import ABC, abstractmethod
-import matplotlib.colors as mcolors
+from copy import copy, deepcopy
+
+import matplotlib.colors as colors
 import numpy as np
+from matplotlib import cm
 from matplotlib import pyplot as plt
 from matplotlib.cm import ScalarMappable
-import matplotlib.colors as colors
-from matplotlib import cm
 from numpy import random as npr
 from sympy.utilities.iterables import multiset_permutations
-from copy import copy, deepcopy
-from lgca.plots import muller_plot
-import warnings
 from tqdm.auto import tqdm
 
-# configure matplotlib style
-plt.style.use('default')
+from lgca.plots import muller_plot
 
+
+# configure matplotlib style
+# plt.style.use('default')
 
 
 def colorbar_index(ncolors: int, cmap, use_gridspec: bool=False, cax=None):
@@ -2743,7 +2744,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
         self.rng = npr.default_rng(seed=seed)
         self.props = {}
-        self.length_checker = np.vectorize(len)
+        self.length_checker = lambda arr: np.fromiter((len(x) for x in arr.flat), dtype=np.uint,
+                                                      count=arr.size).reshape(arr.shape)
         self.set_bc(bc)
         self.interaction_params = {}
         if restchannels != 1:
@@ -2762,7 +2764,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.channel_pop = self.length_checker(self.nodes)  # population of a channel
         self.cell_density = self.channel_pop.sum(-1)  # population of a node
 
-    def convert_int_to_ib_old(self, occ):
+    def convert_int_to_ib(self, occ):
         """
         Convert an array of integers representing the occupation numbers of an lgca to an array consisting of lists of
         individual cell labels, starting at 0. The length of each list corresponds to the entry in 'occ'.
@@ -2771,38 +2773,13 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         """
         ntot = occ.sum()
         labels = list(range(ntot))
-        # tempnodes = np.empty(occ.shape, dtype=object)
-        tempnodes = get_arr_of_empty_lists(occ.shape)
+        tempnodes = np.empty(occ.shape, dtype=object)
         counter = 0
         for ind, dens in np.ndenumerate(occ):
-            if dens == 0: continue
             tempnodes[ind] = labels[counter:counter+dens]
             counter += dens
 
         return tempnodes
-
-    def convert_int_to_ib(self, nodes):
-        """
-        Convert an array of integers representing the occupation numbers of an lgca to an array consisting of lists of
-        individual cell labels, starting at 0. The length of each list corresponds to the entry in 'occ'.
-        :param occ: array of occupation numbers. must match the lgca dimensions
-        :return: array, where each entry is a list of individual cell labels.
-        """
-        # Create empty lists array once
-        result = get_arr_of_empty_lists(nodes.shape)
-
-        # Find occupied positions to avoid iterating through every cell
-        occupied = np.nonzero(nodes)
-        max_label = -1
-        # Process only occupied positions
-        for idx in zip(*occupied):
-            count = nodes[idx]
-            if count > 0:
-                # Append particle IDs directly
-                result[idx].extend(range(max_label + 1, max_label + 1 + count))
-                max_label += count
-
-        return result
 
     def random_reset(self, density):
         """
@@ -2817,7 +2794,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
 
     def set_interaction(self, **kwargs):
         from lgca.nove_ib_interactions import randomwalk, birth, birthdeath, birthdeath_cancerdfe, go_or_grow, \
-            evo_steric, go_or_grow_kappa, go_or_grow_glioblastoma
+            evo_steric, go_or_grow_kappa
         from lgca.interactions import only_propagation
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
@@ -3034,71 +3011,6 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                     self.interaction_params['theta'] = 0.5
                     print('switch threshold set to theta = ', self.interaction_params['theta'])
 
-
-            elif interaction == 'go_or_grow_glioblastoma':
-                self.interaction = go_or_grow_glioblastoma
-                try:
-                    assert self.restchannels > 0
-                except AssertionError:
-                    print('There must be exactly one rest channel for this interaction to work!')
-                self.init_families(type='homogeneous', mutation=True)
-                self.props['family'][0] = 1  # there is no 'void' cell, so the cell w/ id = 0 also belongs to fam. 1
-                if 'capacity' in kwargs:
-                    self.interaction_params['capacity'] = kwargs['capacity']
-                else:
-                    self.interaction_params['capacity'] = 8
-                    print('node capacity set to ', self.interaction_params['capacity'])
-
-                if 'kappa_std' in kwargs:
-                    self.interaction_params['kappa_std'] = kwargs['kappa_std']
-                else:
-                    self.interaction_params['kappa_std'] = 0.2
-                    print('std of kappa set to', self.interaction_params['kappa_std'])
-
-                if 'r_d' in kwargs:
-                    self.interaction_params['r_d'] = kwargs['r_d']
-                else:
-                    self.interaction_params['r_d'] = 0.01
-                    print('death rate set to r_d = ', self.interaction_params['r_d'])
-
-                if 'r_m' in kwargs:
-                    self.interaction_params['r_m'] = kwargs['r_m']
-                else:
-                    self.interaction_params['r_m'] = 1e-3
-                    print('mutation rate set to r_m = ', self.interaction_params['r_m'])
-
-                if 'fitness_increase' in kwargs:
-                    self.interaction_params['fitness_increase'] = kwargs['fitness_increase']
-                else:
-                    self.interaction_params['fitness_increase'] = 1.1
-                    print('fitness increase for driver mutations set to ',
-                          self.interaction_params['fitness_increase'])
-
-                if 'r_b' in kwargs:
-                    r_b = kwargs['r_b']
-                    # self.interaction_params['r_b'] = kwargs['r_b']
-                else:
-                    r_b = 0.2
-                    print('birth rate set to r_b = ', r_b)
-
-                self.family_props.update(r_b=[0] + [r_b] * self.maxfamily)
-
-                if 'kappa' in kwargs:
-                    kappa = kwargs['kappa']
-
-                else:
-                    kappa = 4.
-                    print('switch rate set to kappa = ', self.interaction_params['kappa'][0])
-
-                self.family_props.update(kappa=[0] + [kappa] * self.maxfamily)
-                if 'theta' in kwargs:
-                    theta = kwargs['theta']
-                    self.interaction_params['theta'] = theta
-                else:
-                    self.interaction_params['theta'] = 0.25
-                    print('switch threshold set to theta = ', self.interaction_params['theta'])
-
-
             elif interaction == 'steric_evolution':
                 self.interaction = evo_steric
                 if 'r_b' in kwargs:
@@ -3165,9 +3077,9 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
             self.channel_pop_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=np.uint)
             self.channel_pop_t[0, ...] = self.channel_pop[self.nonborder]
         if recordfampop:
-            from lgca.nove_ib_interactions import evo_steric, go_or_grow_glioblastoma
+            from lgca.nove_ib_interactions import evo_steric
             # this needs to include all interactions that can increase the number of recorded families!
-            if self.interaction in [evo_steric, go_or_grow_glioblastoma]:
+            if self.interaction in [evo_steric]:
                 # if mutations are allowed, this is a list because it will be ragged due to increasing family numbers
                 self.fam_pop_t = [self.calc_family_pop_alive()]
                 is_mutating = True
@@ -3200,7 +3112,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                         raise ValueError("Number of families has increased, interaction must be included in the case " +
                                          "distinction for the recordfampop keyword in the IBLGCA base timeevo function!") from e
         if recordfampop and is_mutating:
-            self._straighten_family_populations()
+            self.straighten_family_populations()
 
     def calc_max_label(self):
         cells = self.nodes.sum()
@@ -3374,9 +3286,14 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         if 'family' not in self.props:
             raise RuntimeError("Family properties are not recorded by the LGCA, choose suitable interaction.")
 
-        cells_alive = np.array(self.nodes[self.nonborder].sum()) # indices of live cells # nonborder needed for uniqueness
+        cells_alive_list = []
+        for site_list_collection in self.nodes[self.nonborder].flat:
+            cells_alive_list.extend(site_list_collection)
+
+        cells_alive = np.array(cells_alive_list,
+                               dtype=np.intp)  # indices of live cells # nonborder needed for uniqueness
         cell_fam = np.array(self.props['family'])  # convert for indexing
-        cell_fam_alive = cell_fam[cells_alive.astype(int)]  # filter family array for families of live cells
+        cell_fam_alive = cell_fam[cells_alive]  # filter family array for families of live cells
         fam_alive, fam_pop = np.unique(cell_fam_alive, return_counts=True)  # count number of cells for each family
         # transform into array with population entry for all families that ever existed
         fam_pop_array = np.zeros(self.maxfamily+1, dtype=int)

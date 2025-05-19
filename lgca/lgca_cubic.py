@@ -1,6 +1,9 @@
-import numpy as np
 from lgca.base import *
 from mayavi import mlab
+from mayavi import mlab
+
+from lgca.base import *
+
 
 class LGCA_Cubic(LGCA_base):
     """
@@ -1411,11 +1414,11 @@ class NoVE_IBLGCA_Cubic(NoVE_IBLGCA_base, LGCA_Cubic):
 
 if __name__ == "__main__":
     # Initialize LGCA on a 3D cubic lattice
-    from __init__ import get_lgca
+    from lgca import get_lgca
     L = 50
     nodes = np.zeros((L, L, L, 7), dtype=int)
     nodes[L//2, L//2, L//2, -1] = 10
-    lgca = get_lgca(ib=False, ve=True, geometry='cubic', interaction='alignment', dims=50, density=0.05, beta=3)
+    lgca = get_lgca(ib=False, ve=True, geometry='cubic', interaction='go_or_grow', dims=50, density=0.05, beta=1, )
     lgca.timeevo(timesteps=100, record=True)
 
 
@@ -1423,11 +1426,11 @@ if __name__ == "__main__":
     # lgca.plot_flux()
     #
     # Animate flux
-    lgca.animate_flux()
+    # lgca.animate_flux()
     # lgca.live_animate_flux()
     # lgca.animate_config()
     # mlab.show()
-    # lgca.animate_density()
+    lgca.animate_density()
     # lgca.live_animate_density()
     # lgca.animate_flux()
     # mlab.show()
