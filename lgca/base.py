@@ -2744,7 +2744,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
         self.rng = npr.default_rng(seed=seed)
         self.props = {}
-        self.length_checker = np.vectorize(len)
+        self.length_checker = lambda arr: np.fromiter((len(x) for x in arr.flat), dtype=np.uint,
+                                                      count=arr.size).reshape(arr.shape)
         self.set_bc(bc)
         self.interaction_params = {}
         if restchannels != 1:
@@ -3285,9 +3286,14 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         if 'family' not in self.props:
             raise RuntimeError("Family properties are not recorded by the LGCA, choose suitable interaction.")
 
-        cells_alive = np.array(self.nodes[self.nonborder].sum()) # indices of live cells # nonborder needed for uniqueness
+        cells_alive_list = []
+        for site_list_collection in self.nodes[self.nonborder].flat:
+            cells_alive_list.extend(site_list_collection)
+
+        cells_alive = np.array(cells_alive_list,
+                               dtype=np.intp)  # indices of live cells # nonborder needed for uniqueness
         cell_fam = np.array(self.props['family'])  # convert for indexing
-        cell_fam_alive = cell_fam[cells_alive.astype(np.int)]  # filter family array for families of live cells
+        cell_fam_alive = cell_fam[cells_alive]  # filter family array for families of live cells
         fam_alive, fam_pop = np.unique(cell_fam_alive, return_counts=True)  # count number of cells for each family
         # transform into array with population entry for all families that ever existed
         fam_pop_array = np.zeros(self.maxfamily+1, dtype=int)
