@@ -1808,7 +1808,7 @@ class IBLGCA_base(LGCA_base, ABC):
         return fam_pop_array
         # alternative: look up family for each live cell, then do unique on those altered nodes
 
-    def _straighten_family_populations(self):
+    def straighten_family_populations(self):
         """
         Utility for the :py:meth:`self.timeevo` method. Straighten out the ragged family population record over time
         (:py:attr:`self.fam_pop_t`) in the presence of mutations.
@@ -3141,7 +3141,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                 showprogress=True, recordfampop=False):
         self.update_dynamic_fields()
         if record:
-            self.nodes_t = get_arr_of_empty_lists((timesteps +1,) + self.dims + (self.K,))
+            self.nodes_t = get_arr_of_empty_lists((timesteps + 1,) + self.dims + (self.K,))
             self.nodes_t[0, ...] = copy(self.nodes[self.nonborder])
         if recordN:
             self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
@@ -3153,9 +3153,9 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
             self.channel_pop_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=np.uint)
             self.channel_pop_t[0, ...] = self.channel_pop[self.nonborder]
         if recordfampop:
-            from lgca.nove_ib_interactions import evo_steric
+            from lgca.nove_ib_interactions import evo_steric, go_or_grow_glioblastoma
             # this needs to include all interactions that can increase the number of recorded families!
-            if self.interaction in [evo_steric]:
+            if self.interaction in [evo_steric, go_or_grow_glioblastoma]:
                 # if mutations are allowed, this is a list because it will be ragged due to increasing family numbers
                 self.fam_pop_t = [self.calc_family_pop_alive()]
                 is_mutating = True
@@ -3362,17 +3362,17 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         if 'family' not in self.props:
             raise RuntimeError("Family properties are not recorded by the LGCA, choose suitable interaction.")
 
-        cells_alive_list = []
+        cells_alive = []
         for site_list_collection in self.nodes[self.nonborder].flat:
-            cells_alive_list.extend(site_list_collection)
+            cells_alive.extend(site_list_collection)
 
-        cells_alive = np.array(cells_alive_list,
-                               dtype=np.intp)  # indices of live cells # nonborder needed for uniqueness
+        cells_alive = np.array(cells_alive,
+                               dtype=np.intp)  # indices of live cells
         cell_fam = np.array(self.props['family'])  # convert for indexing
         cell_fam_alive = cell_fam[cells_alive]  # filter family array for families of live cells
         fam_alive, fam_pop = np.unique(cell_fam_alive, return_counts=True)  # count number of cells for each family
         # transform into array with population entry for all families that ever existed
-        fam_pop_array = np.zeros(self.maxfamily+1, dtype=int)
+        fam_pop_array = np.zeros(self.maxfamily + 1, dtype=np.uint)
         fam_pop_array[fam_alive] = fam_pop
         return fam_pop_array
         # alternative: look up family for each live cell, then do unique on those altered nodes

@@ -427,7 +427,8 @@ def go_or_grow_glioblastoma(lgca):
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     # Calculate the average density in the neighborhood
-    nbdensity = lgca.nb_sum(lgca.cell_density, addCenter=True) / ((lgca.velocitychannels+1) * lgca.interaction_params['capacity']) # average density in neighborhood
+    nbdensity = (lgca.nb_sum(lgca.cell_density) + lgca.cell_density) / (
+                (lgca.velocitychannels + 1) * lgca.interaction_params['capacity'])  # average density in neighborhood
     for coord in zip(*coords):
         node = lgca.nodes[coord]
         density = lgca.cell_density[coord]
@@ -481,7 +482,7 @@ def go_or_grow_glioblastoma(lgca):
         node.append(restcells)
         # Assign the migrating cells to random velocity channels
         for cell in velcells:
-            node[lgca.rng.randrange(lgca.velocitychannels)].append(cell)
+            node[lgca.rng.integers(lgca.velocitychannels)].append(cell)
 
         # Update the node in the lgca object
         lgca.nodes[coord] = deepcopy(node)

@@ -403,10 +403,12 @@ class LGCA_Cubic(LGCA_base):
         x = self.xcoords[mask] + .5
         y = self.ycoords[mask] + .5
         z = self.zcoords[mask] + .5
+        vmax = max(density.max(), self.K)
         fig = self.set_up_mayavi_fig()
 
         points = mlab.points3d(x, y, z, density[mask], opacity=opacity, colormap=colormap, mode='cube', scale_mode='none',
-                               vmin=0, vmax=self.K, figure=fig, reset_zoom=False, scale_factor=1., **kwargs)
+
+                               vmin=0, vmax=vmax, figure=fig, reset_zoom=False, scale_factor=1., **kwargs)
         fig = self.setup_mayavi_scene()
         mlab.title('Density', size=0.4, color=(0, 0, 0))
         if cbar:
