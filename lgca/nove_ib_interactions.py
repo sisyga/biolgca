@@ -7,12 +7,15 @@
 Interaction functions and helper functions for identity-based LGCA without volume exclusion.
 """
 
+from copy import deepcopy
+
 # from random import random, shuffle, randrange
 import numpy as np
-from scipy.stats import truncnorm, truncexpon, expon
-from copy import deepcopy
 from numba import jit
+from scipy.stats import truncnorm, expon
+
 from lgca.interactions import tanh_switch
+
 
 def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
     """
@@ -433,7 +436,7 @@ def go_or_grow_glioblastoma(lgca):
         cells = np.array(node.sum())
         # R1: cell death
         # Determine which cells survive
-        notkilled = npr.random(size=density) < 1. - lgca.interaction_params['r_d']
+        notkilled = lgca.rng.random(size=density) < 1. - lgca.interaction_params['r_d']
         cells = cells[notkilled]
         # If all cells at the current node died, continue to the next node
         if len(cells) == 0:
@@ -443,7 +446,8 @@ def go_or_grow_glioblastoma(lgca):
         # Determine which cells switch phenotype based on their individual properties and the local cell density
         fams = [lgca.props['family'][i] for i in cells]
         kappas = [lgca.family_props['kappa'][i] for i in fams]
-        switch = npr.random(len(cells)) < tanh_switch(rho=nbdens, kappa=np.array(kappas), theta=lgca.interaction_params['theta'])
+        switch = lgca.rng.random(len(cells)) < tanh_switch(rho=nbdens, kappa=np.array(kappas),
+                                                           theta=lgca.interaction_params['theta'])
         restcells, velcells = list(cells[switch]), list(cells[~switch])
         # Update the density after deaths for birth
         rho = len(cells) / lgca.interaction_params['capacity']  # update density after deaths for birth
@@ -455,17 +459,17 @@ def go_or_grow_glioblastoma(lgca):
             # mother cell: cell
             # family: lgca.props['family'][cell]
 
-            if random() < r_b * (1 - rho):
+            if lgca.rng.random() < r_b * (1 - rho):
                 lgca.maxlabel += 1
                 newcells.append(lgca.maxlabel)
-                if random() < lgca.interaction_params['r_m']:   # check if a mutation happens
+                if lgca.rng.random() < lgca.interaction_params['r_m']:  # check if a mutation happens
                     # driver mutation mother cell
                     lgca.add_family(fam)
                     # record family of new cell = new family
                     lgca.props['family'].append(int(lgca.maxfamily))
                     lgca.family_props['r_b'].append(lgca.family_props['r_b'][fam] * \
                                                     lgca.interaction_params['fitness_increase'])
-                    lgca.family_props['kappa'].append(float(npr.normal(loc=lgca.family_props['kappa'][fam],
+                    lgca.family_props['kappa'].append(float(lgca.rng.normal(loc=lgca.family_props['kappa'][fam],
                                                              scale=lgca.interaction_params['kappa_std'])))
                 else:
                     # record family of new cell = family of mother cell
@@ -477,7 +481,7 @@ def go_or_grow_glioblastoma(lgca):
         node.append(restcells)
         # Assign the migrating cells to random velocity channels
         for cell in velcells:
-            node[randrange(lgca.velocitychannels)].append(cell)
+            node[lgca.rng.randrange(lgca.velocitychannels)].append(cell)
 
         # Update the node in the lgca object
         lgca.nodes[coord] = deepcopy(node)

@@ -1,5 +1,3 @@
-from lgca.base import *
-from mayavi import mlab
 from mayavi import mlab
 
 from lgca.base import *
@@ -1415,11 +1413,23 @@ class NoVE_IBLGCA_Cubic(NoVE_IBLGCA_base, LGCA_Cubic):
 if __name__ == "__main__":
     # Initialize LGCA on a 3D cubic lattice
     from lgca import get_lgca
+
+    capacity = 100
+    std_kappa = 2.
+    r_d = 0.02
+    r_b = 0.5
+    kappa = 2
+    theta = .1
+    r_mut = 0.0001
+    s_d = 1.
+    L = 100
     L = 50
-    nodes = np.zeros((L, L, L, 7), dtype=int)
-    nodes[L//2, L//2, L//2, -1] = 10
-    lgca = get_lgca(ib=False, ve=True, geometry='cubic', interaction='go_or_grow', dims=50, density=0.05, beta=1, )
-    lgca.timeevo(timesteps=100, record=True)
+    nodes0 = np.zeros((L, L, L, 7), dtype=int)
+    nodes0[L // 2, L // 2, L // 2, -1] = 10
+    lgca = get_lgca(geometry='cubic', dims=(L, L, L), interaction='go_or_grow', ve=False, ib=True, capacity=capacity,
+                    kappa_std=std_kappa, r_d=r_d, r_b=r_b, kappa=kappa, theta=theta, nodes=nodes0, r_m=r_mut,
+                    fitness_increase=s_d)
+    lgca.timeevo(timesteps=50, record=True)
 
 
     # Plot flux using Mayavi

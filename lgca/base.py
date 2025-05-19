@@ -2794,7 +2794,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
 
     def set_interaction(self, **kwargs):
         from lgca.nove_ib_interactions import randomwalk, birth, birthdeath, birthdeath_cancerdfe, go_or_grow, \
-            evo_steric, go_or_grow_kappa
+            evo_steric, go_or_grow_kappa, go_or_grow_glioblastoma
         from lgca.interactions import only_propagation
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
@@ -3052,6 +3052,82 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                     self.interaction_params['fitness_increase'] = 1.1
                     print('fitness increase for driver mutations set to ',
                           self.interaction_params['fitness_increase'])
+
+            elif interaction == 'go_or_grow_glioblastoma':
+                self.interaction = go_or_grow_glioblastoma
+                try:
+                    assert self.restchannels > 0
+                except AssertionError:
+                    print('There must be at least one rest channel for this interaction to work!')
+
+                if 'capacity' in kwargs:
+                    self.interaction_params['capacity'] = kwargs['capacity']
+                else:
+                    self.interaction_params['capacity'] = 8
+                    print('Node capacity set to ', self.interaction_params['capacity'])
+
+                if 'kappa_std' in kwargs:
+                    self.interaction_params['kappa_std'] = kwargs['kappa_std']
+                else:
+                    self.interaction_params['kappa_std'] = 0.2
+                    print('Standard deviation for kappa mutation set to', self.interaction_params['kappa_std'])
+
+                if 'r_d' in kwargs:
+                    self.interaction_params['r_d'] = kwargs['r_d']
+                else:
+                    self.interaction_params['r_d'] = 0.01
+                    print('Death rate set to r_d = ', self.interaction_params['r_d'])
+
+                if 'theta' in kwargs:
+                    self.interaction_params['theta'] = kwargs['theta']
+                else:
+                    self.interaction_params['theta'] = 0.5
+                    print('Global switch threshold theta set to ', self.interaction_params['theta'])
+
+                if 'r_m' in kwargs:
+                    self.interaction_params['r_m'] = kwargs['r_m']
+                else:
+                    self.interaction_params['r_m'] = 0.001
+                    print('Mutation rate r_m set to ', self.interaction_params['r_m'])
+
+                if 'fitness_increase' in kwargs:
+                    self.interaction_params['fitness_increase'] = kwargs['fitness_increase']
+                else:
+                    self.interaction_params['fitness_increase'] = 1.1  # Example: 10% increase
+                    print('Fitness increase factor set to ', self.interaction_params['fitness_increase'])
+
+                # Initial values for family-specific properties
+                initial_r_b = kwargs.get('r_b', 0.2)
+                if 'r_b' not in kwargs:
+                    print('Initial birth rate for families set to r_b = ', initial_r_b)
+
+                initial_kappa = kwargs.get('kappa', 5.0)
+                if 'kappa' not in kwargs:
+                    print('Initial switch rate kappa for families set to kappa = ', initial_kappa)
+
+                # Initialize families and their properties
+                self.init_families(type='homogeneous', mutation=True)
+                # self.maxfamily is 0 if starting homogeneous with no pre-defined families
+                # Family 0 will be the first family.
+                if 'r_b' not in self.family_props:  # Ensure 'r_b' key exists
+                    self.family_props['r_b'] = []
+                if 'kappa' not in self.family_props:  # Ensure 'kappa' key exists
+                    self.family_props['kappa'] = []
+
+                # Extend lists if necessary to cover up to maxfamily
+                current_len_rb = len(self.family_props['r_b'])
+                if self.maxfamily + 1 > current_len_rb:
+                    self.family_props['r_b'].extend([initial_r_b] * (self.maxfamily + 1 - current_len_rb))
+                # Set for all initial families (typically just family 0)
+                for i in range(self.maxfamily + 1):
+                    self.family_props['r_b'][i] = initial_r_b
+
+                current_len_kappa = len(self.family_props['kappa'])
+                if self.maxfamily + 1 > current_len_kappa:
+                    self.family_props['kappa'].extend([initial_kappa] * (self.maxfamily + 1 - current_len_kappa))
+                for i in range(self.maxfamily + 1):
+                    self.family_props['kappa'][i] = initial_kappa
+
             else:
                 print('interaction', kwargs['interaction'], 'is not defined! Random walk used instead.')
                 print('Implemented interactions:', self.interactions)
