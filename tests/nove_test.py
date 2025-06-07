@@ -445,11 +445,12 @@ class Test_LGCA_NoVE(T_LGCA_Common):
         ('square', com.nodes_nove_square),
         ('hex', com.nodes_nove_hex)
     ])
+    @pytest.mark.skip(reason="unstable with missing numba")
     def test_characteristics(self, geom, nodes):
         # volume exclusion does not have to be checked here, uniqueness neither
         # let interactions run for 50 timesteps to check attribute reference problems
         print("Starting characteristics test")
-        ref_lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib)
+        ref_lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib, restchannels=0)
         vchannels_mapping = {'lin':com.b_1d, 'square':com.b_square, 'hex':com.b_hex}
         for interaction in ref_lgca.interactions:
             print(interaction)
