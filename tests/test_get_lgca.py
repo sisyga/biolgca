@@ -62,8 +62,6 @@ PARAMS = [
 
 @pytest.mark.parametrize("geom, ib, ve", PARAMS)
 def test_get_lgca_returns_correct_subclass(geom, ib, ve):
-    if (ib, ve) == (True, False):
-        pytest.importorskip("numba")
     lgca = get_lgca(
         geometry=geom,
         ib=ib,
