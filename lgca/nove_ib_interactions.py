@@ -15,15 +15,27 @@ from numba import jit
 from lgca.interactions import tanh_switch
 
 def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
-    """
-    Draw random variables from a truncated Gaussian distribution. The distribution is normalized between the 'lower'
-    and 'upper' bound, hast he mean value 'mu' and the standard deviation 'sigma'.
-    :param lower: lower bound
-    :param upper: upper bound
-    :param mu: mean value
-    :param sigma: standard deviation
-    :param size: number of samples
-    :return:
+    """Draw samples from a truncated normal distribution.
+
+    Parameters
+    ----------
+    lower : float
+        Lower bound of the distribution.
+    upper : float
+        Upper bound of the distribution.
+    mu : float
+        Mean of the underlying normal distribution.
+    sigma : float, optional
+        Standard deviation of the underlying normal distribution. ``0.1`` by
+        default.
+    size : int, optional
+        Number of samples to draw. ``1`` by default.
+
+    Returns
+    -------
+    float or numpy.ndarray
+        If ``size`` equals ``1`` a single float is returned, otherwise an array
+        of shape ``(size,)`` with the drawn samples.
     """
     a = (lower - mu) / sigma
     b = (upper - mu) / sigma
@@ -35,6 +47,18 @@ def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
 
 
 def randomwalk(lgca):
+    """Move cells by uniformly redistributing them among velocity channels.
+
+    Parameters
+    ----------
+    lgca : object
+        Lattice-gas cellular automaton that is modified in-place.
+
+    Returns
+    -------
+    None
+    """
+
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
@@ -49,16 +73,22 @@ def randomwalk(lgca):
 
 
 def evo_steric(lgca):
-    """
-    Apply a birth-death step, then cells move under steric interactions.
-    Each cell proliferates with its individual birth rate r_b following logistic growth until
-    a capacity 'capacity' is reached, that is constant for all cells.
-    All cells die with a constant probability 'r_d'.
-    During proliferation there can be a mutation on either mother or daughter cell.
-    Mutations can be beneficial (driver mutations) or deleterious to neutral (passenger mutations).
-    These mutations manifest in a changed proliferation rate.
-    :param lgca:
-    :return:
+    """Birth--death dynamics with mutations and steric movement.
+
+    Cells proliferate with their individual birth rates following a logistic
+    growth law limited by ``capacity`` and die with probability ``r_d``. During
+    proliferation mutations may occur which modify the proliferation rate. After
+    the birth--death step cells redistribute among velocity channels according to
+    steric interactions controlled by ``alpha`` and ``gamma``.
+
+    Parameters
+    ----------
+    lgca : object
+        Lattice-gas cellular automaton that will be modified in-place.
+
+    Returns
+    -------
+    None
     """
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
@@ -106,13 +136,20 @@ def evo_steric(lgca):
 
 
 def birth(lgca):
-    """
-    Apply a birth step. Each cell proliferates following a logistic growth law using its individual birth rate r_b and
-    a capacity 'capacity', that is constant for all cells.
-    Daughter cells receive an individual proliferation rate that is drawn from a truncated Gaussian distribution between
-    0 and a_max, whose mean is equal to the mother cell's r_b, with standard deviation 'std'.
-    :param lgca:
-    :return:
+    """Logistic birth process with inheritable proliferation rates.
+
+    Each cell divides with probability ``r_b`` scaled by the available capacity.
+    The proliferation rate of each daughter cell is drawn from a truncated
+    Gaussian distribution centred at the mother's rate.
+
+    Parameters
+    ----------
+    lgca : object
+        Lattice-gas cellular automaton that will be modified in-place.
+
+    Returns
+    -------
+    None
     """
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
@@ -139,13 +176,21 @@ def birth(lgca):
 
 
 def birthdeath(lgca):
-    """
-    Apply a birth-death step. Each cell proliferates following a logistic growth law using its individual birth rate r_b and
-    a capacity 'capacity', that is constant for all cells. All cells die with a constant probability 'r_d'.
-    Daughter cells receive an individual proliferation rate that is drawn from a truncated Gaussian distribution between
-    0 and a_max, whose mean is equal to the mother cell's r_b, with standard deviation 'std'.
-    :param lgca:
-    :return:
+    """Birth and death step with heterogenous proliferation rates.
+
+    Cells divide according to their individual birth rate and the available
+    capacity, while every cell dies with probability ``r_d``. The proliferation
+    rate of each daughter cell is drawn from a truncated Gaussian distribution
+    around the mother's rate.
+
+    Parameters
+    ----------
+    lgca : object
+        Lattice-gas cellular automaton that will be modified in-place.
+
+    Returns
+    -------
+    None
     """
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
@@ -174,15 +219,21 @@ def birthdeath(lgca):
         lgca.nodes[coord] = deepcopy(newnode)
 
 def birthdeath_cancerdfe(lgca):
-    """
-    Apply a birth-death step. Each cell proliferates following a logistic growth law using its individual birth rate r_b and
-    a capacity 'capacity', that is constant for all cells. All cells die with a constant probability 'r_d'.
-    Daughter cells receive an individual proliferation rate that is the mother cell's r_b, with a deviation caused by a
-    mutation. The mutation can either be a driver mutation, which increases the proliferation rate, or a passenger mutation,
-    which slightly decreases the proliferation rate.
-    Both mutations are exponentially distributed with mean s_d and s_p, respectively.
-    :param lgca:
-    :return:
+    """Birth--death step with driver and passenger mutations.
+
+    Proliferation follows a logistic law and death occurs with probability
+    ``r_d``. Daughter cells inherit the mother's birth rate plus a deviation
+    drawn from exponential distributions representing driver (beneficial) or
+    passenger (deleterious) mutations.
+
+    Parameters
+    ----------
+    lgca : object
+        Lattice-gas cellular automaton that will be modified in-place.
+
+    Returns
+    -------
+    None
     """
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
@@ -223,13 +274,22 @@ def birthdeath_cancerdfe(lgca):
 
 
 def go_or_grow(lgca):
-    """
-    Apply the evolutionary "go-or-grow" interaction. Cells switch from a migratory to a resting phenotype and vice versa
-    depending on their individual properties and the local cell density. Resting cells proliferate with a constant
-    proliferation rate. Each cell dies with a constant rate. Daughter cells inherit their switch properties from the
-    mother cells with some small variations given by a (truncated) Gaussian distribution.
-    :param lgca:
-    :return:
+    """Evolutionary ``go-or-grow`` interaction.
+
+    Cells stochastically switch between a migratory and a resting phenotype
+    according to a sigmoidal function of the local density (``tanh_switch``) with
+    individual parameters ``kappa`` and ``theta``. Resting cells proliferate with
+    a constant rate ``r_b`` and all cells die with rate ``r_d``. Offspring inherit
+    the mother's switching parameters with Gaussian noise.
+
+    Parameters
+    ----------
+    lgca : object
+        Lattice-gas cellular automaton that will be modified in-place.
+
+    Returns
+    -------
+    None
     """
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
@@ -275,14 +335,20 @@ def go_or_grow(lgca):
         lgca.nodes[coord] = node
 
 def go_or_grow_kappa(lgca):
-    """
-    Apply the evolutionary "go-or-grow" interaction. Cells switch from a migratory to a resting phenotype and vice versa
-    depending on their individual properties and the local cell density. Resting cells proliferate with a constant
-    proliferation rate. Each cell dies with a constant rate. Daughter cells inherit their switch properties from the
-    mother cells with some small variations given by a (truncated) Gaussian distribution.
+    """``Go-or-grow`` interaction using neighbourhood density.
 
-    :param lgca: The lattice-gas cellular automata object.
-    :return: None. The function modifies the lgca object in-place.
+    Phenotype switching is determined by the average density in the Moore
+    neighbourhood rather than only the local density. Only the slope parameter
+    ``kappa`` evolves, whereas the threshold ``theta`` is fixed globally.
+
+    Parameters
+    ----------
+    lgca : object
+        Lattice-gas cellular automaton that will be modified in-place.
+
+    Returns
+    -------
+    None
     """
     # Identify the relevant cells (those with non-zero density)
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
@@ -337,18 +403,42 @@ def go_or_grow_kappa(lgca):
 
 
 @jit(nopython=True)
-def tanh_switch(rho, kappa=5., theta=0.8):
+def tanh_switch(rho, kappa=5.0, theta=0.8):
+    """Sigmoidal switching function.
+
+    Parameters
+    ----------
+    rho : float or numpy.ndarray
+        Local (or neighbourhood) density.
+    kappa : float, optional
+        Steepness of the transition. Default is ``5.0``.
+    theta : float, optional
+        Density threshold at which the switch probability is ``0.5``.
+        Default is ``0.8``.
+
+    Returns
+    -------
+    float or numpy.ndarray
+        Switching probability with the same shape as ``rho``.
+    """
+
     return 0.5 * (1 + np.tanh(kappa * (rho - theta)))
 
 def go_or_grow_kappa_chemo(lgca):
-    """
-    Apply the evolutionary "go-or-grow" interaction. Cells switch from a migratory to a resting phenotype and vice versa
-    depending on their individual properties and the local cell density. Resting cells proliferate with a constant
-    proliferation rate. Migrating cells move along the cell density gradient.
-    Each cell dies with a constant rate. Daughter cells inherit their switch properties from the
-    mother cells with some small variations given by a (truncated) Gaussian distribution.
-    :param lgca:
-    :return:
+    """``Go-or-grow`` interaction with chemotactic movement.
+
+    Switching dynamics are identical to :func:`go_or_grow_kappa`, but migrating
+    cells move preferentially along the density gradient according to a Boltzmann
+    weight with parameter ``beta``.
+
+    Parameters
+    ----------
+    lgca : object
+        Lattice-gas cellular automaton that will be modified in-place.
+
+    Returns
+    -------
+    None
     """
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
