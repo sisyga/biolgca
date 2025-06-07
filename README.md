@@ -21,9 +21,9 @@ currently supported are:
 - classical LGCA without volume exclusion (all particles/cells have the same properties)
 - identity-based LGCA without volume exclusion (particles/cells can have individual properties)
 
-These can be simulated in a 1D, 2D square or 2D hexagonal lattice. A [library of 
-interaction rules](./lgca/interactions.py) (documentation under construction) is already implemented. Adding a custom 
-interaction rule or customising other parts of the simulation (e.g. the interaction 
+These can be simulated in a 1D, 2D square, 2D hexagonal or 3D cubic lattice. A [library of
+interaction rules](./lgca/interactions.py) (documentation under construction) is already implemented. Adding a custom
+interaction rule or customising other parts of the simulation (e.g. the interaction
 radius) is easy.
 
 Current analysis possibilities include plots of:
@@ -35,6 +35,27 @@ Current analysis possibilities include plots of:
 - vector field
 
 The internal state of the LGCA is always accessible for computational analysis.
+
+# Quick Start
+Clone the repository and install the core requirements:
+```bash
+git clone https://github.com/sisyga/biolgca.git
+cd biolgca
+pip install -r requirements.txt
+```
+Run a short simulation to verify the setup:
+```python
+from lgca import get_lgca
+lgca = get_lgca()
+lgca.timeevo(timesteps=10)
+```
+
+# Table of Contents
+- [Example usage](#example-usage)
+- [Getting started](#getting-started)
+- [Running tests and building docs](#running-tests-and-building-docs)
+- [Questions/Contribute](#questionscontribute)
+- [License](#license)
 
 # Example usage
 #### Timestepping and flux plot
@@ -137,9 +158,19 @@ lgca.plot_density()
 ```
 The [Tutorial](./BioLGCA.ipynb) guides you through the argument options.
 
+# Running tests and building docs
+Run the test-suite from the repository root with
+```bash
+pytest
+```
+Build the HTML documentation in `docs/_build` using
+```bash
+sphinx-build -b html docs/source docs/_build
+```
+
 # Questions/Contribute
-The structure of the package and its functionalities are detailed in the 
-[documentation](). There you will also find coding examples (under construction).
+The structure of the package and its functionalities are detailed in the
+[documentation](docs/). There you will also find coding examples (under construction).
 
 Issues are tracked on the [GitHub page](https://github.com/sisyga/biolgca/issues).
 We collect both bugs and feature ideas there.
@@ -153,4 +184,4 @@ Bianca Güttner: `bianca.guettner@nct-dresden.de`
 # License
 BSD 3-clause license (see LICENSE file or [online resource](https://opensource.org/licenses/BSD-3-Clause)).
 
-Copyright (C) 2018-2022 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.
+Copyright (C) 2018-2025 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.
