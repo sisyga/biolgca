@@ -16,9 +16,16 @@ from lgca.interactions import tanh_switch
 
 
 def random_walk(lgca):
-    """
-    Particles are randomly redistributed among channels with the same probability for each channel.
-    In combination with deterministic propagation it produces an unbiased random walk.
+    """Shuffle particles between channels to mimic diffusion.
+
+    Parameters
+    ----------
+    lgca : BaseLGCA
+        LGCA object whose ``nodes`` array will be permuted.
+
+    Notes
+    -----
+    ``lgca`` is modified in place.
     """
     lgca.nodes = lgca.rng.permuted(lgca.nodes, axis=-1)
     # relevant = lgca.cell_density[lgca.nonborder] > 0
@@ -29,22 +36,44 @@ def random_walk(lgca):
 
 
 def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
-    """
-    Sample from a truncated Gaussian distribution.
-    :param lower: lower limit of truncation
-    :param upper: upper limit of truncation
-    :param mu: mean of the distribution
-    :param sigma: standard deviation of the distribution
-    :param size: desired sample size
-    :returns: (array) of size size, samples from the described truncated Gaussian
+    """Draw samples from a truncated normal distribution.
+
+    Parameters
+    ----------
+    lower : float
+        Lower truncation limit.
+    upper : float
+        Upper truncation limit.
+    mu : float
+        Mean of the underlying distribution.
+    sigma : float, default=0.1
+        Standard deviation of the distribution.
+    size : int, default=1
+        Number of samples to draw.
+
+    Returns
+    -------
+    :class:`numpy.ndarray`
+        Array of samples from the truncated distribution.
     """
     a = (lower - mu) / sigma
     b = (upper - mu) / sigma
     return truncnorm(a, b, loc=mu, scale=sigma).rvs(size)
 
 def birth(lgca):
-    """
-    Simple birth process
+    """Create daughter cells according to individual proliferation rates.
+
+    Parameters
+    ----------
+    lgca : BaseLGCA
+        LGCA object to update.
+
+    Notes
+    -----
+    ``lgca.nodes`` and ``lgca.props['r_b']`` are changed in place.  The
+    proliferation rate of each daughter cell is drawn from
+    :func:`trunc_gauss` with limits ``0`` and ``interaction_params['a_max']``
+    and width ``interaction_params['std']``.
     """
 
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
@@ -72,9 +101,22 @@ def birth(lgca):
 
 
 def birthdeath(lgca):
-    """
-    Simple birth-death process with evolutionary dynamics towards a higher proliferation rate.
-    Family membership of cells can be tracked by passing the keyword argument track_inheritance=True in get_lgca().
+    """Birth-death dynamics with mutating proliferation rates.
+
+    Cells die with probability ``interaction_params['r_d']``. Surviving cells
+    proliferate according to their individual ``r_b``. The proliferation rate
+    of newborns is drawn from :func:`trunc_gauss`. If
+    ``interaction_params['track_inheritance']`` is ``True`` the family index of
+    the mother cell is copied to the daughter.
+
+    Parameters
+    ----------
+    lgca : BaseLGCA
+        LGCA object being modified.
+
+    Notes
+    -----
+    ``lgca`` and its property lists are altered in place.
     """
     # death process, remember who will die but give them the chance to proliferate
     dying = (npr.random(size=lgca.nodes.shape) < lgca.interaction_params['r_d']) & lgca.occupied
@@ -116,8 +158,20 @@ def birthdeath(lgca):
     random_walk(lgca)
 
 def birthdeath_discrete(lgca):
-    """
-    Simple birth-death process with evolutionary dynamics towards a higher proliferation rate
+    """Birth-death process with discrete proliferation-rate mutations.
+
+    Offspring may mutate their ``r_b`` by ``\pm interaction_params['drb']``
+    with probability ``interaction_params['pmut']`` while values are capped
+    by ``interaction_params['a_max']``.
+
+    Parameters
+    ----------
+    lgca : BaseLGCA
+        LGCA object being updated.
+
+    Notes
+    -----
+    Operates in place on ``lgca``.
     """
     # determine which cells will die
     dying = (npr.random(size=lgca.nodes.shape) < lgca.interaction_params['r_d']) & lgca.occupied
@@ -161,8 +215,22 @@ def birthdeath_discrete(lgca):
     random_walk(lgca)
 
 def go_or_grow(lgca):
-    """
-    interactions of the go-or-grow model. formulation too complex for 1d, but to be generalized.
+    """Implement the go-or-grow interaction scheme.
+
+    Cells stochastically switch between moving and resting states based on the
+    local density and their parameters ``kappa`` and ``theta``. Resting cells
+    can proliferate with probability ``interaction_params['r_b']``. The
+    parameters ``kappa_std`` and ``theta_std`` determine the variance of
+    these traits inherited by daughter cells.
+
+    Parameters
+    ----------
+    lgca : BaseLGCA
+        LGCA object to operate on.
+
+    Notes
+    -----
+    The LGCA is updated in place.
     """
 
     # death
@@ -228,10 +296,23 @@ def go_or_grow(lgca):
         lgca.nodes[coord] = node
 
 def go_and_grow_mutations(lgca):
-    """
-    Simple birth-death process with tracked family membership of cells. New families develop by mutations.
-    If lgca.interaction_params['effect'] == 'passenger_mutation': no change in proliferation rate, but mutations found new families
-    If lgca.interaction_params['effect'] == 'driver_mutation': evolutionary dynamics towards a higher proliferation rate
+    """Birth-death dynamics with explicit family tracking and mutations.
+
+    Cells die with probability ``interaction_params['r_d']``. Proliferation
+    rates are either constant or family dependent depending on
+    ``interaction_params['effect']`` (``'passenger_mutation'`` or
+    ``'driver_mutation'``). With probability ``interaction_params['r_m']`` a
+    dividing cell founds a new family. In the driver case the new family's
+    ``r_b`` is multiplied by ``interaction_params['fitness_increase']``.
+
+    Parameters
+    ----------
+    lgca : BaseLGCA
+        LGCA instance that will be updated.
+
+    Notes
+    -----
+    The LGCA object and its property lists are modified in place.
     """
     # dying process
     dying = (npr.random(size=lgca.nodes.shape) < lgca.interaction_params['r_d']) & lgca.occupied
