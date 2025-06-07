@@ -1,5 +1,6 @@
-matplotlib>=3.3.2
-numpy>=1.22.0
-scipy>=1.7.3
-sympy>=1.9
-tqdm>=4.64.0
+matplotlib
+numpy
+scipy
+sympy
+tqdm
+
