@@ -7,6 +7,10 @@ pytest.importorskip("numba")
 from lgca import get_lgca
 from tests.common_test import T_LGCA_Common
 from tests.classical_test import Test_LGCA_classical as T_LGCA_classical
+import tests.classical_test
+from tests.ib_test import matching_import
+matching_import("^nodes_cb_", tests.classical_test, globals())
+matching_import("^out_cb_", tests.classical_test, globals())
 
 
 def counts_to_lists(arr):
@@ -240,6 +244,9 @@ class Test_LGCA_NoVE_IB(T_LGCA_Common):
     test_abc_1d = T_LGCA_classical.test_abc_1d
     test_abc_square = T_LGCA_classical.test_abc_square
     test_abc_hex = T_LGCA_classical.test_abc_hex
+    test_pbc_cubic = T_LGCA_classical.test_pbc_cubic
+    test_rbc_cubic = T_LGCA_classical.test_rbc_cubic
+    test_abc_cubic = T_LGCA_classical.test_abc_cubic
 
     def t_prop_counts_template(self, geom, nodes, expected, bc="pbc"):
         nodes_ib = counts_to_lists(nodes)
@@ -260,7 +267,8 @@ class Test_LGCA_NoVE_IB(T_LGCA_Common):
     @pytest.mark.parametrize("geom,dims", [
         ("lin", (com.xdim_1d,)),
         ("square", (com.xdim_square, com.ydim_square)),
-        ("hex", (com.xdim_hex, com.ydim_hex))
+        ("hex", (com.xdim_hex, com.ydim_hex)),
+        ("cubic", (com.xdim_cubic, com.ydim_cubic, com.zdim_cubic))
     ])
     def test_recording(self, geom, dims):
         lgca_1 = get_lgca(geometry=geom, ve=False, ib=True, dims=dims, density=0.5, interaction="only_propagation")
@@ -348,7 +356,8 @@ class Test_LGCA_NoVE_IB(T_LGCA_Common):
     @pytest.mark.parametrize("geom,nodes,b", [
         ("lin", com.nodes_nove_1d, com.b_1d),
         ("square", com.nodes_nove_square, com.b_square),
-        ("hex", com.nodes_nove_hex, com.b_hex)
+        ("hex", com.nodes_nove_hex, com.b_hex),
+        ("cubic", com.nodes_nove_cubic, com.b_cubic)
     ])
     def test_getlgca_capacity(self, geom, nodes, b):
         capacity = 10
@@ -372,7 +381,8 @@ class Test_LGCA_NoVE_IB(T_LGCA_Common):
     @pytest.mark.parametrize("geom,nodes", [
         ("lin", com.nodes_nove_1d),
         ("square", com.nodes_nove_square),
-        ("hex", com.nodes_nove_hex)
+        ("hex", com.nodes_nove_hex),
+        ("cubic", com.nodes_nove_cubic)
     ])
     def test_characteristics(self, geom, nodes):
         nodes_ib = counts_to_lists(nodes)
