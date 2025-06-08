@@ -369,13 +369,13 @@ class Test_LGCA_NoVE_IB(T_LGCA_Common):
         assert lgca.capacity == capacity
         lgca = get_lgca(geometry=geom, ve=False, ib=True, density=density, capacity=capacity, interaction="only_propagation")
         assert lgca.capacity == capacity
-        lgca = get_lgca(geometry=geom, ve=False, ib=True, density=density, hom=True, capacity=capacity, interaction="only_propagation")
+        lgca = get_lgca(geometry=geom, ve=False, ib=True, density=density, capacity=capacity, interaction="only_propagation")
         assert lgca.capacity == capacity
         lgca = get_lgca(geometry=geom, ve=False, ib=True, nodes=nodes_ib, restchannels=1, interaction="only_propagation")
         assert lgca.capacity == b + 1
         lgca = get_lgca(geometry=geom, ve=False, ib=True, density=density, restchannels=1, interaction="only_propagation")
         assert lgca.capacity == b + 1
-        lgca = get_lgca(geometry=geom, ve=False, ib=True, density=density, hom=True, restchannels=1, interaction="only_propagation")
+        lgca = get_lgca(geometry=geom, ve=False, ib=True, density=density, restchannels=1, interaction="only_propagation")
         assert lgca.capacity == b + 1
 
     @pytest.mark.parametrize("geom,nodes", [
