@@ -171,6 +171,7 @@ class LGCA_Square(LGCA_base):
             self.random_reset(density)
         # initialization with provided initial condition
         else:
+            self._warn_nodes_shape(nodes)
             self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(bool)
             self.apply_boundaries()
 
@@ -1188,6 +1189,7 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
             self.random_reset(density)
 
         else:
+            self._warn_nodes_shape(nodes)
             self.nodes[self.nonborder] = nodes.astype(np.uint)
             self.apply_boundaries()
 
@@ -1341,6 +1343,7 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
             else:
                 self.random_reset(density)
         else:
+            self._warn_nodes_shape(nodes)
             self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(np.uint)
             self.apply_boundaries()
 
@@ -1539,9 +1542,11 @@ class NoVE_IBLGCA_Square(NoVE_IBLGCA_base, NoVE_LGCA_Square):
             self.random_reset(density)
 
         elif nodes.dtype == object:
+            self._warn_nodes_shape(nodes)
             self.nodes[self.nonborder] = nodes
 
         else:
+            self._warn_nodes_shape(nodes)
             occ = nodes.astype(int)
             self.nodes[self.nonborder] = self.convert_int_to_ib(occ)
 
