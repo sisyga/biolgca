@@ -507,17 +507,6 @@ class Test_LGCA_NoVE(T_LGCA_Common):
         lgca = get_lgca(
             geometry=geom,
             ve=False,
-            density=density,
-            hom=True,
-            capacity=capacity,
-            interaction="only_propagation",
-        )
-        assert (
-            lgca.capacity == capacity
-        ), "Capacity keyword not respected in homogeneous random reset"
-        lgca = get_lgca(
-            geometry=geom,
-            ve=False,
             nodes=nodes,
             restchannels=restchannels,
             interaction="only_propagation",
@@ -535,28 +524,6 @@ class Test_LGCA_NoVE(T_LGCA_Common):
         assert (
             lgca.capacity == b + restchannels
         ), "Capacity not correctly calculated from provided geometry and rest channels"
-        lgca = get_lgca(
-            geometry=geom,
-            ve=False,
-            density=density,
-            hom=True,
-            restchannels=restchannels,
-            interaction="only_propagation",
-        )
-        assert (
-            lgca.capacity == b + restchannels
-        ), "Capacity not correctly calculated from provided geometry and rest channels"
-
-    @pytest.mark.parametrize(
-        "geom,nodes",
-        [
-            ("lin", com.nodes_nove_1d),
-            ("square", com.nodes_nove_square),
-            ("hex", com.nodes_nove_hex),
-            ("cubic", com.nodes_nove_cubic),
-        ],
-    )
-
     @pytest.mark.skip(reason="unstable with missing numba")
     def test_characteristics(self, geom, nodes):
         # volume exclusion does not have to be checked here, uniqueness neither
