@@ -12,12 +12,13 @@ try:  # optional plotting dependencies
     import matplotlib.colors as mplcolors
     import matplotlib.pyplot as plt
     import matplotlib.ticker as ticker
+    from matplotlib.ticker import FuncFormatter
     import matplotlib.cm as cm
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 except ImportError:  # pragma: no cover - handled at runtime
     from lgca.base import _MissingPlotLib
 
-    mplcolors = plt = ticker = cm = make_axes_locatable = _MissingPlotLib(
+    mplcolors = plt = ticker = FuncFormatter = cm = make_axes_locatable = _MissingPlotLib(
         "matplotlib"
     )
 
@@ -457,7 +458,7 @@ def muller_plot(root_ID, cum_pop_t, children_nlist, parent_list, timeline, facec
     ax.yaxis.set_minor_locator(ticker.MultipleLocator(0.1))
     ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
     # shift tick labels to start from 0 and stop at 1
-    ax.yaxis.set_major_formatter(lambda x, pos: x + 0.5)
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: x + 0.5))
 
     if legend:
         # set up legend, with sorted entries if desired
