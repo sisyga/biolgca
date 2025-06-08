@@ -946,48 +946,8 @@ class LGCA_base(ABC):
             Desired average particle density of the lattice.
             ``density = total_number_of_particles / (number_of_nodes * number_of_channels_per_node)``.
 
-        See Also
-        --------
-        homogeneous_random_reset : Initialize the lattice randomly with a fixed number of particles per node.
-
         """
         self.nodes = npr.random(self.nodes.shape) < density
-        self.apply_boundaries()
-        self.update_dynamic_fields()
-
-    def homogeneous_random_reset(self, density):
-        """
-        Initialize lattice nodes with average density `density`. Channels are occupied at random and all nodes
-        have the same particle number.
-
-        The particle number per node that matches `density` most closely is determined. The configuration for one
-        node with this number of particles is then permutated to fill the lattice.
-
-
-        Parameters
-        ----------
-        density : float
-            Desired average density of the lattice.
-            ``density = total_number_of_particles / (number_of_nodes * number_of_channels_per_node)``.
-            Here also: ``density = number_of_particles_per_node / number_of_channels_per_node``.
-
-        See Also
-        --------
-        random_reset : Initialize the lattice randomly with a varying number of particles per node.
-
-        """
-        # find the number of particles per lattice site which is closest to the desired density
-        if int(density * self.K) == density * self.K:
-            initcells = int(density * self.K)
-        else:
-            initcells = min(int(density * self.K) + 1, self.K)
-        # create a configuration for one node with the calculated number of particles
-        channels = [1] * initcells + [0] * (self.K - initcells)
-        # permutate it to fill the lattice
-        n_nodes = self.nodes[..., 0].size
-        channels = np.array([npr.permutation(channels) for _ in range(n_nodes)])
-        self.nodes = channels.reshape(self.nodes.shape)
-
         self.apply_boundaries()
         self.update_dynamic_fields()
         # achieved density
@@ -2467,8 +2427,9 @@ class NoVE_LGCA_base(LGCA_base, ABC):
     """
     Base class for LGCA without volume exclusion.
     """
+
     def __init__(self, nodes=None, dims=None, restchannels=1, density=0.1,
-                 hom=None, bc='periodic', seed=None, capacity=None,
+                 bc='periodic', seed=None, capacity=None,
                  propagation=True, **kwargs):
         """
         Initialize class instance.
@@ -2487,7 +2448,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         self.set_bc(bc)
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes, capacity=capacity)
         self.init_coords()
-        self.init_nodes(density=density, nodes=nodes, hom=hom)
+        self.init_nodes(density=density, nodes=nodes)
         self.update_dynamic_fields()
         self.interaction_params = {}
         self.set_interaction(**kwargs)
@@ -2680,24 +2641,6 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         eff_dens = self.nodes[self.nonborder].sum()/(self.capacity * self.cell_density[self.nonborder].size)
         print("Required density: {:.3f}, Achieved density: {:.3f}".format(density, eff_dens))
 
-    def homogeneous_random_reset(self, density):
-        """
-        Distribute particles in the lattice homogeneously according to a given density: each lattice site has the same
-            number of particles, randomly distributed among the channels
-        :param density: particle density in the lattice: number of particles/(dimensions*capacity)
-        """
-        # find the number of particles per lattice site which is closest to the desired density
-        if int(density * self.capacity) == density * self.capacity:
-            initcells = int(density * self.capacity)
-        else:
-            initcells = int(density * self.capacity) + 1
-        # distribute calculated number of particles among channels in the lattice
-        self.nodes = npr.multinomial(initcells, [1 / self.K] * self.K, size=self.nodes.shape[:-1])
-        self.apply_boundaries()
-        self.update_dynamic_fields()
-        # check result
-        eff_dens = self.nodes[self.nonborder].sum() / (self.capacity * self.cell_density[self.nonborder].size)
-        print("Required density: {:.3f}, Achieved density: {:.3f}".format(density, eff_dens))
 
     def calc_entropy(self, base=None):
         """

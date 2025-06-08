@@ -99,7 +99,7 @@ class LGCA_Cubic(LGCA_base):
         self.K = self.velocitychannels + self.restchannels
         self.capacity = capacity if capacity is not None else self.K
 
-    def init_nodes(self, density=0.1, nodes=None, hom=None, **kwargs):
+    def init_nodes(self, density=0.1, nodes=None, **kwargs):
         """
         Initialize LGCA lattice configuration. Create the lattice and then assign particles to channels in the nodes.
 
@@ -130,10 +130,7 @@ class LGCA_Cubic(LGCA_base):
         )
 
         if nodes is None:
-            if hom:
-                self.homogeneous_random_reset(density)
-            else:
-                self.random_reset(density)
+            self.random_reset(density)
         else:
             self._warn_nodes_shape(nodes)
             self.nodes[self.nonborder] = nodes.astype(bool)
@@ -1131,7 +1128,7 @@ class NoVE_LGCA_Cubic(LGCA_Cubic, NoVE_LGCA_base):
         self.K = self.velocitychannels + self.restchannels
         self.capacity = capacity if capacity is not None else self.K
 
-    def init_nodes(self, density=4, nodes=None, hom=False):
+    def init_nodes(self, density=4, nodes=None):
         """
         Initialize lattice nodes.
         """
@@ -1145,10 +1142,7 @@ class NoVE_LGCA_Cubic(LGCA_Cubic, NoVE_LGCA_base):
             dtype=np.uint,
         )
         if nodes is None:
-            if hom:
-                self.homogeneous_random_reset(density)
-            else:
-                self.random_reset(density)
+            self.random_reset(density)
         else:
             self._warn_nodes_shape(nodes)
             self.nodes[
