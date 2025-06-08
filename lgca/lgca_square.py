@@ -104,6 +104,11 @@ class LGCA_Square(LGCA_base):
         # set dimensions according to provided initial condition
         if nodes is not None:
             self.lx, self.ly, self.K = nodes.shape
+            if self.K < self.velocitychannels:
+                raise RuntimeError(
+                    'Not enough channels specified for the chosen geometry! '
+                    f'Required: {self.velocitychannels}, provided: {self.K}'
+                )
             self.restchannels = self.K - self.velocitychannels
             self.dims = self.lx, self.ly
             return
