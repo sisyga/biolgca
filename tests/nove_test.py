@@ -317,11 +317,15 @@ class Test_LGCA_NoVE(T_LGCA_Common):
     test_abc_1d = T_LGCA_classical.test_abc_1d
     test_abc_square = T_LGCA_classical.test_abc_square
     test_abc_hex = T_LGCA_classical.test_abc_hex
+    test_pbc_cubic = T_LGCA_classical.test_pbc_cubic
+    test_rbc_cubic = T_LGCA_classical.test_rbc_cubic
+    test_abc_cubic = T_LGCA_classical.test_abc_cubic
 
     @pytest.mark.parametrize("geom,dims", [
         ('lin', (com.xdim_1d,)),
         ('square', (com.xdim_square, com.ydim_square)),
-        ('hex', (com.xdim_hex, com.ydim_hex))
+        ('hex', (com.xdim_hex, com.ydim_hex)),
+        ('cubic', (com.xdim_cubic, com.ydim_cubic, com.zdim_cubic))
     ])
     def test_recording(self, geom, dims):
         # timeevo and recording: check if all properties are available when requested
@@ -418,7 +422,8 @@ class Test_LGCA_NoVE(T_LGCA_Common):
     @pytest.mark.parametrize("geom,nodes,b", [
         ('lin', com.nodes_nove_1d, com.b_1d),
         ('square', com.nodes_nove_square, com.b_square),
-        ('hex', com.nodes_nove_hex, com.b_hex)
+        ('hex', com.nodes_nove_hex, com.b_hex),
+        ('cubic', com.nodes_nove_cubic, com.b_cubic)
     ])
     def test_getlgca_capacity(self, geom, nodes, b):
         # lattice setup test with capacity: capacity defines how density is calculated
@@ -443,7 +448,8 @@ class Test_LGCA_NoVE(T_LGCA_Common):
     @pytest.mark.parametrize("geom,nodes", [
         ('lin', com.nodes_nove_1d),
         ('square', com.nodes_nove_square),
-        ('hex', com.nodes_nove_hex)
+        ('hex', com.nodes_nove_hex),
+        ('cubic', com.nodes_nove_cubic)
     ])
     @pytest.mark.skip(reason="unstable with missing numba")
     def test_characteristics(self, geom, nodes):
