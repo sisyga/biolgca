@@ -1448,7 +1448,7 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
 
         # colors = 'none', 'k'
         vmax = nodes.max() if vmax is None else vmax
-        cmap = get_cmap(density, vmax=vmax, cmap=cmap, cbar=cbar, cbarlabel=cbarlabel)
+        cmap = get_cmap(density, ax=ax, vmax=vmax, cmap=cmap, cbar=cbar, cbarlabel=cbarlabel)
         arrows = []
         for i in range(self.velocitychannels):
             cx = self.c[0, i] * 0.5
