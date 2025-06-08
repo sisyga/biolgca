@@ -548,6 +548,17 @@ class LGCA_base(ABC):
         """
         raise NotImplementedError("Inflow boundary conditions not yet implemented for class "+str(self.__class__)+".")
 
+    def _warn_nodes_shape(self, nodes):
+        """Issue warnings if ``nodes`` do not match current geometry."""
+        if nodes is None:
+            return
+        expected = self.dims + (self.K,)
+        if nodes.shape != expected:
+            warnings.warn(
+                f"Provided nodes have shape {nodes.shape}, expected {expected}.",
+                UserWarning,
+            )
+
     def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', seed=None, **kwargs):
         """ Initialize class instance. See class docstring."""
         self.r_int: int = 1  # Interaction radius. Must be at least 1 to handle propagation.
