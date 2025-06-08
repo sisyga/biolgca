@@ -527,7 +527,7 @@ class LGCA_base(ABC):
         raise NotImplementedError("Reflecting boundary conditions not yet implemented for class " +
                                   str(self.__class__)+".")
 
-    def apply_pbc(self):
+    def apply_abc(self):
         """
         Apply absorbing boundary conditions.
 
