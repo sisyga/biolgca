@@ -1,4 +1,7 @@
 import pytest
+
+pytest.importorskip("matplotlib", reason="requires matplotlib for plotting tests")
+
 from lgca.plots import IdentityColourMapper
 
 
