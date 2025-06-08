@@ -472,12 +472,13 @@ class LGCA_1D(LGCA_base):
         plt.sca(ax)
         return plot
 
-    def plot_flux(self, nodes_t=None, **kwargs):
+    def plot_flux(self, nodes_t=None, cbar=True, colorbarwidth=0.03, **kwargs):
         """
         Plot flux in each node over time. X axis: 1D lattice, y axis: time.
 
         A flux vector to the left is indicated by a blue color of the node, a flux vector to the right by red. If the
-        velocities of all particles cancel out, the node is colored in black. Empty nodes are white.
+        velocities of all particles cancel out, the node is colored in black. Empty nodes are white. A color bar
+        illustrates the mapping from colors to flux direction.
 
         Parameters
         ----------
@@ -485,6 +486,11 @@ class LGCA_1D(LGCA_base):
             Node configurations for a lattice over time, used to calculate the flux and plot it. If set to None and a
             simulation has been performed before with ``record=True``, the result of the simulation is plotted.
             Dimensions: ``(timesteps + 1,) + self.dims + (self.K,)``.
+        cbar : bool, default=True
+            Draw a color bar indicating the flux coding.
+        colorbarwidth : float
+            Width of the additional axis for the color bar, passed to
+            :py:meth:`mpl_toolkits.axes_grid1.axes_divider.AxesDivider.append_axes`.
         **kwargs
             Arguments to be passed on to :py:meth:`setup_figure`.
 
@@ -511,11 +517,19 @@ class LGCA_1D(LGCA_base):
         flux_t = nodes_t[..., 0].astype(int) - nodes_t[..., 1].astype(int)
 
         # color code flux
-        rgba = np.zeros((tmax, l, 4)) #  4: RGBA A=alpha: transparency
-        rgba[dens_t > 0, -1] = 1.
-        rgba[flux_t > 0, 0] = 1.
-        rgba[flux_t < 0, 2] = 1.
-        rgba[flux_t == 0, :-1] = 0.  # unpopulated lattice sites are white
+        rgba = np.zeros((tmax, l, 4))  # 4: RGBA, A=alpha for visibility
+        rgba[dens_t > 0, -1] = 1.0
+        rgba[flux_t > 0, 0] = 1.0
+        rgba[flux_t < 0, 2] = 1.0
+        rgba[flux_t == 0, :-1] = 0.0  # unpopulated lattice sites are white
+
+        # create mapping for the optional color bar
+        flux_code = np.zeros((tmax, l), dtype=int)
+        flux_code[(dens_t > 0) & (flux_t < 0)] = 1
+        flux_code[(dens_t > 0) & (flux_t == 0)] = 2
+        flux_code[(dens_t > 0) & (flux_t > 0)] = 3
+        cmap = colors.ListedColormap(['white', 'blue', 'black', 'red'])
+        norm = colors.BoundaryNorm(np.arange(-0.5, 4, 1), cmap.N)
 
         # create plot
         fig, ax = self.setup_figure(tmax, **kwargs)
@@ -526,7 +540,15 @@ class LGCA_1D(LGCA_base):
         ax.xaxis.set_ticks_position('top')
         ax.xaxis.tick_top()
         plt.tight_layout()
-        # color bar option is missing here
+        if cbar:
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size=colorbarwidth, pad=0.1)
+            mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
+            cbar_handle = fig.colorbar(mappable, use_gridspec=True, cax=cax)
+            cbar_handle.set_ticks(range(4))
+            cbar_handle.set_ticklabels(['empty', 'left', 'no flux', 'right'])
+            cbar_handle.set_label('Flux direction')
+            plt.sca(ax)
         return plot
 
 
