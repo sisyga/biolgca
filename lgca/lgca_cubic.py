@@ -26,6 +26,7 @@ class LGCA_Cubic(LGCA_base):
     """
 
     # Set class attributes
+    geometry = 'cubic'
     interactions = [
         "go_and_grow",
         "go_or_grow",

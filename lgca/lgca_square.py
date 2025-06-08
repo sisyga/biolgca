@@ -71,6 +71,7 @@ class LGCA_Square(LGCA_base):
 
     """
     # set class attributes
+    geometry = 'square'
     interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation',
                     'random_walk', 'excitable_medium', 'nematic', 'persistent_motion', 'chemotaxis', 'contact_guidance',
                     'only_propagation']

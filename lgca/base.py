@@ -880,15 +880,20 @@ class LGCA_base(ABC):
         """
         if bc in ['absorbing', 'absorb', 'abs', 'abc', 'fixed']:
             self.apply_boundaries = self.apply_abc
+            self.bc = 'absorbing'
         elif bc in ['reflecting', 'reflect', 'refl', 'rbc', 'no_flux', 'noflux']:
             self.apply_boundaries = self.apply_rbc
+            self.bc = 'reflecting'
         elif bc in ['periodic', 'pbc']:
             self.apply_boundaries = self.apply_pbc
+            self.bc = 'periodic'
         elif bc in ['inflow']:
             self.apply_boundaries = self.apply_inflowbc
+            self.bc = 'inflow'
         else:
             print(bc, 'not defined, using periodic boundaries')
             self.apply_boundaries = self.apply_pbc
+            self.bc = 'periodic'
 
     def calc_flux(self, nodes):
         """
@@ -1107,6 +1112,38 @@ class LGCA_base(ABC):
             Total population size.
         """
         return int(self.cell_density[self.nonborder].sum())
+
+    def __repr__(self) -> str:
+        """Return a concise representation for debugging."""
+        geom = getattr(self, "geometry", "unknown")
+        bc = getattr(self, "bc", "periodic")
+        interaction = getattr(self.interaction, "__name__", str(self.interaction))
+        return (
+            f"{self.__class__.__name__}(geometry={geom}, dims={self.dims}, "
+            f"rest={self.restchannels}, K={self.K}, r_int={self.r_int}, bc={bc}, "
+            f"interaction={interaction})"
+        )
+
+    def __str__(self) -> str:
+        """Human readable summary of the LGCA."""
+        geom = getattr(self, "geometry", "unknown")
+        bc = getattr(self, "bc", "periodic")
+        interaction = getattr(self.interaction, "__name__", str(self.interaction))
+        capacity = getattr(self, "capacity", self.K)
+        prop = "ensemble" if getattr(self, "ensemble", False) else "normal"
+        lines = [
+            f"Model: {self.__class__.__name__}",
+            f"Geometry: {geom}",
+            f"Dimensions: {self.dims}",
+            f"Rest channels: {self.restchannels}",
+            f"Carrying capacity: {capacity}",
+            f"Interaction radius: {self.r_int}",
+            f"Boundary conditions: {bc}",
+            f"Propagation: {prop}",
+            f"Interaction: {interaction}",
+            f"Interaction parameters: {self.interaction_params}",
+        ]
+        return "\n".join(lines)
 
 
 class IBLGCA_base(LGCA_base, ABC):
