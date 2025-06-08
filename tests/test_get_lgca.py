@@ -6,6 +6,10 @@ from lgca.lgca_square import LGCA_Square, IBLGCA_Square, NoVE_LGCA_Square, NoVE_
 from lgca.lgca_hex import LGCA_Hex, IBLGCA_Hex, NoVE_LGCA_Hex, NoVE_IBLGCA_Hex
 
 try:
+    import mayavi  # noqa: F401
+except Exception:
+    HAS_CUBIC = False
+else:
     from lgca.lgca_cubic import (
         LGCA_Cubic,
         IBLGCA_Cubic,
@@ -13,8 +17,6 @@ try:
         NoVE_IBLGCA_Cubic,
     )
     HAS_CUBIC = True
-except Exception:
-    HAS_CUBIC = False
 
 EXPECTED = {
     'lin': {

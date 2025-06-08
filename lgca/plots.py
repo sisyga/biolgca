@@ -8,11 +8,18 @@
 import numpy as np
 import random
 from itertools import cycle
-import matplotlib.colors as mplcolors
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-import matplotlib.cm as cm
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+try:  # optional plotting dependencies
+    import matplotlib.colors as mplcolors
+    import matplotlib.pyplot as plt
+    import matplotlib.ticker as ticker
+    import matplotlib.cm as cm
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+except ImportError:  # pragma: no cover - handled at runtime
+    from lgca.base import _MissingPlotLib
+
+    mplcolors = plt = ticker = cm = make_axes_locatable = _MissingPlotLib(
+        "matplotlib"
+    )
 
 
 class IdentityColourMapper:

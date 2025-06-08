@@ -1,8 +1,9 @@
 from lgca.base import *
-from mayavi import mlab
-from mayavi import mlab
-
-from lgca.base import *
+try:  # optional plotting dependency
+    from mayavi import mlab
+except ImportError:  # pragma: no cover - handled at runtime
+    from lgca.base import _MissingPlotLib
+    mlab = _MissingPlotLib("mayavi")
 
 
 class LGCA_Cubic(LGCA_base):
