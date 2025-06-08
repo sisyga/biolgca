@@ -38,7 +38,8 @@ advantages of the framework.
 
 .. note::
 
-   This project is under active development and the documentation is under construction.
+   This project is under active development.  The documentation describes the
+   available LGCA types, lattice geometries and interaction rules.
    
 The types of LGCA currently supported are:
 
@@ -47,7 +48,10 @@ The types of LGCA currently supported are:
 - classical LGCA without volume exclusion (all particles/cells have the same properties)
 - identity-based LGCA without volume exclusion (particles/cells can have individual properties)
 
-These can be simulated in a 1D, 2D square or 2D hexagonal lattice. A :ref:`library of interaction rules <interaction_chapter>` is already implemented (documentation under construction). :ref:`Adding a custom interaction rule <adding_own_interactions>` or customising other parts of the simulation (e.g. the interaction radius) is easy.
+These can be simulated in a 1D, 2D square, 2D hexagonal or 3D cubic lattice.  A
+:ref:`library of interaction rules <interaction_chapter>` is already
+implemented.  :ref:`Adding a custom interaction rule <adding_own_interactions>`
+or customising other parts of the simulation (e.g. the interaction radius) is easy.
 
 Current analysis possibilities include plots of:
 
@@ -143,7 +147,7 @@ Identity-based LGCA and 1D plots
 Questions/Contribute
 --------------------
 
-    The structure of the package and its functionalities are detailed in the other chapters of this documentation. :ref:`Here <examples_chapter>` you can find coding examples (under construction).
+    The structure of the package and its functionalities are detailed in the other chapters of this documentation. :ref:`Here <examples_chapter>` you can find coding examples illustrating typical workflows.
 
     Issues are tracked on the `GitHub page <https://github.com/sisyga/biolgca/issues>`_.
     We collect both bugs and feature ideas there.
@@ -209,3 +213,4 @@ Copyright (C) 2018-2024 Technische Universität Dresden.
         padding-top: 0px;
     	padding-bottom: 0px;
     }
+
