@@ -3,11 +3,10 @@
 Built-in Interactions
 =====================
 
-.. note::
-
-   This section is under construction.
-   
-Interactions specify the behaviour of the LGCA. A timestep consists of an interaction step followed by a propagation step.
+This section lists the interaction functions that ship with the package.
+Interactions specify the behaviour of the LGCA.  During a timestep the
+interaction step updates the state of each node and is followed by a
+propagation step moving particles along the lattice.
 
 To specify your own interaction function, please see the tutorial (source code -> BioLGCA.ipynb, dedicated page planned). Built-in interactions can be found below.
 
@@ -34,3 +33,4 @@ Interactions for LGCA without volume exclusion
 .. automodule:: lgca.nove_interactions
    :members:
    :noindex:
+

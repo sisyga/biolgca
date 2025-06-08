@@ -3,13 +3,10 @@
 Examples
 ========
 
-.. note::
+This section collects small tutorials showing how to set up simulations and
+customise the LGCA simulator.
 
-   This section is under construction.
-
-Here you find tutorials on how to get started and how to customise the LGCA simulator.
-
-Other examples show features that may be useful to you!
+Other examples demonstrate additional features that may be useful to you.
 
 .. toctree::
    :maxdepth: 2

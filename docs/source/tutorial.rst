@@ -2,11 +2,11 @@
 Tutorial
 ********
 
-.. note::
-
-   This section is under construction.
-
-To Do: put contents of the .ipynb file here and link functions to usage guide.
+This tutorial introduces the main API by walking through a typical
+simulation workflow.  Detailed, runnable examples are provided in the
+notebooks :download:`BioLGCA.ipynb <../../BioLGCA.ipynb>` and
+:download:`Evolutionary LGCA.ipynb <../../Evolutionary LGCA.ipynb>`.  For more
+code snippets see also :doc:`examples`.
 
 
 
@@ -26,3 +26,4 @@ timestep and timeevo
 Customisation
 -------------
 How to specify your own interaction
+
