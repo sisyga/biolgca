@@ -3,6 +3,5 @@ numpy
 scipy
 sympy
 mayavi
-numba
 tqdm
 
