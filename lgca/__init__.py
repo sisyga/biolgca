@@ -23,12 +23,90 @@ References
 ----------
 .. [1] Deutsch A, Nava-Sedeño JM, Syga S, Hatzikirou H (2021) BIO-LGCA: A cellular
     automaton modelling class for analysing collective cell migration.
-    PLoS Comput Biol 17(6): e1009066. https://doi.org/10.1371/journal.pcbi.1009066
+PLoS Comput Biol 17(6): e1009066. https://doi.org/10.1371/journal.pcbi.1009066
 
 """
 
+import warnings
+from typing import Tuple, Any
 
-def get_lgca(geometry: str='hex', ib: bool=False, ve: bool=True, **kwargs):
+
+def _translate_dims(dims: Any, geom_key: str) -> Tuple[int, ...]:
+    """Translate the user supplied ``dims`` argument to a tuple.
+
+    Parameters
+    ----------
+    dims
+        Dimension argument passed to :func:`get_lgca`.
+    geom_key
+        Canonicalized geometry identifier.
+
+    Returns
+    -------
+    tuple of int
+        Dimensions interpreted in the same way as in ``set_dims``.
+    """
+    if dims is None:
+        return None
+    if isinstance(dims, tuple):
+        if geom_key == 'lin':
+            return (dims[0],)
+        if geom_key in {'square', 'hex'}:
+            return (dims[0], dims[1]) if len(dims) > 1 else (dims[0], dims[0])
+        if geom_key == 'cubic':
+            if len(dims) >= 3:
+                return dims[0], dims[1], dims[2]
+            if len(dims) == 2:
+                return dims[0], dims[0], dims[1]
+            return (dims[0],) * 3
+    else:
+        if geom_key == 'lin':
+            return (int(dims),)
+        if geom_key in {'square', 'hex'}:
+            d = int(dims)
+            return (d, d)
+        if geom_key == 'cubic':
+            d = int(dims)
+            return (d, d, d)
+    return tuple(dims)
+
+
+def _warn_on_node_mismatch(nodes, dims_arg, rest_arg, geom_key):
+    """Warn if provided ``nodes`` are inconsistent with ``dims`` or ``restchannels``."""
+    if nodes is None:
+        return
+
+    velocity_lookup = {
+        'lin': 2,
+        'square': 4,
+        'hex': 6,
+        'cubic': 6,
+    }
+
+    dims_from_nodes = nodes.shape[:-1]
+    vel = velocity_lookup.get(geom_key)
+    if vel is not None:
+        rest_from_nodes = nodes.shape[-1] - vel
+    else:
+        rest_from_nodes = None
+
+    dims_translated = _translate_dims(dims_arg, geom_key)
+    if dims_translated is not None and dims_from_nodes != tuple(dims_translated):
+        warnings.warn(
+            f"Provided nodes with dimensions {dims_from_nodes} override ``dims``={dims_arg}.",
+            UserWarning,
+        )
+
+    if rest_arg is not None and rest_from_nodes is not None and rest_from_nodes != rest_arg:
+        warnings.warn(
+            f"Provided nodes imply {rest_from_nodes} rest channels but ``restchannels``={rest_arg} was passed.",
+            UserWarning,
+        )
+
+
+
+
+def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs):
     """
     Build an LGCA with the specified geometry and initial conditions. Choose the correct LGCA subclass
     from the package and pass remaining keyword parameters on to it for initialization.
@@ -110,92 +188,84 @@ def get_lgca(geometry: str='hex', ib: bool=False, ve: bool=True, **kwargs):
     Progress: [####################] 100% Done...
 
     """
+    nodes = kwargs.get('nodes')
+    rest_arg = kwargs.get('restchannels')
+    dims_arg = kwargs.get('dims')
+
+    geom_map = {
+        '1d': 'lin',
+        'lin': 'lin',
+        'linear': 'lin',
+        'square': 'square',
+        'sq': 'square',
+        'rect': 'square',
+        'rectangular': 'square',
+        'hex': 'hex',
+        'hx': 'hex',
+        'hexagonal': 'hex',
+        'cubic': 'cubic',
+        'cb': 'cubic',
+    }
+
+    geom_key = geom_map.get(geometry, geometry)
+
     if not ve and not ib:
-        if geometry in ['1d', '1D', 'lin', 'linear']:
-            from lgca.lgca_1d import NoVE_LGCA_1D
-            return NoVE_LGCA_1D(**kwargs, ve=ve)
-
-        elif geometry in ['square', 'sq', 'rect', 'rectangular']:
-            from lgca.lgca_square import NoVE_LGCA_Square
-            return NoVE_LGCA_Square(**kwargs, ve=ve)
-
-        elif geometry in ['hex', 'hx', 'hexagonal']:
-            from lgca.lgca_hex import NoVE_LGCA_Hex
-            return NoVE_LGCA_Hex(**kwargs)
-
-        elif geometry in ['cubic', 'cb']:
-            from lgca.lgca_cubic import NoVE_LGCA_Cubic
-            return NoVE_LGCA_Cubic(**kwargs)
-
+        if geom_key == 'lin':
+            from lgca.lgca_1d import NoVE_LGCA_1D as _Cls
+        elif geom_key == 'square':
+            from lgca.lgca_square import NoVE_LGCA_Square as _Cls
+        elif geom_key == 'hex':
+            from lgca.lgca_hex import NoVE_LGCA_Hex as _Cls
+        elif geom_key == 'cubic':
+            from lgca.lgca_cubic import NoVE_LGCA_Cubic as _Cls
         else:
-            raise ValueError("Geometry specification is unknown. Try: '1d', 'lin', "
-                             "'linear', 'square', 'sq', 'rect', 'rectangular', 'hex', 'hx',  'hexagonal', "
-                             "'cubic', or 'cb'.")
-
-
-    if ib and ve:
-        if geometry in ['1d', '1D', 'lin', 'linear']:
-            from lgca.lgca_1d import IBLGCA_1D
-            return IBLGCA_1D(**kwargs)
-
-        elif geometry in ['square', 'sq', 'rect', 'rectangular']:
-            from lgca.lgca_square import IBLGCA_Square
-            return IBLGCA_Square(**kwargs)
-
-        elif geometry in ['hex', 'hx', 'hexagonal']:
-            from lgca.lgca_hex import IBLGCA_Hex
-            return IBLGCA_Hex(**kwargs)
-
-        elif geometry in ['cubic', 'cb']:
-            from lgca.lgca_cubic import IBLGCA_Cubic
-            return IBLGCA_Cubic(**kwargs)
-
+            raise ValueError(
+                "Geometry specification is unknown. Try: '1d', 'lin', 'linear', 'square', 'sq', "
+                "'rect', 'rectangular', 'hex', 'hx',  'hexagonal', 'cubic', or 'cb'."
+            )
+    elif ib and ve:
+        if geom_key == 'lin':
+            from lgca.lgca_1d import IBLGCA_1D as _Cls
+        elif geom_key == 'square':
+            from lgca.lgca_square import IBLGCA_Square as _Cls
+        elif geom_key == 'hex':
+            from lgca.lgca_hex import IBLGCA_Hex as _Cls
+        elif geom_key == 'cubic':
+            from lgca.lgca_cubic import IBLGCA_Cubic as _Cls
         else:
-            raise ValueError("Geometry specification is unknown. Try: '1d', 'lin', "
-                             "'linear', 'square', 'sq', 'rect', 'rectangular', 'hex', 'hx',  'hexagonal', "
-                             "'cubic', or 'cb'.")
-
-    if not ve and ib:
-        if geometry in ['1d', '1D', 'lin', 'linear']:
-            from lgca.lgca_1d import NoVE_IBLGCA_1D
-            return NoVE_IBLGCA_1D(**kwargs)
-
-        elif geometry in ['square', 'sq', 'rect', 'rectangular']:
-            from lgca.lgca_square import NoVE_IBLGCA_Square
-            return NoVE_IBLGCA_Square(**kwargs)
-
-        elif geometry in ['hex', 'hx', 'hexagonal']:
-            from lgca.lgca_hex import NoVE_IBLGCA_Hex
-            return NoVE_IBLGCA_Hex(**kwargs)
-
-        elif geometry in ['cubic', 'cb']:
-            from lgca.lgca_cubic import NoVE_IBLGCA_Cubic
-            return NoVE_IBLGCA_Cubic(**kwargs)
-
+            raise ValueError(
+                "Geometry specification is unknown. Try: '1d', 'lin', 'linear', 'square', 'sq', "
+                "'rect', 'rectangular', 'hex', 'hx',  'hexagonal', 'cubic', or 'cb'."
+            )
+    elif not ve and ib:
+        if geom_key == 'lin':
+            from lgca.lgca_1d import NoVE_IBLGCA_1D as _Cls
+        elif geom_key == 'square':
+            from lgca.lgca_square import NoVE_IBLGCA_Square as _Cls
+        elif geom_key == 'hex':
+            from lgca.lgca_hex import NoVE_IBLGCA_Hex as _Cls
+        elif geom_key == 'cubic':
+            from lgca.lgca_cubic import NoVE_IBLGCA_Cubic as _Cls
         else:
-            raise ValueError("Geometry specification is unknown. Try: '1d', 'lin', "
-                             "'linear', 'square', 'sq', 'rect', 'rectangular', 'hex', 'hx',  'hexagonal', "
-                             "'cubic', or 'cb'.")
-
-
+            raise ValueError(
+                "Geometry specification is unknown. Try: '1d', 'lin', 'linear', 'square', 'sq', "
+                "'rect', 'rectangular', 'hex', 'hx',  'hexagonal', 'cubic', or 'cb'."
+            )
     else:
-        if geometry in ['1d', '1D', 'lin', 'linear']:
-            from lgca.lgca_1d import LGCA_1D
-            return LGCA_1D(**kwargs)
-
-        elif geometry in ['square', 'sq', 'rect', 'rectangular']:
-            from lgca.lgca_square import LGCA_Square
-            return LGCA_Square(**kwargs)
-
-        elif geometry in ['hex', 'hx', 'hexagonal']:
-            from lgca.lgca_hex import LGCA_Hex
-            return LGCA_Hex(**kwargs)
-
-        elif geometry in ['cubic', 'cb']:
-            from lgca.lgca_cubic import LGCA_Cubic
-            return LGCA_Cubic(**kwargs)
-
+        if geom_key == 'lin':
+            from lgca.lgca_1d import LGCA_1D as _Cls
+        elif geom_key == 'square':
+            from lgca.lgca_square import LGCA_Square as _Cls
+        elif geom_key == 'hex':
+            from lgca.lgca_hex import LGCA_Hex as _Cls
+        elif geom_key == 'cubic':
+            from lgca.lgca_cubic import LGCA_Cubic as _Cls
         else:
-            raise ValueError("Geometry specification is unknown. Try: '1d', 'lin', "
-                             "'linear', 'square', 'sq', 'rect', 'rectangular', 'hex', 'hx',  'hexagonal', "
-                             "'cubic', or 'cb'.")
+            raise ValueError(
+                "Geometry specification is unknown. Try: '1d', 'lin', 'linear', 'square', 'sq', "
+                "'rect', 'rectangular', 'hex', 'hx',  'hexagonal', 'cubic', or 'cb'."
+            )
+
+    lgca = _Cls(**kwargs)
+    _warn_on_node_mismatch(nodes, dims_arg, rest_arg, geom_key)
+    return lgca
