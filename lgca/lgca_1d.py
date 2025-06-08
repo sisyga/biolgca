@@ -133,7 +133,7 @@ class LGCA_1D(LGCA_base):
         # initialization with provided initial condition
         else:
             self._warn_nodes_shape(nodes)
-            self.nodes[self.r_int:-self.r_int, :] = nodes.astype(bool)
+            self.nodes[self.r_int:-self.r_int, :] = self._ensure_bool_nodes(nodes)
             self.apply_boundaries()
 
     def init_coords(self):
