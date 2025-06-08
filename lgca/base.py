@@ -39,8 +39,11 @@ try:  # optional plotting dependencies
     from matplotlib import cm, pyplot as plt
     from matplotlib.cm import ScalarMappable
     from matplotlib.ticker import MaxNLocator, FuncFormatter
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
 except ImportError:  # pragma: no cover - handled at runtime
-    colors = cm = plt = ScalarMappable = MaxNLocator = FuncFormatter = _MissingPlotLib("matplotlib")
+    colors = cm = plt = ScalarMappable = MaxNLocator = FuncFormatter = make_axes_locatable = _MissingPlotLib(
+        "matplotlib"
+    )
 from numpy import random as npr
 from sympy.utilities.iterables import multiset_permutations
 from tqdm.auto import tqdm
@@ -185,7 +188,16 @@ def estimate_figsize(array, x: float=8., cbar: bool=False, dy: float=1.):
     return figsize
 
 
-def get_cmap(density, ax=None, vmax=None, cmap='viridis', cbar=True, cbarlabel=''):
+def get_cmap(
+    density,
+    ax=None,
+    vmax=None,
+    cmap="viridis",
+    cbar=True,
+    cbarlabel="",
+    colorbarwidth="5%",
+    pad=0.1,
+):
     if vmax is None:
         K = int(density.max())
     else:
@@ -210,11 +222,23 @@ def get_cmap(density, ax=None, vmax=None, cmap='viridis', cbar=True, cbarlabel='
     if not cbar:
         return cmap
 
+    if ax is None:
+        ax = plt.gca()
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size=colorbarwidth, pad=pad)
+
     if K <= 1:
         # requires extra treatment because there is only one colour
-        cbar = plt.colorbar(cmap, ax=ax, extend='min', use_gridspec=True, boundaries=[0, 0.5, 1], values=[0, 1])
+        cbar = plt.colorbar(
+            cmap,
+            cax=cax,
+            extend="min",
+            use_gridspec=True,
+            boundaries=[0, 0.5, 1],
+            values=[0, 1],
+        )
     else:
-        cbar = plt.colorbar(cmap, ax=ax, extend='min', use_gridspec=True)
+        cbar = plt.colorbar(cmap, cax=cax, extend="min", use_gridspec=True)
     cbar.set_label(cbarlabel)
     if cmap_scaled:
         ncolors = nbins
@@ -254,6 +278,7 @@ def get_cmap(density, ax=None, vmax=None, cmap='viridis', cbar=True, cbarlabel='
     else:
         cbar.set_ticks(list(ticks[0::stride]) + [ticks[-1]])
         cbar.set_ticklabels(labels[0::stride] + [labels[-1]])
+    plt.sca(ax)
     return cmap
 
 
