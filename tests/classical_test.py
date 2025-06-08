@@ -279,6 +279,109 @@ def out_hex_brbound(nodes_hex_brbound):
     return expected_output
 
 
+# cubic boundary condition fixtures
+@pytest.fixture
+def nodes_cb_rbound():
+    nodes = np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic + 2))
+    nodes[-1, 1, 1, 0] = 1  # particle crossing +x
+    nodes[-1, 1, 1, 6] = 1  # rest ref
+    nodes[0, 1, 1, 0] = 1  # moving reference
+    return nodes
+
+
+@pytest.fixture
+def out_cb_rbound(nodes_cb_rbound):
+    expected_output = np.zeros(nodes_cb_rbound.shape)
+    expected_output[-1, 1, 1, 6] = 1
+    expected_output[1, 1, 1, 0] = 1
+    return expected_output
+
+
+@pytest.fixture
+def nodes_cb_lbound():
+    nodes = np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic + 2))
+    nodes[0, 1, 1, 1] = 1
+    nodes[0, 1, 1, 6] = 1
+    nodes[2, 1, 1, 1] = 1
+    return nodes
+
+
+@pytest.fixture
+def out_cb_lbound(nodes_cb_lbound):
+    expected_output = np.zeros(nodes_cb_lbound.shape)
+    expected_output[0, 1, 1, 6] = 1
+    expected_output[1, 1, 1, 1] = 1
+    return expected_output
+
+
+@pytest.fixture
+def nodes_cb_tbound():
+    nodes = np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic + 2))
+    nodes[1, -1, 1, 2] = 1
+    nodes[1, -1, 1, 6] = 1
+    nodes[1, 0, 1, 2] = 1
+    return nodes
+
+
+@pytest.fixture
+def out_cb_tbound(nodes_cb_tbound):
+    expected_output = np.zeros(nodes_cb_tbound.shape)
+    expected_output[1, -1, 1, 6] = 1
+    expected_output[1, 1, 1, 2] = 1
+    return expected_output
+
+
+@pytest.fixture
+def nodes_cb_bbound():
+    nodes = np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic + 2))
+    nodes[1, 0, 1, 3] = 1
+    nodes[1, 0, 1, 6] = 1
+    nodes[1, 2, 1, 3] = 1
+    return nodes
+
+
+@pytest.fixture
+def out_cb_bbound(nodes_cb_bbound):
+    expected_output = np.zeros(nodes_cb_bbound.shape)
+    expected_output[1, 0, 1, 6] = 1
+    expected_output[1, 1, 1, 3] = 1
+    return expected_output
+
+
+@pytest.fixture
+def nodes_cb_ubound():
+    nodes = np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic + 2))
+    nodes[1, 1, -1, 4] = 1
+    nodes[1, 1, -1, 6] = 1
+    nodes[1, 1, 0, 4] = 1
+    return nodes
+
+
+@pytest.fixture
+def out_cb_ubound(nodes_cb_ubound):
+    expected_output = np.zeros(nodes_cb_ubound.shape)
+    expected_output[1, 1, -1, 6] = 1
+    expected_output[1, 1, 1, 4] = 1
+    return expected_output
+
+
+@pytest.fixture
+def nodes_cb_dbound():
+    nodes = np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic + 2))
+    nodes[1, 1, 0, 5] = 1
+    nodes[1, 1, 0, 6] = 1
+    nodes[1, 1, 2, 5] = 1
+    return nodes
+
+
+@pytest.fixture
+def out_cb_dbound(nodes_cb_dbound):
+    expected_output = np.zeros(nodes_cb_dbound.shape)
+    expected_output[1, 1, 0, 6] = 1
+    expected_output[1, 1, 1, 5] = 1
+    return expected_output
+
+
 class Test_LGCA_classical(T_LGCA_Common):
     """
     Class for testing classical LGCA (volume exclusion, not identity-based).
@@ -295,7 +398,8 @@ class Test_LGCA_classical(T_LGCA_Common):
     @pytest.mark.parametrize("geom,dims", [
         ('lin', (com.xdim_1d,)),
         ('square', (com.xdim_square, com.ydim_square)),
-        ('hex', (com.xdim_hex, com.ydim_hex))
+        ('hex', (com.xdim_hex, com.ydim_hex)),
+        ('cubic', (com.xdim_cubic, com.ydim_cubic, com.zdim_cubic))
     ])
     def test_recording(self, geom, dims):
         # timeevo and recording: check if all properties are available when requested
@@ -372,6 +476,20 @@ class Test_LGCA_classical(T_LGCA_Common):
         expected_output = np.zeros((self.xdim_hex, self.ydim_hex, restchannels + self.b_hex))
         expected_output[1, 1, 0:7] = 1
         self.t_propagation_template('hex', nodes, expected_output)
+
+        # 3D cubic
+        restchannels = 2
+        nodes = np.zeros((self.xdim_cubic, self.ydim_cubic, self.zdim_cubic, restchannels + self.b_cubic))
+        nodes[0, 1, 1, 0] = 1  # +x
+        nodes[2, 1, 1, 1] = 1  # -x
+        nodes[1, 0, 1, 2] = 1  # +y
+        nodes[1, 2, 1, 3] = 1  # -y
+        nodes[1, 1, 0, 4] = 1  # +z
+        nodes[1, 1, 2, 5] = 1  # -z
+        nodes[1, 1, 1, 6] = 1  # rest
+        expected_output = np.zeros((self.xdim_cubic, self.ydim_cubic, self.zdim_cubic, restchannels + self.b_cubic))
+        expected_output[1, 1, 1, 0:7] = 1
+        self.t_propagation_template('cubic', nodes, expected_output)
 
     def test_pbc_1d(self, nodes_1d_rbound, out_1d_rbound, nodes_1d_lbound, out_1d_lbound):
         # check periodic boundary conditions in 1D
@@ -548,10 +666,53 @@ class Test_LGCA_classical(T_LGCA_Common):
         # bottom right boundary
         self.t_propagation_template('hex', nodes_hex_brbound, out_hex_brbound, bc='abc')
 
+    def test_pbc_cubic(self, nodes_cb_rbound, out_cb_rbound, nodes_cb_lbound, out_cb_lbound,
+                       nodes_cb_tbound, out_cb_tbound, nodes_cb_bbound, out_cb_bbound,
+                       nodes_cb_ubound, out_cb_ubound, nodes_cb_dbound, out_cb_dbound):
+        out_cb_rbound[0, 1, 1, 0] = 1
+        out_cb_lbound[-1, 1, 1, 1] = 1
+        out_cb_tbound[1, 0, 1, 2] = 1
+        out_cb_bbound[1, -1, 1, 3] = 1
+        out_cb_ubound[1, 1, 0, 4] = 1
+        out_cb_dbound[1, 1, 2, 5] = 1
+        self.t_propagation_template('cubic', nodes_cb_rbound, out_cb_rbound, bc='pbc')
+        self.t_propagation_template('cubic', nodes_cb_lbound, out_cb_lbound, bc='pbc')
+        self.t_propagation_template('cubic', nodes_cb_tbound, out_cb_tbound, bc='pbc')
+        self.t_propagation_template('cubic', nodes_cb_bbound, out_cb_bbound, bc='pbc')
+        self.t_propagation_template('cubic', nodes_cb_ubound, out_cb_ubound, bc='pbc')
+        self.t_propagation_template('cubic', nodes_cb_dbound, out_cb_dbound, bc='pbc')
+
+    def test_rbc_cubic(self, nodes_cb_rbound, out_cb_rbound, nodes_cb_lbound, out_cb_lbound,
+                       nodes_cb_tbound, out_cb_tbound, nodes_cb_bbound, out_cb_bbound,
+                       nodes_cb_ubound, out_cb_ubound, nodes_cb_dbound, out_cb_dbound):
+        out_cb_rbound[-1, 1, 1, 1] = 1
+        out_cb_lbound[0, 1, 1, 0] = 1
+        out_cb_tbound[1, -1, 1, 3] = 1
+        out_cb_bbound[1, 0, 1, 2] = 1
+        out_cb_ubound[1, 1, -1, 5] = 1
+        out_cb_dbound[1, 1, 0, 4] = 1
+        self.t_propagation_template('cubic', nodes_cb_rbound, out_cb_rbound, bc='rbc')
+        self.t_propagation_template('cubic', nodes_cb_lbound, out_cb_lbound, bc='rbc')
+        self.t_propagation_template('cubic', nodes_cb_tbound, out_cb_tbound, bc='rbc')
+        self.t_propagation_template('cubic', nodes_cb_bbound, out_cb_bbound, bc='rbc')
+        self.t_propagation_template('cubic', nodes_cb_ubound, out_cb_ubound, bc='rbc')
+        self.t_propagation_template('cubic', nodes_cb_dbound, out_cb_dbound, bc='rbc')
+
+    def test_abc_cubic(self, nodes_cb_rbound, out_cb_rbound, nodes_cb_lbound, out_cb_lbound,
+                       nodes_cb_tbound, out_cb_tbound, nodes_cb_bbound, out_cb_bbound,
+                       nodes_cb_ubound, out_cb_ubound, nodes_cb_dbound, out_cb_dbound):
+        self.t_propagation_template('cubic', nodes_cb_rbound, out_cb_rbound, bc='abc')
+        self.t_propagation_template('cubic', nodes_cb_lbound, out_cb_lbound, bc='abc')
+        self.t_propagation_template('cubic', nodes_cb_tbound, out_cb_tbound, bc='abc')
+        self.t_propagation_template('cubic', nodes_cb_bbound, out_cb_bbound, bc='abc')
+        self.t_propagation_template('cubic', nodes_cb_ubound, out_cb_ubound, bc='abc')
+        self.t_propagation_template('cubic', nodes_cb_dbound, out_cb_dbound, bc='abc')
+
     @pytest.mark.parametrize("geom,nodes", [
         ('lin', com.nodes_ve_1d),
         ('square', com.nodes_ve_square),
-        ('hex', com.nodes_ve_hex)
+        ('hex', com.nodes_ve_hex),
+        ('cubic', com.nodes_ve_cubic)
     ])
     def test_characteristics(self, geom, nodes):
         # test compliance in all interactions to:

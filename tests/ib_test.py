@@ -25,8 +25,11 @@ from tests.common_test import T_LGCA_Common
 from tests.nove_test import Test_LGCA_NoVE as T_LGCA_NoVE  # rename to avoid duplicate execution of these tests
 from tests.classical_test import Test_LGCA_classical as T_LGCA_classical
 import tests.nove_test
+import tests.classical_test
 matching_import("^nodes_", tests.nove_test, globals())
 matching_import("^out_", tests.nove_test, globals())
+matching_import("^nodes_cb_", tests.classical_test, globals())
+matching_import("^out_cb_", tests.classical_test, globals())
 
 com = T_LGCA_Common
 
@@ -54,11 +57,15 @@ class Test_LGCA_IB(T_LGCA_Common):
     test_rbc_square = T_LGCA_NoVE.test_rbc_square
     test_pbc_hex = T_LGCA_NoVE.test_pbc_hex
     test_rbc_hex = T_LGCA_NoVE.test_rbc_hex
+    test_pbc_cubic = T_LGCA_classical.test_pbc_cubic
+    test_rbc_cubic = T_LGCA_classical.test_rbc_cubic
+    test_abc_cubic = T_LGCA_classical.test_abc_cubic
 
     @pytest.mark.parametrize("geom,dims", [
         ('lin', (com.xdim_1d,)),
         ('square', (com.xdim_square, com.ydim_square)),
-        ('hex', (com.xdim_hex, com.ydim_hex))
+        ('hex', (com.xdim_hex, com.ydim_hex)),
+        ('cubic', (com.xdim_cubic, com.ydim_cubic, com.zdim_cubic))
     ])
     def test_recording(self, geom, dims):
         # timeevo and recording: check if all properties are available when requested
@@ -140,10 +147,31 @@ class Test_LGCA_IB(T_LGCA_Common):
         expected_output[1, 1, 6] = 7  # particle resting
         self.t_propagation_template('hex', nodes, expected_output)
 
+        # 3D cubic
+        restchannels = 2
+        nodes = np.zeros((self.xdim_cubic, self.ydim_cubic, self.zdim_cubic, self.b_cubic + restchannels))
+        nodes[0, 1, 1, 0] = 1
+        nodes[2, 1, 1, 1] = 2
+        nodes[1, 0, 1, 2] = 3
+        nodes[1, 2, 1, 3] = 4
+        nodes[1, 1, 0, 4] = 5
+        nodes[1, 1, 2, 5] = 6
+        nodes[1, 1, 1, 6] = 7
+        expected_output = np.zeros((self.xdim_cubic, self.ydim_cubic, self.zdim_cubic, self.b_cubic + restchannels))
+        expected_output[1, 1, 1, 0] = 1
+        expected_output[1, 1, 1, 1] = 2
+        expected_output[1, 1, 1, 2] = 3
+        expected_output[1, 1, 1, 3] = 4
+        expected_output[1, 1, 1, 4] = 5
+        expected_output[1, 1, 1, 5] = 6
+        expected_output[1, 1, 1, 6] = 7
+        self.t_propagation_template('cubic', nodes, expected_output)
+
     @pytest.mark.parametrize("geom,nodes", [
         ('lin', com.nodes_ib_1d),
         ('square', com.nodes_ib_square),
-        ('hex', com.nodes_ib_hex)
+        ('hex', com.nodes_ib_hex),
+        ('cubic', com.nodes_ib_cubic)
     ])
     def test_characteristics(self, geom, nodes):
         # test compliance in all interactions to:
