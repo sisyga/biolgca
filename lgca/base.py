@@ -38,8 +38,9 @@ try:  # optional plotting dependencies
     import matplotlib.colors as colors
     from matplotlib import cm, pyplot as plt
     from matplotlib.cm import ScalarMappable
+    from matplotlib.ticker import MaxNLocator, FuncFormatter
 except ImportError:  # pragma: no cover - handled at runtime
-    colors = cm = plt = ScalarMappable = _MissingPlotLib("matplotlib")
+    colors = cm = plt = ScalarMappable = MaxNLocator = FuncFormatter = _MissingPlotLib("matplotlib")
 from numpy import random as npr
 from sympy.utilities.iterables import multiset_permutations
 from tqdm.auto import tqdm
@@ -57,9 +58,9 @@ def colorbar_index(ncolors: int, cmap, use_gridspec: bool=False, cax=None):
 
     Builds a discrete colormap with `ncolors` colors from the near-continuous colormap `cmap`,
     adds it to the axis `cax` and draws tick labels in the center of each color. If
-    ncolors is high, some labels are omitted to avoid cluttering.
-
-    .. note:: To Do: Implement the label stride with Locator and Formatter instead.
+    ncolors is high, tick positions are determined automatically using
+    :class:`~matplotlib.ticker.MaxNLocator` and labels are formatted with
+    :class:`~matplotlib.ticker.FuncFormatter`.
 
     Parameters
     ----------
@@ -80,37 +81,24 @@ def colorbar_index(ncolors: int, cmap, use_gridspec: bool=False, cax=None):
     """
     # discretize the colormap
     cmap = cmap_discretize(cmap, ncolors)
-    # stride the colorbar labels to avoid cluttering for many colors
-    if ncolors > 101:
-        stride = 10
-    elif ncolors > 51:
-        stride = 5
-    elif ncolors > 31:
-        stride = 2
-    else:
-        stride = 1
+
     # map colors to values
     mappable = ScalarMappable(cmap=cmap)
     mappable.set_array([])
-    mappable.set_clim(-0.5, ncolors + 0.5)
-    # create colorbar
-    colorbar = plt.colorbar(mappable, use_gridspec=use_gridspec, cax=cax)
-    # set ticklabels to the center of respective color and support label stride
-    ticks = np.linspace(-0.5, ncolors + 0.5, 2 * ncolors + 1)[1::2]
-    labels = list(range(ncolors))
-    # if last strided label is the maximum label, plot all strided labels
-    if ticks[-1] == ticks[0::stride][-1]:
-        colorbar.set_ticks(ticks[0::stride])
-        colorbar.set_ticklabels(labels[0::stride])
-    # if last strided label is different from the maximum label by less than half the stride:
-    # only plot strided labels up to the second last and the maximum label
-    elif stride > 1 and ticks[-1] != ticks[0::stride][-1] and ticks[-1] - ticks[0::stride][-1] < stride/2:
-        colorbar.set_ticks(list(ticks[0::stride][:-1]) + [ticks[-1]])
-        colorbar.set_ticklabels(labels[0::stride][:-1] + [labels[-1]])
-    # otherwise plot all strided labels and the maximum label
-    else:
-        colorbar.set_ticks(list(ticks[0::stride]) + [ticks[-1]])
-        colorbar.set_ticklabels(labels[0::stride] + [labels[-1]])
+    mappable.set_clim(-0.5, ncolors - 0.5)
+
+    # create colorbar with discrete boundaries
+    boundaries = np.arange(-0.5, ncolors, 1)
+    colorbar = plt.colorbar(
+        mappable, use_gridspec=use_gridspec, cax=cax, boundaries=boundaries
+    )
+
+    # configure ticks and labels using locators and formatters
+    locator = MaxNLocator(nbins="auto", integer=True)
+    formatter = FuncFormatter(lambda val, pos: int(val))
+    colorbar.ax.yaxis.set_major_locator(locator)
+    colorbar.ax.yaxis.set_major_formatter(formatter)
+    colorbar.update_ticks()
     return colorbar
 
 
