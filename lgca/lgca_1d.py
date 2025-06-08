@@ -46,6 +46,7 @@ class LGCA_1D(LGCA_base):
 
     """
     # set class attributes
+    geometry = 'lin'
     interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation', 'parameter_controlled_diffusion',
                     'random_walk', 'persistent_motion', 'birthdeath', 'only_propagation']
     velocitychannels = 2
