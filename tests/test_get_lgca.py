@@ -1,4 +1,5 @@
 import pytest
+import numpy as np
 
 from lgca import get_lgca
 from lgca.lgca_1d import LGCA_1D, IBLGCA_1D, NoVE_LGCA_1D, NoVE_IBLGCA_1D
@@ -74,4 +75,26 @@ def test_get_lgca_returns_correct_subclass(geom, ib, ve):
         interaction="only_propagation",
     )
     assert isinstance(lgca, EXPECTED[geom][(ib, ve)])
+
+
+def test_warning_on_mismatched_dims():
+    nodes = np.zeros((3, 4))
+    with pytest.warns(UserWarning):
+        get_lgca(
+            geometry='lin',
+            nodes=nodes,
+            dims=10,
+            interaction='only_propagation',
+        )
+
+
+def test_warning_on_mismatched_restchannels():
+    nodes = np.zeros((3, 4))
+    with pytest.warns(UserWarning):
+        get_lgca(
+            geometry='lin',
+            nodes=nodes,
+            restchannels=1,
+            interaction='only_propagation',
+        )
 

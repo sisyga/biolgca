@@ -134,6 +134,7 @@ class LGCA_Cubic(LGCA_base):
             else:
                 self.random_reset(density)
         else:
+            self._warn_nodes_shape(nodes)
             self.nodes[self.nonborder] = nodes.astype(bool)
             self.apply_boundaries()
 
@@ -955,6 +956,7 @@ class IBLGCA_Cubic(IBLGCA_base, LGCA_Cubic):
         if nodes is None:
             self.random_reset(density)
         else:
+            self._warn_nodes_shape(nodes)
             self.nodes[self.nonborder] = nodes.astype(np.uint)
             self.apply_boundaries()
 
@@ -1147,6 +1149,7 @@ class NoVE_LGCA_Cubic(LGCA_Cubic, NoVE_LGCA_base):
             else:
                 self.random_reset(density)
         else:
+            self._warn_nodes_shape(nodes)
             self.nodes[
                 self.r_int : -self.r_int,
                 self.r_int : -self.r_int,
@@ -1698,8 +1701,10 @@ class NoVE_IBLGCA_Cubic(NoVE_IBLGCA_base, LGCA_Cubic):
         if nodes is None:
             self.random_reset(density)
         elif nodes.dtype == object:
+            self._warn_nodes_shape(nodes)
             self.nodes[self.nonborder] = nodes
         else:
+            self._warn_nodes_shape(nodes)
             occ = nodes.astype(int)
             self.nodes[self.nonborder] = self.convert_int_to_ib(occ)
         self.calc_max_label()
