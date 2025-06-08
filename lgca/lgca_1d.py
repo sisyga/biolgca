@@ -114,17 +114,12 @@ class LGCA_1D(LGCA_base):
         ----------
         density : float, default=0.1
             If `nodes` is None, initialize lattice randomly with this particle density.
-        hom : float, default=False
-            Fill channels randomly with particle density `density`, but with an equal number of particles for each node.
-            Note that depending on :py:attr:`self.K` not all densities can be realized.
         nodes : :py:class:`numpy.ndarray`
             Custom initial lattice configuration. Dimensions: ``(self.dims[0], self.K)``.
 
         See Also
         --------
         base.LGCA_base.random_reset : Initialize lattice nodes with average density `density`.
-        base.LGCA_base.homogeneous_random_reset : Initialize lattice nodes with average density `density` and a fixed number
-            of particles per node.
         set_dims : Set LGCA dimensions.
         init_coords : Initialize LGCA coordinates.
 
@@ -132,13 +127,7 @@ class LGCA_1D(LGCA_base):
         self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=bool)
 
         # random initialization
-        if 'hom' in kwargs:
-            hom = kwargs['hom']
-        else:
-            hom = None
-        if nodes is None and hom:
-            self.homogeneous_random_reset(density)
-        elif nodes is None:
+        if nodes is None:
             self.random_reset(density)
         # initialization with provided initial condition
         else:
@@ -666,7 +655,7 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         else:
             self.capacity = self.K
 
-    def init_nodes(self, density, nodes=None, hom=None):
+    def init_nodes(self, density, nodes=None):
         """
         Initialize nodes for the instance.
         :param density: desired particle density in the lattice: number of particles/(dimensions*number of channels)
@@ -676,10 +665,7 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.uint)
         # if no lattice given, populate randomly
         if nodes is None:
-            if hom:
-                self.homogeneous_random_reset(density)
-            else:
-                self.random_reset(density)
+            self.random_reset(density)
         # if lattice given, populate lattice with given particles. Virtual lattice sites for boundary conditions not included
         else:
             self._warn_nodes_shape(nodes)

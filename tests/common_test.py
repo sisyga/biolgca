@@ -182,9 +182,17 @@ class Test_LGCA_General:
     ])
     def test_getlgca_lattice_setup_nodes(self, geom, ve, ib, nodes, dims, restchannels):
         # 'node' keyword check: provided lattice is adopted by LGCA
-        # if nodes are provided, 'restchannels', 'dims', 'density' and 'hom' have to be ignored
-        lgca = get_lgca(geometry=geom, ve=ve, ib=ib, nodes=nodes, dims=dims, density=0.01, restchannels=restchannels+1,
-                        hom=True, interaction='only_propagation')
+        # if nodes are provided, 'restchannels', 'dims' and 'density' have to be ignored
+        lgca = get_lgca(
+            geometry=geom,
+            ve=ve,
+            ib=ib,
+            nodes=nodes,
+            dims=dims,
+            density=0.01,
+            restchannels=restchannels + 1,
+            interaction='only_propagation'
+        )
         assert np.array_equal(lgca.nodes[lgca.nonborder], nodes), "Nodes not adopted correctly"
         assert lgca.restchannels == restchannels, "Wrong number of rest channels defined if nodes are given"
         assert lgca.dims == nodes.shape[:-1], "Wrong dimensions defined if nodes are given"
@@ -215,47 +223,6 @@ class Test_LGCA_General:
     def test_nodes_too_few_channels(self, geom, nodes):
         with pytest.raises(RuntimeError):
             get_lgca(geometry=geom, nodes=nodes, interaction='only_propagation')
-
-    # parameter tuples for 'hom', 'density' keyword check
-    # init_particles = number of particles expected in each node int(density*capacity)
-    @pytest.mark.parametrize("geom,ve,dims,restchannels,density,init_particles", [
-        # classical LGCA (ve, non-ib)
-        # (geom,    ve,   dims,                               restchannels,                  density,    init_particles)
-        ('lin',     True, (com.xdim_1d,),                     com.restchannels_ve_1d,        density_ve, calc_init_particles(True, density_ve, com.restchannels_ve_1d, K=com.K_ve_1d)),
-        ('square',  True, (com.xdim_square, com.ydim_square), com.restchannels_ve_square,    density_ve, calc_init_particles(True, density_ve, com.restchannels_ve_square, K=com.K_ve_square)),
-        ('hex',     True, (com.xdim_hex, com.ydim_hex),       com.restchannels_ve_hex,       density_ve, calc_init_particles(True, density_ve, com.restchannels_ve_hex, K=com.K_ve_hex)),
-        ('cubic',   True, (com.xdim_cubic, com.ydim_cubic, com.zdim_cubic), com.restchannels_ve_cubic, density_ve, calc_init_particles(True, density_ve, com.restchannels_ve_cubic, K=com.K_ve_cubic)),
-        # NoVE_LGCA (nove, non-ib)
-        # written assuming that capacity for nove is set to velocitychannels + restchannels
-        # (geom,    ve,    dims,                               restchannels,                 density,        init_particles)
-        ('lin',     False, (com.xdim_1d,),                     com.restchannels_nove_1d,     density_nove_1, calc_init_particles(False, density_nove_1, com.restchannels_nove_1d, b=com.b_1d)),
-        ('square',  False, (com.xdim_square, com.ydim_square), com.restchannels_nove_square, density_nove_1, calc_init_particles(False, density_nove_1, com.restchannels_nove_square, b=com.b_square)),
-        ('hex',     False, (com.xdim_hex, com.ydim_hex),       com.restchannels_nove_hex,    density_nove_1, calc_init_particles(False, density_nove_1, com.restchannels_nove_hex, b=com.b_hex)),
-        ('cubic',   False, (com.xdim_cubic, com.ydim_cubic, com.zdim_cubic), com.restchannels_nove_cubic, density_nove_1, calc_init_particles(False, density_nove_1, com.restchannels_nove_cubic, b=com.b_cubic)),
-        # (geom,    ve,    dims,                               restchannels,                 density,        init_particles)
-        ('lin',     False, (com.xdim_1d,),                     com.restchannels_nove_1d,     density_nove_2, calc_init_particles(False, density_nove_2, com.restchannels_nove_1d, b=com.b_1d)),
-        ('square',  False, (com.xdim_square, com.ydim_square), com.restchannels_nove_square, density_nove_2, calc_init_particles(False, density_nove_2, com.restchannels_nove_square, b=com.b_square)),
-        ('hex',     False, (com.xdim_hex, com.ydim_hex),       com.restchannels_nove_hex,    density_nove_2, calc_init_particles(False, density_nove_2, com.restchannels_nove_hex, b=com.b_hex))
-        ,('cubic',   False, (com.xdim_cubic, com.ydim_cubic, com.zdim_cubic), com.restchannels_nove_cubic,    density_nove_2, calc_init_particles(False, density_nove_2, com.restchannels_nove_cubic, b=com.b_cubic))
-    ])
-    def test_getlgca_lattice_setup_homogeneous(self, geom, ve, dims, restchannels, density, init_particles):
-        # 'hom', 'density' keyword check
-        lgca = get_lgca(geometry=geom, ve=ve, ib=False, dims=dims, density=density, hom=True, restchannels=restchannels,
-                        interaction='only_propagation')
-        assert lgca.dims == dims, "Wrong dimensions defined"
-        # in the excluded case the lattice will be fully filled
-        if not (ve and density == 1):
-            # compare flattened node config to config moved one node forward to see if nodes all have the same config
-            assert not np.array_equal(lgca.nodes[lgca.nonborder].flatten(),
-                                      np.roll(lgca.nodes[lgca.nonborder].flatten(), lgca.nodes.shape[-1])), \
-                "Node configuration is not random"
-        if geom == 'cubic' and ve:
-            pytest.xfail("Homogeneous initialization unstable for cubic geometry")
-        assert np.all(lgca.nodes[lgca.nonborder].sum(-1) == init_particles), \
-            "Density not reached or not reached homogeneously"
-        if ve:
-            assert np.max(lgca.nodes.astype(int)) <= 1, "Volume exclusion principle is not respected"
-
     # parameter tuples for 'density' keyword check, random reset
     @pytest.mark.parametrize("geom,ve,ib,dims_large,restchannels,density,capacity", [
         # classical LGCA (ve, non-ib)
