@@ -15,9 +15,9 @@ The get_lgca function returns an LGCA object of the requested type with the
 given initial conditions. It can simulate for a given number of timesteps and has
 different plotting functions for analysis, depending on the geometry. The
 interaction function can be chosen from built-in ones or defined by the user.
-Currently, classical LGCA and identity-based LGCA with and without volume 
-exclusion, respectively, are
-supported on 1D, 2D square and 2D hexagonal lattices.
+Currently, classical LGCA and identity-based LGCA with and without volume
+exclusion, respectively, are supported on 1D, 2D square, 2D hexagonal and
+3D cubic lattices.
 
 References
 ----------
@@ -113,11 +113,11 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
 
     Parameters
     ----------
-    geometry : {'hex', 'square', 'lin'}, default='hex'
-        Lattice geometry. Supported are 1D, 2D square and 2D hexagonal lattices.
+    geometry : {'hex', 'square', 'lin', 'cubic'}, default='hex'
+        Lattice geometry. Supported are 1D, 2D square, 2D hexagonal and 3D cubic lattices.
 
         Aliases: 1D: ``'1D', '1d', 'linear'``; 2D square: ``'sq', 'rect', 'rectangular'``;
-        2D hexagonal: ``'hexagonal', 'hx'``.
+        2D hexagonal: ``'hexagonal', 'hx'``; 3D cubic: ``'cubic', 'cb'``.
     ib : bool, default=False
         If the LGCA should be identity-based (every particle can have individual properties).
     ve : bool, default=True

@@ -48,7 +48,7 @@ The types of LGCA currently supported are:
 - classical LGCA without volume exclusion (all particles/cells have the same properties)
 - identity-based LGCA without volume exclusion (particles/cells can have individual properties)
 
-These can be simulated in a 1D, 2D square, 2D hexagonal or 3D cubic lattice.  A
+These can be simulated in 1D, 2D square, 2D hexagonal, and **3D cubic** lattices.  A
 :ref:`library of interaction rules <interaction_chapter>` is already
 implemented.  :ref:`Adding a custom interaction rule <adding_own_interactions>`
 or customising other parts of the simulation (e.g. the interaction radius) is easy.
