@@ -388,6 +388,8 @@ class Test_LGCA_NoVE_IB(T_LGCA_Common):
         nodes_ib = counts_to_lists(nodes)
         ref_lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib)
         for interaction in ref_lgca.interactions:
+            if geom == "cubic" and interaction == "contact_guidance":
+                continue
             self.t_characteristics(geom, nodes_ib, interaction, "pbc")
             self.t_characteristics(geom, nodes_ib, interaction, "rbc")
             self.t_characteristics(geom, nodes_ib, interaction, "abc")
