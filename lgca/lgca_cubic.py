@@ -58,6 +58,11 @@ class LGCA_Cubic(LGCA_base):
         """
         if nodes is not None:
             self.lx, self.ly, self.lz, self.K = nodes.shape
+            if self.K < self.velocitychannels:
+                raise RuntimeError(
+                    'Not enough channels specified for the chosen geometry! '
+                    f'Required: {self.velocitychannels}, provided: {self.K}'
+                )
             self.restchannels = self.K - self.velocitychannels
             self.dims = (self.lx, self.ly, self.lz)
             return
