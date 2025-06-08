@@ -133,7 +133,7 @@ class LGCA_Cubic(LGCA_base):
             self.random_reset(density)
         else:
             self._warn_nodes_shape(nodes)
-            self.nodes[self.nonborder] = nodes.astype(bool)
+            self.nodes[self.nonborder] = self._ensure_bool_nodes(nodes)
             self.apply_boundaries()
 
     def init_coords(self):

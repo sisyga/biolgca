@@ -87,3 +87,16 @@ def test_warning_on_mismatched_restchannels():
             interaction='only_propagation',
         )
 
+
+def test_warning_on_nonboolean_nodes():
+    nodes = np.array([[2, 0], [3, 1]])
+    with pytest.warns(UserWarning):
+        lgca = get_lgca(
+            geometry='lin',
+            ib=False,
+            ve=True,
+            nodes=nodes,
+            interaction='only_propagation',
+        )
+    assert set(np.unique(lgca.nodes[lgca.nonborder])) <= {0, 1}
+
