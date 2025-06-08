@@ -55,6 +55,7 @@ class LGCA_Hex(LGCA_Square):
 
     """
     # set class attributes
+    geometry = 'hex'
     # interactions are inherited from 2D square LGCA
     velocitychannels = 6
     cix = np.cos(np.arange(velocitychannels) * pi2 / velocitychannels)
