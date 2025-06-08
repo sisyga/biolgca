@@ -11,8 +11,21 @@ import numpy as np
 from lgca.interactions import tanh_switch
 
 def random_walk(lgca):
-    """
-    Rearrangement step for random walk interaction
+    """Perform a random walk rearrangement on the lattice.
+
+    All particles of every occupied lattice site are redistributed
+    uniformly over the velocity channels.
+
+    Parameters
+    ----------
+    lgca : LGCA_1D, LGCA_Square, LGCA_Hex, or LGCA_Cubic
+        LGCA instance that the interaction is applied to. The lattice may be
+        one-, two-, or three-dimensional.
+
+    Notes
+    -----
+    ``lgca.nodes`` is overwritten with the new lattice configuration.
+    No other attributes are updated.
     """
     newnodes = lgca.nodes.copy()
     # filter for nodes that are not virtual border lattice sites
@@ -34,8 +47,25 @@ def random_walk(lgca):
     lgca.nodes = newnodes
 
 def dd_alignment(lgca):
-    """
-    Rearrangement step for density-dependent alignment interaction including the central lattice site.
+    """Density dependent alignment of particle directions.
+
+    The local director field is obtained from the flux of all neighboring nodes
+    (including the central node if ``nb_include_center`` is set).  Particles in
+    each occupied node are then reoriented according to
+    ``exp(beta * dot(g, c_i))`` where ``g`` is the director field and ``c_i`` are
+    the velocity vectors.
+
+    Parameters
+    ----------
+    lgca : LGCA_1D, LGCA_Square, LGCA_Hex, or LGCA_Cubic
+        LGCA instance that the interaction is applied to. The lattice may be
+        one-, two-, or three-dimensional. Requires the
+        ``beta`` and ``nb_include_center`` entries in
+        ``lgca.interaction_params``.
+
+    Notes
+    -----
+    ``lgca.nodes`` is replaced by the sampled configuration.
     """
     newnodes = lgca.nodes.copy()
     # filter for nodes that are not virtual border lattice sites
@@ -76,8 +106,23 @@ def dd_alignment(lgca):
 
 
 def di_alignment(lgca):
-    """
-    Rearrangement step for density-independent alignment interaction including the central lattice site.
+    """Density independent alignment of particle directions.
+
+    Similar to :func:`dd_alignment`, but the director field is
+    normalized by the number of neighbors so that the reorientation
+    does not depend on local density.
+
+    Parameters
+    ----------
+    lgca : LGCA_1D, LGCA_Square, LGCA_Hex, or LGCA_Cubic
+        LGCA instance that the interaction is applied to. The lattice may be
+        one-, two-, or three-dimensional. Requires the
+        ``beta`` and ``nb_include_center`` entries in
+        ``lgca.interaction_params``.
+
+    Notes
+    -----
+    ``lgca.nodes`` is replaced by the sampled configuration.
     """
     newnodes = lgca.nodes.copy()
     # filter for nodes that are not virtual border lattice sites
@@ -119,8 +164,24 @@ def di_alignment(lgca):
     lgca.nodes = newnodes
 
 def go_or_grow(lgca):
-    """
-    interactions (switch, reorientation, birth, death) of the go-or-grow model for volume exclusion free LGCA
+    """Interaction step of the go-or-grow model without volume exclusion.
+
+    Cells switch between moving and resting states depending on the local
+    density.  Resting cells may proliferate and both phenotypes can die.  After
+    the switch and birth/death events, moving cells are reoriented uniformly
+    among the velocity channels.
+
+    Parameters
+    ----------
+    lgca : LGCA_1D, LGCA_Square, LGCA_Hex, or LGCA_Cubic
+        LGCA instance that the interaction is applied to. The lattice may be
+        one-, two-, or three-dimensional. The following keys in
+        ``lgca.interaction_params`` are used: ``kappa``, ``theta``, ``r_b`` and
+        ``r_d``.
+
+    Notes
+    -----
+    ``lgca.nodes`` is overwritten with the updated node configuration.
     """
     relevant = lgca.cell_density[lgca.nonborder] > 0
     coords = [a[relevant] for a in lgca.nonborder]
@@ -159,9 +220,21 @@ def go_or_grow(lgca):
 
 
 def go_or_rest(lgca):
-    """
-    interactions (switch, reorientation) of the go-or-rest model for volume exclusion free LGCA
-    go-or-rest is a go-or-grow model without birth and death
+    """Simplified go-or-grow interaction without birth and death.
+
+    Only the switching between moving and resting states and the
+    reorientation of moving cells are performed.
+
+    Parameters
+    ----------
+    lgca : LGCA_1D, LGCA_Square, LGCA_Hex, or LGCA_Cubic
+        LGCA instance that the interaction is applied to. The lattice may be
+        one-, two-, or three-dimensional. Uses the ``kappa`` and
+        ``theta`` values from ``lgca.interaction_params``.
+
+    Notes
+    -----
+    ``lgca.nodes`` is overwritten with the updated node configuration.
     """
     relevant = lgca.cell_density[lgca.nonborder] > 0
     coords = [a[relevant] for a in lgca.nonborder]
