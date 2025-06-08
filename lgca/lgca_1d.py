@@ -16,8 +16,12 @@ Supported LGCA types:
 - identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_1D`)
 """
 
-import matplotlib.ticker as mticker
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+try:  # optional plotting dependency
+    import matplotlib.ticker as mticker
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+except ImportError:  # pragma: no cover - handled at runtime
+    from lgca.base import _MissingPlotLib
+    mticker = make_axes_locatable = _MissingPlotLib("matplotlib")
 
 from lgca.base import *
 
@@ -73,6 +77,11 @@ class LGCA_1D(LGCA_base):
         # set dimensions according to provided initial condition
         if nodes is not None:
             self.l, self.K = nodes.shape
+            if self.K < self.velocitychannels:
+                raise RuntimeError(
+                    'Not enough channels specified for the chosen geometry! '
+                    f'Required: {self.velocitychannels}, provided: {self.K}'
+                )
             self.restchannels = self.K - self.velocitychannels
             self.dims = self.l,
             return
