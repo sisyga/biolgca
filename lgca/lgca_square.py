@@ -17,15 +17,24 @@ Supported LGCA types:
 - identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_Square`)
 """
 
-import matplotlib.animation as animation
-import matplotlib.colors as colors
-import matplotlib.ticker as mticker
 import numpy as np
-from matplotlib.collections import PatchCollection
-from matplotlib.colors import Normalize
-from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
-from matplotlib import cm
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+try:  # optional plotting dependencies
+    import matplotlib.animation as animation
+    import matplotlib.colors as colors
+    import matplotlib.ticker as mticker
+    from matplotlib.collections import PatchCollection
+    from matplotlib.colors import Normalize
+    from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
+    from matplotlib import cm
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+except ImportError:  # pragma: no cover - handled at runtime
+    from lgca.base import _MissingPlotLib  # reuse stub
+
+    animation = colors = mticker = PatchCollection = Normalize = (
+        RegularPolygon
+    ) = Circle = FancyArrowPatch = cm = make_axes_locatable = _MissingPlotLib(
+        "matplotlib"
+    )
 import warnings
 from copy import copy
 
