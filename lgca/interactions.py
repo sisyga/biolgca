@@ -47,16 +47,45 @@ def ent_prod(x):
 
 
 def random_walk(lgca):
-    """
-    Shuffle config in the last axis, modeling a random walk.
-    :return:
+    """Apply a random walk to all nodes.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place. This interaction does not use
+    ``lgca.interaction_params``.
+
+    Returns
+    -------
+    None
     """
     lgca.nodes = lgca.rng.permuted(lgca.nodes, axis=-1)
 
 def birth(lgca):
-    """
-    Simple birth process coupled to a random walk
-    :return:
+    """Perform a simple birth step followed by a random walk.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Interaction Parameters
+    ----------------------
+    r_b : float
+        Birth probability per empty channel; effective
+        probability is ``r_b * n / lgca.K`` for local density ``n``.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
     birth = lgca.rng.random(lgca.nodes.shape) < lgca.interaction_params['r_b'] * lgca.cell_density[..., None] / lgca.K
     np.add(lgca.nodes, (1 - lgca.nodes) * birth, out=lgca.nodes, casting='unsafe')
@@ -64,9 +93,27 @@ def birth(lgca):
 
 
 def birthdeath(lgca):
-    """
-    Simple birth-death process coupled to a random walk
-    :return:
+    """Perform a birth--death step followed by a random walk.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Interaction Parameters
+    ----------------------
+    r_b : float
+        Birth probability per empty channel.
+    r_d : float
+        Death probability per occupied channel.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
     birth = lgca.rng.random(lgca.nodes.shape) < lgca.interaction_params['r_b'] * lgca.cell_density[..., None] / lgca.K
     death = lgca.rng.random(lgca.nodes.shape) < lgca.interaction_params['r_d']
@@ -77,9 +124,25 @@ def birthdeath(lgca):
 
 
 def persistent_walk(lgca):
-    """
-    Rearrangement step for persistent motion (alignment with yourlgca)
-    :return:
+    """Rearrange nodes to implement persistent motion.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Interaction Parameters
+    ----------------------
+    beta : float
+        Strength of alignment with the previous velocity direction.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
                (lgca.cell_density[lgca.nonborder] < lgca.K)
@@ -99,9 +162,27 @@ def persistent_walk(lgca):
 
 
 def chemotaxis(lgca):
-    """
-    Rearrangement step for chemotaxis to external gradient field
-    :return:
+    """Rearrange nodes in response to an external gradient.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Interaction Parameters
+    ----------------------
+    beta : float
+        Strength of the bias toward the gradient.
+    gradient_field : numpy.ndarray
+        External gradient field influencing motion.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
     newnodes = lgca.nodes.copy()
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
@@ -122,9 +203,25 @@ def chemotaxis(lgca):
 
 
 def contact_guidance(lgca):
-    """
-    Rearrangement step for contact guidance interaction. Cells are guided by an external axis
-    :return:
+    """Align cells with a predefined guiding axis.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Interaction Parameters
+    ----------------------
+    beta : float
+        Alignment strength toward the guiding axis.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
     newnodes = lgca.nodes.copy()
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
@@ -143,9 +240,25 @@ def contact_guidance(lgca):
 
 
 def alignment(lgca):
-    """
-    Rearrangement step for alignment interaction
-    :return:
+    """Align moving cells with their neighbours.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Interaction Parameters
+    ----------------------
+    beta : float
+        Alignment strength with neighbouring velocities.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
     newnodes = lgca.nodes.copy()
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
@@ -172,9 +285,25 @@ def alignment(lgca):
 
 
 def nematic(lgca):
-    """
-    Rearrangement step for nematic interaction
-    :return:
+    """Implement nematic alignment of neighbouring cells.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Interaction Parameters
+    ----------------------
+    beta : float
+        Strength of nematic alignment.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
     newnodes = lgca.nodes.copy()
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
@@ -197,13 +326,25 @@ def nematic(lgca):
 
 
 def aggregation(lgca):
-    """
-    Aggregation interaction.
+    """Bias movement towards higher cell density.
 
     Parameters
     ----------
-    lgca: LGCA_1D or LGCA_Square or LGCA_Hex
-          LGCA instance that the interaction is applied to
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Interaction Parameters
+    ----------------------
+    beta : float
+        Strength of the bias toward higher density regions.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
     newnodes = lgca.nodes.copy()
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
@@ -222,10 +363,33 @@ def aggregation(lgca):
     lgca.nodes = newnodes
 
 def wetting(lgca):
-    """
-    Wetting of a surface for different levels of E-cadherin
-    :param lgca:
-    :return:
+    """Model wetting dynamics on an adhesive surface.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Interaction Parameters
+    ----------------------
+    r_b : float
+        Birth probability used inside the spheroid region.
+    rho_0 : float
+        Homeostatic density determining the pressure gradient.
+    alpha : float
+        ECM degradation rate.
+    beta : float
+        Adhesion strength weighting flux alignment.
+    gamma : float
+        Strength of the pressure gradient term.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
     if hasattr(lgca, 'spheroid'):
         birth = lgca.rng.random(lgca.nodes[lgca.spheroid].shape) < lgca.interaction_params['r_b']
@@ -270,9 +434,29 @@ def wetting(lgca):
 
 
 def excitable_medium(lgca):
-    """
-    Model for an excitable medium based on Barkley's PDE model.
-    :return:
+    """Simulate an excitable medium following Barkley's model.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Interaction Parameters
+    ----------------------
+    alpha : float
+        Controls the excitability of the medium.
+    beta : float
+        Interaction coefficient between species.
+    N : int
+        Number of sub-steps performed in each interaction.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
     n_x = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
     n_y = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
@@ -306,9 +490,31 @@ def excitable_medium(lgca):
 
 
 def go_or_grow(lgca):
-    """
-    interactions of the go-or-grow model.
-    :return:
+    """Perform the go-or-grow switching interaction.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Interaction Parameters
+    ----------------------
+    r_b : float
+        Birth probability for resting cells.
+    r_d : float
+        Death probability for both states.
+    kappa : float
+        Steepness of the switching function.
+    theta : float
+        Threshold density for switching.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
     relevant = lgca.cell_density[lgca.nonborder] > 0
     coords = [a[relevant] for a in lgca.nonborder]
@@ -344,12 +550,44 @@ def go_or_grow(lgca):
 
 
 def p_binom(k, n, p):
+    """Probability mass function of the binomial distribution.
+
+    Parameters
+    ----------
+    k : array_like
+        Number of successes.
+    n : array_like
+        Number of trials.
+    p : array_like
+        Probability of success.
+
+    Returns
+    -------
+    numpy.ndarray
+        The probability ``P(K=k)`` for each ``k``.
+    """
     pb = binom_coeff(n, k) * p ** k * (1 - p) ** (n - k)
     pb[n < k] = 0.
     return pb
 
 
 def s_binom(n, p0, kmax):
+    """Shannon entropy of a binomial distribution up to ``kmax`` successes.
+
+    Parameters
+    ----------
+    n : array_like
+        Number of trials.
+    p0 : array_like
+        Success probability.
+    kmax : int
+        Maximum number of successes considered.
+
+    Returns
+    -------
+    numpy.ndarray
+        The entropy values.
+    """
     n = n[..., None]
     p0 = p0[..., None]
     k = np.arange(kmax + 1)
@@ -358,10 +596,29 @@ def s_binom(n, p0, kmax):
 
 
 def leup_test(lgca):
-    """
-    Go-or-grow with least-environmental uncertainty principle. cells try to minimize their entropy with the environment,
-    by changing their state between moving and resting. resting cells can proliferate. all cells die at a constant rate.
-    :return:
+    """Go-or-grow model with the least environmental uncertainty principle.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Interaction Parameters
+    ----------------------
+    r_b : float
+        Birth probability for resting cells.
+    r_d : float
+        Death probability for cells.
+    beta : float
+        Sensitivity of the LEUP switching rule.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
     if lgca.interaction_params['r_b'] > 0 or lgca.interaction_params['r_d'] > 0:
         n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
@@ -461,8 +718,27 @@ def leup_test(lgca):
 
 
 def go_or_rest(lgca):
-    """
-    Interactions of the go-or-grow model without birth and death, i.e. only the switch and random walk.
+    """Switch cells between moving and resting states without birth or death.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Interaction Parameters
+    ----------------------
+    kappa : float
+        Steepness of the switching function.
+    theta : float
+        Density threshold for switching.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
     relevant = lgca.cell_density[lgca.nonborder] > 0
     coords = [a[relevant] for a in lgca.nonborder]
@@ -494,4 +770,20 @@ def go_or_rest(lgca):
 
 
 def only_propagation(lgca):
+    """Placeholder interaction that performs no rearrangement.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place but remains unchanged. This
+    interaction does not use ``lgca.interaction_params``.
+
+    Returns
+    -------
+    None
+    """
     pass

@@ -1124,7 +1124,19 @@ class IBLGCA_base(LGCA_base, ABC):
 
     Attributes
     ----------
-    # TODO!! ##############
+    occupied : :py:class:`numpy.ndarray`
+        Boolean array indicating which channels are filled in the current
+        lattice state. Dimensions: ``lgca.dims + (lgca.K,)``.
+    props : dict
+        Dictionary storing properties of individual cells indexed by their
+        particle label.
+    maxlabel : int
+        Identifier of the highest particle label currently in use.
+    family_props : dict, optional
+        Dictionary storing properties of cell families if inheritance is
+        tracked.
+    maxfamily : int, optional
+        Identifier of the highest family in :py:attr:`family_props`.
     apply_boundaries : callable
         Function implementing the boundary conditions.
     c
