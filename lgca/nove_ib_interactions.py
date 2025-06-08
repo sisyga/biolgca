@@ -11,7 +11,6 @@ Interaction functions and helper functions for identity-based LGCA without volum
 import numpy as np
 from scipy.stats import truncnorm, truncexpon, expon
 from copy import deepcopy
-from numba import jit
 from lgca.interactions import tanh_switch
 
 def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
@@ -336,7 +335,6 @@ def go_or_grow_kappa(lgca):
         lgca.nodes[coord] = deepcopy(node)
 
 
-@jit(nopython=True)
 def tanh_switch(rho, kappa=5., theta=0.8):
     return 0.5 * (1 + np.tanh(kappa * (rho - theta)))
 
