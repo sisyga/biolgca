@@ -206,6 +206,16 @@ class Test_LGCA_General:
                 for propname in lgca.props.keys():
                     assert len(lgca.props[propname]) == lgca.maxlabel + 1, "Properties not set up for all particles"
 
+    @pytest.mark.parametrize("geom,nodes", [
+        ('lin', np.zeros((com.xdim_1d, com.b_1d - 1), dtype=bool)),
+        ('square', np.zeros((com.xdim_square, com.ydim_square, com.b_square - 1), dtype=bool)),
+        ('hex', np.zeros((com.xdim_hex, com.ydim_hex, com.b_hex - 1), dtype=bool)),
+        ('cubic', np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic - 1), dtype=bool)),
+    ])
+    def test_nodes_too_few_channels(self, geom, nodes):
+        with pytest.raises(RuntimeError):
+            get_lgca(geometry=geom, nodes=nodes, interaction='only_propagation')
+
     # parameter tuples for 'hom', 'density' keyword check
     # init_particles = number of particles expected in each node int(density*capacity)
     @pytest.mark.parametrize("geom,ve,dims,restchannels,density,init_particles", [
