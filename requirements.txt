@@ -1,7 +1,5 @@
-matplotlib
 numpy
 scipy
 sympy
-mayavi
 tqdm
 
