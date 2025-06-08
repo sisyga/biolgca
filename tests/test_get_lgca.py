@@ -5,19 +5,12 @@ from lgca import get_lgca
 from lgca.lgca_1d import LGCA_1D, IBLGCA_1D, NoVE_LGCA_1D, NoVE_IBLGCA_1D
 from lgca.lgca_square import LGCA_Square, IBLGCA_Square, NoVE_LGCA_Square, NoVE_IBLGCA_Square
 from lgca.lgca_hex import LGCA_Hex, IBLGCA_Hex, NoVE_LGCA_Hex, NoVE_IBLGCA_Hex
-
-try:
-    import mayavi  # noqa: F401
-except Exception:
-    HAS_CUBIC = False
-else:
-    from lgca.lgca_cubic import (
-        LGCA_Cubic,
-        IBLGCA_Cubic,
-        NoVE_LGCA_Cubic,
-        NoVE_IBLGCA_Cubic,
-    )
-    HAS_CUBIC = True
+from lgca.lgca_cubic import (
+    LGCA_Cubic,
+    IBLGCA_Cubic,
+    NoVE_LGCA_Cubic,
+    NoVE_IBLGCA_Cubic,
+)
 
 EXPECTED = {
     'lin': {
@@ -38,19 +31,15 @@ EXPECTED = {
         (False, False): NoVE_LGCA_Hex,
         (True, False): NoVE_IBLGCA_Hex,
     },
-}
-
-if HAS_CUBIC:
-    EXPECTED['cubic'] = {
+    'cubic': {
         (False, True): LGCA_Cubic,
         (True, True): IBLGCA_Cubic,
         (False, False): NoVE_LGCA_Cubic,
         (True, False): NoVE_IBLGCA_Cubic,
-    }
+    },
+}
 
-geometries = ['lin', 'square', 'hex']
-if HAS_CUBIC:
-    geometries.append('cubic')
+geometries = ['lin', 'square', 'hex', 'cubic']
 
 PARAMS = [
     (g, ib, ve)
