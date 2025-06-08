@@ -298,6 +298,8 @@ class LGCA_base(ABC):
         Custom initial lattice configuration.
     restchannels : int, default=0
         Number of resting channels.
+    propagation : bool, default=True
+        Toggle whether the propagation step is executed during a timestep.
     **kwargs
         Further arguments for the initial condition and/or the interaction.
 
@@ -559,8 +561,10 @@ class LGCA_base(ABC):
                 UserWarning,
             )
 
-    def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', seed=None, **kwargs):
-        """ Initialize class instance. See class docstring."""
+    def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1,
+                 bc='periodic', seed=None, propagation=True, **kwargs):
+        """Initialize class instance. See class docstring."""
+        self.enable_propagation = propagation
         self.r_int: int = 1  # Interaction radius. Must be at least 1 to handle propagation.
         self.rng = npr.default_rng(seed=seed)
         # set boundary conditions, set self.apply_boundaries
@@ -1003,8 +1007,9 @@ class LGCA_base(ABC):
         """
         self.interaction(self)
         self.apply_boundaries()
-        self.propagation()
-        self.apply_boundaries()
+        if getattr(self, "enable_propagation", True):
+            self.propagation()
+            self.apply_boundaries()
         self.update_dynamic_fields()
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True,
@@ -1118,10 +1123,11 @@ class LGCA_base(ABC):
         geom = getattr(self, "geometry", "unknown")
         bc = getattr(self, "bc", "periodic")
         interaction = getattr(self.interaction, "__name__", str(self.interaction))
+        prop_flag = getattr(self, "enable_propagation", True)
         return (
             f"{self.__class__.__name__}(geometry={geom}, dims={self.dims}, "
             f"rest={self.restchannels}, K={self.K}, r_int={self.r_int}, bc={bc}, "
-            f"interaction={interaction})"
+            f"propagate={prop_flag}, interaction={interaction})"
         )
 
     def __str__(self) -> str:
@@ -1130,7 +1136,8 @@ class LGCA_base(ABC):
         bc = getattr(self, "bc", "periodic")
         interaction = getattr(self.interaction, "__name__", str(self.interaction))
         capacity = getattr(self, "capacity", self.K)
-        prop = "ensemble" if getattr(self, "ensemble", False) else "normal"
+        prop_mode = "ensemble" if getattr(self, "ensemble", False) else "normal"
+        prop_flag = getattr(self, "enable_propagation", True)
         lines = [
             f"Model: {self.__class__.__name__}",
             f"Geometry: {geom}",
@@ -1139,7 +1146,8 @@ class LGCA_base(ABC):
             f"Carrying capacity: {capacity}",
             f"Interaction radius: {self.r_int}",
             f"Boundary conditions: {bc}",
-            f"Propagation: {prop}",
+            f"Propagation mode: {prop_mode}",
+            f"Propagation enabled: {prop_flag}",
             f"Interaction: {interaction}",
             f"Interaction parameters: {self.interaction_params}",
         ]
@@ -1170,6 +1178,8 @@ class IBLGCA_base(LGCA_base, ABC):
         Custom initial lattice configuration.
     restchannels : int, default=0
         Number of resting channels.
+    propagation : bool, default=True
+        Toggle whether the propagation step is executed during a timestep.
     **kwargs
         Further arguments for the initial condition and/or the interaction.
 
@@ -1261,8 +1271,10 @@ class IBLGCA_base(LGCA_base, ABC):
 
     """
 
-    def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', seed=None, **kwargs):
-        """ Initialize class instance. See class docstring."""
+    def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1,
+                 bc='periodic', seed=None, propagation=True, **kwargs):
+        """Initialize class instance. See class docstring."""
+        self.enable_propagation = propagation
         self.r_int = 1  # Interaction radius. Must be at least 1 to handle propagation.
         self.rng = npr.default_rng(seed=seed)
         # set boundary conditions, set self.apply_boundaries
@@ -2455,8 +2467,9 @@ class NoVE_LGCA_base(LGCA_base, ABC):
     """
     Base class for LGCA without volume exclusion.
     """
-    def __init__(self, nodes=None, dims=None, restchannels=1, density=0.1, hom=None, bc='periodic', seed=None, capacity=None,
-                 **kwargs):
+    def __init__(self, nodes=None, dims=None, restchannels=1, density=0.1,
+                 hom=None, bc='periodic', seed=None, capacity=None,
+                 propagation=True, **kwargs):
         """
         Initialize class instance.
         :param nodes: :py:class:`numpy.ndarray` initial configuration set manually
@@ -2465,8 +2478,10 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         :param density: float, if nodes is None, initialize lattice randomly with this particle density
         :param bc: boundary conditions
         :param r_int: interaction range
+        :param propagation: execute propagation step during a timestep
         """
 
+        self.enable_propagation = propagation
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
         self.rng = npr.default_rng(seed=seed)
         self.set_bc(bc)
@@ -2793,7 +2808,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     """
     interactions = ['go_or_grow', 'birthdeath', 'randomwalk', 'steric_evolution']
 
-    def __init__(self, nodes=None, dims=None, density=.1, restchannels=1, bc='periodic', seed=None, **kwargs):
+    def __init__(self, nodes=None, dims=None, density=.1, restchannels=1,
+                 bc='periodic', seed=None, propagation=True, **kwargs):
         """
         Initialize class instance.
         :param nodes:
@@ -2803,7 +2819,9 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         :param bc:
         :param r_int:
         :param kwargs:
+        :param propagation: execute propagation step during a timestep
         """
+        self.enable_propagation = propagation
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
         self.rng = npr.default_rng(seed=seed)
         self.props = {}
