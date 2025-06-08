@@ -586,6 +586,16 @@ class LGCA_base(ABC):
                 UserWarning,
             )
 
+    def _ensure_bool_nodes(self, nodes):
+        """Return ``nodes`` as boolean array, warn if non-boolean values found."""
+        if not np.isin(nodes, [0, 1]).all():
+            warnings.warn(
+                "Provided nodes contain values other than 0 or 1. "
+                "Interpreting values as booleans.",
+                UserWarning,
+            )
+        return nodes.astype(bool)
+
     def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1,
                  bc='periodic', seed=None, propagation=True, **kwargs):
         """Initialize class instance. See class docstring."""
