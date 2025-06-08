@@ -117,7 +117,7 @@ class LGCA_Cubic(LGCA_base):
         z = np.arange(self.lz) + self.r_int
         xx, yy, zz = np.meshgrid(x, y, z, indexing='ij')
         self.nonborder = (xx, yy, zz)
-        self.coord_triples = list(zip(xx.flat, yy.flat, zz.flat))
+        self.coord_pairs = list(zip(xx.flat, yy.flat, zz.flat))
         self.xcoords, self.ycoords, self.zcoords = np.meshgrid(
             np.arange(self.lx + 2 * self.r_int) - self.r_int,
             np.arange(self.ly + 2 * self.r_int) - self.r_int,
