@@ -6,10 +6,10 @@ documentation yourself.  More detailed usage examples can be found in the
 :doc:`examples` section.
 ..  # Getting started
     #### Dependencies
-    `biolgca` heavily depends on `numpy` and `matplotlib`. To install all dependencies 
-    for using the package, run this from a command line:
-    ```python
-    pip install matplotlib==3.3.2 numpy scipy sympy
+    `biolgca` depends only on `numpy` for running simulations. To enable plotting
+    features, install the optional dependencies:
+    ```bash
+    pip install -r plotting-requirements.txt
     ```
     (On Windows, a terminal that understands `pip` out of the box can be opened in Anaconda in the 
     "Environments" tab, clicking on the triangle next to the environment's name.)

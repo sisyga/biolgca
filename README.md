@@ -42,6 +42,8 @@ Clone the repository and install the core requirements:
 git clone https://github.com/sisyga/biolgca.git
 cd biolgca
 pip install -r requirements.txt
+# install extra packages for plotting support
+pip install -r plotting-requirements.txt
 ```
 Run a short simulation to verify the setup:
 ```python
@@ -115,10 +117,10 @@ lgca.plot_prop_spatial(propname='r_b')  # plot on the right
 
 # Getting started
 #### Dependencies
-`biolgca` heavily depends on `numpy` and `matplotlib`. To install all dependencies 
-for using the package, run this from a command line:
-```python
-pip install matplotlib==3.3.2 numpy scipy sympy
+`biolgca` depends only on `numpy` for running simulations. To enable plotting
+features, install the optional dependencies:
+```bash
+pip install -r plotting-requirements.txt
 ```
 (On Windows, a terminal that understands `pip` out of the box can be opened in Anaconda in the 
 "Environments" tab, clicking on the triangle next to the environment's name.)
