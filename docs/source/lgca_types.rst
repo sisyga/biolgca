@@ -1,9 +1,10 @@
 Types of LGCA
 =============
 
-.. note::
-
-   This section is under construction.
+The simulator implements four flavours of lattice--gas cellular automata.
+Each variant differs in the way particles occupy lattice channels and
+whether individual particles carry their own properties.  The sections
+below summarise the characteristics of each type.
 
 Here we detail the specificities of each LGCA type and the corresponding data structure including figures.
 
@@ -11,21 +12,22 @@ Here we detail the specificities of each LGCA type and the corresponding data st
 Classical LGCA
 --------------
 
-Only one particle can reside in a channel and they are not distinguishable.
+Only one particle may reside in each velocity channel and particles do not carry individual properties. This variant corresponds to the traditional volume--exclusion LGCA used to model populations of identical cells.
 
 
 LGCA without volume exclusion
 -----------------------------
 
-Particles are not distinguishable, but channels can be occupied by an arbitrary number of particles.
+Channels can hold arbitrarily many particles. All particles share the same
+properties and collisions are ignored.
 
 Identity-based LGCA
 -------------------
 
-Only one particle can reside in a channel. Each particle has individual properties and can be tracked across the simulation.
+Only one particle fits into a channel, but every particle stores its own state. These individual properties allow the simulation of heterogeneous cell populations.
 
 
 Identity-based LGCA without volume exclusion
 --------------------------------------------
 
-Channels can be occupied by an arbitrary number of particles. Each particle has individual properties and can be tracked across the simulation.
+The most general model removes the volume--exclusion constraint while keeping individual particle properties. Many cells may occupy the same node and still be distinguished throughout the simulation.

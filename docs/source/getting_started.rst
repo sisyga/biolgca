@@ -1,11 +1,9 @@
 Getting started
 ===============
 
-.. note::
-
-   This section is under construction.
-
-To do: put content of readme here and link other files.
+This guide summarises the basic installation steps and explains how to build the
+documentation yourself.  More detailed usage examples can be found in the
+:doc:`examples` section.
 ..  # Getting started
     #### Dependencies
     `biolgca` heavily depends on `numpy` and `matplotlib`. To install all dependencies 
@@ -51,3 +49,15 @@ To do: put content of readme here and link other files.
     ```
 
     This [Tutorial](./BioLGCA.ipynb) guides you through the argument options.
+
+Building the documentation
+-------------------------
+The online documentation is built automatically by `Read the Docs`_.
+The build process is configured in the :file:`.readthedocs.yaml` file at the
+repository root.  After installing the packages listed in
+:download:`optional-requirements.txt <../../optional-requirements.txt>` you can
+reproduce the HTML build locally with::
+
+   sphinx-build -b html docs/source docs/_build
+
+
