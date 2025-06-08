@@ -22,6 +22,7 @@ try:  # optional plotting dependencies
     import matplotlib.animation as animation
     import matplotlib.colors as colors
     import matplotlib.ticker as mticker
+    from matplotlib.ticker import FuncFormatter
     from matplotlib.collections import PatchCollection
     from matplotlib.colors import Normalize
     from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
@@ -30,7 +31,7 @@ try:  # optional plotting dependencies
 except ImportError:  # pragma: no cover - handled at runtime
     from lgca.base import _MissingPlotLib  # reuse stub
 
-    animation = colors = mticker = PatchCollection = Normalize = (
+    animation = colors = mticker = FuncFormatter = PatchCollection = Normalize = (
         RegularPolygon
     ) = Circle = FancyArrowPatch = cm = make_axes_locatable = _MissingPlotLib(
         "matplotlib"
@@ -653,8 +654,10 @@ class LGCA_Square(LGCA_base):
         else:
             minstep = 1
             integer = False
-        ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[minstep, 2*self.dy, 5*self.dy, 10*self.dy], integer=integer))
-        ax.yaxis.set_major_formatter(lambda x, pos: (int(x/self.dy)))
+        ax.yaxis.set_major_locator(
+            mticker.MaxNLocator(nbins=9, steps=[minstep, 2 * self.dy, 5 * self.dy, 10 * self.dy], integer=integer)
+        )
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: int(x / self.dy)))
         ax.spines['top'].set_visible(True)
         ax.spines['right'].set_visible(True)
         ax.yaxis.set_ticks_position('both')
@@ -853,8 +856,8 @@ class LGCA_Square(LGCA_base):
             mappable.set_array(np.arange(K))
             cbar = fig.colorbar(mappable, extend='min', use_gridspec=True, cax=cax)
             cbar.set_label('Particle number $n$')
-            cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[3::2])
-            cax.yaxis.set_major_formatter(lambda x, pos: (int(x - 0.5)))
+            cbar.set_ticks(np.linspace(0.0, K + 1, 2 * K + 3, endpoint=True)[3::2])
+            cax.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: int(x - 0.5)))
             # cbar.set_ticklabels(1 + np.arange(K)) # np.arange(K+1)
             plt.sca(ax)
         else:
@@ -1029,8 +1032,8 @@ class LGCA_Square(LGCA_base):
             cax = divider.append_axes("right", size="5%", pad=0.1)
             cbar = fig.colorbar(cmap, extend='min', use_gridspec=True, cax=cax)
             cbar.set_label(cbarlabel)
-            cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[3::2])
-            cax.yaxis.set_major_formatter(lambda x, pos: (int(x - 0.5)))
+            cbar.set_ticks(np.linspace(0.0, K + 1, 2 * K + 3, endpoint=True)[3::2])
+            cax.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: int(x - 0.5)))
             #cbar.set_ticklabels(1 + np.arange(K)) # np.arange(K+1)
             plt.sca(ax)
 
