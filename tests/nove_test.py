@@ -556,6 +556,7 @@ class Test_LGCA_NoVE(T_LGCA_Common):
             ("cubic", com.nodes_nove_cubic),
         ],
     )
+
     @pytest.mark.skip(reason="unstable with missing numba")
     def test_characteristics(self, geom, nodes):
         # volume exclusion does not have to be checked here, uniqueness neither

@@ -1,10 +1,8 @@
 from lgca.base import *
-
 try:  # optional plotting dependency
     from mayavi import mlab
 except ImportError:  # pragma: no cover - handled at runtime
     from lgca.base import _MissingPlotLib
-
     mlab = _MissingPlotLib("mayavi")
 
 
