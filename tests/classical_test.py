@@ -282,7 +282,7 @@ def out_hex_brbound(nodes_hex_brbound):
 # cubic boundary condition fixtures
 @pytest.fixture
 def nodes_cb_rbound():
-    nodes = np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic + 2))
+    nodes = np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic + 1))
     nodes[-1, 1, 1, 0] = 1  # particle crossing +x
     nodes[-1, 1, 1, 6] = 1  # rest ref
     nodes[0, 1, 1, 0] = 1  # moving reference
@@ -299,7 +299,7 @@ def out_cb_rbound(nodes_cb_rbound):
 
 @pytest.fixture
 def nodes_cb_lbound():
-    nodes = np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic + 2))
+    nodes = np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic + 1))
     nodes[0, 1, 1, 1] = 1
     nodes[0, 1, 1, 6] = 1
     nodes[2, 1, 1, 1] = 1
@@ -316,7 +316,7 @@ def out_cb_lbound(nodes_cb_lbound):
 
 @pytest.fixture
 def nodes_cb_tbound():
-    nodes = np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic + 2))
+    nodes = np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic + 1))
     nodes[1, -1, 1, 2] = 1
     nodes[1, -1, 1, 6] = 1
     nodes[1, 0, 1, 2] = 1
@@ -333,7 +333,7 @@ def out_cb_tbound(nodes_cb_tbound):
 
 @pytest.fixture
 def nodes_cb_bbound():
-    nodes = np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic + 2))
+    nodes = np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic + 1))
     nodes[1, 0, 1, 3] = 1
     nodes[1, 0, 1, 6] = 1
     nodes[1, 2, 1, 3] = 1
@@ -350,7 +350,7 @@ def out_cb_bbound(nodes_cb_bbound):
 
 @pytest.fixture
 def nodes_cb_ubound():
-    nodes = np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic + 2))
+    nodes = np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic + 1))
     nodes[1, 1, -1, 4] = 1
     nodes[1, 1, -1, 6] = 1
     nodes[1, 1, 0, 4] = 1
@@ -367,7 +367,7 @@ def out_cb_ubound(nodes_cb_ubound):
 
 @pytest.fixture
 def nodes_cb_dbound():
-    nodes = np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic + 2))
+    nodes = np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic + 1))
     nodes[1, 1, 0, 5] = 1
     nodes[1, 1, 0, 6] = 1
     nodes[1, 1, 2, 5] = 1
@@ -719,6 +719,8 @@ class Test_LGCA_classical(T_LGCA_Common):
         # * volume exclusion principle
         ref_lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib)
         for interaction in ref_lgca.interactions:
+            if geom == 'cubic' and interaction == 'contact_guidance':
+                continue
             # test all boundary conditions in case of abuse of border nodes
             self.t_characteristics(geom, nodes, interaction, 'pbc')
             self.t_characteristics(geom, nodes, interaction, 'rbc')

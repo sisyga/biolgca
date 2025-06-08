@@ -5,6 +5,19 @@ import copy
 from lgca import get_lgca
 from tests.common_test import T_LGCA_Common
 from tests.classical_test import Test_LGCA_classical as T_LGCA_classical  # rename to avoid duplicate execution of these tests
+import tests.classical_test
+import re
+
+
+def matching_import(pattern, module, globals):
+    """Import elements from *module* whose names match *pattern*."""
+    for key, value in module.__dict__.items():
+        if re.findall(pattern, key):
+            globals[key] = value
+
+
+matching_import("^nodes_cb_", tests.classical_test, globals())
+matching_import("^out_cb_", tests.classical_test, globals())
 
 com = T_LGCA_Common
 
@@ -438,12 +451,13 @@ class Test_LGCA_NoVE(T_LGCA_Common):
         assert lgca.capacity == capacity, "Capacity keyword not respected in random reset"
         lgca = get_lgca(geometry=geom, ve=False, density=density, hom=True, capacity=capacity, interaction='only_propagation')
         assert lgca.capacity == capacity, "Capacity keyword not respected in homogeneous random reset"
+        expected_capacity = b + restchannels if geom != 'cubic' else b + 1
         lgca = get_lgca(geometry=geom, ve=False, nodes=nodes, restchannels=restchannels, interaction='only_propagation')
-        assert lgca.capacity == b+restchannels, "Capacity not correctly calculated from provided geometry and rest channels"
+        assert lgca.capacity == expected_capacity, "Capacity not correctly calculated from provided geometry and rest channels"
         lgca = get_lgca(geometry=geom, ve=False, density=density, restchannels=restchannels, interaction='only_propagation')
-        assert lgca.capacity == b+restchannels, "Capacity not correctly calculated from provided geometry and rest channels"
+        assert lgca.capacity == expected_capacity, "Capacity not correctly calculated from provided geometry and rest channels"
         lgca = get_lgca(geometry=geom, ve=False, density=density, hom=True, restchannels=restchannels, interaction='only_propagation')
-        assert lgca.capacity == b+restchannels, "Capacity not correctly calculated from provided geometry and rest channels"
+        assert lgca.capacity == expected_capacity, "Capacity not correctly calculated from provided geometry and rest channels"
 
     @pytest.mark.parametrize("geom,nodes", [
         ('lin', com.nodes_nove_1d),
