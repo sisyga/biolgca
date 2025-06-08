@@ -20,11 +20,26 @@ import warnings
 from abc import ABC, abstractmethod
 from copy import copy, deepcopy
 
-import matplotlib.colors as colors
+
+class _MissingPlotLib:
+    """Placeholder object for an optional plotting library."""
+
+    def __init__(self, name: str):
+        self._name = name
+
+    def __getattr__(self, _):
+        raise ImportError(
+            f"Plotting requires {self._name}. Install extras with 'pip install -r plotting-requirements.txt'."
+        )
+
+
 import numpy as np
-from matplotlib import cm
-from matplotlib import pyplot as plt
-from matplotlib.cm import ScalarMappable
+try:  # optional plotting dependencies
+    import matplotlib.colors as colors
+    from matplotlib import cm, pyplot as plt
+    from matplotlib.cm import ScalarMappable
+except ImportError:  # pragma: no cover - handled at runtime
+    colors = cm = plt = ScalarMappable = _MissingPlotLib("matplotlib")
 from numpy import random as npr
 from sympy.utilities.iterables import multiset_permutations
 from tqdm.auto import tqdm
