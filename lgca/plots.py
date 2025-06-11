@@ -483,3 +483,231 @@ def muller_plot(root_ID, cum_pop_t, children_nlist, parent_list, timeline, facec
 
     plt.tight_layout()
     return fig, ax, ret, fc_map
+def colorbar_index(ncolors: int, cmap, use_gridspec: bool=False, cax=None):
+    """
+    Create a colorbar with `ncolors` colors.
+
+    Builds a discrete colormap with `ncolors` colors from the near-continuous colormap `cmap`,
+    adds it to the axis `cax` and draws tick labels in the center of each color. If
+    ncolors is high, tick positions are determined automatically using
+    :class:`~matplotlib.ticker.MaxNLocator` and labels are formatted with
+    :class:`~matplotlib.ticker.FuncFormatter`.
+
+    Parameters
+    ----------
+    ncolors : int
+        Desired number of colors for the discretized colormap.
+    cmap : str or :py:class:`matplotlib.colors.Colormap`
+        Near-continuous colormap to create discrete colormap from, e.g. ``matplotlib.cm.jet`` or ``'jet'``.
+    use_gridspec : bool, optional
+        Passed on to :py:func:`matplotlib.pyplot.colorbar`.
+    cax : :py:class:`matplotlib.axes.Axes` object, optional
+        Axis into which the colorbar will be drawn.
+
+    Returns
+    -------
+    colorbar : :py:class:`matplotlib.colorbar.Colorbar`
+        Colorbar instance.
+
+    """
+    # discretize the colormap
+    cmap = cmap_discretize(cmap, ncolors)
+
+    # map colors to values
+    mappable = ScalarMappable(cmap=cmap)
+    mappable.set_array([])
+    mappable.set_clim(-0.5, ncolors - 0.5)
+
+    # create colorbar with discrete boundaries
+    boundaries = np.arange(-0.5, ncolors, 1)
+    colorbar = plt.colorbar(
+        mappable, use_gridspec=use_gridspec, cax=cax, boundaries=boundaries
+    )
+
+    # configure ticks and labels using locators and formatters
+    locator = MaxNLocator(nbins="auto", integer=True)
+    formatter = FuncFormatter(lambda val, pos: int(val))
+    colorbar.ax.yaxis.set_major_locator(locator)
+    colorbar.ax.yaxis.set_major_formatter(formatter)
+    colorbar.update_ticks()
+    return colorbar
+
+
+def cmap_discretize(cmap, N: int):
+    """
+    Downsample the near-continuous colormap `cmap` to the number of colors `N`.
+
+    Parameters
+    ----------
+    cmap : str or :py:class:`matplotlib.colors.Colormap`
+        Colormap to be discretized, e.g. ``matplotlib.cm.jet`` or ``'jet'``.
+    N : int
+        Number of colors of the new colormap.
+
+    Returns
+    -------
+    :py:class:`matplotlib.colors.LinearSegmentedColormap`
+        Discretized colormap with `N` colors.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import matplotlib.cm as cm
+    >>> import matplotlib.pyplot as plt
+    >>> x = np.resize(np.arange(100), (5,20))
+    >>> # discretize jet colormap
+    >>> djet = cmap_discretize(cm.jet, 5)
+    >>> # show color limits
+    >>> plt.imshow(x, cmap=djet)
+
+    The name of the colormap is updated to ``cmap.name + '_N'``:
+
+    >>> djet.name
+    'jet_5'
+
+    """
+    # see https://matplotlib.org/stable/tutorials/colors/colormap-manipulation.html#creating-linear-segmented-colormaps
+    # for details
+    if type(cmap) == str:
+        cmap = plt.get_cmap(cmap)
+    # create anchor points and fill them with colors from the colormap
+    colors_i = np.concatenate((np.linspace(0, 1., N), (0., 0., 0., 0.)))
+    colors_rgba = cmap(colors_i)
+    # index rgba values according to discretization
+    indices = np.linspace(0, 1., N + 1)
+    cdict = {}
+    for ki, key in enumerate(('red', 'green', 'blue')):
+        cdict[key] = [(indices[i], colors_rgba[i - 1, ki], colors_rgba[i, ki]) for i in range(N + 1)]
+    # create new linear segmented colormap
+    return plt.matplotlib.colors.LinearSegmentedColormap(cmap.name + "_%d" % N, cdict, 1024)
+
+
+def estimate_figsize(array, x: float=8., cbar: bool=False, dy: float=1.):
+    """
+    .. deprecated:: 1.0
+        :py:func:`estimate_figsize` will be removed in biolgca 1.0, it is replaced
+        by the default value for the figure size in :py:meth:`setup_figure` of the
+        respective LGCA object.
+
+    Parameters
+    ----------
+    array : :py:class:`numpy.ndarray`
+        Array holding the data to be plotted.
+    x : float, default=8.0
+        Desired x dimension of the figure. Used to scale the y dimension.
+    cbar : bool, optional
+        If the figure will contain a colorbar.
+    dy : float, default=1.0
+        Scale of a unit in the y direction as compared to the x direction.
+
+    Returns
+    -------
+    figsize : tuple(float, float)
+        Optimal figure size.
+
+    """
+    lx, ly = array.shape
+    if cbar:
+        y = min([abs(x * ly /lx - 1), 10.])
+    else:
+        y = min([x * ly / lx, 10.])
+    y *= dy
+    figsize = (x, y)
+    return figsize
+
+
+def get_cmap(
+    density,
+    ax=None,
+    vmax=None,
+    cmap="viridis",
+    cbar=True,
+    cbarlabel="",
+    colorbarwidth="5%",
+    pad=0.1,
+):
+    if vmax is None:
+        K = int(density.max())
+    else:
+        K = vmax
+
+    cmap = copy(cm.get_cmap(cmap))  # do not modify a globally registered colormap in matplotlib > 3.3.2
+    cmap.set_under(alpha=0.0)
+    cmap_scaled = False
+
+    if 1 < K <= cmap.N:
+        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
+    elif K > 1:
+        cmap_scaled = True
+        scaling_factor = K / cmap.N
+        nbins = cmap.N
+        density = density / scaling_factor
+        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(cmap.N + 1), cmap.N))
+    else:
+        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.Normalize(vmin=1e-6, vmax=1))
+    cmap.set_array(density)
+
+    if not cbar:
+        return cmap
+
+    if ax is None:
+        ax = plt.gca()
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size=colorbarwidth, pad=pad)
+
+    if K <= 1:
+        # requires extra treatment because there is only one colour
+        cbar = plt.colorbar(
+            cmap,
+            cax=cax,
+            extend="min",
+            use_gridspec=True,
+            boundaries=[0, 0.5, 1],
+            values=[0, 1],
+        )
+    else:
+        cbar = plt.colorbar(cmap, cax=cax, extend="min", use_gridspec=True)
+    cbar.set_label(cbarlabel)
+    if cmap_scaled:
+        ncolors = nbins
+    else:
+        ncolors = max(1, K)
+    # set a numbering interval for high densities (e.g. 5-10-15-20)
+    if ncolors > 101:
+        stride = 10
+    elif ncolors > 51:
+        stride = 5
+    elif ncolors > 31:
+        stride = 2
+    else:
+        stride = 1
+    if K <= 1:
+        # requires extra treatment because there is only one colour
+        ticks = np.array([0.75])
+    else:
+        ticks = np.arange(1, ncolors + 1, 1) + 0.5
+    if cmap_scaled:
+        indices = np.arange(1, nbins + 2)
+        low_label = np.ceil(indices * scaling_factor - 1e-6)
+        low_label = np.roll(low_label, 1)
+        low_label = np.delete(low_label, 0).astype(int)
+        labels = list(low_label)
+    else:
+        labels = list(np.arange(1, ncolors + 1, 1, dtype=int))
+    # if max label comes up automatically, leave it as it is
+    if ticks[-1] == ticks[0::stride][-1]:
+        cbar.set_ticks(ticks[0::stride])
+        cbar.set_ticklabels(labels[0::stride])
+    # if max label is too close to last strided label, leave the latter out
+    elif stride > 1 and ticks[-1] != ticks[0::stride][-1] and ticks[-1] - ticks[0::stride][-1] < stride / 2:
+        cbar.set_ticks(list(ticks[0::stride][:-1]) + [ticks[-1]])
+        cbar.set_ticklabels(labels[0::stride][:-1] + [labels[-1]])
+    # if there is enough space, just add the max label
+    else:
+        cbar.set_ticks(list(ticks[0::stride]) + [ticks[-1]])
+        cbar.set_ticklabels(labels[0::stride] + [labels[-1]])
+    plt.sca(ax)
+    return cmap
+
+
+
