@@ -34,3 +34,19 @@ has six velocity channels pointing to the neighbouring cubes along the cardinal
 directions.  A resting channel may also be present.  Propagation moves particles
 to adjacent cubes in three dimensions.
 
+3-dimensional Moore lattice
+---------------------------
+
+This lattice extends the cubic neighbourhood to include the 26 surrounding
+nodes in all directions. Each node therefore has 26 velocity channels pointing
+to all combinations of ``(dx, dy, dz)`` in ``{-1, 0, 1}`` except the origin. The
+resulting neighbourhood is often called the *Moore* neighbourhood in three
+dimensions. Propagation moves particles to any of the adjacent or diagonal
+neighbours as well as allowing a rest channel when configured.
+
+Example::
+
+    from lgca import get_lgca
+    lgca = get_lgca(geometry='moore')
+
+

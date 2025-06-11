@@ -19,6 +19,7 @@ def matching_import(pattern, module, globals):
 
 
 from lgca import get_lgca
+from lgca.lgca_3dmoore import LGCA_3dMoore
 # import other test modules for fixture and function reuse
 # CAUTION: they need to be renamed and lose the "Test" prefix so that pytest does not executes these tests again
 from tests.common_test import T_LGCA_Common
@@ -60,12 +61,16 @@ class Test_LGCA_IB(T_LGCA_Common):
     test_pbc_cubic = T_LGCA_classical.test_pbc_cubic
     test_rbc_cubic = T_LGCA_classical.test_rbc_cubic
     test_abc_cubic = T_LGCA_classical.test_abc_cubic
+    test_pbc_moore = T_LGCA_classical.test_pbc_moore
+    test_rbc_moore = T_LGCA_classical.test_rbc_moore
+    test_abc_moore = T_LGCA_classical.test_abc_moore
 
     @pytest.mark.parametrize("geom,dims", [
         ('lin', (com.xdim_1d,)),
         ('square', (com.xdim_square, com.ydim_square)),
         ('hex', (com.xdim_hex, com.ydim_hex)),
-        ('cubic', (com.xdim_cubic, com.ydim_cubic, com.zdim_cubic))
+        ('cubic', (com.xdim_cubic, com.ydim_cubic, com.zdim_cubic)),
+        ('moore', (com.xdim_moore, com.ydim_moore, com.zdim_moore))
     ])
     def test_recording(self, geom, dims):
         # timeevo and recording: check if all properties are available when requested
@@ -167,11 +172,40 @@ class Test_LGCA_IB(T_LGCA_Common):
         expected_output[1, 1, 1, 6] = 7
         self.t_propagation_template('cubic', nodes, expected_output)
 
+        # 3D moore
+        restchannels = 2
+        nodes = np.zeros((self.xdim_moore, self.ydim_moore, self.zdim_moore, self.b_moore + restchannels))
+        nodes[0, 1, 1, 21] = 1  # +x
+        nodes[2, 1, 1, 4] = 2   # -x
+        nodes[1, 0, 1, 15] = 3  # +y
+        nodes[1, 2, 1, 10] = 4  # -y
+        nodes[1, 1, 0, 13] = 5  # +z
+        nodes[1, 1, 2, 12] = 6  # -z
+        nodes[1, 1, 1, 26] = 7  # rest
+        expected_output = np.zeros((self.xdim_moore, self.ydim_moore, self.zdim_moore, self.b_moore + restchannels))
+        expected_output[1, 1, 1, [21, 4, 15, 10, 13, 12, 26]] = [1, 2, 3, 4, 5, 6, 7]
+        self.t_propagation_template('moore', nodes, expected_output)
+
+    def test_propagation_moore_all_channels(self):
+        restchannels = 2
+        nodes = np.zeros(
+            (self.xdim_moore, self.ydim_moore, self.zdim_moore, restchannels + self.b_moore),
+            dtype=bool,
+        )
+        center = (1, 1, 1)
+        for idx, (dx, dy, dz) in enumerate(LGCA_3dMoore.velocities):
+            nodes[center[0] - dx, center[1] - dy, center[2] - dz, idx] = True
+        nodes[center][self.b_moore :] = True
+        expected = np.zeros_like(nodes)
+        expected[center] = True
+        self.t_propagation_template('moore', nodes, expected)
+
     @pytest.mark.parametrize("geom,nodes", [
         ('lin', com.nodes_ib_1d),
         ('square', com.nodes_ib_square),
         ('hex', com.nodes_ib_hex),
-        ('cubic', com.nodes_ib_cubic)
+        ('cubic', com.nodes_ib_cubic),
+        ('moore', com.nodes_ib_moore)
     ])
     def test_characteristics(self, geom, nodes):
         # test compliance in all interactions to:
