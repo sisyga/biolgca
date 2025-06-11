@@ -14,3 +14,24 @@ docs/source/generated/*
 __pycache__
 .pkl
 .jpg
+output/
+outputs/
+*.csv
+*.tsv
+*.json
+*.xml
+*.txt
+*.dat
+
+# Plots and figures
+*.png
+*.jpg
+*.jpeg
+*.pdf
+*.svg
+*.eps
+
+# Compressed files
+*.zip
+*.tar.gz
+*.7z
