@@ -1059,48 +1059,45 @@ class LGCA_base(ABC):
                 self.velcells_t[t, ...] = self.nodes[self.nonborder][..., :self.velocitychannels].sum(-1)
                 self.restcells_t[t, ...] = self.nodes[self.nonborder][..., self.velocitychannels:].sum(-1)
 
-    def calc_permutations(self):
-        """
-        Precompute quantities that only depend on the geometry and lattice definition, but not on the current
-        configuration, for reuse in interaction functions. This speeds up concerned interactions.
-
-        Currently computed quantities are a list of all possible node configurations (:py:attr:`self.permutations`),
-        the flux for each possible node configuration (:py:attr:`self.j`), all nematic tensor possibilities
-        (:py:attr:`self.cij`) and the nematic tensor for all possible node configurations (:py:attr:`self.si`).
-
-        """
-        # list of all possible configurations for a lattice site
+def calc_permutations(self):
+    """
+    Initialize lazy computation structures for permutations.
+    Only compute permutations when actually needed.
+    """
+    # For geometries with many channels, use lazy computation
+    if self.K > 15:  # threshold for when precomputation becomes expensive
+        self._permutation_cache = {}
+        self._flux_cache = {}
+        self._si_cache = {}
+        self.permutations = None  # Signal that we're using lazy computation
+        # Still compute cij as it's geometry-dependent and small
+        self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(self.c.shape[0]))[None, ...]
+    else:
+        # Original precomputation for smaller geometries
         self.permutations = [np.array(list(multiset_permutations([1] * n + [0] * (self.K - n))), dtype=np.int8)
                              for n in range(self.K + 1)]
-        # builds list with one configuration for particle number
-        # n in an array of size self.K (velocity + resting)
-        # builds list with all possible permutations for this array
-        # for all possible particle numbers in an array of size self.K (velocity + resting)
-        # first dim: number of particles
-        # second dim: all permutations for this n
-        # third dim: channels
-
-        # array of flux for each permutation for each number of particles
         self.j = [np.dot(self.c, self.permutations[n][:, :self.velocitychannels].T) for n in range(self.K + 1)]
-        # dot product between the neighborhood vectors and the particles in the velocity channels
-        # for each possible number of particles
-        # first dim: number of particles
-        # second dim: flux vector for each permutation (directions as specified in c)
-
-        # element-wise multiplication of neighborhood vectors with themselves minus .5 * identity matrix to get nematic tensor
         self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(self.c.shape[0]))[None, ...]
-        # 1st dim: neighborhood vector
-        # 2nd and 3rd dim: combination of x and y components of the vector as [[xx, xy], [yx, yy]]
-
-
         self.si = [np.einsum('ij,jkl', self.permutations[n][:, :self.velocitychannels], self.cij) for n in
                    range(self.K + 1)]
-        # filter out self.cij with occupation of velocity channels corresponding to the neighborhood vectors
-        # list for all possible particle numbers
-        # 1st dim: number of particles
-        # 2nd dim: permutation
-        # 3rd dim and 4th dim: nematic tensor for each configuration
-        # -> combination of x and y components of the result as [[xx, xy], [yx, yy]]
+
+def get_permutations(self, n_particles):
+    """Get permutations for n_particles, computing if necessary."""
+    if self.permutations is not None:
+        return self.permutations[n_particles]
+    
+    if n_particles not in self._permutation_cache:
+        # Limit cache size to prevent memory issues
+        if len(self._permutation_cache) > 50:
+            # Remove least recently used (simple FIFO here)
+            oldest_key = next(iter(self._permutation_cache))
+            del self._permutation_cache[oldest_key]
+        
+        self._permutation_cache[n_particles] = np.array(
+            list(multiset_permutations([1] * n_particles + [0] * (self.K - n_particles))), 
+            dtype=np.int8
+        )
+    return self._permutation_cache[n_particles]
 
     def total_population(self):
         """

@@ -152,7 +152,7 @@ def persistent_walk(lgca):
     for coord in zip(*coords):
         n = lgca.cell_density[coord]
 
-        permutations = lgca.permutations[n]
+        permutations = lgca.get_permutations(n)
         j = lgca.j[n]
         weights = np.exp(lgca.interaction_params['beta'] * np.einsum('i,ij', g[coord], j)).cumsum()
         ind = bisect_left(weights, lgca.rng.random() * weights[-1])
@@ -191,7 +191,7 @@ def chemotaxis(lgca):
     for coord in zip(*coords):
         n = lgca.cell_density[coord]
 
-        permutations = lgca.permutations[n]
+        permutations = lgca.get_permutations(n)
         j = lgca.j[n]
         weights = np.exp(lgca.interaction_params['beta'] * np.einsum('i,ij',
                                                                      lgca.interaction_params['gradient_field'][coord],
@@ -230,7 +230,7 @@ def contact_guidance(lgca):
     for coord in zip(*coords):
         n = lgca.cell_density[coord]
         sni = lgca.guiding_tensor[coord]
-        permutations = lgca.permutations[n]
+        permutations = lgca.get_permutations(n)
         si = lgca.si[n]
         weights = np.exp(lgca.interaction_params['beta'] * np.einsum('ijk,jk', si, sni)).cumsum()
         ind = bisect_left(weights, lgca.rng.random() * weights[-1])
@@ -271,7 +271,7 @@ def alignment(lgca):
     g = lgca.nb_sum(g)  # calculates sum of flux of neighbors for each lattice site
     for coord in zip(*coords):
         n = lgca.cell_density[coord]
-        permutations = lgca.permutations[n]
+        permutations = lgca.get_permutations(n)
         j = lgca.j[n]  # flux per permutation
         weights = np.exp(lgca.interaction_params['beta'] * np.einsum('i,ij', g[coord], j)).cumsum()
         # multiply neighborhood flux with the flux for each possible permutation
@@ -316,7 +316,7 @@ def nematic(lgca):
     for coord in zip(*coords):
         n = lgca.cell_density[coord]
         sni = sn[coord]
-        permutations = lgca.permutations[n]
+        permutations = lgca.get_permutations(n)
         si = lgca.si[n]
         weights = np.exp(lgca.interaction_params['beta'] * np.einsum('ijk,jk', si, sni)).cumsum()
         ind = bisect_left(weights, lgca.rng.random() * weights[-1])
@@ -354,7 +354,7 @@ def aggregation(lgca):
     g = np.asarray(lgca.gradient(lgca.cell_density))  # np.asarray not needed
     for coord in zip(*coords):
         n = lgca.cell_density[coord]
-        permutations = lgca.permutations[n]
+        permutations = lgca.get_permutations(n)
         j = lgca.j[n]
         weights = np.exp(lgca.interaction_params['beta'] * np.einsum('i,ij', g[coord], j)).cumsum()
         ind = bisect_left(weights, lgca.rng.random() * weights[-1])
@@ -413,7 +413,7 @@ def wetting(lgca):
 
     for coord in zip(*coords):
         n = lgca.cell_density[coord]
-        permutations = lgca.permutations[n]
+        permutations = lgca.get_permutations(n)
         restc = permutations[:, lgca.velocitychannels:].sum(-1)
         j = lgca.j[n]
         j_nb = g[coord]
