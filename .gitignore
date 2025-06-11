@@ -12,3 +12,5 @@ docs/source/_autosummary/*
 docs/source/generated/*
 .gitignore
 __pycache__
+.pkl
+.jpg
