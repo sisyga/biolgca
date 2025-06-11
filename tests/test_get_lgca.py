@@ -11,6 +11,12 @@ from lgca.lgca_cubic import (
     NoVE_LGCA_Cubic,
     NoVE_IBLGCA_Cubic,
 )
+from lgca.lgca_3dmoore import (
+    LGCA_3dMoore,
+    IBLGCA_Moore,
+    NoVE_LGCA_Moore,
+    NoVE_IBLGCA_Moore,
+)
 
 EXPECTED = {
     'lin': {
@@ -37,9 +43,15 @@ EXPECTED = {
         (False, False): NoVE_LGCA_Cubic,
         (True, False): NoVE_IBLGCA_Cubic,
     },
+    'moore': {
+        (False, True): LGCA_3dMoore,
+        (True, True): IBLGCA_Moore,
+        (False, False): NoVE_LGCA_Moore,
+        (True, False): NoVE_IBLGCA_Moore,
+    },
 }
 
-geometries = ['lin', 'square', 'hex', 'cubic']
+geometries = ['lin', 'square', 'hex', 'cubic', 'moore']
 
 PARAMS = [
     (g, ib, ve)

@@ -4,6 +4,7 @@ import copy
 import warnings
 
 from lgca import get_lgca
+from lgca.lgca_3dmoore import LGCA_3dMoore
 from tests.common_test import T_LGCA_Common
 
 com = T_LGCA_Common
@@ -382,6 +383,189 @@ def out_cb_dbound(nodes_cb_dbound):
     return expected_output
 
 
+# moore boundary condition fixtures
+@pytest.fixture
+def nodes_mo_rbound():
+    nodes = np.zeros((com.xdim_moore, com.ydim_moore, com.zdim_moore, com.b_moore + 1))
+    nodes[-1, 1, 1, 21] = 1  # +x
+    nodes[-1, 1, 1, 26] = 1  # rest reference
+    nodes[0, 1, 1, 21] = 1   # moving reference
+    return nodes
+
+
+@pytest.fixture
+def out_mo_rbound(nodes_mo_rbound):
+    expected_output = np.zeros(nodes_mo_rbound.shape)
+    expected_output[-1, 1, 1, 26] = 1
+    expected_output[1, 1, 1, 21] = 1
+    return expected_output
+
+
+@pytest.fixture
+def nodes_mo_lbound():
+    nodes = np.zeros((com.xdim_moore, com.ydim_moore, com.zdim_moore, com.b_moore + 1))
+    nodes[0, 1, 1, 4] = 1
+    nodes[0, 1, 1, 26] = 1
+    nodes[2, 1, 1, 4] = 1
+    return nodes
+
+
+@pytest.fixture
+def out_mo_lbound(nodes_mo_lbound):
+    expected_output = np.zeros(nodes_mo_lbound.shape)
+    expected_output[0, 1, 1, 26] = 1
+    expected_output[1, 1, 1, 4] = 1
+    return expected_output
+
+
+@pytest.fixture
+def nodes_mo_tbound():
+    nodes = np.zeros((com.xdim_moore, com.ydim_moore, com.zdim_moore, com.b_moore + 1))
+    nodes[1, -1, 1, 15] = 1
+    nodes[1, -1, 1, 26] = 1
+    nodes[1, 0, 1, 15] = 1
+    return nodes
+
+
+@pytest.fixture
+def out_mo_tbound(nodes_mo_tbound):
+    expected_output = np.zeros(nodes_mo_tbound.shape)
+    expected_output[1, -1, 1, 26] = 1
+    expected_output[1, 1, 1, 15] = 1
+    return expected_output
+
+
+@pytest.fixture
+def nodes_mo_bbound():
+    nodes = np.zeros((com.xdim_moore, com.ydim_moore, com.zdim_moore, com.b_moore + 1))
+    nodes[1, 0, 1, 10] = 1
+    nodes[1, 0, 1, 26] = 1
+    nodes[1, 2, 1, 10] = 1
+    return nodes
+
+
+@pytest.fixture
+def out_mo_bbound(nodes_mo_bbound):
+    expected_output = np.zeros(nodes_mo_bbound.shape)
+    expected_output[1, 0, 1, 26] = 1
+    expected_output[1, 1, 1, 10] = 1
+    return expected_output
+
+
+@pytest.fixture
+def nodes_mo_ubound():
+    nodes = np.zeros((com.xdim_moore, com.ydim_moore, com.zdim_moore, com.b_moore + 1))
+    nodes[1, 1, -1, 13] = 1
+    nodes[1, 1, -1, 26] = 1
+    nodes[1, 1, 0, 13] = 1
+    return nodes
+
+
+@pytest.fixture
+def out_mo_ubound(nodes_mo_ubound):
+    expected_output = np.zeros(nodes_mo_ubound.shape)
+    expected_output[1, 1, -1, 26] = 1
+    expected_output[1, 1, 1, 13] = 1
+    return expected_output
+
+
+@pytest.fixture
+def nodes_mo_dbound():
+    nodes = np.zeros((com.xdim_moore, com.ydim_moore, com.zdim_moore, com.b_moore + 1))
+    nodes[1, 1, 0, 12] = 1
+    nodes[1, 1, 0, 26] = 1
+    nodes[1, 1, 2, 12] = 1
+    return nodes
+
+
+@pytest.fixture
+def out_mo_dbound(nodes_mo_dbound):
+    expected_output = np.zeros(nodes_mo_dbound.shape)
+    expected_output[1, 1, 0, 26] = 1
+    expected_output[1, 1, 1, 12] = 1
+    return expected_output
+
+
+@pytest.fixture
+def nodes_mo_edge_xy():
+    nodes = np.zeros((com.xdim_moore, com.ydim_moore, com.zdim_moore, com.b_moore + 1))
+    idx = LGCA_3dMoore.velocities.index((1, 1, 0))
+    nodes[-1, -1, 1, idx] = 1
+    nodes[-1, -1, 1, 26] = 1
+    nodes[1, 1, 1, idx] = 1
+    return nodes
+
+
+@pytest.fixture
+def out_mo_edge_xy_pbc(nodes_mo_edge_xy):
+    expected_output = np.zeros(nodes_mo_edge_xy.shape)
+    idx = LGCA_3dMoore.velocities.index((1, 1, 0))
+    expected_output[-1, -1, 1, 26] = 1
+    expected_output[0, 0, 1, idx] = 1
+    expected_output[2, 2, 1, idx] = 1
+    return expected_output
+
+
+@pytest.fixture
+def out_mo_edge_xy_rbc(nodes_mo_edge_xy):
+    expected_output = np.zeros(nodes_mo_edge_xy.shape)
+    idx = LGCA_3dMoore.velocities.index((1, 1, 0))
+    idx_ref = LGCA_3dMoore.velocities.index((-1, -1, 0))
+    expected_output[-1, -1, 1, 26] = 1
+    expected_output[2, 2, 1, idx] = 1
+    expected_output[2, 2, 1, idx_ref] = 1
+    return expected_output
+
+
+@pytest.fixture
+def out_mo_edge_xy_abc(nodes_mo_edge_xy):
+    expected_output = np.zeros(nodes_mo_edge_xy.shape)
+    idx = LGCA_3dMoore.velocities.index((1, 1, 0))
+    expected_output[-1, -1, 1, 26] = 1
+    expected_output[2, 2, 1, idx] = 1
+    return expected_output
+
+
+@pytest.fixture
+def nodes_mo_corner_xyz():
+    nodes = np.zeros((com.xdim_moore, com.ydim_moore, com.zdim_moore, com.b_moore + 1))
+    idx = LGCA_3dMoore.velocities.index((1, 1, 1))
+    nodes[-1, -1, -1, idx] = 1
+    nodes[-1, -1, -1, 26] = 1
+    nodes[1, 1, 1, idx] = 1
+    return nodes
+
+
+@pytest.fixture
+def out_mo_corner_xyz_pbc(nodes_mo_corner_xyz):
+    expected_output = np.zeros(nodes_mo_corner_xyz.shape)
+    idx = LGCA_3dMoore.velocities.index((1, 1, 1))
+    expected_output[-1, -1, -1, 26] = 1
+    expected_output[0, 0, 0, idx] = 1
+    expected_output[2, 2, 2, idx] = 1
+    return expected_output
+
+
+@pytest.fixture
+def out_mo_corner_xyz_rbc(nodes_mo_corner_xyz):
+    expected_output = np.zeros(nodes_mo_corner_xyz.shape)
+    idx = LGCA_3dMoore.velocities.index((1, 1, 1))
+    idx_ref = LGCA_3dMoore.velocities.index((-1, -1, -1))
+    expected_output[-1, -1, -1, 26] = 1
+    expected_output[2, 2, 2, idx] = 1
+    expected_output[2, 2, 2, idx_ref] = 1
+    return expected_output
+
+
+@pytest.fixture
+def out_mo_corner_xyz_abc(nodes_mo_corner_xyz):
+    expected_output = np.zeros(nodes_mo_corner_xyz.shape)
+    idx = LGCA_3dMoore.velocities.index((1, 1, 1))
+    expected_output[-1, -1, -1, 26] = 1
+    expected_output[2, 2, 2, idx] = 1
+    return expected_output
+
+
 class Test_LGCA_classical(T_LGCA_Common):
     """
     Class for testing classical LGCA (volume exclusion, not identity-based).
@@ -399,7 +583,8 @@ class Test_LGCA_classical(T_LGCA_Common):
         ('lin', (com.xdim_1d,)),
         ('square', (com.xdim_square, com.ydim_square)),
         ('hex', (com.xdim_hex, com.ydim_hex)),
-        ('cubic', (com.xdim_cubic, com.ydim_cubic, com.zdim_cubic))
+        ('cubic', (com.xdim_cubic, com.ydim_cubic, com.zdim_cubic)),
+        ('moore', (com.xdim_moore, com.ydim_moore, com.zdim_moore))
     ])
     def test_recording(self, geom, dims):
         # timeevo and recording: check if all properties are available when requested
@@ -490,6 +675,34 @@ class Test_LGCA_classical(T_LGCA_Common):
         expected_output = np.zeros((self.xdim_cubic, self.ydim_cubic, self.zdim_cubic, restchannels + self.b_cubic))
         expected_output[1, 1, 1, 0:7] = 1
         self.t_propagation_template('cubic', nodes, expected_output)
+
+        # 3D moore
+        restchannels = 2
+        nodes = np.zeros((self.xdim_moore, self.ydim_moore, self.zdim_moore, restchannels + self.b_moore))
+        nodes[0, 1, 1, 21] = 1  # +x
+        nodes[2, 1, 1, 4] = 1   # -x
+        nodes[1, 0, 1, 15] = 1  # +y
+        nodes[1, 2, 1, 10] = 1  # -y
+        nodes[1, 1, 0, 13] = 1  # +z
+        nodes[1, 1, 2, 12] = 1  # -z
+        nodes[1, 1, 1, 26] = 1  # rest
+        expected_output = np.zeros((self.xdim_moore, self.ydim_moore, self.zdim_moore, restchannels + self.b_moore))
+        expected_output[1, 1, 1, [21,4,15,10,13,12,26]] = 1
+        self.t_propagation_template('moore', nodes, expected_output)
+
+    def test_propagation_moore_all_channels(self):
+        restchannels = 2
+        nodes = np.zeros(
+            (self.xdim_moore, self.ydim_moore, self.zdim_moore, restchannels + self.b_moore),
+            dtype=bool,
+        )
+        center = (1, 1, 1)
+        for idx, (dx, dy, dz) in enumerate(LGCA_3dMoore.velocities):
+            nodes[center[0] - dx, center[1] - dy, center[2] - dz, idx] = True
+        nodes[center][self.b_moore :] = True
+        expected = np.zeros_like(nodes)
+        expected[center] = True
+        self.t_propagation_template('moore', nodes, expected)
 
     def test_pbc_1d(self, nodes_1d_rbound, out_1d_rbound, nodes_1d_lbound, out_1d_lbound):
         # check periodic boundary conditions in 1D
@@ -708,18 +921,76 @@ class Test_LGCA_classical(T_LGCA_Common):
         self.t_propagation_template('cubic', nodes_cb_ubound, out_cb_ubound, bc='abc')
         self.t_propagation_template('cubic', nodes_cb_dbound, out_cb_dbound, bc='abc')
 
+    def test_pbc_moore(self, nodes_mo_rbound, out_mo_rbound, nodes_mo_lbound, out_mo_lbound,
+                       nodes_mo_tbound, out_mo_tbound, nodes_mo_bbound, out_mo_bbound,
+                       nodes_mo_ubound, out_mo_ubound, nodes_mo_dbound, out_mo_dbound):
+        out_mo_rbound[0, 1, 1, 21] = 1
+        out_mo_lbound[-1, 1, 1, 4] = 1
+        out_mo_tbound[1, 0, 1, 15] = 1
+        out_mo_bbound[1, -1, 1, 10] = 1
+        out_mo_ubound[1, 1, 0, 13] = 1
+        out_mo_dbound[1, 1, 2, 12] = 1
+        self.t_propagation_template('moore', nodes_mo_rbound, out_mo_rbound, bc='pbc')
+        self.t_propagation_template('moore', nodes_mo_lbound, out_mo_lbound, bc='pbc')
+        self.t_propagation_template('moore', nodes_mo_tbound, out_mo_tbound, bc='pbc')
+        self.t_propagation_template('moore', nodes_mo_bbound, out_mo_bbound, bc='pbc')
+        self.t_propagation_template('moore', nodes_mo_ubound, out_mo_ubound, bc='pbc')
+        self.t_propagation_template('moore', nodes_mo_dbound, out_mo_dbound, bc='pbc')
+
+    def test_rbc_moore(self, nodes_mo_rbound, out_mo_rbound, nodes_mo_lbound, out_mo_lbound,
+                       nodes_mo_tbound, out_mo_tbound, nodes_mo_bbound, out_mo_bbound,
+                       nodes_mo_ubound, out_mo_ubound, nodes_mo_dbound, out_mo_dbound):
+        out_mo_rbound[-1, 1, 1, 4] = 1
+        out_mo_lbound[0, 1, 1, 21] = 1
+        out_mo_tbound[1, -1, 1, 10] = 1
+        out_mo_bbound[1, 0, 1, 15] = 1
+        out_mo_ubound[1, 1, -1, 12] = 1
+        out_mo_dbound[1, 1, 0, 13] = 1
+        self.t_propagation_template('moore', nodes_mo_rbound, out_mo_rbound, bc='rbc')
+        self.t_propagation_template('moore', nodes_mo_lbound, out_mo_lbound, bc='rbc')
+        self.t_propagation_template('moore', nodes_mo_tbound, out_mo_tbound, bc='rbc')
+        self.t_propagation_template('moore', nodes_mo_bbound, out_mo_bbound, bc='rbc')
+        self.t_propagation_template('moore', nodes_mo_ubound, out_mo_ubound, bc='rbc')
+        self.t_propagation_template('moore', nodes_mo_dbound, out_mo_dbound, bc='rbc')
+
+    def test_abc_moore(self, nodes_mo_rbound, out_mo_rbound, nodes_mo_lbound, out_mo_lbound,
+                       nodes_mo_tbound, out_mo_tbound, nodes_mo_bbound, out_mo_bbound,
+                       nodes_mo_ubound, out_mo_ubound, nodes_mo_dbound, out_mo_dbound):
+        self.t_propagation_template('moore', nodes_mo_rbound, out_mo_rbound, bc='abc')
+        self.t_propagation_template('moore', nodes_mo_lbound, out_mo_lbound, bc='abc')
+        self.t_propagation_template('moore', nodes_mo_tbound, out_mo_tbound, bc='abc')
+        self.t_propagation_template('moore', nodes_mo_bbound, out_mo_bbound, bc='abc')
+        self.t_propagation_template('moore', nodes_mo_ubound, out_mo_ubound, bc='abc')
+        self.t_propagation_template('moore', nodes_mo_dbound, out_mo_dbound, bc='abc')
+
+    def test_edge_conditions_moore_pbc(self, nodes_mo_edge_xy, out_mo_edge_xy_pbc,
+                                      nodes_mo_corner_xyz, out_mo_corner_xyz_pbc):
+        self.t_propagation_template('moore', nodes_mo_edge_xy, out_mo_edge_xy_pbc, bc='pbc')
+        self.t_propagation_template('moore', nodes_mo_corner_xyz, out_mo_corner_xyz_pbc, bc='pbc')
+
+    def test_edge_conditions_moore_rbc(self, nodes_mo_edge_xy, out_mo_edge_xy_rbc,
+                                      nodes_mo_corner_xyz, out_mo_corner_xyz_rbc):
+        self.t_propagation_template('moore', nodes_mo_edge_xy, out_mo_edge_xy_rbc, bc='rbc')
+        self.t_propagation_template('moore', nodes_mo_corner_xyz, out_mo_corner_xyz_rbc, bc='rbc')
+
+    def test_edge_conditions_moore_abc(self, nodes_mo_edge_xy, out_mo_edge_xy_abc,
+                                      nodes_mo_corner_xyz, out_mo_corner_xyz_abc):
+        self.t_propagation_template('moore', nodes_mo_edge_xy, out_mo_edge_xy_abc, bc='abc')
+        self.t_propagation_template('moore', nodes_mo_corner_xyz, out_mo_corner_xyz_abc, bc='abc')
+
     @pytest.mark.parametrize("geom,nodes", [
         ('lin', com.nodes_ve_1d),
         ('square', com.nodes_ve_square),
         ('hex', com.nodes_ve_hex),
-        ('cubic', com.nodes_ve_cubic)
+        ('cubic', com.nodes_ve_cubic),
+        ('moore', com.nodes_ve_moore)
     ])
     def test_characteristics(self, geom, nodes):
         # test compliance in all interactions to:
         # * volume exclusion principle
         ref_lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib)
         for interaction in ref_lgca.interactions:
-            if geom == 'cubic' and interaction == 'contact_guidance':
+            if geom in {'cubic', 'moore'} and interaction == 'contact_guidance':
                 continue
             # test all boundary conditions in case of abuse of border nodes
             self.t_characteristics(geom, nodes, interaction, 'pbc')

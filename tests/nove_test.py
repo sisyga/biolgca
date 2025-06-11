@@ -3,6 +3,7 @@ import pytest
 import copy
 
 from lgca import get_lgca
+from lgca.lgca_3dmoore import LGCA_3dMoore
 from tests.common_test import T_LGCA_Common
 from tests.classical_test import (
     Test_LGCA_classical as T_LGCA_classical,  # rename to avoid duplicate execution of these tests
@@ -338,6 +339,9 @@ class Test_LGCA_NoVE(T_LGCA_Common):
     test_pbc_cubic = T_LGCA_classical.test_pbc_cubic
     test_rbc_cubic = T_LGCA_classical.test_rbc_cubic
     test_abc_cubic = T_LGCA_classical.test_abc_cubic
+    test_pbc_moore = T_LGCA_classical.test_pbc_moore
+    test_rbc_moore = T_LGCA_classical.test_rbc_moore
+    test_abc_moore = T_LGCA_classical.test_abc_moore
 
     @pytest.mark.parametrize(
         "geom,dims",
@@ -346,6 +350,7 @@ class Test_LGCA_NoVE(T_LGCA_Common):
             ("square", (com.xdim_square, com.ydim_square)),
             ("hex", (com.xdim_hex, com.ydim_hex)),
             ("cubic", (com.xdim_cubic, com.ydim_cubic, com.zdim_cubic)),
+            ("moore", (com.xdim_moore, com.ydim_moore, com.zdim_moore)),
         ],
     )
     def test_recording(self, geom, dims):
@@ -466,6 +471,34 @@ class Test_LGCA_NoVE(T_LGCA_Common):
         expected_output[1, 1, 6] = 7  # particles resting
         self.t_propagation_template("hex", nodes, expected_output)
 
+        # 3D moore
+        restchannels = 2
+        nodes = np.zeros((self.xdim_moore, self.ydim_moore, self.zdim_moore, self.b_moore + restchannels))
+        nodes[0, 1, 1, 21] = 1
+        nodes[2, 1, 1, 4] = 2
+        nodes[1, 0, 1, 15] = 3
+        nodes[1, 2, 1, 10] = 4
+        nodes[1, 1, 0, 13] = 5
+        nodes[1, 1, 2, 12] = 6
+        nodes[1, 1, 1, 26] = 7
+        expected_output = np.zeros((self.xdim_moore, self.ydim_moore, self.zdim_moore, self.b_moore + restchannels))
+        expected_output[1, 1, 1, [21, 4, 15, 10, 13, 12, 26]] = [1, 2, 3, 4, 5, 6, 7]
+        self.t_propagation_template("moore", nodes, expected_output)
+
+    def test_propagation_moore_all_channels(self):
+        restchannels = 2
+        nodes = np.zeros(
+            (self.xdim_moore, self.ydim_moore, self.zdim_moore, restchannels + self.b_moore),
+            dtype=bool,
+        )
+        center = (1, 1, 1)
+        for idx, (dx, dy, dz) in enumerate(LGCA_3dMoore.velocities):
+            nodes[center[0] - dx, center[1] - dy, center[2] - dz, idx] = True
+        nodes[center][self.b_moore :] = True
+        expected = np.zeros_like(nodes)
+        expected[center] = True
+        self.t_propagation_template("moore", nodes, expected)
+
     @pytest.mark.parametrize(
         "geom,nodes,b",
         [
@@ -473,6 +506,7 @@ class Test_LGCA_NoVE(T_LGCA_Common):
             ("square", com.nodes_nove_square, com.b_square),
             ("hex", com.nodes_nove_hex, com.b_hex),
             ("cubic", com.nodes_nove_cubic, com.b_cubic),
+            ("moore", com.nodes_nove_moore, com.b_moore),
         ],
     )
     def test_getlgca_capacity(self, geom, nodes, b):
