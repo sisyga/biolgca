@@ -7,10 +7,18 @@ except Exception:
     HAS_CUBIC = False
 else:
     HAS_CUBIC = True
+try:
+    from lgca.lgca_3dmoore import LGCA_3dMoore  # noqa: F401
+except Exception:
+    HAS_MOORE = False
+else:
+    HAS_MOORE = True
 
 geometries = ['lin', 'square', 'hex']
 if HAS_CUBIC:
     geometries.append('cubic')
+if HAS_MOORE:
+    geometries.append('moore')
 
 @pytest.mark.parametrize('geom', geometries)
 def test_repr_and_str(geom):

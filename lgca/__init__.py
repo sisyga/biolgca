@@ -16,8 +16,8 @@ given initial conditions. It can simulate for a given number of timesteps and ha
 different plotting functions for analysis, depending on the geometry. The
 interaction function can be chosen from built-in ones or defined by the user.
 Currently, classical LGCA and identity-based LGCA with and without volume
-exclusion, respectively, are supported on 1D, 2D square, 2D hexagonal and
-3D cubic lattices.
+exclusion, respectively, are supported on 1D, 2D square, 2D hexagonal,
+3D cubic and 3D Moore lattices.
 
 References
 ----------
@@ -53,7 +53,7 @@ def _translate_dims(dims: Any, geom_key: str) -> Tuple[int, ...]:
             return (dims[0],)
         if geom_key in {'square', 'hex'}:
             return (dims[0], dims[1]) if len(dims) > 1 else (dims[0], dims[0])
-        if geom_key == 'cubic':
+        if geom_key in {'cubic', 'moore'}:
             if len(dims) >= 3:
                 return dims[0], dims[1], dims[2]
             if len(dims) == 2:
@@ -65,7 +65,7 @@ def _translate_dims(dims: Any, geom_key: str) -> Tuple[int, ...]:
         if geom_key in {'square', 'hex'}:
             d = int(dims)
             return (d, d)
-        if geom_key == 'cubic':
+        if geom_key in {'cubic', 'moore'}:
             d = int(dims)
             return (d, d, d)
     return tuple(dims)
@@ -81,6 +81,7 @@ def _warn_on_node_mismatch(nodes, dims_arg, rest_arg, geom_key):
         'square': 4,
         'hex': 6,
         'cubic': 6,
+        'moore': 26,
     }
 
     dims_from_nodes = nodes.shape[:-1]
@@ -113,11 +114,13 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
 
     Parameters
     ----------
-    geometry : {'hex', 'square', 'lin', 'cubic'}, default='hex'
-        Lattice geometry. Supported are 1D, 2D square, 2D hexagonal and 3D cubic lattices.
+    geometry : {'hex', 'square', 'lin', 'cubic', 'moore'}, default='hex'
+        Lattice geometry. Supported are 1D, 2D square, 2D hexagonal,
+        3D cubic and 3D Moore lattices.
 
         Aliases: 1D: ``'1D', '1d', 'linear'``; 2D square: ``'sq', 'rect', 'rectangular'``;
-        2D hexagonal: ``'hexagonal', 'hx'``; 3D cubic: ``'cubic', 'cb'``.
+        2D hexagonal: ``'hexagonal', 'hx'``; 3D cubic: ``'cubic', 'cb'``;
+        3D Moore: ``'moore3d'``.
     ib : bool, default=False
         If the LGCA should be identity-based (every particle can have individual properties).
     ve : bool, default=True
@@ -205,6 +208,8 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
         'hexagonal': 'hex',
         'cubic': 'cubic',
         'cb': 'cubic',
+        'moore': 'moore',
+        'moore3d': 'moore',
     }
 
     geom_key = geom_map.get(geometry, geometry)
@@ -218,10 +223,12 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
             from lgca.lgca_hex import NoVE_LGCA_Hex as _Cls
         elif geom_key == 'cubic':
             from lgca.lgca_cubic import NoVE_LGCA_Cubic as _Cls
+        elif geom_key == 'moore':
+            from lgca.lgca_3dmoore import NoVE_LGCA_Moore as _Cls
         else:
             raise ValueError(
                 "Geometry specification is unknown. Try: '1d', 'lin', 'linear', 'square', 'sq', "
-                "'rect', 'rectangular', 'hex', 'hx',  'hexagonal', 'cubic', or 'cb'."
+                "'rect', 'rectangular', 'hex', 'hx',  'hexagonal', 'cubic', 'cb', or 'moore3d'."
             )
     elif ib and ve:
         if geom_key == 'lin':
@@ -232,10 +239,12 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
             from lgca.lgca_hex import IBLGCA_Hex as _Cls
         elif geom_key == 'cubic':
             from lgca.lgca_cubic import IBLGCA_Cubic as _Cls
+        elif geom_key == 'moore':
+            from lgca.lgca_3dmoore import IBLGCA_Moore as _Cls
         else:
             raise ValueError(
                 "Geometry specification is unknown. Try: '1d', 'lin', 'linear', 'square', 'sq', "
-                "'rect', 'rectangular', 'hex', 'hx',  'hexagonal', 'cubic', or 'cb'."
+                "'rect', 'rectangular', 'hex', 'hx',  'hexagonal', 'cubic', 'cb', or 'moore3d'."
             )
     elif not ve and ib:
         if geom_key == 'lin':
@@ -246,10 +255,12 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
             from lgca.lgca_hex import NoVE_IBLGCA_Hex as _Cls
         elif geom_key == 'cubic':
             from lgca.lgca_cubic import NoVE_IBLGCA_Cubic as _Cls
+        elif geom_key == 'moore':
+            from lgca.lgca_3dmoore import NoVE_IBLGCA_Moore as _Cls
         else:
             raise ValueError(
                 "Geometry specification is unknown. Try: '1d', 'lin', 'linear', 'square', 'sq', "
-                "'rect', 'rectangular', 'hex', 'hx',  'hexagonal', 'cubic', or 'cb'."
+                "'rect', 'rectangular', 'hex', 'hx',  'hexagonal', 'cubic', 'cb', or 'moore3d'."
             )
     else:
         if geom_key == 'lin':
@@ -260,10 +271,12 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
             from lgca.lgca_hex import LGCA_Hex as _Cls
         elif geom_key == 'cubic':
             from lgca.lgca_cubic import LGCA_Cubic as _Cls
+        elif geom_key == 'moore':
+            from lgca.lgca_3dmoore import LGCA_3dMoore as _Cls
         else:
             raise ValueError(
                 "Geometry specification is unknown. Try: '1d', 'lin', 'linear', 'square', 'sq', "
-                "'rect', 'rectangular', 'hex', 'hx',  'hexagonal', 'cubic', or 'cb'."
+                "'rect', 'rectangular', 'hex', 'hx',  'hexagonal', 'cubic', 'cb', or 'moore3d'."
             )
 
     lgca = _Cls(**kwargs)

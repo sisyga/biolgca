@@ -21,7 +21,7 @@ currently supported are:
 - classical LGCA without volume exclusion (all particles/cells have the same properties)
 - identity-based LGCA without volume exclusion (particles/cells can have individual properties)
 
-These can be simulated in 1D, 2D square, 2D hexagonal, and **3D cubic** lattices. A
+These can be simulated in 1D, 2D square, 2D hexagonal, **3D cubic**, and **3D Moore** lattices. A
 [library of interaction rules](./lgca/interactions.py) (documentation under construction) is already implemented.
 Adding a custom interaction rule or customising other parts of the simulation (e.g. the interaction radius) is easy.
 
