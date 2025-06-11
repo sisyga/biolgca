@@ -1848,38 +1848,3 @@ class NoVE_IBLGCA_Cubic(NoVE_IBLGCA_base, LGCA_Cubic):
             kwargs.update({"cbarlabel": str(propname)})
 
         return super().plot_scalarfield(mean_prop, **kwargs)
-
-
-if __name__ == "__main__":
-    # Initialize LGCA on a 3D cubic lattice
-    from lgca import get_lgca
-
-    L = 50
-    nodes = np.zeros((L, L, L, 7), dtype=int)
-    nodes[L // 2, L // 2, L // 2, -1] = 10
-    lgca = get_lgca(
-        ib=False,
-        ve=True,
-        geometry="cubic",
-        interaction="go_or_grow",
-        dims=50,
-        density=0.05,
-        beta=1,
-    )
-    lgca.timeevo(timesteps=100, record=True)
-
-    # Plot flux using Mayavi
-    # lgca.plot_flux()
-    #
-    # Animate flux
-    # lgca.animate_flux()
-    # lgca.live_animate_flux()
-    # lgca.animate_config()
-    # mlab.show()
-    lgca.animate_density()
-    # lgca.live_animate_density()
-    # lgca.animate_flux()
-    # mlab.show()
-    # lgca.plot_config()
-    # lgca.animate_config()
-    # mlab.show()
