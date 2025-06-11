@@ -23,7 +23,26 @@ outputs/
 *.txt
 *.dat
 
-# Plots and figures
+# Compressed files
+*.zip
+*.tar.gz
+*.7z
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Large data/output files
 *.png
 *.jpg
 *.jpeg
@@ -31,7 +50,14 @@ outputs/
 *.svg
 *.eps
 
-# Compressed files
-*.zip
-*.tar.gz
-*.7z
+# Unless you specifically want to keep small documentation images
+!docs/images/*.png
+
+# Patch and temporary files
+*.patch
+*.tmp
+*.temp
+
+# OS files
+.DS_Store
+Thumbs.db
