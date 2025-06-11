@@ -53,12 +53,15 @@ def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
 
     Returns
     -------
-    :class:`numpy.ndarray`
-        Array of samples from the truncated distribution.
+    float or :class:`numpy.ndarray`
+        ``float`` if ``size`` equals ``1`` or an array of samples otherwise.
     """
     a = (lower - mu) / sigma
     b = (upper - mu) / sigma
-    return truncnorm(a, b, loc=mu, scale=sigma).rvs(size)
+    vals = truncnorm(a, b, loc=mu, scale=sigma).rvs(size)
+    if size != 1:
+        return vals
+    return float(np.asarray(vals).item())
 
 def birth(lgca):
     """Create daughter cells according to individual proliferation rates.
