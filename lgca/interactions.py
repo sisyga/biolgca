@@ -153,7 +153,7 @@ def persistent_walk(lgca):
         n = lgca.cell_density[coord]
 
         permutations = lgca.get_permutations(n)
-        j = lgca.j[n]
+        j = lgca.get_flux_permutations(n)
         weights = np.exp(lgca.interaction_params['beta'] * np.einsum('i,ij', g[coord], j)).cumsum()
         ind = bisect_left(weights, lgca.rng.random() * weights[-1])
         newnodes[coord] = permutations[ind]
@@ -192,7 +192,7 @@ def chemotaxis(lgca):
         n = lgca.cell_density[coord]
 
         permutations = lgca.get_permutations(n)
-        j = lgca.j[n]
+        j = lgca.get_flux_permutations(n)
         weights = np.exp(lgca.interaction_params['beta'] * np.einsum('i,ij',
                                                                      lgca.interaction_params['gradient_field'][coord],
                                                                      j)).cumsum()
@@ -272,7 +272,7 @@ def alignment(lgca):
     for coord in zip(*coords):
         n = lgca.cell_density[coord]
         permutations = lgca.get_permutations(n)
-        j = lgca.j[n]  # flux per permutation
+        j = lgca.get_flux_permutations(n)  # flux per permutation
         weights = np.exp(lgca.interaction_params['beta'] * np.einsum('i,ij', g[coord], j)).cumsum()
         # multiply neighborhood flux with the flux for each possible permutation
         # np.exp for probability
@@ -355,7 +355,7 @@ def aggregation(lgca):
     for coord in zip(*coords):
         n = lgca.cell_density[coord]
         permutations = lgca.get_permutations(n)
-        j = lgca.j[n]
+        j = lgca.get_flux_permutations(n)
         weights = np.exp(lgca.interaction_params['beta'] * np.einsum('i,ij', g[coord], j)).cumsum()
         ind = bisect_left(weights, lgca.rng.random() * weights[-1])
         newnodes[coord] = permutations[ind]
@@ -415,7 +415,7 @@ def wetting(lgca):
         n = lgca.cell_density[coord]
         permutations = lgca.get_permutations(n)
         restc = permutations[:, lgca.velocitychannels:].sum(-1)
-        j = lgca.j[n]
+        j = lgca.get_flux_permutations(n)
         j_nb = g[coord]
         weights = np.exp(
             lgca.interaction_params['beta'] * (j_nb[0] * j[0] + j_nb[1] * j[1]) / lgca.velocitychannels / 2

@@ -873,6 +873,16 @@ class LGCA_base(ABC):
             )
         return self._permutation_cache[n_particles]
 
+    def get_flux_permutations(self, n_particles):
+        """Get flux permutations for n_particles, computing if necessary."""
+        if hasattr(self, 'j') and self.j is not None:
+            return self.j[n_particles]
+
+        if n_particles not in self._flux_cache:
+            perms = self.get_permutations(n_particles)
+            self._flux_cache[n_particles] = np.dot(self.c, perms[:, :self.velocitychannels].T)
+        return self._flux_cache[n_particles]
+
     def total_population(self):
         """
         Calculate the amount of particles in the lattice.
