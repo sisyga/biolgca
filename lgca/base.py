@@ -833,45 +833,45 @@ class LGCA_base(ABC):
                 self.velcells_t[t, ...] = self.nodes[self.nonborder][..., :self.velocitychannels].sum(-1)
                 self.restcells_t[t, ...] = self.nodes[self.nonborder][..., self.velocitychannels:].sum(-1)
 
-def calc_permutations(self):
-    """
-    Initialize lazy computation structures for permutations.
-    Only compute permutations when actually needed.
-    """
-    # For geometries with many channels, use lazy computation
-    if self.K > 15:  # threshold for when precomputation becomes expensive
-        self._permutation_cache = {}
-        self._flux_cache = {}
-        self._si_cache = {}
-        self.permutations = None  # Signal that we're using lazy computation
-        # Still compute cij as it's geometry-dependent and small
-        self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(self.c.shape[0]))[None, ...]
-    else:
-        # Original precomputation for smaller geometries
-        self.permutations = [np.array(list(multiset_permutations([1] * n + [0] * (self.K - n))), dtype=np.int8)
-                             for n in range(self.K + 1)]
-        self.j = [np.dot(self.c, self.permutations[n][:, :self.velocitychannels].T) for n in range(self.K + 1)]
-        self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(self.c.shape[0]))[None, ...]
-        self.si = [np.einsum('ij,jkl', self.permutations[n][:, :self.velocitychannels], self.cij) for n in
-                   range(self.K + 1)]
+    def calc_permutations(self):
+        """
+        Initialize lazy computation structures for permutations.
+        Only compute permutations when actually needed.
+        """
+        # For geometries with many channels, use lazy computation
+        if self.K > 15:  # threshold for when precomputation becomes expensive
+            self._permutation_cache = {}
+            self._flux_cache = {}
+            self._si_cache = {}
+            self.permutations = None  # Signal that we're using lazy computation
+            # Still compute cij as it's geometry-dependent and small
+            self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(self.c.shape[0]))[None, ...]
+        else:
+            # Original precomputation for smaller geometries
+            self.permutations = [np.array(list(multiset_permutations([1] * n + [0] * (self.K - n))), dtype=np.int8)
+                                 for n in range(self.K + 1)]
+            self.j = [np.dot(self.c, self.permutations[n][:, :self.velocitychannels].T) for n in range(self.K + 1)]
+            self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(self.c.shape[0]))[None, ...]
+            self.si = [np.einsum('ij,jkl', self.permutations[n][:, :self.velocitychannels], self.cij) for n in
+                       range(self.K + 1)]
 
-def get_permutations(self, n_particles):
-    """Get permutations for n_particles, computing if necessary."""
-    if self.permutations is not None:
-        return self.permutations[n_particles]
+    def get_permutations(self, n_particles):
+        """Get permutations for n_particles, computing if necessary."""
+        if self.permutations is not None:
+            return self.permutations[n_particles]
 
-    if n_particles not in self._permutation_cache:
-        # Limit cache size to prevent memory issues
-        if len(self._permutation_cache) > 50:
-            # Remove least recently used (simple FIFO here)
-            oldest_key = next(iter(self._permutation_cache))
-            del self._permutation_cache[oldest_key]
+        if n_particles not in self._permutation_cache:
+            # Limit cache size to prevent memory issues
+            if len(self._permutation_cache) > 50:
+                # Remove least recently used (simple FIFO here)
+                oldest_key = next(iter(self._permutation_cache))
+                del self._permutation_cache[oldest_key]
 
-        self._permutation_cache[n_particles] = np.array(
-            list(multiset_permutations([1] * n_particles + [0] * (self.K - n_particles))),
-            dtype=np.int8
-        )
-    return self._permutation_cache[n_particles]
+            self._permutation_cache[n_particles] = np.array(
+                list(multiset_permutations([1] * n_particles + [0] * (self.K - n_particles))),
+                dtype=np.int8
+            )
+        return self._permutation_cache[n_particles]
 
     def total_population(self):
         """
