@@ -2,10 +2,8 @@
 # cellular automata (LGCA) in the biological context.
 # It is made available under the BSD 3-clause license (see LICENSE.txt or
 # https://opensource.org/licenses/BSD-3-Clause).
-# Copyright (C) 2018-2022 Technische Universität Dresden, Germany.
+# Copyright (C) 2018-2025 Technische Universität Dresden, Germany.
 # Contact: simon.syga@tu-dresden.de or bianca.guettner@nct-dresden.de.
-
-
 """
 biolgca is a Python package for simulating different types of lattice-gas
 cellular automata (LGCA) in the biological context. It is under active development.
