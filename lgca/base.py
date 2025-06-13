@@ -855,9 +855,22 @@ class LGCA_base(ABC):
                        range(self.K + 1)]
 
     def get_permutations(self, n_particles):
-        """Get permutations for n_particles, computing if necessary."""
-        if self.permutations is not None:
+        """Get permutations for ``n_particles``.
+
+        Parameters
+        ----------
+        n_particles : int
+            Number of occupied channels.
+
+        Returns
+        -------
+        numpy.ndarray
+            Array of permutations for ``n_particles``.
+        """
+        try:
             return self.permutations[n_particles]
+        except (AttributeError, TypeError):
+            pass
 
         if n_particles not in self._permutation_cache:
             # Limit cache size to prevent memory issues
@@ -873,9 +886,11 @@ class LGCA_base(ABC):
         return self._permutation_cache[n_particles]
 
     def get_flux_permutations(self, n_particles):
-        """Get flux permutations for n_particles, computing if necessary."""
-        if hasattr(self, 'j') and self.j is not None:
+        """Get flux permutations for ``n_particles``."""
+        try:
             return self.j[n_particles]
+        except (AttributeError, TypeError):
+            pass
 
         if n_particles not in self._flux_cache:
             perms = self.get_permutations(n_particles)
