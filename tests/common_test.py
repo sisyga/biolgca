@@ -81,29 +81,41 @@ class T_LGCA_Common(ABC):
     # ib parameters ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # reuses some classical parameters
     # 1D
-    no_particles_1d = rng.integers(low=1, high=(xdim_1d * (b_1d + restchannels_ve_1d)), endpoint=True,
-                                       size=1)
+    no_particles_1d = rng.integers(
+        low=1,
+        high=(xdim_1d * (b_1d + restchannels_ve_1d)),
+        endpoint=True,
+    )
     nodes_ib_1d = np.append(np.arange(no_particles_1d) + 1, np.zeros(xdim_1d * (b_1d + restchannels_ve_1d)
                                                                      - no_particles_1d))
     rng.shuffle(nodes_ib_1d)
     nodes_ib_1d = nodes_ib_1d.reshape((xdim_1d, b_1d + restchannels_ve_1d))
     # 2D square
-    no_particles_square = rng.integers(low=1, high=(xdim_square * ydim_square *
-                                                        (b_square + restchannels_ve_square)), endpoint=True, size=1)
+    no_particles_square = rng.integers(
+        low=1,
+        high=(xdim_square * ydim_square * (b_square + restchannels_ve_square)),
+        endpoint=True,
+    )
     nodes_ib_square = np.append(np.arange(no_particles_square) + 1, np.zeros(xdim_square * ydim_square *
                                                                              (b_square + restchannels_ve_square) - no_particles_square))
     rng.shuffle(nodes_ib_square)
     nodes_ib_square = nodes_ib_square.reshape((xdim_square, ydim_square, b_square + restchannels_ve_square))
     # 2D hex
-    no_particles_hex = rng.integers(low=1, high=(xdim_hex * ydim_hex *
-                                                     (b_hex + restchannels_ve_hex)), endpoint=True, size=1)
+    no_particles_hex = rng.integers(
+        low=1,
+        high=(xdim_hex * ydim_hex * (b_hex + restchannels_ve_hex)),
+        endpoint=True,
+    )
     nodes_ib_hex = np.append(np.arange(no_particles_hex) + 1, np.zeros(xdim_hex * ydim_hex *
                                                                        (b_hex + restchannels_ve_hex) - no_particles_hex))
     rng.shuffle(nodes_ib_hex)
     nodes_ib_hex = nodes_ib_hex.reshape((xdim_hex, ydim_hex, b_hex + restchannels_ve_hex))
     # 3D cubic
-    no_particles_cubic = rng.integers(low=1, high=(xdim_cubic * ydim_cubic * zdim_cubic *
-                                                    (b_cubic + restchannels_ve_cubic)), endpoint=True, size=1)
+    no_particles_cubic = rng.integers(
+        low=1,
+        high=(xdim_cubic * ydim_cubic * zdim_cubic * (b_cubic + restchannels_ve_cubic)),
+        endpoint=True,
+    )
     nodes_ib_cubic = np.append(np.arange(no_particles_cubic) + 1,
                                np.zeros(xdim_cubic * ydim_cubic * zdim_cubic *
                                          (b_cubic + restchannels_ve_cubic) - no_particles_cubic))
@@ -115,7 +127,6 @@ class T_LGCA_Common(ABC):
         low=1,
         high=(xdim_moore * ydim_moore * zdim_moore * (b_moore + restchannels_ve_moore)),
         endpoint=True,
-        size=1,
     )
     nodes_ib_moore = np.append(
         np.arange(no_particles_moore) + 1,
