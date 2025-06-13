@@ -1,3 +1,7 @@
+# biolgca is a Python package for simulating different kinds of lattice-gas
+# cellular automata (LGCA) in the biological context.
+# Copyright (C) 2018-2025 Technische Universität Dresden, Germany.
+# The full license notice is found in the file lgca/__init__.py.
 """3D Moore lattice LGCA implementations."""
 
 import numpy as np
