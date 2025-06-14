@@ -112,3 +112,12 @@ def test_warning_on_nonboolean_nodes():
         )
     assert set(np.unique(lgca.nodes[lgca.nonborder])) <= {0, 1}
 
+
+def test_persistent_motion_space_alias():
+    lgca = get_lgca(
+        geometry="square",
+        dims=3,
+        interaction="persistent motion",
+    )
+    assert lgca.interaction.__name__ == "persistent_walk"
+

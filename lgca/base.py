@@ -434,7 +434,7 @@ class LGCA_base(ABC):
                 contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium, \
                 only_propagation
         if 'interaction' in kwargs:
-            interaction = kwargs['interaction']
+            interaction = kwargs['interaction'].replace(" ", "_")
             if interaction == 'go_or_grow':
                 self.interaction = go_or_grow
                 if 'r_d' in kwargs:
