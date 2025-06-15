@@ -44,7 +44,7 @@ except ImportError:  # pragma: no cover - handled at runtime
         "matplotlib"
     )
 from numpy import random as npr
-from sympy.utilities.iterables import multiset_permutations
+from itertools import combinations
 from tqdm.auto import tqdm
 
 from lgca.plots import muller_plot, colorbar_index, cmap_discretize, estimate_figsize, get_cmap
@@ -70,6 +70,28 @@ def calc_nematic_tensor(v):
     If 'v' has shape (nx, ny, 2) then the array of tensors has the shape (nx, ny, 2, 2).
     """
     return np.einsum('...i,...j->...ij', v, v) - 0.5 * np.diag(np.ones(2))[None, ...]
+
+
+def _generate_permutations(K: int, n: int) -> np.ndarray:
+    """Generate all boolean permutations for ``K`` channels with ``n`` occupied.
+
+    Parameters
+    ----------
+    K : int
+        Total number of channels.
+    n : int
+        Number of occupied channels.
+
+    Returns
+    -------
+    numpy.ndarray
+        Boolean array of shape ``(C(K, n), K)`` containing all permutations.
+    """
+    combs = list(combinations(range(K), n))
+    perms = np.zeros((len(combs), K), dtype=bool)
+    for i, idx in enumerate(combs):
+        perms[i, list(idx)] = True
+    return perms
 
 
 class LGCA_base(ABC):
@@ -846,9 +868,8 @@ class LGCA_base(ABC):
             # Still compute cij as it's geometry-dependent and small
             self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(self.c.shape[0]))[None, ...]
         else:
-            # Original precomputation for smaller geometries
-            self.permutations = [np.array(list(multiset_permutations([1] * n + [0] * (self.K - n))), dtype=np.int8)
-                                 for n in range(self.K + 1)]
+            # Precompute all permutations for smaller geometries
+            self.permutations = [_generate_permutations(self.K, n) for n in range(self.K + 1)]
             self.j = [np.dot(self.c, self.permutations[n][:, :self.velocitychannels].T) for n in range(self.K + 1)]
             self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(self.c.shape[0]))[None, ...]
             self.si = [np.einsum('ij,jkl', self.permutations[n][:, :self.velocitychannels], self.cij) for n in
@@ -879,10 +900,7 @@ class LGCA_base(ABC):
                 oldest_key = next(iter(self._permutation_cache))
                 del self._permutation_cache[oldest_key]
 
-            self._permutation_cache[n_particles] = np.array(
-                list(multiset_permutations([1] * n_particles + [0] * (self.K - n_particles))),
-                dtype=np.int8
-            )
+            self._permutation_cache[n_particles] = _generate_permutations(self.K, n_particles)
         return self._permutation_cache[n_particles]
 
     def get_flux_permutations(self, n_particles):
