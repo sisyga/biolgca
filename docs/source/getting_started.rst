@@ -15,8 +15,8 @@ documentation yourself.  More detailed usage examples can be found in the
     "Environments" tab, clicking on the triangle next to the environment's name.)
 
     If you want to add code to the package, in order to run tests and build documentation you should also install:
-    ```python
-    pip install pytest==6.2.5 Sphinx==4.4.0 sphinx-autodoc-typehints alabaster numpydoc
+    ```bash
+    pip install -r documentation_requirements.txt pytest==6.2.5
     ```
 
     #### Installation
@@ -55,7 +55,7 @@ Building the documentation
 The online documentation is built automatically by `Read the Docs`_.
 The build process is configured in the :file:`.readthedocs.yaml` file at the
 repository root.  After installing the packages listed in
-:download:`optional-requirements.txt <../../optional-requirements.txt>` you can
+:download:`documentation_requirements.txt <../../documentation_requirements.txt>` you can
 reproduce the HTML build locally with::
 
    sphinx-build -b html docs/source docs/_build

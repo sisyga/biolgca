@@ -125,8 +125,8 @@ pip install -r plotting-requirements.txt
 "Environments" tab, clicking on the triangle next to the environment's name.)
 
 If you want to add code to the package, in order to run tests and build documentation you should also install:
-```python
-pip install pytest==6.2.5 Sphinx==4.4.0 sphinx-autodoc-typehints alabaster numpydoc
+```bash
+pip install -r documentation_requirements.txt pytest==6.2.5
 ```
 
 #### Installation
