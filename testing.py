@@ -1,10 +1,12 @@
-from lgca import get_lgca
 from matplotlib import pyplot as plt
 
-lgca = get_lgca(dims=(20, 20, 20), bc='refl', ib=False, ve=True, geometry='moore', interaction='alignment',
-                beta=1, restchannels=0, density=.3/26)
+from lgca import get_lgca
+
+lgca = get_lgca(dims=(100, 100), bc='refl', ib=False, ve=True, geometry='hex', interaction='alignment',
+                beta=3, restchannels=0)
 print(lgca)
 lgca.timeevo(100, record=True)
-lgca.animate_density()
+anim = lgca.animate_flux()
+plt.show()
 
 #%%
