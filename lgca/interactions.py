@@ -332,37 +332,26 @@ def chemotaxis(lgca):
     -------
     None
     """
-    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-               (lgca.cell_density[lgca.nonborder] < lgca.K)
-    coords = tuple(nb_coord_array[relevant] for nb_coord_array in lgca.nonborder)
-
-    if not coords[0].size:
-        return
+    beta = lgca.interaction_params['beta']
+    grad = lgca.interaction_params['gradient_field']
 
     newnodes = lgca.nodes.copy()
-    gradient_field = lgca.interaction_params['gradient_field']
+    nb_nodes = newnodes[lgca.nonborder]
+    gradients = grad[lgca.nonborder]
+    density = lgca.cell_density[lgca.nonborder]
 
-    for coord_idx_tuple in zip(*coords):
-        n = lgca.cell_density[coord_idx_tuple]
-        permutations = lgca.get_permutations(n)
+    unique = np.unique(density)
+    unique = unique[(unique > 0) & (unique < lgca.K)]
+    for n in unique:
+        mask = density == n
         j = lgca.get_flux_permutations(n)
+        weights = np.exp(beta * (gradients[mask] @ j))
+        cumw = weights.cumsum(axis=1)
+        rnd = lgca.rng.random(mask.sum()) * cumw[:, -1]
+        ind = (rnd[:, None] < cumw).argmax(axis=1)
+        nb_nodes[mask] = lgca.get_permutations(n)[ind]
 
-        local_gradient = gradient_field[coord_idx_tuple]
-        if local_gradient.ndim == 0:
-            local_gradient = np.array([local_gradient])
-
-        if j.ndim == 2 and local_gradient.shape[0] == j.shape[1]:
-            weights = np.exp(lgca.interaction_params['beta'] * np.einsum('j,ij->i', local_gradient, j)).cumsum()
-            if weights.size > 0 and weights[-1] > 0:
-                ind = bisect_left(weights, lgca.rng.random() * weights[-1])
-                newnodes[(Ellipsis,) + coord_idx_tuple] = permutations[ind]
-            elif permutations.shape[0] > 0:
-                ind = lgca.rng.integers(permutations.shape[0])
-                newnodes[(Ellipsis,) + coord_idx_tuple] = permutations[ind]
-        elif permutations.shape[0] > 0:
-            ind = lgca.rng.integers(permutations.shape[0])
-            newnodes[(Ellipsis,) + coord_idx_tuple] = permutations[ind]
-
+    newnodes[lgca.nonborder] = nb_nodes
     lgca.nodes = newnodes
 
 
@@ -387,35 +376,25 @@ def contact_guidance(lgca):
     -------
     None
     """
-    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-               (lgca.cell_density[lgca.nonborder] < lgca.K)
-    coords = tuple(nb_coord_array[relevant] for nb_coord_array in lgca.nonborder)
-
-    if not coords[0].size:
-        return
+    beta = lgca.interaction_params['beta']
 
     newnodes = lgca.nodes.copy()
+    nb_nodes = newnodes[lgca.nonborder]
+    tensors = lgca.guiding_tensor[lgca.nonborder]
+    density = lgca.cell_density[lgca.nonborder]
 
-    for coord_idx_tuple in zip(*coords):
-        n = lgca.cell_density[coord_idx_tuple]
-        sni = lgca.guiding_tensor[coord_idx_tuple]  # Guiding tensor at the coordinate
-        permutations = lgca.get_permutations(n)
-        si = lgca.si[n]  # Shape (num_perms, d_geom, d_geom) or similar for tensor contraction
+    unique = np.unique(density)
+    unique = unique[(unique > 0) & (unique < lgca.K)]
+    for n in unique:
+        mask = density == n
+        si = lgca.si[n]
+        weights = np.exp(beta * np.einsum('nij,pij->np', tensors[mask], si))
+        cumw = weights.cumsum(axis=1)
+        rnd = lgca.rng.random(mask.sum()) * cumw[:, -1]
+        ind = (rnd[:, None] < cumw).argmax(axis=1)
+        nb_nodes[mask] = lgca.get_permutations(n)[ind]
 
-        # Ensure sni and si are compatible for einsum('ijk,jk->i', si, sni)
-        # si: (P, M, N), sni: (M, N) -> weights: (P,)
-        if si.ndim == 3 and sni.ndim == 2 and si.shape[1:] == sni.shape:
-            weights = np.exp(lgca.interaction_params['beta'] * np.einsum('pmn,mn->p', si, sni)).cumsum()
-            if weights.size > 0 and weights[-1] > 0:
-                ind = bisect_left(weights, lgca.rng.random() * weights[-1])
-                newnodes[(Ellipsis,) + coord_idx_tuple] = permutations[ind]
-            elif permutations.shape[0] > 0:  # Fallback
-                ind = lgca.rng.integers(permutations.shape[0])
-                newnodes[(Ellipsis,) + coord_idx_tuple] = permutations[ind]
-        elif permutations.shape[0] > 0:  # Fallback
-            ind = lgca.rng.integers(permutations.shape[0])
-            newnodes[(Ellipsis,) + coord_idx_tuple] = permutations[ind]
-            
+    newnodes[lgca.nonborder] = nb_nodes
     lgca.nodes = newnodes
 
 
@@ -440,38 +419,27 @@ def nematic(lgca):
     -------
     None
     """
+    beta = lgca.interaction_params['beta']
+
     newnodes = lgca.nodes.copy()
-    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-               (lgca.cell_density[lgca.nonborder] < lgca.K)
-    coords = tuple(nb_coord_array[relevant] for nb_coord_array in lgca.nonborder)
-
-    if not coords[0].size:
-        return
-
-    # lgca.nodes shape (K, dims...), lgca.cij shape (K, d, d) or (vel_K, d, d)
-    # s should have shape (dims..., d, d)
-    # Assuming lgca.nodes[:lgca.velocitychannels, ...] are the relevant channels for cij
+    nb_nodes = newnodes[lgca.nonborder]
     s = np.einsum('k...,kxy->...xy', lgca.nodes[:lgca.velocitychannels, ...], lgca.cij)
-    sn = lgca.nb_sum(s)  # sn is sum of s over neighbors, shape (dims..., d, d)
+    sn = lgca.nb_sum(s)
+    tensors = sn[lgca.nonborder]
+    density = lgca.cell_density[lgca.nonborder]
 
-    for coord_idx_tuple in zip(*coords):
-        n = lgca.cell_density[coord_idx_tuple]
-        sni_local = sn[coord_idx_tuple]  # (d,d) nematic tensor from neighbors
-        permutations = lgca.get_permutations(n)
-        si = lgca.si[n]  # (P, d, d) nematic tensors for each permutation
+    unique = np.unique(density)
+    unique = unique[(unique > 0) & (unique < lgca.K)]
+    for n in unique:
+        mask = density == n
+        si = lgca.si[n]
+        weights = np.exp(beta * np.einsum('nij,pij->np', tensors[mask], si))
+        cumw = weights.cumsum(axis=1)
+        rnd = lgca.rng.random(mask.sum()) * cumw[:, -1]
+        ind = (rnd[:, None] < cumw).argmax(axis=1)
+        nb_nodes[mask] = lgca.get_permutations(n)[ind]
 
-        if si.ndim == 3 and sni_local.ndim == 2 and si.shape[1:] == sni_local.shape:
-            weights = np.exp(lgca.interaction_params['beta'] * np.einsum('pmn,mn->p', si, sni_local)).cumsum()
-            if weights.size > 0 and weights[-1] > 0:
-                ind = bisect_left(weights, lgca.rng.random() * weights[-1])
-                newnodes[(Ellipsis,) + coord_idx_tuple] = permutations[ind]
-            elif permutations.shape[0] > 0:  # Fallback
-                ind = lgca.rng.integers(permutations.shape[0])
-                newnodes[(Ellipsis,) + coord_idx_tuple] = permutations[ind]
-        elif permutations.shape[0] > 0:  # Fallback
-            ind = lgca.rng.integers(permutations.shape[0])
-            newnodes[(Ellipsis,) + coord_idx_tuple] = permutations[ind]
-
+    newnodes[lgca.nonborder] = nb_nodes
     lgca.nodes = newnodes
 
 
@@ -496,39 +464,26 @@ def aggregation(lgca):
     -------
     None
     """
-    newnodes = lgca.nodes.copy()
-    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-               (lgca.cell_density[lgca.nonborder] < lgca.K)
-    coords = tuple(nb_coord_array[relevant] for nb_coord_array in lgca.nonborder)
-
-    if not coords[0].size:
-        return
-
-    # g is gradient of cell_density, shape (d_geom, dims...)
+    beta = lgca.interaction_params['beta']
     g = lgca.gradient(lgca.cell_density)
 
-    for coord_idx_tuple in zip(*coords):
-        n = lgca.cell_density[coord_idx_tuple]
-        permutations = lgca.get_permutations(n)
-        j = lgca.get_flux_permutations(n)  # (P, d_geom)
+    newnodes = lgca.nodes.copy()
+    nb_nodes = newnodes[lgca.nonborder]
+    grad = g[lgca.nonborder]
+    density = lgca.cell_density[lgca.nonborder]
 
-        # local_grad has shape (d_geom,)
-        local_grad = g[(slice(None),) + coord_idx_tuple]
-        if local_grad.ndim == 0:  # Should be (d_geom,)
-            local_grad = np.array([local_grad])
+    unique = np.unique(density)
+    unique = unique[(unique > 0) & (unique < lgca.K)]
+    for n in unique:
+        mask = density == n
+        j = lgca.get_flux_permutations(n)
+        weights = np.exp(beta * (grad[mask] @ j))
+        cumw = weights.cumsum(axis=1)
+        rnd = lgca.rng.random(mask.sum()) * cumw[:, -1]
+        ind = (rnd[:, None] < cumw).argmax(axis=1)
+        nb_nodes[mask] = lgca.get_permutations(n)[ind]
 
-        if j.ndim == 2 and local_grad.shape[0] == j.shape[1]:
-            weights = np.exp(lgca.interaction_params['beta'] * np.einsum('d,pd->p', local_grad, j)).cumsum()
-            if weights.size > 0 and weights[-1] > 0:
-                ind = bisect_left(weights, lgca.rng.random() * weights[-1])
-                newnodes[(Ellipsis,) + coord_idx_tuple] = permutations[ind]
-            elif permutations.shape[0] > 0:  # Fallback
-                ind = lgca.rng.integers(permutations.shape[0])
-                newnodes[(Ellipsis,) + coord_idx_tuple] = permutations[ind]
-        elif permutations.shape[0] > 0:  # Fallback
-            ind = lgca.rng.integers(permutations.shape[0])
-            newnodes[(Ellipsis,) + coord_idx_tuple] = permutations[ind]
-            
+    newnodes[lgca.nonborder] = nb_nodes
     lgca.nodes = newnodes
 
 
