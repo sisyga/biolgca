@@ -6,7 +6,6 @@
 Interaction functions and helper functions for classical LGCA with volume exclusion.
 """
 
-import itertools  # Added for itertools.product
 from bisect import bisect_left
 
 import numpy as np
@@ -125,104 +124,48 @@ def birthdeath(lgca):
 
 
 def alignment(lgca):
-    """Interaction rule: Particles align with the mean flux in their local
-    neighborhood. The sensitivity of alignment is controlled by lgca.beta.
-    Vectorized implementation.
+    """Align moving cells with their neighbours.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Interaction Parameters
+    ----------------------
+    beta : float
+        Alignment strength with neighbouring velocities.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
-    if not hasattr(lgca, 'beta') or lgca.beta is None:
-        # print('sensitivity set to beta = ', 2.0)
-        lgca.beta = 2.0
+    beta = lgca.interaction_params['beta']
+    g = lgca.nb_sum(lgca.calc_flux(lgca.nodes))
 
-    d_geom = len(lgca.dims)
+    newnodes = lgca.nodes.copy()
+    nb_nodes = newnodes[lgca.nonborder]
+    flux = g[lgca.nonborder]
+    density = lgca.cell_density[lgca.nonborder]
 
-    # Determine the velocity matrix to use
-    velocity_matrix = None
-    if hasattr(lgca, 'c') and isinstance(lgca.c, np.ndarray) and lgca.c.shape == (lgca.K, d_geom):
-        velocity_matrix = lgca.c
-    elif hasattr(lgca, 'velocity_vectors') and isinstance(lgca.velocity_vectors, np.ndarray) and \
-            lgca.velocity_vectors.shape == (lgca.K, d_geom):
-        velocity_matrix = lgca.velocity_vectors
+    unique = np.unique(density)
+    unique = unique[(unique > 0) & (unique < lgca.K)]
+    for n in unique:
+        mask = density == n
 
-    if velocity_matrix is None:
-        # print("Warning: No compatible velocity matrix found for alignment. Skipping interaction.")
-        return
+        j = lgca.get_flux_permutations(n)
+        weights = np.exp(beta * (flux[mask] @ j))
+        cumw = weights.cumsum(axis=1)
+        rnd = lgca.rng.random(mask.sum()) * cumw[:, -1]
+        ind = (rnd[:, None] < cumw).argmax(axis=1)
+        nb_nodes[mask] = lgca.get_permutations(n)[ind]
 
-    # Assumes lgca.nodes has shape (K, dim0_padded, dim1_padded, ...)
-    spatial_axes_in_nodes = tuple(range(1, lgca.nodes.ndim))  # All axes except the first (K)
-
-    # Define neighborhood offsets (Moore neighborhood, radius 1, including center)
-    radius = 1
-    iter_ranges_for_offsets = [range(-radius, radius + 1)] * d_geom
-    neighbor_offsets = list(itertools.product(*iter_ranges_for_offsets))
-
-    sum_nodes_k_in_nb = np.zeros_like(lgca.nodes)
-    for offset_coords in neighbor_offsets:
-        roll_shifts = [0] * lgca.nodes.ndim  # Shift for [K, dim0, dim1, ...]
-        for i in range(d_geom):
-            roll_shifts[spatial_axes_in_nodes[i]] = -offset_coords[i]
-        sum_nodes_k_in_nb += np.roll(lgca.nodes, shift=tuple(roll_shifts), axis=tuple(range(lgca.nodes.ndim)))
-
-    total_particles_in_nb_map = sum_nodes_k_in_nb.sum(axis=0)  # Sum over K, shape (padded_dims...)
-    sum_weighted_velocities_map = np.einsum('k...,kd->...d', sum_nodes_k_in_nb,
-                                            velocity_matrix)  # (padded_dims..., d_geom)
-
-    mean_flux_map = np.zeros_like(sum_weighted_velocities_map)
-    valid_nb_mask_for_flux = total_particles_in_nb_map > 0
-    mean_flux_map[valid_nb_mask_for_flux] = sum_weighted_velocities_map[valid_nb_mask_for_flux] / \
-                                            total_particles_in_nb_map[valid_nb_mask_for_flux][..., np.newaxis]
-
-    updatable_mask_full = np.zeros(lgca.cell_density.shape, dtype=bool)  # (padded_dims...)
-    updatable_mask_full[lgca.nonborder] = True
-
-    mean_flux_physical = mean_flux_map[lgca.nonborder]  # (physical_dims..., d_geom)
-    is_zero_flux_physical = np.all(np.isclose(mean_flux_physical, 0.0), axis=-1)  # (physical_dims...)
-
-    _temp_zero_flux_full = np.zeros(lgca.cell_density.shape, dtype=bool)
-    _temp_zero_flux_full[lgca.nonborder] = is_zero_flux_physical
-
-    nodes_to_shuffle_mask = updatable_mask_full & _temp_zero_flux_full  # (padded_dims...)
-    nodes_to_align_mask = updatable_mask_full & (~_temp_zero_flux_full)  # (padded_dims...)
-
-    num_shuffle_nodes = np.sum(nodes_to_shuffle_mask)
-    if num_shuffle_nodes > 0:
-        subset_to_shuffle = lgca.nodes[:, nodes_to_shuffle_mask]  # (K, num_shuffle_nodes)
-        for i in range(num_shuffle_nodes):
-            np.random.shuffle(subset_to_shuffle[:, i])
-        lgca.nodes[:, nodes_to_shuffle_mask] = subset_to_shuffle
-
-    num_align_nodes = np.sum(nodes_to_align_mask)
-    if num_align_nodes > 0:
-        active_mean_flux = mean_flux_map[nodes_to_align_mask]  # (num_align_nodes, d_geom)
-
-        v_prop_all = np.dot(active_mean_flux, velocity_matrix.T)  # (num_align_nodes, K)
-        v_prop_all = np.exp(lgca.beta * v_prop_all)
-
-        v_prop_all_sum = v_prop_all.sum(axis=1, keepdims=True)  # (num_align_nodes, 1)
-
-        p_vals_normalized = np.zeros_like(v_prop_all)
-        has_positive_sum = (v_prop_all_sum > 1e-9).squeeze(axis=1)  # (num_align_nodes,)
-
-        p_vals_normalized[~has_positive_sum, :] = 1.0 / lgca.K
-        if np.any(has_positive_sum):
-            p_vals_normalized[has_positive_sum, :] = \
-                v_prop_all[has_positive_sum, :] / v_prop_all_sum[has_positive_sum, :]
-
-        densities_for_align_nodes = lgca.cell_density[nodes_to_align_mask]  # (num_align_nodes,)
-        new_states_for_align_nodes_flat = np.zeros((num_align_nodes, lgca.K), dtype=lgca.nodes.dtype)
-
-        for i in range(num_align_nodes):
-            n_particles = int(densities_for_align_nodes[i])
-            if n_particles > 0:
-                current_pvals = p_vals_normalized[i, :]
-                current_pvals_sum = current_pvals.sum()
-                if not (np.isfinite(current_pvals_sum) and current_pvals_sum > 1e-9):
-                    current_pvals = np.ones(lgca.K) / lgca.K
-                elif not np.isclose(current_pvals_sum, 1.0):
-                    current_pvals = current_pvals / current_pvals_sum
-
-                new_states_for_align_nodes_flat[i, :] = lgca.rng.multinomial(n_particles, current_pvals)
-
-        lgca.nodes[:, nodes_to_align_mask] = new_states_for_align_nodes_flat.T
+    newnodes[lgca.nonborder] = nb_nodes
+    lgca.nodes = newnodes
 
 
 def persistent_walk(lgca):
