@@ -260,27 +260,26 @@ def alignment(lgca):
     -------
     None
     """
-    newnodes = lgca.nodes.copy()
-    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-               (lgca.cell_density[lgca.nonborder] < lgca.K)
-    # gives ndarray of boolean values
-    coords = [a[relevant] for a in lgca.nonborder]
-    # a is an array of numbers, array can be indexed with another array of same size with boolean specification if
-    # element should be included. Returns only the relevant elements and coords is a list here
-    g = lgca.calc_flux(lgca.nodes)  # calculates flux for each lattice site
-    g = lgca.nb_sum(g)  # calculates sum of flux of neighbors for each lattice site
-    for coord in zip(*coords):
-        n = lgca.cell_density[coord]
-        permutations = lgca.get_permutations(n)
-        j = lgca.get_flux_permutations(n)  # flux per permutation
-        weights = np.exp(lgca.interaction_params['beta'] * np.einsum('i,ij', g[coord], j)).cumsum()
-        # multiply neighborhood flux with the flux for each possible permutation
-        # np.exp for probability
-        # cumsum() for cumulative distribution function
-        ind = bisect_left(weights, lgca.rng.random() * weights[-1])
-        # inverse transform sampling method
-        newnodes[coord] = permutations[ind]
+    beta = lgca.interaction_params['beta']
+    g = lgca.nb_sum(lgca.calc_flux(lgca.nodes))
 
+    newnodes = lgca.nodes.copy()
+    nb_nodes = newnodes[lgca.nonborder]
+    flux = g[lgca.nonborder]
+    density = lgca.cell_density[lgca.nonborder]
+
+    unique = np.unique(density)
+    unique = unique[(unique > 0) & (unique < lgca.K)]
+    for n in unique:
+        mask = density == n
+        j = lgca.get_flux_permutations(n)  # flux per permutation
+        weights = np.exp(beta * (flux[mask] @ j))
+        cumw = weights.cumsum(axis=1)
+        rnd = lgca.rng.random(mask.sum()) * cumw[:, -1]
+        ind = (rnd[:, None] < cumw).argmax(axis=1)
+        nb_nodes[mask] = lgca.permutations[n][ind]
+
+    newnodes[lgca.nonborder] = nb_nodes
     lgca.nodes = newnodes
 
 
