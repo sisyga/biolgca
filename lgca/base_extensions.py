@@ -17,7 +17,6 @@ from copy import copy, deepcopy
 
 import numpy as np
 from numpy import random as npr
-from sympy.utilities.iterables import multiset_permutations
 from tqdm.auto import tqdm
 
 from .base import LGCA_base

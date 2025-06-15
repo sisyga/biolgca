@@ -79,7 +79,7 @@ html_style = 'css/methods.css'
 # configured like https://github.com/JamesALeedham/Sphinx-Autosummary-Recursion/
 autosummary_generate = True  # Turn on sphinx.ext.autosummary
 autosummary_imported_members = False  # Do not include imported members
-autodoc_mock_imports = ["matplotlib", "sympy", "mpl_toolkits"]
+autodoc_mock_imports = ["matplotlib", "mpl_toolkits"]
 
 #autoclass_content = "both"  # Add __init__ doc (ie. params) to class summaries
 html_show_sourcelink = False  # Remove 'view source code' from top of page (for html, not python)
