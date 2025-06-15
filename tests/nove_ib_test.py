@@ -1,9 +1,9 @@
 import numpy as np
 import copy
 import warnings
+
 import pytest
 
-pytest.importorskip("numba")
 from lgca import get_lgca
 from lgca.lgca_3dmoore import LGCA_3dMoore
 from tests.common_test import T_LGCA_Common
