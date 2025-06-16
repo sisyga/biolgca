@@ -27,11 +27,6 @@ def random_walk(lgca):
     ``lgca`` is modified in place.
     """
     lgca.nodes = lgca.rng.permuted(lgca.nodes, axis=-1)
-    # relevant = lgca.cell_density[lgca.nonborder] > 0
-    # coords = [a[relevant] for a in lgca.nonborder]
-    # for coord in zip(*coords):
-    #     npr.shuffle(lgca.nodes[coord])
-
 
 
 def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
