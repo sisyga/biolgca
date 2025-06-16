@@ -773,7 +773,7 @@ class LGCA_base(ABC):
             Desired average number of particles per node.
             ``density = total_number_of_particles / number_of_nodes``.
         """
-        self.nodes = npr.random(self.nodes.shape) < (density / self.K)
+        self.nodes = self.rng.random(self.nodes.shape) < (density / self.K)
         self.apply_boundaries()
         self.update_dynamic_fields()
         # achieved density example
