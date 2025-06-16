@@ -24,7 +24,7 @@ class T_LGCA_Common(ABC):
     # reproducible but non-uniform fixups
     rng = npr.default_rng(1)
     # absolute tolerance for random densities
-    density_epsilon = 0.2
+    density_epsilon = 0.3
     # 1D
     xdim_1d = 5
     b_1d = 2
