@@ -23,6 +23,7 @@ except ImportError:  # pragma: no cover - handled at runtime
     mticker = make_axes_locatable = _MissingPlotLib("matplotlib")
 
 from lgca.base import *
+from lgca.base_extensions import get_arr_of_empty_lists
 
 
 class LGCA_1D(LGCA_base):

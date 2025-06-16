@@ -414,19 +414,17 @@ class Test_LGCA_NoVE_IB(T_LGCA_Common):
         nodes_ib = counts_to_lists(nodes)
         ref_lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib)
         for interaction in ref_lgca.interactions:
-            if geom in {"cubic", "moore"} and interaction == "contact_guidance":
-                continue
             self.t_characteristics(geom, nodes_ib, interaction, "pbc")
             self.t_characteristics(geom, nodes_ib, interaction, "rbc")
             self.t_characteristics(geom, nodes_ib, interaction, "abc")
 
     def t_characteristics(self, geom, nodes, interaction, bc):
         lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib, nodes=copy.deepcopy(nodes), interaction=interaction, bc=bc)
-        lgca.timeevo(timesteps=1, recorddens=False, record=True, showprogress=False)
+        lgca.timeevo(timesteps=2, recorddens=False, record=True, showprogress=False)
         current = [id_ for node in lgca.nodes[lgca.nonborder].flat for id_ in node]
         if len(current) == 0 and len([id_ for node in lgca.nodes_t[0].flat for id_ in node]) != 0 and bc != "abc":
             warnings.warn("System died out in " + str(interaction))
-        for i in range(101):
+        for i in range(3):
             labels = [id_ for node in lgca.nodes_t[i].flat for id_ in node]
             assert len(labels) == len(set(labels)), "Uniqueness principle is broken"
             if labels:
