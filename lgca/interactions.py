@@ -7,7 +7,7 @@ Interaction functions and helper functions for classical LGCA with volume exclus
 """
 
 from bisect import bisect_left
-from scipy.special import binom as binom_coeff
+from scipy.special import binom as binom_coeff, softmax
 import numpy as np
 
 
@@ -43,6 +43,7 @@ def tanh_switch(rho, kappa=5., theta=0.8):
 
 def ent_prod(x):
     return x * np.log(x, where=x > 0, out=np.zeros_like(x, dtype=float))
+
 
 
 def random_walk(lgca):
@@ -158,9 +159,9 @@ def alignment(lgca):
         mask = density == n
 
         j = lgca.get_flux_permutations(n)
-        weights = np.exp(beta * (flux[mask] @ j))
+        weights = softmax(beta * (flux[mask] @ j), axis=1)
         cumw = weights.cumsum(axis=1)
-        rnd = lgca.rng.random(mask.sum()) * cumw[:, -1]
+        rnd = lgca.rng.random(mask.sum())
         ind = (rnd[:, None] < cumw).argmax(axis=1)
         nb_nodes[mask] = lgca.get_permutations(n)[ind]
 
@@ -205,9 +206,9 @@ def persistent_walk(lgca):
         mask = density == n
 
         j = lgca.get_flux_permutations(n)
-        weights = np.exp(beta * (flux[mask] @ j))
+        weights = softmax(beta * (flux[mask] @ j), axis=1)
         cumw = weights.cumsum(axis=1)
-        rnd = lgca.rng.random(mask.sum()) * cumw[:, -1]
+        rnd = lgca.rng.random(mask.sum())
         ind = (rnd[:, None] < cumw).argmax(axis=1)
         nb_nodes[mask] = lgca.get_permutations(n)[ind]
 
@@ -252,9 +253,9 @@ def chemotaxis(lgca):
     for n in unique:
         mask = density == n
         j = lgca.get_flux_permutations(n)
-        weights = np.exp(beta * (gradients[mask] @ j))
+        weights = softmax(beta * (gradients[mask] @ j), axis=1)
         cumw = weights.cumsum(axis=1)
-        rnd = lgca.rng.random(mask.sum()) * cumw[:, -1]
+        rnd = lgca.rng.random(mask.sum())
         ind = (rnd[:, None] < cumw).argmax(axis=1)
         nb_nodes[mask] = lgca.get_permutations(n)[ind]
 
@@ -295,9 +296,9 @@ def contact_guidance(lgca):
     for n in unique:
         mask = density == n
         si = lgca.si[n]
-        weights = np.exp(beta * np.einsum('nij,pij->np', tensors[mask], si))
+        weights = softmax(beta * np.einsum('nij,pij->np', tensors[mask], si), axis=1)
         cumw = weights.cumsum(axis=1)
-        rnd = lgca.rng.random(mask.sum()) * cumw[:, -1]
+        rnd = lgca.rng.random(mask.sum())
         ind = (rnd[:, None] < cumw).argmax(axis=1)
         nb_nodes[mask] = lgca.get_permutations(n)[ind]
 
@@ -340,9 +341,9 @@ def nematic(lgca):
     for n in unique:
         mask = density == n
         si = lgca.si[n]
-        weights = np.exp(beta * np.einsum('nij,pij->np', tensors[mask], si))
+        weights = softmax(beta * np.einsum('nij,pij->np', tensors[mask], si), axis=1)
         cumw = weights.cumsum(axis=1)
-        rnd = lgca.rng.random(mask.sum()) * cumw[:, -1]
+        rnd = lgca.rng.random(mask.sum())
         ind = (rnd[:, None] < cumw).argmax(axis=1)
         nb_nodes[mask] = lgca.get_permutations(n)[ind]
 
@@ -384,9 +385,9 @@ def aggregation(lgca):
     for n in unique:
         mask = density == n
         j = lgca.get_flux_permutations(n)
-        weights = np.exp(beta * (grad[mask] @ j))
+        weights = softmax(beta * (grad[mask] @ j), axis=1)
         cumw = weights.cumsum(axis=1)
-        rnd = lgca.rng.random(mask.sum()) * cumw[:, -1]
+        rnd = lgca.rng.random(mask.sum())
         ind = (rnd[:, None] < cumw).argmax(axis=1)
         nb_nodes[mask] = lgca.get_permutations(n)[ind]
 
@@ -457,15 +458,16 @@ def wetting(lgca):
         perms = lgca.get_permutations(n)
         restc = perms[:, lgca.velocitychannels:].sum(-1)
         j = lgca.j[n]
-        weights = np.exp(
+        weights = softmax(
             lgca.interaction_params['beta'] * (flux[mask] @ j) / lgca.velocitychannels / 2
             + lgca.interaction_params['beta'] * rest_nb[mask, None] * restc
             + lgca.interaction_params['beta'] * np.einsum('nd,dp->np', g_adh_nb[mask], j)
             + restc * ecm_nb[mask, None]
-            + lgca.interaction_params['gamma'] * np.einsum('nd,dp->np', g_press_nb[mask], j)
+            + lgca.interaction_params['gamma'] * np.einsum('nd,dp->np', g_press_nb[mask], j),
+            axis=1,
         )
         cumw = weights.cumsum(axis=1)
-        rnd = lgca.rng.random(mask.sum()) * cumw[:, -1]
+        rnd = lgca.rng.random(mask.sum())
         ind = (rnd[:, None] < cumw).argmax(axis=1)
         nb_nodes[mask] = perms[ind]
 

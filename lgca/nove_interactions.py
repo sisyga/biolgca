@@ -7,6 +7,7 @@ Interaction functions and helper functions for LGCA without volume exclusion.
 """
 
 import numpy as np
+from scipy.special import softmax
 from lgca.interactions import tanh_switch
 
 def random_walk(lgca):
@@ -62,8 +63,7 @@ def dd_alignment(lgca):
     else:
         g = lgca.nb_sum(g)
 
-    weights = np.exp(beta * np.einsum('...i,ij->...j', g, lgca.c))
-    weights /= weights.sum(axis=-1, keepdims=True)
+    weights = softmax(beta * np.einsum('...i,ij->...j', g, lgca.c), axis=-1)
 
     newnodes = lgca.nodes.copy()
     nb_density = lgca.cell_density[lgca.nonborder]
@@ -104,8 +104,7 @@ def di_alignment(lgca):
     np.maximum(nsum, 1, out=nsum)
     g = g / nsum
 
-    weights = np.exp(beta * np.einsum('...i,ij->...j', g, lgca.c))
-    weights /= weights.sum(axis=-1, keepdims=True)
+    weights = softmax(beta * np.einsum('...i,ij->...j', g, lgca.c), axis=-1)
 
     newnodes = lgca.nodes.copy()
     nb_density = lgca.cell_density[lgca.nonborder]
