@@ -763,25 +763,21 @@ class LGCA_base(ABC):
         print(self.nodes.astype(int))
 
     def random_reset(self, density):
-        """
-        Initialize lattice nodes with average density `density`. Channels are occupied at random and nodes can
-        have different particle numbers.
+        """Randomly fill channels so that each node has on average ``density`` particles.
 
-        For each channel a random number is drawn. If it is lower than `density`, the channel is filled,
-        otherwise it stays empty.
+        Each channel is independently occupied with probability ``density / self.K``.
 
         Parameters
         ----------
         density : float
-            Desired average particle density of the lattice.
-            ``density = total_number_of_particles / (number_of_nodes * number_of_channels_per_node)``.
-
+            Desired average number of particles per node.
+            ``density = total_number_of_particles / number_of_nodes``.
         """
-        self.nodes = npr.random(self.nodes.shape) < density
+        self.nodes = npr.random(self.nodes.shape) < (density / self.K)
         self.apply_boundaries()
         self.update_dynamic_fields()
-        # achieved density
-        # eff_dens = self.nodes[self.nonborder].sum() / (self.K * self.cell_density[self.nonborder].size)
+        # achieved density example
+        # eff_dens = self.nodes[self.nonborder].sum() / self.cell_density[self.nonborder].size
 
     def update_dynamic_fields(self):
         """
