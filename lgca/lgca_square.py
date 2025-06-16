@@ -443,7 +443,7 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
         self._apply_rbcx()
 
         if hasattr(self, 'inflow'):
-            self.nodes[self.r_int, ...] = npr.random(self.nodes[0].shape) < self.inflow
+            self.nodes[self.r_int, ...] = self.rng.random(self.nodes[0].shape) < self.inflow
         else:
             self.nodes[self.r_int, ...] = 1
 

@@ -29,11 +29,12 @@ def disarrange(a: np.ndarray, axis=-1):
            last axis.
     """
     b = a.swapaxes(axis, -1)
-    # Shuffle `b` in-place along the last axis.  `b` is a view of `a`,
+    # Shuffle `b` in-place along the last axis. `b` is a view of `a`,
     # so `a` is shuffled in place, too.
+    rng = npr.default_rng()
     shp = b.shape[:-1]
     for ndx in np.ndindex(shp):
-        np.random.shuffle(b[ndx])
+        rng.shuffle(b[ndx])
     return
 
 
