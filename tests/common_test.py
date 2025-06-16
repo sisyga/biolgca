@@ -336,7 +336,7 @@ class Test_LGCA_General:
                 "Node configuration is not random"
             assert lgca.nodes[lgca.nonborder].sum(-1).min() != lgca.nodes[lgca.nonborder].sum(-1).max(), \
                 "Number of particles is homogeneous when it should differ randomly"
-        assert np.abs(lgca.nodes[lgca.nonborder].sum() / lgca.cell_density[lgca.nonborder].size * capacity / lgca.K - density) \
+        assert np.abs(lgca.nodes[lgca.nonborder].sum() / lgca.cell_density[lgca.nonborder].size - density) \
                < self.com.density_epsilon, "Wrong density reached"
         if ve and not ib:
             assert np.max(lgca.nodes.astype(int)) <= 1, "Volume exclusion principle is not respected"
