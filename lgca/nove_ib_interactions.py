@@ -41,10 +41,10 @@ def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
     if size != 1:
         return vals
     else:
-        return float(vals)
+        return vals[0]
 
 
-def randomwalk(lgca):
+def random_walk(lgca):
     """Move cells by uniformly redistributing them among velocity channels.
 
     Parameters

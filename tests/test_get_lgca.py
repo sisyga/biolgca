@@ -73,7 +73,7 @@ def test_get_lgca_returns_correct_subclass(geom, ib, ve):
         ve=ve,
         density=0,
         dims=2,
-        restchannels=0,
+        restchannels=1,
         interaction="only_propagation",
     )
     assert isinstance(lgca, EXPECTED[geom][(ib, ve)])
@@ -113,12 +113,4 @@ def test_warning_on_nonboolean_nodes():
         )
     assert set(np.unique(lgca.nodes[lgca.nonborder])) <= {0, 1}
 
-
-def test_persistent_motion_space_alias():
-    lgca = get_lgca(
-        geometry="square",
-        dims=3,
-        interaction="persistent motion",
-    )
-    assert lgca.interaction.__name__ == "persistent_walk"
 

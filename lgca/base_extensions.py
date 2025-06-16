@@ -9,8 +9,6 @@ volume exclusion.
 """
 
 
-from __future__ import annotations
-
 import warnings
 from abc import ABC
 from copy import copy, deepcopy
@@ -1726,13 +1724,13 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.update_dynamic_fields()
 
     def set_interaction(self, **kwargs):
-        from lgca.nove_ib_interactions import randomwalk, birth, birthdeath, birthdeath_cancerdfe, go_or_grow, \
+        from lgca.nove_ib_interactions import random_walk, birth, birthdeath, birthdeath_cancerdfe, go_or_grow, \
             evo_steric, go_or_grow_kappa
         from lgca.interactions import only_propagation
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
             if interaction in ('random walk', 'random_walk', 'diffusion'):
-                self.interaction = randomwalk
+                self.interaction = random_walk
             elif interaction == 'only_propagation':
                 self.interaction = only_propagation
 
@@ -1988,11 +1986,11 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
             else:
                 print('interaction', kwargs['interaction'], 'is not defined! Random walk used instead.')
                 print('Implemented interactions:', self.interactions)
-                self.interaction = randomwalk
+                self.interaction = random_walk
 
         else:
             print('Random walk interaction is used.')
-            self.interaction = randomwalk
+            self.interaction = random_walk
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, recordchanneldens=False,
                 showprogress=True, recordfampop=False):

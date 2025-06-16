@@ -157,7 +157,7 @@ def birthdeath(lgca):
 def birthdeath_discrete(lgca):
     """Birth-death process with discrete proliferation-rate mutations.
 
-    Offspring may mutate their ``r_b`` by ``\pm interaction_params['drb']``
+    Offspring may mutate their ``r_b`` by ``pm interaction_params['drb']``
     with probability ``interaction_params['pmut']`` while values are capped
     by ``interaction_params['a_max']``.
 

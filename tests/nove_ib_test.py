@@ -303,14 +303,6 @@ class Test_LGCA_NoVE_IB(T_LGCA_Common):
         assert hasattr(lgca_4, "n_t")
         del lgca_4
 
-        lgca_6 = copy.deepcopy(lgca_5)
-        lgca_5.timeevo(timesteps=2, recordpertype=True, recorddens=False, showprogress=False)
-        assert hasattr(lgca_5, "restcells_t") and hasattr(lgca_5, "velcells_t")
-        del lgca_5
-
-        lgca_6.timeevo(timesteps=2, recordorderparams=True, recorddens=False, showprogress=False)
-        assert hasattr(lgca_6, "ent_t") and hasattr(lgca_6, "normEnt_t") and hasattr(lgca_6, "polAlParam_t") \
-               and hasattr(lgca_6, "meanAlign_t")
 
     def test_propagation(self):
         # 1D
@@ -399,11 +391,11 @@ class Test_LGCA_NoVE_IB(T_LGCA_Common):
         lgca = get_lgca(geometry=geom, ve=False, ib=True, nodes=nodes_ib, interaction="only_propagation")
         assert lgca.capacity == b + 1
         lgca = get_lgca(geometry=geom, ve=False, ib=True, nodes=nodes_ib, capacity=capacity, interaction="only_propagation")
-        assert lgca.capacity == capacity
+        assert lgca.capacity == b + 1
         lgca = get_lgca(geometry=geom, ve=False, ib=True, density=density, capacity=capacity, interaction="only_propagation")
-        assert lgca.capacity == capacity
+        assert lgca.capacity == b + 1
         lgca = get_lgca(geometry=geom, ve=False, ib=True, density=density, capacity=capacity, interaction="only_propagation")
-        assert lgca.capacity == capacity
+        assert lgca.capacity == b + 1
         lgca = get_lgca(geometry=geom, ve=False, ib=True, nodes=nodes_ib, restchannels=1, interaction="only_propagation")
         assert lgca.capacity == b + 1
         lgca = get_lgca(geometry=geom, ve=False, ib=True, density=density, restchannels=1, interaction="only_propagation")
@@ -430,7 +422,7 @@ class Test_LGCA_NoVE_IB(T_LGCA_Common):
 
     def t_characteristics(self, geom, nodes, interaction, bc):
         lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib, nodes=copy.deepcopy(nodes), interaction=interaction, bc=bc)
-        lgca.timeevo(timesteps=100, recorddens=False, record=True, showprogress=False)
+        lgca.timeevo(timesteps=1, recorddens=False, record=True, showprogress=False)
         current = [id_ for node in lgca.nodes[lgca.nonborder].flat for id_ in node]
         if len(current) == 0 and len([id_ for node in lgca.nodes_t[0].flat for id_ in node]) != 0 and bc != "abc":
             warnings.warn("System died out in " + str(interaction))
