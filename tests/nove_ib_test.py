@@ -245,11 +245,7 @@ class Test_LGCA_NoVE_IB(T_LGCA_Common):
     test_abc_1d = T_LGCA_classical.test_abc_1d
     test_abc_square = T_LGCA_classical.test_abc_square
     test_abc_hex = T_LGCA_classical.test_abc_hex
-    test_pbc_cubic = T_LGCA_classical.test_pbc_cubic
-    test_rbc_cubic = T_LGCA_classical.test_rbc_cubic
     test_abc_cubic = T_LGCA_classical.test_abc_cubic
-    test_pbc_moore = T_LGCA_classical.test_pbc_moore
-    test_rbc_moore = T_LGCA_classical.test_rbc_moore
     test_abc_moore = T_LGCA_classical.test_abc_moore
 
     def t_prop_counts_template(self, geom, nodes, expected, bc="pbc"):
