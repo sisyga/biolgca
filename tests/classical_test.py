@@ -983,19 +983,21 @@ class Test_LGCA_classical(T_LGCA_Common):
         ('square', com.nodes_ve_square),
         ('hex', com.nodes_ve_hex),
         ('cubic', com.nodes_ve_cubic),
-        ('moore', com.nodes_ve_moore)
+        # ('moore', com.nodes_ve_moore)
     ])
-    # def test_characteristics(self, geom, nodes):
-    #     ref_lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib)
-    #     for interaction in ref_lgca.interactions:
-    #         # test all boundary conditions in case of abuse of border nodes
-    #         self.t_characteristics(geom, nodes, interaction, 'pbc')
-    #         self.t_characteristics(geom, nodes, interaction, 'rbc')
-    #         self.t_characteristics(geom, nodes, interaction, 'abc')
-    #
-    # def t_characteristics(self, geom, nodes, interaction, bc):
-    #     lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib, nodes=nodes, interaction=interaction, bc=bc)
-    #     lgca.timeevo(timesteps=1, recorddens=False, record=True, showprogress=False)
-    #     assert np.max(lgca.nodes_t.astype(int)) <= 1, "Volume exclusion principle is not respected"
-    #     if lgca.nodes_t[-1].max() == 0 and lgca.nodes_t[0].max() != 0 and bc!='abc':
-    #         warnings.warn("System died out in " + str(interaction))
+    def test_characteristics(self, geom, nodes):
+        # test compliance in all interactions to:
+        # * volume exclusion principle
+        ref_lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib)
+        for interaction in ref_lgca.interactions:
+            # test all boundary conditions in case of abuse of border nodes
+            self.t_characteristics(geom, nodes, interaction, 'pbc')
+            self.t_characteristics(geom, nodes, interaction, 'rbc')
+            self.t_characteristics(geom, nodes, interaction, 'abc')
+
+    def t_characteristics(self, geom, nodes, interaction, bc):
+        lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib, nodes=nodes, interaction=interaction, bc=bc)
+        lgca.timeevo(timesteps=1, recorddens=False, record=True, showprogress=False)
+        assert np.max(lgca.nodes_t.astype(int)) <= 1, "Volume exclusion principle is not respected"
+        if lgca.nodes_t[-1].max() == 0 and lgca.nodes_t[0].max() != 0 and bc!='abc':
+            warnings.warn("System died out in " + str(interaction))
