@@ -3,10 +3,11 @@ import numpy as np
 
 from lgca import get_lgca
 from lgca.lgca_1d import LGCA_1D, IBLGCA_1D, NoVE_LGCA_1D, NoVE_IBLGCA_1D
-from lgca.lgca_square import LGCA_Square, IBLGCA_Square, NoVE_LGCA_Square, NoVE_IBLGCA_Square
+from lgca.lgca_square import LGCA_Square
+from lgca.square_ext import IBLGCA_Square, NoVE_LGCA_Square, NoVE_IBLGCA_Square
 from lgca.lgca_hex import LGCA_Hex, IBLGCA_Hex, NoVE_LGCA_Hex, NoVE_IBLGCA_Hex
-from lgca.lgca_cubic import (
-    LGCA_Cubic,
+from lgca.lgca_cubic import LGCA_Cubic
+from lgca.cubic_ext import (
     IBLGCA_Cubic,
     NoVE_LGCA_Cubic,
     NoVE_IBLGCA_Cubic,

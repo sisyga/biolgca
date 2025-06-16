@@ -216,11 +216,11 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
         if geom_key == 'lin':
             from lgca.lgca_1d import NoVE_LGCA_1D as _Cls
         elif geom_key == 'square':
-            from lgca.lgca_square import NoVE_LGCA_Square as _Cls
+            from lgca.square_ext import NoVE_LGCA_Square as _Cls
         elif geom_key == 'hex':
             from lgca.lgca_hex import NoVE_LGCA_Hex as _Cls
         elif geom_key == 'cubic':
-            from lgca.lgca_cubic import NoVE_LGCA_Cubic as _Cls
+            from lgca.cubic_ext import NoVE_LGCA_Cubic as _Cls
         elif geom_key == 'moore':
             from lgca.lgca_3dmoore import NoVE_LGCA_Moore as _Cls
         else:
@@ -232,11 +232,11 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
         if geom_key == 'lin':
             from lgca.lgca_1d import IBLGCA_1D as _Cls
         elif geom_key == 'square':
-            from lgca.lgca_square import IBLGCA_Square as _Cls
+            from lgca.square_ext import IBLGCA_Square as _Cls
         elif geom_key == 'hex':
             from lgca.lgca_hex import IBLGCA_Hex as _Cls
         elif geom_key == 'cubic':
-            from lgca.lgca_cubic import IBLGCA_Cubic as _Cls
+            from lgca.cubic_ext import IBLGCA_Cubic as _Cls
         elif geom_key == 'moore':
             from lgca.lgca_3dmoore import IBLGCA_Moore as _Cls
         else:
@@ -248,11 +248,11 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
         if geom_key == 'lin':
             from lgca.lgca_1d import NoVE_IBLGCA_1D as _Cls
         elif geom_key == 'square':
-            from lgca.lgca_square import NoVE_IBLGCA_Square as _Cls
+            from lgca.square_ext import NoVE_IBLGCA_Square as _Cls
         elif geom_key == 'hex':
             from lgca.lgca_hex import NoVE_IBLGCA_Hex as _Cls
         elif geom_key == 'cubic':
-            from lgca.lgca_cubic import NoVE_IBLGCA_Cubic as _Cls
+            from lgca.cubic_ext import NoVE_IBLGCA_Cubic as _Cls
         elif geom_key == 'moore':
             from lgca.lgca_3dmoore import NoVE_IBLGCA_Moore as _Cls
         else:
