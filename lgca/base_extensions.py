@@ -408,7 +408,7 @@ class IBLGCA_base(LGCA_base, ABC):
             Desired average number of particles per node.
             ``density = total_number_of_particles / number_of_nodes``.
         """
-        occupied = npr.random(self.dims + (self.K,)) < (density / self.K)
+        occupied = self.rng.random(self.dims + (self.K,)) < (density / self.K)
         self.nodes[self.nonborder] = self.convert_bool_to_ib(occupied)
         self.apply_boundaries()
 
@@ -1529,9 +1529,9 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         """Populate the lattice from a Poisson distribution with mean ``density`` per node."""
 
         density = abs(density) / self.capacity
-        draw1 = npr.poisson(lam=density, size=self.nodes.shape)
+        draw1 = self.rng.poisson(lam=density, size=self.nodes.shape)
         if self.capacity > self.K:
-            draw2 = npr.poisson(lam=density, size=self.nodes.shape[:-1] + ((self.capacity - self.K),))
+            draw2 = self.rng.poisson(lam=density, size=self.nodes.shape[:-1] + ((self.capacity - self.K),))
             draw1[..., -1] += draw2.sum(-1)
         self.nodes = draw1
         self.apply_boundaries()
@@ -1706,7 +1706,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     def random_reset(self, density):
         """Populate the lattice from a Poisson distribution with mean ``density`` per node."""
         lam = abs(density) / self.capacity
-        numbers = npr.poisson(lam=lam, size=self.dims + (self.K,))
+        numbers = self.rng.poisson(lam=lam, size=self.dims + (self.K,))
         tempnodes = self.convert_int_to_ib(numbers)
         self.nodes[self.nonborder] = tempnodes
         self.maxlabel = numbers.sum()
