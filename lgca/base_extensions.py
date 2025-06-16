@@ -398,21 +398,17 @@ class IBLGCA_base(LGCA_base, ABC):
         return conf
 
     def random_reset(self, density):
-        """
-        Initialize lattice nodes with average density `density`. Channels are occupied at random and nodes can
-        have different particle numbers.
+        """Randomly fill channels so that each node has on average ``density`` particles.
 
-        For each channel a random number is drawn. If it is lower than `density`, the channel is filled,
-        otherwise it stays empty.
+        Each channel is independently occupied with probability ``density / self.K``.
 
         Parameters
         ----------
         density : float
-            Desired average particle density of the lattice.
-            ``density = total_number_of_particles / (number_of_nodes * number_of_channels_per_node)``.
-
+            Desired average number of particles per node.
+            ``density = total_number_of_particles / number_of_nodes``.
         """
-        occupied = npr.random(self.dims + (self.K,)) < density
+        occupied = npr.random(self.dims + (self.K,)) < (density / self.K)
         self.nodes[self.nonborder] = self.convert_bool_to_ib(occupied)
         self.apply_boundaries()
 
@@ -1530,23 +1526,20 @@ class NoVE_LGCA_base(LGCA_base, ABC):
                 self.restcells_t[t, ...] = self.nodes[self.nonborder][..., self.velocitychannels:].sum(-1)
 
     def random_reset(self, density):
-        """
-        Distribute particles in the lattice according to a given density; can yield different cell numbers per
-        lattice site
-        :param density: particle density in the lattice: average number of particles per channel
-        """
+        """Populate the lattice from a Poisson distribution with mean ``density`` per node."""
 
-        # sample from a Poisson distribution with mean=density
-        density = abs(density)
-        draw1 = npr.poisson(lam=density, size=self.nodes.shape)
-        if self.capacity > self.K:
-            draw2 = npr.poisson(lam=density, size=self.nodes.shape[:-1]+((self.capacity-self.K),))
-            draw1[..., -1] += draw2.sum(-1)
-        self.nodes = draw1
+        target_density = abs(density)
+        lam = target_density / self.capacity
+        self.nodes = npr.poisson(lam=lam, size=self.nodes.shape)
         self.apply_boundaries()
         self.update_dynamic_fields()
-        eff_dens = self.nodes[self.nonborder].sum()/(self.capacity * self.cell_density[self.nonborder].size)
-        print("Required density: {:.3f}, Achieved density: {:.3f}".format(density, eff_dens))
+        eff_dens = self.nodes[self.nonborder].sum() / self.cell_density[self.nonborder].size
+        print(
+            "Required density: {:.3f}, Achieved density: {:.3f}".format(
+                target_density,
+                eff_dens,
+            )
+        )
 
 
     def calc_entropy(self, base=None):
@@ -1713,14 +1706,12 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         return tempnodes
 
     def random_reset(self, density):
-        """
-        Distribute particles in the lattice according to a given density; can yield different cell numbers per lattice site
-        :param density: particle density in the lattice: average number of particles per channel
-        """
-        density = npr.poisson(lam=density, size=self.dims + (self.K,))
-        tempnodes = self.convert_int_to_ib(density)
+        """Populate the lattice from a Poisson distribution with mean ``density`` per node."""
+        lam = abs(density) / self.capacity
+        numbers = npr.poisson(lam=lam, size=self.dims + (self.K,))
+        tempnodes = self.convert_int_to_ib(numbers)
         self.nodes[self.nonborder] = tempnodes
-        self.maxlabel = density.sum()
+        self.maxlabel = numbers.sum()
         self.update_dynamic_fields()
 
     def set_interaction(self, **kwargs):
