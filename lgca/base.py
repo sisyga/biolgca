@@ -452,9 +452,23 @@ class LGCA_base(ABC):
             Interaction parameters.
 
         """
-        from lgca.interactions import go_or_grow, go_or_rest, birth, alignment, persistent_walk, chemotaxis, \
-                contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium, \
-                only_propagation
+        from lgca.interactions import (
+            go_or_grow,
+            go_or_rest,
+            birth,
+            alignment,
+            persistent_walk,
+            chemotaxis,
+            contact_guidance,
+            nematic,
+            aggregation,
+            wetting,
+            random_walk,
+            birthdeath,
+            excitable_medium,
+            only_propagation,
+        )
+        from lgca.ms_interactions import excitable_medium_ms
         if 'interaction' in kwargs:
             interaction = kwargs['interaction'].replace(" ", "_")
             if interaction == 'go_or_grow':
@@ -675,6 +689,26 @@ class LGCA_base(ABC):
                     self.interaction_params['alpha'] = kwargs['alpha']
                 else:
                     self.interaction_params['alpha'] = 1.
+                    print('aggregation sensitivity set to alpha = ', self.interaction_params['alpha'])
+
+                if 'N' in kwargs:
+                    self.interaction_params['N'] = kwargs['N']
+                else:
+                    self.interaction_params['N'] = 50
+                    print('repetition of fast reaction set to N = ', self.interaction_params['N'])
+
+            elif interaction == 'excitable_medium_ms':
+                self.interaction = excitable_medium_ms
+                if 'beta' in kwargs:
+                    self.interaction_params['beta'] = kwargs['beta']
+                else:
+                    self.interaction_params['beta'] = 0.05
+                    print('alignment sensitivity set to beta = ', self.interaction_params['beta'])
+
+                if 'alpha' in kwargs:
+                    self.interaction_params['alpha'] = kwargs['alpha']
+                else:
+                    self.interaction_params['alpha'] = 1.0
                     print('aggregation sensitivity set to alpha = ', self.interaction_params['alpha'])
 
                 if 'N' in kwargs:

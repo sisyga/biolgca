@@ -265,26 +265,26 @@ class LGCA_Hex(LGCA_Square):
         newcellnodes[..., 6:] = self.nodes[..., 6:]
 
         # prop in 0-direction
-        newcellnodes[1:, :, 0] = self.nodes[:-1, :, 0]
+        newcellnodes[1:, ..., 0] = self.nodes[:-1, ..., 0]
 
         # prop in 1-direction
-        newcellnodes[:, 1::2, 1] = self.nodes[:, :-1:2, 1]
-        newcellnodes[1:, 2::2, 1] = self.nodes[:-1, 1:-1:2, 1]
+        newcellnodes[:, 1::2, ..., 1] = self.nodes[:, :-1:2, ..., 1]
+        newcellnodes[1:, 2::2, ..., 1] = self.nodes[:-1, 1:-1:2, ..., 1]
 
         # prop in 2-direction
-        newcellnodes[:-1, 1::2, 2] = self.nodes[1:, :-1:2, 2]
-        newcellnodes[:, 2::2, 2] = self.nodes[:, 1:-1:2, 2]
+        newcellnodes[:-1, 1::2, ..., 2] = self.nodes[1:, :-1:2, ..., 2]
+        newcellnodes[:, 2::2, ..., 2] = self.nodes[:, 1:-1:2, ..., 2]
 
         # prop in 3-direction
-        newcellnodes[:-1, :, 3] = self.nodes[1:, :, 3]
+        newcellnodes[:-1, ..., 3] = self.nodes[1:, ..., 3]
 
         # prop in 4-direction
-        newcellnodes[:, :-1:2, 4] = self.nodes[:, 1::2, 4]
-        newcellnodes[:-1, 1:-1:2, 4] = self.nodes[1:, 2::2, 4]
+        newcellnodes[:, :-1:2, ..., 4] = self.nodes[:, 1::2, ..., 4]
+        newcellnodes[:-1, 1:-1:2, ..., 4] = self.nodes[1:, 2::2, ..., 4]
 
         # prop in 5-direction
-        newcellnodes[1:, :-1:2, 5] = self.nodes[:-1, 1::2, 5]
-        newcellnodes[:, 1:-1:2, 5] = self.nodes[:, 2::2, 5]
+        newcellnodes[1:, :-1:2, ..., 5] = self.nodes[:-1, 1::2, ..., 5]
+        newcellnodes[:, 1:-1:2, ..., 5] = self.nodes[:, 2::2, ..., 5]
 
         self.nodes = newcellnodes
 
@@ -292,32 +292,28 @@ class LGCA_Hex(LGCA_Square):
     def _apply_rbcx(self):
         # documented in parent class
         # left boundary
-        self.nodes[self.r_int, :, 0] += self.nodes[self.r_int - 1, :, 3]
-        self.nodes[self.r_int, 2:-1:2, 1] += self.nodes[self.r_int - 1, 1:-2:2, 4]
-        self.nodes[self.r_int, 2:-1:2, 5] += self.nodes[self.r_int - 1, 3::2, 2]
+        self.nodes[self.r_int, ..., 0] += self.nodes[self.r_int - 1, ..., 3]
+        self.nodes[self.r_int, 2:-1:2, ..., 1] += self.nodes[self.r_int - 1, 1:-2:2, ..., 4]
+        self.nodes[self.r_int, 2:-1:2, ..., 5] += self.nodes[self.r_int - 1, 3::2, ..., 2]
 
         # right boundary
-        self.nodes[-self.r_int - 1, :, 3] += self.nodes[-self.r_int, :, 0]
-        self.nodes[-self.r_int - 1, 1:-1:2, 4] += self.nodes[-self.r_int, 2::2, 1]
-        self.nodes[-self.r_int - 1, 1:-1:2, 2] += self.nodes[-self.r_int, :-2:2, 5]
+        self.nodes[-self.r_int - 1, ..., 3] += self.nodes[-self.r_int, ..., 0]
+        self.nodes[-self.r_int - 1, 1:-1:2, ..., 4] += self.nodes[-self.r_int, 2::2, ..., 1]
+        self.nodes[-self.r_int - 1, 1:-1:2, ..., 2] += self.nodes[-self.r_int, :-2:2, ..., 5]
 
         self._apply_abcx()
 
     def _apply_rbcy(self):
         # documented in parent class
-        lx, ly, _ = self.nodes.shape
+        lx, ly = self.nodes.shape[:2]
 
         # lower boundary
-        self.nodes[(1 - (self.r_int % 2)):, self.r_int, 1] += self.nodes[:lx - (1 - (self.r_int % 2)), self.r_int - 1,
-                                                              4]
-        self.nodes[:lx - (self.r_int % 2), self.r_int, 2] += self.nodes[(self.r_int % 2):, self.r_int - 1, 5]
+        self.nodes[(1 - (self.r_int % 2)):, self.r_int, ..., 1] += self.nodes[: lx - (1 - (self.r_int % 2)), self.r_int - 1, ..., 4]
+        self.nodes[: lx - (self.r_int % 2), self.r_int, ..., 2] += self.nodes[(self.r_int % 2) :, self.r_int - 1, ..., 5]
 
         # upper boundary
-        self.nodes[:lx - ((ly - 1 - self.r_int) % 2), -self.r_int - 1, 4] += self.nodes[((ly - 1 - self.r_int) % 2):,
-                                                                             -self.r_int, 1]
-        self.nodes[(1 - ((ly - 1 - self.r_int) % 2)):, -self.r_int - 1, 5] += self.nodes[
-                                                                              :lx - (1 - ((ly - 1 - self.r_int) % 2)),
-                                                                              -self.r_int, 2]
+        self.nodes[: lx - ((ly - 1 - self.r_int) % 2), -self.r_int - 1, ..., 4] += self.nodes[((ly - 1 - self.r_int) % 2) :, -self.r_int, ..., 1]
+        self.nodes[(1 - ((ly - 1 - self.r_int) % 2)) :, -self.r_int - 1, ..., 5] += self.nodes[: lx - (1 - ((ly - 1 - self.r_int) % 2)), -self.r_int, ..., 2]
         self._apply_abcy()
 
     def gradient(self, qty):

@@ -69,7 +69,7 @@ def _translate_dims(dims: Any, geom_key: str) -> Tuple[int, ...]:
     return tuple(dims)
 
 
-def _warn_on_node_mismatch(nodes, dims_arg, rest_arg, geom_key):
+def _warn_on_node_mismatch(nodes, dims_arg, rest_arg, geom_key, n_species=1):
     """Warn if provided ``nodes`` are inconsistent with ``dims`` or ``restchannels``."""
     if nodes is None:
         return
@@ -82,7 +82,7 @@ def _warn_on_node_mismatch(nodes, dims_arg, rest_arg, geom_key):
         'moore': 26,
     }
 
-    dims_from_nodes = nodes.shape[:-1]
+    dims_from_nodes = nodes.shape[:-2] if n_species > 1 else nodes.shape[:-1]
     vel = velocity_lookup.get(geom_key)
     if vel is not None:
         rest_from_nodes = nodes.shape[-1] - vel
@@ -105,7 +105,7 @@ def _warn_on_node_mismatch(nodes, dims_arg, rest_arg, geom_key):
 
 
 
-def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs):
+def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, n_species: int = 1, **kwargs):
     """
     Build an LGCA with the specified geometry and initial conditions. Choose the correct LGCA subclass
     from the package and pass remaining keyword parameters on to it for initialization.
@@ -123,6 +123,8 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
         If the LGCA should be identity-based (every particle can have individual properties).
     ve : bool, default=True
         If the LGCA should comply with the volume exclusion principle (only one particle per channel).
+    n_species : int, default=1
+        Number of species. >1 enables multi-species classes.
     **kwargs : dict
         Keyword arguments for dimensions, initial conditions and interaction. Used by the constructor of the LGCA subclass.
 
@@ -193,8 +195,8 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
     rest_arg = kwargs.get('restchannels')
     dims_arg = kwargs.get('dims')
 
+    kwargs["n_species"] = n_species
     geom_map = {
-        '1d': 'lin',
         'lin': 'lin',
         'linear': 'lin',
         'square': 'square',
@@ -208,11 +210,40 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
         'cb': 'cubic',
         'moore': 'moore',
         'moore3d': 'moore',
+
     }
-
     geom_key = geom_map.get(geometry, geometry)
+    if n_species > 1:
+        if ib:
+            raise NotImplementedError("Multi-species identity-based not implemented")
+        if ve:
+            if geom_key == "square":
+                from lgca.ms_square import MSLGCA_Square as _Cls
+            elif geom_key == "lin":
+                from lgca.ms_1d import MSLGCA_1D as _Cls
+            elif geom_key == "hex":
+                from lgca.ms_hex import MSLGCA_Hex as _Cls
+            elif geom_key == "cubic":
+                from lgca.ms_cubic import MSLGCA_Cubic as _Cls
+            elif geom_key == "moore":
+                from lgca.ms_moore import MSLGCA_Moore as _Cls
+            else:
+                raise NotImplementedError("Multi-species not implemented for this geometry")
+        else:
+            if geom_key == "square":
+                from lgca.ms_square import MSLGCA_NoVE_Square as _Cls
+            elif geom_key == "lin":
+                from lgca.ms_1d import MSLGCA_NoVE_1D as _Cls
+            elif geom_key == "hex":
+                from lgca.ms_hex import MSLGCA_NoVE_Hex as _Cls
+            elif geom_key == "cubic":
+                from lgca.ms_cubic import MSLGCA_NoVE_Cubic as _Cls
+            elif geom_key == "moore":
+                from lgca.ms_moore import MSLGCA_NoVE_Moore as _Cls
+            else:
+                raise NotImplementedError("Multi-species not implemented for this geometry")
 
-    if not ve and not ib:
+    elif not ve and not ib:
         if geom_key == 'lin':
             from lgca.lgca_1d import NoVE_LGCA_1D as _Cls
         elif geom_key == 'square':
@@ -278,5 +309,5 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
             )
 
     lgca = _Cls(**kwargs)
-    _warn_on_node_mismatch(nodes, dims_arg, rest_arg, geom_key)
+    _warn_on_node_mismatch(nodes, dims_arg, rest_arg, geom_key, n_species)
     return lgca

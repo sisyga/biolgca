@@ -418,36 +418,36 @@ class NoVE_IBLGCA_Square(NoVE_IBLGCA_base, NoVE_LGCA_Square):
         newnodes[..., 4:] = self.nodes[..., 4:]
 
         # prop. to the right
-        newnodes[1:, :, 0] = self.nodes[:-1, :, 0]
+        newnodes[1:, ..., 0] = self.nodes[:-1, ..., 0]
 
         # prop. to the left
-        newnodes[:-1, :, 2] = self.nodes[1:, :, 2]
+        newnodes[:-1, ..., 2] = self.nodes[1:, ..., 2]
 
         # prop. upwards
-        newnodes[:, 1:, 1] = self.nodes[:, :-1, 1]
+        newnodes[:, 1:, ..., 1] = self.nodes[:, :-1, ..., 1]
 
         # prop. downwards
-        newnodes[:, :-1, 3] = self.nodes[:, 1:, 3]
+        newnodes[:, :-1, ..., 3] = self.nodes[:, 1:, ..., 3]
 
         self.nodes = newnodes
 
     def _apply_rbcx(self):
-        self.nodes[self.r_int, :, 0] = self.nodes[self.r_int, :, 0] + self.nodes[self.r_int - 1, :, 2]
-        self.nodes[-self.r_int - 1, :, 2] = self.nodes[-self.r_int - 1, :, 2] + self.nodes[-self.r_int, :, 0]
+        self.nodes[self.r_int, ..., 0] = self.nodes[self.r_int, ..., 0] + self.nodes[self.r_int - 1, ..., 2]
+        self.nodes[-self.r_int - 1, ..., 2] = self.nodes[-self.r_int - 1, ..., 2] + self.nodes[-self.r_int, ..., 0]
         self._apply_abcx()
 
     def _apply_rbcy(self):
-        self.nodes[:, self.r_int, 1] = self.nodes[:, self.r_int, 1] + self.nodes[:, self.r_int - 1, 3]
-        self.nodes[:, -self.r_int - 1, 3] = self.nodes[:, -self.r_int - 1, 3] + self.nodes[:, -self.r_int, 1]
+        self.nodes[:, self.r_int, ..., 1] = self.nodes[:, self.r_int, ..., 1] + self.nodes[:, self.r_int - 1, ..., 3]
+        self.nodes[:, -self.r_int - 1, ..., 3] = self.nodes[:, -self.r_int - 1, ..., 3] + self.nodes[:, -self.r_int, ..., 1]
         self._apply_abcy()
 
     def _apply_abcx(self):
-        self.nodes[:self.r_int, ...] = get_arr_of_empty_lists(self.nodes[:self.r_int, ...].shape)
-        self.nodes[-self.r_int:, ...] = get_arr_of_empty_lists(self.nodes[-self.r_int:, ...].shape)
+        self.nodes[: self.r_int, ...] = get_arr_of_empty_lists(self.nodes[: self.r_int, ...].shape)
+        self.nodes[-self.r_int :, ...] = get_arr_of_empty_lists(self.nodes[-self.r_int :, ...].shape)
 
     def _apply_abcy(self):
-        self.nodes[:, :self.r_int, :] = get_arr_of_empty_lists(self.nodes[:, :self.r_int, :].shape)
-        self.nodes[:, -self.r_int:, :] = get_arr_of_empty_lists(self.nodes[:, -self.r_int:, :].shape)
+        self.nodes[:, : self.r_int, ...] = get_arr_of_empty_lists(self.nodes[:, : self.r_int, ...].shape)
+        self.nodes[:, -self.r_int :, ...] = get_arr_of_empty_lists(self.nodes[:, -self.r_int :, ...].shape)
 
     def plot_density(self, density=None, channels=slice(None), **kwargs):
         if density is None:

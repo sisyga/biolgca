@@ -343,16 +343,16 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
         newnodes[..., 4:] = self.nodes[..., 4:]
 
         # prop. to the right
-        newnodes[1:, :, 0] = self.nodes[:-1, :, 0]
+        newnodes[1:, ..., 0] = self.nodes[:-1, ..., 0]
 
         # prop. to the left
-        newnodes[:-1, :, 2] = self.nodes[1:, :, 2]
+        newnodes[:-1, ..., 2] = self.nodes[1:, ..., 2]
 
         # prop. upwards
-        newnodes[:, 1:, 1] = self.nodes[:, :-1, 1]
+        newnodes[:, 1:, ..., 1] = self.nodes[:, :-1, ..., 1]
 
         # prop. downwards
-        newnodes[:, :-1, 3] = self.nodes[:, 1:, 3]
+        newnodes[:, :-1, ..., 3] = self.nodes[:, 1:, ..., 3]
 
         self.nodes = newnodes
 
@@ -371,8 +371,8 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
 
         Written for :py:meth:`self.apply_pbc` and :py:meth:`self.apply_inflowbc`.
         """
-        self.nodes[:, :self.r_int, :] = self.nodes[:, -2 * self.r_int:-self.r_int, :]  # upper boundary
-        self.nodes[:, -self.r_int:, :] = self.nodes[:, self.r_int:2 * self.r_int, :]  # lower boundary
+        self.nodes[:, : self.r_int, ...] = self.nodes[:, -2 * self.r_int : -self.r_int, ...]  # upper boundary
+        self.nodes[:, -self.r_int :, ...] = self.nodes[:, self.r_int : 2 * self.r_int, ...]  # lower boundary
 
     def apply_pbc(self):
         # documented in parent class
@@ -385,8 +385,8 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
 
         Written for :py:meth:`self.apply_rbc` and :py:meth:`self.apply_inflowbc`.
         """
-        self.nodes[self.r_int, :, 0] += self.nodes[self.r_int - 1, :, 2]
-        self.nodes[-self.r_int - 1, :, 2] += self.nodes[-self.r_int, :, 0]
+        self.nodes[self.r_int, ..., 0] += self.nodes[self.r_int - 1, ..., 2]
+        self.nodes[-self.r_int - 1, ..., 2] += self.nodes[-self.r_int, ..., 0]
         self._apply_abcx()
 
     def _apply_rbcy(self):
@@ -395,8 +395,8 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
 
         Written for :py:meth:`self.apply_rbc`.
         """
-        self.nodes[:, self.r_int, 1] += self.nodes[:, self.r_int - 1, 3]
-        self.nodes[:, -self.r_int - 1, 3] += self.nodes[:, -self.r_int, 1]
+        self.nodes[:, self.r_int, ..., 1] += self.nodes[:, self.r_int - 1, ..., 3]
+        self.nodes[:, -self.r_int - 1, ..., 3] += self.nodes[:, -self.r_int, ..., 1]
         self._apply_abcy()
 
     def apply_rbc(self):
@@ -410,8 +410,8 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
 
         Written for :py:meth:`self.apply_abc` and :py:meth:`self._apply_rbcx`.
         """
-        self.nodes[:self.r_int, ...] = 0
-        self.nodes[-self.r_int:, ...] = 0
+        self.nodes[: self.r_int, ...] = 0
+        self.nodes[-self.r_int :, ...] = 0
 
     def _apply_abcy(self):
         """
@@ -419,8 +419,8 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
 
         Written for :py:meth:`self.apply_abc` and :py:meth:`self._apply_rbcy`.
         """
-        self.nodes[:, :self.r_int, :] = 0
-        self.nodes[:, -self.r_int:, :] = 0
+        self.nodes[:, : self.r_int, ...] = 0
+        self.nodes[:, -self.r_int :, ...] = 0
 
     def apply_abc(self):
         # documented in parent class
