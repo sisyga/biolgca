@@ -23,6 +23,7 @@ except ImportError:  # pragma: no cover - handled at runtime
     mticker = make_axes_locatable = _MissingPlotLib("matplotlib")
 
 from lgca.base import *
+from lgca.base_extensions import get_arr_of_empty_lists
 
 
 class LGCA_1D(LGCA_base):
@@ -106,14 +107,14 @@ class LGCA_1D(LGCA_base):
         Initialize LGCA lattice configuration. Create the lattice and then assign particles to
         channels in the nodes.
 
-        Initializes :py:attr:`self.nodes`. If `nodes` is not provided, the lattice is initialized with particles
-        randomly so that the averge lattice density is `density`. For the random initialization there is a choice
-        between a fixed or random number of particles per node.
+        Initializes :py:attr:`self.nodes`. If `nodes` is not provided, the lattice is initialized randomly so that
+        each node contains on average ``density`` particles. For the random initialization there is a choice between
+        a fixed or random number of particles per node.
 
         Parameters
         ----------
         density : float, default=0.1
-            If `nodes` is None, initialize lattice randomly with this particle density.
+            If `nodes` is None, initialize lattice randomly with this average number of particles per node.
         nodes : :py:class:`numpy.ndarray`
             Custom initial lattice configuration. Dimensions: ``(self.dims[0], self.K)``.
 

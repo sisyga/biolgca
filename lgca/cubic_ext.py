@@ -11,8 +11,14 @@ Adds identity-based and no-volume-exclusion variants for cubic geometries.
 from __future__ import annotations
 
 import numpy as np
-from lgca.base_extensions import IBLGCA_base, NoVE_LGCA_base, NoVE_IBLGCA_base
+import warnings
+from lgca.base_extensions import IBLGCA_base, NoVE_LGCA_base, NoVE_IBLGCA_base, get_arr_of_empty_lists
 from .lgca_cubic import LGCA_Cubic
+try:  # optional plotting dependency
+    from mayavi import mlab
+except ImportError:  # pragma: no cover - handled at runtime
+    from lgca.base import _MissingPlotLib
+    mlab = _MissingPlotLib("mayavi")
 
 
 class IBLGCA_Cubic(IBLGCA_base, LGCA_Cubic):

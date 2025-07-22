@@ -13,7 +13,26 @@ from __future__ import annotations
 import numpy as np
 from lgca.base_extensions import get_arr_of_empty_lists
 from lgca.base_extensions import IBLGCA_base, NoVE_LGCA_base, NoVE_IBLGCA_base
-from .lgca_square import LGCA_Square
+from lgca.lgca_square import LGCA_Square
+try:  # optional plotting dependencies
+    import matplotlib.animation as animation
+    import matplotlib.colors as colors
+    import matplotlib.ticker as mticker
+    from matplotlib.ticker import FuncFormatter
+    from matplotlib.collections import PatchCollection
+    from matplotlib.colors import Normalize
+    from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
+    from matplotlib import cm
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+except ImportError:  # pragma: no cover - handled at runtime
+    from lgca.base import _MissingPlotLib  # reuse stub
+
+    animation = colors = mticker = FuncFormatter = PatchCollection = Normalize = (
+        RegularPolygon
+    ) = Circle = FancyArrowPatch = cm = make_axes_locatable = _MissingPlotLib(
+        "matplotlib"
+    )
+
 
 
 class IBLGCA_Square(IBLGCA_base, LGCA_Square):

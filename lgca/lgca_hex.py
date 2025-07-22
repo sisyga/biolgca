@@ -17,6 +17,7 @@ Supported LGCA types:
 """
 
 from lgca.base import *
+from lgca.base_extensions import get_arr_of_empty_lists
 from lgca.lgca_square import LGCA_Square, IBLGCA_Square, NoVE_LGCA_Square, NoVE_IBLGCA_Square
 
 pi2 = 2 * np.pi

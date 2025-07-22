@@ -1,6 +1,1 @@
-alabaster
-numpydoc
-pytest
-Sphinx
-sphinx-autodoc-typehints
-
+pytest==6.2.5

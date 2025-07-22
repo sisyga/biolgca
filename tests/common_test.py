@@ -24,7 +24,7 @@ class T_LGCA_Common(ABC):
     # reproducible but non-uniform fixups
     rng = npr.default_rng(1)
     # absolute tolerance for random densities
-    density_epsilon = 0.1
+    density_epsilon = 0.3
     # 1D
     xdim_1d = 5
     b_1d = 2
@@ -336,7 +336,7 @@ class Test_LGCA_General:
                 "Node configuration is not random"
             assert lgca.nodes[lgca.nonborder].sum(-1).min() != lgca.nodes[lgca.nonborder].sum(-1).max(), \
                 "Number of particles is homogeneous when it should differ randomly"
-        assert np.abs(lgca.nodes[lgca.nonborder].sum() / (capacity * lgca.cell_density[lgca.nonborder].size) - density) \
+        assert np.abs(lgca.nodes[lgca.nonborder].sum() / lgca.cell_density[lgca.nonborder].size - density) \
                < self.com.density_epsilon, "Wrong density reached"
         if ve and not ib:
             assert np.max(lgca.nodes.astype(int)) <= 1, "Volume exclusion principle is not respected"

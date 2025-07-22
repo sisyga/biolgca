@@ -5,8 +5,8 @@
 """3D Moore lattice LGCA implementations."""
 
 import numpy as np
-from lgca.lgca_cubic import (
-    LGCA_Cubic,
+from lgca.lgca_cubic import LGCA_Cubic
+from lgca.cubic_ext import (
     IBLGCA_Cubic,
     NoVE_LGCA_Cubic,
     NoVE_IBLGCA_Cubic,

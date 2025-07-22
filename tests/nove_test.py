@@ -19,6 +19,18 @@ from tests.classical_test import (
     out_cb_ubound,
     nodes_cb_dbound,
     out_cb_dbound,
+    nodes_mo_rbound,
+    out_mo_rbound,
+    nodes_mo_lbound,
+    out_mo_lbound,
+    nodes_mo_tbound,
+    out_mo_tbound,
+    nodes_mo_bbound,
+    out_mo_bbound,
+    nodes_mo_ubound,
+    out_mo_ubound,
+    nodes_mo_dbound,
+    out_mo_dbound,
 )
 
 com = T_LGCA_Common
