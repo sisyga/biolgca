@@ -46,6 +46,22 @@ def tanh_switch(rho, kappa=5., theta=0.8):
 def ent_prod(x):
     return x * np.log(x, where=x > 0, out=np.zeros_like(x, dtype=float))
 
+def ecm_guidance(lgca, ecm):
+    newnodes = lgca.nodes.copy()
+    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
+               (lgca.cell_density[lgca.nonborder] < lgca.K)
+    coords = [a[relevant] for a in lgca.nonborder]
+
+    for coord in zip(*coords):
+        n = lgca.cell_density[coord]
+        grad = ecm.vector_field[coord][:2]
+        b_guid = ecm.vector_field[coord][2]
+        permutations = lgca.permutations[n]
+        j = lgca.j[n]
+        weights = np.exp(lgca.beta * b_guid * np.einsum('i,ij', grad, j)).cumsum()
+        ind = bisect_left(weights, random() * weights[-1])
+        newnodes[coord] = permutations[ind]
+    lgca.nodes = newnodes
 
 def random_walk(lgca):
     """
@@ -384,15 +400,6 @@ def leup_test(lgca):
         np.add(lgca.nodes, ds, out=lgca.nodes, casting='unsafe')
         lgca.update_dynamic_fields()
 
-    # if lgca.interaction_params['r_b'] > 0: # or lgca.interaction_params['r_d'] > 0:
-    #     n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
-    #     n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
-    #     birth = npr.random(lgca.nodes.shape) < lgca.interaction_params['r_b'] * n_r[..., None] / lgca.restchannels
-    #     death = npr.random(birth.shape) < lgca.interaction_params['r_d'] * (n_r[..., None] / lgca.restchannels + n_m[..., None] / lgca.velocitychannels)
-    #     ds = (1 - lgca.nodes) * birth - lgca.nodes * death
-    #     np.add(lgca.nodes, ds, out=lgca.nodes, casting='unsafe')
-    #     lgca.update_dynamic_fields()
-
     relevant = (lgca.cell_density[lgca.nonborder] > 0) & (lgca.cell_density[lgca.nonborder] < lgca.K)
     coords = [a[relevant] for a in lgca.nonborder]
     n = lgca.cell_density
@@ -505,9 +512,25 @@ def go_or_rest(lgca):
 def only_propagation(lgca):
     pass
 
+
+
 def maze_formation(lgca):
     """
     Maze formation interaction. Contact guidance along axes defined by a scalar ECM field.
     Degradation and formation of ecm.
     """
+    contact_guidance(lgca)  # contact guidance along ECM axes
+    # update ECM field
+    lgca.scalar_field += lgca.d_neigh * lgca.nb_sum(lgca.cell_density)  - lgca.d * lgca.cell_density
+    lgca.scalar_field = np.clip(lgca.scalar_field, 0, 1)
+    # update tensor field
+    weights = lgca.channel_weight(lgca.cell_density)
+    for coord in lgca.coord_pairs:
+
+        # weights = self.nb_ECM(coord)
+        tensor, ev, ew = calc_inertia_tensor(weights)
+        lgca.vector_field[coord] = np.array([ev[0][0], ev[0][1], max(ew)])
+        lgca.tensor_field[coord] = tensor
+
+    
 

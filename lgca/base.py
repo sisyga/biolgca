@@ -4,8 +4,8 @@
 # The full license notice is found in the file lgca/__init__.py.
 
 """
-Abstract base classes. These classes define properties and structure of the LGCA 
-types/subclasses and specify geometry-independent LGCA behavior. 
+Abstract base classes. These classes define properties and structure of the LGCA
+types/subclasses and specify geometry-independent LGCA behavior.
 They cannot be used to simulate.
 
 Supported LGCA types:
@@ -38,9 +38,9 @@ def colorbar_index(ncolors: int, cmap, use_gridspec: bool=False, cax=None):
     """
     Create a colorbar with `ncolors` colors.
 
-    Builds a discrete colormap with `ncolors` colors from the near-continuous colormap `cmap`, 
-    adds it to the axis `cax` and draws tick labels in the center of each color. If 
-    ncolors is high, some labels are omitted to avoid cluttering. 
+    Builds a discrete colormap with `ncolors` colors from the near-continuous colormap `cmap`,
+    adds it to the axis `cax` and draws tick labels in the center of each color. If
+    ncolors is high, some labels are omitted to avoid cluttering.
 
     .. note:: To Do: Implement the label stride with Locator and Formatter instead.
 
@@ -149,9 +149,9 @@ def cmap_discretize(cmap, N: int):
 def estimate_figsize(array, x: float=8., cbar: bool=False, dy: float=1.):
     """
     .. deprecated:: 1.0
-        :py:func:`estimate_figsize` will be removed in biolgca 1.0, it is replaced 
-        by the default value for the figure size in :py:meth:`setup_figure` of the 
-        respective LGCA object. 
+        :py:func:`estimate_figsize` will be removed in biolgca 1.0, it is replaced
+        by the default value for the figure size in :py:meth:`setup_figure` of the
+        respective LGCA object.
 
     Parameters
     ----------
@@ -268,26 +268,40 @@ def calc_nematic_tensor(v):
     """
     return np.einsum('...i,...j->...ij', v, v) - 0.5 * np.diag(np.ones(2))[None, ...]
 
+def calc_inertia_tensor(weights, tensors):
+    """
+    Calculate the inertia tensor from the mass distribution `weights` (a 1D array) and the nematic tensors `tensors`
+    (a 3D array with the first dimension equal to the length of `weights`).
+    """
+    tens = np.dot(weights, tensors)
+    ew, ev = np.linalg.eig(tens)
+    if ew[1] >= ew[0]:
+        ev = ev[::-1]
+    if np.round(ew[1], 10) == np.round(ew[0], 10):  # if no anisotropy, choose random direction
+        ev[0] = [np.random.uniform(-1,1) for _ in ev[0]]
+        ev[0] = ev[0]/np.linalg.norm(ev[0])
+    guid_tens = np.outer(ev[0], ev[0]) - 0.5 * np.diag(np.ones(2))
+    return guid_tens, ev, ew
 
 class LGCA_base(ABC):
     """
-    Abstract base class for classical LGCA with volume exclusion. 
+    Abstract base class for classical LGCA with volume exclusion.
 
-    It holds all methods and attributes that are common for all geometries. 
-    Cannot simulate on its own. 
-    If you want to use it, instantiate one of the geometry-specific derived classes. 
+    It holds all methods and attributes that are common for all geometries.
+    Cannot simulate on its own.
+    If you want to use it, instantiate one of the geometry-specific derived classes.
 
     Parameters
     ----------
     bc : {'absorbing', 'reflecting', 'periodic', 'inflow'}, default='periodic'
-        Boundary conditions. Not all bc are supported in all geometries (yet). 
+        Boundary conditions. Not all bc are supported in all geometries (yet).
 
-        Aliases: absorbing: ``'absorb', 'abs', 'abc'``; reflecting: ``'reflect', 'refl', 'rbc'``; 
+        Aliases: absorbing: ``'absorb', 'abs', 'abc'``; reflecting: ``'reflect', 'refl', 'rbc'``;
         periodic: ``'pbc'``.
     density : float, default=0.1
         If `nodes` is None, initialize lattice randomly with this particle density.
     dims : tuple or int
-        Lattice dimensions. Must match with specified geometry. An integer for a 2D geometry is interpreted as 
+        Lattice dimensions. Must match with specified geometry. An integer for a 2D geometry is interpreted as
         ``(dims, dims)``.
     nodes : :py:class:`numpy.ndarray`
         Custom initial lattice configuration.
@@ -302,23 +316,23 @@ class LGCA_base(ABC):
         Function implementing the boundary conditions.
     c
     cell_density : :py:class:`numpy.ndarray`
-        Number of particles at each lattice node in the current LGCA state. Computed field. Dimensions: 
+        Number of particles at each lattice node in the current LGCA state. Computed field. Dimensions:
         :py:attr:`lgca.dims`.
     cij : :py:class:`numpy.ndarray`
-        Nematic tensor. Element-wise multiplication of neighborhood vectors with themselves. Computed from the geometry. 
-        Dimensions: 
-        ``(lgca.c.shape[1], lgca.c.shape[0], lgca.c.shape[0})``. First dimension: neighborhood vector, second and 
-        third dimension: combination of x and y components of the vector as 
-        ``[[cix*cix, cix*ciy], [ciy*cix, ciy*ciy]]``. 
+        Nematic tensor. Element-wise multiplication of neighborhood vectors with themselves. Computed from the geometry.
+        Dimensions:
+        ``(lgca.c.shape[1], lgca.c.shape[0], lgca.c.shape[0})``. First dimension: neighborhood vector, second and
+        third dimension: combination of x and y components of the vector as
+        ``[[cix*cix, cix*ciy], [ciy*cix, ciy*ciy]]``.
     concentration
         Internal variable for the chemotaxis interaction.
     dens_t : :py:class:`numpy.ndarray`
-        Number of particles at each lattice node for all timesteps in the previous simulation. 
-        Only available after a simulation performed with ``timeevo(recorddens=True)``. 
-        Dimensions: ``(timesteps,) + lgca.dims``. 
+        Number of particles at each lattice node for all timesteps in the previous simulation.
+        Only available after a simulation performed with ``timeevo(recorddens=True)``.
+        Dimensions: ``(timesteps,) + lgca.dims``.
     dims : tuple
-        Lattice dimensions/size of the lattice as ``(xdim,)`` (1D LGCA) or ``(xdim, ydim)`` (2D LGCA), 
-        excluding shadow nodes on the border. 
+        Lattice dimensions/size of the lattice as ``(xdim,)`` (1D LGCA) or ``(xdim, ydim)`` (2D LGCA),
+        excluding shadow nodes on the border.
     guiding_tensor
         Internal variable for the contact_guidance interaction.
     interaction : callable
@@ -331,35 +345,35 @@ class LGCA_base(ABC):
     n_crit
         Internal variable for the wetting interaction.
     n_t : :py:class:`numpy.ndarray`
-        Sum of particles in the lattice for all timesteps in the previous simulation. 
-        Only available after a simulation performed with ``timeevo(recordN=True)``. Dimensions: ``(timesteps,)``. 
+        Sum of particles in the lattice for all timesteps in the previous simulation.
+        Only available after a simulation performed with ``timeevo(recordN=True)``. Dimensions: ``(timesteps,)``.
     nodes : :py:class:`numpy.ndarray`
-        State of the lattice, configuration of all channels. Dimensions: ``(lgca.l + 2*lgca.r_int, lgca.K)`` 
-        (in 1D LGCA) or ``(lgca.lx + 2*lgca.r_int, lgca.ly + 2*lgca.r_int, lgca.K)``. Includes shadow nodes 
-        on all borders for implementing boundary conditions. 
+        State of the lattice, configuration of all channels. Dimensions: ``(lgca.l + 2*lgca.r_int, lgca.K)``
+        (in 1D LGCA) or ``(lgca.lx + 2*lgca.r_int, lgca.ly + 2*lgca.r_int, lgca.K)``. Includes shadow nodes
+        on all borders for implementing boundary conditions.
     nodes_t : :py:class:`numpy.ndarray`
-        Full lattice configuration of non-border nodes for all timesteps in the previous simulation. 
-        Only available after a simulation performed with ``timeevo(record=True)``. 
-        Dimensions: ``(timesteps,) + lgca.dims + (K,)``. 
+        Full lattice configuration of non-border nodes for all timesteps in the previous simulation.
+        Only available after a simulation performed with ``timeevo(record=True)``.
+        Dimensions: ``(timesteps,) + lgca.dims + (K,)``.
     nonborder : tuple of :py:class:`numpy.ndarray`
-        Indices of non-border nodes in the :py:attr:`lgca.nodes` array as ``(x-indices,)`` (in 1D LGCA) or 
-        ``(x-indices, y-indices)`` (in 2D LGCA), i.e. all nodes excluding shadow nodes for boundary conditions. 
-        Both arrays x-indices and y-indices have the dimensions :py:attr:`lgca.dims`. 
+        Indices of non-border nodes in the :py:attr:`lgca.nodes` array as ``(x-indices,)`` (in 1D LGCA) or
+        ``(x-indices, y-indices)`` (in 2D LGCA), i.e. all nodes excluding shadow nodes for boundary conditions.
+        Both arrays x-indices and y-indices have the dimensions :py:attr:`lgca.dims`.
     permutations : list of :py:class:`numpy.ndarray`
-        All possible configurations for a lattice site with :py:attr:`lgca.K` channels. Dimensions: 
-        ``(lgca.K + 1, n, lgca.K)``. n is the number of possible permutations for the 
-        node if x channels are occupied, where x is given by the first dimension. 
+        All possible configurations for a lattice site with :py:attr:`lgca.K` channels. Dimensions:
+        ``(lgca.K + 1, n, lgca.K)``. n is the number of possible permutations for the
+        node if x channels are occupied, where x is given by the first dimension.
     r_int : int, default=1
         Interaction radius. Must be at least 1 to handle propagation.
     restchannels : int
         Number of resting channels.
     si : list of :py:class:`numpy.ndarray`
-        Nematic tensor for all possible node configurations, obtained from :py:attr:`lgca.permutations` and 
-        :py:attr:`py.cij`. Dimensions: ``(lgca.K + 1, n, len(lgca.c), len(lgca.c))``. n is the number of possible 
-        permutations for the node if x channels are occupied, where x is given by the first dimension. 
+        Nematic tensor for all possible node configurations, obtained from :py:attr:`lgca.permutations` and
+        :py:attr:`py.cij`. Dimensions: ``(lgca.K + 1, n, len(lgca.c), len(lgca.c))``. n is the number of possible
+        permutations for the node if x channels are occupied, where x is given by the first dimension.
     velcells_t, restcells_t : :py:class:`numpy.ndarray`
-        Sum of particles in velocity/rest channels, respectively, for all timesteps in the previous simulation. 
-        Only available after a simulation performed with ``timeevo(recordpertype=True)``. 
+        Sum of particles in velocity/rest channels, respectively, for all timesteps in the previous simulation.
+        Only available after a simulation performed with ``timeevo(recordpertype=True)``.
         Dimensions: ``(timesteps,) + lgca.dims``.
     velocitychannels
 
@@ -391,17 +405,17 @@ class LGCA_base(ABC):
     @property
     @abstractmethod
     def c(self) -> np.ndarray:
-        """(Class attribute.) Array of the velocity channel vectors. Dimensions: ``(dims, lgca.velocitychannels)``, 
+        """(Class attribute.) Array of the velocity channel vectors. Dimensions: ``(dims, lgca.velocitychannels)``,
         where dims is 1 or 2 depending on the geometry."""
         ...
 
     @abstractmethod
     def set_dims(self, dims=None, nodes=None, restchannels=0):
         """
-        Set LGCA dimensions. In the implementation, set :py:attr:`self.K`, :py:attr:`self.restchannels` 
+        Set LGCA dimensions. In the implementation, set :py:attr:`self.K`, :py:attr:`self.restchannels`
         and :py:attr:`self.dims` to meaningful and consistent values.
 
-        Must match what is done in :py:meth:`init_coords` and :py:meth:`init_nodes`. 
+        Must match what is done in :py:meth:`init_coords` and :py:meth:`init_nodes`.
         For arguments and attribute types see :py:class:`lgca.base.LGCA_base`.
         """
         ...
@@ -409,11 +423,11 @@ class LGCA_base(ABC):
     @abstractmethod
     def init_coords(self):
         """
-        Initialize LGCA coordinates. These are used to index the lattice nodes. In the implementation, 
-        set :py:attr:`self.nonborder`, :py:attr:`self.xcoords`, :py:attr:`self.ycoords`, 
+        Initialize LGCA coordinates. These are used to index the lattice nodes. In the implementation,
+        set :py:attr:`self.nonborder`, :py:attr:`self.xcoords`, :py:attr:`self.ycoords`,
         and :py:attr:`self.coord_pairs` to meaningful and consistent values.
 
-        Must match what is done in :py:meth:`set_dims` and :py:meth:`init_nodes`. 
+        Must match what is done in :py:meth:`set_dims` and :py:meth:`init_nodes`.
         For the attribute types see :py:class:`lgca.base.LGCA_base`.
         """
         ...
@@ -421,10 +435,10 @@ class LGCA_base(ABC):
     @abstractmethod
     def init_nodes(self, density, nodes=None, **kwargs):
         """
-        Initialize LGCA lattice configuration. Create the lattice and then assign particles to 
+        Initialize LGCA lattice configuration. Create the lattice and then assign particles to
         channels in the nodes. In the implementation, set :py:attr:`self.nodes`.
 
-        Must match what is done in :py:meth:`set_dims` and :py:meth:`init_coords`. 
+        Must match what is done in :py:meth:`set_dims` and :py:meth:`init_coords`.
         For arguments and attribute types see :py:class:`lgca.base.LGCA_base`.
         """
         ...
@@ -437,29 +451,29 @@ class LGCA_base(ABC):
         Parameters
         ----------
         qty : :py:class:`numpy.ndarray`
-            Quantity to take the gradient of. Needs to have the same number of dimensions as :py:attr:`self.nodes`. 
+            Quantity to take the gradient of. Needs to have the same number of dimensions as :py:attr:`self.nodes`.
             If ``qty.shape == self.nodes.shape[:-1]`` the result can be indexed with the LGCA coordinates (see example).
 
         Returns
         -------
         :py:class:`numpy.ndarray`
-            Computed gradient. Dimensions: ``qty.shape + (len(self.c),)``. If ``self`` and ``qty`` are 2D arrays, 
-            ``gradient(qty)[...,0]`` is the gradient in x direction and ``gradient(qty)[...,1]`` the gradient in 
+            Computed gradient. Dimensions: ``qty.shape + (len(self.c),)``. If ``self`` and ``qty`` are 2D arrays,
+            ``gradient(qty)[...,0]`` is the gradient in x direction and ``gradient(qty)[...,1]`` the gradient in
             y direction.
 
         Notes
         -----
-        The gradient is calculated using :py:func:`numpy.gradient()` with stepwidth h=0.5 
-        (s.t. no normalization takes place). 
-        It is computed as the central finite difference with equidistant support points and supports one-sided 
+        The gradient is calculated using :py:func:`numpy.gradient()` with stepwidth h=0.5
+        (s.t. no normalization takes place).
+        It is computed as the central finite difference with equidistant support points and supports one-sided
         differences at the boundaries.
 
-        In most cases this yields the simple difference between the two closest array elements in the given direction. 
+        In most cases this yields the simple difference between the two closest array elements in the given direction.
         For example, the gradient at position 1 of ``np.array([1, 2, 4])`` would be (4 - 1)/(2 * 0.5) = 3.
 
         Examples
         --------
-        If the input quantity has the same x (and y) dimensions as the LGCA's nodes, the gradient at each node 
+        If the input quantity has the same x (and y) dimensions as the LGCA's nodes, the gradient at each node
         position can be accessed the same way as the node itself.
 
         >>> from lgca import get_lgca
@@ -484,14 +498,14 @@ class LGCA_base(ABC):
         >>>         print("Gradient at index", coord, "is ", grad[coord])
         >>>         print("Configuration at index ", coord, " is ", lgca.nodes[coord],
         >>>               ", with cell density ", lgca.cell_density[coord])
-        Gradient at index (1, 3) is  [3. 0.] 
-        Configuration at index  (1, 3)  is  [False False False  True] , with cell density  1 
+        Gradient at index (1, 3) is  [3. 0.]
+        Configuration at index  (1, 3)  is  [False False False  True] , with cell density  1
 
-        The first element of the gradient holds the gradient in x direction, the second element the gradient in 
-        y direction. Note that ``(1, 3)`` is the index corresponding to a logical non-border coordinate ``(0, 2)`` 
-        if the interaction radius is 1. This is relevant for defining a custom field qty: Only the field values at 
-        non-border indices will be "felt" by the particles in the LGCA if the interaction is defined accordingly, 
-        but border nodes can be used to specify the field's boundary conditions. 
+        The first element of the gradient holds the gradient in x direction, the second element the gradient in
+        y direction. Note that ``(1, 3)`` is the index corresponding to a logical non-border coordinate ``(0, 2)``
+        if the interaction radius is 1. This is relevant for defining a custom field qty: Only the field values at
+        non-border indices will be "felt" by the particles in the LGCA if the interaction is defined accordingly,
+        but border nodes can be used to specify the field's boundary conditions.
 
         The gradient in x direction is 3 = (3 - 0)/1. In y direction it is 0 = (1 - 1)/1.
 
@@ -503,7 +517,7 @@ class LGCA_base(ABC):
         """
         Perform the transport step of the LGCA: Move particles through the lattice according to their velocity.
 
-        Propagate the particles by updating :py:attr:`self.nodes`, respecting the geometry. 
+        Propagate the particles by updating :py:attr:`self.nodes`, respecting the geometry.
         Boundary conditions are enforced later by :py:meth:`apply_boundaries`.
         """
         ...
@@ -590,8 +604,8 @@ class LGCA_base(ABC):
         """
         Set the interaction rule and respective needed parameters.
 
-        Set :py:attr:`self.interaction` and possibly add entries in :py:attr:`self.interaction_params`. 
-        Do not use this to specify a custom interaction. In order to do this (as of now), :py:attr:`self.interaction` 
+        Set :py:attr:`self.interaction` and possibly add entries in :py:attr:`self.interaction_params`.
+        Do not use this to specify a custom interaction. In order to do this (as of now), :py:attr:`self.interaction`
         and :py:attr:`self.interaction_params` must be manipulated directly from an external script.
 
         Parameters
@@ -604,7 +618,7 @@ class LGCA_base(ABC):
         """
         from lgca.interactions import go_or_grow, go_or_rest, birth, alignment, persistent_walk, chemotaxis, \
                 contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium, \
-                only_propagation
+                only_propagation, maze_formation
         if 'interaction' in kwargs:
             interaction = kwargs['interaction']
             if interaction == 'go_or_grow':
@@ -725,6 +739,23 @@ class LGCA_base(ABC):
                 if self.velocitychannels < 4:
                     print('WARNING: NEMATIC INTERACTION UNDEFINED IN 1D!')
 
+            elif interaction == 'maze_formation':
+                self.interaction = maze_formation
+                self.calc_permutations()
+                if 'beta' in kwargs:
+                    self.interaction_params['beta'] = kwargs['beta']
+                else:
+                    self.interaction_params['beta'] = 2.
+                    print('sensitivity set to beta = ', self.interaction_params['beta'])
+                if 'ecm' in kwargs:
+                    self.ecm = kwargs['ecm']
+                else:
+                    self.ecm = np.random.uniform(0, 1,
+                                                 size=(self.lx + 2 * self.r_int, self.ly + 2 * self.r_int))
+                # self.guiding_tensor = calc_inertia_tensor(self.channel_weight(self.ecm), self.inertia)
+                if self.velocitychannels < 4:
+                    print('WARNING: MAZE FORMATION INTERACTION UNDEFINED IN 1D!')
+
             elif interaction == 'nematic':
                 self.interaction = nematic
                 self.calc_permutations()
@@ -779,6 +810,8 @@ class LGCA_base(ABC):
 
             elif interaction == 'birth':
                 self.interaction = birth
+                self.calc_permutations()
+
                 if 'r_b' in kwargs:
                     self.interaction_params['r_b'] = kwargs['r_b']
                 else:
@@ -836,16 +869,16 @@ class LGCA_base(ABC):
         """
         Set the boundary conditions.
 
-        Selects a method which is called every timestep to enforce boundary conditions. 
-        The methods to select from are implemented in the derived classes. The chosen one is assigned to 
+        Selects a method which is called every timestep to enforce boundary conditions.
+        The methods to select from are implemented in the derived classes. The chosen one is assigned to
         :py:meth:`self.apply_boundaries`.
 
         Parameters
         ----------
         bc : {'absorbing', 'reflecting', 'periodic', 'inflow'}
-            Boundary conditions. Not all bc are supported in all geometries (yet). 
+            Boundary conditions. Not all bc are supported in all geometries (yet).
 
-            Aliases: absorbing: ``'absorb', 'abs', 'abc'``; reflecting: ``'reflect', 'refl', 'rbc'``; 
+            Aliases: absorbing: ``'absorb', 'abs', 'abc'``; reflecting: ``'reflect', 'refl', 'rbc'``;
             periodic: ``'pbc'``.
 
         """
@@ -865,14 +898,14 @@ class LGCA_base(ABC):
         """
         Calculate the flux vector for all lattice sites in `nodes`.
 
-        The elements of the flux vectors are computed as the dot product between the LGCA's neighborhood vectors and 
+        The elements of the flux vectors are computed as the dot product between the LGCA's neighborhood vectors and
         the velocity channel configuration in `nodes`.
 
         Parameters
         ----------
         nodes : :py:class:`numpy.ndarray`
-            Lattice configuration to compute the flux for. Must have more than or the same number of 
-            dimensions as :py:attr:`self.nodes` and ``nodes.shape[-1] >= self.velocitychannels``. 
+            Lattice configuration to compute the flux for. Must have more than or the same number of
+            dimensions as :py:attr:`self.nodes` and ``nodes.shape[-1] >= self.velocitychannels``.
             Is typically :py:attr:`self.nodes`.
 
         Returns
@@ -896,16 +929,16 @@ class LGCA_base(ABC):
 
     def random_reset(self, density):
         """
-        Initialize lattice nodes with average density `density`. Channels are occupied at random and nodes can 
+        Initialize lattice nodes with average density `density`. Channels are occupied at random and nodes can
         have different particle numbers.
 
-        For each channel a random number is drawn. If it is lower than `density`, the channel is filled, 
+        For each channel a random number is drawn. If it is lower than `density`, the channel is filled,
         otherwise it stays empty.
 
         Parameters
         ----------
         density : float
-            Desired average particle density of the lattice. 
+            Desired average particle density of the lattice.
             ``density = total_number_of_particles / (number_of_nodes * number_of_channels_per_node)``.
 
         See Also
@@ -919,18 +952,18 @@ class LGCA_base(ABC):
 
     def homogeneous_random_reset(self, density):
         """
-        Initialize lattice nodes with average density `density`. Channels are occupied at random and all nodes 
+        Initialize lattice nodes with average density `density`. Channels are occupied at random and all nodes
         have the same particle number.
 
-        The particle number per node that matches `density` most closely is determined. The configuration for one 
+        The particle number per node that matches `density` most closely is determined. The configuration for one
         node with this number of particles is then permutated to fill the lattice.
 
 
         Parameters
         ----------
         density : float
-            Desired average density of the lattice. 
-            ``density = total_number_of_particles / (number_of_nodes * number_of_channels_per_node)``. 
+            Desired average density of the lattice.
+            ``density = total_number_of_particles / (number_of_nodes * number_of_channels_per_node)``.
             Here also: ``density = number_of_particles_per_node / number_of_channels_per_node``.
 
         See Also
@@ -978,7 +1011,7 @@ class LGCA_base(ABC):
         """
         Perform a simulation of the LGCA for `timesteps` timesteps.
 
-        Different quantities can be recorded during the simulation, e.g. the total number of particles at each 
+        Different quantities can be recorded during the simulation, e.g. the total number of particles at each
         timestep. They are stored in LGCA attributes.
 
         Parameters
@@ -992,7 +1025,7 @@ class LGCA_base(ABC):
         recordN : bool, default=False
             Record the total number of particles in the lattice for each timestep in :py:attr:`self.n_t`.
         recordpertype : bool, default=False
-            Record the number of particles in velocity channels/resting channels at each lattice site for 
+            Record the number of particles in velocity channels/resting channels at each lattice site for
             each timestep in :py:attr:`self.velcells_t` and :py:attr:`self.restcells_t`, respectively.
         showprogress : bool, default=True
             Show a simple progress bar with a percentage of performed timesteps in the standard output.
@@ -1027,12 +1060,13 @@ class LGCA_base(ABC):
 
     def calc_permutations(self):
         """
-        Precompute quantities that only depend on the geometry and lattice definition, but not on the current 
+        Precompute quantities that only depend on the geometry and lattice definition, but not on the current
         configuration, for reuse in interaction functions. This speeds up concerned interactions.
 
-        Currently computed quantities are a list of all possible node configurations (:py:attr:`self.permutations`), 
-        the flux for each possible node configuration (:py:attr:`self.j`), all nematic tensor possibilities 
-        (:py:attr:`self.cij`) and the nematic tensor for all possible node configurations (:py:attr:`self.si`).
+        Currently computed quantities are a list of all possible node configurations (:py:attr:`self.permutations`),
+        the flux for each possible node configuration (:py:attr:`self.j`), all nematic tensor possibilities
+        (:py:attr:`self.cij`), the nematic tensor for all possible node configurations (:py:attr:`self.si`), and
+        the inertia tensor contributions of masses in neighboring lattice sites.
 
         """
         # list of all possible configurations for a lattice site
@@ -1067,6 +1101,12 @@ class LGCA_base(ABC):
         # 2nd dim: permutation
         # 3rd dim and 4th dim: nematic tensor for each configuration
         # -> combination of x and y components of the result as [[xx, xy], [yx, yy]]
+        # inertia tensors of velocity channels (masses c away from central node)
+        c_squared = np.sum(self.c ** 2, axis=0)
+        temp = np.einsum('ij,ik->ijk', self.c.T, self.c.T)
+        self.inertia = np.einsum('ij,jkl', np.diag(c_squared), -temp)
+        # self.inertia = np.einsum('ij,jkl', self.c, self.c)
+        # np.array([[y1[i] ** 2, -x1[i] * y1[i]], [-x1[i] * y1[i], x1[i] ** 2]]))
 
     def total_population(self):
         """
