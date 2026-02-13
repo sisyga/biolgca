@@ -33,6 +33,24 @@ from tqdm.auto import tqdm
 # configure matplotlib style
 plt.style.use('default')
 
+# Public API
+__all__ = [
+    # Classes
+    'LGCA_base',
+    'IBLGCA_base',
+    'NoVE_LGCA_base',
+    'NoVE_IBLGCA_base',
+    # Functions
+    'colorbar_index',
+    'cmap_discretize',
+    'estimate_figsize',
+    'get_cmap',
+    'calc_nematic_tensor',
+    'get_arr_of_empty_lists',
+    # Re-exported modules
+    'np',
+]
+
 
 def colorbar_index(ncolors: int, cmap, use_gridspec: bool=False, cax=None):
     """

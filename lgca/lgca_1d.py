@@ -19,7 +19,9 @@ Supported LGCA types:
 import matplotlib.ticker as mticker
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from lgca.base import *
+from lgca.base import (LGCA_base, IBLGCA_base, NoVE_LGCA_base, NoVE_IBLGCA_base,
+                       colorbar_index, cmap_discretize, estimate_figsize, get_arr_of_empty_lists,
+                       np)
 
 
 class LGCA_1D(LGCA_base):

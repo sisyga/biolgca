@@ -29,7 +29,8 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import warnings
 from copy import copy
 
-from lgca.base import *
+from lgca.base import (LGCA_base, IBLGCA_base, NoVE_LGCA_base, NoVE_IBLGCA_base,
+                       estimate_figsize, get_cmap, get_arr_of_empty_lists)
 
 class LGCA_Square(LGCA_base):
     """

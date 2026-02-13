@@ -17,7 +17,7 @@ Supported LGCA types:
 - identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_Hex`)
 """
 
-from lgca.base import *
+from lgca.base import get_arr_of_empty_lists, np
 from lgca.lgca_square import LGCA_Square, IBLGCA_Square, NoVE_LGCA_Square, NoVE_IBLGCA_Square
 
 pi2 = 2 * np.pi
