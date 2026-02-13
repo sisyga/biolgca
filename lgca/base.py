@@ -543,8 +543,85 @@ class LGCA_base(ABC):
         """
         raise NotImplementedError("Inflow boundary conditions not yet implemented for class "+str(self.__class__)+".")
 
+    @classmethod
+    def _get_valid_kwargs(cls):
+        """
+        Get the set of valid keyword arguments for this LGCA class.
+        
+        Returns
+        -------
+        set
+            Set of valid keyword argument names.
+        """
+        # Common __init__ parameters (these are explicit params, not in **kwargs)
+        init_params = {'nodes', 'dims', 'restchannels', 'density', 'bc', 'seed'}
+        
+        # init_nodes parameters (forwarded kwargs)
+        init_nodes_params = {'hom'}  # used in NoVE variants
+        
+        # set_interaction parameters
+        interaction_params = {
+            'interaction',  # interaction type selector
+            # Rate parameters
+            'r_b', 'r_d', 'r_m', 'r_int',
+            # Switch/motion parameters
+            'kappa', 'theta', 'beta',
+            # Field/guidance parameters
+            'gradient', 'director', 'include_center',
+            # Wetting parameters
+            'alpha', 'gamma', 'rho_0',
+            # Excitable medium
+            'N',
+            # Mutation/identity-based parameters
+            'effect', 'fitness_increase', 'pmut', 'drb', 'a_max', 'track_inheritance',
+            # Standard deviations
+            'std', 'kappa_std', 'theta_std'
+        }
+        
+        # Combine all valid kwargs
+        return init_params | init_nodes_params | interaction_params
+    
+    @classmethod
+    def _validate_kwargs(cls, kwargs):
+        """
+        Validate that all provided kwargs are valid. Raise TypeError with helpful message if not.
+        
+        Parameters
+        ----------
+        kwargs : dict
+            Keyword arguments to validate.
+            
+        Raises
+        ------
+        TypeError
+            If any unknown keyword arguments are found.
+        """
+        import difflib
+        
+        valid_kwargs = cls._get_valid_kwargs()
+        unknown_kwargs = set(kwargs.keys()) - valid_kwargs
+        
+        if unknown_kwargs:
+            # Build helpful error message with suggestions
+            suggestions = {}
+            for unknown in unknown_kwargs:
+                matches = difflib.get_close_matches(unknown, valid_kwargs, n=1, cutoff=0.6)
+                if matches:
+                    suggestions[unknown] = matches[0]
+            
+            error_parts = [f"got unexpected keyword argument(s): {', '.join(repr(k) for k in unknown_kwargs)}"]
+            if suggestions:
+                suggestion_text = ', '.join(f"{repr(k)} (did you mean {repr(v)}?)" for k, v in suggestions.items())
+                error_parts.append(f"Did you mean: {suggestion_text}")
+            
+            raise TypeError(f"{cls.__name__}.__init__() {error_parts[0]}" + 
+                          (f"\n{error_parts[1]}" if len(error_parts) > 1 else ""))
+
     def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', seed=None, **kwargs):
         """ Initialize class instance. See class docstring."""
+        # Validate kwargs to catch typos early
+        self._validate_kwargs(kwargs)
+        
         self.r_int: int = 1  # Interaction radius. Must be at least 1 to handle propagation.
         self.rng = npr.default_rng(seed=seed)
         # set boundary conditions, set self.apply_boundaries
@@ -1185,6 +1262,9 @@ class IBLGCA_base(LGCA_base, ABC):
 
     def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', seed=None, **kwargs):
         """ Initialize class instance. See class docstring."""
+        # Validate kwargs to catch typos early
+        self._validate_kwargs(kwargs)
+        
         self.r_int = 1  # Interaction radius. Must be at least 1 to handle propagation.
         self.rng = npr.default_rng(seed=seed)
         # set boundary conditions, set self.apply_boundaries
@@ -2377,6 +2457,22 @@ class NoVE_LGCA_base(LGCA_base, ABC):
     """
     Base class for LGCA without volume exclusion.
     """
+    @classmethod
+    def _get_valid_kwargs(cls):
+        """
+        Get the set of valid keyword arguments for NoVE_LGCA class.
+        
+        Returns
+        -------
+        set
+            Set of valid keyword argument names.
+        """
+        # Get base class valid kwargs
+        valid = super()._get_valid_kwargs()
+        # Add NoVE-specific kwargs
+        valid.add('capacity')
+        return valid
+    
     def __init__(self, nodes=None, dims=None, restchannels=None, density=0.1, hom=None, bc='periodic', seed=None, capacity=None,
                  **kwargs):
         """
@@ -2388,6 +2484,8 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         :param bc: boundary conditions
         :param r_int: interaction range
         """
+        # Validate kwargs to catch typos early
+        self._validate_kwargs(kwargs)
 
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
         self.rng = npr.default_rng(seed=seed)
@@ -2710,6 +2808,9 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         :param r_int:
         :param kwargs:
         """
+        # Validate kwargs to catch typos early
+        self._validate_kwargs(kwargs)
+        
         self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
         self.rng = npr.default_rng(seed=seed)
         self.props = {}
