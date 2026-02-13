@@ -421,7 +421,6 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         cells = self.nodes.sum()
         if len(cells) == 0:
             self.maxlabel = None
-
         else:
             self.maxlabel = max(cells)
 
