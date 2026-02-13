@@ -559,6 +559,9 @@ class LGCA_base(ABC):
         # init_nodes parameters (forwarded kwargs)
         init_nodes_params = {'hom'}  # used in NoVE variants
         
+        # Parameters passed by get_lgca but may be unused
+        get_lgca_params = {'ve'}  # volume exclusion flag passed by get_lgca to some NoVE constructors
+        
         # set_interaction parameters
         interaction_params = {
             'interaction',  # interaction type selector
@@ -579,7 +582,7 @@ class LGCA_base(ABC):
         }
         
         # Combine all valid kwargs
-        return init_params | init_nodes_params | interaction_params
+        return init_params | init_nodes_params | get_lgca_params | interaction_params
     
     @classmethod
     def _validate_kwargs(cls, kwargs):
