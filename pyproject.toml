@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68.0", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "biolgca"
+version = "0.1.0"
+description = "A Python package for simulating lattice-gas cellular automata (LGCA) in biological contexts"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Simon Syga"},
+]
+keywords = ["LGCA", "lattice-gas", "cellular automata", "agent-based model", "mathematical biology", "cell migration"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
+dependencies = [
+    "numpy",
+    "scipy",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+plot = [
+    "matplotlib",
+    "mayavi",
+]
+dev = [
+    "pytest",
+    "ruff",
+    "sphinx",
+]
+
+[project.urls]
+Homepage = "https://github.com/sisyga/biolgca"
+Repository = "https://github.com/sisyga/biolgca"
+Documentation = "https://biolgca.readthedocs.io"
+Issues = "https://github.com/sisyga/biolgca/issues"
+
+[tool.setuptools.packages.find]
+include = ["lgca*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
