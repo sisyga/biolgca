@@ -415,14 +415,15 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                         raise ValueError("Number of families has increased, interaction must be included in the case " +
                                          "distinction for the recordfampop keyword in the IBLGCA base timeevo function!") from e
         if recordfampop and is_mutating:
-            self.straighten_family_populations()
+            self._straighten_family_populations()
 
     def calc_max_label(self):
         cells = self.nodes.sum()
         if len(cells) == 0:
             self.maxlabel = None
 
-        else: self.maxlabel = max(cells)
+        else:
+            self.maxlabel = max(cells)
 
     def get_prop(self, nodes=None, props=None, propname=None):
         """
