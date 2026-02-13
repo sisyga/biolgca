@@ -38,8 +38,10 @@ class TestKwargsValidation:
         """Test that multiple unknown kwargs are caught."""
         with pytest.raises(TypeError) as exc_info:
             get_lgca(densty=0.5, bcx='periodic')
-        # Should mention at least one of the typos
-        assert 'densty' in str(exc_info.value) or 'bcx' in str(exc_info.value)
+        # Should mention both typos
+        error_msg = str(exc_info.value)
+        assert 'densty' in error_msg
+        assert 'bcx' in error_msg
 
     def test_interaction_params_accepted(self):
         """Test that interaction-specific params are accepted."""

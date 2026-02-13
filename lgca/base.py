@@ -609,13 +609,13 @@ class LGCA_base(ABC):
                 if matches:
                     suggestions[unknown] = matches[0]
             
-            error_parts = [f"got unexpected keyword argument(s): {', '.join(repr(k) for k in unknown_kwargs)}"]
+            # Build error message
+            error_msg = f"{cls.__name__}.__init__() got unexpected keyword argument(s): {', '.join(repr(k) for k in unknown_kwargs)}"
             if suggestions:
                 suggestion_text = ', '.join(f"{repr(k)} (did you mean {repr(v)}?)" for k, v in suggestions.items())
-                error_parts.append(f"Did you mean: {suggestion_text}")
+                error_msg += f"\nDid you mean: {suggestion_text}"
             
-            raise TypeError(f"{cls.__name__}.__init__() {error_parts[0]}" + 
-                          (f"\n{error_parts[1]}" if len(error_parts) > 1 else ""))
+            raise TypeError(error_msg)
 
     def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1, bc='periodic', seed=None, **kwargs):
         """ Initialize class instance. See class docstring."""
