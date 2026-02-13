@@ -20,6 +20,9 @@ import matplotlib.ticker as mticker
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from lgca.base import *
+from lgca.ib_base import IBLGCA_base
+from lgca.nove_base import NoVE_LGCA_base, get_arr_of_empty_lists
+from lgca.nove_ib_base import NoVE_IBLGCA_base
 
 
 class LGCA_1D(LGCA_base):
@@ -535,7 +538,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
     Identity-based LGCA with volume exclusion on a 1D lattice.
 
     It holds all methods and attributes that are specific for a linear geometry. See :py:class:`lgca.base.LGCA_base`
-    and :py:class:`lgca.base.IBLGCA_base` for the documentation of inherited attributes.
+    and :py:class:`lgca.ib_base.IBLGCA_base` for the documentation of inherited attributes.
 
     Attributes
     ----------
@@ -547,7 +550,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
     See Also
     --------
     lgca.base.LGCA_base : Base class for LGCA with volume exclusion with geometry-independent methods and attributes.
-    lgca.base.IBLGCA_base : Base class for IBLGCA with volume exclusion with geometry-independent methods and attributes.
+    lgca.ib_base.IBLGCA_base : Base class for IBLGCA with volume exclusion with geometry-independent methods and attributes.
 
     """
     interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath', 'birthdeath_discrete', 'only_propagation', 'go_and_grow_mutations']

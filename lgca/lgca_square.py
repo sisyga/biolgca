@@ -30,6 +30,9 @@ import warnings
 from copy import copy
 
 from lgca.base import *
+from lgca.ib_base import IBLGCA_base
+from lgca.nove_base import NoVE_LGCA_base, get_arr_of_empty_lists
+from lgca.nove_ib_base import NoVE_IBLGCA_base
 
 class LGCA_Square(LGCA_base):
     """

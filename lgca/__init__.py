@@ -71,15 +71,15 @@ def get_lgca(geometry: str='hex', ib: bool=False, ve: bool=True, **kwargs):
         - :py:class:`lgca.lgca_1d.LGCA_1D`
         - :py:class:`lgca.lgca_square.LGCA_Square`
         - :py:class:`lgca.lgca_hex.LGCA_Hex`
-    - :py:class:`lgca.base.IBLGCA_base`: identity-based LGCA
+    - :py:class:`lgca.ib_base.IBLGCA_base`: identity-based LGCA
         - :py:class:`lgca.lgca_1d.IBLGCA_1D`
         - :py:class:`lgca.lgca_square.IBLGCA_Square`
         - :py:class:`lgca.lgca_hex.IBLGCA_Hex`
-    - :py:class:`lgca.base.NoVE_LGCA_base`: classical LGCA without volume exclusion
+    - :py:class:`lgca.nove_base.NoVE_LGCA_base`: classical LGCA without volume exclusion
         - :py:class:`lgca.lgca_1d.NoVE_LGCA_1D`
         - :py:class:`lgca.lgca_square.NoVE_LGCA_Square`
         - :py:class:`lgca.lgca_hex.NoVE_LGCA_Hex`
-    - :py:class:`lgca.base.NoVE_IBLGCA_base`: identity-based LGCA without volume exclusion
+    - :py:class:`lgca.nove_ib_base.NoVE_IBLGCA_base`: identity-based LGCA without volume exclusion
         - :py:class:`lgca.lgca_1d.NoVE_IBLGCA_1D`
         - :py:class:`lgca.lgca_square.NoVE_IBLGCA_Square`
         - :py:class:`lgca.lgca_hex.NoVE_IBLGCA_Hex`
