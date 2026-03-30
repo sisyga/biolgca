@@ -738,7 +738,7 @@ class IBLGCA_base(LGCA_base, ABC):
         cells_alive = self.nodes[self.nonborder][
             np.where(self.nodes[self.nonborder] > 0)]  # indices of live cells # nonborder needed for uniqueness
         cell_fam = np.array(self.props['family'])  # convert for indexing
-        cell_fam_alive = cell_fam[cells_alive.astype(np.int)]  # filter family array for families of live cells
+        cell_fam_alive = cell_fam[cells_alive.astype(int)]  # filter family array for families of live cells
         fam_alive, fam_pop = np.unique(cell_fam_alive, return_counts=True)  # count number of cells for each family
         # transform into array with population entry for all families that ever existed
         fam_pop_array = np.zeros(self.maxfamily+1, dtype=int)
@@ -1061,7 +1061,7 @@ class IBLGCA_base(LGCA_base, ABC):
         cells_alive = self.nodes[self.nonborder][
             np.where(self.nodes[self.nonborder] > 0)]  # indices of live cells # nonborder needed for uniqueness
         cell_fam = np.array(self.props['family'])  # convert for indexing
-        cell_fam_alive = cell_fam[cells_alive.astype(np.int)]  # filter family array for families of live cells
+        cell_fam_alive = cell_fam[cells_alive.astype(int)]  # filter family array for families of live cells
         return np.unique(cell_fam_alive)  # remove duplicate entries
 
     def calc_family_generations(self):
@@ -2228,6 +2228,6 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         """
         cells_alive = np.array(self.nodes[self.nonborder].sum(-1))  # indices of live cells # nonborder needed for uniqueness
         cell_fam = np.array(self.props['family'])  # convert for indexing
-        cell_fam_alive = cell_fam[cells_alive.astype(np.int)]  # filter family array for families of live cells
+        cell_fam_alive = cell_fam[cells_alive.astype(int)]  # filter family array for families of live cells
         return np.unique(cell_fam_alive) # remove duplicate entries
 
