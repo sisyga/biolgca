@@ -1,9 +1,11 @@
 import random
+import inspect
 
 import numpy as np
 import pytest
 
 from lgca import get_lgca
+import lgca.nove_ib_interactions as nove_ib_interactions
 
 
 def test_geometry_modules_do_not_use_base_wildcard_imports():
@@ -341,3 +343,52 @@ def test_nove_ib_recorded_nodes_do_not_alias_live_lists():
     assert recorded is not live
     live.append(99)
     assert recorded == [0]
+
+
+@pytest.mark.parametrize(
+    "function_name",
+    [
+        "random_walk",
+        "evo_steric",
+        "birth",
+        "birthdeath",
+        "birthdeath_cancerdfe",
+        "go_or_grow",
+        "go_or_grow_kappa",
+        "go_or_grow_kappa_chemo",
+    ],
+)
+def test_nove_ib_hot_paths_avoid_deepcopy_and_list_sum(function_name):
+    source = inspect.getsource(getattr(nove_ib_interactions, function_name))
+
+    assert "deepcopy(" not in source
+    assert "node.sum()" not in source
+
+
+def test_nove_ib_go_or_grow_batches_property_array_growth(monkeypatch):
+    nodes = _nove_ib_nodes(length=20)
+    concatenate_calls = 0
+    original_concatenate = nove_ib_interactions.np.concatenate
+    lgca = get_lgca(
+        geometry="lin",
+        ib=True,
+        ve=False,
+        nodes=nodes,
+        interaction="go_or_grow",
+        seed=1,
+        r_b=1.0,
+        r_d=0.0,
+        capacity=1_000_000,
+        kappa=100.0,
+        theta=-1.0,
+    )
+
+    def counting_concatenate(*args, **kwargs):
+        nonlocal concatenate_calls
+        concatenate_calls += 1
+        return original_concatenate(*args, **kwargs)
+
+    monkeypatch.setattr(nove_ib_interactions.np, "concatenate", counting_concatenate)
+    lgca.interaction(lgca)
+
+    assert concatenate_calls <= 2

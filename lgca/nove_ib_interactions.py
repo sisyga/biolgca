@@ -7,10 +7,22 @@ Interaction functions and helper functions for identity-based LGCA without volum
 """
 
 # from random import random, shuffle, randrange
+from itertools import chain
+
 import numpy as np
 from scipy.stats import truncnorm
-from copy import deepcopy
 from lgca.interactions import tanh_switch
+
+
+def _cells_from_node(node):
+    """Return a flat list of cell ids from all channels in a node."""
+    return list(chain.from_iterable(node))
+
+
+def _split_cells_into_channels(cells, channeldist):
+    """Split a shuffled cell list at cumulative channel counts."""
+    return [cells[:channeldist[0]]] + [cells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
+
 
 def trunc_gauss(lower, upper, mu, sigma=.1, size=1, rng=None):
     """Draw samples from a truncated normal distribution.
@@ -61,13 +73,12 @@ def random_walk(lgca):
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
         node = lgca.nodes[coord]
-        cells = node.sum()
+        cells = _cells_from_node(node)
 
         channeldist = lgca.rng.multinomial(len(cells), [1. / lgca.K] * lgca.K).cumsum()
         lgca.rng.shuffle(cells)
-        newnode = [cells[:channeldist[0]]] + [cells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
 
-        lgca.nodes[coord] = deepcopy(newnode)
+        lgca.nodes[coord] = _split_cells_into_channels(cells, channeldist)
 
 
 def evo_steric(lgca):
@@ -96,10 +107,9 @@ def evo_steric(lgca):
     channelprobs = np.exp(channelweights)
     channelprobs /= np.sum(channelprobs, axis=-1)[..., None]
     for coord in zip(*coords):
-        node = deepcopy(lgca.nodes[coord])
         density = lgca.cell_density[coord]
         rho = density / lgca.interaction_params['capacity']
-        cells = node.sum()
+        cells = _cells_from_node(lgca.nodes[coord])
         newcells = cells.copy()
         for cell in cells:
             if lgca.rng.random() < lgca.interaction_params['r_d']:
@@ -128,9 +138,8 @@ def evo_steric(lgca):
         channelprob = channelprobs[coord]
         channeldist = lgca.rng.multinomial(len(newcells), channelprob).cumsum()
         lgca.rng.shuffle(newcells)
-        newnode = [newcells[:channeldist[0]]] + [newcells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
 
-        lgca.nodes[coord] = deepcopy(newnode)
+        lgca.nodes[coord] = _split_cells_into_channels(newcells, channeldist)
 
 
 def birth(lgca):
@@ -152,10 +161,9 @@ def birth(lgca):
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
-        node = deepcopy(lgca.nodes[coord])
         density = lgca.cell_density[coord]
         rho = density / lgca.interaction_params['capacity']
-        cells = node.sum()
+        cells = _cells_from_node(lgca.nodes[coord])
         newcells = cells.copy()
         for cell in cells:
             r_b = lgca.props['r_b'][cell]
@@ -169,9 +177,8 @@ def birth(lgca):
         # channeldist = lgca.rng.multinomial(len(newcells), [1. / lgca.K] * lgca.K).cumsum()
         channeldist = lgca.rng.multinomial(len(newcells), lgca.channel_weights).cumsum()
         lgca.rng.shuffle(newcells)
-        newnode = [newcells[:channeldist[0]]] + [newcells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
 
-        lgca.nodes[coord] = deepcopy(newnode)
+        lgca.nodes[coord] = _split_cells_into_channels(newcells, channeldist)
 
 
 def birthdeath(lgca):
@@ -194,10 +201,9 @@ def birthdeath(lgca):
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
-        node = deepcopy(lgca.nodes[coord])
         density = lgca.cell_density[coord]
         rho = density / lgca.interaction_params['capacity']
-        cells = node.sum()
+        cells = _cells_from_node(lgca.nodes[coord])
         newcells = cells.copy()
         for cell in cells:
             if lgca.rng.random() < lgca.interaction_params['r_d']:
@@ -214,9 +220,8 @@ def birthdeath(lgca):
         # channeldist = lgca.rng.multinomial(len(newcells), [1. / lgca.K] * lgca.K).cumsum()
         channeldist = lgca.rng.multinomial(len(newcells), lgca.channel_weights).cumsum()
         lgca.rng.shuffle(newcells)
-        newnode = [newcells[:channeldist[0]]] + [newcells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
 
-        lgca.nodes[coord] = deepcopy(newnode)
+        lgca.nodes[coord] = _split_cells_into_channels(newcells, channeldist)
 
 def birthdeath_cancerdfe(lgca):
     """Birth--death step with driver and passenger mutations.
@@ -238,10 +243,9 @@ def birthdeath_cancerdfe(lgca):
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
-        node = deepcopy(lgca.nodes[coord])
         density = lgca.cell_density[coord]
         rho = density / lgca.interaction_params['capacity']
-        cells = node.sum()
+        cells = _cells_from_node(lgca.nodes[coord])
         newcells = cells.copy()
         for cell in cells:
             if lgca.rng.random() < lgca.interaction_params['r_d']:
@@ -265,9 +269,8 @@ def birthdeath_cancerdfe(lgca):
         # channeldist = lgca.rng.multinomial(len(newcells), [1. / lgca.K] * lgca.K).cumsum()
         channeldist = lgca.rng.multinomial(len(newcells), lgca.channel_weights).cumsum()
         lgca.rng.shuffle(newcells)
-        newnode = [newcells[:channeldist[0]]] + [newcells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
 
-        lgca.nodes[coord] = deepcopy(newnode)
+        lgca.nodes[coord] = _split_cells_into_channels(newcells, channeldist)
 
 
 def go_or_grow(lgca):
@@ -290,11 +293,13 @@ def go_or_grow(lgca):
     """
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
+    new_kappa_chunks = []
+    new_theta_chunks = []
     for coord in zip(*coords):
         node = lgca.nodes[coord]
         density = lgca.cell_density[coord]
         rho = density / lgca.interaction_params['capacity']
-        cells = np.array(node.sum())
+        cells = np.asarray(_cells_from_node(node), dtype=int)
         # R1: cell death
         notkilled = lgca.rng.random(size=density) < 1. - lgca.interaction_params['r_d']
         cells = cells[notkilled]
@@ -313,15 +318,21 @@ def go_or_grow(lgca):
             proliferating = lgca.rng.choice(restcells, size=n_prolif, replace=False, shuffle=False)
             lgca.maxlabel += n_prolif
             new_cells = np.arange(lgca.maxlabel - n_prolif + 1, lgca.maxlabel + 1)
-            lgca.props['kappa'] = np.concatenate((lgca.props['kappa'],
-                                                  lgca.rng.normal(loc=lgca.props['kappa'][proliferating],
-                                                             scale=lgca.interaction_params['kappa_std'])))
+            new_kappa_chunks.append(
+                lgca.rng.normal(
+                    loc=lgca.props['kappa'][proliferating],
+                    scale=lgca.interaction_params['kappa_std'],
+                )
+            )
             # lgca.props['theta'] = np.concatenate((lgca.props['theta'],
             #                                       trunc_gauss(0, 1, mu=lgca.props['theta'][proliferating],
             #                                                   sigma=lgca.interaction_params['theta_std'])))
-            lgca.props['theta'] = np.concatenate((lgca.props['theta'],
-                                                  lgca.rng.normal(loc=lgca.props['theta'][proliferating],
-                                                            scale=lgca.interaction_params['theta_std'])))
+            new_theta_chunks.append(
+                lgca.rng.normal(
+                    loc=lgca.props['theta'][proliferating],
+                    scale=lgca.interaction_params['theta_std'],
+                )
+            )
             restcells.extend(list(new_cells))
 
         node = [[] for _ in range(lgca.velocitychannels)]
@@ -330,6 +341,9 @@ def go_or_grow(lgca):
             node[lgca.rng.integers(lgca.velocitychannels)].append(cell)
 
         lgca.nodes[coord] = node
+    if new_kappa_chunks:
+        lgca.props['kappa'] = np.concatenate((lgca.props['kappa'], *new_kappa_chunks))
+        lgca.props['theta'] = np.concatenate((lgca.props['theta'], *new_theta_chunks))
 
 def go_or_grow_kappa(lgca):
     """``Go-or-grow`` interaction using neighbourhood density.
@@ -352,13 +366,14 @@ def go_or_grow_kappa(lgca):
     coords = [a[relevant] for a in lgca.nonborder]
     # Calculate the average density in the neighborhood
     nbdensity = lgca.nb_sum(lgca.cell_density, addCenter=True) / ((lgca.velocitychannels+1) * lgca.interaction_params['capacity']) # average density in neighborhood
+    new_kappa_chunks = []
     for coord in zip(*coords):
         node = lgca.nodes[coord]
         density = lgca.cell_density[coord]
         nbdens = nbdensity[coord]
         # rho = density / lgca.interaction_params['capacity']
         # Get the list of cells at the current node
-        cells = np.array(node.sum())
+        cells = np.asarray(_cells_from_node(node), dtype=int)
         # R1: cell death
         # Determine which cells survive
         notkilled = lgca.rng.random(size=density) < 1. - lgca.interaction_params['r_d']
@@ -382,9 +397,12 @@ def go_or_grow_kappa(lgca):
             lgca.maxlabel += n_prolif
             new_cells = np.arange(lgca.maxlabel - n_prolif + 1, lgca.maxlabel + 1)
             # Update the kappa properties of the new cells
-            lgca.props['kappa'] = np.concatenate((lgca.props['kappa'],
-                                                  lgca.rng.normal(loc=lgca.props['kappa'][proliferating],
-                                                             scale=lgca.interaction_params['kappa_std'])))
+            new_kappa_chunks.append(
+                lgca.rng.normal(
+                    loc=lgca.props['kappa'][proliferating],
+                    scale=lgca.interaction_params['kappa_std'],
+                )
+            )
             # Add the new cells to the list of resting cells
             restcells.extend(list(new_cells))
 
@@ -396,7 +414,9 @@ def go_or_grow_kappa(lgca):
             node[lgca.rng.integers(lgca.velocitychannels)].append(cell)
 
         # Update the node in the lgca object
-        lgca.nodes[coord] = deepcopy(node)
+        lgca.nodes[coord] = node
+    if new_kappa_chunks:
+        lgca.props['kappa'] = np.concatenate((lgca.props['kappa'], *new_kappa_chunks))
 
 
 def tanh_switch(rho, kappa=5.0, theta=0.8):
@@ -439,12 +459,13 @@ def go_or_grow_kappa_chemo(lgca):
     coords = [a[relevant] for a in lgca.nonborder]
     g = lgca.gradient(lgca.cell_density / lgca.interaction_params['capacity'])  # density gradient for each lattice site
     nbdensity = lgca.nb_sum(lgca.cell_density, addCenter=True) / (lgca.velocitychannels * lgca.interaction_params['capacity']) # density of neighbors
+    new_kappa_chunks = []
     for coord in zip(*coords):
         node = lgca.nodes[coord]
         density = lgca.cell_density[coord]
         nbdens = nbdensity[coord]
         rho = density / lgca.interaction_params['capacity']
-        cells = np.array(node.sum())
+        cells = np.asarray(_cells_from_node(node), dtype=int)
         # R1: cell death
         notkilled = lgca.rng.random(size=density) < 1. - lgca.interaction_params['r_d']
         cells = cells[notkilled]
@@ -462,9 +483,12 @@ def go_or_grow_kappa_chemo(lgca):
             proliferating = lgca.rng.choice(restcells, n_prolif, replace=False)
             lgca.maxlabel += n_prolif
             new_cells = np.arange(lgca.maxlabel - n_prolif + 1, lgca.maxlabel + 1)
-            lgca.props['kappa'] = np.concatenate((lgca.props['kappa'],
-                                                  lgca.rng.normal(loc=lgca.props['kappa'][proliferating],
-                                                             scale=lgca.interaction_params['kappa_std'])))
+            new_kappa_chunks.append(
+                lgca.rng.normal(
+                    loc=lgca.props['kappa'][proliferating],
+                    scale=lgca.interaction_params['kappa_std'],
+                )
+            )
             restcells.extend(list(new_cells))
 
         node = [[] for _ in range(lgca.velocitychannels)]
@@ -491,3 +515,5 @@ def go_or_grow_kappa_chemo(lgca):
                 velcells = velcells[sample[i]:]
 
         lgca.nodes[coord] = node
+    if new_kappa_chunks:
+        lgca.props['kappa'] = np.concatenate((lgca.props['kappa'], *new_kappa_chunks))
