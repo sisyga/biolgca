@@ -6,11 +6,10 @@
 """
 
 
-from lgca.base import *
+from lgca.base import LGCA_base, _MissingPlotLib, np
 try:  # optional plotting dependency
     from mayavi import mlab
 except ImportError:  # pragma: no cover - handled at runtime
-    from lgca.base import _MissingPlotLib
     mlab = _MissingPlotLib("mayavi")
 
 

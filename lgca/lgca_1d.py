@@ -22,7 +22,19 @@ except ImportError:  # pragma: no cover - handled at runtime
     from lgca.base import _MissingPlotLib
     mticker = make_axes_locatable = _MissingPlotLib("matplotlib")
 
-from lgca.base import *
+from lgca.base import (
+    IBLGCA_base,
+    LGCA_base,
+    NoVE_IBLGCA_base,
+    NoVE_LGCA_base,
+    cm,
+    colorbar_index,
+    colors,
+    cmap_discretize,
+    estimate_figsize,
+    np,
+    plt,
+)
 from lgca.base_extensions import get_arr_of_empty_lists
 
 
@@ -47,7 +59,7 @@ class LGCA_1D(LGCA_base):
     """
     # set class attributes
     geometry = 'lin'
-    interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation', 'parameter_controlled_diffusion',
+    interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation',
                     'random_walk', 'persistent_motion', 'birthdeath', 'only_propagation']
     velocitychannels = 2
     c = np.array([1., -1.])[None, ...] #directions of velocity channels; shape: (1,2)

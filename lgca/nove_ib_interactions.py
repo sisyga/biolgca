@@ -8,11 +8,11 @@ Interaction functions and helper functions for identity-based LGCA without volum
 
 # from random import random, shuffle, randrange
 import numpy as np
-from scipy.stats import truncnorm, truncexpon, expon
+from scipy.stats import truncnorm
 from copy import deepcopy
 from lgca.interactions import tanh_switch
 
-def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
+def trunc_gauss(lower, upper, mu, sigma=.1, size=1, rng=None):
     """Draw samples from a truncated normal distribution.
 
     Parameters
@@ -37,7 +37,7 @@ def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
     """
     a = (lower - mu) / sigma
     b = (upper - mu) / sigma
-    vals = truncnorm(a, b, loc=mu, scale=sigma).rvs(size)
+    vals = truncnorm(a, b, loc=mu, scale=sigma).rvs(size, random_state=rng)
     if size != 1:
         return vals
     else:
@@ -90,17 +90,17 @@ def evo_steric(lgca):
     """
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
+    velchannelweights = -lgca.interaction_params['alpha'] * lgca.channel_weight(lgca.cell_density)
+    channelweights = np.append(velchannelweights, np.full(lgca.cell_density.shape,
+                                                          lgca.interaction_params['gamma'])[..., None], axis=-1)
+    channelprobs = np.exp(channelweights)
+    channelprobs /= np.sum(channelprobs, axis=-1)[..., None]
     for coord in zip(*coords):
         node = deepcopy(lgca.nodes[coord])
         density = lgca.cell_density[coord]
         rho = density / lgca.interaction_params['capacity']
         cells = node.sum()
         newcells = cells.copy()
-        velchannelweights = -lgca.interaction_params['alpha'] * lgca.channel_weight(lgca.cell_density)
-        channelweights = np.append(velchannelweights, np.full(lgca.cell_density.shape,
-                                                              lgca.interaction_params['gamma'])[..., None], axis=-1)
-        channelprobs = np.exp(channelweights)
-        channelprobs /= np.sum(channelprobs, axis=-1)[..., None]
         for cell in cells:
             if lgca.rng.random() < lgca.interaction_params['r_d']:
                 newcells.remove(cell)
@@ -163,7 +163,8 @@ def birth(lgca):
                 lgca.maxlabel += 1
                 newcells.append(lgca.maxlabel)
                 lgca.props['r_b'].append(float(trunc_gauss(0, lgca.interaction_params['a_max'], r_b,
-                                                           sigma=lgca.interaction_params['std'])))
+                                                           sigma=lgca.interaction_params['std'],
+                                                           rng=lgca.rng)))
 
         # channeldist = lgca.rng.multinomial(len(newcells), [1. / lgca.K] * lgca.K).cumsum()
         channeldist = lgca.rng.multinomial(len(newcells), lgca.channel_weights).cumsum()
@@ -207,7 +208,8 @@ def birthdeath(lgca):
                 lgca.maxlabel += 1
                 newcells.append(lgca.maxlabel)
                 lgca.props['r_b'].append(float(trunc_gauss(0, lgca.interaction_params['a_max'], r_b,
-                                                           sigma=lgca.interaction_params['std'])))
+                                                           sigma=lgca.interaction_params['std'],
+                                                           rng=lgca.rng)))
 
         # channeldist = lgca.rng.multinomial(len(newcells), [1. / lgca.K] * lgca.K).cumsum()
         channeldist = lgca.rng.multinomial(len(newcells), lgca.channel_weights).cumsum()
@@ -252,13 +254,10 @@ def birthdeath_cancerdfe(lgca):
                 passenger = 0.
                 driver = 0.
                 if lgca.rng.random() < lgca.interaction_params['p_p']:
-                    passenger = float(expon.rvs(scale=lgca.interaction_params['s_p']))
-                    # lgca.props['r_b'].append(max(0., r_b-float(expon.rvs(scale=lgca.interaction_params['s_p']))))
+                    passenger = float(lgca.rng.exponential(scale=lgca.interaction_params['s_p']))
 
                 if lgca.rng.random() < lgca.interaction_params['p_d']:
-                    driver = float(expon.rvs(scale=lgca.interaction_params['s_d']))
-                    # lgca.props['r_b'].append(r_b+float(truncexpon.rvs(lgca.interaction_params['a_max']-r_b,
-                    #                                                   scale=lgca.interaction_params['s_d'])))
+                    driver = float(lgca.rng.exponential(scale=lgca.interaction_params['s_d']))
 
                 lgca.props['r_b'].append(min(r_b - passenger + driver, lgca.interaction_params['a_max']))
 

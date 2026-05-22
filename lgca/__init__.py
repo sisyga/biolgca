@@ -25,8 +25,67 @@ PLoS Comput Biol 17(6): e1009066. https://doi.org/10.1371/journal.pcbi.1009066
 
 """
 
+import difflib
 import warnings
 from typing import Tuple, Any
+
+
+_VALID_KWARGS = {
+    "N",
+    "a_max",
+    "alpha",
+    "bc",
+    "beta",
+    "capacity",
+    "density",
+    "dims",
+    "director",
+    "drb",
+    "effect",
+    "fitness_increase",
+    "gamma",
+    "gradient",
+    "include_center",
+    "interaction",
+    "kappa",
+    "kappa_std",
+    "nodes",
+    "p_d",
+    "p_p",
+    "pmut",
+    "propagation",
+    "r_b",
+    "r_d",
+    "r_int",
+    "r_m",
+    "restchannels",
+    "rho_0",
+    "s_d",
+    "s_p",
+    "seed",
+    "std",
+    "theta",
+    "theta_std",
+    "track_inheritance",
+}
+
+
+def _validate_kwargs(kwargs):
+    """Raise on unknown factory kwargs and suggest likely typos."""
+    unknown = sorted(set(kwargs) - _VALID_KWARGS)
+    if not unknown:
+        return
+
+    details = []
+    for key in unknown:
+        matches = difflib.get_close_matches(key, _VALID_KWARGS, n=1)
+        if matches:
+            details.append(f"{key!r} (did you mean {matches[0]!r}?)")
+        else:
+            details.append(repr(key))
+    raise TypeError(
+        "get_lgca() got unexpected keyword argument(s): " + ", ".join(details)
+    )
 
 
 def _translate_dims(dims: Any, geom_key: str) -> Tuple[int, ...]:
@@ -189,6 +248,8 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
     Progress: [####################] 100% Done...
 
     """
+    _validate_kwargs(kwargs)
+
     nodes = kwargs.get('nodes')
     rest_arg = kwargs.get('restchannels')
     dims_arg = kwargs.get('dims')
@@ -210,7 +271,8 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
         'moore3d': 'moore',
     }
 
-    geom_key = geom_map.get(geometry, geometry)
+    geom_spec = geometry.lower() if isinstance(geometry, str) else geometry
+    geom_key = geom_map.get(geom_spec, geom_spec)
 
     if not ve and not ib:
         if geom_key == 'lin':

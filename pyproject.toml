@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "biolgca"
+version = "0.1.0"
+description = "Biological lattice-gas cellular automata simulation tools"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "BSD-3-Clause"
+license-files = ["LICENSE.txt"]
+authors = [
+    { name = "Simon Syga", email = "simon.syga@tu-dresden.de" },
+    { name = "Bianca Guettner", email = "bianca.guettner@nct-dresden.de" },
+]
+keywords = ["cellular automata", "lattice gas", "biological modelling", "simulation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "numpy",
+    "scipy",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8",
+]
+docs = [
+    "Sphinx",
+    "sphinx-autodoc-typehints",
+    "alabaster",
+    "numpydoc",
+]
+plot2d = [
+    "matplotlib",
+]
+plot3d = [
+    "mayavi",
+]
+plotting = [
+    "matplotlib",
+    "mayavi",
+]
+dev = [
+    "pytest>=8",
+    "Sphinx",
+    "sphinx-autodoc-typehints",
+    "alabaster",
+    "numpydoc",
+    "matplotlib",
+    "build",
+]
+
+[project.urls]
+Homepage = "https://github.com/sisyga/biolgca"
+Issues = "https://github.com/sisyga/biolgca/issues"
+Documentation = "https://sisyga.github.io/biolgca/"
+
+[tool.setuptools]
+packages = ["lgca"]

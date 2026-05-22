@@ -13,6 +13,13 @@ from lgca.cubic_ext import (
 )
 
 
+_empty_list_array = np.frompyfunc(list, 0, 1)
+
+
+def _get_arr_of_empty_lists(shape):
+    return _empty_list_array(np.empty(shape, dtype=object))
+
+
 class LGCA_3dMoore(LGCA_Cubic):
     """Classical LGCA on a 3D Moore lattice."""
 
@@ -128,6 +135,20 @@ class NoVE_LGCA_Moore(NoVE_LGCA_Cubic, LGCA_3dMoore):
 
 class NoVE_IBLGCA_Moore(NoVE_IBLGCA_Cubic, LGCA_3dMoore):
     """Identity-based 3D Moore LGCA without volume exclusion."""
+
+    def propagation(self):
+        """Move object-list particles through all 26 Moore velocity channels."""
+        newnodes = _get_arr_of_empty_lists(self.nodes.shape)
+        newnodes[..., self.velocitychannels :] = self.nodes[..., self.velocitychannels :]
+        for k, (dx, dy, dz) in enumerate(self._vels):
+            src_x = slice(max(-dx, 0), self.nodes.shape[0] - max(dx, 0))
+            dst_x = slice(max(dx, 0), self.nodes.shape[0] - max(-dx, 0))
+            src_y = slice(max(-dy, 0), self.nodes.shape[1] - max(dy, 0))
+            dst_y = slice(max(dy, 0), self.nodes.shape[1] - max(-dy, 0))
+            src_z = slice(max(-dz, 0), self.nodes.shape[2] - max(dz, 0))
+            dst_z = slice(max(dz, 0), self.nodes.shape[2] - max(-dz, 0))
+            newnodes[dst_x, dst_y, dst_z, k] = self.nodes[src_x, src_y, src_z, k]
+        self.nodes = newnodes
 
     def _apply_rbc_x(self):
         for i, (dx, _, _) in enumerate(self._vels):

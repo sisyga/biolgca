@@ -38,7 +38,7 @@ except ImportError:  # pragma: no cover - handled at runtime
 import warnings
 from copy import copy
 
-from lgca.base import *
+from lgca.base import IBLGCA_base, LGCA_base, NoVE_IBLGCA_base, NoVE_LGCA_base
 
 from .square_plotting import SquarePlotMixin
 class LGCA_Square(SquarePlotMixin, LGCA_base):

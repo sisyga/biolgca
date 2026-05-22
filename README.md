@@ -116,28 +116,28 @@ lgca.plot_prop_spatial(propname='r_b')  # plot on the right
 
 # Getting started
 #### Dependencies
-`biolgca` depends only on `numpy` for running simulations. To enable plotting
-features, install the optional dependencies:
+`biolgca` depends on `numpy`, `scipy`, and `tqdm` for running simulations.
+To enable plotting features, install the optional plotting extras:
 ```bash
-pip install -r plotting-requirements.txt
+pip install -e ".[plot2d]"
 ```
-(On Windows, a terminal that understands `pip` out of the box can be opened in Anaconda in the 
-"Environments" tab, clicking on the triangle next to the environment's name.)
 
-If you want to add code to the package, in order to run tests and build documentation you should also install:
+For 3D Mayavi plotting support, install:
 ```bash
-pip install -r documentation_requirements.txt pytest==6.2.5
+pip install -e ".[plot3d]"
 ```
 
 #### Installation
-`biolgca` does not have a package distribution yet. To use it, clone (or unzip the download of) 
-the master branch of the repository into a folder of your choice.
+Clone the repository and install it into your active Python environment:
+```bash
+git clone https://github.com/sisyga/biolgca.git
+cd biolgca
+pip install -e .
+```
 
-If your scripts are not going to be in the `biolgca` folder, add the following to
-the beginning of the Python files:
-```python
-import sys
-sys.path.insert(1, "/absolute/path/to/folder/biolgca")
+For development, install test and documentation dependencies:
+```bash
+pip install -e ".[test,docs]"
 ```
 
 #### Use

@@ -54,6 +54,88 @@ from lgca.plots import muller_plot, colorbar_index, cmap_discretize, estimate_fi
 # plt.style.use('default')
 
 
+def _as_numeric_array(value, name):
+    """Return a numeric array for validation and raise a clear error otherwise."""
+    try:
+        arr = np.asarray(value, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be numeric.") from exc
+    if arr.size == 0 or not np.all(np.isfinite(arr)):
+        raise ValueError(f"{name} must contain finite numeric values.")
+    return arr
+
+
+def _validate_positive_int(value, name):
+    """Validate a positive integer parameter and return it as ``int``."""
+    if isinstance(value, bool):
+        raise ValueError(f"{name} must be a positive integer.")
+    try:
+        int_value = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be a positive integer.") from exc
+    if int_value != value or int_value < 1:
+        raise ValueError(f"{name} must be a positive integer.")
+    return int_value
+
+
+def _validate_nonnegative_int(value, name):
+    """Validate a non-negative integer parameter and return it as ``int``."""
+    if isinstance(value, bool):
+        raise ValueError(f"{name} must be a non-negative integer.")
+    try:
+        int_value = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be a non-negative integer.") from exc
+    if int_value != value or int_value < 0:
+        raise ValueError(f"{name} must be a non-negative integer.")
+    return int_value
+
+
+def _validate_probability(value, name):
+    """Validate scalar or vector probabilities."""
+    arr = _as_numeric_array(value, name)
+    if np.any((arr < 0) | (arr > 1)):
+        raise ValueError(f"{name} must be between 0 and 1.")
+    return value
+
+
+def _validate_nonnegative(value, name):
+    """Validate scalar or vector non-negative finite values."""
+    arr = _as_numeric_array(value, name)
+    if np.any(arr < 0):
+        raise ValueError(f"{name} must be non-negative.")
+    return value
+
+
+def _validate_positive(value, name):
+    """Validate scalar or vector positive finite values."""
+    arr = _as_numeric_array(value, name)
+    if np.any(arr <= 0):
+        raise ValueError(f"{name} must be positive.")
+    return value
+
+
+def _validate_density(density, max_density=None):
+    """Validate random-initialization density before it is used as a probability or rate."""
+    arr = _as_numeric_array(density, "density")
+    if arr.shape != ():
+        raise ValueError("density must be a scalar.")
+    density_value = float(arr)
+    if density_value < 0:
+        raise ValueError("density must be non-negative.")
+    if max_density is not None and density_value > max_density:
+        raise ValueError(f"density must not exceed the available channel count ({max_density}).")
+    return density
+
+
+def _validate_vector_field_shape(field, expected_shape, name):
+    """Validate user-supplied vector fields used by chemotaxis/contact guidance."""
+    arr = np.asarray(field)
+    if arr.shape != expected_shape:
+        raise ValueError(f"{name} must have shape {expected_shape}; got {arr.shape}.")
+    return arr
+
+
 
 def calc_nematic_tensor(v):
     """
@@ -395,14 +477,18 @@ class LGCA_base(ABC):
                  bc='periodic', seed=None, propagation=True, **kwargs):
         """Initialize class instance. See class docstring."""
         self.enable_propagation = propagation
-        self.r_int: int = 1  # Interaction radius. Must be at least 1 to handle propagation.
+        self.r_int: int = _validate_positive_int(kwargs.pop("r_int", 1), "r_int")
         self.rng = npr.default_rng(seed=seed)
         # set boundary conditions, set self.apply_boundaries
         self.set_bc(bc)
 
         # initialize lattice
         # define self.K, self.restchannels, self.dims, self.l or self.lx and self.ly
+        restchannels = _validate_nonnegative_int(restchannels, "restchannels")
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
+        self._validate_model_setup(nodes=nodes)
+        if nodes is None:
+            _validate_density(density, max_density=self.K)
         # define self.nonborder, self.xcoords, (self.ycoords), self.coord_pairs
         self.init_coords()
         # define self.init_nodes
@@ -416,6 +502,37 @@ class LGCA_base(ABC):
         self.interaction_params = {}
         # define self.interaction and potentially self.permutations, self.j, self.cij, self.si
         self.set_interaction(**kwargs)
+
+    def _validate_model_setup(self, nodes=None):
+        """Validate dimensions and channel metadata after geometry-specific setup."""
+        dims = getattr(self, "dims", None)
+        if dims is None:
+            raise ValueError("dims must be specified by the geometry setup.")
+        for dim in dims:
+            _validate_positive_int(dim, "dims")
+        self.restchannels = _validate_nonnegative_int(self.restchannels, "restchannels")
+        self.K = _validate_positive_int(self.K, "channels")
+        if self.K < self.velocitychannels:
+            raise ValueError(
+                f"channels must be at least the velocity channel count ({self.velocitychannels})."
+            )
+        if hasattr(self, "capacity"):
+            _validate_positive(self.capacity, "capacity")
+        if nodes is not None:
+            self._warn_nodes_shape(nodes)
+
+    def _validate_interaction_params(self):
+        """Validate common interaction parameters that represent probabilities or positive scales."""
+        probability_params = {"r_b", "r_d", "r_m", "p_d", "p_p", "pmut"}
+        nonnegative_params = {"std", "kappa_std", "theta_std", "drb", "s_d", "s_p"}
+        positive_params = {"a_max", "capacity"}
+
+        for name in probability_params & self.interaction_params.keys():
+            _validate_probability(self.interaction_params[name], name)
+        for name in nonnegative_params & self.interaction_params.keys():
+            _validate_nonnegative(self.interaction_params[name], name)
+        for name in positive_params & self.interaction_params.keys():
+            _validate_positive(self.interaction_params[name], name)
 
     def set_r_int(self, r):
         """
@@ -431,9 +548,11 @@ class LGCA_base(ABC):
             New interaction radius.
 
         """
+        r = _validate_positive_int(r, "r_int")
+        old_nodes = deepcopy(self.nodes[self.nonborder])
         self.r_int = r
-        self.init_nodes(nodes=self.nodes[self.nonborder])
         self.init_coords()
+        self.init_nodes(density=0, nodes=old_nodes)
         self.update_dynamic_fields()
 
     def set_interaction(self, **kwargs):
@@ -536,7 +655,11 @@ class LGCA_base(ABC):
                     print('sensitivity set to beta = ', self.interaction_params['beta'])
 
                 if 'gradient' in kwargs:
-                    self.interaction_params['gradient_field'] = kwargs['gradient']
+                    self.interaction_params['gradient_field'] = _validate_vector_field_shape(
+                        kwargs['gradient'],
+                        self.nodes.shape[:-1] + (self.c.shape[0],),
+                        "gradient",
+                    )
                 else:
                     if len(self.dims) == 2:
                         x_source = self.xcoords.mean()
@@ -569,6 +692,8 @@ class LGCA_base(ABC):
 
 
             elif interaction == 'contact_guidance':
+                if len(self.dims) != 2:
+                    raise ValueError("contact_guidance is not supported for this geometry.")
                 self.interaction = contact_guidance
                 self.calc_permutations()
 
@@ -579,12 +704,16 @@ class LGCA_base(ABC):
                     print('sensitivity set to beta = ', self.interaction_params['beta'])
 
                 if 'director' in kwargs:
-                    self.interaction_params['gradient_field'] = kwargs['director']
+                    self.interaction_params['gradient_field'] = _validate_vector_field_shape(
+                        kwargs['director'],
+                        self.nodes.shape[:-1] + (2,),
+                        "director",
+                    )
                 else:
                     self.interaction_params['gradient_field'] = np.zeros((self.lx + 2 * self.r_int,
                                                                           self.ly + 2 * self.r_int, 2))
                     self.interaction_params['gradient_field'][..., 0] = 1
-                    self.guiding_tensor = calc_nematic_tensor(self.interaction_params['gradient_field'])
+                self.guiding_tensor = calc_nematic_tensor(self.interaction_params['gradient_field'])
                 if self.velocitychannels < 4:
                     print('WARNING: NEMATIC INTERACTION UNDEFINED IN 1D!')
 
@@ -687,13 +816,16 @@ class LGCA_base(ABC):
                 self.interaction = only_propagation
 
             else:
-                print('interaction', kwargs['interaction'], 'is not defined! Random walk used instead.')
-                print('Implemented interactions:', self.interactions)
-                self.interaction = random_walk
+                raise ValueError(
+                    "Unknown interaction {!r}. Implemented interactions: {}".format(
+                        kwargs["interaction"], self.interactions
+                    )
+                )
 
         else:
             print('Random walk interaction is used.')
             self.interaction = random_walk
+        self._validate_interaction_params()
 
     def set_bc(self, bc):
         """
@@ -725,9 +857,9 @@ class LGCA_base(ABC):
             self.apply_boundaries = self.apply_inflowbc
             self.bc = 'inflow'
         else:
-            print(bc, 'not defined, using periodic boundaries')
-            self.apply_boundaries = self.apply_pbc
-            self.bc = 'periodic'
+            raise ValueError(
+                "Unknown boundary condition {!r}. Use one of: absorbing, reflecting, periodic, inflow.".format(bc)
+            )
 
     def calc_flux(self, nodes):
         """
@@ -773,6 +905,7 @@ class LGCA_base(ABC):
             Desired average number of particles per node.
             ``density = total_number_of_particles / number_of_nodes``.
         """
+        _validate_density(density, max_density=self.K)
         self.nodes = self.rng.random(self.nodes.shape) < (density / self.K)
         self.apply_boundaries()
         self.update_dynamic_fields()
@@ -959,4 +1092,18 @@ class LGCA_base(ABC):
 
 
 from .base_extensions import IBLGCA_base, NoVE_LGCA_base, NoVE_IBLGCA_base
+
+__all__ = [
+    "LGCA_base",
+    "IBLGCA_base",
+    "NoVE_LGCA_base",
+    "NoVE_IBLGCA_base",
+    "calc_nematic_tensor",
+    "colorbar_index",
+    "cmap_discretize",
+    "estimate_figsize",
+    "get_cmap",
+    "muller_plot",
+    "np",
+]
 

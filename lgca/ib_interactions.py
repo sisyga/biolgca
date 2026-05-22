@@ -6,9 +6,7 @@
 Interaction functions and helper functions for identity-based LGCA with volume exclusion.
 """
 
-from random import choices
 import numpy as np
-from numpy import random as npr
 from scipy.stats import truncnorm
 
 from lgca.interactions import tanh_switch
@@ -29,7 +27,7 @@ def random_walk(lgca):
     lgca.nodes = lgca.rng.permuted(lgca.nodes, axis=-1)
 
 
-def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
+def trunc_gauss(lower, upper, mu, sigma=.1, size=1, rng=None):
     """Draw samples from a truncated normal distribution.
 
     Parameters
@@ -52,7 +50,7 @@ def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
     """
     a = (lower - mu) / sigma
     b = (upper - mu) / sigma
-    vals = truncnorm(a, b, loc=mu, scale=sigma).rvs(size)
+    vals = truncnorm(a, b, loc=mu, scale=sigma).rvs(size, random_state=rng)
     if size != 1:
         return vals
     return float(np.asarray(vals).item())
@@ -91,7 +89,8 @@ def birth(lgca):
                 node[ind] = lgca.maxlabel
                 r_b = lgca.props['r_b'][label]
                 lgca.props['r_b'].append(float(trunc_gauss(0, lgca.interaction_params['a_max'], r_b,
-                                                           sigma=lgca.interaction_params['std'])))
+                                                           sigma=lgca.interaction_params['std'],
+                                                           rng=lgca.rng)))
 
         lgca.nodes[coord] = node
     random_walk(lgca)
@@ -142,7 +141,8 @@ def birthdeath(lgca):
                 r_b = lgca.props['r_b'][label]
                 if lgca.interaction_params['std'] > 0:
                     lgca.props['r_b'].append(float(trunc_gauss(0, lgca.interaction_params['a_max'], r_b,
-                                                               sigma=lgca.interaction_params['std'])))
+                                                               sigma=lgca.interaction_params['std'],
+                                                               rng=lgca.rng)))
                 else:
                     lgca.props['r_b'].append(r_b)
                 if lgca.interaction_params['track_inheritance']:
@@ -197,15 +197,18 @@ def birthdeath_discrete(lgca):
                 node[ind] = lgca.maxlabel
                 r_b = lgca.props['r_b'][label]
                 if r_b < lgca.interaction_params['a_max']:
-                    lgca.props['r_b'].append(choices((r_b-lgca.interaction_params['drb'],
-                                                      r_b+lgca.interaction_params['drb'], r_b),
-                                                     weights=(lgca.interaction_params['pmut']/2,
-                                                              lgca.interaction_params['pmut']/2,
-                                                              1-lgca.interaction_params['pmut']))[0])
+                    lgca.props['r_b'].append(lgca.rng.choice(
+                        (r_b - lgca.interaction_params['drb'], r_b + lgca.interaction_params['drb'], r_b),
+                        p=(lgca.interaction_params['pmut'] / 2,
+                           lgca.interaction_params['pmut'] / 2,
+                           1 - lgca.interaction_params['pmut']),
+                    ))
                 else:
-                    lgca.props['r_b'].append(choices((r_b-lgca.interaction_params['drb'], r_b),
-                                                     weights=(lgca.interaction_params['pmut']/2,
-                                                              1-lgca.interaction_params['pmut']/2))[0])
+                    lgca.props['r_b'].append(lgca.rng.choice(
+                        (r_b - lgca.interaction_params['drb'], r_b),
+                        p=(lgca.interaction_params['pmut'] / 2,
+                           1 - lgca.interaction_params['pmut'] / 2),
+                    ))
 
         lgca.nodes[coord] = node
 

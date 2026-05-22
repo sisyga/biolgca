@@ -17,7 +17,13 @@ import numpy as np
 from numpy import random as npr
 from tqdm.auto import tqdm
 
-from .base import LGCA_base
+from .base import (
+    LGCA_base,
+    _validate_density,
+    _validate_nonnegative_int,
+    _validate_positive,
+    _validate_positive_int,
+)
 from .plots import muller_plot
 
 
@@ -142,14 +148,18 @@ class IBLGCA_base(LGCA_base, ABC):
                  bc='periodic', seed=None, propagation=True, **kwargs):
         """Initialize class instance. See class docstring."""
         self.enable_propagation = propagation
-        self.r_int = 1  # Interaction radius. Must be at least 1 to handle propagation.
+        self.r_int = _validate_positive_int(kwargs.pop("r_int", 1), "r_int")
         self.rng = npr.default_rng(seed=seed)
         # set boundary conditions, set self.apply_boundaries
         self.set_bc(bc)
 
         # initialize lattice
         # define self.K, self.restchannels, self.dims, self.l or self.lx and self.ly
+        restchannels = _validate_nonnegative_int(restchannels, "restchannels")
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
+        self._validate_model_setup(nodes=nodes)
+        if nodes is None:
+            _validate_density(density, max_density=self.K)
         # define self.nonborder, self.xcoords, (self.ycoords), self.coord_pairs
         self.init_coords()
         # define self.init_nodes
@@ -361,10 +371,14 @@ class IBLGCA_base(LGCA_base, ABC):
                         print('fitness increase for driver mutations set to ',
                               self.interaction_params['fitness_increase'])
             else:
-                print('keyword', interaction, 'is not defined! Random walk used instead.')
-                self.interaction = random_walk
+                raise ValueError(
+                    "Unknown interaction {!r}. Implemented interactions: {}".format(
+                        kwargs["interaction"], self.interactions
+                    )
+                )
         else:
             self.interaction = random_walk
+        self._validate_interaction_params()
 
     def update_dynamic_fields(self):
         """
@@ -408,6 +422,7 @@ class IBLGCA_base(LGCA_base, ABC):
             Desired average number of particles per node.
             ``density = total_number_of_particles / number_of_nodes``.
         """
+        _validate_density(density, max_density=self.K)
         occupied = self.rng.random(self.dims + (self.K,)) < (density / self.K)
         self.nodes[self.nonborder] = self.convert_bool_to_ib(occupied)
         self.apply_boundaries()
@@ -738,7 +753,7 @@ class IBLGCA_base(LGCA_base, ABC):
         cells_alive = self.nodes[self.nonborder][
             np.where(self.nodes[self.nonborder] > 0)]  # indices of live cells # nonborder needed for uniqueness
         cell_fam = np.array(self.props['family'])  # convert for indexing
-        cell_fam_alive = cell_fam[cells_alive.astype(np.int)]  # filter family array for families of live cells
+        cell_fam_alive = cell_fam[cells_alive.astype(int)]  # filter family array for families of live cells
         fam_alive, fam_pop = np.unique(cell_fam_alive, return_counts=True)  # count number of cells for each family
         # transform into array with population entry for all families that ever existed
         fam_pop_array = np.zeros(self.maxfamily+1, dtype=int)
@@ -1061,7 +1076,7 @@ class IBLGCA_base(LGCA_base, ABC):
         cells_alive = self.nodes[self.nonborder][
             np.where(self.nodes[self.nonborder] > 0)]  # indices of live cells # nonborder needed for uniqueness
         cell_fam = np.array(self.props['family'])  # convert for indexing
-        cell_fam_alive = cell_fam[cells_alive.astype(np.int)]  # filter family array for families of live cells
+        cell_fam_alive = cell_fam[cells_alive.astype(int)]  # filter family array for families of live cells
         return np.unique(cell_fam_alive)  # remove duplicate entries
 
     def calc_family_generations(self):
@@ -1346,10 +1361,14 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         """
 
         self.enable_propagation = propagation
-        self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
+        self.r_int = _validate_positive_int(kwargs.pop("r_int", 1), "r_int")
         self.rng = npr.default_rng(seed=seed)
         self.set_bc(bc)
+        restchannels = _validate_nonnegative_int(restchannels, "restchannels")
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes, capacity=capacity)
+        self._validate_model_setup(nodes=nodes)
+        if nodes is None:
+            _validate_density(density)
         self.init_coords()
         self.init_nodes(density=density, nodes=nodes)
         self.update_dynamic_fields()
@@ -1445,22 +1464,11 @@ class NoVE_LGCA_base(LGCA_base, ABC):
                 self.interaction = only_propagation
 
             else:
-                print('interaction', kwargs['interaction'], 'is not defined! Density-dependent alignment '
-                                                            'interaction used instead.')
-                print('Implemented interactions:', self.interactions)
-                self.interaction = dd_alignment
-
-                if 'beta' in kwargs:
-                    self.interaction_params['beta'] = kwargs['beta']
-                else:
-                    self.interaction_params['beta'] = 2.
-                    print('sensitivity set to beta = ', self.interaction_params['beta'])
-
-                if 'include_center' in kwargs:
-                    self.interaction_params['nb_include_center'] = kwargs['include_center']
-                else:
-                    self.interaction_params['nb_include_center'] = False
-                    print('neighbourhood set to exclude the central node')
+                raise ValueError(
+                    "Unknown interaction {!r}. Implemented interactions: {}".format(
+                        kwargs["interaction"], self.interactions
+                    )
+                )
 
         # if nothing is specified, use density-dependent interaction rule
         else:
@@ -1481,6 +1489,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
             else:
                 self.interaction_params['nb_include_center'] = False
                 print('neighbourhood set to exclude the central node')
+        self._validate_interaction_params()
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True,
                 recordorderparams=False, recordpertype=False):
@@ -1528,7 +1537,8 @@ class NoVE_LGCA_base(LGCA_base, ABC):
     def random_reset(self, density):
         """Populate the lattice from a Poisson distribution with mean ``density`` per node."""
 
-        density = abs(density) / self.capacity
+        _validate_density(density)
+        density = density / self.capacity
         draw1 = self.rng.poisson(lam=density, size=self.nodes.shape)
         if self.capacity > self.K:
             draw2 = self.rng.poisson(lam=density, size=self.nodes.shape[:-1] + ((self.capacity - self.K),))
@@ -1626,6 +1636,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
 # create a numpy universal function (ufunc) of the python function 'list'. Can be used to create an numpy array of
 # empty lists if applied to an empty array
 ufunclist = np.frompyfunc(list, 0, 1)
+_copylist = np.frompyfunc(list, 1, 1)
 
 def get_arr_of_empty_lists(dims):
     """
@@ -1641,6 +1652,11 @@ def get_arr_of_empty_lists(dims):
 
     """
     return ufunclist(np.empty(dims, dtype=object))
+
+
+def _copy_arr_of_lists(arr):
+    """Copy each list stored in an object array."""
+    return _copylist(arr)
 
 
 class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
@@ -1663,17 +1679,21 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         :param propagation: execute propagation step during a timestep
         """
         self.enable_propagation = propagation
-        self.r_int = 1  # interaction range; must be at least 1 to handle propagation.
+        self.r_int = _validate_positive_int(kwargs.pop("r_int", 1), "r_int")
         self.rng = npr.default_rng(seed=seed)
         self.props = {}
         self.length_checker = lambda arr: np.fromiter((len(x) for x in arr.flat), dtype=np.uint,
                                                       count=arr.size).reshape(arr.shape)
         self.set_bc(bc)
         self.interaction_params = {}
+        restchannels = _validate_nonnegative_int(restchannels, "restchannels")
         if restchannels != 1:
             restchannels = 1
             warnings.warn("There can only be one rest channel in this LGCA class. Setting to 1 to prevent issues")
-        self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
+        self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes, capacity=kwargs.get("capacity"))
+        self._validate_model_setup(nodes=nodes)
+        if nodes is None:
+            _validate_density(density)
         self.init_coords()
         self.init_nodes(density, nodes=nodes)
         self.calc_max_label()
@@ -1705,7 +1725,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
 
     def random_reset(self, density):
         """Populate the lattice from a Poisson distribution with mean ``density`` per node."""
-        lam = abs(density) / self.capacity
+        _validate_density(density)
+        lam = density / self.capacity
         numbers = self.rng.poisson(lam=lam, size=self.dims + (self.K,))
         tempnodes = self.convert_int_to_ib(numbers)
         self.nodes[self.nonborder] = tempnodes
@@ -1973,20 +1994,23 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                     print('fitness increase for driver mutations set to ',
                           self.interaction_params['fitness_increase'])
             else:
-                print('interaction', kwargs['interaction'], 'is not defined! Random walk used instead.')
-                print('Implemented interactions:', self.interactions)
-                self.interaction = random_walk
+                raise ValueError(
+                    "Unknown interaction {!r}. Implemented interactions: {}".format(
+                        kwargs["interaction"], self.interactions
+                    )
+                )
 
         else:
             print('Random walk interaction is used.')
             self.interaction = random_walk
+        self._validate_interaction_params()
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, recordchanneldens=False,
                 showprogress=True, recordfampop=False):
         self.update_dynamic_fields()
         if record:
             self.nodes_t = get_arr_of_empty_lists((timesteps +1,) + self.dims + (self.K,))
-            self.nodes_t[0, ...] = copy(self.nodes[self.nonborder])
+            self.nodes_t[0, ...] = _copy_arr_of_lists(self.nodes[self.nonborder])
         if recordN:
             self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
             self.n_t[0] = self.cell_density[self.nonborder].sum()
@@ -2015,7 +2039,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         for t in tqdm(iterable=range(1, timesteps + 1), disable=1-showprogress):
             self.timestep()
             if record:
-                self.nodes_t[t, ...] = copy(self.nodes[self.nonborder])
+                self.nodes_t[t, ...] = _copy_arr_of_lists(self.nodes[self.nonborder])
             if recordN:
                 self.n_t[t] = self.cell_density[self.nonborder].sum()
             if recorddens:
@@ -2037,7 +2061,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     def calc_max_label(self):
         cells = self.nodes.sum()
         if len(cells) == 0:
-            self.maxlabel = None
+            self.maxlabel = 0
 
         else: self.maxlabel = max(cells)
 
@@ -2228,6 +2252,6 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         """
         cells_alive = np.array(self.nodes[self.nonborder].sum(-1))  # indices of live cells # nonborder needed for uniqueness
         cell_fam = np.array(self.props['family'])  # convert for indexing
-        cell_fam_alive = cell_fam[cells_alive.astype(np.int)]  # filter family array for families of live cells
+        cell_fam_alive = cell_fam[cells_alive.astype(int)]  # filter family array for families of live cells
         return np.unique(cell_fam_alive) # remove duplicate entries
 
