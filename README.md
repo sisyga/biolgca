@@ -1,4 +1,6 @@
 # Welcome to biolgca!
+[![CI](https://github.com/sisyga/biolgca/actions/workflows/ci.yml/badge.svg)](https://github.com/sisyga/biolgca/actions/workflows/ci.yml)
+
 `biolgca` is a Python package for simulating different types of **lattice-gas 
 cellular automata (LGCA)** in the biological context.
 
@@ -21,10 +23,10 @@ currently supported are:
 - classical LGCA without volume exclusion (all particles/cells have the same properties)
 - identity-based LGCA without volume exclusion (particles/cells can have individual properties)
 
-These can be simulated in a 1D, 2D square or 2D hexagonal lattice. A [library of 
-interaction rules](./lgca/interactions.py) (documentation under construction) is already implemented. Adding a custom 
-interaction rule or customising other parts of the simulation (e.g. the interaction 
-radius) is easy.
+These can be simulated in 1D, 2D square, 2D hexagonal, **3D cubic**, and **3D Moore** lattices.
+Classical multi-species LGCA are available by passing `n_species > 1`.
+A [library of interaction rules](docs/source/interactions_summary.rst) is already implemented.
+Adding a custom interaction rule or customising other parts of the simulation (e.g. the interaction radius) is easy.
 
 Current analysis possibilities include plots of:
 - density (+ animation)
@@ -35,6 +37,27 @@ Current analysis possibilities include plots of:
 - vector field
 
 The internal state of the LGCA is always accessible for computational analysis.
+
+# Quick Start
+Clone the repository and install the package into your active Python environment:
+```bash
+git clone https://github.com/sisyga/biolgca.git
+cd biolgca
+python -m pip install -e .
+```
+Run a short simulation to verify the setup:
+```python
+from lgca import get_lgca
+lgca = get_lgca()
+lgca.timeevo(timesteps=10)
+```
+
+# Table of Contents
+- [Example usage](#example-usage)
+- [Getting started](#getting-started)
+- [Running tests and building docs](#running-tests-and-building-docs)
+- [Questions/Contribute](#questionscontribute)
+- [License](#license)
 
 # Example usage
 #### Timestepping and flux plot
@@ -62,8 +85,7 @@ lgca = get_lgca(interaction='excitable_medium', restchannels=20, N=20, bc='refl'
 # initialise a custom lattice configuration
 lgca.nodes[...] = 0
 lgca.nodes[:lgca.lx // 2, :, :lgca.velocitychannels] = 1  # 6 moving particles per node in the left half of the lattice
-lgca.nodes[:, :lgca.ly // 2,
-lgca.velocitychannels:] = 1  # 6 resting particles per node in the lower half of the lattice
+lgca.nodes[:, :lgca.ly // 2, lgca.velocitychannels:] = 1  # 6 resting particles per node in the lower half of the lattice
 # view a live simulation: density profile of the velocity channels only
 lgca.live_animate_density(channels=slice(0, lgca.velocitychannels), vmax=lgca.velocitychannels)
 # the following image results from stopping the simulation after k=87 timesteps
@@ -94,28 +116,23 @@ lgca.plot_prop_spatial(propname='r_b')  # plot on the right
 
 # Getting started
 #### Dependencies
-`biolgca` heavily depends on `numpy` and `matplotlib`. To install all dependencies 
-for using the package, run this from a command line:
-```python
-pip install matplotlib==3.3.2 numpy scipy sympy
+`biolgca` depends on `numpy`, `scipy`, and `tqdm` for running simulations.
+To enable plotting features, install the optional plotting extras:
+```bash
+python -m pip install -e ".[plot]"
 ```
-(On Windows, a terminal that understands `pip` out of the box can be opened in Anaconda in the 
-"Environments" tab, clicking on the triangle next to the environment's name.)
 
-If you want to add code to the package, in order to run tests and build documentation you should also install:
-```python
-pip install pytest==6.2.5 Sphinx==4.4.0 sphinx-autodoc-typehints alabaster numpydoc
+For development, install test, lint, and documentation dependencies:
+```bash
+python -m pip install -e ".[dev]"
 ```
 
 #### Installation
-`biolgca` does not have a package distribution yet. To use it, clone (or unzip the download of) 
-the master branch of the repository into a folder of your choice.
-
-If your scripts are not going to be in the `biolgca` folder, add the following to
-the beginning of the Python files:
-```python
-import sys
-sys.path.insert(1, "/absolute/path/to/folder/biolgca")
+Clone the repository and install it into your active Python environment:
+```bash
+git clone https://github.com/sisyga/biolgca.git
+cd biolgca
+pip install -e .
 ```
 
 #### Use
@@ -137,9 +154,19 @@ lgca.plot_density()
 ```
 The [Tutorial](./BioLGCA.ipynb) guides you through the argument options.
 
+# Running tests and building docs
+Run the test-suite from the repository root with
+```bash
+pytest
+```
+Build the HTML documentation in `docs/_build` using
+```bash
+python -m sphinx -b html docs/source docs/_build/html
+```
+
 # Questions/Contribute
-The structure of the package and its functionalities are detailed in the 
-[documentation](). There you will also find coding examples (under construction).
+The structure of the package and its functionalities are detailed in the
+[documentation](docs/source/). There you will also find coding examples and API pages.
 
 Issues are tracked on the [GitHub page](https://github.com/sisyga/biolgca/issues).
 We collect both bugs and feature ideas there.
@@ -153,4 +180,4 @@ Bianca Güttner: `bianca.guettner@nct-dresden.de`
 # License
 BSD 3-clause license (see LICENSE file or [online resource](https://opensource.org/licenses/BSD-3-Clause)).
 
-Copyright (C) 2018-2022 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.
+Copyright (C) 2018-2025 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.

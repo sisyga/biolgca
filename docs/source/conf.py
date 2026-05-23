@@ -22,8 +22,8 @@ sys.path.insert(0, os.path.abspath('../..'))
 
 # -- Project information -----------------------------------------------------
 
-project = 'BIO-LGCA'
-copyright = '2024, TUD Dresden University of Technology'
+project = 'biolgca'
+copyright = '2026, TUD Dresden University of Technology'
 author = 'Simon Syga, Bianca Güttner'
 
 # The full version, including alpha/beta/rc tags
@@ -69,7 +69,6 @@ html_theme = 'alabaster'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static/']
-#html_css_files = ['css/custom.css']
 html_style = 'css/methods.css'
 
 #def setup(app):
@@ -79,7 +78,9 @@ html_style = 'css/methods.css'
 # configured like https://github.com/JamesALeedham/Sphinx-Autosummary-Recursion/
 autosummary_generate = True  # Turn on sphinx.ext.autosummary
 autosummary_imported_members = False  # Do not include imported members
-autodoc_mock_imports = ["matplotlib", "sympy", "mpl_toolkits"]
+autodoc_mock_imports = ["matplotlib", "mpl_toolkits"]
+numpydoc_show_class_members = False
+numpydoc_class_members_toctree = False
 
 #autoclass_content = "both"  # Add __init__ doc (ie. params) to class summaries
 html_show_sourcelink = False  # Remove 'view source code' from top of page (for html, not python)

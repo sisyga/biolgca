@@ -1,8 +1,7 @@
 # biolgca is a Python package for simulating different kinds of lattice-gas
 # cellular automata (LGCA) in the biological context.
-# Copyright (C) 2018-2022 Technische Universität Dresden, Germany.
+# Copyright (C) 2018-2025 Technische Universität Dresden, Germany.
 # The full license notice is found in the file lgca/__init__.py.
-
 """
 Classes for two-dimensional LGCA on a hexagonal arm-share lattice. They specify
 geometry-dependent LGCA behavior and inherit properties and structure from the
@@ -17,7 +16,8 @@ Supported LGCA types:
 - identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_Hex`)
 """
 
-from lgca.base import *
+from lgca.base import np, plt
+from lgca.list_utils import get_arr_of_empty_lists
 from lgca.lgca_square import LGCA_Square, IBLGCA_Square, NoVE_LGCA_Square, NoVE_IBLGCA_Square
 
 pi2 = 2 * np.pi
@@ -55,6 +55,7 @@ class LGCA_Hex(LGCA_Square):
 
     """
     # set class attributes
+    geometry = 'hex'
     # interactions are inherited from 2D square LGCA
     velocitychannels = 6
     cix = np.cos(np.arange(velocitychannels) * pi2 / velocitychannels)
@@ -264,26 +265,26 @@ class LGCA_Hex(LGCA_Square):
         newcellnodes[..., 6:] = self.nodes[..., 6:]
 
         # prop in 0-direction
-        newcellnodes[1:, :, 0] = self.nodes[:-1, :, 0]
+        newcellnodes[1:, ..., 0] = self.nodes[:-1, ..., 0]
 
         # prop in 1-direction
-        newcellnodes[:, 1::2, 1] = self.nodes[:, :-1:2, 1]
-        newcellnodes[1:, 2::2, 1] = self.nodes[:-1, 1:-1:2, 1]
+        newcellnodes[:, 1::2, ..., 1] = self.nodes[:, :-1:2, ..., 1]
+        newcellnodes[1:, 2::2, ..., 1] = self.nodes[:-1, 1:-1:2, ..., 1]
 
         # prop in 2-direction
-        newcellnodes[:-1, 1::2, 2] = self.nodes[1:, :-1:2, 2]
-        newcellnodes[:, 2::2, 2] = self.nodes[:, 1:-1:2, 2]
+        newcellnodes[:-1, 1::2, ..., 2] = self.nodes[1:, :-1:2, ..., 2]
+        newcellnodes[:, 2::2, ..., 2] = self.nodes[:, 1:-1:2, ..., 2]
 
         # prop in 3-direction
-        newcellnodes[:-1, :, 3] = self.nodes[1:, :, 3]
+        newcellnodes[:-1, ..., 3] = self.nodes[1:, ..., 3]
 
         # prop in 4-direction
-        newcellnodes[:, :-1:2, 4] = self.nodes[:, 1::2, 4]
-        newcellnodes[:-1, 1:-1:2, 4] = self.nodes[1:, 2::2, 4]
+        newcellnodes[:, :-1:2, ..., 4] = self.nodes[:, 1::2, ..., 4]
+        newcellnodes[:-1, 1:-1:2, ..., 4] = self.nodes[1:, 2::2, ..., 4]
 
         # prop in 5-direction
-        newcellnodes[1:, :-1:2, 5] = self.nodes[:-1, 1::2, 5]
-        newcellnodes[:, 1:-1:2, 5] = self.nodes[:, 2::2, 5]
+        newcellnodes[1:, :-1:2, ..., 5] = self.nodes[:-1, 1::2, ..., 5]
+        newcellnodes[:, 1:-1:2, ..., 5] = self.nodes[:, 2::2, ..., 5]
 
         self.nodes = newcellnodes
 
@@ -291,32 +292,28 @@ class LGCA_Hex(LGCA_Square):
     def _apply_rbcx(self):
         # documented in parent class
         # left boundary
-        self.nodes[self.r_int, :, 0] += self.nodes[self.r_int - 1, :, 3]
-        self.nodes[self.r_int, 2:-1:2, 1] += self.nodes[self.r_int - 1, 1:-2:2, 4]
-        self.nodes[self.r_int, 2:-1:2, 5] += self.nodes[self.r_int - 1, 3::2, 2]
+        self.nodes[self.r_int, ..., 0] += self.nodes[self.r_int - 1, ..., 3]
+        self.nodes[self.r_int, 2:-1:2, ..., 1] += self.nodes[self.r_int - 1, 1:-2:2, ..., 4]
+        self.nodes[self.r_int, 2:-1:2, ..., 5] += self.nodes[self.r_int - 1, 3::2, ..., 2]
 
         # right boundary
-        self.nodes[-self.r_int - 1, :, 3] += self.nodes[-self.r_int, :, 0]
-        self.nodes[-self.r_int - 1, 1:-1:2, 4] += self.nodes[-self.r_int, 2::2, 1]
-        self.nodes[-self.r_int - 1, 1:-1:2, 2] += self.nodes[-self.r_int, :-2:2, 5]
+        self.nodes[-self.r_int - 1, ..., 3] += self.nodes[-self.r_int, ..., 0]
+        self.nodes[-self.r_int - 1, 1:-1:2, ..., 4] += self.nodes[-self.r_int, 2::2, ..., 1]
+        self.nodes[-self.r_int - 1, 1:-1:2, ..., 2] += self.nodes[-self.r_int, :-2:2, ..., 5]
 
         self._apply_abcx()
 
     def _apply_rbcy(self):
         # documented in parent class
-        lx, ly, _ = self.nodes.shape
+        lx, ly = self.nodes.shape[:2]
 
         # lower boundary
-        self.nodes[(1 - (self.r_int % 2)):, self.r_int, 1] += self.nodes[:lx - (1 - (self.r_int % 2)), self.r_int - 1,
-                                                              4]
-        self.nodes[:lx - (self.r_int % 2), self.r_int, 2] += self.nodes[(self.r_int % 2):, self.r_int - 1, 5]
+        self.nodes[(1 - (self.r_int % 2)):, self.r_int, ..., 1] += self.nodes[:lx - (1 - (self.r_int % 2)), self.r_int - 1, ..., 4]
+        self.nodes[:lx - (self.r_int % 2), self.r_int, ..., 2] += self.nodes[(self.r_int % 2):, self.r_int - 1, ..., 5]
 
         # upper boundary
-        self.nodes[:lx - ((ly - 1 - self.r_int) % 2), -self.r_int - 1, 4] += self.nodes[((ly - 1 - self.r_int) % 2):,
-                                                                             -self.r_int, 1]
-        self.nodes[(1 - ((ly - 1 - self.r_int) % 2)):, -self.r_int - 1, 5] += self.nodes[
-                                                                              :lx - (1 - ((ly - 1 - self.r_int) % 2)),
-                                                                              -self.r_int, 2]
+        self.nodes[:lx - ((ly - 1 - self.r_int) % 2), -self.r_int - 1, ..., 4] += self.nodes[((ly - 1 - self.r_int) % 2):, -self.r_int, ..., 1]
+        self.nodes[(1 - ((ly - 1 - self.r_int) % 2)):, -self.r_int - 1, ..., 5] += self.nodes[:lx - (1 - ((ly - 1 - self.r_int) % 2)), -self.r_int, ..., 2]
         self._apply_abcy()
 
     def gradient(self, qty):
@@ -470,13 +467,18 @@ class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
 
 class NoVE_LGCA_Hex(NoVE_LGCA_Square, LGCA_Hex):
 
-    def nb_sum(self, qty, addCenter=False):
-        """
-        Calculate sum of values in neighboring lattice sites of each lattice site.
-        :param qty: ndarray in which neighboring values have to be added
-                    first dimension indexes lattice sites
-        :param addCenter: toggle adding central value
-        :return: sum as ndarray
+    def nb_sum(self, qty):
+        """Calculate neighbour sums on the hexagonal lattice.
+
+        Parameters
+        ----------
+        qty : numpy.ndarray
+            Array whose first two axes index lattice sites.
+
+        Returns
+        -------
+        numpy.ndarray
+            Sum of values in neighbouring lattice sites.
         """
         sum = np.zeros(qty.shape)
         # shift to left padding 0 and add to shift to the right padding 0
@@ -490,9 +492,7 @@ class NoVE_LGCA_Hex(NoVE_LGCA_Square, LGCA_Hex):
         sum[:-1, 1:-1:2, ...] += qty[1:, 2::2, ...]
         sum[1:, :-1:2, ...] += qty[:-1, 1::2, ...]
         sum[:, 1:-1:2, ...] += qty[:, 2::2, ...]
-        # add central value
-        if addCenter:
-            sum += qty
+
         return sum
 
 

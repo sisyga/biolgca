@@ -1,78 +1,116 @@
 # biolgca is a Python package for simulating different kinds of lattice-gas
 # cellular automata (LGCA) in the biological context.
-# Copyright (C) 2018-2022 Technische Universität Dresden, Germany.
+# Copyright (C) 2018-2025 Technische Universität Dresden, Germany.
 # The full license notice is found in the file lgca/__init__.py.
-
 """
 Interaction functions and helper functions for identity-based LGCA without volume exclusion.
 """
 
 # from random import random, shuffle, randrange
+from itertools import chain
+
 import numpy as np
-from scipy.stats import truncnorm, truncexpon, expon
-from copy import deepcopy
-from numba import jit
+from scipy.stats import truncnorm
 from lgca.interactions import tanh_switch
 
-def trunc_gauss(lower, upper, mu, sigma=.1, size=1):
-    """
-    Draw random variables from a truncated Gaussian distribution. The distribution is normalized between the 'lower'
-    and 'upper' bound, hast he mean value 'mu' and the standard deviation 'sigma'.
-    :param lower: lower bound
-    :param upper: upper bound
-    :param mu: mean value
-    :param sigma: standard deviation
-    :param size: number of samples
-    :return:
+
+def _cells_from_node(node):
+    """Return a flat list of cell ids from all channels in a node."""
+    return list(chain.from_iterable(node))
+
+
+def _split_cells_into_channels(cells, channeldist):
+    """Split a shuffled cell list at cumulative channel counts."""
+    return [cells[:channeldist[0]]] + [cells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
+
+
+def trunc_gauss(lower, upper, mu, sigma=.1, size=1, rng=None):
+    """Draw samples from a truncated normal distribution.
+
+    Parameters
+    ----------
+    lower : float
+        Lower bound of the distribution.
+    upper : float
+        Upper bound of the distribution.
+    mu : float
+        Mean of the underlying normal distribution.
+    sigma : float, optional
+        Standard deviation of the underlying normal distribution. ``0.1`` by
+        default.
+    size : int, optional
+        Number of samples to draw. ``1`` by default.
+
+    Returns
+    -------
+    float or numpy.ndarray
+        If ``size`` equals ``1`` a single float is returned, otherwise an array
+        of shape ``(size,)`` with the drawn samples.
     """
     a = (lower - mu) / sigma
     b = (upper - mu) / sigma
-    vals = truncnorm(a, b, loc=mu, scale=sigma).rvs(size)
+    vals = truncnorm(a, b, loc=mu, scale=sigma).rvs(size, random_state=rng)
     if size != 1:
         return vals
     else:
-        return float(vals)
+        return vals[0]
 
 
-def randomwalk(lgca):
+def random_walk(lgca):
+    """Move cells by uniformly redistributing them among velocity channels.
+
+    Parameters
+    ----------
+    lgca : object
+        Lattice-gas cellular automaton that is modified in-place.
+
+    Returns
+    -------
+    None
+    """
+
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
         node = lgca.nodes[coord]
-        cells = node.sum()
+        cells = _cells_from_node(node)
 
         channeldist = lgca.rng.multinomial(len(cells), [1. / lgca.K] * lgca.K).cumsum()
         lgca.rng.shuffle(cells)
-        newnode = [cells[:channeldist[0]]] + [cells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
 
-        lgca.nodes[coord] = deepcopy(newnode)
+        lgca.nodes[coord] = _split_cells_into_channels(cells, channeldist)
 
 
 def evo_steric(lgca):
-    """
-    Apply a birth-death step, then cells move under steric interactions.
-    Each cell proliferates with its individual birth rate r_b following logistic growth until
-    a capacity 'capacity' is reached, that is constant for all cells.
-    All cells die with a constant probability 'r_d'.
-    During proliferation there can be a mutation on either mother or daughter cell.
-    Mutations can be beneficial (driver mutations) or deleterious to neutral (passenger mutations).
-    These mutations manifest in a changed proliferation rate.
-    :param lgca:
-    :return:
+    """Birth--death dynamics with mutations and steric movement.
+
+    Cells proliferate with their individual birth rates following a logistic
+    growth law limited by ``capacity`` and die with probability ``r_d``. During
+    proliferation mutations may occur which modify the proliferation rate. After
+    the birth--death step cells redistribute among velocity channels according to
+    steric interactions controlled by ``alpha`` and ``gamma``.
+
+    Parameters
+    ----------
+    lgca : object
+        Lattice-gas cellular automaton that will be modified in-place.
+
+    Returns
+    -------
+    None
     """
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
+    velchannelweights = -lgca.interaction_params['alpha'] * lgca.channel_weight(lgca.cell_density)
+    channelweights = np.append(velchannelweights, np.full(lgca.cell_density.shape,
+                                                          lgca.interaction_params['gamma'])[..., None], axis=-1)
+    channelprobs = np.exp(channelweights)
+    channelprobs /= np.sum(channelprobs, axis=-1)[..., None]
     for coord in zip(*coords):
-        node = deepcopy(lgca.nodes[coord])
         density = lgca.cell_density[coord]
         rho = density / lgca.interaction_params['capacity']
-        cells = node.sum()
+        cells = _cells_from_node(lgca.nodes[coord])
         newcells = cells.copy()
-        velchannelweights = -lgca.interaction_params['alpha'] * lgca.channel_weight(lgca.cell_density)
-        channelweights = np.append(velchannelweights, np.full(lgca.cell_density.shape,
-                                                              lgca.interaction_params['gamma'])[..., None], axis=-1)
-        channelprobs = np.exp(channelweights)
-        channelprobs /= np.sum(channelprobs, axis=-1)[..., None]
         for cell in cells:
             if lgca.rng.random() < lgca.interaction_params['r_d']:
                 newcells.remove(cell)
@@ -100,27 +138,32 @@ def evo_steric(lgca):
         channelprob = channelprobs[coord]
         channeldist = lgca.rng.multinomial(len(newcells), channelprob).cumsum()
         lgca.rng.shuffle(newcells)
-        newnode = [newcells[:channeldist[0]]] + [newcells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
 
-        lgca.nodes[coord] = deepcopy(newnode)
+        lgca.nodes[coord] = _split_cells_into_channels(newcells, channeldist)
 
 
 def birth(lgca):
-    """
-    Apply a birth step. Each cell proliferates following a logistic growth law using its individual birth rate r_b and
-    a capacity 'capacity', that is constant for all cells.
-    Daughter cells receive an individual proliferation rate that is drawn from a truncated Gaussian distribution between
-    0 and a_max, whose mean is equal to the mother cell's r_b, with standard deviation 'std'.
-    :param lgca:
-    :return:
+    """Logistic birth process with inheritable proliferation rates.
+
+    Each cell divides with probability ``r_b`` scaled by the available capacity.
+    The proliferation rate of each daughter cell is drawn from a truncated
+    Gaussian distribution centred at the mother's rate.
+
+    Parameters
+    ----------
+    lgca : object
+        Lattice-gas cellular automaton that will be modified in-place.
+
+    Returns
+    -------
+    None
     """
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
-        node = deepcopy(lgca.nodes[coord])
         density = lgca.cell_density[coord]
         rho = density / lgca.interaction_params['capacity']
-        cells = node.sum()
+        cells = _cells_from_node(lgca.nodes[coord])
         newcells = cells.copy()
         for cell in cells:
             r_b = lgca.props['r_b'][cell]
@@ -128,32 +171,39 @@ def birth(lgca):
                 lgca.maxlabel += 1
                 newcells.append(lgca.maxlabel)
                 lgca.props['r_b'].append(float(trunc_gauss(0, lgca.interaction_params['a_max'], r_b,
-                                                           sigma=lgca.interaction_params['std'])))
+                                                           sigma=lgca.interaction_params['std'],
+                                                           rng=lgca.rng)))
 
         # channeldist = lgca.rng.multinomial(len(newcells), [1. / lgca.K] * lgca.K).cumsum()
         channeldist = lgca.rng.multinomial(len(newcells), lgca.channel_weights).cumsum()
         lgca.rng.shuffle(newcells)
-        newnode = [newcells[:channeldist[0]]] + [newcells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
 
-        lgca.nodes[coord] = deepcopy(newnode)
+        lgca.nodes[coord] = _split_cells_into_channels(newcells, channeldist)
 
 
 def birthdeath(lgca):
-    """
-    Apply a birth-death step. Each cell proliferates following a logistic growth law using its individual birth rate r_b and
-    a capacity 'capacity', that is constant for all cells. All cells die with a constant probability 'r_d'.
-    Daughter cells receive an individual proliferation rate that is drawn from a truncated Gaussian distribution between
-    0 and a_max, whose mean is equal to the mother cell's r_b, with standard deviation 'std'.
-    :param lgca:
-    :return:
+    """Birth and death step with heterogenous proliferation rates.
+
+    Cells divide according to their individual birth rate and the available
+    capacity, while every cell dies with probability ``r_d``. The proliferation
+    rate of each daughter cell is drawn from a truncated Gaussian distribution
+    around the mother's rate.
+
+    Parameters
+    ----------
+    lgca : object
+        Lattice-gas cellular automaton that will be modified in-place.
+
+    Returns
+    -------
+    None
     """
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
-        node = deepcopy(lgca.nodes[coord])
         density = lgca.cell_density[coord]
         rho = density / lgca.interaction_params['capacity']
-        cells = node.sum()
+        cells = _cells_from_node(lgca.nodes[coord])
         newcells = cells.copy()
         for cell in cells:
             if lgca.rng.random() < lgca.interaction_params['r_d']:
@@ -164,33 +214,38 @@ def birthdeath(lgca):
                 lgca.maxlabel += 1
                 newcells.append(lgca.maxlabel)
                 lgca.props['r_b'].append(float(trunc_gauss(0, lgca.interaction_params['a_max'], r_b,
-                                                           sigma=lgca.interaction_params['std'])))
+                                                           sigma=lgca.interaction_params['std'],
+                                                           rng=lgca.rng)))
 
         # channeldist = lgca.rng.multinomial(len(newcells), [1. / lgca.K] * lgca.K).cumsum()
         channeldist = lgca.rng.multinomial(len(newcells), lgca.channel_weights).cumsum()
         lgca.rng.shuffle(newcells)
-        newnode = [newcells[:channeldist[0]]] + [newcells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
 
-        lgca.nodes[coord] = deepcopy(newnode)
+        lgca.nodes[coord] = _split_cells_into_channels(newcells, channeldist)
 
 def birthdeath_cancerdfe(lgca):
-    """
-    Apply a birth-death step. Each cell proliferates following a logistic growth law using its individual birth rate r_b and
-    a capacity 'capacity', that is constant for all cells. All cells die with a constant probability 'r_d'.
-    Daughter cells receive an individual proliferation rate that is the mother cell's r_b, with a deviation caused by a
-    mutation. The mutation can either be a driver mutation, which increases the proliferation rate, or a passenger mutation,
-    which slightly decreases the proliferation rate.
-    Both mutations are exponentially distributed with mean s_d and s_p, respectively.
-    :param lgca:
-    :return:
+    """Birth--death step with driver and passenger mutations.
+
+    Proliferation follows a logistic law and death occurs with probability
+    ``r_d``. Daughter cells inherit the mother's birth rate plus a deviation
+    drawn from exponential distributions representing driver (beneficial) or
+    passenger (deleterious) mutations.
+
+    Parameters
+    ----------
+    lgca : object
+        Lattice-gas cellular automaton that will be modified in-place.
+
+    Returns
+    -------
+    None
     """
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     for coord in zip(*coords):
-        node = deepcopy(lgca.nodes[coord])
         density = lgca.cell_density[coord]
         rho = density / lgca.interaction_params['capacity']
-        cells = node.sum()
+        cells = _cells_from_node(lgca.nodes[coord])
         newcells = cells.copy()
         for cell in cells:
             if lgca.rng.random() < lgca.interaction_params['r_d']:
@@ -203,13 +258,10 @@ def birthdeath_cancerdfe(lgca):
                 passenger = 0.
                 driver = 0.
                 if lgca.rng.random() < lgca.interaction_params['p_p']:
-                    passenger = float(expon.rvs(scale=lgca.interaction_params['s_p']))
-                    # lgca.props['r_b'].append(max(0., r_b-float(expon.rvs(scale=lgca.interaction_params['s_p']))))
+                    passenger = float(lgca.rng.exponential(scale=lgca.interaction_params['s_p']))
 
                 if lgca.rng.random() < lgca.interaction_params['p_d']:
-                    driver = float(expon.rvs(scale=lgca.interaction_params['s_d']))
-                    # lgca.props['r_b'].append(r_b+float(truncexpon.rvs(lgca.interaction_params['a_max']-r_b,
-                    #                                                   scale=lgca.interaction_params['s_d'])))
+                    driver = float(lgca.rng.exponential(scale=lgca.interaction_params['s_d']))
 
                 lgca.props['r_b'].append(min(r_b - passenger + driver, lgca.interaction_params['a_max']))
 
@@ -217,27 +269,37 @@ def birthdeath_cancerdfe(lgca):
         # channeldist = lgca.rng.multinomial(len(newcells), [1. / lgca.K] * lgca.K).cumsum()
         channeldist = lgca.rng.multinomial(len(newcells), lgca.channel_weights).cumsum()
         lgca.rng.shuffle(newcells)
-        newnode = [newcells[:channeldist[0]]] + [newcells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
 
-        lgca.nodes[coord] = deepcopy(newnode)
+        lgca.nodes[coord] = _split_cells_into_channels(newcells, channeldist)
 
 
 def go_or_grow(lgca):
-    """
-    Apply the evolutionary "go-or-grow" interaction. Cells switch from a migratory to a resting phenotype and vice versa
-    depending on their individual properties and the local cell density. Resting cells proliferate with a constant
-    proliferation rate. Each cell dies with a constant rate. Daughter cells inherit their switch properties from the
-    mother cells with some small variations given by a (truncated) Gaussian distribution.
-    :param lgca:
-    :return:
+    """Evolutionary ``go-or-grow`` interaction.
+
+    Cells stochastically switch between a migratory and a resting phenotype
+    according to a sigmoidal function of the local density (``tanh_switch``) with
+    individual parameters ``kappa`` and ``theta``. Resting cells proliferate with
+    a constant rate ``r_b`` and all cells die with rate ``r_d``. Offspring inherit
+    the mother's switching parameters with Gaussian noise.
+
+    Parameters
+    ----------
+    lgca : object
+        Lattice-gas cellular automaton that will be modified in-place.
+
+    Returns
+    -------
+    None
     """
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
+    new_kappa_chunks = []
+    new_theta_chunks = []
     for coord in zip(*coords):
         node = lgca.nodes[coord]
         density = lgca.cell_density[coord]
         rho = density / lgca.interaction_params['capacity']
-        cells = np.array(node.sum())
+        cells = np.asarray(_cells_from_node(node), dtype=int)
         # R1: cell death
         notkilled = lgca.rng.random(size=density) < 1. - lgca.interaction_params['r_d']
         cells = cells[notkilled]
@@ -256,15 +318,21 @@ def go_or_grow(lgca):
             proliferating = lgca.rng.choice(restcells, size=n_prolif, replace=False, shuffle=False)
             lgca.maxlabel += n_prolif
             new_cells = np.arange(lgca.maxlabel - n_prolif + 1, lgca.maxlabel + 1)
-            lgca.props['kappa'] = np.concatenate((lgca.props['kappa'],
-                                                  lgca.rng.normal(loc=lgca.props['kappa'][proliferating],
-                                                             scale=lgca.interaction_params['kappa_std'])))
+            new_kappa_chunks.append(
+                lgca.rng.normal(
+                    loc=lgca.props['kappa'][proliferating],
+                    scale=lgca.interaction_params['kappa_std'],
+                )
+            )
             # lgca.props['theta'] = np.concatenate((lgca.props['theta'],
             #                                       trunc_gauss(0, 1, mu=lgca.props['theta'][proliferating],
             #                                                   sigma=lgca.interaction_params['theta_std'])))
-            lgca.props['theta'] = np.concatenate((lgca.props['theta'],
-                                                  lgca.rng.normal(loc=lgca.props['theta'][proliferating],
-                                                            scale=lgca.interaction_params['theta_std'])))
+            new_theta_chunks.append(
+                lgca.rng.normal(
+                    loc=lgca.props['theta'][proliferating],
+                    scale=lgca.interaction_params['theta_std'],
+                )
+            )
             restcells.extend(list(new_cells))
 
         node = [[] for _ in range(lgca.velocitychannels)]
@@ -273,29 +341,39 @@ def go_or_grow(lgca):
             node[lgca.rng.integers(lgca.velocitychannels)].append(cell)
 
         lgca.nodes[coord] = node
+    if new_kappa_chunks:
+        lgca.props['kappa'] = np.concatenate((lgca.props['kappa'], *new_kappa_chunks))
+        lgca.props['theta'] = np.concatenate((lgca.props['theta'], *new_theta_chunks))
 
 def go_or_grow_kappa(lgca):
-    """
-    Apply the evolutionary "go-or-grow" interaction. Cells switch from a migratory to a resting phenotype and vice versa
-    depending on their individual properties and the local cell density. Resting cells proliferate with a constant
-    proliferation rate. Each cell dies with a constant rate. Daughter cells inherit their switch properties from the
-    mother cells with some small variations given by a (truncated) Gaussian distribution.
+    """``Go-or-grow`` interaction using neighbourhood density.
 
-    :param lgca: The lattice-gas cellular automata object.
-    :return: None. The function modifies the lgca object in-place.
+    Phenotype switching is determined by the average density in the Moore
+    neighbourhood rather than only the local density. Only the slope parameter
+    ``kappa`` evolves, whereas the threshold ``theta`` is fixed globally.
+
+    Parameters
+    ----------
+    lgca : object
+        Lattice-gas cellular automaton that will be modified in-place.
+
+    Returns
+    -------
+    None
     """
     # Identify the relevant cells (those with non-zero density)
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     # Calculate the average density in the neighborhood
     nbdensity = lgca.nb_sum(lgca.cell_density, addCenter=True) / ((lgca.velocitychannels+1) * lgca.interaction_params['capacity']) # average density in neighborhood
+    new_kappa_chunks = []
     for coord in zip(*coords):
         node = lgca.nodes[coord]
         density = lgca.cell_density[coord]
         nbdens = nbdensity[coord]
         # rho = density / lgca.interaction_params['capacity']
         # Get the list of cells at the current node
-        cells = np.array(node.sum())
+        cells = np.asarray(_cells_from_node(node), dtype=int)
         # R1: cell death
         # Determine which cells survive
         notkilled = lgca.rng.random(size=density) < 1. - lgca.interaction_params['r_d']
@@ -319,9 +397,12 @@ def go_or_grow_kappa(lgca):
             lgca.maxlabel += n_prolif
             new_cells = np.arange(lgca.maxlabel - n_prolif + 1, lgca.maxlabel + 1)
             # Update the kappa properties of the new cells
-            lgca.props['kappa'] = np.concatenate((lgca.props['kappa'],
-                                                  lgca.rng.normal(loc=lgca.props['kappa'][proliferating],
-                                                             scale=lgca.interaction_params['kappa_std'])))
+            new_kappa_chunks.append(
+                lgca.rng.normal(
+                    loc=lgca.props['kappa'][proliferating],
+                    scale=lgca.interaction_params['kappa_std'],
+                )
+            )
             # Add the new cells to the list of resting cells
             restcells.extend(list(new_cells))
 
@@ -333,45 +414,58 @@ def go_or_grow_kappa(lgca):
             node[lgca.rng.integers(lgca.velocitychannels)].append(cell)
 
         # Update the node in the lgca object
-        lgca.nodes[coord] = deepcopy(node)
+        lgca.nodes[coord] = node
+    if new_kappa_chunks:
+        lgca.props['kappa'] = np.concatenate((lgca.props['kappa'], *new_kappa_chunks))
 
 
-@jit(nopython=True)
-def tanh_switch(rho, kappa=5., theta=0.8):
+def tanh_switch(rho, kappa=5.0, theta=0.8):
+    """Sigmoidal switching function.
+
+    Parameters
+    ----------
+    rho : float or numpy.ndarray
+        Local (or neighbourhood) density.
+    kappa : float, optional
+        Steepness of the transition. Default is ``5.0``.
+    theta : float, optional
+        Density threshold at which the switch probability is ``0.5``.
+        Default is ``0.8``.
+
+    Returns
+    -------
+    float or numpy.ndarray
+        Switching probability with the same shape as ``rho``.
+    """
     return 0.5 * (1 + np.tanh(kappa * (rho - theta)))
 
-
-@jit(nopython=True)
-def nb_sum(qty, addCenter):
-    sum = np.zeros(qty.shape)
-    sum[:-1, ...] += qty[1:, ...]
-    sum[1:, ...] += qty[:-1, ...]
-
-    if addCenter:
-        sum += qty
-    return sum
-
-
 def go_or_grow_kappa_chemo(lgca):
-    """
-    Apply the evolutionary "go-or-grow" interaction. Cells switch from a migratory to a resting phenotype and vice versa
-    depending on their individual properties and the local cell density. Resting cells proliferate with a constant
-    proliferation rate. Migrating cells move along the cell density gradient.
-    Each cell dies with a constant rate. Daughter cells inherit their switch properties from the
-    mother cells with some small variations given by a (truncated) Gaussian distribution.
-    :param lgca:
-    :return:
+    """``Go-or-grow`` interaction with chemotactic movement.
+
+    Switching dynamics are identical to :func:`go_or_grow_kappa`, but migrating
+    cells move preferentially along the density gradient according to a Boltzmann
+    weight with parameter ``beta``.
+
+    Parameters
+    ----------
+    lgca : object
+        Lattice-gas cellular automaton that will be modified in-place.
+
+    Returns
+    -------
+    None
     """
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     g = lgca.gradient(lgca.cell_density / lgca.interaction_params['capacity'])  # density gradient for each lattice site
     nbdensity = lgca.nb_sum(lgca.cell_density, addCenter=True) / (lgca.velocitychannels * lgca.interaction_params['capacity']) # density of neighbors
+    new_kappa_chunks = []
     for coord in zip(*coords):
         node = lgca.nodes[coord]
         density = lgca.cell_density[coord]
         nbdens = nbdensity[coord]
         rho = density / lgca.interaction_params['capacity']
-        cells = np.array(node.sum())
+        cells = np.asarray(_cells_from_node(node), dtype=int)
         # R1: cell death
         notkilled = lgca.rng.random(size=density) < 1. - lgca.interaction_params['r_d']
         cells = cells[notkilled]
@@ -389,9 +483,12 @@ def go_or_grow_kappa_chemo(lgca):
             proliferating = lgca.rng.choice(restcells, n_prolif, replace=False)
             lgca.maxlabel += n_prolif
             new_cells = np.arange(lgca.maxlabel - n_prolif + 1, lgca.maxlabel + 1)
-            lgca.props['kappa'] = np.concatenate((lgca.props['kappa'],
-                                                  lgca.rng.normal(loc=lgca.props['kappa'][proliferating],
-                                                             scale=lgca.interaction_params['kappa_std'])))
+            new_kappa_chunks.append(
+                lgca.rng.normal(
+                    loc=lgca.props['kappa'][proliferating],
+                    scale=lgca.interaction_params['kappa_std'],
+                )
+            )
             restcells.extend(list(new_cells))
 
         node = [[] for _ in range(lgca.velocitychannels)]
@@ -416,5 +513,92 @@ def go_or_grow_kappa_chemo(lgca):
             for i in range(lgca.velocitychannels):
                 node[i].extend(velcells[:sample[i]])
                 velcells = velcells[sample[i]:]
+
+        lgca.nodes[coord] = node
+    if new_kappa_chunks:
+        lgca.props['kappa'] = np.concatenate((lgca.props['kappa'], *new_kappa_chunks))
+
+
+def go_or_grow_glioblastoma(lgca):
+    """Clone-level go-or-grow dynamics for glioblastoma evolution.
+
+    Cells switch between migratory and resting phenotypes according to the local
+    neighbourhood density. Resting cells proliferate with a birth rate stored on
+    their family, and driver mutations found new families with increased birth
+    rate and inherited switch sensitivity.
+
+    Parameters
+    ----------
+    lgca : object
+        Lattice-gas cellular automaton that will be modified in-place.
+
+    Returns
+    -------
+    None
+    """
+    relevant = (lgca.cell_density[lgca.nonborder] > 0)
+    coords = [a[relevant] for a in lgca.nonborder]
+    capacity = lgca.interaction_params['capacity']
+    nbdensity = lgca.nb_sum(lgca.cell_density, addCenter=True) / (
+        (lgca.velocitychannels + 1) * capacity
+    )
+    family_ids = np.asarray(lgca.props['family'], dtype=int)
+    family_kappa = np.asarray(lgca.family_props['kappa'], dtype=float)
+
+    for coord in zip(*coords):
+        cells = np.asarray(_cells_from_node(lgca.nodes[coord]), dtype=int)
+        if cells.size == 0:
+            lgca.nodes[coord] = [[] for _ in range(lgca.K)]
+            continue
+
+        notkilled = lgca.rng.random(size=cells.size) < 1.0 - lgca.interaction_params['r_d']
+        cells = cells[notkilled]
+        if cells.size == 0:
+            lgca.nodes[coord] = [[] for _ in range(lgca.K)]
+            continue
+
+        fams = family_ids[cells]
+        kappas = family_kappa[fams]
+        switch = lgca.rng.random(cells.size) < tanh_switch(
+            rho=nbdensity[coord],
+            kappa=kappas,
+            theta=lgca.interaction_params['theta'],
+        )
+        restcells = list(map(int, cells[switch]))
+        velcells = list(map(int, cells[~switch]))
+
+        rho = cells.size / capacity
+        newcells = []
+        for cell in restcells:
+            fam = lgca.props['family'][cell]
+            r_b = lgca.family_props['r_b'][fam]
+            if lgca.rng.random() < max(r_b * (1.0 - rho), 0.0):
+                lgca.maxlabel += 1
+                newcell = int(lgca.maxlabel)
+                newcells.append(newcell)
+                if lgca.rng.random() < lgca.interaction_params['r_m']:
+                    lgca.add_family(fam)
+                    new_family = int(lgca.maxfamily)
+                    lgca.props['family'].append(new_family)
+                    lgca.family_props['r_b'].append(
+                        lgca.family_props['r_b'][fam] * lgca.interaction_params['fitness_increase']
+                    )
+                    lgca.family_props['kappa'].append(
+                        float(
+                            lgca.rng.normal(
+                                loc=lgca.family_props['kappa'][fam],
+                                scale=lgca.interaction_params['kappa_std'],
+                            )
+                        )
+                    )
+                else:
+                    lgca.props['family'].append(fam)
+
+        restcells.extend(newcells)
+
+        node = [[] for _ in range(lgca.velocitychannels)]
+        node.append(restcells)
+        for cell in velcells:
+            node[lgca.rng.integers(lgca.velocitychannels)].append(cell)
 
         lgca.nodes[coord] = node

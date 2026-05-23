@@ -3,17 +3,12 @@
 Examples
 ========
 
-.. note::
-
-   This section is under construction.
-
-Here you find tutorials on how to get started and how to customise the LGCA simulator.
-
-Other examples show features that may be useful to you!
+This section collects small tutorials and notebooks showing how to set up
+simulations and customise the LGCA simulator. The Sphinx pages are intentionally
+short; the notebooks contain longer exploratory workflows.
 
 .. toctree::
    :maxdepth: 2
    
-   getting_started
    tutorial
    

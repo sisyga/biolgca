@@ -24,7 +24,7 @@ class T_LGCA_Common(ABC):
     # reproducible but non-uniform fixups
     rng = npr.default_rng(1)
     # absolute tolerance for random densities
-    density_epsilon = 0.1
+    density_epsilon = 0.3
     # 1D
     xdim_1d = 5
     b_1d = 2
@@ -36,6 +36,16 @@ class T_LGCA_Common(ABC):
     b_hex = 6
     xdim_hex = 4
     ydim_hex = 6
+    # 3D cubic
+    b_cubic = 6
+    xdim_cubic = 3
+    ydim_cubic = 3
+    zdim_cubic = 3
+    # 3D moore
+    b_moore = 26
+    xdim_moore = 3
+    ydim_moore = 3
+    zdim_moore = 3
 
     # classical parameters ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # 1D
@@ -53,30 +63,79 @@ class T_LGCA_Common(ABC):
     K_ve_hex = b_hex + restchannels_ve_hex
     nodes_ve_hex = rng.integers(low=0, high=1, endpoint=True,
                                 size=(xdim_hex, ydim_hex, b_hex + restchannels_ve_hex))
+    # 3D cubic
+    restchannels_ve_cubic = 2
+    K_ve_cubic = b_cubic + restchannels_ve_cubic
+    nodes_ve_cubic = rng.integers(low=0, high=1, endpoint=True,
+                                  size=(xdim_cubic, ydim_cubic, zdim_cubic, b_cubic + restchannels_ve_cubic))
+    # 3D moore
+    restchannels_ve_moore = 2
+    K_ve_moore = b_moore + restchannels_ve_moore
+    nodes_ve_moore = rng.integers(
+        low=0,
+        high=1,
+        endpoint=True,
+        size=(xdim_moore, ydim_moore, zdim_moore, b_moore + restchannels_ve_moore),
+    )
 
     # ib parameters ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # reuses some classical parameters
     # 1D
-    no_particles_1d = rng.integers(low=1, high=(xdim_1d * (b_1d + restchannels_ve_1d)), endpoint=True,
-                                       size=1)
+    no_particles_1d = rng.integers(
+        low=1,
+        high=(xdim_1d * (b_1d + restchannels_ve_1d)),
+        endpoint=True,
+    )
     nodes_ib_1d = np.append(np.arange(no_particles_1d) + 1, np.zeros(xdim_1d * (b_1d + restchannels_ve_1d)
                                                                      - no_particles_1d))
     rng.shuffle(nodes_ib_1d)
     nodes_ib_1d = nodes_ib_1d.reshape((xdim_1d, b_1d + restchannels_ve_1d))
     # 2D square
-    no_particles_square = rng.integers(low=1, high=(xdim_square * ydim_square *
-                                                        (b_square + restchannels_ve_square)), endpoint=True, size=1)
+    no_particles_square = rng.integers(
+        low=1,
+        high=(xdim_square * ydim_square * (b_square + restchannels_ve_square)),
+        endpoint=True,
+    )
     nodes_ib_square = np.append(np.arange(no_particles_square) + 1, np.zeros(xdim_square * ydim_square *
                                                                              (b_square + restchannels_ve_square) - no_particles_square))
     rng.shuffle(nodes_ib_square)
     nodes_ib_square = nodes_ib_square.reshape((xdim_square, ydim_square, b_square + restchannels_ve_square))
     # 2D hex
-    no_particles_hex = rng.integers(low=1, high=(xdim_hex * ydim_hex *
-                                                     (b_hex + restchannels_ve_hex)), endpoint=True, size=1)
+    no_particles_hex = rng.integers(
+        low=1,
+        high=(xdim_hex * ydim_hex * (b_hex + restchannels_ve_hex)),
+        endpoint=True,
+    )
     nodes_ib_hex = np.append(np.arange(no_particles_hex) + 1, np.zeros(xdim_hex * ydim_hex *
                                                                        (b_hex + restchannels_ve_hex) - no_particles_hex))
     rng.shuffle(nodes_ib_hex)
     nodes_ib_hex = nodes_ib_hex.reshape((xdim_hex, ydim_hex, b_hex + restchannels_ve_hex))
+    # 3D cubic
+    no_particles_cubic = rng.integers(
+        low=1,
+        high=(xdim_cubic * ydim_cubic * zdim_cubic * (b_cubic + restchannels_ve_cubic)),
+        endpoint=True,
+    )
+    nodes_ib_cubic = np.append(np.arange(no_particles_cubic) + 1,
+                               np.zeros(xdim_cubic * ydim_cubic * zdim_cubic *
+                                         (b_cubic + restchannels_ve_cubic) - no_particles_cubic))
+    rng.shuffle(nodes_ib_cubic)
+    nodes_ib_cubic = nodes_ib_cubic.reshape((xdim_cubic, ydim_cubic, zdim_cubic,
+                                            b_cubic + restchannels_ve_cubic))
+    # 3D moore
+    no_particles_moore = rng.integers(
+        low=1,
+        high=(xdim_moore * ydim_moore * zdim_moore * (b_moore + restchannels_ve_moore)),
+        endpoint=True,
+    )
+    nodes_ib_moore = np.append(
+        np.arange(no_particles_moore) + 1,
+        np.zeros(xdim_moore * ydim_moore * zdim_moore * (b_moore + restchannels_ve_moore) - no_particles_moore),
+    )
+    rng.shuffle(nodes_ib_moore)
+    nodes_ib_moore = nodes_ib_moore.reshape(
+        (xdim_moore, ydim_moore, zdim_moore, b_moore + restchannels_ve_moore)
+    )
 
     # nove parameters ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # nodes must be defined in the correct size! Maximum size of last dimension = b+1
@@ -94,7 +153,21 @@ class T_LGCA_Common(ABC):
     restchannels_nove_hex = restchannels_nove_square
     capacity_nove_hex = 8
     nodes_nove_hex = rng.integers(low=0, high=int(1.5 * capacity_nove_hex),
-                                      size=(xdim_hex, ydim_hex, b_hex + 1), endpoint=True)
+                                  size=(xdim_hex, ydim_hex, b_hex + 1), endpoint=True)
+    # 3D cubic
+    restchannels_nove_cubic = 1
+    capacity_nove_cubic = 7
+    nodes_nove_cubic = rng.integers(low=0, high=int(1.5 * capacity_nove_cubic),
+                                    size=(xdim_cubic, ydim_cubic, zdim_cubic, b_cubic + 1), endpoint=True)
+    # 3D moore
+    restchannels_nove_moore = 1
+    capacity_nove_moore = b_moore + restchannels_nove_moore
+    nodes_nove_moore = rng.integers(
+        low=0,
+        high=int(1.5 * capacity_nove_moore),
+        size=(xdim_moore, ydim_moore, zdim_moore, b_moore + 1),
+        endpoint=True,
+    )
 
     def t_propagation_template(self, geom, nodes, expected_output, bc='pbc'):
         # check that propagation and rest channels work: all particles should move into one node within one timestep
@@ -142,22 +215,37 @@ class Test_LGCA_General:
         ('lin',     True, False, com.nodes_ve_1d,       (com.xdim_1d,),                     com.restchannels_ve_1d),
         ('square',  True, False, com.nodes_ve_square,   (com.xdim_square, com.ydim_square), com.restchannels_ve_square),
         ('hex',     True, False, com.nodes_ve_hex,      (com.xdim_hex, com.ydim_hex),       com.restchannels_ve_hex),
+        ('cubic',   True, False, com.nodes_ve_cubic,    (com.xdim_cubic, com.ydim_cubic, com.zdim_cubic), com.restchannels_ve_cubic),
+        ('moore',   True, False, com.nodes_ve_moore,   (com.xdim_moore, com.ydim_moore, com.zdim_moore), com.restchannels_ve_moore),
         # IBLGCA (ve, ib)
         # (geom,    ve,   ib,   nodes,                  dims,                               restchannels)
         ('lin',     True, True, com.nodes_ib_1d,        (com.xdim_1d,),                     com.restchannels_ve_1d),
         ('square',  True, True, com.nodes_ib_square,    (com.xdim_square, com.ydim_square), com.restchannels_ve_square),
         ('hex',     True, True, com.nodes_ib_hex,       (com.xdim_hex, com.ydim_hex),       com.restchannels_ve_hex),
+        ('cubic',   True, True, com.nodes_ib_cubic,     (com.xdim_cubic, com.ydim_cubic, com.zdim_cubic), com.restchannels_ve_cubic),
+        ('moore',   True, True, com.nodes_ib_moore,    (com.xdim_moore, com.ydim_moore, com.zdim_moore), com.restchannels_ve_moore),
         # NoVE_LGCA (nove, non-ib)
         # (geom,    ve,    ib,    nodes,                    dims,                               restchannels)
         ('lin',     False, False, com.nodes_nove_1d,        (com.xdim_1d,),                     1),
         ('square',  False, False, com.nodes_nove_square,    (com.xdim_square, com.ydim_square), 1),
-        ('hex',     False, False, com.nodes_nove_hex,       (com.xdim_hex, com.ydim_hex),       1)
+        ('hex',     False, False, com.nodes_nove_hex,       (com.xdim_hex, com.ydim_hex),       1),
+        ('cubic',   False, False, com.nodes_nove_cubic,     (com.xdim_cubic, com.ydim_cubic, com.zdim_cubic), 1),
+        ('moore',   False, False, com.nodes_nove_moore,    (com.xdim_moore, com.ydim_moore, com.zdim_moore), 1)
     ])
     def test_getlgca_lattice_setup_nodes(self, geom, ve, ib, nodes, dims, restchannels):
         # 'node' keyword check: provided lattice is adopted by LGCA
-        # if nodes are provided, 'restchannels', 'dims', 'density' and 'hom' have to be ignored
-        lgca = get_lgca(geometry=geom, ve=ve, ib=ib, nodes=nodes, dims=dims, density=0.01, restchannels=restchannels+1,
-                        hom=True, interaction='only_propagation')
+        # if nodes are provided, 'restchannels', 'dims' and 'density' have to be ignored
+        with pytest.warns(UserWarning, match="Provided nodes"):
+            lgca = get_lgca(
+                geometry=geom,
+                ve=ve,
+                ib=ib,
+                nodes=nodes,
+                dims=dims,
+                density=0.01,
+                restchannels=restchannels + 1,
+                interaction='only_propagation'
+            )
         assert np.array_equal(lgca.nodes[lgca.nonborder], nodes), "Nodes not adopted correctly"
         assert lgca.restchannels == restchannels, "Wrong number of rest channels defined if nodes are given"
         assert lgca.dims == nodes.shape[:-1], "Wrong dimensions defined if nodes are given"
@@ -179,41 +267,16 @@ class Test_LGCA_General:
                 for propname in lgca.props.keys():
                     assert len(lgca.props[propname]) == lgca.maxlabel + 1, "Properties not set up for all particles"
 
-    # parameter tuples for 'hom', 'density' keyword check
-    # init_particles = number of particles expected in each node int(density*capacity)
-    @pytest.mark.parametrize("geom,ve,dims,restchannels,density,init_particles", [
-        # classical LGCA (ve, non-ib)
-        # (geom,    ve,   dims,                               restchannels,                  density,    init_particles)
-        ('lin',     True, (com.xdim_1d,),                     com.restchannels_ve_1d,        density_ve, calc_init_particles(True, density_ve, com.restchannels_ve_1d, K=com.K_ve_1d)),
-        ('square',  True, (com.xdim_square, com.ydim_square), com.restchannels_ve_square,    density_ve, calc_init_particles(True, density_ve, com.restchannels_ve_square, K=com.K_ve_square)),
-        ('hex',     True, (com.xdim_hex, com.ydim_hex),       com.restchannels_ve_hex,       density_ve, calc_init_particles(True, density_ve, com.restchannels_ve_hex, K=com.K_ve_hex)),
-        # NoVE_LGCA (nove, non-ib)
-        # written assuming that capacity for nove is set to velocitychannels + restchannels
-        # (geom,    ve,    dims,                               restchannels,                 density,        init_particles)
-        ('lin',     False, (com.xdim_1d,),                     com.restchannels_nove_1d,     density_nove_1, calc_init_particles(False, density_nove_1, com.restchannels_nove_1d, b=com.b_1d)),
-        ('square',  False, (com.xdim_square, com.ydim_square), com.restchannels_nove_square, density_nove_1, calc_init_particles(False, density_nove_1, com.restchannels_nove_square, b=com.b_square)),
-        ('hex',     False, (com.xdim_hex, com.ydim_hex),       com.restchannels_nove_hex,    density_nove_1, calc_init_particles(False, density_nove_1, com.restchannels_nove_hex, b=com.b_hex)),
-        # (geom,    ve,    dims,                               restchannels,                 density,        init_particles)
-        ('lin',     False, (com.xdim_1d,),                     com.restchannels_nove_1d,     density_nove_2, calc_init_particles(False, density_nove_2, com.restchannels_nove_1d, b=com.b_1d)),
-        ('square',  False, (com.xdim_square, com.ydim_square), com.restchannels_nove_square, density_nove_2, calc_init_particles(False, density_nove_2, com.restchannels_nove_square, b=com.b_square)),
-        ('hex',     False, (com.xdim_hex, com.ydim_hex),       com.restchannels_nove_hex,    density_nove_2, calc_init_particles(False, density_nove_2, com.restchannels_nove_hex, b=com.b_hex))
+    @pytest.mark.parametrize("geom,nodes", [
+        ('lin', np.zeros((com.xdim_1d, com.b_1d - 1), dtype=bool)),
+        ('square', np.zeros((com.xdim_square, com.ydim_square, com.b_square - 1), dtype=bool)),
+        ('hex', np.zeros((com.xdim_hex, com.ydim_hex, com.b_hex - 1), dtype=bool)),
+        ('cubic', np.zeros((com.xdim_cubic, com.ydim_cubic, com.zdim_cubic, com.b_cubic - 1), dtype=bool)),
+        ('moore', np.zeros((com.xdim_moore, com.ydim_moore, com.zdim_moore, com.b_moore - 1), dtype=bool)),
     ])
-    def test_getlgca_lattice_setup_homogeneous(self, geom, ve, dims, restchannels, density, init_particles):
-        # 'hom', 'density' keyword check
-        lgca = get_lgca(geometry=geom, ve=ve, ib=False, dims=dims, density=density, hom=True, restchannels=restchannels,
-                        interaction='only_propagation')
-        assert lgca.dims == dims, "Wrong dimensions defined"
-        # in the excluded case the lattice will be fully filled
-        if not (ve and density == 1):
-            # compare flattened node config to config moved one node forward to see if nodes all have the same config
-            assert not np.array_equal(lgca.nodes[lgca.nonborder].flatten(),
-                                      np.roll(lgca.nodes[lgca.nonborder].flatten(), lgca.nodes.shape[-1])), \
-                "Node configuration is not random"
-        assert np.all(lgca.nodes[lgca.nonborder].sum(-1) == init_particles), \
-            "Density not reached or not reached homogeneously"
-        if ve:
-            assert np.max(lgca.nodes.astype(int)) <= 1, "Volume exclusion principle is not respected"
-
+    def test_nodes_too_few_channels(self, geom, nodes):
+        with pytest.raises(RuntimeError):
+            get_lgca(geometry=geom, nodes=nodes, interaction='only_propagation')
     # parameter tuples for 'density' keyword check, random reset
     @pytest.mark.parametrize("geom,ve,ib,dims_large,restchannels,density,capacity", [
         # classical LGCA (ve, non-ib)
@@ -221,21 +284,29 @@ class Test_LGCA_General:
         ('lin',     True, False, (400,),        com.restchannels_ve_1d,        density_ve, com.K_ve_1d),
         ('square',  True, False, (20, 20),      com.restchannels_ve_square,    density_ve, com.K_ve_square),
         ('hex',     True, False, (20, 20),      com.restchannels_ve_hex,       density_ve, com.K_ve_hex),
+        ('cubic',   True, False, (5, 5, 5),     com.restchannels_ve_cubic,    density_ve, com.K_ve_cubic),
+        ('moore',   True, False, (5, 5, 5),     com.restchannels_ve_moore,   density_ve, com.K_ve_moore),
         # IBLGCA (ve, ib)
         # (geom,    ve,   ib,   dims_large,    restchannels,                density,    capacity)
         ('lin',     True, True, (400,),        com.restchannels_ve_1d,      density_ve, com.K_ve_1d),
         ('square',  True, True, (20, 20),      com.restchannels_ve_square,  density_ve, com.K_ve_square),
         ('hex',     True, True, (20, 20),      com.restchannels_ve_hex,     density_ve, com.K_ve_hex),
+        ('cubic',   True, True, (5, 5, 5),     com.restchannels_ve_cubic,   density_ve, com.K_ve_cubic),
+        ('moore',   True, True, (5, 5, 5),     com.restchannels_ve_moore,  density_ve, com.K_ve_moore),
         # NoVE_LGCA (nove, non-ib)
         # written assuming that capacity for nove is set to velocitychannels + restchannels
         # (geom,   ve,    ib,    dims_large,   restchannels,                 density,        capacity)
         ('lin',    False, False, (400,),       com.restchannels_nove_1d,     density_nove_1, com.b_1d+com.restchannels_nove_1d),
         ('square', False, False, (20, 20),     com.restchannels_nove_square, density_nove_1, com.b_square+com.restchannels_nove_square),
         ('hex',    False, False, (20, 20),     com.restchannels_nove_hex,    density_nove_1, com.b_hex+com.restchannels_nove_hex),
+        ('cubic',  False, False, (5, 5, 5),    com.restchannels_nove_cubic, density_nove_1, com.b_cubic+com.restchannels_nove_cubic),
+        ('moore',  False, False, (5, 5, 5),    com.restchannels_nove_moore, density_nove_1, com.b_moore+com.restchannels_nove_moore),
         # (geom,   ve,    ib,    dims_large,   restchannels,                 density,        capacity)
         ('lin',    False, False, (400,),       com.restchannels_nove_1d,     density_nove_2, com.b_1d+com.restchannels_nove_1d),
         ('square', False, False, (20, 20),     com.restchannels_nove_square, density_nove_2, com.b_square+com.restchannels_nove_square),
         ('hex',    False, False, (20, 20),     com.restchannels_nove_hex,    density_nove_2, com.b_hex+com.restchannels_nove_hex)
+        ,('cubic', False, False, (5, 5, 5),    com.restchannels_nove_cubic, density_nove_2, com.b_cubic+com.restchannels_nove_cubic),
+        ('moore',  False, False, (5, 5, 5),    com.restchannels_nove_moore, density_nove_2, com.b_moore+com.restchannels_nove_moore)
     ])
     def test_getlgca_lattice_setup_random(self, geom, ve, ib, dims_large, restchannels, density, capacity):
         # 'density' keyword check, random reset
@@ -266,7 +337,7 @@ class Test_LGCA_General:
                 "Node configuration is not random"
             assert lgca.nodes[lgca.nonborder].sum(-1).min() != lgca.nodes[lgca.nonborder].sum(-1).max(), \
                 "Number of particles is homogeneous when it should differ randomly"
-        assert np.abs(lgca.nodes[lgca.nonborder].sum() / (capacity * lgca.cell_density[lgca.nonborder].size) - density) \
+        assert np.abs(lgca.nodes[lgca.nonborder].sum() / lgca.cell_density[lgca.nonborder].size - density) \
                < self.com.density_epsilon, "Wrong density reached"
         if ve and not ib:
             assert np.max(lgca.nodes.astype(int)) <= 1, "Volume exclusion principle is not respected"

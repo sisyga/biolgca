@@ -1,17 +1,15 @@
 User Guide
 ==========
-.. note::
 
-   This section is under construction.
+This part of the documentation introduces the simulator classes in detail.  It
+describes the data structures used by the different LGCA types, explains the
+implemented lattice geometries and summarises the available interaction rules.
 
-Here the LGCA simulator classes will be introduced in detail. The first section details the specificities of each LGCA type and the corresponding data structure including figures. The second 
-section describes the different lattice geometries with geometry-specific operations like propagation and how to interpret the coordinates. 
-The third section provides a summary of predefined interaction functions.
-   
 .. toctree::
    :maxdepth: 2
-   
+
    lgca_types
+   factory_reference
    lattice_geometries
    interactions_summary
-   
+   planned_topics

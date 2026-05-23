@@ -1,8 +1,7 @@
 # biolgca is a Python package for simulating different kinds of lattice-gas
 # cellular automata (LGCA) in the biological context.
-# Copyright (C) 2018-2022 Technische Universität Dresden, Germany.
+# Copyright (C) 2018-2025 Technische Universität Dresden, Germany.
 # The full license notice is found in the file lgca/__init__.py.
-
 """
 Classes for one-dimensional LGCA. They specify geometry-dependent LGCA behavior
 and inherit properties and structure from the respective abstract base classes.
@@ -16,10 +15,27 @@ Supported LGCA types:
 - identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_1D`)
 """
 
-import matplotlib.ticker as mticker
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+try:  # optional plotting dependency
+    import matplotlib.ticker as mticker
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+except ImportError:  # pragma: no cover - handled at runtime
+    from lgca.base import _MissingPlotLib
+    mticker = make_axes_locatable = _MissingPlotLib("matplotlib")
 
-from lgca.base import *
+from lgca.base import (
+    IBLGCA_base,
+    LGCA_base,
+    NoVE_IBLGCA_base,
+    NoVE_LGCA_base,
+    cm,
+    colorbar_index,
+    colors,
+    cmap_discretize,
+    estimate_figsize,
+    np,
+    plt,
+)
+from lgca.list_utils import get_arr_of_empty_lists
 
 
 class LGCA_1D(LGCA_base):
@@ -42,7 +58,8 @@ class LGCA_1D(LGCA_base):
 
     """
     # set class attributes
-    interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation', 'parameter_controlled_diffusion',
+    geometry = 'lin'
+    interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation',
                     'random_walk', 'persistent_motion', 'birthdeath', 'only_propagation']
     velocitychannels = 2
     c = np.array([1., -1.])[None, ...] #directions of velocity channels; shape: (1,2)
@@ -73,6 +90,11 @@ class LGCA_1D(LGCA_base):
         # set dimensions according to provided initial condition
         if nodes is not None:
             self.l, self.K = nodes.shape
+            if self.K < self.velocitychannels:
+                raise RuntimeError(
+                    'Not enough channels specified for the chosen geometry! '
+                    f'Required: {self.velocitychannels}, provided: {self.K}'
+                )
             self.restchannels = self.K - self.velocitychannels
             self.dims = self.l,
             return
@@ -97,25 +119,20 @@ class LGCA_1D(LGCA_base):
         Initialize LGCA lattice configuration. Create the lattice and then assign particles to
         channels in the nodes.
 
-        Initializes :py:attr:`self.nodes`. If `nodes` is not provided, the lattice is initialized with particles
-        randomly so that the averge lattice density is `density`. For the random initialization there is a choice
-        between a fixed or random number of particles per node.
+        Initializes :py:attr:`self.nodes`. If `nodes` is not provided, the lattice is initialized randomly so that
+        each node contains on average ``density`` particles. For the random initialization there is a choice between
+        a fixed or random number of particles per node.
 
         Parameters
         ----------
         density : float, default=0.1
-            If `nodes` is None, initialize lattice randomly with this particle density.
-        hom : float, default=False
-            Fill channels randomly with particle density `density`, but with an equal number of particles for each node.
-            Note that depending on :py:attr:`self.K` not all densities can be realized.
+            If `nodes` is None, initialize lattice randomly with this average number of particles per node.
         nodes : :py:class:`numpy.ndarray`
             Custom initial lattice configuration. Dimensions: ``(self.dims[0], self.K)``.
 
         See Also
         --------
         base.LGCA_base.random_reset : Initialize lattice nodes with average density `density`.
-        base.LGCA_base.homogeneous_random_reset : Initialize lattice nodes with average density `density` and a fixed number
-            of particles per node.
         set_dims : Set LGCA dimensions.
         init_coords : Initialize LGCA coordinates.
 
@@ -123,17 +140,12 @@ class LGCA_1D(LGCA_base):
         self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=bool)
 
         # random initialization
-        if 'hom' in kwargs:
-            hom = kwargs['hom']
-        else:
-            hom = None
-        if nodes is None and hom:
-            self.homogeneous_random_reset(density)
-        elif nodes is None:
+        if nodes is None:
             self.random_reset(density)
         # initialization with provided initial condition
         else:
-            self.nodes[self.r_int:-self.r_int, :] = nodes.astype(bool)
+            self._warn_nodes_shape(nodes)
+            self.nodes[self.r_int:-self.r_int, :] = self._ensure_bool_nodes(nodes)
             self.apply_boundaries()
 
     def init_coords(self):
@@ -244,33 +256,33 @@ class LGCA_1D(LGCA_base):
         """
         newnodes = np.zeros_like(self.nodes)
         # resting particles stay
-        newnodes[:, 2:] = self.nodes[:, 2:]
+        newnodes[..., 2:] = self.nodes[..., 2:]
 
         # propagation to the right
-        newnodes[1:, 0] = self.nodes[:-1, 0]
+        newnodes[1:, ..., 0] = self.nodes[:-1, ..., 0]
 
         # propagation to the left
-        newnodes[:-1, 1] = self.nodes[1:, 1]
+        newnodes[:-1, ..., 1] = self.nodes[1:, ..., 1]
 
         self.nodes = newnodes
 
     def apply_pbc(self):
         # documented in parent class
-        self.nodes[:self.r_int, :] = self.nodes[-2 * self.r_int:-self.r_int, :]
-        self.nodes[-self.r_int:, :] = self.nodes[self.r_int:2 * self.r_int, :]
+        self.nodes[:self.r_int, ...] = self.nodes[-2 * self.r_int:-self.r_int, ...]
+        self.nodes[-self.r_int:, ...] = self.nodes[self.r_int:2 * self.r_int, ...]
 
     def apply_rbc(self):
         # documented in parent class
         # left boundary cell inside domain: right channel gets added left channel from the left
-        self.nodes[self.r_int, 0] += self.nodes[self.r_int - 1, 1]
+        self.nodes[self.r_int, ..., 0] += self.nodes[self.r_int - 1, ..., 1]
         # right boundary cell inside domain: left channel gets added right channel from the right
-        self.nodes[-self.r_int - 1, 1] += self.nodes[-self.r_int, 0]
+        self.nodes[-self.r_int - 1, ..., 1] += self.nodes[-self.r_int, ..., 0]
         self.apply_abc()
 
     def apply_abc(self):
         # documented in parent class
-        self.nodes[:self.r_int, :] = 0
-        self.nodes[-self.r_int:, :] = 0
+        self.nodes[:self.r_int, ...] = 0
+        self.nodes[-self.r_int:, ...] = 0
 
     def nb_sum(self, qty):
         """
@@ -472,12 +484,13 @@ class LGCA_1D(LGCA_base):
         plt.sca(ax)
         return plot
 
-    def plot_flux(self, nodes_t=None, **kwargs):
+    def plot_flux(self, nodes_t=None, cbar=True, colorbarwidth=0.03, **kwargs):
         """
         Plot flux in each node over time. X axis: 1D lattice, y axis: time.
 
         A flux vector to the left is indicated by a blue color of the node, a flux vector to the right by red. If the
-        velocities of all particles cancel out, the node is colored in black. Empty nodes are white.
+        velocities of all particles cancel out, the node is colored in black. Empty nodes are white. A color bar
+        illustrates the mapping from colors to flux direction.
 
         Parameters
         ----------
@@ -485,6 +498,11 @@ class LGCA_1D(LGCA_base):
             Node configurations for a lattice over time, used to calculate the flux and plot it. If set to None and a
             simulation has been performed before with ``record=True``, the result of the simulation is plotted.
             Dimensions: ``(timesteps + 1,) + self.dims + (self.K,)``.
+        cbar : bool, default=True
+            Draw a color bar indicating the flux coding.
+        colorbarwidth : float
+            Width of the additional axis for the color bar, passed to
+            :py:meth:`mpl_toolkits.axes_grid1.axes_divider.AxesDivider.append_axes`.
         **kwargs
             Arguments to be passed on to :py:meth:`setup_figure`.
 
@@ -511,11 +529,19 @@ class LGCA_1D(LGCA_base):
         flux_t = nodes_t[..., 0].astype(int) - nodes_t[..., 1].astype(int)
 
         # color code flux
-        rgba = np.zeros((tmax, l, 4)) #  4: RGBA A=alpha: transparency
-        rgba[dens_t > 0, -1] = 1.
-        rgba[flux_t > 0, 0] = 1.
-        rgba[flux_t < 0, 2] = 1.
-        rgba[flux_t == 0, :-1] = 0.  # unpopulated lattice sites are white
+        rgba = np.zeros((tmax, l, 4))  # 4: RGBA, A=alpha for visibility
+        rgba[dens_t > 0, -1] = 1.0
+        rgba[flux_t > 0, 0] = 1.0
+        rgba[flux_t < 0, 2] = 1.0
+        rgba[flux_t == 0, :-1] = 0.0  # unpopulated lattice sites are white
+
+        # create mapping for the optional color bar
+        flux_code = np.zeros((tmax, l), dtype=int)
+        flux_code[(dens_t > 0) & (flux_t < 0)] = 1
+        flux_code[(dens_t > 0) & (flux_t == 0)] = 2
+        flux_code[(dens_t > 0) & (flux_t > 0)] = 3
+        cmap = colors.ListedColormap(['white', 'blue', 'black', 'red'])
+        norm = colors.BoundaryNorm(np.arange(-0.5, 4, 1), cmap.N)
 
         # create plot
         fig, ax = self.setup_figure(tmax, **kwargs)
@@ -526,7 +552,15 @@ class LGCA_1D(LGCA_base):
         ax.xaxis.set_ticks_position('top')
         ax.xaxis.tick_top()
         plt.tight_layout()
-        # color bar option is missing here
+        if cbar:
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size=colorbarwidth, pad=0.1)
+            mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
+            cbar_handle = fig.colorbar(mappable, use_gridspec=True, cax=cax)
+            cbar_handle.set_ticks(range(4))
+            cbar_handle.set_ticklabels(['empty', 'left', 'no flux', 'right'])
+            cbar_handle.set_label('Flux direction')
+            plt.sca(ax)
         return plot
 
 
@@ -558,6 +592,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             self.random_reset(density)
 
         else:
+            self._warn_nodes_shape(nodes)
             self.nodes[self.nonborder] = nodes.astype(np.uint)
             self.apply_boundaries()
 
@@ -655,7 +690,7 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         else:
             self.capacity = self.K
 
-    def init_nodes(self, density, nodes=None, hom=None):
+    def init_nodes(self, density, nodes=None):
         """
         Initialize nodes for the instance.
         :param density: desired particle density in the lattice: number of particles/(dimensions*number of channels)
@@ -665,12 +700,10 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.uint)
         # if no lattice given, populate randomly
         if nodes is None:
-            if hom:
-                self.homogeneous_random_reset(density)
-            else:
-                self.random_reset(density)
+            self.random_reset(density)
         # if lattice given, populate lattice with given particles. Virtual lattice sites for boundary conditions not included
         else:
+            self._warn_nodes_shape(nodes)
             self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.uint)
             self.apply_boundaries()
 
@@ -785,22 +818,27 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
         self.nodes[-self.r_int:] = get_arr_of_empty_lists(self.nodes[-self.r_int:].shape)
 
     def init_nodes(self, density, nodes=None):
-        """
-        initialize the nodes. there are three options:
-        1) you provide only the argument "density", which should be a positive float that indicates the average number
-        of cells in each channel
-        2) you provide an array "nodes" with nodes.dtype == int,
-            where each integer determines the number of cells in each channel
-        3) you provide an array "nodes" with nodes.dtype == object, where each element is a list of unique cell labels
+        """Initialize NoVE identity-based 1D nodes.
+
+        Parameters
+        ----------
+        density : float
+            Average number of cells in each channel when ``nodes`` is not
+            supplied.
+        nodes : numpy.ndarray, optional
+            Custom initial state. Integer arrays are interpreted as cell counts
+            per channel. Object arrays must contain lists of unique cell labels.
         """
         self.nodes = get_arr_of_empty_lists(((self.l + 2 * self.r_int, self.K)))
         if nodes is None:
             self.random_reset(density)
 
         elif nodes.dtype == object:
+            self._warn_nodes_shape(nodes)
             self.nodes[self.nonborder] = nodes
 
         else:
+            self._warn_nodes_shape(nodes)
             occ = nodes.astype(int)
             self.nodes[self.nonborder] = self.convert_int_to_ib(occ)
 

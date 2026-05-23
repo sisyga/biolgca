@@ -1,18 +1,25 @@
 # biolgca is a Python package for simulating different kinds of lattice-gas
 # cellular automata (LGCA) in the biological context.
-# Copyright (C) 2018-2022 Technische Universität Dresden, Germany.
+# Copyright (C) 2018-2025 Technische Universität Dresden, Germany.
 # The full license notice is found in the file lgca/__init__.py.
-
 """Utilities for plotting properties and outputs of all LGCA types."""
 
 import numpy as np
 import random
 from itertools import cycle
-import matplotlib.colors as mplcolors
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-import matplotlib.cm as cm
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+try:  # optional plotting dependencies
+    import matplotlib.colors as mplcolors
+    import matplotlib.pyplot as plt
+    import matplotlib.ticker as ticker
+    from matplotlib.ticker import FuncFormatter
+    import matplotlib.cm as cm
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+except ImportError:  # pragma: no cover - handled at runtime
+    from lgca.base import _MissingPlotLib
+
+    mplcolors = plt = ticker = FuncFormatter = cm = make_axes_locatable = _MissingPlotLib(
+        "matplotlib"
+    )
 
 
 class IdentityColourMapper:
@@ -170,12 +177,21 @@ class PropertyColourMapper:
 
 
 def clip_frequencies(y):
-    """
-    Clip an array of frequencies to the first non-zero and the last non-zero values.
-    Utility for draw_wedges of the Muller plot.
-    Adapted from https://phylo-baltic.github.io/baltic-gallery/advanced-muller-plots-raw/
-    :returns: (np.ndarray x_clipped, np.ndarray x) -
-              (indices of the clipped array, indices of the full array)
+    """Clip a frequency trace to the non-zero span used by Muller plots.
+
+    Adapted from
+    https://phylo-baltic.github.io/baltic-gallery/advanced-muller-plots-raw/.
+
+    Parameters
+    ----------
+    y : numpy.ndarray
+        Frequency values over time.
+
+    Returns
+    -------
+    tuple of numpy.ndarray
+        ``(x_clipped, x)`` where ``x_clipped`` indexes the clipped trace and
+        ``x`` indexes the full trace.
     """
     # obtain indices and filter them according to y's content
     x = np.arange(len(y), dtype=int)
@@ -315,46 +331,47 @@ def muller_plot(root_ID, cum_pop_t, children_nlist, parent_list, timeline, facec
                 facecolour_map=None, cmap=None, norm=None, edgecolour=None,
                 xlabel=r"Time $k$", ylabel="Relative frequency", title=None,
                 label_map=None, legend_title=None, sort_labels=False, legend_on=False, **kwargs):
-    """
-    Draw a Muller plot from the given data.
-    # content parameters
-    :param root_ID: integer, ID of the root family in the family tree defined by children_nlist
-    :param cum_pop_t: array of shape (time, families): cumulative populations of all families and all their children
-    :param children_nlist: family tree as nested list of child family IDs, index=parent of the children
-    :param parent_list: family tree as list of parent family IDs, index=child of this parent
-    :param timeline: array, timesteps of the simulation
+    """Draw a Muller plot from family-tree population data.
 
-    # wedge colour customisation
-    :param facecolour: ['identity', 'property', name of a matplotlib colour, None] how the wedges should be coloured.
-                        identity: based on family identity
-                        property: based on a property of the family
-                        name of a matplotlib colour: all families equally in this colour
-    :param facecolour_map: [callable, list, None] how to map from family ID to colour of the wedge based on
-                           the face colouring strategy defined by 'facecolour'
-    :param cmap: if facecolour == 'identity': [name of a matplotlib colourmap, list of colour names, ListedColormap, None] (defaults to 'tab20')
-                 if facecolour == 'property': [name of a matplotlib colourmap, ListedColormap, None] (defaults to 'jet')
-                 2 use cases: - colour map used for colouring in the wedges if facecolour_map is None
-                              - colourmap to make a colourbar if facecolour == 'property' and facecolour_map is callable
-    :param norm: matplotlib.colors.Normalize: used with cmap to make a colourbar if facecolour == 'property'
-                                              and facecolour_map is callable
-    :param edgecolour: edgecolour of wedges, if set to 'align' the edgecolour will be the same as the facecolour of each wedge
+    Parameters
+    ----------
+    root_ID : int
+        ID of the root family in ``children_nlist``.
+    cum_pop_t : numpy.ndarray
+        Cumulative population of all families and descendants with shape
+        ``(time, families)``.
+    children_nlist : list
+        Nested list of child family IDs indexed by parent family ID.
+    parent_list : list
+        Parent family ID indexed by child family ID.
+    timeline : numpy.ndarray
+        Timesteps of the simulation.
+    facecolour : {'identity', 'property'} or str or None, default='identity'
+        Colouring strategy for wedges.
+    facecolour_map : callable or list, optional
+        Mapping from family ID to a colour or property value.
+    cmap : str or matplotlib.colors.Colormap, optional
+        Colormap used for identity or property colouring.
+    norm : matplotlib.colors.Normalize, optional
+        Normalization used for property colouring.
+    edgecolour : str, optional
+        Edge colour for wedges. ``'align'`` reuses each wedge face colour.
+    xlabel, ylabel, title : str, optional
+        Axis labels and title.
+    label_map : callable or list, optional
+        Mapping from family ID to legend label.
+    legend_title : str, optional
+        Legend or colourbar title.
+    sort_labels : bool, default=False
+        If ``True``, sort identity legend labels alphabetically.
+    legend_on : bool, default=False
+        Whether to show the legend for identity colouring.
 
-    # plot setup
-    :param xlabel: label of the x axis
-    :param ylabel: label of the y axis
-    :param title: title of the Muller plot
-
-    # labels and legend
-    :param label_map: [callable, list, None] how to map from family ID to the label in the legend,
-                                             only used if facecolour == 'identity' (defaults to family index)
-    :param legend_title: title of the legend (if facecolour=='identity') or colourbar (if facecolour=='property')
-    :param sort_labels: Boolean - if True, sort labels in the legend alphabetically (family tree = by level).
-                        If False, labels will appear in the same order that the artists are drawn: following each
-                        branch of the family tree from the root to the leaves, then the next branch
-
-    :returns: (fig, ax, ret) fig = matplotlib figure handle, ax = Muller plot axis handle,
-                             ret = handle of legend, handle of colourbar or None. The separate colourbar axis handle
-                             can be retrieved as ret.ax
+    Returns
+    -------
+    tuple
+        ``(fig, ax, ret, fc_map)`` where ``ret`` is the legend, colourbar or
+        ``None`` and ``fc_map`` maps family IDs to face colours.
     """
     # set up drawing mode
     legend = False
@@ -450,7 +467,7 @@ def muller_plot(root_ID, cum_pop_t, children_nlist, parent_list, timeline, facec
     ax.yaxis.set_minor_locator(ticker.MultipleLocator(0.1))
     ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
     # shift tick labels to start from 0 and stop at 1
-    ax.yaxis.set_major_formatter(lambda x, pos: x + 0.5)
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: x + 0.5))
 
     if legend:
         # set up legend, with sorted entries if desired
@@ -475,3 +492,228 @@ def muller_plot(root_ID, cum_pop_t, children_nlist, parent_list, timeline, facec
 
     plt.tight_layout()
     return fig, ax, ret, fc_map
+def colorbar_index(ncolors: int, cmap, use_gridspec: bool=False, cax=None):
+    """
+    Create a colorbar with `ncolors` colors.
+
+    Builds a discrete colormap with `ncolors` colors from the near-continuous colormap `cmap`,
+    adds it to the axis `cax` and draws tick labels in the center of each color. If
+    ncolors is high, tick positions are determined automatically using
+    :class:`~matplotlib.ticker.MaxNLocator` and labels are formatted with
+    :class:`~matplotlib.ticker.FuncFormatter`.
+
+    Parameters
+    ----------
+    ncolors : int
+        Desired number of colors for the discretized colormap.
+    cmap : str or :py:class:`matplotlib.colors.Colormap`
+        Near-continuous colormap to create discrete colormap from, e.g. ``matplotlib.cm.jet`` or ``'jet'``.
+    use_gridspec : bool, optional
+        Passed on to :py:func:`matplotlib.pyplot.colorbar`.
+    cax : :py:class:`matplotlib.axes.Axes` object, optional
+        Axis into which the colorbar will be drawn.
+
+    Returns
+    -------
+    colorbar : :py:class:`matplotlib.colorbar.Colorbar`
+        Colorbar instance.
+
+    """
+    # discretize the colormap
+    cmap = cmap_discretize(cmap, ncolors)
+
+    # map colors to values
+    mappable = ScalarMappable(cmap=cmap)
+    mappable.set_array([])
+    mappable.set_clim(-0.5, ncolors - 0.5)
+
+    # create colorbar with discrete boundaries
+    boundaries = np.arange(-0.5, ncolors, 1)
+    colorbar = plt.colorbar(
+        mappable, use_gridspec=use_gridspec, cax=cax, boundaries=boundaries
+    )
+
+    # configure ticks and labels using locators and formatters
+    locator = MaxNLocator(nbins="auto", integer=True)
+    formatter = FuncFormatter(lambda val, pos: int(val))
+    colorbar.ax.yaxis.set_major_locator(locator)
+    colorbar.ax.yaxis.set_major_formatter(formatter)
+    colorbar.update_ticks()
+    return colorbar
+
+
+def cmap_discretize(cmap, N: int):
+    """
+    Downsample the near-continuous colormap `cmap` to the number of colors `N`.
+
+    Parameters
+    ----------
+    cmap : str or :py:class:`matplotlib.colors.Colormap`
+        Colormap to be discretized, e.g. ``matplotlib.cm.jet`` or ``'jet'``.
+    N : int
+        Number of colors of the new colormap.
+
+    Returns
+    -------
+    :py:class:`matplotlib.colors.LinearSegmentedColormap`
+        Discretized colormap with `N` colors.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import matplotlib.cm as cm
+    >>> import matplotlib.pyplot as plt
+    >>> x = np.resize(np.arange(100), (5,20))
+    >>> # discretize jet colormap
+    >>> djet = cmap_discretize(cm.jet, 5)
+    >>> # show color limits
+    >>> plt.imshow(x, cmap=djet)
+
+    The name of the colormap is updated to ``cmap.name + '_N'``:
+
+    >>> djet.name
+    'jet_5'
+
+    """
+    # see https://matplotlib.org/stable/tutorials/colors/colormap-manipulation.html#creating-linear-segmented-colormaps
+    # for details
+    if type(cmap) == str:
+        cmap = plt.get_cmap(cmap)
+    # create anchor points and fill them with colors from the colormap
+    colors_i = np.concatenate((np.linspace(0, 1., N), (0., 0., 0., 0.)))
+    colors_rgba = cmap(colors_i)
+    # index rgba values according to discretization
+    indices = np.linspace(0, 1., N + 1)
+    cdict = {}
+    for ki, key in enumerate(('red', 'green', 'blue')):
+        cdict[key] = [(indices[i], colors_rgba[i - 1, ki], colors_rgba[i, ki]) for i in range(N + 1)]
+    # create new linear segmented colormap
+    return plt.matplotlib.colors.LinearSegmentedColormap(cmap.name + "_%d" % N, cdict, 1024)
+
+
+def estimate_figsize(array, x: float=8., cbar: bool=False, dy: float=1.):
+    """
+    .. deprecated:: 1.0
+        :py:func:`estimate_figsize` will be removed in biolgca 1.0, it is replaced
+        by the default value for the figure size in :py:meth:`setup_figure` of the
+        respective LGCA object.
+
+    Parameters
+    ----------
+    array : :py:class:`numpy.ndarray`
+        Array holding the data to be plotted.
+    x : float, default=8.0
+        Desired x dimension of the figure. Used to scale the y dimension.
+    cbar : bool, optional
+        If the figure will contain a colorbar.
+    dy : float, default=1.0
+        Scale of a unit in the y direction as compared to the x direction.
+
+    Returns
+    -------
+    figsize : tuple(float, float)
+        Optimal figure size.
+
+    """
+    lx, ly = array.shape
+    if cbar:
+        y = min([abs(x * ly /lx - 1), 10.])
+    else:
+        y = min([x * ly / lx, 10.])
+    y *= dy
+    figsize = (x, y)
+    return figsize
+
+
+def get_cmap(
+    density,
+    ax=None,
+    vmax=None,
+    cmap="viridis",
+    cbar=True,
+    cbarlabel="",
+    colorbarwidth="5%",
+    pad=0.1,
+):
+    if vmax is None:
+        K = int(density.max())
+    else:
+        K = vmax
+
+    cmap = copy(cm.get_cmap(cmap))  # do not modify a globally registered colormap in matplotlib > 3.3.2
+    cmap.set_under(alpha=0.0)
+    cmap_scaled = False
+
+    if 1 < K <= cmap.N:
+        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
+    elif K > 1:
+        cmap_scaled = True
+        scaling_factor = K / cmap.N
+        nbins = cmap.N
+        density = density / scaling_factor
+        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(cmap.N + 1), cmap.N))
+    else:
+        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.Normalize(vmin=1e-6, vmax=1))
+    cmap.set_array(density)
+
+    if not cbar:
+        return cmap
+
+    if ax is None:
+        ax = plt.gca()
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size=colorbarwidth, pad=pad)
+
+    if K <= 1:
+        # requires extra treatment because there is only one colour
+        cbar = plt.colorbar(
+            cmap,
+            cax=cax,
+            extend="min",
+            use_gridspec=True,
+            boundaries=[0, 0.5, 1],
+            values=[0, 1],
+        )
+    else:
+        cbar = plt.colorbar(cmap, cax=cax, extend="min", use_gridspec=True)
+    cbar.set_label(cbarlabel)
+    if cmap_scaled:
+        ncolors = nbins
+    else:
+        ncolors = max(1, K)
+    # set a numbering interval for high densities (e.g. 5-10-15-20)
+    if ncolors > 101:
+        stride = 10
+    elif ncolors > 51:
+        stride = 5
+    elif ncolors > 31:
+        stride = 2
+    else:
+        stride = 1
+    if K <= 1:
+        # requires extra treatment because there is only one colour
+        ticks = np.array([0.75])
+    else:
+        ticks = np.arange(1, ncolors + 1, 1) + 0.5
+    if cmap_scaled:
+        indices = np.arange(1, nbins + 2)
+        low_label = np.ceil(indices * scaling_factor - 1e-6)
+        low_label = np.roll(low_label, 1)
+        low_label = np.delete(low_label, 0).astype(int)
+        labels = list(low_label)
+    else:
+        labels = list(np.arange(1, ncolors + 1, 1, dtype=int))
+    # if max label comes up automatically, leave it as it is
+    if ticks[-1] == ticks[0::stride][-1]:
+        cbar.set_ticks(ticks[0::stride])
+        cbar.set_ticklabels(labels[0::stride])
+    # if max label is too close to last strided label, leave the latter out
+    elif stride > 1 and ticks[-1] != ticks[0::stride][-1] and ticks[-1] - ticks[0::stride][-1] < stride / 2:
+        cbar.set_ticks(list(ticks[0::stride][:-1]) + [ticks[-1]])
+        cbar.set_ticklabels(labels[0::stride][:-1] + [labels[-1]])
+    # if there is enough space, just add the max label
+    else:
+        cbar.set_ticks(list(ticks[0::stride]) + [ticks[-1]])
+        cbar.set_ticklabels(labels[0::stride] + [labels[-1]])
+    plt.sca(ax)
+    return cmap

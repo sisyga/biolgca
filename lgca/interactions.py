@@ -1,15 +1,14 @@
 # biolgca is a Python package for simulating different kinds of lattice-gas
 # cellular automata (LGCA) in the biological context.
-# Copyright (C) 2018-2022 Technische Universität Dresden, Germany.
+# Copyright (C) 2018-2025 Technische Universität Dresden, Germany.
 # The full license notice is found in the file lgca/__init__.py.
-
 """
 Interaction functions and helper functions for classical LGCA with volume exclusion.
 """
 
 from bisect import bisect_left
+from scipy.special import binom as binom_coeff, softmax
 import numpy as np
-from scipy.special import binom as binom_coeff
 
 
 def disarrange(a: np.ndarray, axis=-1):
@@ -30,11 +29,12 @@ def disarrange(a: np.ndarray, axis=-1):
            last axis.
     """
     b = a.swapaxes(axis, -1)
-    # Shuffle `b` in-place along the last axis.  `b` is a view of `a`,
+    # Shuffle `b` in-place along the last axis. `b` is a view of `a`,
     # so `a` is shuffled in place, too.
+    rng = npr.default_rng()
     shp = b.shape[:-1]
     for ndx in np.ndindex(shp):
-        np.random.shuffle(b[ndx])
+        rng.shuffle(b[ndx])
     return
 
 
@@ -46,17 +46,48 @@ def ent_prod(x):
     return x * np.log(x, where=x > 0, out=np.zeros_like(x, dtype=float))
 
 
+
 def random_walk(lgca):
-    """
-    Shuffle config in the last axis, modeling a random walk.
-    :return:
+    """Apply a random walk to all nodes.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place. This interaction does not use
+    ``lgca.interaction_params``.
+
+    Returns
+    -------
+    None
     """
     lgca.nodes = lgca.rng.permuted(lgca.nodes, axis=-1)
 
+
 def birth(lgca):
-    """
-    Simple birth process coupled to a random walk
-    :return:
+    """Perform a simple birth step followed by a random walk.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Other Parameters
+    ----------------
+    r_b : float
+        Birth probability per empty channel; effective
+        probability is ``r_b * n / lgca.K`` for local density ``n``.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
     birth = lgca.rng.random(lgca.nodes.shape) < lgca.interaction_params['r_b'] * lgca.cell_density[..., None] / lgca.K
     np.add(lgca.nodes, (1 - lgca.nodes) * birth, out=lgca.nodes, casting='unsafe')
@@ -64,9 +95,27 @@ def birth(lgca):
 
 
 def birthdeath(lgca):
-    """
-    Simple birth-death process coupled to a random walk
-    :return:
+    """Perform a birth--death step followed by a random walk.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Other Parameters
+    ----------------
+    r_b : float
+        Birth probability per empty channel.
+    r_d : float
+        Death probability per occupied channel.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
     birth = lgca.rng.random(lgca.nodes.shape) < lgca.interaction_params['r_b'] * lgca.cell_density[..., None] / lgca.K
     death = lgca.rng.random(lgca.nodes.shape) < lgca.interaction_params['r_d']
@@ -76,203 +125,382 @@ def birthdeath(lgca):
     random_walk(lgca)
 
 
-def persistent_walk(lgca):
+def alignment(lgca):
+    """Align moving cells with their neighbours.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Other Parameters
+    ----------------
+    beta : float
+        Alignment strength with neighbouring velocities.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
-    Rearrangement step for persistent motion (alignment with yourlgca)
-    :return:
-    """
-    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-               (lgca.cell_density[lgca.nonborder] < lgca.K)
-    coords = [a[relevant] for a in lgca.nonborder]
+    beta = lgca.interaction_params['beta']
+    g = lgca.nb_sum(lgca.calc_flux(lgca.nodes))
+
     newnodes = lgca.nodes.copy()
-    g = lgca.calc_flux(lgca.nodes)
-    for coord in zip(*coords):
-        n = lgca.cell_density[coord]
+    nb_nodes = newnodes[lgca.nonborder]
+    flux = g[lgca.nonborder]
+    density = lgca.cell_density[lgca.nonborder]
 
-        permutations = lgca.permutations[n]
-        j = lgca.j[n]
-        weights = np.exp(lgca.interaction_params['beta'] * np.einsum('i,ij', g[coord], j)).cumsum()
-        ind = bisect_left(weights, lgca.rng.random() * weights[-1])
-        newnodes[coord] = permutations[ind]
+    unique = np.unique(density)
+    unique = unique[(unique > 0) & (unique < lgca.K)]
+    for n in unique:
+        mask = density == n
 
+        j = lgca.get_flux_permutations(n)
+        weights = softmax(beta * (flux[mask] @ j), axis=1)
+        cumw = weights.cumsum(axis=1)
+        rnd = lgca.rng.random(mask.sum())
+        ind = (rnd[:, None] < cumw).argmax(axis=1)
+        nb_nodes[mask] = lgca.get_permutations(n)[ind]
+
+    newnodes[lgca.nonborder] = nb_nodes
     lgca.nodes = newnodes
 
 
-def chemotaxis(lgca):
+def persistent_walk(lgca):
+    """Rearrange nodes to implement persistent motion.
+    Vectorized implementation.
+    See also: `alignment`. This is a special case of alignment where the interaction radius is 0.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Other Parameters
+    ----------------
+    beta : float
+        Strength of alignment with the previous velocity direction.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
-    Rearrangement step for chemotaxis to external gradient field
-    :return:
-    """
+    beta = lgca.interaction_params['beta']
+    g = lgca.calc_flux(lgca.nodes)
+
     newnodes = lgca.nodes.copy()
-    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-               (lgca.cell_density[lgca.nonborder] < lgca.K)
-    coords = [a[relevant] for a in lgca.nonborder]
-    for coord in zip(*coords):
-        n = lgca.cell_density[coord]
+    nb_nodes = newnodes[lgca.nonborder]
+    flux = g[lgca.nonborder]
+    density = lgca.cell_density[lgca.nonborder]
 
-        permutations = lgca.permutations[n]
-        j = lgca.j[n]
-        weights = np.exp(lgca.interaction_params['beta'] * np.einsum('i,ij',
-                                                                     lgca.interaction_params['gradient_field'][coord],
-                                                                     j)).cumsum()
-        ind = bisect_left(weights, lgca.rng.random() * weights[-1])
-        newnodes[coord] = permutations[ind]
+    unique = np.unique(density)
+    unique = unique[(unique > 0) & (unique < lgca.K)]
+    for n in unique:
+        mask = density == n
 
+        j = lgca.get_flux_permutations(n)
+        weights = softmax(beta * (flux[mask] @ j), axis=1)
+        cumw = weights.cumsum(axis=1)
+        rnd = lgca.rng.random(mask.sum())
+        ind = (rnd[:, None] < cumw).argmax(axis=1)
+        nb_nodes[mask] = lgca.get_permutations(n)[ind]
+
+    newnodes[lgca.nonborder] = nb_nodes
+    lgca.nodes = newnodes
+
+
+
+def chemotaxis(lgca):
+    """Rearrange nodes in response to an external gradient.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Other Parameters
+    ----------------
+    beta : float
+        Strength of the bias toward the gradient.
+    gradient_field : numpy.ndarray
+        External gradient field influencing motion.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
+    """
+    beta = lgca.interaction_params['beta']
+    grad = lgca.interaction_params['gradient_field']
+
+    newnodes = lgca.nodes.copy()
+    nb_nodes = newnodes[lgca.nonborder]
+    gradients = grad[lgca.nonborder]
+    density = lgca.cell_density[lgca.nonborder]
+
+    unique = np.unique(density)
+    unique = unique[(unique > 0) & (unique < lgca.K)]
+    for n in unique:
+        mask = density == n
+        j = lgca.get_flux_permutations(n)
+        weights = softmax(beta * (gradients[mask] @ j), axis=1)
+        cumw = weights.cumsum(axis=1)
+        rnd = lgca.rng.random(mask.sum())
+        ind = (rnd[:, None] < cumw).argmax(axis=1)
+        nb_nodes[mask] = lgca.get_permutations(n)[ind]
+
+    newnodes[lgca.nonborder] = nb_nodes
     lgca.nodes = newnodes
 
 
 def contact_guidance(lgca):
+    """Align cells with a predefined guiding axis.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Other Parameters
+    ----------------
+    beta : float
+        Alignment strength toward the guiding axis.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
-    Rearrangement step for contact guidance interaction. Cells are guided by an external axis
-    :return:
-    """
+    beta = lgca.interaction_params['beta']
+
     newnodes = lgca.nodes.copy()
-    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-               (lgca.cell_density[lgca.nonborder] < lgca.K)
-    coords = [a[relevant] for a in lgca.nonborder]
-    for coord in zip(*coords):
-        n = lgca.cell_density[coord]
-        sni = lgca.guiding_tensor[coord]
-        permutations = lgca.permutations[n]
+    nb_nodes = newnodes[lgca.nonborder]
+    tensors = lgca.guiding_tensor[lgca.nonborder]
+    density = lgca.cell_density[lgca.nonborder]
+
+    unique = np.unique(density)
+    unique = unique[(unique > 0) & (unique < lgca.K)]
+    for n in unique:
+        mask = density == n
         si = lgca.si[n]
-        weights = np.exp(lgca.interaction_params['beta'] * np.einsum('ijk,jk', si, sni)).cumsum()
-        ind = bisect_left(weights, lgca.rng.random() * weights[-1])
-        newnodes[coord] = permutations[ind]
+        weights = softmax(beta * np.einsum('nij,pij->np', tensors[mask], si), axis=1)
+        cumw = weights.cumsum(axis=1)
+        rnd = lgca.rng.random(mask.sum())
+        ind = (rnd[:, None] < cumw).argmax(axis=1)
+        nb_nodes[mask] = lgca.get_permutations(n)[ind]
 
-    lgca.nodes = newnodes
-
-
-def alignment(lgca):
-    """
-    Rearrangement step for alignment interaction
-    :return:
-    """
-    newnodes = lgca.nodes.copy()
-    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-               (lgca.cell_density[lgca.nonborder] < lgca.K)
-    # gives ndarray of boolean values
-    coords = [a[relevant] for a in lgca.nonborder]
-    # a is an array of numbers, array can be indexed with another array of same size with boolean specification if
-    # element should be included. Returns only the relevant elements and coords is a list here
-    g = lgca.calc_flux(lgca.nodes)  # calculates flux for each lattice site
-    g = lgca.nb_sum(g)  # calculates sum of flux of neighbors for each lattice site
-    for coord in zip(*coords):
-        n = lgca.cell_density[coord]
-        permutations = lgca.permutations[n]
-        j = lgca.j[n]  # flux per permutation
-        weights = np.exp(lgca.interaction_params['beta'] * np.einsum('i,ij', g[coord], j)).cumsum()
-        # multiply neighborhood flux with the flux for each possible permutation
-        # np.exp for probability
-        # cumsum() for cumulative distribution function
-        ind = bisect_left(weights, lgca.rng.random() * weights[-1])
-        # inverse transform sampling method
-        newnodes[coord] = permutations[ind]
-
+    newnodes[lgca.nonborder] = nb_nodes
     lgca.nodes = newnodes
 
 
 def nematic(lgca):
+    """Implement nematic alignment of neighbouring cells.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Other Parameters
+    ----------------
+    beta : float
+        Strength of nematic alignment.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
-    Rearrangement step for nematic interaction
-    :return:
-    """
+    beta = lgca.interaction_params['beta']
+
     newnodes = lgca.nodes.copy()
-    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-               (lgca.cell_density[lgca.nonborder] < lgca.K)
-    coords = [a[relevant] for a in lgca.nonborder]
-
-    s = np.einsum('ijk,klm', lgca.nodes[..., :lgca.velocitychannels], lgca.cij)
+    nb_nodes = newnodes[lgca.nonborder]
+    s = np.einsum('...k,kxy->...xy', lgca.nodes[..., :lgca.velocitychannels], lgca.cij)
     sn = lgca.nb_sum(s)
+    tensors = sn[lgca.nonborder]
+    density = lgca.cell_density[lgca.nonborder]
 
-    for coord in zip(*coords):
-        n = lgca.cell_density[coord]
-        sni = sn[coord]
-        permutations = lgca.permutations[n]
+    unique = np.unique(density)
+    unique = unique[(unique > 0) & (unique < lgca.K)]
+    for n in unique:
+        mask = density == n
         si = lgca.si[n]
-        weights = np.exp(lgca.interaction_params['beta'] * np.einsum('ijk,jk', si, sni)).cumsum()
-        ind = bisect_left(weights, lgca.rng.random() * weights[-1])
-        newnodes[coord] = permutations[ind]
+        weights = softmax(beta * np.einsum('nij,pij->np', tensors[mask], si), axis=1)
+        cumw = weights.cumsum(axis=1)
+        rnd = lgca.rng.random(mask.sum())
+        ind = (rnd[:, None] < cumw).argmax(axis=1)
+        nb_nodes[mask] = lgca.get_permutations(n)[ind]
 
+    newnodes[lgca.nonborder] = nb_nodes
     lgca.nodes = newnodes
 
 
 def aggregation(lgca):
-    """
-    Aggregation interaction.
+    """Bias movement towards higher cell density.
 
     Parameters
     ----------
-    lgca: LGCA_1D or LGCA_Square or LGCA_Hex
-          LGCA instance that the interaction is applied to
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Other Parameters
+    ----------------
+    beta : float
+        Strength of the bias toward higher density regions.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
+    beta = lgca.interaction_params['beta']
+    g = lgca.gradient(lgca.cell_density)
+
     newnodes = lgca.nodes.copy()
-    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-               (lgca.cell_density[lgca.nonborder] < lgca.K)
-    coords = [a[relevant] for a in lgca.nonborder]
+    nb_nodes = newnodes[lgca.nonborder]
+    grad = g[lgca.nonborder]
+    density = lgca.cell_density[lgca.nonborder]
 
-    g = np.asarray(lgca.gradient(lgca.cell_density))  # np.asarray not needed
-    for coord in zip(*coords):
-        n = lgca.cell_density[coord]
-        permutations = lgca.permutations[n]
-        j = lgca.j[n]
-        weights = np.exp(lgca.interaction_params['beta'] * np.einsum('i,ij', g[coord], j)).cumsum()
-        ind = bisect_left(weights, lgca.rng.random() * weights[-1])
-        newnodes[coord] = permutations[ind]
+    unique = np.unique(density)
+    unique = unique[(unique > 0) & (unique < lgca.K)]
+    for n in unique:
+        mask = density == n
+        j = lgca.get_flux_permutations(n)
+        weights = softmax(beta * (grad[mask] @ j), axis=1)
+        cumw = weights.cumsum(axis=1)
+        rnd = lgca.rng.random(mask.sum())
+        ind = (rnd[:, None] < cumw).argmax(axis=1)
+        nb_nodes[mask] = lgca.get_permutations(n)[ind]
 
+    newnodes[lgca.nonborder] = nb_nodes
     lgca.nodes = newnodes
 
+
 def wetting(lgca):
-    """
-    Wetting of a surface for different levels of E-cadherin
-    :param lgca:
-    :return:
+    """Model wetting dynamics on an adhesive surface.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Other Parameters
+    ----------------
+    r_b : float
+        Birth probability used inside the spheroid region.
+    rho_0 : float
+        Homeostatic density determining the pressure gradient.
+    alpha : float
+        ECM degradation rate.
+    beta : float
+        Adhesion strength weighting flux alignment.
+    gamma : float
+        Strength of the pressure gradient term.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
     if hasattr(lgca, 'spheroid'):
         birth = lgca.rng.random(lgca.nodes[lgca.spheroid].shape) < lgca.interaction_params['r_b']
         ds = (1 - lgca.nodes[lgca.spheroid]) * birth
         lgca.nodes[lgca.spheroid, :] = np.add(lgca.nodes[lgca.spheroid, :], ds, casting='unsafe')
         lgca.update_dynamic_fields()
+
     newnodes = lgca.nodes.copy()
-    relevant = (lgca.cell_density[lgca.nonborder] > 0)
-    coords = [a[relevant] for a in lgca.nonborder]
-    nbs = lgca.nb_sum(lgca.cell_density)  # + lgca.cell_density
+    nb_nodes = newnodes[lgca.nonborder]
+
+    nbs = lgca.nb_sum(lgca.cell_density)
     nbs *= np.clip(1 - nbs / lgca.n_crit, a_min=0, a_max=None) / lgca.n_crit * 2
     g_adh = lgca.gradient(nbs)
-    pressure = np.clip(lgca.cell_density - lgca.interaction_params['rho_0'], a_min=0., a_max=None) / \
-               (lgca.K - lgca.interaction_params['rho_0'])
+    pressure = (np.clip(lgca.cell_density - lgca.interaction_params['rho_0'], a_min=0., a_max=None) /
+                (lgca.K - lgca.interaction_params['rho_0']))
     g_pressure = -lgca.gradient(pressure)
 
     resting = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
     resting = lgca.nb_sum(resting) / lgca.velocitychannels / lgca.interaction_params['rho_0']
-    g = lgca.calc_flux(lgca.nodes)
-    g = lgca.nb_sum(g)
+    g = lgca.nb_sum(lgca.calc_flux(lgca.nodes))
 
-    for coord in zip(*coords):
-        n = lgca.cell_density[coord]
-        permutations = lgca.permutations[n]
-        restc = permutations[:, lgca.velocitychannels:].sum(-1)
+    density = lgca.cell_density[lgca.nonborder]
+    flux = g[lgca.nonborder]
+    rest_nb = resting[lgca.nonborder]
+    g_adh_nb = g_adh[lgca.nonborder]
+    g_press_nb = g_pressure[lgca.nonborder]
+    ecm_nb = lgca.ecm[lgca.nonborder]
+
+    unique = np.unique(density)
+    unique = unique[(unique > 0) & (unique < lgca.K)]
+    for n in unique:
+        mask = density == n
+        perms = lgca.get_permutations(n)
+        restc = perms[:, lgca.velocitychannels:].sum(-1)
         j = lgca.j[n]
-        j_nb = g[coord]
-        weights = np.exp(
-            lgca.interaction_params['beta'] * (j_nb[0] * j[0] + j_nb[1] * j[1]) / lgca.velocitychannels / 2
-            + lgca.interaction_params['beta'] * resting[coord] * restc
-            # * np.clip(1 - restc / lgca.interaction_params['rho_0'] / 2, a_min=0, a_max=None) * 2
-            + lgca.interaction_params['beta'] * np.einsum('i,ij', g_adh[coord], j)
-            # + lgca.interaction_params['alpha'] * np.einsum('i,ij', g_subs[coord], j)
-            + restc * lgca.ecm[coord]
-            + lgca.interaction_params['gamma'] * np.einsum('i,ij', g_pressure[coord], j)
-        ).cumsum()
-        ind = bisect_left(weights, lgca.rng.random() * weights[-1])
-        newnodes[coord] = permutations[ind]
+        weights = softmax(
+            lgca.interaction_params['beta'] * (flux[mask] @ j) / lgca.velocitychannels / 2
+            + lgca.interaction_params['beta'] * rest_nb[mask, None] * restc
+            + lgca.interaction_params['beta'] * np.einsum('nd,dp->np', g_adh_nb[mask], j)
+            + restc * ecm_nb[mask, None]
+            + lgca.interaction_params['gamma'] * np.einsum('nd,dp->np', g_press_nb[mask], j),
+            axis=1,
+        )
+        cumw = weights.cumsum(axis=1)
+        rnd = lgca.rng.random(mask.sum())
+        ind = (rnd[:, None] < cumw).argmax(axis=1)
+        nb_nodes[mask] = perms[ind]
 
+    newnodes[lgca.nonborder] = nb_nodes
     lgca.nodes = newnodes
     lgca.ecm -= lgca.interaction_params['alpha'] * lgca.ecm * lgca.cell_density / lgca.K
 
 
 def excitable_medium(lgca):
-    """
-    Model for an excitable medium based on Barkley's PDE model.
-    :return:
+    """Simulate an excitable medium following Barkley's model.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Other Parameters
+    ----------------
+    alpha : float
+        Controls the excitability of the medium.
+    beta : float
+        Interaction coefficient between species.
+    N : int
+        Number of sub-steps performed in each interaction.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+
+    Returns
+    -------
+    None
     """
     n_x = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
     n_y = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
@@ -294,54 +522,66 @@ def excitable_medium(lgca):
 
     n_y += dn_y
 
-    newnodes = np.zeros(lgca.nodes.shape, dtype=lgca.nodes.dtype)
-    for coord in lgca.coord_pairs:
-        newnodes[coord + (slice(0, n_x[coord]),)] = 1
-        newnodes[coord + (slice(lgca.velocitychannels, lgca.velocitychannels + n_y[coord]),)] = 1
-
-    newv = newnodes[..., :lgca.velocitychannels]
-    disarrange(newv, axis=-1)
-    newnodes[..., :lgca.velocitychannels] = newv
+    newnodes = np.zeros_like(lgca.nodes)
+    v_idx = np.arange(lgca.velocitychannels)
+    r_idx = np.arange(lgca.restchannels)
+    newnodes[..., :lgca.velocitychannels] = (v_idx < n_x[..., None]).astype(lgca.nodes.dtype)
+    newnodes[..., lgca.velocitychannels:] = (r_idx < n_y[..., None]).astype(lgca.nodes.dtype)
+    newnodes[..., :lgca.velocitychannels] = lgca.rng.permuted(newnodes[..., :lgca.velocitychannels], axis=-1)
     lgca.nodes = newnodes
 
 
+
 def go_or_grow(lgca):
+    """Perform the go-or-grow switching interaction.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Other Parameters
+    ----------------
+    r_b : float # This parameter is not used in the provided snippet for go_or_grow, but kept for consistency if it
+    was intended.
+        Birth probability for resting cells.
+    r_d : float # This parameter is not used in the provided snippet for go_or_grow
+        Death probability for both states.
+    beta : float # Renamed from kappa in some contexts, this is the sensitivity for switching
+        Steepness of the switching function / sensitivity to entropy change.
+    theta : float # This parameter is not used here, tanh_switch is not directly called for entropy part
+        Threshold density for switching.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place.
+    This version attempts to use the entropy-based switching logic.
+    Assumes lgca.velocitychannels and lgca.restchannels are defined.
+    Uses a placeholder `_s_binom_entropy_like` for the undefined `s_binom`.
     """
-    interactions of the go-or-grow model.
-    :return:
-    """
-    relevant = lgca.cell_density[lgca.nonborder] > 0
-    coords = [a[relevant] for a in lgca.nonborder]
     n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
     n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
     M1 = np.minimum(n_m, lgca.restchannels - n_r)
     M2 = np.minimum(n_r, lgca.velocitychannels - n_m)
-    for coord in zip(*coords):
-        # node = lgca.nodes[coord]
-        n = lgca.cell_density[coord]
 
-        n_mxy = n_m[coord]
-        n_rxy = n_r[coord]
+    rho = lgca.cell_density / lgca.K
+    prob = tanh_switch(rho, kappa=lgca.interaction_params['kappa'], theta=lgca.interaction_params['theta'])
+    j_1 = lgca.rng.binomial(M1, prob)
+    j_2 = lgca.rng.binomial(M2, 1 - prob)
+    n_m = n_m + j_2 - j_1
+    n_r = n_r + j_1 - j_2
+    n_m -= lgca.rng.binomial(n_m, lgca.interaction_params['r_d'])
+    n_r -= lgca.rng.binomial(n_r, lgca.interaction_params['r_d'])
+    M = np.minimum(n_r, lgca.restchannels - n_r)
+    n_r += lgca.rng.binomial(M, lgca.interaction_params['r_b'])
 
-        rho = n / lgca.K
-        j_1 = lgca.rng.binomial(M1[coord], tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
-                                                  theta=lgca.interaction_params['theta']))
-        j_2 = lgca.rng.binomial(M2[coord], 1 - tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
-                                                      theta=lgca.interaction_params['theta']))
-        n_mxy += j_2 - j_1
-        n_rxy += j_1 - j_2
-        n_mxy -= lgca.rng.binomial(n_mxy, lgca.interaction_params['r_d'])
-        n_rxy -= lgca.rng.binomial(n_rxy, lgca.interaction_params['r_d'])
-        M = min([n_rxy, lgca.restchannels - n_rxy])
-        n_rxy += lgca.rng.binomial(M, lgca.interaction_params['r_b'])
-
-        v_channels = [1] * n_mxy + [0] * (lgca.velocitychannels - n_mxy)
-        v_channels = lgca.rng.permutation(v_channels)
-        r_channels = np.zeros(lgca.restchannels)
-        r_channels[:n_rxy] = 1
-        node = np.hstack((v_channels, r_channels))
-        lgca.nodes[coord] = node
-
+    newnodes = np.zeros_like(lgca.nodes)
+    v_idx = np.arange(lgca.velocitychannels)
+    r_idx = np.arange(lgca.restchannels)
+    newnodes[..., :lgca.velocitychannels] = (v_idx < n_m[..., None]).astype(lgca.nodes.dtype)
+    newnodes[..., lgca.velocitychannels:] = (r_idx < n_r[..., None]).astype(lgca.nodes.dtype)
+    newnodes[..., :lgca.velocitychannels] = lgca.rng.permuted(newnodes[..., :lgca.velocitychannels], axis=-1)
+    lgca.nodes = newnodes
 
 def p_binom(k, n, p):
     pb = binom_coeff(n, k) * p ** k * (1 - p) ** (n - k)
@@ -357,141 +597,47 @@ def s_binom(n, p0, kmax):
     return -ent_prod(p).sum(-1)
 
 
-def leup_test(lgca):
-    """
-    Go-or-grow with least-environmental uncertainty principle. cells try to minimize their entropy with the environment,
-    by changing their state between moving and resting. resting cells can proliferate. all cells die at a constant rate.
-    :return:
-    """
-    if lgca.interaction_params['r_b'] > 0 or lgca.interaction_params['r_d'] > 0:
-        n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
-        n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
-        birth = np.zeros_like(lgca.nodes)
-        birth[..., lgca.velocitychannels:] = lgca.rng.random(n_r.shape + (lgca.restchannels,)) \
-                                             < lgca.interaction_params['r_b'] * n_r[..., None] / lgca.restchannels
-        death = lgca.rng.random(birth.shape) < lgca.interaction_params['r_d'] * (
-                n_m[..., None] / lgca.velocitychannels + n_r[..., None] / lgca.restchannels) / 2
-        ds = (1 - lgca.nodes) * birth - lgca.nodes * death
-        np.add(lgca.nodes, ds, out=lgca.nodes, casting='unsafe')
-        lgca.update_dynamic_fields()
-
-    # if lgca.interaction_params['r_b'] > 0: # or lgca.interaction_params['r_d'] > 0:
-    #     n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
-    #     n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
-    #     birth = lgca.rng.random(lgca.nodes.shape) < lgca.interaction_params['r_b'] * n_r[..., None] / lgca.restchannels
-    #     death = lgca.rng.random(birth.shape) < lgca.interaction_params['r_d'] * (n_r[..., None] / lgca.restchannels + n_m[..., None] / lgca.velocitychannels)
-    #     ds = (1 - lgca.nodes) * birth - lgca.nodes * death
-    #     np.add(lgca.nodes, ds, out=lgca.nodes, casting='unsafe')
-    #     lgca.update_dynamic_fields()
-
-    relevant = (lgca.cell_density[lgca.nonborder] > 0) & (lgca.cell_density[lgca.nonborder] < lgca.K)
-    coords = [a[relevant] for a in lgca.nonborder]
-    n = lgca.cell_density
-    n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
-    n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
-    M1 = np.minimum(n_m, lgca.restchannels - n_r)
-    M2 = np.minimum(n_r, lgca.velocitychannels - n_m)
-
-    p0 = np.divide(n_r, n, where=n > 0, out=np.zeros_like(n, dtype=float))
-    s = s_binom(n, p0, lgca.velocitychannels)
-    p10 = np.divide(n_r + 1, n, where=n > 0, out=np.zeros_like(n, dtype=float))
-    s10 = s_binom(n, p10, lgca.velocitychannels)
-    ds1 = s10 - s
-
-    p01 = np.divide(n_r - 1, n, where=n > 0, out=np.zeros_like(n, dtype=float))
-    s01 = s_binom(n, p01, lgca.velocitychannels)
-    ds2 = s01 - s
-    #
-    #
-    # s = ent_prod(n_r) + ent_prod(n_m)
-    # ds1 = np.divide(s - ent_prod(n_r + 1) - ent_prod(n_m - 1), n, where=n > 0)
-    p1 = 1 / (1 + np.exp(lgca.interaction_params['beta'] * ds1))
-    p1[M1 == 0] = 0.
-    # ds2 = np.divide(s - ent_prod(n_r - 1) - ent_prod(n_m + 1), n, where=n > 0)
-    p2 = 1 / (1 + np.exp(lgca.interaction_params['beta'] * ds2))
-    p2[M2 == 0] = 0.
-    try:
-        j_1 = lgca.rng.binomial(M1, p1)
-
-    except:
-        print('Error!')
-        ind = np.isnan(p1) | (p1 > 0) | (p1 > 0)
-        print(M1[ind], p1[ind])
-
-    try:
-        j_2 = lgca.rng.binomial(M2, p2)
-
-    except:
-        print('Error!')
-        ind = np.isnan(p2) | (p2 > 0) | (p2 > 0)
-        print(M2[ind], p2[ind])
-
-    n_m += j_2 - j_1
-    n_r += j_1 - j_2
-
-    for coord in zip(*coords):
-        # # node = lgca.nodes[coord]
-        # n = lgca.cell_density[coord]
-        #
-        n_mxy = n_m[coord]
-        n_rxy = n_r[coord]
-        #
-        # s = ent_prod(n_rxy) + ent_prod(n_mxy)
-        # ds1 = (s - ent_prod(n_rxy+1) - ent_prod(n_mxy-1)) / n
-        # p1 = 1 / (1 + exp(lgca.interaction_params['beta'] * ds1))
-        # # switch to velocity channel
-        # ds2 = (s - ent_prod(n_rxy-1) - ent_prod(n_mxy+1)) / n
-        # p2 = 1 / (1 + exp(lgca.interaction_params['beta'] * ds2))
-        #
-        # j_1 = lgca.rng.binomial(M1[coord], p1)
-        # j_2 = lgca.rng.binomial(M2[coord], p2)
-        # n_mxy += j_2 - j_1
-        # n_rxy += j_1 - j_2
-        v_channels = lgca.rng.choice(lgca.velocitychannels, n_mxy, replace=False)
-
-        # v_channels = [1] * n_mxy + [0] * (lgca.velocitychannels - n_mxy)
-        # v_channels = lgca.rng.permutation(v_channels)
-        # r_channels = np.zeros(lgca.restchannels)
-        # r_channels[:n_rxy] = 1
-        node = np.zeros(lgca.K, dtype='bool')
-        node[v_channels] = 1
-        node[lgca.velocitychannels:lgca.velocitychannels + n_rxy] = 1
-        # node = np.hstack((v_channels, r_channels))
-        lgca.nodes[coord] = node
-
-
 def go_or_rest(lgca):
+    """Switch cells between moving and resting states based on local density.
+    Uses tanh_switch function. Assumes lgca.nodes is (K, dims...).
+    No birth or death in this version.
     """
-    Interactions of the go-or-grow model without birth and death, i.e. only the switch and random walk.
-    """
-    relevant = lgca.cell_density[lgca.nonborder] > 0
-    coords = [a[relevant] for a in lgca.nonborder]
     n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
     n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
     M1 = np.minimum(n_m, lgca.restchannels - n_r)
     M2 = np.minimum(n_r, lgca.velocitychannels - n_m)
 
-    for coord in zip(*coords):
-        n = lgca.cell_density[coord]
+    rho = lgca.cell_density / lgca.K
+    prob = tanh_switch(rho, kappa=lgca.interaction_params['kappa'], theta=lgca.interaction_params['theta'])
+    j_1 = lgca.rng.binomial(M1, prob)
+    j_2 = lgca.rng.binomial(M2, 1 - prob)
+    n_m = n_m + j_2 - j_1
+    n_r = n_r + j_1 - j_2
 
-        n_mxy = n_m[coord]
-        n_rxy = n_r[coord]
-
-        rho = n / lgca.K
-        j_1 = lgca.rng.binomial(M1[coord], tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
-                                                  theta=lgca.interaction_params['theta']))
-        j_2 = lgca.rng.binomial(M2[coord], 1 - tanh_switch(rho, kappa=lgca.interaction_params['kappa'],
-                                                      theta=lgca.interaction_params['theta']))
-        n_mxy += j_2 - j_1
-        n_rxy += j_1 - j_2
-
-        v_channels = [1] * n_mxy + [0] * (lgca.velocitychannels - n_mxy)
-        v_channels = lgca.rng.permutation(v_channels)
-        r_channels = np.zeros(lgca.restchannels)
-        r_channels[:n_rxy] = 1
-        node = np.hstack((v_channels, r_channels))
-        lgca.nodes[coord] = node
+    newnodes = np.zeros_like(lgca.nodes)
+    v_idx = np.arange(lgca.velocitychannels)
+    r_idx = np.arange(lgca.restchannels)
+    newnodes[..., :lgca.velocitychannels] = (v_idx < n_m[..., None]).astype(lgca.nodes.dtype)
+    newnodes[..., lgca.velocitychannels:] = (r_idx < n_r[..., None]).astype(lgca.nodes.dtype)
+    newnodes[..., :lgca.velocitychannels] = lgca.rng.permuted(newnodes[..., :lgca.velocitychannels], axis=-1)
+    lgca.nodes = newnodes
 
 
 def only_propagation(lgca):
+    """Placeholder interaction that performs no rearrangement.
+
+    Parameters
+    ----------
+    lgca : LGCA
+        Lattice gas cellular automaton instance.
+
+    Notes
+    -----
+    The ``lgca`` object is modified in place but remains unchanged. This
+    interaction does not use ``lgca.interaction_params``.
+
+    Returns
+    -------
+    None
+    """
     pass
