@@ -1,4 +1,6 @@
 # Welcome to biolgca!
+[![CI](https://github.com/sisyga/biolgca/actions/workflows/ci.yml/badge.svg)](https://github.com/sisyga/biolgca/actions/workflows/ci.yml)
+
 `biolgca` is a Python package for simulating different types of **lattice-gas 
 cellular automata (LGCA)** in the biological context.
 
@@ -119,12 +121,12 @@ lgca.plot_prop_spatial(propname='r_b')  # plot on the right
 `biolgca` depends on `numpy`, `scipy`, and `tqdm` for running simulations.
 To enable plotting features, install the optional plotting extras:
 ```bash
-pip install -e ".[plot2d]"
+pip install -e ".[plot]"
 ```
 
-For 3D Mayavi plotting support, install:
+For development, install test, lint, and documentation dependencies:
 ```bash
-pip install -e ".[plot3d]"
+pip install -e ".[dev]"
 ```
 
 #### Installation
@@ -133,11 +135,6 @@ Clone the repository and install it into your active Python environment:
 git clone https://github.com/sisyga/biolgca.git
 cd biolgca
 pip install -e .
-```
-
-For development, install test and documentation dependencies:
-```bash
-pip install -e ".[test,docs]"
 ```
 
 #### Use

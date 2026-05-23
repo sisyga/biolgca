@@ -235,16 +235,17 @@ class Test_LGCA_General:
     def test_getlgca_lattice_setup_nodes(self, geom, ve, ib, nodes, dims, restchannels):
         # 'node' keyword check: provided lattice is adopted by LGCA
         # if nodes are provided, 'restchannels', 'dims' and 'density' have to be ignored
-        lgca = get_lgca(
-            geometry=geom,
-            ve=ve,
-            ib=ib,
-            nodes=nodes,
-            dims=dims,
-            density=0.01,
-            restchannels=restchannels + 1,
-            interaction='only_propagation'
-        )
+        with pytest.warns(UserWarning, match="Provided nodes"):
+            lgca = get_lgca(
+                geometry=geom,
+                ve=ve,
+                ib=ib,
+                nodes=nodes,
+                dims=dims,
+                density=0.01,
+                restchannels=restchannels + 1,
+                interaction='only_propagation'
+            )
         assert np.array_equal(lgca.nodes[lgca.nonborder], nodes), "Nodes not adopted correctly"
         assert lgca.restchannels == restchannels, "Wrong number of rest channels defined if nodes are given"
         assert lgca.dims == nodes.shape[:-1], "Wrong dimensions defined if nodes are given"

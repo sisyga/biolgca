@@ -320,6 +320,16 @@ class LGCA_base(ABC):
 
     """
 
+    _LOCAL_ENSEMBLE_INTERACTIONS = {
+        "birth",
+        "birthdeath",
+        "go_and_grow",
+        "go_or_grow",
+        "go_or_rest",
+        "only_propagation",
+        "random_walk",
+    }
+
     @property
     @abstractmethod
     def interactions(self) -> list:
@@ -536,6 +546,18 @@ class LGCA_base(ABC):
         raise TypeError(
             f"{cls.__name__}.__init__() got unexpected keyword argument(s): "
             + ", ".join(details)
+        )
+
+    def _warn_if_nonlocal_ensemble_interaction(self, interaction_name):
+        if getattr(self, "enable_propagation", True):
+            return
+        if interaction_name in self._LOCAL_ENSEMBLE_INTERACTIONS:
+            return
+        warnings.warn(
+            "Disabling propagation is intended for local interactions only. "
+            f"The interaction {interaction_name!r} may depend on neighbourhood state.",
+            UserWarning,
+            stacklevel=3,
         )
 
     def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1,
@@ -915,8 +937,10 @@ class LGCA_base(ABC):
 
         else:
             print('Random walk interaction is used.')
+            interaction = 'random_walk'
             self.interaction = random_walk
         self._validate_interaction_params()
+        self._warn_if_nonlocal_ensemble_interaction(interaction)
 
     def set_bc(self, bc):
         """

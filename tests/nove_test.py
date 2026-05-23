@@ -550,13 +550,14 @@ class Test_LGCA_NoVE(T_LGCA_Common):
         assert (
             lgca.capacity == capacity
         ), "Capacity keyword not respected in random reset"
-        lgca = get_lgca(
-            geometry=geom,
-            ve=False,
-            nodes=nodes,
-            restchannels=restchannels,
-            interaction="only_propagation",
-        )
+        with pytest.warns(UserWarning, match="Provided nodes"):
+            lgca = get_lgca(
+                geometry=geom,
+                ve=False,
+                nodes=nodes,
+                restchannels=restchannels,
+                interaction="only_propagation",
+            )
         assert (
             lgca.capacity == b + restchannels
         ), "Capacity not correctly calculated from provided geometry and rest channels"

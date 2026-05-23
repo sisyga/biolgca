@@ -37,6 +37,16 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     Base class for identity-based LGCA without volume exclusion.
     """
     interactions = ['go_or_grow', 'birthdeath', 'randomwalk', 'steric_evolution']
+    _LOCAL_ENSEMBLE_INTERACTIONS = {
+        "birth",
+        "birthdeath",
+        "birthdeath_cancerdfe",
+        "diffusion",
+        "go_or_grow",
+        "go_or_grow_kappa",
+        "only_propagation",
+        "random_walk",
+    }
 
     def __init__(self, nodes=None, dims=None, density=.1, restchannels=1,
                  bc='periodic', seed=None, propagation=True, **kwargs):
@@ -112,8 +122,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
             evo_steric, go_or_grow_kappa
         from lgca.interactions import only_propagation
         if 'interaction' in kwargs:
-            interaction = kwargs['interaction']
-            if interaction in ('random walk', 'random_walk', 'diffusion'):
+            interaction = kwargs['interaction'].replace(" ", "_")
+            if interaction in ('random_walk', 'diffusion'):
                 self.interaction = random_walk
             elif interaction == 'only_propagation':
                 self.interaction = only_propagation
@@ -376,8 +386,10 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
 
         else:
             print('Random walk interaction is used.')
+            interaction = 'random_walk'
             self.interaction = random_walk
         self._validate_interaction_params()
+        self._warn_if_nonlocal_ensemble_interaction(interaction)
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, recordchanneldens=False,
                 showprogress=True, recordfampop=False):

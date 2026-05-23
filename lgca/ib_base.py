@@ -144,6 +144,16 @@ class IBLGCA_base(LGCA_base, ABC):
 
     """
 
+    _LOCAL_ENSEMBLE_INTERACTIONS = {
+        "birth",
+        "birthdeath",
+        "birthdeath_discrete",
+        "go_and_grow",
+        "go_or_grow",
+        "only_propagation",
+        "random_walk",
+    }
+
     def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1,
                  bc='periodic', seed=None, propagation=True, **kwargs):
         """Initialize class instance. See class docstring."""
@@ -378,8 +388,10 @@ class IBLGCA_base(LGCA_base, ABC):
                     )
                 )
         else:
+            interaction = 'random_walk'
             self.interaction = random_walk
         self._validate_interaction_params()
+        self._warn_if_nonlocal_ensemble_interaction(interaction)
 
     def update_dynamic_fields(self):
         """

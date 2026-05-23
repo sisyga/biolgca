@@ -101,6 +101,17 @@ def test_warning_on_mismatched_restchannels():
         )
 
 
+def test_warning_when_nodes_override_density():
+    nodes = np.zeros((3, 2), dtype=bool)
+    with pytest.warns(UserWarning, match="density"):
+        get_lgca(
+            geometry='lin',
+            nodes=nodes,
+            density=0.9,
+            interaction='only_propagation',
+        )
+
+
 def test_warning_on_nonboolean_nodes():
     nodes = np.array([[2, 0], [3, 1]])
     with pytest.warns(UserWarning):

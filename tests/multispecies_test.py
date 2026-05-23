@@ -253,15 +253,16 @@ def test_excitable_medium_ms_requires_rest_channel():
 
 
 def test_excitable_medium_ms_keeps_species_in_expected_channel_groups():
-    lgca = get_lgca(
-        geometry="square",
-        n_species=2,
-        restchannels=1,
-        density=0,
-        interaction="excitable_medium_ms",
-        propagation=False,
-        seed=1,
-    )
+    with pytest.warns(UserWarning, match="local interactions"):
+        lgca = get_lgca(
+            geometry="square",
+            n_species=2,
+            restchannels=1,
+            density=0,
+            interaction="excitable_medium_ms",
+            propagation=False,
+            seed=1,
+        )
 
     center = (lgca.r_int, lgca.r_int)
     lgca.nodes.fill(False)

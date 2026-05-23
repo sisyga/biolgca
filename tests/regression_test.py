@@ -151,7 +151,7 @@ def test_unknown_interaction_raises_value_error(ib, ve):
             geometry="square",
             ib=ib,
             ve=ve,
-            restchannels=0,
+            restchannels=1 if ib and not ve else 0,
             density=0,
             interaction="not_an_interaction",
         )
@@ -203,6 +203,21 @@ def test_nove_1d_set_r_int_preserves_state():
     assert lgca.r_int == 2
     assert lgca.nodes.shape == (9, lgca.K)
     np.testing.assert_array_equal(lgca.nodes[lgca.nonborder], before)
+
+
+def test_nove_alignment_measures_are_zero_for_empty_lattice():
+    lgca = get_lgca(
+        geometry="lin",
+        ve=False,
+        dims=4,
+        restchannels=0,
+        density=0,
+        interaction="only_propagation",
+    )
+
+    with np.errstate(invalid="raise", divide="raise"):
+        assert lgca.calc_polar_alignment_parameter() == 0.0
+        assert lgca.calc_mean_alignment() == 0.0
 
 
 def test_nove_ib_moore_propagates_all_velocity_channels():

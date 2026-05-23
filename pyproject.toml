@@ -47,12 +47,17 @@ plot2d = [
 plot3d = [
     "mayavi",
 ]
+plot = [
+    "matplotlib",
+    "mayavi",
+]
 plotting = [
     "matplotlib",
     "mayavi",
 ]
 dev = [
     "pytest>=8",
+    "ruff",
     "Sphinx",
     "sphinx-autodoc-typehints",
     "alabaster",

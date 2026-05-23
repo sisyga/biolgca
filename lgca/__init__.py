@@ -128,7 +128,7 @@ def _translate_dims(dims: Any, geom_key: str) -> Tuple[int, ...]:
     return tuple(dims)
 
 
-def _warn_on_node_mismatch(nodes, dims_arg, rest_arg, geom_key, n_species=1):
+def _warn_on_node_mismatch(nodes, dims_arg, rest_arg, density_arg, geom_key, n_species=1):
     """Warn if provided ``nodes`` are inconsistent with ``dims`` or ``restchannels``."""
     if nodes is None:
         return
@@ -158,6 +158,12 @@ def _warn_on_node_mismatch(nodes, dims_arg, rest_arg, geom_key, n_species=1):
     if rest_arg is not None and rest_from_nodes is not None and rest_from_nodes != rest_arg:
         warnings.warn(
             f"Provided nodes imply {rest_from_nodes} rest channels but ``restchannels``={rest_arg} was passed.",
+            UserWarning,
+        )
+
+    if density_arg is not None:
+        warnings.warn(
+            f"Provided nodes override ``density``={density_arg}.",
             UserWarning,
         )
 
@@ -253,6 +259,7 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, n_species
     nodes = kwargs.get('nodes')
     rest_arg = kwargs.get('restchannels')
     dims_arg = kwargs.get('dims')
+    density_arg = kwargs.get('density') if 'density' in kwargs else None
 
     geom_map = {
         '1d': 'lin',
@@ -390,5 +397,5 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, n_species
             )
 
     lgca = _Cls(**kwargs)
-    _warn_on_node_mismatch(nodes, dims_arg, rest_arg, geom_key, n_species)
+    _warn_on_node_mismatch(nodes, dims_arg, rest_arg, density_arg, geom_key, n_species)
     return lgca

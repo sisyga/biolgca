@@ -32,6 +32,13 @@ class NoVE_LGCA_base(LGCA_base, ABC):
     Base class for LGCA without volume exclusion.
     """
 
+    _LOCAL_ENSEMBLE_INTERACTIONS = {
+        "go_or_grow",
+        "go_or_rest",
+        "only_propagation",
+        "random_walk",
+    }
+
     @classmethod
     def _get_valid_kwargs(cls):
         valid = super()._get_valid_kwargs()
@@ -166,6 +173,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         # if nothing is specified, use density-dependent interaction rule
         else:
             print('Density-dependent alignment interaction is used.')
+            interaction = 'dd_alignment'
             self.interaction = dd_alignment
 
             if self.restchannels > 0:
@@ -183,6 +191,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
                 self.interaction_params['nb_include_center'] = False
                 print('neighbourhood set to exclude the central node')
         self._validate_interaction_params()
+        self._warn_if_nonlocal_ensemble_interaction(interaction)
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True,
                 recordorderparams=False, recordpertype=False):
@@ -277,6 +286,9 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         of particles.
         :return: Polar alignment parameter of the lattice from 0 (no alignment) to 1 (complete alignment)
         """
+        N = self.cell_density[self.nonborder].sum()
+        if N == 0:
+            return 0.0
         # calculate flux only for non-boundary nodes, result is a flux vector at each node position
         flux = self.calc_flux(self.nodes[self.nonborder])
         # calculate along which axes the lattice needs to be summed up, e.g. axes=(0) for 1D, axes=(0,1) for 2D
@@ -284,7 +296,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         # sum fluxes up accordingly
         flux = np.sum(flux, axis=axes)
         # take Euclidean norm and normalise by number of particles
-        return np.linalg.norm(flux, ord=None)/self.cell_density[self.nonborder].sum()
+        return np.linalg.norm(flux, ord=None) / N
 
     def calc_mean_alignment(self):
         """
@@ -297,6 +309,9 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         :return: Local alignment parameter: ranging from -1 (antiparallel alignment) through 0 (no alignment)
         to 1 (parallel alignment)
         """
+        N = self.cell_density[self.nonborder].sum()
+        if N == 0:
+            return 0.0
         # Calculate the director field
         flux = self.calc_flux(self.nodes)
         # # retrieve number of particles and reshape to combine with flux
@@ -323,7 +338,6 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         # # also normalise director field by no. of neighbours retrospectively -
         # #  (computation on less elements if done here)
         no_neighbours = self.c.shape[-1]
-        N = self.cell_density[self.nonborder].sum()
         return alignment[self.nonborder].sum() / (no_neighbours * N)
 
 # create a numpy universal function (ufunc) of the python function 'list'. Can be used to create an numpy array of
