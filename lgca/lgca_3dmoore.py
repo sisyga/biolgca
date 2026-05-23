@@ -57,7 +57,7 @@ class LGCA_3dMoore(LGCA_Cubic):
             dst_y = slice(max(dy, 0), self.nodes.shape[1] - max(-dy, 0))
             src_z = slice(max(-dz, 0), self.nodes.shape[2] - max(dz, 0))
             dst_z = slice(max(dz, 0), self.nodes.shape[2] - max(-dz, 0))
-            newnodes[dst_x, dst_y, dst_z, k] = self.nodes[src_x, src_y, src_z, k]
+            newnodes[dst_x, dst_y, dst_z, ..., k] = self.nodes[src_x, src_y, src_z, ..., k]
         self.nodes = newnodes
 
     def nb_sum(self, qty):
@@ -95,25 +95,25 @@ class LGCA_3dMoore(LGCA_Cubic):
         for i, (dx, _, _) in enumerate(self._vels):
             j = self._ref_x[i]
             if dx == -1:
-                self.nodes[self.r_int, :, :, j] += self.nodes[self.r_int - 1, :, :, i]
+                self.nodes[self.r_int, :, :, ..., j] += self.nodes[self.r_int - 1, :, :, ..., i]
             elif dx == 1:
-                self.nodes[-self.r_int - 1, :, :, j] += self.nodes[-self.r_int, :, :, i]
+                self.nodes[-self.r_int - 1, :, :, ..., j] += self.nodes[-self.r_int, :, :, ..., i]
 
     def _apply_rbc_y(self):
         for i, (_, dy, _) in enumerate(self._vels):
             j = self._ref_y[i]
             if dy == -1:
-                self.nodes[:, self.r_int, :, j] += self.nodes[:, self.r_int - 1, :, i]
+                self.nodes[:, self.r_int, :, ..., j] += self.nodes[:, self.r_int - 1, :, ..., i]
             elif dy == 1:
-                self.nodes[:, -self.r_int - 1, :, j] += self.nodes[:, -self.r_int, :, i]
+                self.nodes[:, -self.r_int - 1, :, ..., j] += self.nodes[:, -self.r_int, :, ..., i]
 
     def _apply_rbc_z(self):
         for i, (_, _, dz) in enumerate(self._vels):
             j = self._ref_z[i]
             if dz == -1:
-                self.nodes[:, :, self.r_int, j] += self.nodes[:, :, self.r_int - 1, i]
+                self.nodes[:, :, self.r_int, ..., j] += self.nodes[:, :, self.r_int - 1, ..., i]
             elif dz == 1:
-                self.nodes[:, :, -self.r_int - 1, j] += self.nodes[:, :, -self.r_int, i]
+                self.nodes[:, :, -self.r_int - 1, ..., j] += self.nodes[:, :, -self.r_int, ..., i]
 
     def apply_rbc(self):
         self._apply_rbc_x()
@@ -147,42 +147,42 @@ class NoVE_IBLGCA_Moore(NoVE_IBLGCA_Cubic, LGCA_3dMoore):
             dst_y = slice(max(dy, 0), self.nodes.shape[1] - max(-dy, 0))
             src_z = slice(max(-dz, 0), self.nodes.shape[2] - max(dz, 0))
             dst_z = slice(max(dz, 0), self.nodes.shape[2] - max(-dz, 0))
-            newnodes[dst_x, dst_y, dst_z, k] = self.nodes[src_x, src_y, src_z, k]
+            newnodes[dst_x, dst_y, dst_z, ..., k] = self.nodes[src_x, src_y, src_z, ..., k]
         self.nodes = newnodes
 
     def _apply_rbc_x(self):
         for i, (dx, _, _) in enumerate(self._vels):
             j = self._ref_x[i]
             if dx == -1:
-                self.nodes[self.r_int, :, :, j] = (
-                    self.nodes[self.r_int, :, :, j] + self.nodes[self.r_int - 1, :, :, i]
+                self.nodes[self.r_int, :, :, ..., j] = (
+                    self.nodes[self.r_int, :, :, ..., j] + self.nodes[self.r_int - 1, :, :, ..., i]
                 )
             elif dx == 1:
-                self.nodes[-self.r_int - 1, :, :, j] = (
-                    self.nodes[-self.r_int - 1, :, :, j] + self.nodes[-self.r_int, :, :, i]
+                self.nodes[-self.r_int - 1, :, :, ..., j] = (
+                    self.nodes[-self.r_int - 1, :, :, ..., j] + self.nodes[-self.r_int, :, :, ..., i]
                 )
 
     def _apply_rbc_y(self):
         for i, (_, dy, _) in enumerate(self._vels):
             j = self._ref_y[i]
             if dy == -1:
-                self.nodes[:, self.r_int, :, j] = (
-                    self.nodes[:, self.r_int, :, j] + self.nodes[:, self.r_int - 1, :, i]
+                self.nodes[:, self.r_int, :, ..., j] = (
+                    self.nodes[:, self.r_int, :, ..., j] + self.nodes[:, self.r_int - 1, :, ..., i]
                 )
             elif dy == 1:
-                self.nodes[:, -self.r_int - 1, :, j] = (
-                    self.nodes[:, -self.r_int - 1, :, j] + self.nodes[:, -self.r_int, :, i]
+                self.nodes[:, -self.r_int - 1, :, ..., j] = (
+                    self.nodes[:, -self.r_int - 1, :, ..., j] + self.nodes[:, -self.r_int, :, ..., i]
                 )
 
     def _apply_rbc_z(self):
         for i, (_, _, dz) in enumerate(self._vels):
             j = self._ref_z[i]
             if dz == -1:
-                self.nodes[:, :, self.r_int, j] = (
-                    self.nodes[:, :, self.r_int, j] + self.nodes[:, :, self.r_int - 1, i]
+                self.nodes[:, :, self.r_int, ..., j] = (
+                    self.nodes[:, :, self.r_int, ..., j] + self.nodes[:, :, self.r_int - 1, ..., i]
                 )
             elif dz == 1:
-                self.nodes[:, :, -self.r_int - 1, j] = (
-                    self.nodes[:, :, -self.r_int - 1, j] + self.nodes[:, :, -self.r_int, i]
+                self.nodes[:, :, -self.r_int - 1, ..., j] = (
+                    self.nodes[:, :, -self.r_int - 1, ..., j] + self.nodes[:, :, -self.r_int, ..., i]
                 )
 

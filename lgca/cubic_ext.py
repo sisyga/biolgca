@@ -12,7 +12,10 @@ from __future__ import annotations
 
 import numpy as np
 import warnings
-from lgca.base_extensions import IBLGCA_base, NoVE_LGCA_base, NoVE_IBLGCA_base, get_arr_of_empty_lists
+from lgca.ib_base import IBLGCA_base
+from lgca.list_utils import get_arr_of_empty_lists
+from lgca.nove_base import NoVE_LGCA_base
+from lgca.nove_ib_base import NoVE_IBLGCA_base
 from .lgca_cubic import LGCA_Cubic
 try:  # optional plotting dependency
     from mayavi import mlab

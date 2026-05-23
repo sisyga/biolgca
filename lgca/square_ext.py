@@ -11,8 +11,10 @@ Includes identity-based and no-volume-exclusion simulators.
 from __future__ import annotations
 
 import numpy as np
-from lgca.base_extensions import get_arr_of_empty_lists
-from lgca.base_extensions import IBLGCA_base, NoVE_LGCA_base, NoVE_IBLGCA_base
+from lgca.ib_base import IBLGCA_base
+from lgca.list_utils import get_arr_of_empty_lists
+from lgca.nove_base import NoVE_LGCA_base
+from lgca.nove_ib_base import NoVE_IBLGCA_base
 from lgca.lgca_square import LGCA_Square
 try:  # optional plotting dependencies
     import matplotlib.animation as animation

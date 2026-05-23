@@ -181,12 +181,12 @@ class LGCA_Cubic(LGCA_base):
         ]
 
         # propagation in each direction
-        newnodes[1:, :, :, 0] = self.nodes[:-1, :, :, 0]
-        newnodes[:-1, :, :, 1] = self.nodes[1:, :, :, 1]
-        newnodes[:, 1:, :, 2] = self.nodes[:, :-1, :, 2]
-        newnodes[:, :-1, :, 3] = self.nodes[:, 1:, :, 3]
-        newnodes[:, :, 1:, 4] = self.nodes[:, :, :-1, 4]
-        newnodes[:, :, :-1, 5] = self.nodes[:, :, 1:, 5]
+        newnodes[1:, ..., 0] = self.nodes[:-1, ..., 0]
+        newnodes[:-1, ..., 1] = self.nodes[1:, ..., 1]
+        newnodes[:, 1:, ..., 2] = self.nodes[:, :-1, ..., 2]
+        newnodes[:, :-1, ..., 3] = self.nodes[:, 1:, ..., 3]
+        newnodes[:, :, 1:, ..., 4] = self.nodes[:, :, :-1, ..., 4]
+        newnodes[:, :, :-1, ..., 5] = self.nodes[:, :, 1:, ..., 5]
 
         self.nodes = newnodes
 
@@ -195,12 +195,12 @@ class LGCA_Cubic(LGCA_base):
         self.nodes[-self.r_int :, ...] = self.nodes[self.r_int : 2 * self.r_int, ...]
 
     def _apply_pbc_y(self):
-        self.nodes[:, : self.r_int, :] = self.nodes[:, -2 * self.r_int : -self.r_int, :]
-        self.nodes[:, -self.r_int :, :] = self.nodes[:, self.r_int : 2 * self.r_int, :]
+        self.nodes[:, : self.r_int, ...] = self.nodes[:, -2 * self.r_int : -self.r_int, ...]
+        self.nodes[:, -self.r_int :, ...] = self.nodes[:, self.r_int : 2 * self.r_int, ...]
 
     def _apply_pbc_z(self):
-        self.nodes[:, :, : self.r_int] = self.nodes[:, :, -2 * self.r_int : -self.r_int]
-        self.nodes[:, :, -self.r_int :] = self.nodes[:, :, self.r_int : 2 * self.r_int]
+        self.nodes[:, :, : self.r_int, ...] = self.nodes[:, :, -2 * self.r_int : -self.r_int, ...]
+        self.nodes[:, :, -self.r_int :, ...] = self.nodes[:, :, self.r_int : 2 * self.r_int, ...]
 
     def apply_pbc(self):
         self._apply_pbc_x()
@@ -208,16 +208,16 @@ class LGCA_Cubic(LGCA_base):
         self._apply_pbc_z()
 
     def _apply_rbc_x(self):
-        self.nodes[self.r_int, :, :, 0] += self.nodes[self.r_int - 1, :, :, 1]
-        self.nodes[-self.r_int - 1, :, :, 1] += self.nodes[-self.r_int, :, :, 0]
+        self.nodes[self.r_int, ..., 0] += self.nodes[self.r_int - 1, ..., 1]
+        self.nodes[-self.r_int - 1, ..., 1] += self.nodes[-self.r_int, ..., 0]
 
     def _apply_rbc_y(self):
-        self.nodes[:, self.r_int, :, 2] += self.nodes[:, self.r_int - 1, :, 3]
-        self.nodes[:, -self.r_int - 1, :, 3] += self.nodes[:, -self.r_int, :, 2]
+        self.nodes[:, self.r_int, ..., 2] += self.nodes[:, self.r_int - 1, ..., 3]
+        self.nodes[:, -self.r_int - 1, ..., 3] += self.nodes[:, -self.r_int, ..., 2]
 
     def _apply_rbc_z(self):
-        self.nodes[:, :, self.r_int, 4] += self.nodes[:, :, self.r_int - 1, 5]
-        self.nodes[:, :, -self.r_int - 1, 5] += self.nodes[:, :, -self.r_int, 4]
+        self.nodes[:, :, self.r_int, ..., 4] += self.nodes[:, :, self.r_int - 1, ..., 5]
+        self.nodes[:, :, -self.r_int - 1, ..., 5] += self.nodes[:, :, -self.r_int, ..., 4]
 
     def apply_rbc(self):
         self._apply_rbc_x()
@@ -226,16 +226,16 @@ class LGCA_Cubic(LGCA_base):
         self.apply_abc()
 
     def _apply_abc_x(self):
-        self.nodes[: self.r_int, :, :, :] = 0
-        self.nodes[-self.r_int :, :, :, :] = 0
+        self.nodes[: self.r_int, ...] = 0
+        self.nodes[-self.r_int :, ...] = 0
 
     def _apply_abc_y(self):
-        self.nodes[:, : self.r_int, :, :] = 0
-        self.nodes[:, -self.r_int :, :, :] = 0
+        self.nodes[:, : self.r_int, ...] = 0
+        self.nodes[:, -self.r_int :, ...] = 0
 
     def _apply_abc_z(self):
-        self.nodes[:, :, : self.r_int, :] = 0
-        self.nodes[:, :, -self.r_int :, :] = 0
+        self.nodes[:, :, : self.r_int, ...] = 0
+        self.nodes[:, :, -self.r_int :, ...] = 0
 
     def apply_abc(self):
         # Apply absorbing boundary conditions

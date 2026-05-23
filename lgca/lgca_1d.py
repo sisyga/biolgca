@@ -35,7 +35,7 @@ from lgca.base import (
     np,
     plt,
 )
-from lgca.base_extensions import get_arr_of_empty_lists
+from lgca.list_utils import get_arr_of_empty_lists
 
 
 class LGCA_1D(LGCA_base):
@@ -256,33 +256,33 @@ class LGCA_1D(LGCA_base):
         """
         newnodes = np.zeros_like(self.nodes)
         # resting particles stay
-        newnodes[:, 2:] = self.nodes[:, 2:]
+        newnodes[..., 2:] = self.nodes[..., 2:]
 
         # propagation to the right
-        newnodes[1:, 0] = self.nodes[:-1, 0]
+        newnodes[1:, ..., 0] = self.nodes[:-1, ..., 0]
 
         # propagation to the left
-        newnodes[:-1, 1] = self.nodes[1:, 1]
+        newnodes[:-1, ..., 1] = self.nodes[1:, ..., 1]
 
         self.nodes = newnodes
 
     def apply_pbc(self):
         # documented in parent class
-        self.nodes[:self.r_int, :] = self.nodes[-2 * self.r_int:-self.r_int, :]
-        self.nodes[-self.r_int:, :] = self.nodes[self.r_int:2 * self.r_int, :]
+        self.nodes[:self.r_int, ...] = self.nodes[-2 * self.r_int:-self.r_int, ...]
+        self.nodes[-self.r_int:, ...] = self.nodes[self.r_int:2 * self.r_int, ...]
 
     def apply_rbc(self):
         # documented in parent class
         # left boundary cell inside domain: right channel gets added left channel from the left
-        self.nodes[self.r_int, 0] += self.nodes[self.r_int - 1, 1]
+        self.nodes[self.r_int, ..., 0] += self.nodes[self.r_int - 1, ..., 1]
         # right boundary cell inside domain: left channel gets added right channel from the right
-        self.nodes[-self.r_int - 1, 1] += self.nodes[-self.r_int, 0]
+        self.nodes[-self.r_int - 1, ..., 1] += self.nodes[-self.r_int, ..., 0]
         self.apply_abc()
 
     def apply_abc(self):
         # documented in parent class
-        self.nodes[:self.r_int, :] = 0
-        self.nodes[-self.r_int:, :] = 0
+        self.nodes[:self.r_int, ...] = 0
+        self.nodes[-self.r_int:, ...] = 0
 
     def nb_sum(self, qty):
         """

@@ -18,6 +18,7 @@ Supported LGCA types:
 import warnings
 from abc import ABC, abstractmethod
 from copy import copy, deepcopy
+import difflib
 
 
 class _MissingPlotLib:
@@ -52,6 +53,45 @@ from lgca.plots import muller_plot, colorbar_index, cmap_discretize, estimate_fi
 
 # configure matplotlib style
 # plt.style.use('default')
+
+
+_VALID_CONSTRUCTOR_KWARGS = {
+    "N",
+    "a_max",
+    "alpha",
+    "bc",
+    "beta",
+    "density",
+    "director",
+    "dims",
+    "drb",
+    "effect",
+    "fitness_increase",
+    "gamma",
+    "gradient",
+    "include_center",
+    "interaction",
+    "kappa",
+    "kappa_std",
+    "nodes",
+    "p_d",
+    "p_p",
+    "pmut",
+    "propagation",
+    "r_b",
+    "r_d",
+    "r_int",
+    "r_m",
+    "restchannels",
+    "rho_0",
+    "s_d",
+    "s_p",
+    "seed",
+    "std",
+    "theta",
+    "theta_std",
+    "track_inheritance",
+}
 
 
 def _as_numeric_array(value, name):
@@ -473,9 +513,35 @@ class LGCA_base(ABC):
             )
         return nodes.astype(bool)
 
+    @classmethod
+    def _get_valid_kwargs(cls):
+        """Return keyword arguments that may be forwarded through constructors."""
+        return set(_VALID_CONSTRUCTOR_KWARGS)
+
+    @classmethod
+    def _validate_kwargs(cls, kwargs):
+        """Raise on unexpected forwarded kwargs before they can be silently ignored."""
+        unknown = sorted(set(kwargs) - cls._get_valid_kwargs())
+        if not unknown:
+            return
+
+        details = []
+        valid = cls._get_valid_kwargs()
+        for key in unknown:
+            matches = difflib.get_close_matches(key, valid, n=1)
+            if matches:
+                details.append(f"{key!r} (did you mean {matches[0]!r}?)")
+            else:
+                details.append(repr(key))
+        raise TypeError(
+            f"{cls.__name__}.__init__() got unexpected keyword argument(s): "
+            + ", ".join(details)
+        )
+
     def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1,
                  bc='periodic', seed=None, propagation=True, **kwargs):
         """Initialize class instance. See class docstring."""
+        self._validate_kwargs(kwargs)
         self.enable_propagation = propagation
         self.r_int: int = _validate_positive_int(kwargs.pop("r_int", 1), "r_int")
         self.rng = npr.default_rng(seed=seed)
@@ -574,6 +640,7 @@ class LGCA_base(ABC):
         from lgca.interactions import go_or_grow, go_or_rest, birth, alignment, persistent_walk, chemotaxis, \
                 contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium, \
                 only_propagation
+        from lgca.ms_interactions import excitable_medium_ms
         if 'interaction' in kwargs:
             interaction = kwargs['interaction'].replace(" ", "_")
             if interaction == 'go_or_grow':
@@ -796,6 +863,30 @@ class LGCA_base(ABC):
                 if 'beta' in kwargs:
                     self.interaction_params['beta'] = kwargs['beta']
 
+                else:
+                    self.interaction_params['beta'] = .05
+                    print('alignment sensitivity set to beta = ', self.interaction_params['beta'])
+
+                if 'alpha' in kwargs:
+                    self.interaction_params['alpha'] = kwargs['alpha']
+                else:
+                    self.interaction_params['alpha'] = 1.
+                    print('aggregation sensitivity set to alpha = ', self.interaction_params['alpha'])
+
+                if 'N' in kwargs:
+                    self.interaction_params['N'] = kwargs['N']
+                else:
+                    self.interaction_params['N'] = 50
+                    print('repetition of fast reaction set to N = ', self.interaction_params['N'])
+
+            elif interaction == 'excitable_medium_ms':
+                if getattr(self, "n_species", 1) != 2:
+                    raise ValueError("excitable_medium_ms requires a multi-species LGCA with exactly two species.")
+                if self.restchannels < 1:
+                    raise ValueError("excitable_medium_ms requires at least one rest channel.")
+                self.interaction = excitable_medium_ms
+                if 'beta' in kwargs:
+                    self.interaction_params['beta'] = kwargs['beta']
                 else:
                     self.interaction_params['beta'] = .05
                     print('alignment sensitivity set to beta = ', self.interaction_params['beta'])
@@ -1091,7 +1182,10 @@ class LGCA_base(ABC):
         return "\n".join(lines)
 
 
-from .base_extensions import IBLGCA_base, NoVE_LGCA_base, NoVE_IBLGCA_base
+from .ib_base import IBLGCA_base
+from .list_utils import get_arr_of_empty_lists
+from .nove_base import NoVE_LGCA_base
+from .nove_ib_base import NoVE_IBLGCA_base
 
 __all__ = [
     "LGCA_base",
@@ -1102,6 +1196,7 @@ __all__ = [
     "colorbar_index",
     "cmap_discretize",
     "estimate_figsize",
+    "get_arr_of_empty_lists",
     "get_cmap",
     "muller_plot",
     "np",

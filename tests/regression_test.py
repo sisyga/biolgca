@@ -1,10 +1,14 @@
 import random
 import inspect
+import importlib
+import importlib.util
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from lgca import get_lgca
+from lgca.lgca_1d import LGCA_1D, IBLGCA_1D, NoVE_LGCA_1D, NoVE_IBLGCA_1D
 import lgca.nove_ib_interactions as nove_ib_interactions
 
 
@@ -19,6 +23,112 @@ def test_geometry_modules_do_not_use_base_wildcard_imports():
         with open(module_path, encoding="utf-8") as module_file:
             source = module_file.read()
         assert "from lgca.base import *" not in source
+
+
+def test_base_public_api_exports_lgca_base_classes():
+    import lgca.base as base
+
+    expected = {
+        "LGCA_base",
+        "IBLGCA_base",
+        "NoVE_LGCA_base",
+        "NoVE_IBLGCA_base",
+        "calc_nematic_tensor",
+        "colorbar_index",
+        "cmap_discretize",
+        "estimate_figsize",
+        "get_cmap",
+        "get_arr_of_empty_lists",
+        "np",
+    }
+    assert expected <= set(base.__all__)
+    assert callable(base.get_arr_of_empty_lists)
+
+
+@pytest.mark.parametrize(
+    ("module_name", "class_name"),
+    [
+        ("lgca.ib_base", "IBLGCA_base"),
+        ("lgca.nove_base", "NoVE_LGCA_base"),
+        ("lgca.nove_ib_base", "NoVE_IBLGCA_base"),
+    ],
+)
+def test_dedicated_base_modules_define_own_base_classes(module_name, class_name):
+    assert importlib.util.find_spec(module_name) is not None
+
+    module = importlib.import_module(module_name)
+    cls = getattr(module, class_name)
+
+    assert cls.__module__ == module_name
+
+
+def test_base_extensions_is_only_a_compatibility_reexport():
+    import lgca.base_extensions as base_extensions
+    from lgca.ib_base import IBLGCA_base
+    from lgca.nove_base import NoVE_LGCA_base
+    from lgca.nove_ib_base import NoVE_IBLGCA_base
+
+    assert base_extensions.IBLGCA_base is IBLGCA_base
+    assert base_extensions.NoVE_LGCA_base is NoVE_LGCA_base
+    assert base_extensions.NoVE_IBLGCA_base is NoVE_IBLGCA_base
+
+
+def test_runtime_modules_do_not_import_from_base_extensions():
+    module_paths = [
+        "lgca/base.py",
+        "lgca/lgca_1d.py",
+        "lgca/lgca_square.py",
+        "lgca/lgca_hex.py",
+        "lgca/lgca_cubic.py",
+        "lgca/lgca_3dmoore.py",
+        "lgca/square_ext.py",
+        "lgca/cubic_ext.py",
+    ]
+
+    for module_path in module_paths:
+        source = Path(module_path).read_text(encoding="utf-8")
+        assert "from lgca.base_extensions import" not in source
+        assert "from .base_extensions import" not in source
+
+
+@pytest.mark.parametrize(
+    "cls",
+    [LGCA_1D, IBLGCA_1D, NoVE_LGCA_1D, NoVE_IBLGCA_1D],
+)
+def test_direct_lgca_constructors_reject_unknown_kwargs(cls):
+    with pytest.raises(TypeError, match="densty.*density"):
+        cls(dims=4, density=0, interaction="only_propagation", densty=0.5)
+
+
+def test_direct_lgca_constructors_accept_valid_interaction_kwargs():
+    lgca = LGCA_1D(
+        dims=4,
+        density=0,
+        interaction="birthdeath",
+        r_b=0.2,
+        r_d=0.1,
+    )
+
+    assert lgca.interaction_params["r_b"] == 0.2
+    assert lgca.interaction_params["r_d"] == 0.1
+
+
+def test_direct_nove_constructor_accepts_capacity_and_rejects_typo():
+    lgca = NoVE_LGCA_1D(
+        dims=4,
+        density=0,
+        capacity=4,
+        interaction="only_propagation",
+    )
+    assert lgca.capacity == 4
+
+    with pytest.raises(TypeError, match="capasity.*capacity"):
+        NoVE_LGCA_1D(
+            dims=4,
+            density=0,
+            interaction="only_propagation",
+            capasity=4,
+        )
 
 
 @pytest.mark.parametrize("alias", ["1D", "1d", "lin", "linear"])

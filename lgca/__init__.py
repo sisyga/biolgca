@@ -128,7 +128,7 @@ def _translate_dims(dims: Any, geom_key: str) -> Tuple[int, ...]:
     return tuple(dims)
 
 
-def _warn_on_node_mismatch(nodes, dims_arg, rest_arg, geom_key):
+def _warn_on_node_mismatch(nodes, dims_arg, rest_arg, geom_key, n_species=1):
     """Warn if provided ``nodes`` are inconsistent with ``dims`` or ``restchannels``."""
     if nodes is None:
         return
@@ -141,7 +141,7 @@ def _warn_on_node_mismatch(nodes, dims_arg, rest_arg, geom_key):
         'moore': 26,
     }
 
-    dims_from_nodes = nodes.shape[:-1]
+    dims_from_nodes = nodes.shape[:-2] if n_species > 1 else nodes.shape[:-1]
     vel = velocity_lookup.get(geom_key)
     if vel is not None:
         rest_from_nodes = nodes.shape[-1] - vel
@@ -164,7 +164,7 @@ def _warn_on_node_mismatch(nodes, dims_arg, rest_arg, geom_key):
 
 
 
-def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs):
+def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, n_species: int = 1, **kwargs):
     """
     Build an LGCA with the specified geometry and initial conditions. Choose the correct LGCA subclass
     from the package and pass remaining keyword parameters on to it for initialization.
@@ -182,6 +182,8 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
         If the LGCA should be identity-based (every particle can have individual properties).
     ve : bool, default=True
         If the LGCA should comply with the volume exclusion principle (only one particle per channel).
+    n_species : int, default=1
+        Number of species. Values greater than one select multi-species LGCA classes.
     **kwargs : dict
         Keyword arguments for dimensions, initial conditions and interaction. Used by the constructor of the LGCA subclass.
 
@@ -227,12 +229,10 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
     Request a classical LGCA with a hexagonal lattice and a random walk interaction.
 
     >>> from lgca import get_lgca
-    >>> lgca = get_lgca(test='unused')
+    >>> lgca = get_lgca(interaction='random_walk')
     Random walk interaction is used.
-    {'test': 'unused'}
 
     Used default values for interactions are printed to the terminal.
-    Unused keywords are printed as a dictionary below that.
 
     Request an identity-based LGCA in a linear geometry with a birth interaction.
 
@@ -274,7 +274,57 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
     geom_spec = geometry.lower() if isinstance(geometry, str) else geometry
     geom_key = geom_map.get(geom_spec, geom_spec)
 
-    if not ve and not ib:
+    if isinstance(n_species, bool) or int(n_species) != n_species or n_species < 1:
+        raise ValueError("n_species must be a positive integer.")
+    n_species = int(n_species)
+    interaction = kwargs.get("interaction")
+    interaction_name = interaction.replace(" ", "_") if isinstance(interaction, str) else interaction
+
+    if interaction_name == "excitable_medium_ms":
+        if not ve:
+            raise ValueError("excitable_medium_ms requires volume exclusion.")
+        if n_species != 2:
+            raise ValueError("excitable_medium_ms requires a multi-species LGCA with exactly two species.")
+        if kwargs.get("restchannels", 0) < 1:
+            raise ValueError("excitable_medium_ms requires at least one rest channel.")
+
+    if n_species > 1:
+        kwargs["n_species"] = n_species
+        if ib:
+            raise NotImplementedError("Multi-species identity-based LGCA is not implemented yet.")
+        if ve:
+            if geom_key == 'lin':
+                from lgca.ms_1d import MSLGCA_1D as _Cls
+            elif geom_key == 'square':
+                from lgca.ms_square import MSLGCA_Square as _Cls
+            elif geom_key == 'hex':
+                from lgca.ms_hex import MSLGCA_Hex as _Cls
+            elif geom_key == 'cubic':
+                from lgca.ms_cubic import MSLGCA_Cubic as _Cls
+            elif geom_key == 'moore':
+                from lgca.ms_moore import MSLGCA_Moore as _Cls
+            else:
+                raise ValueError(
+                    "Geometry specification is unknown. Try: '1d', 'lin', 'linear', 'square', 'sq', "
+                    "'rect', 'rectangular', 'hex', 'hx',  'hexagonal', 'cubic', 'cb', or 'moore3d'."
+                )
+        else:
+            if geom_key == 'lin':
+                from lgca.ms_1d import MSLGCA_NoVE_1D as _Cls
+            elif geom_key == 'square':
+                from lgca.ms_square import MSLGCA_NoVE_Square as _Cls
+            elif geom_key == 'hex':
+                from lgca.ms_hex import MSLGCA_NoVE_Hex as _Cls
+            elif geom_key == 'cubic':
+                from lgca.ms_cubic import MSLGCA_NoVE_Cubic as _Cls
+            elif geom_key == 'moore':
+                from lgca.ms_moore import MSLGCA_NoVE_Moore as _Cls
+            else:
+                raise ValueError(
+                    "Geometry specification is unknown. Try: '1d', 'lin', 'linear', 'square', 'sq', "
+                    "'rect', 'rectangular', 'hex', 'hx',  'hexagonal', 'cubic', 'cb', or 'moore3d'."
+                )
+    elif not ve and not ib:
         if geom_key == 'lin':
             from lgca.lgca_1d import NoVE_LGCA_1D as _Cls
         elif geom_key == 'square':
@@ -340,5 +390,5 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, **kwargs)
             )
 
     lgca = _Cls(**kwargs)
-    _warn_on_node_mismatch(nodes, dims_arg, rest_arg, geom_key)
+    _warn_on_node_mismatch(nodes, dims_arg, rest_arg, geom_key, n_species)
     return lgca
