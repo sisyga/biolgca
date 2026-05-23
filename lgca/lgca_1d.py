@@ -818,13 +818,16 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
         self.nodes[-self.r_int:] = get_arr_of_empty_lists(self.nodes[-self.r_int:].shape)
 
     def init_nodes(self, density, nodes=None):
-        """
-        initialize the nodes. there are three options:
-        1) you provide only the argument "density", which should be a positive float that indicates the average number
-        of cells in each channel
-        2) you provide an array "nodes" with nodes.dtype == int,
-            where each integer determines the number of cells in each channel
-        3) you provide an array "nodes" with nodes.dtype == object, where each element is a list of unique cell labels
+        """Initialize NoVE identity-based 1D nodes.
+
+        Parameters
+        ----------
+        density : float
+            Average number of cells in each channel when ``nodes`` is not
+            supplied.
+        nodes : numpy.ndarray, optional
+            Custom initial state. Integer arrays are interpreted as cell counts
+            per channel. Object arrays must contain lists of unique cell labels.
         """
         self.nodes = get_arr_of_empty_lists(((self.l + 2 * self.r_int, self.K)))
         if nodes is None:

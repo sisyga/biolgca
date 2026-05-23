@@ -582,5 +582,16 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
         corr = np.divide(corr, nb_flux_norm, where=nb_flux_norm > 1e-6, out=np.zeros_like(corr))
         return corr
 
-from .square_ext import IBLGCA_Square, NoVE_LGCA_Square, NoVE_IBLGCA_Square
+def __getattr__(name):
+    """Lazily expose square-lattice extension classes."""
+    if name == "IBLGCA_Square":
+        from .square_ext import IBLGCA_Square
+        return IBLGCA_Square
+    if name == "NoVE_LGCA_Square":
+        from .square_ext import NoVE_LGCA_Square
+        return NoVE_LGCA_Square
+    if name == "NoVE_IBLGCA_Square":
+        from .square_ext import NoVE_IBLGCA_Square
+        return NoVE_IBLGCA_Square
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 

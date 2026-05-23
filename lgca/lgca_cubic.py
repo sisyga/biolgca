@@ -929,5 +929,16 @@ class LGCA_Cubic(LGCA_base):
         mlab.show()
 
 
-from .cubic_ext import IBLGCA_Cubic, NoVE_LGCA_Cubic, NoVE_IBLGCA_Cubic
+def __getattr__(name):
+    """Lazily expose cubic-lattice extension classes."""
+    if name == "IBLGCA_Cubic":
+        from .cubic_ext import IBLGCA_Cubic
+        return IBLGCA_Cubic
+    if name == "NoVE_LGCA_Cubic":
+        from .cubic_ext import NoVE_LGCA_Cubic
+        return NoVE_LGCA_Cubic
+    if name == "NoVE_IBLGCA_Cubic":
+        from .cubic_ext import NoVE_IBLGCA_Cubic
+        return NoVE_IBLGCA_Cubic
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 

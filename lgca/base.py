@@ -1206,10 +1206,21 @@ class LGCA_base(ABC):
         return "\n".join(lines)
 
 
-from .ib_base import IBLGCA_base
 from .list_utils import get_arr_of_empty_lists
-from .nove_base import NoVE_LGCA_base
-from .nove_ib_base import NoVE_IBLGCA_base
+
+
+def __getattr__(name):
+    """Lazily expose compatibility base-class reexports."""
+    if name == "IBLGCA_base":
+        from .ib_base import IBLGCA_base
+        return IBLGCA_base
+    if name == "NoVE_LGCA_base":
+        from .nove_base import NoVE_LGCA_base
+        return NoVE_LGCA_base
+    if name == "NoVE_IBLGCA_base":
+        from .nove_ib_base import NoVE_IBLGCA_base
+        return NoVE_IBLGCA_base
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
     "LGCA_base",

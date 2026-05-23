@@ -9,6 +9,8 @@ implemented lattice geometries and summarises the available interaction rules.
    :maxdepth: 2
    
    lgca_types
+   factory_reference
    lattice_geometries
    interactions_summary
+   planned_topics
    

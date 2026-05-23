@@ -177,12 +177,21 @@ class PropertyColourMapper:
 
 
 def clip_frequencies(y):
-    """
-    Clip an array of frequencies to the first non-zero and the last non-zero values.
-    Utility for draw_wedges of the Muller plot.
-    Adapted from https://phylo-baltic.github.io/baltic-gallery/advanced-muller-plots-raw/
-    :returns: (np.ndarray x_clipped, np.ndarray x) -
-              (indices of the clipped array, indices of the full array)
+    """Clip a frequency trace to the non-zero span used by Muller plots.
+
+    Adapted from
+    https://phylo-baltic.github.io/baltic-gallery/advanced-muller-plots-raw/.
+
+    Parameters
+    ----------
+    y : numpy.ndarray
+        Frequency values over time.
+
+    Returns
+    -------
+    tuple of numpy.ndarray
+        ``(x_clipped, x)`` where ``x_clipped`` indexes the clipped trace and
+        ``x`` indexes the full trace.
     """
     # obtain indices and filter them according to y's content
     x = np.arange(len(y), dtype=int)
@@ -322,46 +331,47 @@ def muller_plot(root_ID, cum_pop_t, children_nlist, parent_list, timeline, facec
                 facecolour_map=None, cmap=None, norm=None, edgecolour=None,
                 xlabel=r"Time $k$", ylabel="Relative frequency", title=None,
                 label_map=None, legend_title=None, sort_labels=False, legend_on=False, **kwargs):
-    """
-    Draw a Muller plot from the given data.
-    # content parameters
-    :param root_ID: integer, ID of the root family in the family tree defined by children_nlist
-    :param cum_pop_t: array of shape (time, families): cumulative populations of all families and all their children
-    :param children_nlist: family tree as nested list of child family IDs, index=parent of the children
-    :param parent_list: family tree as list of parent family IDs, index=child of this parent
-    :param timeline: array, timesteps of the simulation
+    """Draw a Muller plot from family-tree population data.
 
-    # wedge colour customisation
-    :param facecolour: ['identity', 'property', name of a matplotlib colour, None] how the wedges should be coloured.
-                        identity: based on family identity
-                        property: based on a property of the family
-                        name of a matplotlib colour: all families equally in this colour
-    :param facecolour_map: [callable, list, None] how to map from family ID to colour of the wedge based on
-                           the face colouring strategy defined by 'facecolour'
-    :param cmap: if facecolour == 'identity': [name of a matplotlib colourmap, list of colour names, ListedColormap, None] (defaults to 'tab20')
-                 if facecolour == 'property': [name of a matplotlib colourmap, ListedColormap, None] (defaults to 'jet')
-                 2 use cases: - colour map used for colouring in the wedges if facecolour_map is None
-                              - colourmap to make a colourbar if facecolour == 'property' and facecolour_map is callable
-    :param norm: matplotlib.colors.Normalize: used with cmap to make a colourbar if facecolour == 'property'
-                                              and facecolour_map is callable
-    :param edgecolour: edgecolour of wedges, if set to 'align' the edgecolour will be the same as the facecolour of each wedge
+    Parameters
+    ----------
+    root_ID : int
+        ID of the root family in ``children_nlist``.
+    cum_pop_t : numpy.ndarray
+        Cumulative population of all families and descendants with shape
+        ``(time, families)``.
+    children_nlist : list
+        Nested list of child family IDs indexed by parent family ID.
+    parent_list : list
+        Parent family ID indexed by child family ID.
+    timeline : numpy.ndarray
+        Timesteps of the simulation.
+    facecolour : {'identity', 'property'} or str or None, default='identity'
+        Colouring strategy for wedges.
+    facecolour_map : callable or list, optional
+        Mapping from family ID to a colour or property value.
+    cmap : str or matplotlib.colors.Colormap, optional
+        Colormap used for identity or property colouring.
+    norm : matplotlib.colors.Normalize, optional
+        Normalization used for property colouring.
+    edgecolour : str, optional
+        Edge colour for wedges. ``'align'`` reuses each wedge face colour.
+    xlabel, ylabel, title : str, optional
+        Axis labels and title.
+    label_map : callable or list, optional
+        Mapping from family ID to legend label.
+    legend_title : str, optional
+        Legend or colourbar title.
+    sort_labels : bool, default=False
+        If ``True``, sort identity legend labels alphabetically.
+    legend_on : bool, default=False
+        Whether to show the legend for identity colouring.
 
-    # plot setup
-    :param xlabel: label of the x axis
-    :param ylabel: label of the y axis
-    :param title: title of the Muller plot
-
-    # labels and legend
-    :param label_map: [callable, list, None] how to map from family ID to the label in the legend,
-                                             only used if facecolour == 'identity' (defaults to family index)
-    :param legend_title: title of the legend (if facecolour=='identity') or colourbar (if facecolour=='property')
-    :param sort_labels: Boolean - if True, sort labels in the legend alphabetically (family tree = by level).
-                        If False, labels will appear in the same order that the artists are drawn: following each
-                        branch of the family tree from the root to the leaves, then the next branch
-
-    :returns: (fig, ax, ret) fig = matplotlib figure handle, ax = Muller plot axis handle,
-                             ret = handle of legend, handle of colourbar or None. The separate colourbar axis handle
-                             can be retrieved as ret.ax
+    Returns
+    -------
+    tuple
+        ``(fig, ax, ret, fc_map)`` where ``ret`` is the legend, colourbar or
+        ``None`` and ``fc_map`` maps family IDs to face colours.
     """
     # set up drawing mode
     legend = False

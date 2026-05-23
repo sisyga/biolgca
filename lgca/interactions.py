@@ -75,8 +75,8 @@ def birth(lgca):
     lgca : LGCA
         Lattice gas cellular automaton instance.
 
-    Interaction Parameters
-    ----------------------
+    Other Parameters
+    ----------------
     r_b : float
         Birth probability per empty channel; effective
         probability is ``r_b * n / lgca.K`` for local density ``n``.
@@ -102,8 +102,8 @@ def birthdeath(lgca):
     lgca : LGCA
         Lattice gas cellular automaton instance.
 
-    Interaction Parameters
-    ----------------------
+    Other Parameters
+    ----------------
     r_b : float
         Birth probability per empty channel.
     r_d : float
@@ -133,8 +133,8 @@ def alignment(lgca):
     lgca : LGCA
         Lattice gas cellular automaton instance.
 
-    Interaction Parameters
-    ----------------------
+    Other Parameters
+    ----------------
     beta : float
         Alignment strength with neighbouring velocities.
 
@@ -180,8 +180,8 @@ def persistent_walk(lgca):
     lgca : LGCA
         Lattice gas cellular automaton instance.
 
-    Interaction Parameters
-    ----------------------
+    Other Parameters
+    ----------------
     beta : float
         Strength of alignment with the previous velocity direction.
 
@@ -226,8 +226,8 @@ def chemotaxis(lgca):
     lgca : LGCA
         Lattice gas cellular automaton instance.
 
-    Interaction Parameters
-    ----------------------
+    Other Parameters
+    ----------------
     beta : float
         Strength of the bias toward the gradient.
     gradient_field : numpy.ndarray
@@ -272,8 +272,8 @@ def contact_guidance(lgca):
     lgca : LGCA
         Lattice gas cellular automaton instance.
 
-    Interaction Parameters
-    ----------------------
+    Other Parameters
+    ----------------
     beta : float
         Alignment strength toward the guiding axis.
 
@@ -315,8 +315,8 @@ def nematic(lgca):
     lgca : LGCA
         Lattice gas cellular automaton instance.
 
-    Interaction Parameters
-    ----------------------
+    Other Parameters
+    ----------------
     beta : float
         Strength of nematic alignment.
 
@@ -360,8 +360,8 @@ def aggregation(lgca):
     lgca : LGCA
         Lattice gas cellular automaton instance.
 
-    Interaction Parameters
-    ----------------------
+    Other Parameters
+    ----------------
     beta : float
         Strength of the bias toward higher density regions.
 
@@ -404,8 +404,8 @@ def wetting(lgca):
     lgca : LGCA
         Lattice gas cellular automaton instance.
 
-    Interaction Parameters
-    ----------------------
+    Other Parameters
+    ----------------
     r_b : float
         Birth probability used inside the spheroid region.
     rho_0 : float
@@ -485,8 +485,8 @@ def excitable_medium(lgca):
     lgca : LGCA
         Lattice gas cellular automaton instance.
 
-    Interaction Parameters
-    ----------------------
+    Other Parameters
+    ----------------
     alpha : float
         Controls the excitability of the medium.
     beta : float
@@ -540,8 +540,8 @@ def go_or_grow(lgca):
     lgca : LGCA
         Lattice gas cellular automaton instance.
 
-    Interaction Parameters
-    ----------------------
+    Other Parameters
+    ----------------
     r_b : float # This parameter is not used in the provided snippet for go_or_grow, but kept for consistency if it
     was intended.
         Birth probability for resting cells. 
