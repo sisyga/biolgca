@@ -57,6 +57,7 @@ plotting = [
 ]
 dev = [
     "pytest>=8",
+    "tomli; python_version < '3.11'",
     "ruff",
     "Sphinx",
     "sphinx-autodoc-typehints",
