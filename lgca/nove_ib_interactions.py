@@ -517,3 +517,88 @@ def go_or_grow_kappa_chemo(lgca):
         lgca.nodes[coord] = node
     if new_kappa_chunks:
         lgca.props['kappa'] = np.concatenate((lgca.props['kappa'], *new_kappa_chunks))
+
+
+def go_or_grow_glioblastoma(lgca):
+    """Clone-level go-or-grow dynamics for glioblastoma evolution.
+
+    Cells switch between migratory and resting phenotypes according to the local
+    neighbourhood density. Resting cells proliferate with a birth rate stored on
+    their family, and driver mutations found new families with increased birth
+    rate and inherited switch sensitivity.
+
+    Parameters
+    ----------
+    lgca : object
+        Lattice-gas cellular automaton that will be modified in-place.
+
+    Returns
+    -------
+    None
+    """
+    relevant = (lgca.cell_density[lgca.nonborder] > 0)
+    coords = [a[relevant] for a in lgca.nonborder]
+    capacity = lgca.interaction_params['capacity']
+    nbdensity = lgca.nb_sum(lgca.cell_density, addCenter=True) / (
+        (lgca.velocitychannels + 1) * capacity
+    )
+    family_ids = np.asarray(lgca.props['family'], dtype=int)
+    family_kappa = np.asarray(lgca.family_props['kappa'], dtype=float)
+
+    for coord in zip(*coords):
+        cells = np.asarray(_cells_from_node(lgca.nodes[coord]), dtype=int)
+        if cells.size == 0:
+            lgca.nodes[coord] = [[] for _ in range(lgca.K)]
+            continue
+
+        notkilled = lgca.rng.random(size=cells.size) < 1.0 - lgca.interaction_params['r_d']
+        cells = cells[notkilled]
+        if cells.size == 0:
+            lgca.nodes[coord] = [[] for _ in range(lgca.K)]
+            continue
+
+        fams = family_ids[cells]
+        kappas = family_kappa[fams]
+        switch = lgca.rng.random(cells.size) < tanh_switch(
+            rho=nbdensity[coord],
+            kappa=kappas,
+            theta=lgca.interaction_params['theta'],
+        )
+        restcells = list(map(int, cells[switch]))
+        velcells = list(map(int, cells[~switch]))
+
+        rho = cells.size / capacity
+        newcells = []
+        for cell in restcells:
+            fam = lgca.props['family'][cell]
+            r_b = lgca.family_props['r_b'][fam]
+            if lgca.rng.random() < max(r_b * (1.0 - rho), 0.0):
+                lgca.maxlabel += 1
+                newcell = int(lgca.maxlabel)
+                newcells.append(newcell)
+                if lgca.rng.random() < lgca.interaction_params['r_m']:
+                    lgca.add_family(fam)
+                    new_family = int(lgca.maxfamily)
+                    lgca.props['family'].append(new_family)
+                    lgca.family_props['r_b'].append(
+                        lgca.family_props['r_b'][fam] * lgca.interaction_params['fitness_increase']
+                    )
+                    lgca.family_props['kappa'].append(
+                        float(
+                            lgca.rng.normal(
+                                loc=lgca.family_props['kappa'][fam],
+                                scale=lgca.interaction_params['kappa_std'],
+                            )
+                        )
+                    )
+                else:
+                    lgca.props['family'].append(fam)
+
+        restcells.extend(newcells)
+
+        node = [[] for _ in range(lgca.velocitychannels)]
+        node.append(restcells)
+        for cell in velcells:
+            node[lgca.rng.integers(lgca.velocitychannels)].append(cell)
+
+        lgca.nodes[coord] = node
