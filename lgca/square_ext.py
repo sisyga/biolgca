@@ -514,5 +514,3 @@ class NoVE_IBLGCA_Square(NoVE_IBLGCA_base, NoVE_LGCA_Square):
             kwargs.update({'cbarlabel': str(propname)})
 
         return super().plot_scalarfield(mean_prop, **kwargs)
-
-

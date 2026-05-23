@@ -56,9 +56,8 @@ def test_ib_properties():
 def test_families():
     lgca = get_lgca(ib=True, geometry='square', interaction='go_and_grow', dims=10, density=0.2, track_inheritance=True)
     assert 'family' in lgca.props
-    
+
     # Try recording family pop
     lgca = get_lgca(ib=True, geometry='square', interaction='go_and_grow_mutations', dims=10, density=0.2, track_inheritance=True)
     lgca.timeevo(timesteps=2, recordfampop=True, showprogress=False)
     assert hasattr(lgca, 'fam_pop_t')
-

@@ -985,4 +985,3 @@ if __name__ == "__main__":
     # lgca.plot_config()
     # lgca.animate_config()
     # mlab.show()
-

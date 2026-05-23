@@ -941,4 +941,3 @@ def __getattr__(name):
         from .cubic_ext import NoVE_IBLGCA_Cubic
         return NoVE_IBLGCA_Cubic
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-

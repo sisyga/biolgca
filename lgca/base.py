@@ -1236,4 +1236,3 @@ __all__ = [
     "muller_plot",
     "np",
 ]
-

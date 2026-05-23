@@ -54,4 +54,3 @@ assign a callable to ``lgca.interaction`` and store any parameters in
 ``lgca.interaction_params``. The callable should refresh dynamic fields when it
 changes density-dependent state and should leave propagation to
 ``lgca.timestep()`` unless propagation has been disabled intentionally.
-

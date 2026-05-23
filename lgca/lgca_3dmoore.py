@@ -185,4 +185,3 @@ class NoVE_IBLGCA_Moore(NoVE_IBLGCA_Cubic, LGCA_3dMoore):
                 self.nodes[:, :, -self.r_int - 1, ..., j] = (
                     self.nodes[:, :, -self.r_int - 1, ..., j] + self.nodes[:, :, -self.r_int, ..., i]
                 )
-

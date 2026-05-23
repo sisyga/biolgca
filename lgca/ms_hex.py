@@ -38,4 +38,3 @@ class MSLGCA_NoVE_Hex(MultiSpeciesNoVE_LGCA_base, NoVE_LGCA_Hex):
             self._warn_nodes_shape(nodes)
             self.nodes[self.nonborder] = nodes.astype(np.uint)
             self.apply_boundaries()
-

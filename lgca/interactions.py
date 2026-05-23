@@ -544,7 +544,7 @@ def go_or_grow(lgca):
     ----------------
     r_b : float # This parameter is not used in the provided snippet for go_or_grow, but kept for consistency if it
     was intended.
-        Birth probability for resting cells. 
+        Birth probability for resting cells.
     r_d : float # This parameter is not used in the provided snippet for go_or_grow
         Death probability for both states.
     beta : float # Renamed from kappa in some contexts, this is the sensitivity for switching

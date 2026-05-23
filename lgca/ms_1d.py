@@ -38,4 +38,3 @@ class MSLGCA_NoVE_1D(MultiSpeciesNoVE_LGCA_base, NoVE_LGCA_1D):
             self._warn_nodes_shape(nodes)
             self.nodes[self.nonborder] = nodes.astype(np.uint)
             self.apply_boundaries()
-

@@ -717,6 +717,3 @@ def get_cmap(
         cbar.set_ticklabels(labels[0::stride] + [labels[-1]])
     plt.sca(ax)
     return cmap
-
-
-
