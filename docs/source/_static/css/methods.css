@@ -1,5 +1,10 @@
 @import '../alabaster.css';
 
+div.sphinxsidebarwrapper p.logo img {
+    max-width: 100%;
+    height: auto;
+}
+
 .method {
     padding-top: 10px;
 	padding-bottom: 30px;
