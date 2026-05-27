@@ -21,7 +21,7 @@ References
 ----------
 .. [1] Deutsch A, Nava-Sedeño JM, Syga S, Hatzikirou H (2021) BIO-LGCA: A cellular
     automaton modelling class for analysing collective cell migration.
-PLoS Comput Biol 17(6): e1009066. https://doi.org/10.1371/journal.pcbi.1009066
+    PLoS Comput Biol 17(6): e1009066. https://doi.org/10.1371/journal.pcbi.1009066
 
 """
 
@@ -214,22 +214,42 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, n_species
 
     How to navigate: Subclasses are structured as follows (omitting geometry inheritance):
 
-    - :py:class:`lgca.base.LGCA_base`: classical LGCA
+    - :py:class:`lgca.base.LGCA_base`: classical LGCA with volume exclusion
         - :py:class:`lgca.lgca_1d.LGCA_1D`
         - :py:class:`lgca.lgca_square.LGCA_Square`
         - :py:class:`lgca.lgca_hex.LGCA_Hex`
-    - :py:class:`lgca.base.IBLGCA_base`: identity-based LGCA
+        - :py:class:`lgca.lgca_cubic.LGCA_Cubic`
+        - :py:class:`lgca.lgca_3dmoore.LGCA_3dMoore`
+    - :py:class:`lgca.ib_base.IBLGCA_base`: identity-based LGCA with volume exclusion
         - :py:class:`lgca.lgca_1d.IBLGCA_1D`
-        - :py:class:`lgca.lgca_square.IBLGCA_Square`
+        - :py:class:`lgca.square_ext.IBLGCA_Square`
         - :py:class:`lgca.lgca_hex.IBLGCA_Hex`
-    - :py:class:`lgca.base.NoVE_LGCA_base`: classical LGCA without volume exclusion
+        - :py:class:`lgca.cubic_ext.IBLGCA_Cubic`
+        - :py:class:`lgca.lgca_3dmoore.IBLGCA_Moore`
+    - :py:class:`lgca.nove_base.NoVE_LGCA_base`: classical LGCA without volume exclusion
         - :py:class:`lgca.lgca_1d.NoVE_LGCA_1D`
-        - :py:class:`lgca.lgca_square.NoVE_LGCA_Square`
+        - :py:class:`lgca.square_ext.NoVE_LGCA_Square`
         - :py:class:`lgca.lgca_hex.NoVE_LGCA_Hex`
-    - :py:class:`lgca.base.NoVE_IBLGCA_base`: identity-based LGCA without volume exclusion
+        - :py:class:`lgca.cubic_ext.NoVE_LGCA_Cubic`
+        - :py:class:`lgca.lgca_3dmoore.NoVE_LGCA_Moore`
+    - :py:class:`lgca.nove_ib_base.NoVE_IBLGCA_base`: identity-based LGCA without volume exclusion
         - :py:class:`lgca.lgca_1d.NoVE_IBLGCA_1D`
-        - :py:class:`lgca.lgca_square.NoVE_IBLGCA_Square`
+        - :py:class:`lgca.square_ext.NoVE_IBLGCA_Square`
         - :py:class:`lgca.lgca_hex.NoVE_IBLGCA_Hex`
+        - :py:class:`lgca.cubic_ext.NoVE_IBLGCA_Cubic`
+        - :py:class:`lgca.lgca_3dmoore.NoVE_IBLGCA_Moore`
+    - :py:class:`lgca.multispecies_base.MultiSpeciesLGCA_base`: multi-species classical LGCA
+        - :py:class:`lgca.ms_1d.MSLGCA_1D`
+        - :py:class:`lgca.ms_square.MSLGCA_Square`
+        - :py:class:`lgca.ms_hex.MSLGCA_Hex`
+        - :py:class:`lgca.ms_cubic.MSLGCA_Cubic`
+        - :py:class:`lgca.ms_moore.MSLGCA_Moore`
+    - :py:class:`lgca.multispecies_base.MultiSpeciesNoVE_LGCA_base`: multi-species LGCA without volume exclusion
+        - :py:class:`lgca.ms_1d.MSLGCA_NoVE_1D`
+        - :py:class:`lgca.ms_square.MSLGCA_NoVE_Square`
+        - :py:class:`lgca.ms_hex.MSLGCA_NoVE_Hex`
+        - :py:class:`lgca.ms_cubic.MSLGCA_NoVE_Cubic`
+        - :py:class:`lgca.ms_moore.MSLGCA_NoVE_Moore`
 
     Examples
     --------

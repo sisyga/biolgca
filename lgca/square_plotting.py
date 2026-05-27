@@ -264,7 +264,6 @@ class SquarePlotMixin:
 
         ani = animation.FuncAnimation(fig, update, interval=interval)
         return ani
-
     def plot_flow(self, nodes=None, figsize=None, cmap='viridis', vmax=None, cbar=False, **kwargs):
 
         if nodes is None:
@@ -622,4 +621,3 @@ class SquarePlotMixin:
 
         ani = animation.FuncAnimation(fig, update, interval=interval)
         return ani
-

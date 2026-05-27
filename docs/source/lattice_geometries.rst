@@ -1,52 +1,74 @@
 Lattice geometries
 ==================
 
-The LGCA can be simulated on several lattice types.  The geometry determines
-the neighbourhood of each node and therefore how particles propagate.  The
-following sections outline the supported geometries and how to interpret the
-coordinates used by the simulator.
+The geometry determines the coordinate system, velocity channels and
+propagation neighbourhood. Pass a geometry name or alias to
+:func:`lgca.get_lgca`.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Geometry
+     - Common aliases
+     - Velocity channels
+     - Coordinates
+   * - 1D linear
+     - ``"1d"``, ``"lin"``, ``"linear"``
+     - 2
+     - ``x``
+   * - 2D square
+     - ``"square"``, ``"sq"``, ``"rect"``, ``"rectangular"``
+     - 4
+     - ``(x, y)``
+   * - 2D hexagonal
+     - ``"hex"``, ``"hx"``, ``"hexagonal"``
+     - 6
+     - ``(x, y)``
+   * - 3D cubic
+     - ``"cubic"``, ``"cb"``
+     - 6
+     - ``(x, y, z)``
+   * - 3D Moore
+     - ``"moore"``, ``"moore3d"``
+     - 26
+     - ``(x, y, z)``
 
 1-dimensional lattice
 ---------------------
 
-Nodes are arranged on a line and indexed by a single coordinate ``x``.  Each
-node has two opposing velocity channels so particles can move left or right
-in every timestep.
+Nodes are arranged on a line. The two velocity channels represent motion to the
+left and right. Integer ``dims`` values create a lattice of that length.
 
 2-dimensional square lattice
 ----------------------------
 
-Nodes form a rectangular grid indexed by ``(x, y)`` coordinates.  Four velocity
-channels point to the orthogonal neighbours and an optional resting channel may
-be present.
+Nodes form a rectangular grid. Four velocity channels point to the orthogonal
+neighbours. Optional rest channels can be appended after the velocity channels.
 
 2-dimensional hexagonal lattice
 -------------------------------
 
-Nodes are arranged on a hexagonal tiling.  Six velocity channels point to the
-adjacent hexagons which gives rise to isotropic propagation on the plane.
+Nodes are arranged on a hexagonal tiling. Six velocity channels point to
+adjacent hexagons, giving a more isotropic planar neighbourhood than the square
+lattice.
 
 3-dimensional cubic lattice
 ---------------------------
 
-Nodes occupy points on a regular cube grid indexed by ``(x, y, z)``.  Each node
-has six velocity channels pointing to the neighbouring cubes along the cardinal
-directions.  A resting channel may also be present.  Propagation moves particles
-to adjacent cubes in three dimensions.
+Nodes occupy a regular cube grid. Six velocity channels point along the
+positive and negative coordinate axes.
 
 3-dimensional Moore lattice
 ---------------------------
 
-This lattice extends the cubic neighbourhood to include the 26 surrounding
-nodes in all directions. Each node therefore has 26 velocity channels pointing
-to all combinations of ``(dx, dy, dz)`` in ``{-1, 0, 1}`` except the origin. The
-resulting neighbourhood is often called the *Moore* neighbourhood in three
-dimensions. Propagation moves particles to any of the adjacent or diagonal
-neighbours as well as allowing a rest channel when configured.
+The Moore lattice extends the cubic neighbourhood to all 26 surrounding nodes:
+all combinations of ``(dx, dy, dz)`` in ``{-1, 0, 1}`` except the origin.
 
-Example::
+Example
+-------
 
-    from lgca import get_lgca
-    lgca = get_lgca(geometry='moore')
+.. code-block:: python
 
+   from lgca import get_lgca
 
+   lgca = get_lgca(geometry="moore", dims=(10, 10, 10), seed=1)

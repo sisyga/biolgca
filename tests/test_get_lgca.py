@@ -123,5 +123,3 @@ def test_warning_on_nonboolean_nodes():
             interaction='only_propagation',
         )
     assert set(np.unique(lgca.nodes[lgca.nonborder])) <= {0, 1}
-
-

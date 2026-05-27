@@ -468,11 +468,17 @@ class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
 class NoVE_LGCA_Hex(NoVE_LGCA_Square, LGCA_Hex):
 
     def nb_sum(self, qty):
-        """
-        Calculate sum of values in neighboring lattice sites of each lattice site.
-        :param qty: ndarray in which neighboring values have to be added
-                    first dimension indexes lattice sites
-        :return: sum as ndarray
+        """Calculate neighbour sums on the hexagonal lattice.
+
+        Parameters
+        ----------
+        qty : numpy.ndarray
+            Array whose first two axes index lattice sites.
+
+        Returns
+        -------
+        numpy.ndarray
+            Sum of values in neighbouring lattice sites.
         """
         sum = np.zeros(qty.shape)
         # shift to left padding 0 and add to shift to the right padding 0

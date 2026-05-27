@@ -316,4 +316,3 @@ class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
             if recordpertype:
                 self.velcells_t[t, ...] = self.channel_pop[self.nonborder][..., :self.velocitychannels].sum(-1)
                 self.restcells_t[t, ...] = self.channel_pop[self.nonborder][..., self.velocitychannels:].sum(-1)
-

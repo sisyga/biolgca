@@ -36,13 +36,24 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     """
     Base class for identity-based LGCA without volume exclusion.
     """
-    interactions = ['go_or_grow', 'birthdeath', 'randomwalk', 'steric_evolution']
+    interactions = [
+        'go_or_grow',
+        'go_or_grow_kappa',
+        'go_or_grow_glioblastoma',
+        'birth',
+        'birthdeath',
+        'birthdeath_cancerdfe',
+        'random_walk',
+        'randomwalk',
+        'steric_evolution',
+    ]
     _LOCAL_ENSEMBLE_INTERACTIONS = {
         "birth",
         "birthdeath",
         "birthdeath_cancerdfe",
         "diffusion",
         "go_or_grow",
+        "go_or_grow_glioblastoma",
         "go_or_grow_kappa",
         "only_propagation",
         "random_walk",
@@ -119,7 +130,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
 
     def set_interaction(self, **kwargs):
         from lgca.nove_ib_interactions import random_walk, birth, birthdeath, birthdeath_cancerdfe, go_or_grow, \
-            evo_steric, go_or_grow_kappa
+            evo_steric, go_or_grow_kappa, go_or_grow_glioblastoma
         from lgca.interactions import only_propagation
         if 'interaction' in kwargs:
             interaction = kwargs['interaction'].replace(" ", "_")
@@ -377,6 +388,68 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                     self.interaction_params['fitness_increase'] = 1.1
                     print('fitness increase for driver mutations set to ',
                           self.interaction_params['fitness_increase'])
+
+            elif interaction == 'go_or_grow_glioblastoma':
+                self.interaction = go_or_grow_glioblastoma
+                try:
+                    assert self.restchannels > 0
+                except AssertionError:
+                    print('There must be exactly one rest channel for this interaction to work!')
+
+                if 'capacity' in kwargs:
+                    self.interaction_params['capacity'] = kwargs['capacity']
+                else:
+                    self.interaction_params['capacity'] = 8
+                    print('node capacity set to ', self.interaction_params['capacity'])
+
+                if 'kappa_std' in kwargs:
+                    self.interaction_params['kappa_std'] = kwargs['kappa_std']
+                else:
+                    self.interaction_params['kappa_std'] = 0.2
+                    print('std of kappa set to', self.interaction_params['kappa_std'])
+
+                if 'r_d' in kwargs:
+                    self.interaction_params['r_d'] = kwargs['r_d']
+                else:
+                    self.interaction_params['r_d'] = 0.01
+                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+
+                if 'r_m' in kwargs:
+                    self.interaction_params['r_m'] = kwargs['r_m']
+                else:
+                    self.interaction_params['r_m'] = 1e-3
+                    print('mutation rate set to r_m = ', self.interaction_params['r_m'])
+
+                if 'fitness_increase' in kwargs:
+                    self.interaction_params['fitness_increase'] = kwargs['fitness_increase']
+                else:
+                    self.interaction_params['fitness_increase'] = 1.1
+                    print('fitness increase for driver mutations set to ',
+                          self.interaction_params['fitness_increase'])
+
+                if 'theta' in kwargs:
+                    self.interaction_params['theta'] = kwargs['theta']
+                else:
+                    self.interaction_params['theta'] = 0.5
+                    print('switch threshold set to theta = ', self.interaction_params['theta'])
+
+                if 'r_b' in kwargs:
+                    initial_r_b = kwargs['r_b']
+                else:
+                    initial_r_b = 0.2
+                    print('initial family birth rate set to r_b = ', initial_r_b)
+
+                if 'kappa' in kwargs:
+                    initial_kappa = kwargs['kappa']
+                else:
+                    initial_kappa = 5.0
+                    print('initial family switch rate set to kappa = ', initial_kappa)
+
+                self.init_families(type='homogeneous', mutation=True)
+                if self.props.get('family'):
+                    self.props['family'][0] = 1
+                self.family_props.update(r_b=[0.0] + [initial_r_b] * self.maxfamily)
+                self.family_props.update(kappa=[0.0] + [initial_kappa] * self.maxfamily)
             else:
                 raise ValueError(
                     "Unknown interaction {!r}. Implemented interactions: {}".format(
@@ -407,9 +480,9 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
             self.channel_pop_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=np.uint)
             self.channel_pop_t[0, ...] = self.channel_pop[self.nonborder]
         if recordfampop:
-            from lgca.nove_ib_interactions import evo_steric
+            from lgca.nove_ib_interactions import evo_steric, go_or_grow_glioblastoma
             # this needs to include all interactions that can increase the number of recorded families!
-            if self.interaction in [evo_steric]:
+            if self.interaction in [evo_steric, go_or_grow_glioblastoma]:
                 # if mutations are allowed, this is a list because it will be ragged due to increasing family numbers
                 self.fam_pop_t = [self.calc_family_pop_alive()]
                 is_mutating = True
@@ -442,7 +515,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                         raise ValueError("Number of families has increased, interaction must be included in the case " +
                                          "distinction for the recordfampop keyword in the IBLGCA base timeevo function!") from e
         if recordfampop and is_mutating:
-            self.straighten_family_populations()
+            self._straighten_family_populations()
 
     def calc_max_label(self):
         cells = self.nodes.sum()

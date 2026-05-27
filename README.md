@@ -23,8 +23,9 @@ currently supported are:
 - classical LGCA without volume exclusion (all particles/cells have the same properties)
 - identity-based LGCA without volume exclusion (particles/cells can have individual properties)
 
-These can be simulated in 1D, 2D square, 2D hexagonal, **3D cubic**, and **3D Moore** lattices. A
-[library of interaction rules](./lgca/interactions.py) (documentation under construction) is already implemented.
+These can be simulated in 1D, 2D square, 2D hexagonal, **3D cubic**, and **3D Moore** lattices.
+Classical multi-species LGCA are available by passing `n_species > 1`.
+A [library of interaction rules](docs/source/interactions_summary.rst) is already implemented.
 Adding a custom interaction rule or customising other parts of the simulation (e.g. the interaction radius) is easy.
 
 Current analysis possibilities include plots of:
@@ -38,13 +39,11 @@ Current analysis possibilities include plots of:
 The internal state of the LGCA is always accessible for computational analysis.
 
 # Quick Start
-Clone the repository and install the core requirements:
+Clone the repository and install the package into your active Python environment:
 ```bash
 git clone https://github.com/sisyga/biolgca.git
 cd biolgca
-pip install -r requirements.txt
-# install extra packages for plotting support
-pip install -r plotting-requirements.txt
+python -m pip install -e .
 ```
 Run a short simulation to verify the setup:
 ```python
@@ -86,8 +85,7 @@ lgca = get_lgca(interaction='excitable_medium', restchannels=20, N=20, bc='refl'
 # initialise a custom lattice configuration
 lgca.nodes[...] = 0
 lgca.nodes[:lgca.lx // 2, :, :lgca.velocitychannels] = 1  # 6 moving particles per node in the left half of the lattice
-lgca.nodes[:, :lgca.ly // 2,
-lgca.velocitychannels:] = 1  # 6 resting particles per node in the lower half of the lattice
+lgca.nodes[:, :lgca.ly // 2, lgca.velocitychannels:] = 1  # 6 resting particles per node in the lower half of the lattice
 # view a live simulation: density profile of the velocity channels only
 lgca.live_animate_density(channels=slice(0, lgca.velocitychannels), vmax=lgca.velocitychannels)
 # the following image results from stopping the simulation after k=87 timesteps
@@ -121,12 +119,12 @@ lgca.plot_prop_spatial(propname='r_b')  # plot on the right
 `biolgca` depends on `numpy`, `scipy`, and `tqdm` for running simulations.
 To enable plotting features, install the optional plotting extras:
 ```bash
-pip install -e ".[plot]"
+python -m pip install -e ".[plot]"
 ```
 
 For development, install test, lint, and documentation dependencies:
 ```bash
-pip install -e ".[dev]"
+python -m pip install -e ".[dev]"
 ```
 
 #### Installation
@@ -163,12 +161,12 @@ pytest
 ```
 Build the HTML documentation in `docs/_build` using
 ```bash
-sphinx-build -b html docs/source docs/_build
+python -m sphinx -b html docs/source docs/_build/html
 ```
 
 # Questions/Contribute
 The structure of the package and its functionalities are detailed in the
-[documentation](docs/). There you will also find coding examples (under construction).
+[documentation](docs/source/). There you will also find coding examples and API pages.
 
 Issues are tracked on the [GitHub page](https://github.com/sisyga/biolgca/issues).
 We collect both bugs and feature ideas there.

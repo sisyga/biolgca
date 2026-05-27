@@ -218,4 +218,3 @@ def excitable_medium_ms(lgca):
         newnodes[..., 1, :lgca.velocitychannels], axis=-1
     )
     lgca.nodes = newnodes
-
