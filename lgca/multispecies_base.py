@@ -155,6 +155,11 @@ class MultiSpeciesLGCA_base(LGCA_base):
 class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
     """No-volume-exclusion LGCA with multiple species."""
 
+    _LOCAL_ENSEMBLE_INTERACTIONS = NoVE_LGCA_base._LOCAL_ENSEMBLE_INTERACTIONS | {
+        "birth",
+        "birthdeath",
+    }
+
     def __init__(self, *, n_species: int = 1, **kwargs: Any) -> None:
         if isinstance(n_species, bool) or int(n_species) != n_species or n_species < 1:
             raise ValueError("n_species must be a positive integer.")
@@ -208,6 +213,64 @@ class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
     def set_interaction(self, **kwargs):
         if kwargs.get("interaction") == "excitable_medium_ms":
             raise ValueError("excitable_medium_ms requires volume exclusion.")
+        interaction = kwargs.get("interaction", "").replace(" ", "_")
+        if interaction in {"birth", "birthdeath", "go_or_grow"}:
+            from lgca.ms_interactions import (
+                _resolve_mutation_matrix,
+                _validate_mutation_matrix,
+                _validate_species_vector,
+                birth,
+                birthdeath,
+                go_or_grow,
+            )
+
+            self.interaction_params["capacity"] = self.capacity
+            if "mutation_matrix" in kwargs:
+                self.interaction_params["mutation_matrix"] = _validate_mutation_matrix(
+                    self, kwargs["mutation_matrix"]
+                )
+
+            if interaction in {"birth", "birthdeath"}:
+                self.interaction = birthdeath if interaction == "birthdeath" else birth
+                r_b = kwargs.get("r_b", 0.2)
+                self.interaction_params["r_b"] = _validate_species_vector(self, "r_b", r_b)
+                if "std" in kwargs:
+                    self.interaction_params["std"] = kwargs["std"]
+                self.interaction_params["mutation_matrix"] = _validate_mutation_matrix(
+                    self, _resolve_mutation_matrix(self, trait_name="r_b", std_name="std")
+                )
+                if interaction == "birthdeath":
+                    self.interaction_params["r_d"] = kwargs.get("r_d", 0.02)
+                elif "r_d" in kwargs:
+                    warnings.warn("Death rate defined but not used in birth interaction.")
+
+                gamma = kwargs.get("gamma", 0.0)
+                self.interaction_params["gamma"] = gamma
+                z = self.velocitychannels + np.exp(gamma) * self.restchannels
+                self.channel_weights = np.array(
+                    [1.0 / z] * self.velocitychannels
+                    + [np.exp(gamma) / z] * self.restchannels
+                )
+
+            else:
+                if self.restchannels != 1:
+                    raise ValueError("go_or_grow requires exactly one rest channel.")
+                self.interaction = go_or_grow
+                self.interaction_params["r_d"] = kwargs.get("r_d", 0.01)
+                self.interaction_params["r_b"] = kwargs.get("r_b", 0.2)
+                self.interaction_params["kappa"] = _validate_species_vector(
+                    self, "kappa", kwargs.get("kappa", 5.0)
+                )
+                self.interaction_params["theta"] = kwargs.get("theta", 0.5)
+                if "kappa_std" in kwargs:
+                    self.interaction_params["kappa_std"] = kwargs["kappa_std"]
+                self.interaction_params["mutation_matrix"] = _validate_mutation_matrix(
+                    self, _resolve_mutation_matrix(self, trait_name="kappa", std_name="kappa_std")
+                )
+
+            self._validate_interaction_params()
+            self._warn_if_nonlocal_ensemble_interaction(interaction)
+            return
         super().set_interaction(**kwargs)
 
     def update_dynamic_fields(self) -> None:

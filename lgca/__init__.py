@@ -49,6 +49,7 @@ _VALID_KWARGS = {
     "interaction",
     "kappa",
     "kappa_std",
+    "mutation_matrix",
     "nodes",
     "p_d",
     "p_p",
