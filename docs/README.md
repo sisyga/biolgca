@@ -20,13 +20,17 @@ currently supported are:
 - identity-based LGCA (volume exclusion, particles/cells can have individual properties)
 - classical LGCA without volume exclusion (all particles/cells have the same properties)
 - identity-based LGCA without volume exclusion (particles/cells can have individual properties)
+- classical multi-species LGCA with or without volume exclusion
 
 These can be simulated in 1D, 2D square, 2D hexagonal, **3D cubic**, and **3D Moore** lattices.
 Classical multi-species LGCA are available by passing `n_species > 1`.
 A library of interaction rules is documented in `source/interactions_summary.rst`.
-Adding a custom interaction rule or customising other parts of the simulation (e.g. the interaction radius) is easy.
+Built-in rules are available through the legacy `interaction=` argument and as
+native interaction plugins for declarative `ModelSpec` pipelines. Adding a
+custom interaction rule or customising other parts of the simulation (e.g. the
+interaction radius) is easy.
 
-Current analysis possibilities include plots of:
+Current analysis possibilities include observer-based logging plus plots of:
 - density (+ animation)
 - flux (+ animation)
 - flow (+ animation)
@@ -52,6 +56,7 @@ lgca.timeevo(timesteps=10)
 
 # Table of Contents
 - [Example usage](#example-usage)
+- [Declarative simulations](#declarative-simulations)
 - [Getting started](#getting-started)
 - [Running tests and building docs](#running-tests-and-building-docs)
 - [Questions/Contribute](#questionscontribute)
@@ -111,6 +116,32 @@ lgca.plot_density(colorbarwidth=0.2)  # plot on the left
 lgca.plot_prop_spatial(propname='r_b')  # plot on the right
 ```
 ![Go and grow density](docs/images/go_and_grow_density_small.png) ![Go and grow birth rate](./docs/images/go_and_grow_rb_small.png)
+
+# Declarative simulations
+For reproducible simulations, `ModelSpec` separates lattice setup, interaction
+plugins, observer-based logging, and plotting:
+
+```python
+from lgca.model import AnalysisSpec, ModelSpec, SpaceSpec, StateSpec, TimeSpec, run_model
+from lgca.pipeline import InteractionPipelineSpec
+from lgca.simulation import DensityRecorder
+
+spec = ModelSpec(
+    space=SpaceSpec(geometry="hex", dims=(20, 20), boundary="reflecting"),
+    state=StateSpec(density=0.2, restchannels=0),
+    time=TimeSpec(steps=100, seed=1),
+    dynamics=InteractionPipelineSpec(
+        operators=[{"name": "classical.alignment", "parameters": {"beta": 2.0}}],
+    ),
+    analysis=AnalysisSpec(observers=[DensityRecorder()]),
+)
+
+result = run_model(spec, showprogress=False)
+result.lgca.plot_density()
+```
+
+See the [ModelSpec and plugin guide](source/model_specs_and_plugins.rst)
+and the [observer/plotting guide](source/observers_and_plotting.rst).
 
 # Getting started
 #### Dependencies
@@ -178,4 +209,4 @@ Bianca Güttner: `bianca.guettner@nct-dresden.de`
 # License
 BSD 3-clause license (see LICENSE file or [online resource](https://opensource.org/licenses/BSD-3-Clause)).
 
-Copyright (C) 2018-2025 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.
+Copyright (C) 2018-2026 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.

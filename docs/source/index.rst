@@ -4,6 +4,9 @@ Welcome to the biolgca Documentation!
 
 `biolgca <https://github.com/sisyga/biolgca>`_ is a Python package for
 simulating lattice-gas cellular automata (LGCA) in biological contexts.
+Simulations can be built with the traditional :func:`lgca.get_lgca` factory or
+with declarative :class:`lgca.model.ModelSpec` objects that separate model
+setup, interaction plugins, observer-based logging and plotting.
 
 LGCA
 ----
@@ -32,9 +35,10 @@ The :func:`lgca.get_lgca` factory selects a simulator class from these axes:
 Supported geometries are 1D linear, 2D square, 2D hexagonal, 3D cubic and 3D
 Moore lattices. Multi-species identity-based LGCA are not implemented yet.
 
-Current analysis helpers include density, flux, flow, state-space, scalar-field,
-vector-field, property and family-population plots. Plotting features require
-the optional plotting dependencies.
+Current analysis helpers include observer recorders for lattice state, density,
+population and identity-based family summaries, plus density, flux, flow,
+state-space, scalar-field, vector-field, property and family-population plots.
+Plotting features require the optional plotting dependencies.
 
 Quick example
 -------------
@@ -50,6 +54,28 @@ Quick example
 .. figure:: ../images/alignment_small.png
 
    Alignment interaction on a hexagonal lattice.
+
+Declarative example
+-------------------
+
+.. code-block:: python
+
+   from lgca.model import AnalysisSpec, ModelSpec, SpaceSpec, StateSpec, TimeSpec, run_model
+   from lgca.pipeline import InteractionPipelineSpec
+   from lgca.simulation import DensityRecorder
+
+   spec = ModelSpec(
+       space=SpaceSpec(geometry="hex", dims=(20, 20), boundary="reflecting"),
+       state=StateSpec(density=0.2, restchannels=0),
+       time=TimeSpec(steps=100, seed=1),
+       dynamics=InteractionPipelineSpec(
+           operators=[{"name": "classical.alignment", "parameters": {"beta": 2.0}}],
+       ),
+       analysis=AnalysisSpec(observers=[DensityRecorder()]),
+   )
+
+   result = run_model(spec, showprogress=False)
+   result.lgca.plot_density()
 
 More examples
 -------------

@@ -68,6 +68,35 @@ and interaction rule:
 The :doc:`factory_reference` page lists the supported factory switches and
 class families.
 
+Declarative simulations
+-----------------------
+
+For reproducible model setup, use :class:`lgca.model.ModelSpec`. A model spec
+keeps lattice setup, interaction dynamics and observer-based logging in
+separate sections:
+
+.. code-block:: python
+
+   from lgca.model import AnalysisSpec, ModelSpec, SpaceSpec, StateSpec, TimeSpec, run_model
+   from lgca.pipeline import InteractionPipelineSpec
+   from lgca.simulation import DensityRecorder
+
+   spec = ModelSpec(
+       space=SpaceSpec(geometry="hex", dims=(20, 20), boundary="reflecting"),
+       state=StateSpec(density=0.2, restchannels=0),
+       time=TimeSpec(steps=50, seed=1),
+       dynamics=InteractionPipelineSpec(
+           operators=[{"name": "classical.random_walk"}],
+       ),
+       analysis=AnalysisSpec(observers=[DensityRecorder()]),
+   )
+
+   result = run_model(spec, showprogress=False)
+   print(result.lgca.dens_t.shape)
+
+See :doc:`model_specs_and_plugins` for composed interaction phases and
+:doc:`observers_and_plotting` for recorders, snapshots and movies.
+
 Running tests
 -------------
 

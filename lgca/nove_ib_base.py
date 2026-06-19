@@ -466,56 +466,27 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, recordchanneldens=False,
                 showprogress=True, recordfampop=False):
-        self.update_dynamic_fields()
-        if record:
-            self.nodes_t = get_arr_of_empty_lists((timesteps +1,) + self.dims + (self.K,))
-            self.nodes_t[0, ...] = _copy_arr_of_lists(self.nodes[self.nonborder])
-        if recordN:
-            self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
-            self.n_t[0] = self.cell_density[self.nonborder].sum()
-        if recorddens:
-            self.dens_t = np.zeros((timesteps + 1,) + self.dims, dtype=np.uint)
-            self.dens_t[0, ...] = self.cell_density[self.nonborder]
-        if recordchanneldens:
-            self.channel_pop_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=np.uint)
-            self.channel_pop_t[0, ...] = self.channel_pop[self.nonborder]
-        if recordfampop:
-            from lgca.nove_ib_interactions import evo_steric, go_or_grow_glioblastoma
-            # this needs to include all interactions that can increase the number of recorded families!
-            if self.interaction in [evo_steric, go_or_grow_glioblastoma]:
-                # if mutations are allowed, this is a list because it will be ragged due to increasing family numbers
-                self.fam_pop_t = [self.calc_family_pop_alive()]
-                is_mutating = True
-            else:
-                if 'family' not in self.props:
-                    raise RuntimeError("Interaction does not deal with families, "
-                                       "family population can therefore not be recorded.")
-                # otherwise standard procedure
-                self.fam_pop_t = np.zeros((timesteps + 1, self.maxfamily + 1))
-                self.fam_pop_t[0, ...] = self.calc_family_pop_alive()
-                is_mutating = False
+        from .simulation import (
+            ChannelDensityRecorder,
+            DensityRecorder,
+            FamilyPopulationRecorder,
+            NodeRecorder,
+            PopulationRecorder,
+            run_timeevo,
+        )
 
-        for t in tqdm(iterable=range(1, timesteps + 1), disable=1-showprogress):
-            self.timestep()
-            if record:
-                self.nodes_t[t, ...] = _copy_arr_of_lists(self.nodes[self.nonborder])
-            if recordN:
-                self.n_t[t] = self.cell_density[self.nonborder].sum()
-            if recorddens:
-                self.dens_t[t, ...] = self.cell_density[self.nonborder]
-            if recordfampop:
-                if is_mutating:
-                    # append to the ragged nested list
-                    self.fam_pop_t.append(self.calc_family_pop_alive())
-                else:
-                    # standard procedure
-                    try:
-                        self.fam_pop_t[t, ...] = self.calc_family_pop_alive()
-                    except ValueError as e:
-                        raise ValueError("Number of families has increased, interaction must be included in the case " +
-                                         "distinction for the recordfampop keyword in the IBLGCA base timeevo function!") from e
-        if recordfampop and is_mutating:
-            self._straighten_family_populations()
+        observers = []
+        if record:
+            observers.append(NodeRecorder())
+        if recordN:
+            observers.append(PopulationRecorder())
+        if recorddens:
+            observers.append(DensityRecorder(dtype=np.uint))
+        if recordchanneldens:
+            observers.append(ChannelDensityRecorder())
+        if recordfampop:
+            observers.append(FamilyPopulationRecorder())
+        run_timeevo(self, timesteps=timesteps, observers=observers, showprogress=showprogress)
 
     def calc_max_label(self):
         cells = self.nodes.sum()

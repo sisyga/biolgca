@@ -195,46 +195,27 @@ class NoVE_LGCA_base(LGCA_base, ABC):
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True,
                 recordorderparams=False, recordpertype=False):
-        self.update_dynamic_fields()
+        from .simulation import (
+            DensityRecorder,
+            NodeRecorder,
+            OrderParameterRecorder,
+            PerTypeRecorder,
+            PopulationRecorder,
+            run_timeevo,
+        )
+
+        observers = []
         if record:
-            self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
-            self.nodes_t[0, ...] = self.nodes[self.nonborder]
+            observers.append(NodeRecorder())
         if recordN:
-            self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
-            self.n_t[0] = self.cell_density[self.nonborder].sum()
+            observers.append(PopulationRecorder())
         if recorddens:
-            self.dens_t = np.zeros((timesteps + 1,) + self.dims)
-            self.dens_t[0, ...] = self.cell_density[self.nonborder]
+            observers.append(DensityRecorder())
         if recordorderparams:
-            self.ent_t = np.zeros(timesteps + 1, dtype=float)
-            self.ent_t[0, ...] = self.calc_entropy()
-            self.normEnt_t = np.zeros(timesteps + 1, dtype=float)
-            self.normEnt_t[0, ...] = self.calc_normalized_entropy()
-            self.polAlParam_t = np.zeros(timesteps + 1, dtype=float)
-            self.polAlParam_t[0, ...] = self.calc_polar_alignment_parameter()
-            self.meanAlign_t = np.zeros(timesteps + 1, dtype=float)
-            self.meanAlign_t[0, ...] = self.calc_mean_alignment()
+            observers.append(OrderParameterRecorder())
         if recordpertype:
-            self.velcells_t = np.zeros((timesteps + 1,) + self.dims)
-            self.velcells_t[0, ...] = self.nodes[self.nonborder][..., :self.velocitychannels].sum(-1)
-            self.restcells_t = np.zeros((timesteps + 1,) + self.dims)
-            self.restcells_t[0, ...] = self.nodes[self.nonborder][..., self.velocitychannels:].sum(-1)
-        for t in tqdm(iterable=range(1, timesteps + 1), disable=1-showprogress):
-            self.timestep()
-            if record:
-                self.nodes_t[t, ...] = self.nodes[self.nonborder]
-            if recordN:
-                self.n_t[t] = self.cell_density[self.nonborder].sum()
-            if recorddens:
-                self.dens_t[t, ...] = self.cell_density[self.nonborder]
-            if recordorderparams:
-                self.ent_t[t, ...] = self.calc_entropy()
-                self.normEnt_t[t, ...] = self.calc_normalized_entropy()
-                self.polAlParam_t[t, ...] = self.calc_polar_alignment_parameter()
-                self.meanAlign_t[t, ...] = self.calc_mean_alignment()
-            if recordpertype:
-                self.velcells_t[t, ...] = self.nodes[self.nonborder][..., :self.velocitychannels].sum(-1)
-                self.restcells_t[t, ...] = self.nodes[self.nonborder][..., self.velocitychannels:].sum(-1)
+            observers.append(PerTypeRecorder())
+        run_timeevo(self, timesteps=timesteps, observers=observers, showprogress=showprogress)
 
     def random_reset(self, density):
         """Populate the lattice from a Poisson distribution with mean ``density`` per node."""

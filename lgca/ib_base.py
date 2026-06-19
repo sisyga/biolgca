@@ -464,55 +464,24 @@ class IBLGCA_base(LGCA_base, ABC):
             Show a simple progress bar with a percentage of performed timesteps in the standard output.
 
         """
-        self.update_dynamic_fields()
+        from .simulation import (
+            DensityRecorder,
+            FamilyPopulationRecorder,
+            NodeRecorder,
+            PopulationRecorder,
+            run_timeevo,
+        )
+
+        observers = []
         if record:
-            self.nodes_t = np.zeros((timesteps + 1,) + self.dims + (self.K,), dtype=self.nodes.dtype)
-            self.nodes_t[0, ...] = self.nodes[self.nonborder]
-            # self.props_t = [copy(self.props)]  # this is mostly useless, just use self.props of the last time step
+            observers.append(NodeRecorder())
         if recordN:
-            self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
-            self.n_t[0] = self.cell_density[self.nonborder].sum()
+            observers.append(PopulationRecorder())
         if recorddens:
-            self.dens_t = np.zeros((timesteps + 1,) + self.dims)
-            self.dens_t[0, ...] = self.cell_density[self.nonborder]
+            observers.append(DensityRecorder())
         if recordfampop:
-            from lgca.ib_interactions import go_and_grow_mutations
-            # this needs to include all interactions that can increase the number of recorded families!
-            if self.interaction == go_and_grow_mutations:
-                # if mutations are allowed, this is a list because it will be ragged due to increasing family numbers
-                self.fam_pop_t = [self.calc_family_pop_alive()]
-                is_mutating = True
-            else:
-                if 'family' not in self.props:
-                    raise RuntimeError("Interaction does not deal with families, " +
-                                       "family population can therefore not be recorded.")
-                # otherwise standard procedure
-                self.fam_pop_t = np.zeros((timesteps + 1, self.maxfamily+1))
-                self.fam_pop_t[0, ...] = self.calc_family_pop_alive()
-                is_mutating = False
-        for t in tqdm(iterable=range(1, timesteps + 1), disable=1-showprogress):
-            self.timestep()
-            if record:
-                self.nodes_t[t, ...] = self.nodes[self.nonborder]
-                # self.props_t.append(copy(self.props))
-            if recordN:
-                self.n_t[t] = self.cell_density[self.nonborder].sum()
-            if recorddens:
-                self.dens_t[t, ...] = self.cell_density[self.nonborder]
-            if recordfampop:
-                if is_mutating:
-                    # append to the ragged nested list
-                    self.fam_pop_t.append(self.calc_family_pop_alive())
-                else:
-                    # standard procedure
-                    try:
-                        self.fam_pop_t[t, ...] = self.calc_family_pop_alive()
-                    except ValueError as e:
-                        raise ValueError("Number of families has increased, interaction must be included in the case " +
-                                         "distinction for the recordfampop keyword in the IBLGCA base " +
-                                         "timeevo function!") from e
-        if recordfampop and is_mutating:
-            self._straighten_family_populations()
+            observers.append(FamilyPopulationRecorder())
+        run_timeevo(self, timesteps=timesteps, observers=observers, showprogress=showprogress)
 
     def calc_flux(self, nodes):
         """

@@ -7,9 +7,11 @@ the current code alone.
 Custom interactions
 -------------------
 
-Placeholder. A complete guide should explain how to write a callable
-interaction, how to initialize ``interaction_params``, which dynamic fields must
-be refreshed, and how propagation interacts with local and non-local rules.
+The basic callable and plugin paths are described in
+:doc:`interactions_summary` and :doc:`model_specs_and_plugins`. A future
+cookbook should add end-to-end examples for external plugin packages,
+parameter-schema conventions, dynamic-field refresh rules and non-local
+operators.
 
 Boundary conditions
 -------------------
@@ -20,9 +22,10 @@ inflow boundary support by geometry and model family.
 Plotting cookbook
 -----------------
 
-Placeholder. A complete plotting guide should cover optional dependencies, 1D,
-2D and 3D plotting differences, animation functions and property/family plots
-for identity-based models.
+The observer and plotting dispatch APIs are described in
+:doc:`observers_and_plotting`. A future cookbook should add gallery-style
+examples for 1D, 2D and 3D plotting differences, animation writers,
+property/family plots for identity-based models and publication styling.
 
 Custom initial conditions
 -------------------------

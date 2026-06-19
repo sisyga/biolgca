@@ -121,35 +121,18 @@ class MultiSpeciesLGCA_base(LGCA_base):
         showprogress: bool = True,
         recordpertype: bool = False,
     ) -> None:
-        self.update_dynamic_fields()
+        from .simulation import DensityRecorder, NodeRecorder, PerTypeRecorder, PopulationRecorder, run_timeevo
+
+        observers = []
         if record:
-            self.nodes_t = np.zeros(
-                (timesteps + 1,) + self.dims + (self.n_species, self.K),
-                dtype=self.nodes.dtype,
-            )
-            self.nodes_t[0, ...] = self.nodes[self.nonborder]
+            observers.append(NodeRecorder())
         if recordN:
-            self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
-            self.n_t[0] = self.cell_density[self.nonborder].sum()
+            observers.append(PopulationRecorder())
         if recorddens:
-            self.dens_t = np.zeros((timesteps + 1,) + self.dims + (self.n_species,))
-            self.dens_t[0, ...] = self.species_density[self.nonborder]
+            observers.append(DensityRecorder())
         if recordpertype:
-            self.velcells_t = np.zeros((timesteps + 1,) + self.dims + (self.n_species,))
-            self.velcells_t[0, ...] = self.nodes[self.nonborder][..., :self.velocitychannels].sum(-1)
-            self.restcells_t = np.zeros((timesteps + 1,) + self.dims + (self.n_species,))
-            self.restcells_t[0, ...] = self.nodes[self.nonborder][..., self.velocitychannels:].sum(-1)
-        for t in tqdm(range(1, timesteps + 1), disable=1 - showprogress):
-            self.timestep()
-            if record:
-                self.nodes_t[t, ...] = self.nodes[self.nonborder]
-            if recordN:
-                self.n_t[t] = self.cell_density[self.nonborder].sum()
-            if recorddens:
-                self.dens_t[t, ...] = self.species_density[self.nonborder]
-            if recordpertype:
-                self.velcells_t[t, ...] = self.nodes[self.nonborder][..., :self.velocitychannels].sum(-1)
-                self.restcells_t[t, ...] = self.nodes[self.nonborder][..., self.velocitychannels:].sum(-1)
+            observers.append(PerTypeRecorder())
+        run_timeevo(self, timesteps=timesteps, observers=observers, showprogress=showprogress)
 
 
 class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
@@ -287,32 +270,15 @@ class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
         showprogress: bool = True,
         recordpertype: bool = False,
     ) -> None:
-        self.update_dynamic_fields()
+        from .simulation import DensityRecorder, NodeRecorder, PerTypeRecorder, PopulationRecorder, run_timeevo
+
+        observers = []
         if record:
-            self.nodes_t = np.zeros(
-                (timesteps + 1,) + self.dims + (self.n_species, self.K),
-                dtype=self.nodes.dtype,
-            )
-            self.nodes_t[0, ...] = self.nodes[self.nonborder]
+            observers.append(NodeRecorder())
         if recordN:
-            self.n_t = np.zeros(timesteps + 1, dtype=np.uint)
-            self.n_t[0] = self.cell_density[self.nonborder].sum()
+            observers.append(PopulationRecorder())
         if recorddens:
-            self.dens_t = np.zeros((timesteps + 1,) + self.dims + (self.n_species,))
-            self.dens_t[0, ...] = self.species_density[self.nonborder]
+            observers.append(DensityRecorder())
         if recordpertype:
-            self.velcells_t = np.zeros((timesteps + 1,) + self.dims + (self.n_species,))
-            self.velcells_t[0, ...] = self.channel_pop[self.nonborder][..., :self.velocitychannels].sum(-1)
-            self.restcells_t = np.zeros((timesteps + 1,) + self.dims + (self.n_species,))
-            self.restcells_t[0, ...] = self.channel_pop[self.nonborder][..., self.velocitychannels:].sum(-1)
-        for t in tqdm(range(1, timesteps + 1), disable=1 - showprogress):
-            self.timestep()
-            if record:
-                self.nodes_t[t, ...] = self.nodes[self.nonborder]
-            if recordN:
-                self.n_t[t] = self.cell_density[self.nonborder].sum()
-            if recorddens:
-                self.dens_t[t, ...] = self.species_density[self.nonborder]
-            if recordpertype:
-                self.velcells_t[t, ...] = self.channel_pop[self.nonborder][..., :self.velocitychannels].sum(-1)
-                self.restcells_t[t, ...] = self.channel_pop[self.nonborder][..., self.velocitychannels:].sum(-1)
+            observers.append(PerTypeRecorder())
+        run_timeevo(self, timesteps=timesteps, observers=observers, showprogress=showprogress)

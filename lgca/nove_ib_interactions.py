@@ -24,6 +24,17 @@ def _split_cells_into_channels(cells, channeldist):
     return [cells[:channeldist[0]]] + [cells[i:j] for i, j in zip(channeldist[:-1], channeldist[1:])]
 
 
+def _nb_sum(lgca, qty, add_center=False):
+    """Call ``nb_sum`` with optional center inclusion across geometries."""
+    try:
+        return lgca.nb_sum(qty, addCenter=add_center)
+    except TypeError:
+        result = lgca.nb_sum(qty)
+        if add_center:
+            result = result + qty
+        return result
+
+
 def trunc_gauss(lower, upper, mu, sigma=.1, size=1, rng=None):
     """Draw samples from a truncated normal distribution.
 
@@ -365,7 +376,7 @@ def go_or_grow_kappa(lgca):
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     # Calculate the average density in the neighborhood
-    nbdensity = lgca.nb_sum(lgca.cell_density, addCenter=True) / ((lgca.velocitychannels+1) * lgca.interaction_params['capacity']) # average density in neighborhood
+    nbdensity = _nb_sum(lgca, lgca.cell_density, add_center=True) / ((lgca.velocitychannels+1) * lgca.interaction_params['capacity']) # average density in neighborhood
     new_kappa_chunks = []
     for coord in zip(*coords):
         node = lgca.nodes[coord]
@@ -458,7 +469,7 @@ def go_or_grow_kappa_chemo(lgca):
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     g = lgca.gradient(lgca.cell_density / lgca.interaction_params['capacity'])  # density gradient for each lattice site
-    nbdensity = lgca.nb_sum(lgca.cell_density, addCenter=True) / (lgca.velocitychannels * lgca.interaction_params['capacity']) # density of neighbors
+    nbdensity = _nb_sum(lgca, lgca.cell_density, add_center=True) / (lgca.velocitychannels * lgca.interaction_params['capacity']) # density of neighbors
     new_kappa_chunks = []
     for coord in zip(*coords):
         node = lgca.nodes[coord]
@@ -539,7 +550,7 @@ def go_or_grow_glioblastoma(lgca):
     relevant = (lgca.cell_density[lgca.nonborder] > 0)
     coords = [a[relevant] for a in lgca.nonborder]
     capacity = lgca.interaction_params['capacity']
-    nbdensity = lgca.nb_sum(lgca.cell_density, addCenter=True) / (
+    nbdensity = _nb_sum(lgca, lgca.cell_density, add_center=True) / (
         (lgca.velocitychannels + 1) * capacity
     )
     family_ids = np.asarray(lgca.props['family'], dtype=int)

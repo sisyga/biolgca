@@ -1,0 +1,187 @@
+Model specs and interaction plugins
+===================================
+
+The traditional :func:`lgca.get_lgca` API is still supported. New code can also
+describe a complete simulation with :class:`lgca.model.ModelSpec`, which keeps
+model setup, interaction dynamics, logging and plotting separate. The design is
+inspired by Morpheus-style model declarations: dynamics are named plugins with
+metadata, validation and an explicit execution order, while propagation remains
+the deterministic lattice movement phase.
+
+Pipeline phases
+---------------
+
+One timestep is compiled as:
+
+1. particle-number changing operators, such as birth, death and division
+2. phenotype/species switching operators
+3. reorientation operators, including Boltzmann samplers over channel states
+4. deterministic propagation
+
+The default compiler enforces this order. Pass
+``InteractionPipelineSpec(allow_custom_order=True)`` only for specialised
+experiments where the order itself is part of the model.
+
+Minimal ModelSpec
+-----------------
+
+.. code-block:: python
+
+   from lgca.model import (
+       AnalysisSpec,
+       Description,
+       ModelSpec,
+       SpaceSpec,
+       StateSpec,
+       TimeSpec,
+       run_model,
+   )
+   from lgca.pipeline import InteractionPipelineSpec
+   from lgca.simulation import DensityRecorder, NodeRecorder
+
+   spec = ModelSpec(
+       description=Description(title="native random-walk model"),
+       space=SpaceSpec(geometry="hex", dims=(20, 20), boundary="reflecting"),
+       state=StateSpec(density=0.2, restchannels=0),
+       time=TimeSpec(steps=100, seed=1),
+       dynamics=InteractionPipelineSpec(
+           operators=[{"name": "classical.random_walk"}],
+       ),
+       analysis=AnalysisSpec(observers=[NodeRecorder(), DensityRecorder()]),
+   )
+
+   result = run_model(spec, showprogress=False)
+   print(result.metadata["schedule"])
+   result.lgca.plot_density()
+
+The result exposes the final LGCA object, the compiled pipeline, metadata and
+any observer outputs. For example, ``NodeRecorder`` writes ``lgca.nodes_t`` and
+``DensityRecorder`` writes ``lgca.dens_t``.
+
+Composed dynamics
+-----------------
+
+Composed pipelines make the conservation laws visible. The following example
+uses a multispecies volume-exclusion model with particle turnover, phenotype
+switching and a reorientation sampler that combines nematic alignment and
+chemotaxis.
+
+.. code-block:: python
+
+   import numpy as np
+
+   from lgca.model import AnalysisSpec, ModelSpec, SpaceSpec, StateSpec, TimeSpec, run_model
+   from lgca.pipeline import (
+       InteractionPipelineSpec,
+       PhenotypeSwitchSpec,
+       ReorientationSpec,
+       ReorientationTermSpec,
+   )
+   from lgca.simulation import DensityRecorder
+
+   signal = np.linspace(0.0, 1.0, 30)[:, None] + np.zeros((30, 30))
+
+   spec = ModelSpec(
+       space=SpaceSpec(geometry="square", dims=(30, 30), boundary="periodic"),
+       state=StateSpec(
+           density=0.25,
+           restchannels=1,
+           n_species=2,
+           fields={"signal": signal},
+       ),
+       time=TimeSpec(steps=50, seed=3),
+       dynamics=InteractionPipelineSpec(
+           operators=[
+               {
+                   "name": "birth_death",
+                   "parameters": {
+                       "birth_rate": [0.01, 0.005],
+                       "death_rate": [0.002, 0.002],
+                   },
+               },
+               PhenotypeSwitchSpec(
+                   name="phenotype_switch",
+                   parameters={"rates": [[0.0, 0.02], [0.01, 0.0]]},
+               ),
+               ReorientationSpec(
+                   terms=[
+                       ReorientationTermSpec(name="nematic_alignment", beta=1.0),
+                       ReorientationTermSpec(
+                           name="chemotaxis",
+                           beta=0.4,
+                           parameters={"field": "signal"},
+                       ),
+                   ],
+               ),
+           ],
+       ),
+       analysis=AnalysisSpec(observers=[DensityRecorder()]),
+   )
+
+   result = run_model(spec, showprogress=False)
+
+Identity-based family dynamics
+------------------------------
+
+Identity-based models can use native plugins for family and mutation dynamics.
+For example, the glioblastoma go-or-grow interaction tracks family-level
+proliferation rates and switching sensitivities:
+
+.. code-block:: python
+
+   from lgca.model import AnalysisSpec, ModelSpec, SpaceSpec, StateSpec, TimeSpec, run_model
+   from lgca.pipeline import InteractionPipelineSpec
+   from lgca.simulation import DensityRecorder, NodeRecorder
+
+   spec = ModelSpec(
+       space=SpaceSpec(geometry="square", dims=(40, 40), boundary="periodic"),
+       state=StateSpec(
+           density=0.6,
+           restchannels=1,
+           volume_exclusion=False,
+           identity_based=True,
+           parameters={"capacity": 8},
+       ),
+       time=TimeSpec(steps=100, seed=5),
+       dynamics=InteractionPipelineSpec(
+           operators=[
+               {
+                   "name": "nove_ib.go_or_grow_glioblastoma",
+                   "parameters": {
+                       "r_b": 0.2,
+                       "r_d": 0.01,
+                       "r_m": 0.001,
+                       "fitness_increase": 1.1,
+                       "kappa": 5.0,
+                       "theta": 0.5,
+                   },
+               }
+           ],
+       ),
+       analysis=AnalysisSpec(observers=[NodeRecorder(), DensityRecorder()]),
+   )
+
+   result = run_model(spec, showprogress=False)
+   family_rates = result.lgca.family_props["r_b"]
+
+Plugin registry
+---------------
+
+The registry provides the machine-readable interaction catalogue. All built-in
+registered interactions are native operators and have unit-test coverage against
+the previous interaction semantics.
+
+.. code-block:: python
+
+   from lgca.plugins import describe_plugin, interaction_coverage_table, list_plugins
+
+   for plugin in list_plugins(kind="interaction"):
+       print(plugin.name, plugin.operator_kind, plugin.port_status)
+
+   info = describe_plugin("nove_ib.go_or_grow_kappa_chemo")
+   print(info.parameters)
+
+   rows = interaction_coverage_table()
+
+Use plugin metadata when building UIs, validation reports, model provenance
+tables or migration audits.

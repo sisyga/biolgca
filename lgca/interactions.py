@@ -434,7 +434,7 @@ def wetting(lgca):
     newnodes = lgca.nodes.copy()
     nb_nodes = newnodes[lgca.nonborder]
 
-    nbs = lgca.nb_sum(lgca.cell_density)
+    nbs = lgca.nb_sum(lgca.cell_density).astype(float)
     nbs *= np.clip(1 - nbs / lgca.n_crit, a_min=0, a_max=None) / lgca.n_crit * 2
     g_adh = lgca.gradient(nbs)
     pressure = (np.clip(lgca.cell_density - lgca.interaction_params['rho_0'], a_min=0., a_max=None) /
