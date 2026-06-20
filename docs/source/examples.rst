@@ -7,6 +7,9 @@ This section collects small tutorials and notebooks showing how to set up
 simulations and customise the LGCA simulator. The Sphinx pages are intentionally
 short; the notebooks contain longer exploratory workflows.
 
+For a Morpheus-style list of runnable, curated ``ModelSpec`` examples by
+modeling question, see :doc:`example_gallery`.
+
 Legacy factory example
 ----------------------
 
