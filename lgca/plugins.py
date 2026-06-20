@@ -13,6 +13,97 @@ import importlib
 from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping
 
+import numpy as np
+
+
+__all__ = [
+    "BirthDeathOperator",
+    "ConservationLaw",
+    "InteractionOperator",
+    "LegacyInteractionOperator",
+    "ParameterSpec",
+    "PhenotypeSwitchOperator",
+    "PluginInfo",
+    "PluginRegistry",
+    "ReorientationOperator",
+    "ReorientationTerm",
+    "create_plugin",
+    "default_registry",
+    "describe_plugin",
+    "interaction_coverage_table",
+    "list_plugins",
+    "register_plugin",
+    "validate_plugin_parameters",
+]
+
+
+@dataclass(frozen=True)
+class ParameterSpec:
+    """Machine-readable contract for a plugin parameter."""
+
+    default: Any = None
+    required: bool = False
+    type_label: str | None = None
+    shape: Any = None
+    allowed_values: tuple[Any, ...] | None = None
+    dependencies: tuple[str, ...] = ()
+    validator: str | None = None
+    description: str = ""
+
+    @classmethod
+    def from_metadata(cls, metadata: Any) -> "ParameterSpec":
+        if isinstance(metadata, cls):
+            return metadata
+        if isinstance(metadata, Mapping):
+            validator = metadata.get("validator")
+            return cls(
+                default=metadata.get("default"),
+                required=bool(metadata.get("required", "default" not in metadata)),
+                type_label=metadata.get("type_label") or _type_label_from_validator(validator),
+                shape=metadata.get("shape"),
+                allowed_values=_tuple_or_none(metadata.get("allowed_values")),
+                dependencies=tuple(metadata.get("dependencies", ())),
+                validator=validator,
+                description=metadata.get("description", ""),
+            )
+        return cls(default=metadata, required=False)
+
+    def to_dict(self) -> dict[str, Any]:
+        data = {
+            "default": self.default,
+            "required": self.required,
+            "type_label": self.type_label,
+            "shape": self.shape,
+            "allowed_values": self.allowed_values,
+            "dependencies": self.dependencies,
+            "validator": self.validator,
+            "description": self.description,
+        }
+        return {key: value for key, value in data.items() if value not in (None, "", ())}
+
+    def __getitem__(self, key: str) -> Any:
+        return self.to_dict()[key]
+
+
+def _tuple_or_none(value):
+    if value is None:
+        return None
+    return tuple(value)
+
+
+def _type_label_from_validator(validator: str | None) -> str | None:
+    if not validator:
+        return None
+    text = validator.lower()
+    if "probability" in text:
+        return "probability"
+    if "positive integer" in text:
+        return "positive integer"
+    if "non-negative integer" in text:
+        return "non-negative integer"
+    if "finite scalar" in text and " or " not in text:
+        return "finite scalar"
+    return None
 
 @dataclass(frozen=True)
 class ConservationLaw:
@@ -58,6 +149,15 @@ class PluginInfo:
     test_status: str = "unverified"
     description: str = ""
 
+    @property
+    def parameter_specs(self) -> dict[str, ParameterSpec]:
+        """Return parameters normalized to :class:`ParameterSpec` objects."""
+
+        return {
+            name: ParameterSpec.from_metadata(metadata)
+            for name, metadata in self.parameters.items()
+        }
+
 
 class InteractionOperator:
     """Base class for interaction-phase operators."""
@@ -80,6 +180,11 @@ class InteractionOperator:
 
     def validate(self, context) -> None:
         """Validate the operator against a model context."""
+
+    def validate_parameter_contracts(self, context) -> None:
+        """Validate user-supplied parameters against plugin metadata."""
+
+        validate_plugin_parameters(self.info, self.parameters, context=context)
 
     def setup(self, context) -> None:
         """Prepare any cached state before the first timestep."""
@@ -241,6 +346,78 @@ def describe_plugin(name: str) -> PluginInfo:
     return default_registry.describe(name)
 
 
+def validate_plugin_parameters(
+    info: PluginInfo,
+    parameters: Mapping[str, Any] | None,
+    context: Any = None,
+) -> None:
+    """Validate parameters against a plugin's declared contract."""
+
+    parameters = dict(parameters or {})
+    for name, spec in info.parameter_specs.items():
+        if spec.required and name not in parameters:
+            raise ValueError(f"{info.name}.{name} is required")
+        if name not in parameters:
+            continue
+        _validate_parameter_value(info, name, spec, parameters[name], context)
+
+
+def _validate_parameter_value(
+    info: PluginInfo,
+    name: str,
+    spec: ParameterSpec,
+    value: Any,
+    context: Any,
+) -> None:
+    if spec.allowed_values is not None and value not in spec.allowed_values:
+        valid = ", ".join(str(item) for item in spec.allowed_values)
+        raise ValueError(f"{info.name}.{name} must be one of: {valid}")
+
+    if spec.type_label == "probability":
+        values = np.asarray(value, dtype=float)
+        if np.any((values < 0.0) | (values > 1.0)):
+            raise ValueError(f"{info.name}.{name} must be a probability")
+    elif spec.type_label == "finite scalar":
+        if isinstance(value, bool) or np.asarray(value).ndim != 0 or not np.isfinite(float(value)):
+            raise ValueError(f"{info.name}.{name} must be a finite scalar")
+    elif spec.type_label == "positive integer":
+        if isinstance(value, bool) or int(value) != value or value < 1:
+            raise ValueError(f"{info.name}.{name} must be a positive integer")
+    elif spec.type_label == "non-negative integer":
+        if isinstance(value, bool) or int(value) != value or value < 0:
+            raise ValueError(f"{info.name}.{name} must be a non-negative integer")
+    elif spec.type_label == "string":
+        if not isinstance(value, str):
+            raise ValueError(f"{info.name}.{name} must be a string")
+    elif spec.type_label == "boolean":
+        if not isinstance(value, bool):
+            raise ValueError(f"{info.name}.{name} must be a boolean")
+    elif spec.type_label == "array":
+        np.asarray(value)
+
+    _validate_parameter_shape(info, name, spec, value, context)
+
+
+def _validate_parameter_shape(
+    info: PluginInfo,
+    name: str,
+    spec: ParameterSpec,
+    value: Any,
+    context: Any,
+) -> None:
+    if spec.shape is None or context is None:
+        return
+    arr = np.asarray(value)
+    if spec.shape == "spatial_field":
+        expected = tuple(context.lgca.dims)
+    elif spec.shape == "spatial_vector_field":
+        expected = tuple(context.lgca.dims) + (context.lgca.c.shape[0],)
+    else:
+        expected = tuple(spec.shape)
+    if arr.shape != expected:
+        raise ValueError(f"{info.name}.{name} must have shape {expected}; got {arr.shape}")
+
+
 def interaction_coverage_table() -> list[dict[str, Any]]:
     """Return registry rows suitable for documentation and migration audits."""
 
@@ -341,14 +518,17 @@ def _register_native_plugins() -> None:
         parameters={
             "birth_rate": {
                 "default": 0.0,
+                "type_label": "probability",
                 "validator": "probability scalar or per-species vector",
             },
             "death_rate": {
                 "default": 0.0,
+                "type_label": "probability",
                 "validator": "probability scalar or per-species vector",
             },
             "capacity": {
                 "default": "n_species * K",
+                "type_label": "positive integer",
                 "validator": "positive integer",
             },
         },

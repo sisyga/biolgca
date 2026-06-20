@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
@@ -82,6 +83,7 @@ class CompiledPipeline:
 
     def setup(self, context) -> None:
         for operator in self.operators:
+            operator.validate_parameter_contracts(context)
             operator.validate(context)
             operator.setup(context)
 
@@ -105,13 +107,33 @@ class CompiledPipeline:
             parts.append("Propagation (deterministic)")
         return " -> ".join(parts)
 
-    def execute_step(self, context, step: int) -> None:
+    def execute_step(self, context, step: int, timing: list[dict[str, Any]] | None = None) -> None:
         lgca = context.lgca
         for operator in self.operators:
+            start = time.perf_counter()
             operator.apply(context, step)
+            if timing is not None:
+                timing.append(
+                    {
+                        "step": step,
+                        "name": operator.name,
+                        "kind": operator.operator_kind,
+                        "elapsed_seconds": time.perf_counter() - start,
+                    }
+                )
         lgca.apply_boundaries()
         if self.propagation not in (False, None, "none", "disabled"):
+            start = time.perf_counter()
             lgca.propagation()
+            if timing is not None:
+                timing.append(
+                    {
+                        "step": step,
+                        "name": "Propagation",
+                        "kind": "propagation",
+                        "elapsed_seconds": time.perf_counter() - start,
+                    }
+                )
             lgca.apply_boundaries()
         lgca.update_dynamic_fields()
 
@@ -2625,6 +2647,23 @@ class NativeBirthDeathOperator(BirthDeathOperator):
             aliases=("birthdeath_native",),
             operator_kind="birth_death",
             backend_families=("classical", "multispecies"),
+            parameters={
+                "birth_rate": {
+                    "default": 0.0,
+                    "type_label": "probability",
+                    "validator": "probability scalar or per-species vector",
+                },
+                "death_rate": {
+                    "default": 0.0,
+                    "type_label": "probability",
+                    "validator": "probability scalar or per-species vector",
+                },
+                "capacity": {
+                    "default": "n_species * K",
+                    "type_label": "positive integer",
+                    "validator": "positive integer",
+                },
+            },
             conservation_law=ConservationLaw(False, False, False, ("particle number",)),
             port_status="native",
             description="Local birth/death process with volume-exclusion capacity.",

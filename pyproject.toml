@@ -73,4 +73,4 @@ Issues = "https://github.com/sisyga/biolgca/issues"
 Documentation = "https://sisyga.github.io/biolgca/"
 
 [tool.setuptools]
-packages = ["lgca"]
+packages = ["lgca", "lgca.examples"]

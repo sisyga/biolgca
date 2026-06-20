@@ -2,13 +2,32 @@
 
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass
-from typing import Iterable
+from pathlib import Path
+from typing import Any, Iterable, Mapping
 
 import numpy as np
 from tqdm.auto import tqdm
 
 from .list_utils import _copy_arr_of_lists, get_arr_of_empty_lists
+
+
+__all__ = [
+    "CSVSnapshotObserver",
+    "ChannelDensityRecorder",
+    "DensityRecorder",
+    "FamilyPopulationRecorder",
+    "NodeRecorder",
+    "Observer",
+    "OrderParameterRecorder",
+    "PerTypeRecorder",
+    "PopulationRecorder",
+    "ScalarTimeSeriesRecorder",
+    "Schedule",
+    "SimulationRunner",
+    "run_timeevo",
+]
 
 
 @dataclass(frozen=True)
@@ -239,3 +258,95 @@ def run_timeevo(lgca, timesteps: int, observers, showprogress: bool) -> None:
     """Compatibility helper for existing ``timeevo`` methods."""
 
     SimulationRunner(lgca, timesteps=timesteps, observers=observers, showprogress=showprogress).run()
+
+
+class CSVSnapshotObserver(Observer):
+    """Write lattice snapshots to one CSV file per observed timestep."""
+
+    def __init__(
+        self,
+        kind: str = "density",
+        schedule: Schedule | None = None,
+        output_dir=None,
+        filename: str = "{kind}_{step:05d}.csv",
+    ):
+        super().__init__(schedule=schedule)
+        self.kind = kind
+        self.output_dir = Path("." if output_dir is None else output_dir)
+        self.filename = filename
+        self.paths: list[Path] = []
+
+    def setup(self, lgca, runner: SimulationRunner) -> None:
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+    def on_step(self, lgca, step: int) -> None:
+        values = _snapshot_values(lgca, self.kind)
+        path = self.output_dir / self.filename.format(kind=self.kind, step=step)
+        _write_array_csv(path, values)
+        self.paths.append(path)
+
+
+class ScalarTimeSeriesRecorder(Observer):
+    """Record scalar metrics over time and write them to CSV."""
+
+    def __init__(
+        self,
+        metrics: Mapping[str, Any] | None = None,
+        schedule: Schedule | None = None,
+        output_path=None,
+    ):
+        super().__init__(schedule=schedule)
+        self.metrics = dict(metrics or {"population": _total_population})
+        self.output_path = Path("time_series.csv" if output_path is None else output_path)
+        self.records: list[dict[str, Any]] = []
+
+    def setup(self, lgca, runner: SimulationRunner) -> None:
+        self.output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def on_step(self, lgca, step: int) -> None:
+        row = {"step": step}
+        for name, metric in self.metrics.items():
+            row[name] = _scalar_value(metric(lgca))
+        self.records.append(row)
+
+    def finalize(self, lgca, runner: SimulationRunner) -> None:
+        if not self.records:
+            return
+        with self.output_path.open("w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=list(self.records[0]))
+            writer.writeheader()
+            writer.writerows(self.records)
+
+
+def _snapshot_values(lgca, kind: str):
+    key = kind.replace("_", "").lower()
+    if key == "density":
+        if hasattr(lgca, "species_density"):
+            return lgca.species_density[lgca.nonborder]
+        return lgca.cell_density[lgca.nonborder]
+    if key in {"nodes", "config", "configuration"}:
+        return lgca.nodes[lgca.nonborder]
+    if key in {"channelpop", "channelpopulation"}:
+        return lgca.channel_pop[lgca.nonborder]
+    raise ValueError("Unknown CSV snapshot kind {!r}.".format(kind))
+
+
+def _write_array_csv(path: Path, values) -> None:
+    array = np.asarray(values)
+    with path.open("w", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(["flat_index", "value"])
+        for index, value in enumerate(array.ravel()):
+            writer.writerow([index, _scalar_value(value)])
+
+
+def _total_population(lgca):
+    if hasattr(lgca, "species_density"):
+        return lgca.species_density[lgca.nonborder].sum()
+    return lgca.cell_density[lgca.nonborder].sum()
+
+
+def _scalar_value(value):
+    if hasattr(value, "item"):
+        return value.item()
+    return value
