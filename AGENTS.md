@@ -34,13 +34,6 @@ The `biolgca` package is a Python library for simulating lattice-gas cellular au
 - Variable names should be descriptive and indicate their purpose
 - Use type hints where appropriate
 
-### LGCA Implementation Pattern
-
-- New LGCA model classes should inherit from base classes in `base.py`
-- Implement all required abstract methods
-- Boundary conditions should follow the established pattern (periodic, reflecting, absorbing)
-- Use NumPy for efficient array operations
-
 ## Testing
 
 - Run `pytest -q` before proposing a PR
@@ -61,15 +54,3 @@ The `biolgca` package is a Python library for simulating lattice-gas cellular au
 - **Title format**: `[Fix|Feat|Docs] <one-line summary>`
 - **Body requirements**: Must include a "Testing Done" section
 - Include reference to issues being addressed (if applicable)
-
-### Development Workflow
-
-1. Create a new branch for your feature or bugfix
-2. Implement changes with appropriate tests
-3Update documentation if needed
-4Submit a PR with the required format and information
-
-## Common Development Tasks
-
-- **Supporting a new lattice geometry**: Create a new file following the pattern of existing geometry implementations
-- **Fixing bugs**: Include a test case that reproduces the bug before fixing
