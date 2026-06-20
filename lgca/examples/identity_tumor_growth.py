@@ -1,18 +1,19 @@
 """Identity-based tumor growth example.
 
-This model uses a no-volume-exclusion identity-based LGCA. That means cells can
-share a node and can carry individual properties while a go-or-grow rule changes
-motile and proliferative behavior.
-
-What to inspect after running:
-- ``result.lgca.n_t`` records population size.
-- The ``state`` block selects the identity-based, no-volume-exclusion backend.
+This is a compact two-dimensional identity-based go-or-grow model inspired by
+the BioLGCA go-or-grow notebook section.
 """
 
 from __future__ import annotations
 
-from dataclasses import replace
+try:
+    from ._helpers import ensure_project_root_on_path, main
+except ImportError:
+    from _helpers import ensure_project_root_on_path, main
 
+ensure_project_root_on_path(__file__)
+
+from lgca.examples._types import ExampleInfo
 from lgca.model import (
     AnalysisSpec,
     Description,
@@ -20,12 +21,9 @@ from lgca.model import (
     SpaceSpec,
     StateSpec,
     TimeSpec,
-    run_model,
 )
 from lgca.pipeline import InteractionPipelineSpec
 from lgca.simulation import DensityRecorder, PopulationRecorder
-
-from ._types import ExampleInfo
 
 
 INFO = ExampleInfo(
@@ -35,7 +33,7 @@ INFO = ExampleInfo(
     question="How can individual cell properties drive go-or-grow tumor expansion?",
     concepts=("identity-based LGCA", "go-or-grow", "tumor growth"),
     source_path="lgca/examples/identity_tumor_growth.py",
-    source="BioLGCA.ipynb go-and-grow/go-or-grow examples",
+    source="BioLGCA.ipynb go-or-grow example adapted to an identity-based 2D model",
 )
 
 
@@ -48,15 +46,15 @@ def build_spec() -> ModelSpec:
             details="Identity-based tumor growth with a go-or-grow interaction.",
             tags=("example", "identity-based", "tumor-growth"),
         ),
-        space=SpaceSpec(geometry="square", dims=(4, 4), boundary="periodic"),
+        space=SpaceSpec(geometry="square", dims=(50, 50), boundary="periodic"),
         state=StateSpec(
-            density=0.8,
+            density=0.2,
             restchannels=1,
             volume_exclusion=False,
             identity_based=True,
             parameters={"capacity": 8},
         ),
-        time=TimeSpec(steps=2, seed=105),
+        time=TimeSpec(steps=50, seed=105),
         dynamics=InteractionPipelineSpec(
             operators=[
                 {
@@ -80,6 +78,10 @@ def build_spec() -> ModelSpec:
 def run(steps: int | None = None, showprogress: bool = False):
     """Run this example and return a :class:`lgca.model.ModelRunResult`."""
 
+    from dataclasses import replace
+
+    from lgca.model import run_model
+
     spec = build_spec()
     if steps is not None:
         spec = replace(spec, time=replace(spec.time, steps=int(steps)))
@@ -87,5 +89,4 @@ def run(steps: int | None = None, showprogress: bool = False):
 
 
 if __name__ == "__main__":
-    result = run(steps=10)
-    print(result.metadata)
+    main(run)

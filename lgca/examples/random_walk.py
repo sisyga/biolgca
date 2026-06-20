@@ -1,18 +1,20 @@
 """Random walk example.
 
-This is the smallest curated model: choose an LGCA geometry, initialize a
-population density, run unbiased random-walk dynamics, and record density and
-population output.
-
-What to inspect after running:
-- ``result.lgca.dens_t`` shows density snapshots.
-- ``result.lgca.n_t`` shows total population over time.
+This mirrors the introductory simulation loop in ``BioLGCA.ipynb``: choose a
+geometry, initialize a population, run unbiased random-walk dynamics, and record
+density and population output.
 """
 
 from __future__ import annotations
 
-from dataclasses import replace
+try:
+    from ._helpers import ensure_project_root_on_path, main
+except ImportError:
+    from _helpers import ensure_project_root_on_path, main
 
+ensure_project_root_on_path(__file__)
+
+from lgca.examples._types import ExampleInfo
 from lgca.model import (
     AnalysisSpec,
     Description,
@@ -20,12 +22,9 @@ from lgca.model import (
     SpaceSpec,
     StateSpec,
     TimeSpec,
-    run_model,
 )
 from lgca.pipeline import InteractionPipelineSpec
 from lgca.simulation import DensityRecorder, PopulationRecorder
-
-from ._types import ExampleInfo
 
 
 INFO = ExampleInfo(
@@ -35,7 +34,7 @@ INFO = ExampleInfo(
     question="How does unbiased cell movement spread a population?",
     concepts=("movement", "diffusion", "density"),
     source_path="lgca/examples/random_walk.py",
-    source="BioLGCA.ipynb class initialization and simulation sections",
+    source="BioLGCA.ipynb introduction and simulation sections",
 )
 
 
@@ -45,12 +44,12 @@ def build_spec() -> ModelSpec:
     return ModelSpec(
         description=Description(
             title=INFO.title,
-            details="Unbiased random movement on a small square lattice.",
+            details="Unbiased random movement on the default notebook-scale square lattice.",
             tags=("example", "random-walk", "movement"),
         ),
-        space=SpaceSpec(geometry="square", dims=(4, 4), boundary="periodic"),
-        state=StateSpec(density=0.25, restchannels=1),
-        time=TimeSpec(steps=2, seed=101),
+        space=SpaceSpec(geometry="square", dims=(50, 50), boundary="periodic"),
+        state=StateSpec(density=0.1, restchannels=0),
+        time=TimeSpec(steps=100, seed=101),
         dynamics=InteractionPipelineSpec(
             operators=[{"name": "classical.random_walk"}],
         ),
@@ -63,6 +62,10 @@ def build_spec() -> ModelSpec:
 def run(steps: int | None = None, showprogress: bool = False):
     """Run this example and return a :class:`lgca.model.ModelRunResult`."""
 
+    from dataclasses import replace
+
+    from lgca.model import run_model
+
     spec = build_spec()
     if steps is not None:
         spec = replace(spec, time=replace(spec.time, steps=int(steps)))
@@ -70,5 +73,4 @@ def run(steps: int | None = None, showprogress: bool = False):
 
 
 if __name__ == "__main__":
-    result = run(steps=10)
-    print(result.metadata)
+    main(run)

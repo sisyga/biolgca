@@ -14,7 +14,7 @@ def test_example_gallery_lists_beginner_model_cards_by_category():
     assert all(card.concepts for card in cards)
 
     guidance = example_gallery(category="guidance")
-    assert [card.name for card in guidance] == ["chemotaxis"]
+    assert [card.name for card in guidance] == ["chemotaxis", "contact_guidance"]
 
     chemotaxis = describe_example("chemotaxis")
     assert chemotaxis.category == "guidance"

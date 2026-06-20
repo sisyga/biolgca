@@ -156,16 +156,10 @@ def test_describe_model_graph_exposes_fields_plugins_observers_and_outputs():
 
 
 def test_curated_example_specs_smoke_run():
-    from lgca.examples import all_example_specs
+    from lgca.examples import all_example_specs, example_names
 
     examples = all_example_specs()
-    assert set(examples) == {
-        "alignment",
-        "chemotaxis",
-        "identity_tumor_growth",
-        "multispecies_birth_death",
-        "random_walk",
-    }
+    assert set(examples) == set(example_names())
 
     for name, spec in examples.items():
         result = run_model(spec, showprogress=False)

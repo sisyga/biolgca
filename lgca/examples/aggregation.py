@@ -1,7 +1,7 @@
-"""Alignment example.
+"""Aggregation example.
 
-This follows the ``BioLGCA.ipynb`` alignment example: a hexagonal LGCA with
-reflecting boundaries and local alignment that produces collective motion.
+This follows the ``BioLGCA.ipynb`` aggregation section: a square lattice,
+moderate density, and three rest channels so cells can collect in dense regions.
 """
 
 from __future__ import annotations
@@ -23,17 +23,17 @@ from lgca.model import (
     TimeSpec,
 )
 from lgca.pipeline import InteractionPipelineSpec
-from lgca.simulation import DensityRecorder, PopulationRecorder
+from lgca.simulation import DensityRecorder, NodeRecorder, PopulationRecorder
 
 
 INFO = ExampleInfo(
-    name="alignment",
-    title="Alignment example",
+    name="aggregation",
+    title="Aggregation example",
     category="collective motion",
-    question="How do local alignment rules create coherent streams?",
-    concepts=("collective motion", "flux", "reorientation"),
-    source_path="lgca/examples/alignment.py",
-    source="BioLGCA.ipynb alignment example",
+    question="How does density-biased movement create clusters?",
+    concepts=("aggregation", "density", "rest channels"),
+    source_path="lgca/examples/aggregation.py",
+    source="BioLGCA.ipynb aggregation example",
 )
 
 
@@ -43,17 +43,17 @@ def build_spec() -> ModelSpec:
     return ModelSpec(
         description=Description(
             title=INFO.title,
-            details="Hexagonal alignment with reflecting boundaries, as in the notebook.",
-            tags=("example", "alignment", "collective-motion"),
+            details="Square-lattice aggregation with notebook density and rest channels.",
+            tags=("example", "aggregation", "density"),
         ),
-        space=SpaceSpec(geometry="hex", dims=(50, 50), boundary="reflecting"),
-        state=StateSpec(density=0.1, restchannels=0),
-        time=TimeSpec(steps=100, seed=102),
+        space=SpaceSpec(geometry="square", dims=(50, 50), boundary="periodic"),
+        state=StateSpec(density=0.3, restchannels=3),
+        time=TimeSpec(steps=100, seed=106),
         dynamics=InteractionPipelineSpec(
-            operators=[{"name": "classical.alignment", "parameters": {"beta": 2.0}}],
+            operators=[{"name": "classical.aggregation", "parameters": {"beta": 2.0}}],
         ),
         analysis=AnalysisSpec(
-            observers=[DensityRecorder(), PopulationRecorder()],
+            observers=[NodeRecorder(), DensityRecorder(), PopulationRecorder()],
         ),
     )
 

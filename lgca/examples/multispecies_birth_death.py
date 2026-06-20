@@ -1,18 +1,20 @@
 """Multispecies birth-death example.
 
-This model shows how a single BioLGCA model can track two species with
-different birth rates. The operator is backend-aware, so the same model spec
-states the biological rates while BioLGCA chooses the correct implementation.
-
-What to inspect after running:
-- ``result.lgca.n_t`` records total population through time.
-- The species-specific rates are in ``BirthDeathSpec.parameters``.
+This extends the notebook population-dynamics theme to two species with
+different birth rates. It is retained as a compact bridge from the canonical
+single-species notebook models toward multispecies BioLGCA use.
 """
 
 from __future__ import annotations
 
-from dataclasses import replace
+try:
+    from ._helpers import ensure_project_root_on_path, main
+except ImportError:
+    from _helpers import ensure_project_root_on_path, main
 
+ensure_project_root_on_path(__file__)
+
+from lgca.examples._types import ExampleInfo
 from lgca.model import (
     AnalysisSpec,
     Description,
@@ -20,12 +22,9 @@ from lgca.model import (
     SpaceSpec,
     StateSpec,
     TimeSpec,
-    run_model,
 )
 from lgca.pipeline import BirthDeathSpec, InteractionPipelineSpec
 from lgca.simulation import DensityRecorder, PopulationRecorder
-
-from ._types import ExampleInfo
 
 
 INFO = ExampleInfo(
@@ -35,7 +34,7 @@ INFO = ExampleInfo(
     question="How do different birth and death rates change competing populations?",
     concepts=("multispecies", "birth", "death"),
     source_path="lgca/examples/multispecies_birth_death.py",
-    source="Morpheus ODE and multiscale population examples",
+    source="BioLGCA.ipynb population examples extended to multispecies LGCA",
 )
 
 
@@ -48,9 +47,9 @@ def build_spec() -> ModelSpec:
             details="Two species share a lattice but use different birth rates.",
             tags=("example", "multispecies", "birth-death"),
         ),
-        space=SpaceSpec(geometry="square", dims=(4, 4), boundary="periodic"),
-        state=StateSpec(density=0.5, restchannels=1, n_species=2),
-        time=TimeSpec(steps=2, seed=104),
+        space=SpaceSpec(geometry="square", dims=(50, 50), boundary="periodic"),
+        state=StateSpec(density=0.2, restchannels=1, n_species=2),
+        time=TimeSpec(steps=100, seed=104),
         dynamics=InteractionPipelineSpec(
             operators=[
                 BirthDeathSpec(
@@ -68,6 +67,10 @@ def build_spec() -> ModelSpec:
 def run(steps: int | None = None, showprogress: bool = False):
     """Run this example and return a :class:`lgca.model.ModelRunResult`."""
 
+    from dataclasses import replace
+
+    from lgca.model import run_model
+
     spec = build_spec()
     if steps is not None:
         spec = replace(spec, time=replace(spec.time, steps=int(steps)))
@@ -75,5 +78,4 @@ def run(steps: int | None = None, showprogress: bool = False):
 
 
 if __name__ == "__main__":
-    result = run(steps=10)
-    print(result.metadata)
+    main(run)

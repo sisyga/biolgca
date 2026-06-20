@@ -1,7 +1,7 @@
-"""Chemotaxis example.
+"""Nematic contact guidance example.
 
-This keeps the notebook's chemotaxis interaction but makes the guidance field
-explicit so students can see where the directional cue enters the model.
+This adapts the ``BioLGCA.ipynb`` contact-guidance section into an explicit
+director-field model, so the guiding structure is visible in the example file.
 """
 
 from __future__ import annotations
@@ -25,24 +25,34 @@ from lgca.model import (
     TimeSpec,
 )
 from lgca.pipeline import InteractionPipelineSpec, ReorientationSpec, ReorientationTermSpec
-from lgca.simulation import DensityRecorder, PopulationRecorder
+from lgca.simulation import DensityRecorder, NodeRecorder, PopulationRecorder
 
 
 INFO = ExampleInfo(
-    name="chemotaxis",
-    title="Chemotaxis example",
+    name="contact_guidance",
+    title="Nematic contact guidance example",
     category="guidance",
-    question="How does a signal field bias cell movement?",
-    concepts=("signal field", "gradient sensing", "reorientation"),
-    source_path="lgca/examples/chemotaxis.py",
-    source="BioLGCA.ipynb chemotaxis example",
+    question="How does an oriented scaffold bias movement?",
+    concepts=("contact guidance", "director field", "single-cell initial state"),
+    source_path="lgca/examples/contact_guidance.py",
+    source="BioLGCA.ipynb nematic contact guidance example",
 )
 
 
-def build_signal_field() -> np.ndarray:
-    """Create a left-to-right signal gradient for the 50 by 50 lattice."""
+def build_initial_nodes() -> np.ndarray:
+    """Place one cell near the notebook's starting location."""
 
-    return np.linspace(0.0, 1.0, 50)[:, None] + np.zeros((50, 50))
+    nodes = np.zeros((50, 50, 4), dtype=bool)
+    nodes[10, 10, 1] = True
+    return nodes
+
+
+def build_director_field() -> np.ndarray:
+    """Create a horizontal director field for square-lattice contact guidance."""
+
+    director = np.zeros((50, 50, 2), dtype=float)
+    director[..., 0] = 1.0
+    return director
 
 
 def build_spec() -> ModelSpec:
@@ -51,31 +61,31 @@ def build_spec() -> ModelSpec:
     return ModelSpec(
         description=Description(
             title=INFO.title,
-            details="Chemotaxis uses a named state field and a term that reads it.",
-            tags=("example", "chemotaxis", "signal-field"),
+            details="A single cell follows an explicit horizontal director field.",
+            tags=("example", "contact-guidance", "director-field"),
         ),
         space=SpaceSpec(geometry="square", dims=(50, 50), boundary="periodic"),
         state=StateSpec(
-            density=0.1,
+            nodes=build_initial_nodes(),
             restchannels=0,
-            fields={"signal": build_signal_field()},
+            fields={"director": build_director_field()},
         ),
-        time=TimeSpec(steps=100, seed=103),
+        time=TimeSpec(steps=50, seed=109),
         dynamics=InteractionPipelineSpec(
             operators=[
                 ReorientationSpec(
                     terms=[
                         ReorientationTermSpec(
-                            name="chemotaxis",
-                            beta=1.0,
-                            parameters={"field": "signal"},
+                            name="contact_guidance",
+                            beta=2.0,
+                            parameters={"field": "director"},
                         )
                     ],
                 )
             ],
         ),
         analysis=AnalysisSpec(
-            observers=[DensityRecorder(), PopulationRecorder()],
+            observers=[NodeRecorder(), DensityRecorder(), PopulationRecorder()],
         ),
     )
 

@@ -1,7 +1,7 @@
-"""Alignment example.
+"""Nematic interaction example.
 
-This follows the ``BioLGCA.ipynb`` alignment example: a hexagonal LGCA with
-reflecting boundaries and local alignment that produces collective motion.
+This mirrors the ``BioLGCA.ipynb`` nematic example, where neighboring cells
+prefer aligned axes without distinguishing head from tail.
 """
 
 from __future__ import annotations
@@ -27,13 +27,13 @@ from lgca.simulation import DensityRecorder, PopulationRecorder
 
 
 INFO = ExampleInfo(
-    name="alignment",
-    title="Alignment example",
+    name="nematic_interaction",
+    title="Nematic interaction example",
     category="collective motion",
-    question="How do local alignment rules create coherent streams?",
-    concepts=("collective motion", "flux", "reorientation"),
-    source_path="lgca/examples/alignment.py",
-    source="BioLGCA.ipynb alignment example",
+    question="How does axis alignment differ from polar alignment?",
+    concepts=("nematic alignment", "orientation", "flux"),
+    source_path="lgca/examples/nematic_interaction.py",
+    source="BioLGCA.ipynb nematic interaction example",
 )
 
 
@@ -43,14 +43,14 @@ def build_spec() -> ModelSpec:
     return ModelSpec(
         description=Description(
             title=INFO.title,
-            details="Hexagonal alignment with reflecting boundaries, as in the notebook.",
-            tags=("example", "alignment", "collective-motion"),
+            details="Notebook-style nematic interaction on a hexagonal lattice.",
+            tags=("example", "nematic", "collective-motion"),
         ),
-        space=SpaceSpec(geometry="hex", dims=(50, 50), boundary="reflecting"),
+        space=SpaceSpec(geometry="hex", dims=(50, 50), boundary="periodic"),
         state=StateSpec(density=0.1, restchannels=0),
-        time=TimeSpec(steps=100, seed=102),
+        time=TimeSpec(steps=100, seed=107),
         dynamics=InteractionPipelineSpec(
-            operators=[{"name": "classical.alignment", "parameters": {"beta": 2.0}}],
+            operators=[{"name": "classical.nematic", "parameters": {"beta": 2.0}}],
         ),
         analysis=AnalysisSpec(
             observers=[DensityRecorder(), PopulationRecorder()],
