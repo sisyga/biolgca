@@ -311,7 +311,7 @@ class Test_LGCA_General:
     def test_getlgca_lattice_setup_random(self, geom, ve, ib, dims_large, restchannels, density, capacity):
         # 'density' keyword check, random reset
         lgca = get_lgca(geometry=geom, ve=ve, ib=ib, dims=dims_large, density=density, restchannels=restchannels,
-                        interaction='only_propagation')
+                        interaction='only_propagation', seed=1)
         assert lgca.dims == dims_large, "Wrong dimensions defined"
         if ib:
             assert np.array_equal(lgca.occupied, lgca.nodes.astype(bool)), \
