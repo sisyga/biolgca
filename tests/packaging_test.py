@@ -27,6 +27,14 @@ def test_ci_workflow_matches_issue_87_acceptance():
     assert "python -m pytest" in workflow
 
 
+def test_project_and_ci_advertise_python_313_support():
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+    assert "Programming Language :: Python :: 3.13" in pyproject["project"]["classifiers"]
+    assert '"3.13"' in workflow
+
+
 def test_readme_has_ci_badge():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
