@@ -1,8 +1,9 @@
+import numpy as np
 import pytest
 
 pytest.importorskip("matplotlib", reason="requires matplotlib for plotting tests")
 
-from lgca.plots import IdentityColourMapper
+from lgca.plots import IdentityColourMapper, get_cmap
 
 
 def test_colour_consistency_and_cycle():
@@ -37,3 +38,17 @@ def test_invalid_tree_raises_typeerror():
     # parent_list must be a list
     with pytest.raises(TypeError):
         IdentityColourMapper(cmap, [[1], []], 'parent')
+
+
+def test_plot_helpers_work_without_cm_get_cmap(monkeypatch):
+    import matplotlib.cm as cm
+
+    monkeypatch.delattr(cm, "get_cmap", raising=False)
+    children_nlist = [[1], []]
+    parent_list = [0, 0]
+
+    mapper = IdentityColourMapper("tab20", children_nlist, parent_list)
+    scalar_mappable = get_cmap(np.array([[0, 1], [2, 0]]), cbar=False)
+
+    assert mapper.get_colour(0) is not None
+    assert hasattr(scalar_mappable, "to_rgba")

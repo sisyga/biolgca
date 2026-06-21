@@ -6,6 +6,7 @@
 
 import numpy as np
 import random
+from copy import copy
 from itertools import cycle
 try:  # optional plotting dependencies
     import matplotlib.colors as mplcolors
@@ -44,17 +45,17 @@ class IdentityColourMapper:
         # colours to choose from
         if cmap is not None:
             if type(cmap) == str:
-                if not isinstance(plt.cm.get_cmap(cmap), mplcolors.ListedColormap):
+                if not isinstance(plt.get_cmap(cmap), mplcolors.ListedColormap):
                     raise TypeError("Requested colormap must be a matplotlib.colors.ListedColormap!")
                     # it must be a ListedColormap and not just a Colormap as of now to construct the cycler
-                self.cmap = plt.cm.get_cmap(cmap)
+                self.cmap = plt.get_cmap(cmap)
             else:
                 if not isinstance(cmap, mplcolors.ListedColormap) and not isinstance(cmap, list):
                     raise TypeError("Colormap must be string (colormap name), list or matplotlib.colors.ListedColormap!")
                     # it must be a ListedColormap and not just a Colormap as of now to construct the cycler
                 self.cmap = cmap
         else:
-            self.cmap = plt.cm.get_cmap('tab20')
+            self.cmap = plt.get_cmap('tab20')
             # deprecated: shuffle colours because similar colours for non-closely related families can be confusing
             #cols = list(self.cmap.colors)
             #random.shuffle(cols)
@@ -140,13 +141,13 @@ class PropertyColourMapper:
         # colour map to encode the values between 0 and 1
         if cmap is not None:
             if type(cmap) == str:
-                self.cmap = plt.cm.get_cmap(cmap)
+                self.cmap = plt.get_cmap(cmap)
             else:
                 if not isinstance(cmap, mplcolors.Colormap):
                     raise TypeError("Colormap must be string (colormap name) or matplotlib.colors.Colormap!")
                 self.cmap = cmap
         else:
-            self.cmap = plt.cm.get_cmap('jet')
+            self.cmap = plt.get_cmap('jet')
 
         # function to map from property values to the range [0,1]
         if norm is not None:
@@ -640,20 +641,20 @@ def get_cmap(
     else:
         K = vmax
 
-    cmap = copy(cm.get_cmap(cmap))  # do not modify a globally registered colormap in matplotlib > 3.3.2
+    cmap = copy(plt.get_cmap(cmap))  # do not modify a globally registered colormap in matplotlib > 3.3.2
     cmap.set_under(alpha=0.0)
     cmap_scaled = False
 
     if 1 < K <= cmap.N:
-        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
+        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=mplcolors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
     elif K > 1:
         cmap_scaled = True
         scaling_factor = K / cmap.N
         nbins = cmap.N
         density = density / scaling_factor
-        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(cmap.N + 1), cmap.N))
+        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=mplcolors.BoundaryNorm(1 + np.arange(cmap.N + 1), cmap.N))
     else:
-        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.Normalize(vmin=1e-6, vmax=1))
+        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=mplcolors.Normalize(vmin=1e-6, vmax=1))
     cmap.set_array(density)
 
     if not cbar:

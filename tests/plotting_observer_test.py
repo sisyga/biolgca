@@ -34,6 +34,19 @@ def test_plot_snapshot_observer_records_results_and_paths(tmp_path):
     plt.close("all")
 
 
+def test_plot_snapshot_observer_works_without_cm_get_cmap(monkeypatch):
+    import matplotlib.cm as cm
+
+    lgca = make_square_lgca()
+    observer = PlotSnapshotObserver(kind="density", close=True, cbar=False)
+    monkeypatch.delattr(cm, "get_cmap", raising=False)
+
+    SimulationRunner(lgca, timesteps=1, observers=[observer], showprogress=False).run()
+
+    assert [step for step, _ in observer.results] == [0, 1]
+    plt.close("all")
+
+
 def test_plot_snapshot_observer_uses_schedule():
     lgca = make_square_lgca(seed=2)
     observer = PlotSnapshotObserver(

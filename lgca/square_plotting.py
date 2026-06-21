@@ -19,14 +19,14 @@ try:
     from matplotlib.collections import PatchCollection
     from matplotlib.colors import Normalize
     from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
-    from matplotlib import cm, pyplot as plt
+    from matplotlib import pyplot as plt
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 except ImportError:  # pragma: no cover - handled at runtime
     from lgca.base import _MissingPlotLib
 
     animation = colors = mticker = FuncFormatter = PatchCollection = Normalize = (
         RegularPolygon
-    ) = Circle = FancyArrowPatch = cm = make_axes_locatable = _MissingPlotLib(
+    ) = Circle = FancyArrowPatch = make_axes_locatable = _MissingPlotLib(
         "matplotlib"
     )
 
@@ -292,7 +292,7 @@ class SquarePlotMixin:
         if cbar:
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("right", size="5%", pad=0.1)
-            cmap = copy(cm.get_cmap(cmap))
+            cmap = copy(plt.get_cmap(cmap))
             cmap.set_under(alpha=0.0)
             plot.set_cmap(cmap)
             # cmap = plot.get_cmap()
@@ -306,7 +306,7 @@ class SquarePlotMixin:
             # cbar.set_ticklabels(1 + np.arange(K)) # np.arange(K+1)
             plt.sca(ax)
         else:
-            cmap = copy(cm.get_cmap('Greys'))
+            cmap = copy(plt.get_cmap('Greys'))
             cmap.set_under(alpha=0.0)
             plot.set_cmap(cmap)
             # cmap = plot.get_cmap()
@@ -373,7 +373,7 @@ class SquarePlotMixin:
             else: mask = np.zeros_like(field, dtype=bool)
 
 
-        cmap = plt.cm.get_cmap(cmap)
+        cmap = plt.get_cmap(cmap)
         cmap = plt.cm.ScalarMappable(cmap=cmap, norm=Normalize(vmin=vmin, vmax=vmax))
         polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly, alpha=v,
                                    orientation=self.orientation, facecolor=c, edgecolor=edgecolor)
@@ -458,7 +458,7 @@ class SquarePlotMixin:
         # set up figure
         fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
         # set up density translation to color
-        cmap = copy(cm.get_cmap(cmap))  # do not modify a globally registered colormap in matplotlib > 3.3.2
+        cmap = copy(plt.get_cmap(cmap))  # do not modify a globally registered colormap in matplotlib > 3.3.2
         cmap.set_under(alpha=0.0)
         if K > 1:
             cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
@@ -507,7 +507,7 @@ class SquarePlotMixin:
             figsize = estimate_figsize(density, cbar=True)
 
         fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
-        cmap = plt.cm.get_cmap('gist_rainbow')
+        cmap = plt.get_cmap('gist_rainbow')
         cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.Normalize(vmin=0, vmax=360))
 
         jx, jy = np.moveaxis(self.calc_flux(nodes), -1, 0)
