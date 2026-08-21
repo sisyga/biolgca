@@ -350,6 +350,18 @@ def test_pipeline_timing_trace_is_explicit_and_bounded():
     assert [entry["step"] for entry in trace] == [1, 1, 2]
 
 
+@pytest.mark.parametrize(
+    "plugin_name",
+    [
+        "ib.go_and_grow_mutations",
+        "nove_ib.go_or_grow_glioblastoma",
+        "nove_ib.evo_steric",
+    ],
+)
+def test_family_mutating_plugins_declare_their_capability(plugin_name):
+    assert describe_plugin(plugin_name).mutates_families is True
+
+
 def test_ib_go_or_grow_plugin_is_native_and_matches_legacy():
     parameters = {
         "r_b": 0.31,
@@ -1211,7 +1223,9 @@ def test_nove_ib_go_or_grow_glioblastoma_plugin_is_native_and_matches_legacy():
         dynamics=InteractionPipelineSpec(
             operators=[{"name": "nove_ib.go_or_grow_glioblastoma", "parameters": parameters}]
         ),
-        analysis=AnalysisSpec(observers=[NodeRecorder(), DensityRecorder()]),
+        analysis=AnalysisSpec(
+            observers=[NodeRecorder(), DensityRecorder(), FamilyPopulationRecorder()]
+        ),
     )
     result = run_model(spec, showprogress=False)
     legacy = get_lgca(
@@ -1241,6 +1255,7 @@ def test_nove_ib_go_or_grow_glioblastoma_plugin_is_native_and_matches_legacy():
         legacy.family_props["ancestor"],
     )
     assert result.lgca.family_props["descendants"] == legacy.family_props["descendants"]
+    assert result.lgca.fam_pop_t.shape[0] == 3
 
 
 def test_nove_ib_evo_steric_plugin_is_native_and_matches_legacy():
