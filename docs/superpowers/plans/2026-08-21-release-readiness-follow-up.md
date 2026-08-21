@@ -78,4 +78,3 @@
 - [ ] Review `git diff --check`, tracked files, and the complete branch diff.
 - [ ] Merge the feature branch into local `aidevelop` and repeat tests/docs on the merged tree.
 - [ ] Push `aidevelop` to `origin` without force and verify local, remote-tracking, and GitHub SHAs match.
-

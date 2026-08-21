@@ -1,15 +1,16 @@
 """Build the Sphinx documentation from a clean generated state."""
 
-from pathlib import Path
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 
 def clean_generated(source_dir: Path, output_dir: Path) -> None:
     """Remove generated autosummary sources and rendered documentation."""
-    shutil.rmtree(source_dir / "_autosummary", ignore_errors=True)
-    shutil.rmtree(output_dir, ignore_errors=True)
+    for generated_dir in (source_dir / "_autosummary", output_dir):
+        if generated_dir.exists():
+            shutil.rmtree(generated_dir)
 
 
 def main() -> None:
