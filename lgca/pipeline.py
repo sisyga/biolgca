@@ -2115,7 +2115,16 @@ class NativeClassicalGoOrGrowOperator(BirthDeathOperator):
 
 
 class NativePhenotypeSwitchOperator(PhenotypeSwitchOperator):
-    """Native multispecies channel-preserving phenotype switch."""
+    """Sample an atomic, particle-conserving multispecies state transition.
+
+    At each lattice site, ``s`` is the complete ``(n_species, K)`` channel
+    state and the interaction constructs one equally shaped and typed ``s'``.
+    It guarantees ``N(s') == N(s)`` and, for Boolean states, at most one
+    particle per species/channel slot. If at least one phenotype changes, all
+    channel positions are resampled; if none changes, the state is unchanged.
+    Volume-exclusion capacity is enforced while targets are sampled, so
+    collisions cannot merge or delete particles.
+    """
 
     def __init__(self, parameters: Mapping[str, Any] | None = None):
         info = PluginInfo(
@@ -2141,8 +2150,8 @@ class NativePhenotypeSwitchOperator(PhenotypeSwitchOperator):
         rates = np.asarray(self.parameters["rates"], dtype=float)
         if rates.shape != (n_species, n_species):
             raise ValueError("rates must have shape (n_species, n_species)")
-        if np.any(rates < 0):
-            raise ValueError("rates must be non-negative")
+        if not np.all(np.isfinite(rates)) or np.any(rates < 0):
+            raise ValueError("rates must contain finite non-negative values")
         off_diag = rates.copy()
         np.fill_diagonal(off_diag, 0.0)
         if np.any(off_diag.sum(axis=1) > 1.0):
@@ -2157,32 +2166,68 @@ class NativePhenotypeSwitchOperator(PhenotypeSwitchOperator):
             rates = self.rates
         for spatial in np.ndindex(lgca.dims):
             coord = tuple(index + lgca.r_int for index in spatial)
-            for channel in range(lgca.K):
-                counts = lgca.nodes[coord + (slice(None), channel)]
-                lgca.nodes[coord + (slice(None), channel)] = self._switch_channel(counts, rates, lgca.rng)
+            state = lgca.nodes[coord + (slice(None), slice(None))]
+            lgca.nodes[coord + (slice(None), slice(None))] = self._sample_state(
+                state, rates, lgca.rng
+            )
 
     @staticmethod
-    def _switch_channel(counts, rates, rng):
-        n_species = rates.shape[0]
-        if counts.dtype == bool:
-            new_counts = np.zeros(n_species, dtype=bool)
-            for source in np.flatnonzero(counts):
-                probabilities = rates[source].copy()
-                probabilities[source] = 1.0 - probabilities.sum()
-                target = int(rng.choice(n_species, p=probabilities))
-                if new_counts[target]:
-                    target = int(source)
-                new_counts[target] = True
-            return new_counts
+    def _sample_state(state, rates, rng):
+        """Construct one admissible complete state without sequential writes."""
+        state = np.asarray(state)
+        n_species, n_channels = state.shape
+        probabilities = np.asarray(rates, dtype=float).copy()
+        np.fill_diagonal(
+            probabilities, 1.0 - probabilities.sum(axis=1)
+        )
 
-        new_counts = np.zeros(n_species, dtype=counts.dtype)
-        for source, count in enumerate(counts.astype(int)):
-            if count == 0:
-                continue
-            probabilities = rates[source].copy()
-            probabilities[source] = 1.0 - probabilities.sum()
-            new_counts += rng.multinomial(count, probabilities).astype(new_counts.dtype)
-        return new_counts
+        if state.dtype == bool:
+            sources = np.repeat(np.arange(n_species), state.sum(axis=1))
+            if sources.size == 0:
+                return state.copy()
+            rng.shuffle(sources)
+            remaining = np.full(n_species, n_channels, dtype=int)
+            targets = np.empty(sources.size, dtype=int)
+            changed = False
+            for index, source in enumerate(sources):
+                available = remaining > 0
+                constrained = probabilities[source] * available
+                if constrained.sum() == 0.0:
+                    if available[source]:
+                        target = int(source)
+                    else:
+                        target = int(rng.choice(np.flatnonzero(available)))
+                else:
+                    constrained /= constrained.sum()
+                    target = int(rng.choice(n_species, p=constrained))
+                targets[index] = target
+                remaining[target] -= 1
+                changed |= target != source
+
+            if not changed:
+                return state.copy()
+
+            result = np.zeros_like(state)
+            for target, count in enumerate(np.bincount(targets, minlength=n_species)):
+                if count:
+                    channels = rng.choice(n_channels, size=count, replace=False)
+                    result[target, channels] = True
+            return result
+
+        source_counts = state.sum(axis=1).astype(int)
+        flows = np.zeros((n_species, n_species), dtype=int)
+        for source, count in enumerate(source_counts):
+            if count:
+                flows[source] = rng.multinomial(count, probabilities[source])
+        if not (flows - np.diag(np.diag(flows))).any():
+            return state.copy()
+
+        result = np.zeros_like(state)
+        channel_probabilities = np.full(n_channels, 1.0 / n_channels)
+        for target, count in enumerate(flows.sum(axis=0)):
+            if count:
+                result[target] = rng.multinomial(count, channel_probabilities)
+        return result
 
 
 class NativeNoVEAlignmentOperator(ReorientationOperator):

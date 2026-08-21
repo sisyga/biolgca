@@ -14,6 +14,7 @@ from lgca.model import (
 from lgca.pipeline import (
     BirthDeathSpec,
     InteractionPipelineSpec,
+    NativePhenotypeSwitchOperator,
     PhenotypeSwitchSpec,
     ReorientationSpec,
     ReorientationTermSpec,
@@ -318,6 +319,105 @@ def test_phenotype_switch_preserves_total_mass_and_changes_species():
     assert before.tolist() == [2, 0]
     assert after.tolist() == [0, 2]
     assert result.lgca.nodes_t[1].sum() == result.lgca.nodes_t[0].sum()
+
+
+def test_phenotype_switch_collision_is_one_atomic_conserved_transition():
+    nodes = np.zeros((1, 1, 2, 4), dtype=bool)
+    nodes[0, 0, :, 0] = True
+    spec = ModelSpec(
+        description=Description(title="collision-heavy phenotype switch"),
+        space=SpaceSpec(geometry="square", boundary="periodic"),
+        state=StateSpec(nodes=nodes, n_species=2),
+        time=TimeSpec(steps=1, seed=0),
+        dynamics=InteractionPipelineSpec(
+            operators=[
+                PhenotypeSwitchSpec(
+                    name="phenotype_switch",
+                    parameters={"rates": [[0.0, 1.0], [0.0, 0.0]]},
+                )
+            ],
+            propagation=False,
+        ),
+        analysis=AnalysisSpec(observers=[NodeRecorder()]),
+    )
+
+    result = run_model(spec, showprogress=False)
+    final_state = result.lgca.nodes_t[1, 0, 0]
+
+    assert final_state.sum() == 2
+    assert final_state.sum(axis=1).tolist() == [0, 2]
+
+
+@pytest.mark.parametrize("mask", range(16))
+@pytest.mark.parametrize(
+    "rates",
+    [
+        np.zeros((2, 2)),
+        np.array([[0.0, 1.0], [1.0, 0.0]]),
+        np.array([[0.0, 0.35], [0.65, 0.0]]),
+    ],
+)
+def test_phenotype_switch_preserves_every_two_species_two_channel_ve_state(mask, rates):
+    state = np.array([(mask >> bit) & 1 for bit in range(4)], dtype=bool).reshape(2, 2)
+
+    for seed in range(4):
+        result = NativePhenotypeSwitchOperator._sample_state(
+            state, rates, np.random.default_rng(seed)
+        )
+
+        assert result.shape == state.shape
+        assert result.dtype == state.dtype
+        assert result.sum() == state.sum()
+
+
+def test_phenotype_switch_zero_rates_leave_complete_state_unchanged():
+    for state in (
+        np.array([[True, False], [False, True]]),
+        np.array([[2, 0], [1, 3]], dtype=np.int64),
+    ):
+        result = NativePhenotypeSwitchOperator._sample_state(
+            state, np.zeros((2, 2)), np.random.default_rng(7)
+        )
+
+        assert np.array_equal(result, state)
+
+
+def test_phenotype_switch_forced_transition_changes_species_without_losing_particle():
+    state = np.array([[True, False], [False, False]])
+    rates = np.array([[0.0, 1.0], [0.0, 0.0]])
+
+    result = NativePhenotypeSwitchOperator._sample_state(
+        state, rates, np.random.default_rng(9)
+    )
+
+    assert result.sum(axis=1).tolist() == [0, 1]
+
+
+def test_phenotype_switch_nove_samples_one_complete_conserved_state():
+    state = np.array([[3, 1], [2, 4]], dtype=np.int64)
+    rates = np.array([[0.0, 1.0], [1.0, 0.0]])
+
+    result = NativePhenotypeSwitchOperator._sample_state(
+        state, rates, np.random.default_rng(11)
+    )
+
+    assert result.shape == state.shape
+    assert result.dtype == state.dtype
+    assert result.sum() == state.sum()
+    assert result.sum(axis=1).tolist() == [6, 4]
+
+
+def test_phenotype_switch_one_particle_frequency_matches_rate_matrix():
+    state = np.array([[True, False], [False, False]])
+    rates = np.array([[0.0, 0.3], [0.0, 0.0]])
+    rng = np.random.default_rng(1234)
+
+    switched = sum(
+        NativePhenotypeSwitchOperator._sample_state(state, rates, rng)[1].sum()
+        for _ in range(5000)
+    )
+
+    assert switched / 5000 == pytest.approx(0.3, abs=0.03)
 
 
 def test_native_phenotype_switch_plugin_metadata_is_discoverable():
