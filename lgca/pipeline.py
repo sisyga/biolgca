@@ -2157,9 +2157,16 @@ class NativePhenotypeSwitchOperator(PhenotypeSwitchOperator):
             aliases=("species_switch",),
             operator_kind="phenotype_switch",
             backend_families=("multispecies",),
+            parameters={
+                "rates": {
+                    "required": True,
+                    "type_label": "array",
+                    "description": "Off-diagonal phenotype transition probabilities.",
+                }
+            },
             conservation_law=ConservationLaw(True, False, True, ("species identity",)),
             port_status="native",
-            description="Channel-preserving stochastic species transition operator.",
+            description="Atomic phenotype transition with collision-safe channel resampling.",
         )
         super().__init__(info=info, parameters=parameters)
         self.rates = None

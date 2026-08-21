@@ -10,6 +10,8 @@ or transitional interaction functions.
 from __future__ import annotations
 
 import importlib
+import difflib
+import warnings
 from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping
 
@@ -300,12 +302,20 @@ class PluginRegistry:
         self._aliases: dict[str, str] = {}
 
     def register(self, info: PluginInfo, factory: PluginFactory) -> None:
-        if info.name in self._plugins:
-            raise ValueError(f"Plugin {info.name!r} is already registered.")
-        self._plugins[info.name] = (info, factory)
+        occupied = set(self._plugins) | set(self._aliases)
+        if info.name in occupied:
+            raise ValueError(f"Plugin name {info.name!r} is already registered as a name or alias.")
+        aliases = tuple(info.aliases)
+        if len(set(aliases)) != len(aliases):
+            raise ValueError(f"Plugin {info.name!r} declares duplicate aliases.")
         for alias in info.aliases:
-            if alias in self._aliases and self._aliases[alias] != info.name:
-                raise ValueError(f"Plugin alias {alias!r} is already registered.")
+            if alias == info.name or alias in occupied:
+                raise ValueError(
+                    f"Plugin alias {alias!r} is already registered as a name or alias."
+                )
+
+        self._plugins[info.name] = (info, factory)
+        for alias in aliases:
             self._aliases[alias] = info.name
 
     def resolve(self, name: str) -> PluginFactory:
@@ -363,7 +373,30 @@ def validate_plugin_parameters(
     """Validate parameters against a plugin's declared contract."""
 
     parameters = dict(parameters or {})
-    for name, spec in info.parameter_specs.items():
+    parameter_specs = info.parameter_specs
+    unknown = sorted(set(parameters) - set(parameter_specs))
+    if unknown:
+        details = []
+        for name in unknown:
+            matches = difflib.get_close_matches(name, parameter_specs, n=1)
+            suggestion = f" (did you mean {matches[0]!r}?)" if matches else ""
+            details.append(f"{info.name}.{name}{suggestion}")
+        raise ValueError("unknown plugin parameter(s): " + ", ".join(details))
+
+    canonical_capacity = getattr(getattr(context, "spec", None), "state", None)
+    canonical_capacity = getattr(canonical_capacity, "capacity", None)
+    if canonical_capacity is not None and "capacity" in parameters:
+        if parameters["capacity"] != canonical_capacity:
+            raise ValueError(
+                f"{info.name}.capacity conflicts with model.state.capacity={canonical_capacity}"
+            )
+        warnings.warn(
+            f"{info.name}.capacity duplicates model.state.capacity and is deprecated",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+
+    for name, spec in parameter_specs.items():
         if spec.required and name not in parameters:
             raise ValueError(f"{info.name}.{name} is required")
         if name not in parameters:
@@ -384,7 +417,7 @@ def _validate_parameter_value(
 
     if spec.type_label == "probability":
         values = np.asarray(value, dtype=float)
-        if np.any((values < 0.0) | (values > 1.0)):
+        if np.any(~np.isfinite(values)) or np.any((values < 0.0) | (values > 1.0)):
             raise ValueError(f"{info.name}.{name} must be a probability")
     elif spec.type_label == "finite scalar":
         if isinstance(value, bool) or np.asarray(value).ndim != 0 or not np.isfinite(float(value)):
@@ -1894,18 +1927,25 @@ def _register_native_plugins() -> None:
             "External-gradient chemotaxis for volume-exclusion classical LGCA.",
         ),
     ):
+        parameter_contract = {
+            "beta": {
+                "default": 2.0,
+                "validator": "finite scalar sensitivity",
+            },
+        }
+        if mode == "chemotaxis":
+            parameter_contract["gradient"] = {
+                "default": None,
+                "type_label": "array",
+                "description": "Optional precomputed spatial gradient field.",
+            }
         info = PluginInfo(
             name=name,
             aliases=aliases,
             operator_kind="reorientation",
             backend_families=("classical",),
             legacy_source=_legacy_source("lgca.interactions", legacy_function),
-            parameters={
-                "beta": {
-                    "default": 2.0,
-                    "validator": "finite scalar sensitivity",
-                },
-            },
+            parameters=parameter_contract,
             conservation_law=_law_for_kind("reorientation"),
             port_status="native",
             test_status="unit_tested",

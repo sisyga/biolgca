@@ -96,6 +96,16 @@ def build_spec() -> ModelSpec:
                         operator_kind="reorientation",
                         backend_families=("classical",),
                         legacy_source="BioLGCA.ipynb custom interaction rule",
+                        parameters={
+                            "beta": {
+                                "default": 2.0,
+                                "validator": "finite scalar alignment sensitivity",
+                            },
+                            "alpha": {
+                                "default": 2.0,
+                                "validator": "finite scalar resting preference",
+                            },
+                        },
                         conservation_law=ConservationLaw(True, True, False),
                         port_status="example",
                         test_status="smoke",

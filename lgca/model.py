@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import importlib.metadata
+import difflib
 import json
 import time
-from dataclasses import dataclass, field
+import warnings
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -83,6 +85,7 @@ class StateSpec:
     volume_exclusion: bool = True
     identity_based: bool = False
     n_species: int = 1
+    capacity: int | None = None
     parameters: Mapping[str, Any] = field(default_factory=dict)
     fields: Mapping[str, Any] = field(default_factory=dict)
 
@@ -137,6 +140,7 @@ def model_spec_to_dict(spec: ModelSpec) -> dict[str, Any]:
                 "volume_exclusion": spec.state.volume_exclusion,
                 "identity_based": spec.state.identity_based,
                 "n_species": spec.state.n_species,
+                "capacity": spec.state.capacity,
                 "parameters": _to_jsonable(dict(spec.state.parameters)),
                 "fields": _to_jsonable(dict(spec.state.fields)),
             },
@@ -159,7 +163,10 @@ def model_spec_to_dict(spec: ModelSpec) -> dict[str, Any]:
 def model_spec_from_dict(data: Mapping[str, Any]) -> ModelSpec:
     """Build a :class:`ModelSpec` from :func:`model_spec_to_dict` output."""
 
+    if not isinstance(data, Mapping):
+        raise TypeError("model spec must be a mapping")
     data = migrate_model_spec_dict(dict(data))
+    _validate_serialized_model(data)
     model = data["model"]
     description = model.get("description", {})
     space = model.get("space", {})
@@ -185,6 +192,7 @@ def model_spec_from_dict(data: Mapping[str, Any]) -> ModelSpec:
             volume_exclusion=state.get("volume_exclusion", True),
             identity_based=state.get("identity_based", False),
             n_species=state.get("n_species", 1),
+            capacity=state.get("capacity"),
             parameters=_from_jsonable(state.get("parameters", {})),
             fields=_from_jsonable(state.get("fields", {})),
         ),
@@ -312,6 +320,90 @@ def migrate_model_spec_dict(data: dict[str, Any]) -> dict[str, Any]:
             data["schema_version"] = MODEL_SPEC_SCHEMA_VERSION
         return data
     raise ValueError(f"Unsupported ModelSpec schema_version {version!r}.")
+
+
+def _validate_serialized_model(data: Mapping[str, Any]) -> None:
+    _reject_unknown_keys(data, {"schema_version", "model"}, "")
+    model = _mapping_at(data.get("model"), "model")
+    _reject_unknown_keys(
+        model,
+        {"description", "space", "state", "time", "dynamics", "analysis"},
+        "model",
+    )
+    description = _mapping_at(model.get("description", {}), "model.description")
+    space = _mapping_at(model.get("space", {}), "model.space")
+    state = _mapping_at(model.get("state", {}), "model.state")
+    time_spec = _mapping_at(model.get("time", {}), "model.time")
+    dynamics = _mapping_at(model.get("dynamics", {}), "model.dynamics")
+    analysis = model.get("analysis")
+    if analysis is not None:
+        analysis = _mapping_at(analysis, "model.analysis")
+
+    _reject_unknown_keys(description, {"title", "details", "tags"}, "model.description")
+    _reject_unknown_keys(space, {"geometry", "dims", "boundary"}, "model.space")
+    _reject_unknown_keys(
+        state,
+        {
+            "density", "nodes", "restchannels", "volume_exclusion", "identity_based",
+            "n_species", "capacity", "parameters", "fields",
+        },
+        "model.state",
+    )
+    _reject_unknown_keys(time_spec, {"steps", "seed"}, "model.time")
+    _reject_unknown_keys(
+        dynamics, {"operators", "propagation", "allow_custom_order"}, "model.dynamics"
+    )
+    if analysis is not None:
+        _reject_unknown_keys(analysis, {"observers"}, "model.analysis")
+
+    for key in ("title", "details"):
+        if key in description and not isinstance(description[key], str):
+            raise TypeError(f"model.description.{key} must be a string")
+    tags = description.get("tags", ())
+    if isinstance(tags, (str, bytes)) or not isinstance(tags, Sequence):
+        raise TypeError("model.description.tags must be a sequence of strings")
+    if not all(isinstance(tag, str) for tag in tags):
+        raise TypeError("model.description.tags must be a sequence of strings")
+    for key in ("volume_exclusion", "identity_based"):
+        if key in state and not isinstance(state[key], bool):
+            raise TypeError(f"model.state.{key} must be a boolean")
+    for key in ("parameters", "fields"):
+        if key in state and not isinstance(state[key], Mapping):
+            raise TypeError(f"model.state.{key} must be a mapping")
+    for key in ("restchannels", "n_species", "capacity"):
+        value = state.get(key)
+        if value is not None and (isinstance(value, bool) or int(value) != value):
+            raise TypeError(f"model.state.{key} must be an integer")
+    for key in ("steps", "seed"):
+        value = time_spec.get(key)
+        if value is not None and (isinstance(value, bool) or int(value) != value):
+            raise TypeError(f"model.time.{key} must be an integer")
+    for key in ("operators",):
+        value = dynamics.get(key, ())
+        if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
+            raise TypeError(f"model.dynamics.{key} must be a sequence")
+    if "allow_custom_order" in dynamics and not isinstance(
+        dynamics["allow_custom_order"], bool
+    ):
+        raise TypeError("model.dynamics.allow_custom_order must be a boolean")
+    if analysis is not None:
+        observers = analysis.get("observers", ())
+        if isinstance(observers, (str, bytes)) or not isinstance(observers, Sequence):
+            raise TypeError("model.analysis.observers must be a sequence")
+
+
+def _mapping_at(value, path: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise TypeError(f"{path} must be a mapping")
+    return value
+
+
+def _reject_unknown_keys(mapping, allowed, path: str) -> None:
+    for key in sorted(set(mapping) - set(allowed)):
+        full_path = f"{path}.{key}" if path else str(key)
+        matches = difflib.get_close_matches(str(key), sorted(allowed), n=1)
+        suggestion = f"; did you mean {matches[0]!r}?" if matches else ""
+        raise ValueError(f"unknown configuration key {full_path}{suggestion}")
 
 
 def describe_model_graph(spec: ModelSpec) -> dict[str, Any]:
@@ -648,9 +740,10 @@ class ModelRunResult:
 def build_model(spec: ModelSpec) -> CompiledModel:
     """Build an LGCA instance and compile its interaction pipeline."""
 
-    _validate_spec(spec)
+    spec = _normalize_and_validate_spec(spec)
     lgca = _build_lgca(spec)
-    metadata = _metadata_from_spec(spec)
+    _validate_field_names(lgca, spec.state.fields)
+    metadata = _metadata_from_spec(spec, lgca=lgca)
     context = ModelContext(
         lgca=lgca,
         spec=spec,
@@ -681,12 +774,130 @@ def run_model(spec: ModelSpec, showprogress: bool = True) -> ModelRunResult:
 
 
 def _validate_spec(spec: ModelSpec) -> None:
+    if isinstance(spec.time.steps, bool) or int(spec.time.steps) != spec.time.steps:
+        raise ValueError("model.time.steps must be a non-negative integer")
     if spec.time.steps < 0:
-        raise ValueError("time.steps must be non-negative.")
+        raise ValueError("model.time.steps must be a non-negative integer")
+    if spec.time.seed is not None and (
+        isinstance(spec.time.seed, bool) or int(spec.time.seed) != spec.time.seed
+    ):
+        raise ValueError("model.time.seed must be an integer or null")
     if spec.state.nodes is not None and spec.state.density is not None:
-        raise ValueError("state.nodes and state.density are mutually exclusive.")
-    if spec.state.n_species < 1:
-        raise ValueError("state.n_species must be positive.")
+        raise ValueError("model.state.nodes and model.state.density are mutually exclusive")
+    _validate_non_negative_integer("model.state.restchannels", spec.state.restchannels)
+    _validate_positive_integer("model.state.n_species", spec.state.n_species)
+    if spec.state.capacity is not None:
+        _validate_positive_integer("model.state.capacity", spec.state.capacity)
+    if not isinstance(spec.state.volume_exclusion, bool):
+        raise ValueError("model.state.volume_exclusion must be a boolean")
+    if not isinstance(spec.state.identity_based, bool):
+        raise ValueError("model.state.identity_based must be a boolean")
+    if spec.state.density is not None:
+        if (
+            isinstance(spec.state.density, bool)
+            or np.asarray(spec.state.density).ndim != 0
+            or not np.isfinite(float(spec.state.density))
+            or float(spec.state.density) < 0
+        ):
+            raise ValueError("model.state.density must be a finite non-negative scalar")
+    if not isinstance(spec.state.parameters, Mapping):
+        raise ValueError("model.state.parameters must be a mapping")
+    if not isinstance(spec.state.fields, Mapping):
+        raise ValueError("model.state.fields must be a mapping")
+
+
+_GEOMETRY_ALIASES = {
+    "1d": "lin", "lin": "lin", "linear": "lin",
+    "square": "square", "sq": "square", "rect": "square", "rectangular": "square",
+    "hex": "hex", "hx": "hex", "hexagonal": "hex",
+    "cubic": "cubic", "cb": "cubic",
+    "moore": "moore", "moore3d": "moore",
+}
+_BOUNDARY_ALIASES = {
+    "absorbing": "absorbing", "absorb": "absorbing", "abs": "absorbing",
+    "abc": "absorbing", "fixed": "absorbing",
+    "reflecting": "reflecting", "reflect": "reflecting", "refl": "reflecting",
+    "rbc": "reflecting", "no_flux": "reflecting", "noflux": "reflecting",
+    "periodic": "periodic", "pbc": "periodic", "inflow": "inflow",
+}
+_RESERVED_STATE_PARAMETERS = {
+    "bc", "density", "dims", "geometry", "ib", "identity_based", "interaction",
+    "n_species", "nodes", "propagation", "restchannels", "seed", "ve",
+    "volume_exclusion",
+}
+
+
+def _normalize_and_validate_spec(spec: ModelSpec) -> ModelSpec:
+    if not isinstance(spec, ModelSpec):
+        raise TypeError("spec must be a ModelSpec")
+    geometry = spec.space.geometry
+    if not isinstance(geometry, str) or geometry.lower() not in _GEOMETRY_ALIASES:
+        raise ValueError("model.space.geometry must name a supported geometry")
+    boundary = spec.space.boundary
+    if not isinstance(boundary, str) or boundary.lower() not in _BOUNDARY_ALIASES:
+        raise ValueError("model.space.boundary must name a supported boundary condition")
+    _validate_dims(spec.space.dims)
+
+    parameters = dict(spec.state.parameters)
+    for name in sorted(set(parameters) & _RESERVED_STATE_PARAMETERS):
+        raise ValueError(
+            f"model.state.parameters.{name} is reserved by the canonical model configuration"
+        )
+    capacity = spec.state.capacity
+    if "capacity" in parameters:
+        legacy_capacity = parameters.pop("capacity")
+        if capacity is not None and legacy_capacity != capacity:
+            raise ValueError(
+                "model.state.parameters.capacity conflicts with model.state.capacity"
+            )
+        capacity = legacy_capacity if capacity is None else capacity
+        warnings.warn(
+            "model.state.parameters.capacity is deprecated; use model.state.capacity",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+
+    normalized = replace(
+        spec,
+        space=replace(
+            spec.space,
+            geometry=_GEOMETRY_ALIASES[geometry.lower()],
+            boundary=_BOUNDARY_ALIASES[boundary.lower()],
+        ),
+        state=replace(spec.state, parameters=parameters, capacity=capacity),
+    )
+    _validate_spec(normalized)
+    return normalized
+
+
+def _validate_dims(dims) -> None:
+    if dims is None:
+        return
+    values = (dims,) if np.asarray(dims).ndim == 0 else tuple(dims)
+    if not values:
+        raise ValueError("model.space.dims must not be empty")
+    for value in values:
+        _validate_positive_integer("model.space.dims", value)
+
+
+def _validate_positive_integer(path, value) -> None:
+    if isinstance(value, bool) or int(value) != value or value < 1:
+        raise ValueError(f"{path} must be a positive integer")
+
+
+def _validate_non_negative_integer(path, value) -> None:
+    if isinstance(value, bool) or int(value) != value or value < 0:
+        raise ValueError(f"{path} must be a non-negative integer")
+
+
+def _validate_field_names(lgca, fields: Mapping[str, Any]) -> None:
+    for name in fields:
+        if not isinstance(name, str) or not name:
+            raise ValueError("model.state.fields keys must be non-empty strings")
+        if hasattr(lgca, name):
+            raise ValueError(
+                f"model.state.fields.{name} collides with simulator state or methods"
+            )
 
 
 def _build_lgca(spec: ModelSpec):
@@ -703,6 +914,8 @@ def _build_lgca(spec: ModelSpec):
         kwargs["nodes"] = spec.state.nodes
     elif spec.state.density is not None:
         kwargs["density"] = spec.state.density
+    if spec.state.capacity is not None:
+        kwargs["capacity"] = spec.state.capacity
     kwargs.update(dict(spec.state.parameters))
     return get_lgca(
         geometry=spec.space.geometry,
@@ -713,13 +926,21 @@ def _build_lgca(spec: ModelSpec):
     )
 
 
-def _metadata_from_spec(spec: ModelSpec) -> dict[str, Any]:
+def _metadata_from_spec(spec: ModelSpec, lgca=None) -> dict[str, Any]:
+    geometry = getattr(lgca, "geometry", spec.space.geometry)
+    boundary = getattr(lgca, "bc", spec.space.boundary)
+    dims = tuple(getattr(lgca, "dims", spec.space.dims or ()))
+    restchannels = getattr(lgca, "restchannels", spec.state.restchannels)
+    capacity = getattr(lgca, "capacity", getattr(lgca, "K", spec.state.capacity))
     return {
         "title": spec.description.title,
         "biolgca_version": _package_version(),
         "model_spec_schema_version": MODEL_SPEC_SCHEMA_VERSION,
-        "geometry": spec.space.geometry,
-        "boundary": spec.space.boundary,
+        "geometry": geometry,
+        "dims": dims,
+        "boundary": boundary,
+        "restchannels": restchannels,
+        "capacity": capacity,
         "steps": spec.time.steps,
         "seed": spec.time.seed,
         "volume_exclusion": spec.state.volume_exclusion,
