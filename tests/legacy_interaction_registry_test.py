@@ -1,6 +1,10 @@
 import pytest
 
-from lgca.classical_operators import NativeClassicalRandomWalkOperator
+from lgca.classical_operators import (
+    CLASSICAL_RANDOM_WALK_INFO,
+    NativeClassicalRandomWalkOperator,
+    create_classical_random_walk,
+)
 from lgca.operator_base import (
     ConservationLaw as BaseConservationLaw,
     ParameterSpec as BaseParameterSpec,
@@ -34,8 +38,10 @@ def test_classical_random_walk_is_a_complete_extracted_vertical_slice():
     operator = create_plugin("classical.random_walk")
 
     assert type(operator) is NativeClassicalRandomWalkOperator
+    assert operator.info is CLASSICAL_RANDOM_WALK_INFO
     assert operator.info.name == "classical.random_walk"
     assert operator.info.parameter_specs == {}
+    assert type(create_classical_random_walk()) is NativeClassicalRandomWalkOperator
 
 
 EXPECTED_LEGACY_INTERACTIONS = {

@@ -1016,24 +1016,9 @@ def _register_native_plugins() -> None:
 
     register_plugin(nove_go_or_grow_info, nove_go_or_grow_factory)
 
-    classical_random_walk_info = PluginInfo(
-        name="classical.random_walk",
-        aliases=("random_walk",),
-        operator_kind="reorientation",
-        backend_families=("classical",),
-        legacy_source=_legacy_source("lgca.interactions", "random_walk"),
-        conservation_law=_law_for_kind("reorientation"),
-        port_status="native",
-        test_status="unit_tested",
-        description="Uniform channel permutation for volume-exclusion classical LGCA.",
-    )
+    from .classical_operators import register_classical_random_walk
 
-    def classical_random_walk_factory(parameters: Mapping[str, Any] | None = None) -> InteractionOperator:
-        from .classical_operators import NativeClassicalRandomWalkOperator
-
-        return NativeClassicalRandomWalkOperator(classical_random_walk_info, parameters)
-
-    register_plugin(classical_random_walk_info, classical_random_walk_factory)
+    register_classical_random_walk(register_plugin)
 
     classical_excitable_medium_info = PluginInfo(
         name="classical.excitable_medium",
