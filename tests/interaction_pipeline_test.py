@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from lgca import get_lgca
 from lgca.model import (
     AnalysisSpec,
     Description,
@@ -706,3 +707,83 @@ def test_target_example_shape_runs_with_species_specific_reorientation_terms():
     assert result.lgca.nodes_t.shape[0] == 3
     assert result.lgca.dens_t.shape[0] == 3
     assert result.lgca.n_t.shape[0] == 3
+
+
+def test_native_moore_nematic_uses_safe_lazy_tensor_permutations():
+    nodes = np.zeros((2, 2, 2, 26), dtype=bool)
+    nodes[0, 0, 0, 0] = True
+    spec = ModelSpec(
+        description=Description(title="lazy Moore nematic"),
+        space=SpaceSpec(geometry="moore", boundary="periodic"),
+        state=StateSpec(nodes=nodes),
+        time=TimeSpec(steps=1, seed=3),
+        dynamics=InteractionPipelineSpec(
+            operators=[{"name": "classical.nematic", "parameters": {"beta": 1.0}}],
+            propagation=False,
+        ),
+        analysis=AnalysisSpec(observers=[NodeRecorder()]),
+    )
+
+    result = run_model(spec, showprogress=False)
+
+    assert result.lgca.nodes_t.shape == (2, 2, 2, 2, 26)
+    assert result.lgca.nodes_t[1].sum() == 1
+
+
+def test_native_contact_guidance_supports_safe_lazy_square_configuration():
+    nodes = np.zeros((2, 2, 16), dtype=bool)
+    nodes[0, 0, 0] = True
+    spec = ModelSpec(
+        description=Description(title="lazy square contact guidance"),
+        space=SpaceSpec(geometry="square", boundary="periodic"),
+        state=StateSpec(nodes=nodes, restchannels=12),
+        time=TimeSpec(steps=1, seed=4),
+        dynamics=InteractionPipelineSpec(
+            operators=[
+                {"name": "classical.contact_guidance", "parameters": {"beta": 1.0}}
+            ],
+            propagation=False,
+        ),
+        analysis=AnalysisSpec(observers=[NodeRecorder()]),
+    )
+
+    result = run_model(spec, showprogress=False)
+
+    assert result.lgca.nodes_t[1].sum() == 1
+
+
+def test_combinatorial_permutation_request_fails_before_allocation(monkeypatch):
+    import lgca.base as base_module
+
+    lgca = get_lgca(
+        geometry="moore",
+        dims=(2, 2, 2),
+        density=0,
+        interaction="only_propagation",
+    )
+    lgca.calc_permutations()
+    called = False
+
+    def fail_if_called(*args):
+        nonlocal called
+        called = True
+        raise AssertionError("unsafe permutation generation was attempted")
+
+    monkeypatch.setattr(base_module, "_generate_permutations", fail_if_called)
+
+    with pytest.raises(ValueError, match="combinatorial permutation request"):
+        lgca.get_permutations(13)
+    assert not called
+
+
+def test_lazy_permutation_cache_evicts_by_bytes(monkeypatch):
+    import lgca.base as base_module
+
+    monkeypatch.setattr(base_module, "_MAX_LAZY_CACHE_BYTES", 10)
+    cache = {0: np.zeros(8, dtype=np.uint8)}
+
+    base_module.LGCA_base._store_bounded_cache(
+        cache, 1, np.ones(8, dtype=np.uint8)
+    )
+
+    assert list(cache) == [1]

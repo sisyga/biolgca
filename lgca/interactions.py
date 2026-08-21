@@ -296,7 +296,7 @@ def contact_guidance(lgca):
     unique = unique[(unique > 0) & (unique < lgca.K)]
     for n in unique:
         mask = density == n
-        si = lgca.si[n]
+        si = lgca.get_si_permutations(n)
         weights = softmax(beta * np.einsum('nij,pij->np', tensors[mask], si), axis=1)
         cumw = weights.cumsum(axis=1)
         rnd = lgca.rng.random(mask.sum())
@@ -341,7 +341,7 @@ def nematic(lgca):
     unique = unique[(unique > 0) & (unique < lgca.K)]
     for n in unique:
         mask = density == n
-        si = lgca.si[n]
+        si = lgca.get_si_permutations(n)
         weights = softmax(beta * np.einsum('nij,pij->np', tensors[mask], si), axis=1)
         cumw = weights.cumsum(axis=1)
         rnd = lgca.rng.random(mask.sum())

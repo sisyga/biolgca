@@ -19,6 +19,7 @@ import warnings
 from abc import ABC, abstractmethod
 from copy import copy, deepcopy
 import difflib
+from math import comb
 
 
 class _MissingPlotLib:
@@ -215,6 +216,10 @@ def _generate_permutations(K: int, n: int) -> np.ndarray:
     for i, idx in enumerate(combs):
         perms[i, list(idx)] = True
     return perms
+
+
+_MAX_PERMUTATION_CANDIDATES = 1_000_000
+_MAX_LAZY_CACHE_BYTES = 64 * 1024 * 1024
 
 
 class LGCA_base(ABC):
@@ -1119,32 +1124,110 @@ class LGCA_base(ABC):
         numpy.ndarray
             Array of permutations for ``n_particles``.
         """
+        n_particles = int(n_particles)
+        if not 0 <= n_particles <= self.K:
+            raise ValueError(f"n_particles must be between 0 and K={self.K}")
         try:
             return self.permutations[n_particles]
         except (AttributeError, TypeError):
             pass
 
-        if n_particles not in self._permutation_cache:
-            # Limit cache size to prevent memory issues
-            if len(self._permutation_cache) > 50:
-                # Remove least recently used (simple FIFO here)
-                oldest_key = next(iter(self._permutation_cache))
-                del self._permutation_cache[oldest_key]
+        candidates = comb(self.K, n_particles)
+        estimated_bytes = candidates * self.K * np.dtype(bool).itemsize
+        if (
+            candidates > _MAX_PERMUTATION_CANDIDATES
+            or estimated_bytes > _MAX_LAZY_CACHE_BYTES
+        ):
+            raise ValueError(
+                "combinatorial permutation request is too large: "
+                f"C({self.K}, {n_particles})={candidates:,} candidates "
+                f"({estimated_bytes / 1024 ** 2:.1f} MiB before derived tensors). "
+                "Use a specialized non-enumerating interaction or reduce the channel count."
+            )
 
-            self._permutation_cache[n_particles] = _generate_permutations(self.K, n_particles)
+        if not hasattr(self, "_permutation_cache"):
+            self._permutation_cache = {}
+        if n_particles not in self._permutation_cache:
+            permutations = _generate_permutations(self.K, n_particles)
+            self._store_bounded_cache(
+                self._permutation_cache, n_particles, permutations
+            )
         return self._permutation_cache[n_particles]
 
     def get_flux_permutations(self, n_particles):
         """Get flux permutations for ``n_particles``."""
+        n_particles = int(n_particles)
+        if not 0 <= n_particles <= self.K:
+            raise ValueError(f"n_particles must be between 0 and K={self.K}")
         try:
             return self.j[n_particles]
         except (AttributeError, TypeError):
             pass
 
+        if not hasattr(self, "_flux_cache"):
+            self._flux_cache = {}
         if n_particles not in self._flux_cache:
+            estimated_bytes = (
+                comb(self.K, n_particles)
+                * self.c.shape[0]
+                * np.dtype(float).itemsize
+            )
+            if estimated_bytes > _MAX_LAZY_CACHE_BYTES:
+                raise ValueError(
+                    "derived flux permutation request exceeds the "
+                    f"{_MAX_LAZY_CACHE_BYTES / 1024 ** 2:.0f} MiB cache budget"
+                )
             perms = self.get_permutations(n_particles)
-            self._flux_cache[n_particles] = np.dot(self.c, perms[:, :self.velocitychannels].T)
+            flux = np.dot(self.c, perms[:, :self.velocitychannels].T)
+            self._store_bounded_cache(self._flux_cache, n_particles, flux)
         return self._flux_cache[n_particles]
+
+    def get_si_permutations(self, n_particles):
+        """Get nematic tensors for all states with ``n_particles`` particles."""
+        n_particles = int(n_particles)
+        if not 0 <= n_particles <= self.K:
+            raise ValueError(f"n_particles must be between 0 and K={self.K}")
+        try:
+            return self.si[n_particles]
+        except (AttributeError, TypeError):
+            pass
+
+        if not hasattr(self, "_si_cache"):
+            self._si_cache = {}
+        if n_particles not in self._si_cache:
+            estimated_bytes = (
+                comb(self.K, n_particles)
+                * self.cij.shape[-2]
+                * self.cij.shape[-1]
+                * np.dtype(float).itemsize
+            )
+            if estimated_bytes > _MAX_LAZY_CACHE_BYTES:
+                raise ValueError(
+                    "derived tensor permutation request exceeds the "
+                    f"{_MAX_LAZY_CACHE_BYTES / 1024 ** 2:.0f} MiB cache budget"
+                )
+            permutations = self.get_permutations(n_particles)
+            tensors = np.einsum(
+                "ij,jkl",
+                permutations[:, : self.velocitychannels],
+                self.cij,
+            )
+            self._store_bounded_cache(self._si_cache, n_particles, tensors)
+        return self._si_cache[n_particles]
+
+    @staticmethod
+    def _store_bounded_cache(cache, key, value):
+        """Store one array while keeping a lazy cache within its byte budget."""
+        if value.nbytes > _MAX_LAZY_CACHE_BYTES:
+            raise ValueError(
+                f"lazy permutation result requires {value.nbytes / 1024 ** 2:.1f} MiB, "
+                f"exceeding the {_MAX_LAZY_CACHE_BYTES / 1024 ** 2:.0f} MiB cache budget"
+            )
+        cached_bytes = sum(array.nbytes for array in cache.values())
+        while cache and cached_bytes + value.nbytes > _MAX_LAZY_CACHE_BYTES:
+            oldest_key = next(iter(cache))
+            cached_bytes -= cache.pop(oldest_key).nbytes
+        cache[key] = value
 
     def total_population(self):
         """

@@ -462,7 +462,7 @@ class BoltzmannReorientationOperator(ReorientationOperator):
             return np.zeros_like(node)
         if n_particles > lgca.K:
             raise ValueError("native reorientation requires at most one particle per channel")
-        candidates = lgca.get_permutations(n_particles).astype(float)
+        candidates = lgca.get_permutations(n_particles)
         scores = np.zeros(candidates.shape[0], dtype=float)
         for term in self.terms:
             if term.species is None or term.species == species:
@@ -1856,7 +1856,7 @@ class NativeClassicalTensorReorientationOperator(ReorientationOperator):
         unique = unique[(unique > 0) & (unique < lgca.K)]
         for n_particles in unique:
             mask = density == n_particles
-            si = lgca.si[n_particles]
+            si = lgca.get_si_permutations(n_particles)
             weights = _softmax_last_axis(
                 self.beta * np.einsum("nij,pij->np", tensors[mask], si)
             )

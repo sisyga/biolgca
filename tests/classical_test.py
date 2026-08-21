@@ -9,6 +9,23 @@ from tests.common_test import T_LGCA_Common
 
 com = T_LGCA_Common
 
+
+def test_legacy_moore_nematic_uses_lazy_tensor_permutations():
+    nodes = np.zeros((2, 2, 2, 26), dtype=bool)
+    nodes[0, 0, 0, 0] = True
+    lgca = get_lgca(
+        geometry="moore",
+        nodes=nodes,
+        interaction="nematic",
+        bc="periodic",
+        seed=5,
+    )
+
+    lgca.timeevo(timesteps=1, record=True, showprogress=False)
+
+    assert lgca.nodes_t.shape == (2, 2, 2, 2, 26)
+    assert lgca.nodes_t[1].sum() == 1
+
 @pytest.fixture
 def nodes_1d_rbound():
     # fixtures for 1D boundary conditions
