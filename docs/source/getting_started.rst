@@ -201,7 +201,10 @@ Install the docs extra and build the HTML documentation locally:
 .. code-block:: bash
 
    python -m pip install -e ".[docs]"
-   python -m sphinx -W -b html docs/source docs/_build/html
+   python docs/build.py
+
+The build command treats warnings as errors and removes stale generated
+autosummary pages before invoking Sphinx.
 
 Read the Docs uses the same Sphinx configuration from ``docs/source/conf.py``
 and installs the ``docs`` extra through ``.readthedocs.yaml``.

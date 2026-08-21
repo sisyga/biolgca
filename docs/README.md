@@ -190,8 +190,10 @@ pytest
 ```
 Build the HTML documentation in `docs/_build` using
 ```bash
-python -m sphinx -b html docs/source docs/_build/html
+python docs/build.py
 ```
+This command treats warnings as errors and removes stale generated autosummary
+pages before building.
 
 # Questions/Contribute
 The structure of the package and its functionalities are detailed in the

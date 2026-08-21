@@ -260,8 +260,10 @@ python -m pytest -q
 ```
 Build the HTML documentation in `docs/_build` using
 ```bash
-python -m sphinx -W -b html docs/source docs/_build/html
+python docs/build.py
 ```
+The build is strict and removes previously generated autosummary pages first,
+so deleted or renamed APIs cannot leave stale documentation behind.
 
 # Questions/Contribute
 The structure of the package and its functionalities are detailed in the
