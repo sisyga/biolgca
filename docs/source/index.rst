@@ -120,4 +120,5 @@ Copyright (C) 2018-2026 Technische Universität Dresden.
    user_guide
    examples
    example_gallery
+   custom_interactions
    full_api
