@@ -1,0 +1,223 @@
+[
+  {
+    "scenario": "classical_1d_propagation",
+    "family": "classical_ve",
+    "geometry": "lin",
+    "interaction": "only_propagation",
+    "dims": [
+      256
+    ],
+    "density": 0.35,
+    "seed": 7,
+    "steps": 20,
+    "repeats": 1,
+    "wall_seconds": 0.01268299999719602,
+    "wall_seconds_per_step": 0.000634149999859801,
+    "peak_memory_bytes": 293272,
+    "particles_final": 79,
+    "observer_policy": "none",
+    "python_version": "3.13.5",
+    "numpy_version": "2.4.6",
+    "biolgca_version": "0.1.0"
+  },
+  {
+    "scenario": "classical_square_random_walk",
+    "family": "classical_ve",
+    "geometry": "square",
+    "interaction": "random_walk",
+    "dims": [
+      64,
+      64
+    ],
+    "density": 0.35,
+    "seed": 7,
+    "steps": 20,
+    "repeats": 1,
+    "wall_seconds": 0.007946699999592965,
+    "wall_seconds_per_step": 0.0003973349999796483,
+    "peak_memory_bytes": 159556,
+    "particles_final": 1411,
+    "observer_policy": "none",
+    "python_version": "3.13.5",
+    "numpy_version": "2.4.6",
+    "biolgca_version": "0.1.0"
+  },
+  {
+    "scenario": "classical_square_native_birth_death",
+    "family": "classical_ve",
+    "geometry": "square",
+    "interaction": "birth_death",
+    "dims": [
+      64,
+      64
+    ],
+    "density": 0.35,
+    "seed": 7,
+    "steps": 20,
+    "repeats": 1,
+    "wall_seconds": 0.026692499999626307,
+    "wall_seconds_per_step": 0.0013346249999813154,
+    "peak_memory_bytes": 926748,
+    "particles_final": 15673,
+    "observer_policy": "none",
+    "python_version": "3.13.5",
+    "numpy_version": "2.4.6",
+    "biolgca_version": "0.1.0"
+  },
+  {
+    "scenario": "classical_hex_random_walk",
+    "family": "classical_ve",
+    "geometry": "hex",
+    "interaction": "random_walk",
+    "dims": [
+      64,
+      64
+    ],
+    "density": 0.35,
+    "seed": 7,
+    "steps": 20,
+    "repeats": 1,
+    "wall_seconds": 0.010134799998922972,
+    "wall_seconds_per_step": 0.0005067399999461486,
+    "peak_memory_bytes": 163856,
+    "particles_final": 1390,
+    "observer_policy": "none",
+    "python_version": "3.13.5",
+    "numpy_version": "2.4.6",
+    "biolgca_version": "0.1.0"
+  },
+  {
+    "scenario": "classical_cubic_propagation",
+    "family": "classical_ve",
+    "geometry": "cubic",
+    "interaction": "only_propagation",
+    "dims": [
+      16,
+      16,
+      16
+    ],
+    "density": 0.35,
+    "seed": 7,
+    "steps": 20,
+    "repeats": 1,
+    "wall_seconds": 0.0035763999985647388,
+    "wall_seconds_per_step": 0.00017881999992823693,
+    "peak_memory_bytes": 196296,
+    "particles_final": 1395,
+    "observer_policy": "none",
+    "python_version": "3.13.5",
+    "numpy_version": "2.4.6",
+    "biolgca_version": "0.1.0"
+  },
+  {
+    "scenario": "classical_moore_propagation",
+    "family": "classical_ve",
+    "geometry": "moore",
+    "interaction": "only_propagation",
+    "dims": [
+      12,
+      12,
+      12
+    ],
+    "density": 0.35,
+    "seed": 7,
+    "steps": 20,
+    "repeats": 1,
+    "wall_seconds": 0.007163600002968451,
+    "wall_seconds_per_step": 0.00035818000014842255,
+    "peak_memory_bytes": 183224,
+    "particles_final": 585,
+    "observer_policy": "none",
+    "python_version": "3.13.5",
+    "numpy_version": "2.4.6",
+    "biolgca_version": "0.1.0"
+  },
+  {
+    "scenario": "nove_square_random_walk",
+    "family": "nove",
+    "geometry": "square",
+    "interaction": "random_walk",
+    "dims": [
+      64,
+      64
+    ],
+    "density": 0.35,
+    "seed": 7,
+    "steps": 20,
+    "repeats": 1,
+    "wall_seconds": 0.008045000002312008,
+    "wall_seconds_per_step": 0.0004022500001156004,
+    "peak_memory_bytes": 588296,
+    "particles_final": 1444,
+    "observer_policy": "none",
+    "python_version": "3.13.5",
+    "numpy_version": "2.4.6",
+    "biolgca_version": "0.1.0"
+  },
+  {
+    "scenario": "identity_square_random_walk",
+    "family": "identity_ve",
+    "geometry": "square",
+    "interaction": "random_walk",
+    "dims": [
+      64,
+      64
+    ],
+    "density": 0.35,
+    "seed": 7,
+    "steps": 20,
+    "repeats": 1,
+    "wall_seconds": 0.008768799998506438,
+    "wall_seconds_per_step": 0.0004384399999253219,
+    "peak_memory_bytes": 409484,
+    "particles_final": 1402,
+    "observer_policy": "none",
+    "python_version": "3.13.5",
+    "numpy_version": "2.4.6",
+    "biolgca_version": "0.1.0"
+  },
+  {
+    "scenario": "identity_nove_square_random_walk",
+    "family": "identity_nove",
+    "geometry": "square",
+    "interaction": "random_walk",
+    "dims": [
+      32,
+      32
+    ],
+    "density": 0.35,
+    "seed": 7,
+    "steps": 20,
+    "repeats": 1,
+    "wall_seconds": 0.2576874000005773,
+    "wall_seconds_per_step": 0.012884370000028867,
+    "peak_memory_bytes": 615877,
+    "particles_final": 356,
+    "observer_policy": "none",
+    "python_version": "3.13.5",
+    "numpy_version": "2.4.6",
+    "biolgca_version": "0.1.0"
+  },
+  {
+    "scenario": "multispecies_square_birth",
+    "family": "multispecies",
+    "geometry": "square",
+    "interaction": "birth",
+    "dims": [
+      64,
+      64
+    ],
+    "density": 0.35,
+    "seed": 7,
+    "steps": 20,
+    "repeats": 1,
+    "wall_seconds": 0.029890999998315237,
+    "wall_seconds_per_step": 0.001494549999915762,
+    "peak_memory_bytes": 2201710,
+    "particles_final": 21522,
+    "observer_policy": "none",
+    "python_version": "3.13.5",
+    "numpy_version": "2.4.6",
+    "biolgca_version": "0.1.0"
+  }
+]
