@@ -3,10 +3,12 @@ Tutorial
 ********
 
 This tutorial introduces the main API by walking through a typical simulation
-workflow. Detailed, runnable examples are provided in the notebooks
-:download:`BioLGCA.ipynb <../../BioLGCA.ipynb>` and
-:download:`Evolutionary LGCA.ipynb <../../Evolutionary LGCA.ipynb>`. For more
-code snippets see also :doc:`examples`.
+workflow. Tested, runnable starting points are provided in
+:doc:`example_gallery`. The older :download:`BioLGCA.ipynb
+<../../BioLGCA.ipynb>` and :download:`Evolutionary LGCA.ipynb
+<../../Evolutionary LGCA.ipynb>` notebooks remain available as legacy
+factory-API tours, but are not executed by CI. For more code snippets see also
+:doc:`examples`.
 
 Retrieving the correct LGCA
 ---------------------------

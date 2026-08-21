@@ -3,9 +3,9 @@
 Examples
 ========
 
-This section collects small tutorials and notebooks showing how to set up
-simulations and customise the LGCA simulator. The Sphinx pages are intentionally
-short; the notebooks contain longer exploratory workflows.
+This section collects small tutorials showing how to set up simulations and
+customise the LGCA simulator. The Sphinx pages and ModelSpec gallery are the
+maintained examples; the repository notebooks are legacy exploratory material.
 
 For a Morpheus-style list of runnable, curated ``ModelSpec`` examples by
 modeling question, see :doc:`example_gallery`.
@@ -78,6 +78,10 @@ Observer and movie example
 
 Repository examples
 -------------------
+
+The notebooks predate the declarative API and are not executed by CI. Use them
+as legacy factory-API tours; prefer :doc:`example_gallery` for tested starting
+points.
 
 - :download:`BioLGCA notebook <../../BioLGCA.ipynb>`
 - :download:`Evolutionary LGCA notebook <../../Evolutionary LGCA.ipynb>`

@@ -140,8 +140,8 @@ from lgca import get_lgca
 lgca = get_lgca(interaction='go_and_grow', ib=True, geometry='lin', restchannels=6)
 # initialise a custom lattice configuration
 lgca.nodes[...] = 0
-lgca.update_dynamic_fields()
 lgca.nodes[lgca.dims[0] // 2, :] = 1  # 1 fully filled node at the center
+lgca.update_dynamic_fields()  # refresh derived fields after all node changes
 # simulate for 200 timesteps and record the full lattice configuration
 lgca.timeevo(timesteps=200, record=True)
 # plot cell density to see the tumour growth over time
@@ -251,7 +251,8 @@ lgca.timeevo(timesteps=50)
 # plot the development of the particle/cell density over time
 lgca.plot_density()
 ```
-The [Tutorial](./BioLGCA.ipynb) guides you through the argument options.
+The [legacy exploratory notebook](./BioLGCA.ipynb) tours the factory API. For
+new simulations, prefer the tested [ModelSpec example gallery](docs/source/example_gallery.rst).
 
 # Running tests and building docs
 Run the test-suite from the repository root with
@@ -271,6 +272,9 @@ The structure of the package and its functionalities are detailed in the
 
 Issues are tracked on the [GitHub page](https://github.com/sisyga/biolgca/issues).
 We collect both bugs and feature ideas there.
+
+User-facing changes planned for the next release are recorded in the
+[changelog](CHANGELOG.md).
 
 For guidelines how to add code to and maintain the repo visit the [Wiki](https://github.com/sisyga/biolgca/wiki).
 

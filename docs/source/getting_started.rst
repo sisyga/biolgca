@@ -209,10 +209,14 @@ autosummary pages before invoking Sphinx.
 Read the Docs uses the same Sphinx configuration from ``docs/source/conf.py``
 and installs the ``docs`` extra through ``.readthedocs.yaml``.
 
-Notebook examples
------------------
+Legacy notebook examples
+------------------------
 
-The repository includes notebook examples for broader tours of the API:
+The repository includes older exploratory notebooks that predate the
+declarative API. They remain useful as factory-API tours, but they are not part
+of the tested example gallery and may require manual adaptation to current
+Jupyter or plotting environments. Start new simulations from
+:doc:`example_gallery` instead.
 
 - :download:`BioLGCA notebook <../../BioLGCA.ipynb>`
 - :download:`Evolutionary LGCA notebook <../../Evolutionary LGCA.ipynb>`
