@@ -1,0 +1,244 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sisyga.github.io/biolgca/schemas/model-spec-v1.schema.json",
+  "title": "BioLGCA ModelSpec v1",
+  "type": "object",
+  "required": ["schema_version", "model"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "description": {"$ref": "#/$defs/description"},
+        "space": {"$ref": "#/$defs/space"},
+        "state": {"$ref": "#/$defs/state"},
+        "time": {"$ref": "#/$defs/time"},
+        "dynamics": {"$ref": "#/$defs/dynamics"},
+        "analysis": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "observers": {
+                  "type": "array",
+                  "items": {"$ref": "#/$defs/observer"}
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "jsonValue": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "boolean"},
+        {"type": "number"},
+        {"type": "string"},
+        {"type": "array", "items": {"$ref": "#/$defs/jsonValue"}},
+        {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/jsonValue"}
+        }
+      ]
+    },
+    "description": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": {"type": "string"},
+        "details": {"type": "string"},
+        "tags": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "space": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "geometry": {"type": "string"},
+        "dims": {"$ref": "#/$defs/jsonValue"},
+        "boundary": {"type": "string"}
+      }
+    },
+    "initializer": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"enum": ["region", "from_npz"]},
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/jsonValue"}
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "density": {"$ref": "#/$defs/jsonValue"},
+        "nodes": {"$ref": "#/$defs/jsonValue"},
+        "restchannels": {"type": "integer", "minimum": 0},
+        "volume_exclusion": {"type": "boolean"},
+        "identity_based": {"type": "boolean"},
+        "n_species": {"type": "integer", "minimum": 1},
+        "capacity": {"type": ["integer", "null"], "minimum": 1},
+        "initializer": {
+          "oneOf": [{"type": "null"}, {"$ref": "#/$defs/initializer"}]
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/jsonValue"}
+        },
+        "fields": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/jsonValue"}
+        }
+      }
+    },
+    "time": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "steps": {"type": "integer", "minimum": 0},
+        "seed": {"type": ["integer", "null"]},
+        "timing_trace": {"type": "integer", "minimum": 0}
+      }
+    },
+    "registeredOperator": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/jsonValue"}
+        }
+      }
+    },
+    "reorientationTerm": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "beta": {"type": "number"},
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/jsonValue"}
+        },
+        "species": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "reorientationOperator": {
+      "type": "object",
+      "required": ["type", "terms"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {"const": "reorientation"},
+        "sampler": {"type": "string"},
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/jsonValue"}
+        },
+        "terms": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/reorientationTerm"}
+        }
+      }
+    },
+    "dynamics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operators": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {"$ref": "#/$defs/registeredOperator"},
+              {"$ref": "#/$defs/reorientationOperator"}
+            ]
+          }
+        },
+        "propagation": {"$ref": "#/$defs/jsonValue"},
+        "allow_custom_order": {"type": "boolean"}
+      }
+    },
+    "schedule": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "every": {"type": "integer", "minimum": 1},
+            "steps": {
+              "oneOf": [
+                {"type": "null"},
+                {"type": "array", "items": {"type": "integer", "minimum": 0}}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "observer": {
+      "oneOf": [
+        {"$ref": "#/$defs/simpleObserver"},
+        {
+          "type": "object",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "DensityRecorder"},
+            "schedule": {"$ref": "#/$defs/schedule"},
+            "dtype": {"type": ["string", "null"]}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "CSVSnapshotObserver"},
+            "schedule": {"$ref": "#/$defs/schedule"},
+            "kind": {"type": "string"},
+            "output_dir": {"type": "string"},
+            "filename": {"type": "string"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "ScalarTimeSeriesRecorder"},
+            "schedule": {"$ref": "#/$defs/schedule"},
+            "output_path": {"type": "string"}
+          }
+        }
+      ]
+    },
+    "simpleObserver": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "NodeRecorder", "PopulationRecorder", "ChannelDensityRecorder",
+            "PerTypeRecorder", "OrderParameterRecorder", "FamilyPopulationRecorder"
+          ]
+        },
+        "schedule": {"$ref": "#/$defs/schedule"}
+      }
+    }
+  }
+}

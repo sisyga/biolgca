@@ -12,11 +12,15 @@ from lgca.model import (
     StateSpec,
     TimeSpec,
     build_model,
+    model_spec_from_json,
+    model_spec_to_dict,
+    model_spec_to_json,
     run_model,
 )
-from lgca.pipeline import InteractionPipelineSpec
+from lgca.pipeline import BirthDeathSpec, InteractionPipelineSpec, ReorientationSpec, ReorientationTermSpec
 from lgca.plugins import ConservationLaw, InteractionOperator, PluginInfo, describe_plugin, list_plugins
 from lgca.simulation import DensityRecorder, FamilyPopulationRecorder, NodeRecorder
+from lgca.simulation import Observer
 
 
 def _square_spec(*, operators=(), timesteps=3, seed=17):
@@ -47,6 +51,68 @@ def _legacy_square(*, interaction, timesteps=3, seed=17):
         showprogress=False,
     )
     return lgca
+
+
+def test_registered_operator_wire_format_contains_only_stable_data_tags():
+    spec = replace(
+        _square_spec(),
+        dynamics=InteractionPipelineSpec(
+            operators=[
+                BirthDeathSpec(name="birth_death", parameters={"birth_rate": 0.1}),
+                ReorientationSpec(
+                    terms=[ReorientationTermSpec(name="uniform", beta=0.5)]
+                ),
+            ]
+        ),
+    )
+
+    operators = model_spec_to_dict(spec)["model"]["dynamics"]["operators"]
+
+    assert operators[0] == {
+        "name": "birth_death",
+        "parameters": {"birth_rate": 0.1},
+    }
+    assert operators[1]["type"] == "reorientation"
+    assert "BirthDeathSpec" not in model_spec_to_json(spec)
+    assert "ReorientationSpec" not in model_spec_to_json(spec)
+
+
+def test_initializer_declaration_round_trips_as_pure_data():
+    state = replace(
+        _square_spec().state,
+        density=None,
+        initializer={
+            "name": "region",
+            "parameters": {"placement": "center", "extent": [2, 3], "density": 0.5},
+        },
+    )
+    spec = replace(_square_spec(), state=state)
+
+    loaded = model_spec_from_json(model_spec_to_json(spec))
+
+    assert loaded.state.initializer == state.initializer
+
+
+def test_python_only_operator_and_observer_have_actionable_portability_errors():
+    class PythonOnlyOperator:
+        name = "external.unregistered"
+        parameters = {}
+
+    class PythonOnlyObserver(Observer):
+        pass
+
+    operator_spec = replace(
+        _square_spec(),
+        dynamics=InteractionPipelineSpec(operators=[PythonOnlyOperator()]),
+    )
+    observer_spec = replace(
+        _square_spec(), analysis=AnalysisSpec(observers=[PythonOnlyObserver()])
+    )
+
+    with pytest.raises(TypeError, match=r"not portable.*registered plugin"):
+        model_spec_to_dict(operator_spec)
+    with pytest.raises(TypeError, match=r"not portable.*built-in observer"):
+        model_spec_to_dict(observer_spec)
 
 
 def test_model_spec_runs_propagation_as_separate_deterministic_phase():

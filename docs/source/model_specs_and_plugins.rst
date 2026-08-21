@@ -58,6 +58,37 @@ The result exposes the final LGCA object, the compiled pipeline, metadata and
 any observer outputs. For example, ``NodeRecorder`` writes ``lgca.nodes_t`` and
 ``DensityRecorder`` writes ``lgca.dens_t``.
 
+Portable model files
+--------------------
+
+JSON is the canonical portable ModelSpec v1 representation. YAML is an
+optional authoring syntax for the same data model; install it with
+``pip install biolgca[yaml]``. Both formats contain only data:
+
+* registered interactions use ``name`` and ``parameters``;
+* composed reorientation uses the stable ``type: reorientation`` form;
+* analysis contains only the documented built-in observer types;
+* an optional ``state.initializer`` contains a registered initializer name and
+  parameters.
+
+Model files never contain Python import paths and never execute arbitrary
+modules. A third-party interaction may be referenced after a trusted Python
+launcher imports and registers it, but standalone model loading resolves only
+plugins shipped with BioLGCA. Custom Python observers remain Python-only and
+raise an actionable portability error if a caller tries to save them.
+
+.. code-block:: python
+
+   from lgca.model import load_model_spec, run_model, save_model_spec
+
+   save_model_spec(spec, "model.json")
+   loaded = load_model_spec("model.json")
+   result = run_model(loaded, showprogress=False)
+
+The packaged ``model-spec-v1.schema.json`` is intended for editors and
+development-time validation. Runtime loading uses BioLGCA's dependency-light
+strict parser, so ``jsonschema`` is needed only by contributors and tooling.
+
 Composed dynamics
 -----------------
 

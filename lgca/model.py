@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.metadata
+import importlib.resources
 import difflib
 import json
 import time
@@ -26,6 +27,7 @@ from .pipeline import (
 
 
 MODEL_SPEC_SCHEMA_VERSION = 1
+MODEL_SPEC_INITIALIZER_NAMES = frozenset({"region", "from_npz"})
 
 __all__ = [
     "AnalysisSpec",
@@ -41,6 +43,7 @@ __all__ = [
     "build_model",
     "describe_model_graph",
     "load_model_spec",
+    "load_model_spec_schema",
     "migrate_model_spec_dict",
     "model_spec_from_dict",
     "model_spec_from_json",
@@ -86,6 +89,7 @@ class StateSpec:
     identity_based: bool = False
     n_species: int = 1
     capacity: int | None = None
+    initializer: Mapping[str, Any] | None = None
     parameters: Mapping[str, Any] = field(default_factory=dict)
     fields: Mapping[str, Any] = field(default_factory=dict)
 
@@ -142,6 +146,7 @@ def model_spec_to_dict(spec: ModelSpec) -> dict[str, Any]:
                 "identity_based": spec.state.identity_based,
                 "n_species": spec.state.n_species,
                 "capacity": spec.state.capacity,
+                "initializer": _to_jsonable(spec.state.initializer),
                 "parameters": _to_jsonable(dict(spec.state.parameters)),
                 "fields": _to_jsonable(dict(spec.state.fields)),
             },
@@ -195,6 +200,7 @@ def model_spec_from_dict(data: Mapping[str, Any]) -> ModelSpec:
             identity_based=state.get("identity_based", False),
             n_species=state.get("n_species", 1),
             capacity=state.get("capacity"),
+            initializer=_from_jsonable(state.get("initializer")),
             parameters=_from_jsonable(state.get("parameters", {})),
             fields=_from_jsonable(state.get("fields", {})),
         ),
@@ -259,7 +265,7 @@ def model_spec_from_yaml(source: str | Path) -> ModelSpec:
             return model_spec_from_dict(json.loads(text))
         except json.JSONDecodeError as exc:
             raise RuntimeError(
-                "Reading YAML model specs requires PyYAML. Install the docs/dev extras "
+                "Reading YAML model specs requires PyYAML. Install biolgca[yaml] "
                 "or use a .json model spec."
             ) from exc
     return model_spec_from_dict(yaml.safe_load(text))
@@ -325,6 +331,15 @@ def migrate_model_spec_dict(data: dict[str, Any]) -> dict[str, Any]:
     raise ValueError(f"Unsupported ModelSpec schema_version {version!r}.")
 
 
+def load_model_spec_schema() -> dict[str, Any]:
+    """Load the packaged JSON Schema for the stable ModelSpec v1 wire format."""
+
+    resource = importlib.resources.files("lgca.schemas").joinpath(
+        "model-spec-v1.schema.json"
+    )
+    return json.loads(resource.read_text(encoding="utf-8"))
+
+
 def _validate_serialized_model(data: Mapping[str, Any]) -> None:
     _reject_unknown_keys(data, {"schema_version", "model"}, "")
     model = _mapping_at(data.get("model"), "model")
@@ -348,7 +363,7 @@ def _validate_serialized_model(data: Mapping[str, Any]) -> None:
         state,
         {
             "density", "nodes", "restchannels", "volume_exclusion", "identity_based",
-            "n_species", "capacity", "parameters", "fields",
+            "n_species", "capacity", "initializer", "parameters", "fields",
         },
         "model.state",
     )
@@ -373,6 +388,21 @@ def _validate_serialized_model(data: Mapping[str, Any]) -> None:
     for key in ("parameters", "fields"):
         if key in state and not isinstance(state[key], Mapping):
             raise TypeError(f"model.state.{key} must be a mapping")
+    initializer = state.get("initializer")
+    if initializer is not None:
+        initializer = _mapping_at(initializer, "model.state.initializer")
+        _reject_unknown_keys(
+            initializer, {"name", "parameters"}, "model.state.initializer"
+        )
+        if not isinstance(initializer.get("name"), str):
+            raise TypeError("model.state.initializer.name must be a string")
+        if initializer["name"] not in MODEL_SPEC_INITIALIZER_NAMES:
+            valid = ", ".join(sorted(MODEL_SPEC_INITIALIZER_NAMES))
+            raise ValueError(
+                f"model.state.initializer.name must be one of: {valid}"
+            )
+        if not isinstance(initializer.get("parameters", {}), Mapping):
+            raise TypeError("model.state.initializer.parameters must be a mapping")
     for key in ("restchannels", "n_species", "capacity"):
         value = state.get(key)
         if value is not None and (isinstance(value, bool) or int(value) != value):
@@ -385,6 +415,8 @@ def _validate_serialized_model(data: Mapping[str, Any]) -> None:
         value = dynamics.get(key, ())
         if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
             raise TypeError(f"model.dynamics.{key} must be a sequence")
+    for index, operator in enumerate(dynamics.get("operators", ())):
+        _validate_serialized_operator(operator, index)
     if "allow_custom_order" in dynamics and not isinstance(
         dynamics["allow_custom_order"], bool
     ):
@@ -393,6 +425,65 @@ def _validate_serialized_model(data: Mapping[str, Any]) -> None:
         observers = analysis.get("observers", ())
         if isinstance(observers, (str, bytes)) or not isinstance(observers, Sequence):
             raise TypeError("model.analysis.observers must be a sequence")
+        for index, observer in enumerate(observers):
+            _validate_serialized_observer(observer, index)
+
+
+def _validate_serialized_operator(operator, index: int) -> None:
+    path = f"model.dynamics.operators[{index}]"
+    operator = _mapping_at(operator, path)
+    if "type" in operator:
+        _reject_unknown_keys(
+            operator, {"type", "sampler", "parameters", "terms"}, path
+        )
+        if operator.get("type") != "reorientation":
+            raise ValueError(f"{path}.type must be 'reorientation'")
+        terms = operator.get("terms", ())
+        if isinstance(terms, (str, bytes)) or not isinstance(terms, Sequence):
+            raise TypeError(f"{path}.terms must be a sequence")
+        for term_index, term in enumerate(terms):
+            term_path = f"{path}.terms[{term_index}]"
+            term = _mapping_at(term, term_path)
+            _reject_unknown_keys(
+                term, {"name", "beta", "parameters", "species"}, term_path
+            )
+            if not isinstance(term.get("name"), str):
+                raise TypeError(f"{term_path}.name must be a string")
+            if not isinstance(term.get("parameters", {}), Mapping):
+                raise TypeError(f"{term_path}.parameters must be a mapping")
+        if not isinstance(operator.get("parameters", {}), Mapping):
+            raise TypeError(f"{path}.parameters must be a mapping")
+        return
+    _reject_unknown_keys(operator, {"name", "parameters"}, path)
+    if not isinstance(operator.get("name"), str):
+        raise TypeError(f"{path}.name must be a string")
+    if not isinstance(operator.get("parameters", {}), Mapping):
+        raise TypeError(f"{path}.parameters must be a mapping")
+
+
+def _validate_serialized_observer(observer, index: int) -> None:
+    path = f"model.analysis.observers[{index}]"
+    observer = _mapping_at(observer, path)
+    observer_type = observer.get("type")
+    simple = {
+        "NodeRecorder", "PopulationRecorder", "ChannelDensityRecorder",
+        "PerTypeRecorder", "OrderParameterRecorder", "FamilyPopulationRecorder",
+    }
+    if observer_type in simple:
+        allowed = {"type", "schedule"}
+    elif observer_type == "DensityRecorder":
+        allowed = {"type", "schedule", "dtype"}
+    elif observer_type == "CSVSnapshotObserver":
+        allowed = {"type", "schedule", "kind", "output_dir", "filename"}
+    elif observer_type == "ScalarTimeSeriesRecorder":
+        allowed = {"type", "schedule", "output_path"}
+    else:
+        raise ValueError(f"{path}.type unknown observer {observer_type!r}")
+    _reject_unknown_keys(observer, allowed, path)
+    schedule = observer.get("schedule")
+    if schedule is not None:
+        schedule = _mapping_at(schedule, f"{path}.schedule")
+        _reject_unknown_keys(schedule, {"every", "steps"}, f"{path}.schedule")
 
 
 def _mapping_at(value, path: str) -> Mapping[str, Any]:
@@ -476,51 +567,64 @@ def _from_jsonable(value):
 
 
 def _operator_to_dict(operator) -> dict[str, Any]:
-    if isinstance(operator, BirthDeathSpec):
-        return {
-            "type": "BirthDeathSpec",
-            "name": operator.name,
-            "parameters": _to_jsonable(dict(operator.parameters)),
-        }
-    if isinstance(operator, PhenotypeSwitchSpec):
-        return {
-            "type": "PhenotypeSwitchSpec",
-            "name": operator.name,
-            "parameters": _to_jsonable(dict(operator.parameters)),
-        }
+    if isinstance(operator, (BirthDeathSpec, PhenotypeSwitchSpec)):
+        return _registered_operator_to_dict(operator.name, operator.parameters)
     if isinstance(operator, ReorientationSpec):
         return {
-            "type": "ReorientationSpec",
+            "type": "reorientation",
             "sampler": operator.sampler,
             "parameters": _to_jsonable(dict(operator.parameters)),
             "terms": [_reorientation_term_to_dict(term) for term in operator.terms],
         }
     if isinstance(operator, Mapping):
-        return {"type": "Mapping", "value": _to_jsonable(dict(operator))}
-    raise TypeError(f"Cannot serialize operator {operator!r}.")
+        if "name" not in operator:
+            raise TypeError(
+                "ModelSpec is not portable: operator mappings require a registered plugin name."
+            )
+        unexpected = set(operator) - {"name", "parameters"}
+        if unexpected:
+            raise TypeError(
+                "ModelSpec is not portable: registered operator mappings support only "
+                f"'name' and 'parameters', got {sorted(unexpected)}."
+            )
+        return _registered_operator_to_dict(operator["name"], operator.get("parameters", {}))
+    name = getattr(operator, "name", None)
+    parameters = getattr(operator, "parameters", {})
+    if name is not None:
+        return _registered_operator_to_dict(name, parameters)
+    raise TypeError(
+        "ModelSpec is not portable: operators must reference a registered plugin by name."
+    )
+
+
+def _registered_operator_to_dict(name, parameters) -> dict[str, Any]:
+    from .plugins import describe_plugin
+
+    try:
+        info = describe_plugin(str(name))
+    except KeyError as exc:
+        raise TypeError(
+            f"ModelSpec is not portable: operator {name!r} is not a registered plugin. "
+            "Import and register it in a trusted Python launcher before saving."
+        ) from exc
+    return {
+        "name": info.name,
+        "parameters": _to_jsonable(dict(parameters or {})),
+    }
 
 
 def _operator_from_dict(data: Mapping[str, Any]):
     operator_type = data.get("type")
-    if operator_type == "BirthDeathSpec":
-        return BirthDeathSpec(
-            name=data["name"],
-            parameters=_from_jsonable(data.get("parameters", {})),
-        )
-    if operator_type == "PhenotypeSwitchSpec":
-        return PhenotypeSwitchSpec(
-            name=data["name"],
-            parameters=_from_jsonable(data.get("parameters", {})),
-        )
-    if operator_type == "ReorientationSpec":
+    if operator_type == "reorientation":
         return ReorientationSpec(
             terms=tuple(_reorientation_term_from_dict(term) for term in data.get("terms", ())),
             sampler=data.get("sampler", "boltzmann"),
             parameters=_from_jsonable(data.get("parameters", {})),
         )
-    if operator_type == "Mapping":
-        return _from_jsonable(data.get("value", {}))
-    return _from_jsonable(dict(data))
+    return {
+        "name": data["name"],
+        "parameters": _from_jsonable(data.get("parameters", {})),
+    }
 
 
 def _reorientation_term_to_dict(term: ReorientationTermSpec) -> dict[str, Any]:
@@ -542,8 +646,19 @@ def _reorientation_term_from_dict(data: Mapping[str, Any]) -> ReorientationTermS
 
 
 def _observer_to_dict(observer) -> dict[str, Any]:
+    supported = {
+        "NodeRecorder", "PopulationRecorder", "DensityRecorder",
+        "ChannelDensityRecorder", "PerTypeRecorder", "OrderParameterRecorder",
+        "FamilyPopulationRecorder", "CSVSnapshotObserver", "ScalarTimeSeriesRecorder",
+    }
+    observer_type = observer.__class__.__name__
+    if observer_type not in supported:
+        raise TypeError(
+            f"ModelSpec is not portable: {observer_type} is not a built-in observer. "
+            "Custom observers must be attached by a trusted Python launcher."
+        )
     data = {
-        "type": observer.__class__.__name__,
+        "type": observer_type,
         "schedule": _schedule_to_dict(getattr(observer, "schedule", None)),
     }
     if observer.__class__.__name__ == "DensityRecorder":
@@ -786,8 +901,16 @@ def _validate_spec(spec: ModelSpec) -> None:
     ):
         raise ValueError("model.time.seed must be an integer or null")
     _validate_non_negative_integer("model.time.timing_trace", spec.time.timing_trace)
-    if spec.state.nodes is not None and spec.state.density is not None:
-        raise ValueError("model.state.nodes and model.state.density are mutually exclusive")
+    initial_states = [
+        spec.state.nodes is not None,
+        spec.state.density is not None,
+        spec.state.initializer is not None,
+    ]
+    if sum(initial_states) > 1:
+        raise ValueError(
+            "model.state.nodes, model.state.density, and model.state.initializer "
+            "are mutually exclusive"
+        )
     _validate_non_negative_integer("model.state.restchannels", spec.state.restchannels)
     _validate_positive_integer("model.state.n_species", spec.state.n_species)
     if spec.state.capacity is not None:

@@ -36,6 +36,9 @@ dependencies = [
 test = [
     "pytest>=8",
 ]
+yaml = [
+    "PyYAML>=6",
+]
 docs = [
     "Sphinx",
     "sphinx-autodoc-typehints",
@@ -66,6 +69,7 @@ dev = [
     "numpydoc",
     "matplotlib",
     "build",
+    "jsonschema>=4",
 ]
 
 [project.urls]
@@ -74,4 +78,7 @@ Issues = "https://github.com/sisyga/biolgca/issues"
 Documentation = "https://sisyga.github.io/biolgca/"
 
 [tool.setuptools]
-packages = ["lgca", "lgca.examples"]
+packages = ["lgca", "lgca.examples", "lgca.schemas"]
+
+[tool.setuptools.package-data]
+"lgca.schemas" = ["*.json"]

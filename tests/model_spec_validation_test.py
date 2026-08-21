@@ -60,6 +60,38 @@ def test_wrong_serialized_scalar_and_sequence_types_are_rejected(path, value):
         model_spec_from_dict(data)
 
 
+def test_runtime_class_operator_tags_are_not_accepted_by_wire_parser():
+    data = _serialized_model()
+    data["model"]["dynamics"]["operators"] = [
+        {"type": "PythonClass", "module": "untrusted.module", "name": "run"}
+    ]
+
+    with pytest.raises(ValueError, match=r"model\.dynamics\.operators\[0\]"):
+        model_spec_from_dict(data)
+
+
+def test_serialized_observer_rejects_unknown_type_and_options():
+    data = _serialized_model()
+    data["model"]["analysis"]["observers"] = [
+        {"type": "ExternalObserver", "import_path": "untrusted.Observer"}
+    ]
+
+    with pytest.raises(ValueError, match=r"model\.analysis\.observers\[0\]"):
+        model_spec_from_dict(data)
+
+
+def test_initializer_declaration_rejects_unknown_keys_with_full_path():
+    data = _serialized_model()
+    data["model"]["state"].pop("density")
+    data["model"]["state"]["initializer"] = {
+        "name": "region",
+        "paramters": {"density": 0.5},
+    }
+
+    with pytest.raises(ValueError, match=r"model\.state\.initializer\.paramters.*parameters"):
+        model_spec_from_dict(data)
+
+
 @pytest.mark.parametrize("geometry", ["triangle", 3])
 def test_invalid_geometry_is_rejected_before_build(geometry):
     with pytest.raises((TypeError, ValueError), match="model.space.geometry"):

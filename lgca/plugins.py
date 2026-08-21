@@ -2059,7 +2059,16 @@ def _register_native_plugins() -> None:
 
 
 def _register_legacy_plugins() -> None:
-    pass
+    _register_legacy(
+        name="custom.rest_or_align",
+        backend="classical",
+        module="lgca.examples.custom_rest_or_align",
+        function="rest_or_align",
+        legacy_interaction="alignment",
+        operator_kind="reorientation",
+        default_parameters={"beta": 2.0, "alpha": 2.0},
+        description="Alignment with an added resting-channel preference.",
+    )
 
 
 _register_native_plugins()

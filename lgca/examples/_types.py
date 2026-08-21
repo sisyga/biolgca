@@ -16,3 +16,4 @@ class ExampleInfo:
     concepts: tuple[str, ...]
     source_path: str = ""
     source: str = ""
+    portable: bool = True

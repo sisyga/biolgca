@@ -26,7 +26,6 @@ from lgca.model import (
     TimeSpec,
 )
 from lgca.pipeline import InteractionPipelineSpec
-from lgca.plugins import ConservationLaw, LegacyInteractionOperator, PluginInfo
 from lgca.simulation import DensityRecorder, NodeRecorder, PopulationRecorder
 
 
@@ -90,32 +89,10 @@ def build_spec() -> ModelSpec:
         time=TimeSpec(steps=100, seed=112),
         dynamics=InteractionPipelineSpec(
             operators=[
-                LegacyInteractionOperator(
-                    info=PluginInfo(
-                        name="custom.rest_or_align",
-                        operator_kind="reorientation",
-                        backend_families=("classical",),
-                        legacy_source="BioLGCA.ipynb custom interaction rule",
-                        parameters={
-                            "beta": {
-                                "default": 2.0,
-                                "validator": "finite scalar alignment sensitivity",
-                            },
-                            "alpha": {
-                                "default": 2.0,
-                                "validator": "finite scalar resting preference",
-                            },
-                        },
-                        conservation_law=ConservationLaw(True, True, False),
-                        port_status="example",
-                        test_status="smoke",
-                        description="Alignment with an added resting-channel preference.",
-                    ),
-                    legacy_interaction="alignment",
-                    parameters={"beta": 2.0, "alpha": 2.0},
-                    function_module=__name__,
-                    function_name="rest_or_align",
-                )
+                {
+                    "name": "custom.rest_or_align",
+                    "parameters": {"beta": 2.0, "alpha": 2.0},
+                }
             ],
         ),
         analysis=AnalysisSpec(
