@@ -1,4 +1,12 @@
-from lgca.plugins import describe_plugin, interaction_coverage_table, list_plugins
+import pytest
+
+from lgca.plugins import (
+    PluginInfo,
+    PluginRegistry,
+    describe_plugin,
+    interaction_coverage_table,
+    list_plugins,
+)
 
 
 EXPECTED_LEGACY_INTERACTIONS = {
@@ -41,6 +49,57 @@ EXPECTED_LEGACY_INTERACTIONS = {
     "nove_ib.go_or_grow_kappa_chemo",
     "nove_ib.random_walk",
 }
+
+
+def test_registry_rejects_alias_that_shadows_canonical_name_atomically():
+    registry = PluginRegistry()
+    factory = lambda parameters=None: None
+    registry.register(
+        PluginInfo(name="canonical.one", operator_kind="test", backend_families=("test",)),
+        factory,
+    )
+
+    with pytest.raises(ValueError, match="canonical.one"):
+        registry.register(
+            PluginInfo(
+                name="canonical.two",
+                aliases=("canonical.one",),
+                operator_kind="test",
+                backend_families=("test",),
+            ),
+            factory,
+        )
+
+    assert [plugin.name for plugin in registry.list()] == ["canonical.one"]
+
+
+def test_registry_rejects_canonical_name_that_shadows_alias_atomically():
+    registry = PluginRegistry()
+    factory = lambda parameters=None: None
+    registry.register(
+        PluginInfo(
+            name="canonical.one",
+            aliases=("shared",),
+            operator_kind="test",
+            backend_families=("test",),
+        ),
+        factory,
+    )
+
+    with pytest.raises(ValueError, match="shared"):
+        registry.register(
+            PluginInfo(
+                name="shared",
+                aliases=("unused",),
+                operator_kind="test",
+                backend_families=("test",),
+            ),
+            factory,
+        )
+
+    assert [plugin.name for plugin in registry.list()] == ["canonical.one"]
+    with pytest.raises(KeyError):
+        registry.resolve("unused")
 
 
 def test_every_existing_public_interaction_is_registered():
