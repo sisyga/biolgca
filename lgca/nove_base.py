@@ -286,9 +286,16 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         It is calculated as the agreement in direction between the ﬂux of a lattice site and the ﬂux of the director
         field
         summed up and normalized over all lattice sites.
-        .. note:: This is buggy!
-        :return: Local alignment parameter: ranging from -1 (antiparallel alignment) through 0 (no alignment)
-        to 1 (parallel alignment)
+
+        .. warning::
+
+           This calculation is known to be unreliable.
+
+        Returns
+        -------
+        float
+            Local alignment parameter ranging from -1 (antiparallel alignment)
+            through 0 (no alignment) to 1 (parallel alignment).
         """
         N = self.cell_density[self.nonborder].sum()
         if N == 0:

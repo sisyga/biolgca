@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Mapping
 
 import numpy as np
@@ -56,13 +56,16 @@ def resolve_resource_path(
     """Resolve an imported resource without allowing accidental path escape."""
 
     raw = Path(path)
+    portable_paths = (PurePosixPath(path), PureWindowsPath(path))
     if resource_base is None:
         raise ValueError(
             "Relative initializer resources require resource_base; pass the model "
             "directory or use trusted_paths=True (CLI: --trusted-paths) with an explicit base."
         )
     base = Path(resource_base).resolve()
-    if not trusted_paths and (raw.is_absolute() or ".." in raw.parts):
+    if not trusted_paths and any(
+        candidate.anchor or ".." in candidate.parts for candidate in portable_paths
+    ):
         raise ValueError(
             "Initializer resource paths must be relative and may not contain '..'; "
             "use trusted_paths=True (CLI: --trusted-paths) only for trusted local models."

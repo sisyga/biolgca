@@ -84,7 +84,10 @@ def test_from_npz_initializer_loads_contained_relative_state(tmp_path):
     np.testing.assert_array_equal(lgca.nodes[lgca.nonborder], nodes)
 
 
-@pytest.mark.parametrize("path", ["../outside.npz", "C:/outside.npz"])
+@pytest.mark.parametrize(
+    "path",
+    ["../outside.npz", r"..\outside.npz", "C:/outside.npz", "C:outside.npz"],
+)
 def test_from_npz_initializer_rejects_unsafe_paths_by_default(tmp_path, path):
     spec = _initializer_spec(
         {"name": "from_npz", "parameters": {"path": path}}, dims=(3, 4)
