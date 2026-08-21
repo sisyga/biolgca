@@ -1,12 +1,15 @@
+import numpy as np
 import pytest
 
 matplotlib = pytest.importorskip("matplotlib", reason="requires matplotlib for plotting tests")
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
+from matplotlib.image import AxesImage
 
 from lgca import get_lgca
 from lgca.plotting import AnimationObserver, PlotSnapshotObserver, animate, plot
+from lgca.plot_data import select_density, select_density_history
 from lgca.simulation import DensityRecorder, Schedule, SimulationRunner
 
 
@@ -137,12 +140,66 @@ def test_multispecies_density_plot_defaults_to_aggregate_and_selects_species():
         interaction="only_propagation", seed=10,
     )
 
-    fig, collection, _ = lgca.plot_density(cbar=False)
-    assert collection.get_paths()
-    fig2, collection2, _ = plot(lgca, kind="density", species=1, cbar=False)
-    assert collection2.get_paths()
+    fig, image, _ = lgca.plot_density(cbar=False)
+    assert isinstance(image, AxesImage)
+    fig2, image2, _ = plot(lgca, kind="density", species=1, cbar=False)
+    assert isinstance(image2, AxesImage)
+    np.testing.assert_array_equal(
+        np.asarray(image.get_array()).T,
+        lgca.cell_density[lgca.nonborder],
+    )
+    np.testing.assert_array_equal(
+        np.asarray(image2.get_array()).T,
+        lgca.species_density[lgca.nonborder][..., 1],
+    )
     with pytest.raises(ValueError, match="species"):
         plot(lgca, kind="density", species=2, cbar=False)
+    plt.close(fig)
+    plt.close(fig2)
+
+
+def test_plot_data_selects_aggregate_and_species_without_renderer_objects():
+    lgca = get_lgca(
+        geometry="square", dims=(3, 4), density=0.5, n_species=2,
+        interaction="only_propagation", seed=12,
+    )
+
+    aggregate = select_density(lgca)
+    species = select_density(lgca, species=1)
+
+    np.testing.assert_array_equal(aggregate, lgca.cell_density[lgca.nonborder])
+    np.testing.assert_array_equal(species, lgca.species_density[lgca.nonborder][..., 1])
+
+    history = np.stack([lgca.species_density[lgca.nonborder]] * 2)
+    np.testing.assert_array_equal(
+        select_density_history(lgca, history),
+        history.sum(axis=-1),
+    )
+    np.testing.assert_array_equal(
+        select_density_history(lgca, history, species=1),
+        history[..., 1],
+    )
+
+
+def test_large_square_scalar_plots_use_one_image_instead_of_site_artists():
+    lgca = get_lgca(
+        geometry="square", dims=(256, 256), density=0.1,
+        interaction="only_propagation", seed=13,
+    )
+
+    fig, density_image, _ = lgca.plot_density(cbar=False, figindex="efficient-density")
+    fig2, scalar_image, _ = lgca.plot_scalarfield(
+        lgca.cell_density[lgca.nonborder], cbar=False, figindex="efficient-scalar"
+    )
+
+    assert isinstance(density_image, AxesImage)
+    assert isinstance(scalar_image, AxesImage)
+    assert len(fig.axes[0].images) == 1
+    assert len(fig.axes[0].collections) == 0
+    assert len(fig2.axes[0].images) == 1
+    assert len(fig2.axes[0].collections) == 0
+    fig.canvas.draw()
+    fig2.canvas.draw()
     plt.close(fig)
     plt.close(fig2)
 

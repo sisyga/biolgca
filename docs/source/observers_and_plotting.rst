@@ -125,3 +125,8 @@ specification instead of a post-processing step.
 The plotting observers require the optional plotting dependencies and use the
 same backend methods as ``lgca.plot_density()``, ``lgca.animate_density()`` and
 the related geometry-specific helpers.
+
+Density/species selection is shared between static plots and animations.
+Square scalar fields use image artists, so large 2D plots do not create one
+Python polygon per lattice site; hexagonal renderers retain geometry-aware
+collections.

@@ -32,6 +32,12 @@ except ImportError:  # pragma: no cover - handled at runtime
 
 from copy import copy
 
+from .plot_data import (
+    select_density,
+    select_density_history,
+    select_scalar_field,
+    validate_species,
+)
 from .plots import estimate_figsize, get_cmap
 
 
@@ -360,11 +366,7 @@ class SquarePlotMixin:
     def plot_scalarfield(self, field, cmap='cividis', cbar=True, edgecolor='none', mask=None,
                          cbarlabel='Scalar field', vmin=None, vmax=None, **kwargs):
         fig, ax = self.setup_figure(**kwargs)
-        try:
-            assert field.shape == self.dims
-
-        except AssertionError:
-            field = field[self.nonborder]
+        field = select_scalar_field(self, field)
 
         if mask is None:
             if hasattr(field, 'mask'):
@@ -374,7 +376,27 @@ class SquarePlotMixin:
 
 
         cmap = plt.get_cmap(cmap)
-        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=Normalize(vmin=vmin, vmax=vmax))
+        norm = Normalize(vmin=vmin, vmax=vmax)
+        if self.geometry == 'square':
+            masked_field = np.ma.array(field.T, mask=np.asarray(mask).T)
+            image = ax.imshow(
+                masked_field,
+                origin='lower',
+                interpolation='nearest',
+                extent=(self.xcoords.min() - 0.5, self.xcoords.max() + 0.5,
+                        self.ycoords.min() - 0.5, self.ycoords.max() + 0.5),
+                cmap=cmap,
+                norm=norm,
+            )
+            if cbar:
+                divider = make_axes_locatable(ax)
+                cax = divider.append_axes("right", size="5%", pad=0.1)
+                colorbar = fig.colorbar(image, cax=cax, use_gridspec=True)
+                colorbar.set_label(cbarlabel)
+                plt.sca(ax)
+            return fig, image, image
+
+        cmap = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
         polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly, alpha=v,
                                    orientation=self.orientation, facecolor=c, edgecolor=edgecolor)
                     for x, y, c, v in
@@ -440,26 +462,7 @@ class SquarePlotMixin:
         setup_figure : Manage basic layout.
 
         """
-        # set image content
-        if density is None:
-            nodes = self.nodes[self.nonborder]
-            if nodes.ndim == len(self.dims) + 2:
-                species = self._validate_plot_species(species)
-                if species is None:
-                    density = nodes[..., channels].sum(axis=(-2, -1))
-                else:
-                    density = nodes[..., species, channels].sum(-1)
-            else:
-                if species is not None:
-                    raise ValueError("species selection requires a multispecies LGCA")
-                density = nodes[..., channels].sum(-1)
-        else:
-            density = np.asarray(density)
-            if density.ndim == len(self.dims) + 1:
-                species = self._validate_plot_species(species)
-                density = density.sum(-1) if species is None else density[..., species]
-            elif species is not None:
-                raise ValueError("species can only select a species axis in density data")
+        density = select_density(self, density=density, channels=channels, species=species)
 
         # specify image size
         if figsize is None:
@@ -474,12 +477,33 @@ class SquarePlotMixin:
         # set up figure
         fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
         # set up density translation to color
-        cmap = copy(plt.get_cmap(cmap))  # do not modify a globally registered colormap in matplotlib > 3.3.2
-        cmap.set_under(alpha=0.0)
+        color_map = copy(plt.get_cmap(cmap))  # do not modify a globally registered colormap in matplotlib > 3.3.2
+        color_map.set_under(alpha=0.0)
         if K > 1:
-            cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.BoundaryNorm(1 + np.arange(K + 1), cmap.N))
+            norm = colors.BoundaryNorm(1 + np.arange(K + 1), color_map.N)
         else:
-            cmap = plt.cm.ScalarMappable(cmap=cmap)
+            norm = colors.Normalize(vmin=0, vmax=1)
+        if self.geometry == 'square':
+            image = ax.imshow(
+                density.T,
+                origin='lower',
+                interpolation='nearest',
+                extent=(self.xcoords.min() - 0.5, self.xcoords.max() + 0.5,
+                        self.ycoords.min() - 0.5, self.ycoords.max() + 0.5),
+                cmap=color_map,
+                norm=norm,
+            )
+            if cbar:
+                divider = make_axes_locatable(ax)
+                cax = divider.append_axes("right", size="5%", pad=0.1)
+                colorbar = fig.colorbar(image, extend='min', use_gridspec=True, cax=cax)
+                colorbar.set_label(cbarlabel)
+                colorbar.set_ticks(np.linspace(0.0, K + 1, 2 * K + 3, endpoint=True)[3::2])
+                cax.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: int(x - 0.5)))
+                plt.sca(ax)
+            return fig, image, image
+
+        cmap = plt.cm.ScalarMappable(cmap=color_map, norm=norm)
         cmap.set_array(density)
         # draw polygons
         polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,
@@ -501,14 +525,7 @@ class SquarePlotMixin:
         return fig, pc, cmap
 
     def _validate_plot_species(self, species):
-        if species is None:
-            return None
-        n_species = getattr(self, "n_species", 1)
-        if isinstance(species, bool) or not isinstance(species, (int, np.integer)):
-            raise ValueError("species must be an integer index")
-        if not 0 <= int(species) < n_species:
-            raise ValueError(f"species must be between 0 and {n_species - 1}")
-        return int(species)
+        return validate_species(self, species)
 
     def plot_vectorfield(self, x, y, vfx, vfy, figindex=None, figsize=None, tight_layout=True, cmap='viridis'):
         l = np.sqrt(vfx ** 2 + vfy ** 2)
@@ -581,19 +598,17 @@ class SquarePlotMixin:
                 raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
                                    "in past LGCA run, call lgca.timeevo with keyword recorddens=True")
 
-        density_t = np.asarray(density_t)
-        if density_t.ndim == len(self.dims) + 2:
-            species = self._validate_plot_species(species)
-            density_t = density_t.sum(-1) if species is None else density_t[..., species]
-        elif species is not None:
-            raise ValueError("species can only select a species axis in density data")
+        density_t = select_density_history(self, density_t, species=species)
 
         fig, pc, cmap = self.plot_density(density_t[0], **kwargs)
         title = plt.title('Time $k =$0')
 
         def update(n):
             title.set_text('Time $k =${}'.format(n))
-            pc.set(facecolor=cmap.to_rgba(density_t[n, ...].ravel()))
+            if hasattr(pc, 'set_data'):
+                pc.set_data(density_t[n, ...].T)
+            else:
+                pc.set(facecolor=cmap.to_rgba(density_t[n, ...].ravel()))
             return pc, title
 
         ani = animation.FuncAnimation(fig, update, interval=interval, frames=density_t.shape[0], repeat=repeat)

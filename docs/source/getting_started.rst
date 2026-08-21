@@ -38,7 +38,7 @@ are declared in ``pyproject.toml``:
      - 3D plotting with Mayavi
      - ``python -m pip install -e ".[plot3d]"``
    * - ``plot`` or ``plotting``
-     - All plotting extras
+     - Matplotlib plus the optional Mayavi 3D stack
      - ``python -m pip install -e ".[plot]"``
    * - ``dev``
      - Development, testing, docs and 2D plotting
@@ -47,6 +47,10 @@ are declared in ``pyproject.toml``:
 The legacy ``requirements.txt``, ``documentation_requirements.txt`` and
 ``plotting-requirements.txt`` files are still present for older workflows, but
 the extras above are the preferred installation interface.
+
+For ordinary 1D and 2D work, prefer ``plot2d``. The ``plot``/``plotting``
+umbrella also installs Mayavi and is intended only when both renderer stacks
+are needed.
 
 Creating a simulator
 --------------------
