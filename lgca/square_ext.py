@@ -13,6 +13,7 @@ from __future__ import annotations
 import warnings
 
 import numpy as np
+from lgca.base import plt
 from lgca.ib_base import IBLGCA_base
 from lgca.list_utils import get_arr_of_empty_lists
 from lgca.nove_base import NoVE_LGCA_base
@@ -26,14 +27,14 @@ try:  # optional plotting dependencies
     from matplotlib.collections import PatchCollection
     from matplotlib.colors import Normalize
     from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
-    from matplotlib import cm, pyplot as plt
+    from matplotlib import cm
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 except ImportError:  # pragma: no cover - handled at runtime
     from lgca.base import _MissingPlotLib  # reuse stub
 
     animation = colors = mticker = FuncFormatter = PatchCollection = Normalize = (
         RegularPolygon
-    ) = Circle = FancyArrowPatch = cm = plt = make_axes_locatable = _MissingPlotLib(
+    ) = Circle = FancyArrowPatch = cm = make_axes_locatable = _MissingPlotLib(
         "matplotlib"
     )
 
