@@ -71,7 +71,7 @@ def select_density_history(lgca, density_history, species=None):
     return density_history
 
 
-def reject_sparse_implicit_history(lgca, data_argument):
+def _reject_sparse_implicit_history(lgca, data_argument):
     """Reject recorded histories whose frame indices are not simulation steps."""
 
     data_attr = "dens_t" if data_argument == "density_t" else data_argument

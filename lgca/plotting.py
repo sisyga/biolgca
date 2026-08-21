@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 
 from .list_utils import _copy_arr_of_lists, get_arr_of_empty_lists
-from .plot_data import reject_sparse_implicit_history
+from .plot_data import _reject_sparse_implicit_history
 from .simulation import Observer, Schedule
 
 __all__ = [
@@ -50,7 +50,7 @@ def animate(lgca, kind: str = "density", data=None, **kwargs):
     method_name, data_argument = _resolve_animation(kind)
     method = getattr(lgca, method_name)
     if data is None:
-        reject_sparse_implicit_history(lgca, data_argument)
+        _reject_sparse_implicit_history(lgca, data_argument)
         return method(**kwargs)
     return method(**{data_argument: data}, **kwargs)
 

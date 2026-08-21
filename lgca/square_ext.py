@@ -37,7 +37,7 @@ except ImportError:  # pragma: no cover - handled at runtime
         "matplotlib"
     )
 
-from .plot_data import reject_sparse_implicit_history, select_density_history
+from .plot_data import _reject_sparse_implicit_history, select_density_history
 from .plots import estimate_figsize, get_cmap
 
 
@@ -269,7 +269,7 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
     def animate_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis', interval=200, vmax=None,
                         tight_layout=True, edgecolor='None', species=None):
         if density_t is None:
-            reject_sparse_implicit_history(self, "density_t")
+            _reject_sparse_implicit_history(self, "density_t")
             if hasattr(self, 'dens_t'):
                 density_t = self.dens_t
             else:
