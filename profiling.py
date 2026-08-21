@@ -1,139 +1,222 @@
+"""Reproducible end-to-end BioLGCA benchmark harness."""
+
+from __future__ import annotations
+
 import argparse
-import cProfile
 import csv
-import io
-import pstats
+import importlib.metadata
+import json
+import platform
+import statistics
 import time
-from typing import Dict, Iterable, List, Tuple
+import tracemalloc
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Mapping, Sequence
+
+import numpy as np
 
 from lgca import get_lgca
+from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
+from lgca.pipeline import InteractionPipelineSpec
+from lgca.simulation import SimulationRunner
 
 
-def profile_timeevo(config: Dict, timesteps: int = 100) -> Tuple[float, int, str]:
-    """Profile ``timeevo`` for a single LGCA configuration.
+@dataclass(frozen=True)
+class BenchmarkScenario:
+    """One seeded end-to-end simulation benchmark."""
 
-    Parameters
-    ----------
-    config : dict
-        Keyword arguments passed to :func:`lgca.get_lgca`.
-    timesteps : int, optional
-        Number of timesteps for the simulation. ``100`` by default.
-
-    Returns
-    -------
-    float
-        Wall clock time spent in :meth:`timeevo`.
-    int
-        Number of particles in the lattice after initialization.
-    str
-        Formatted profiling information for the 10 most costly functions.
-    """
-    lgca = get_lgca(**config)
-
-    profiler = cProfile.Profile()
-    start = time.perf_counter()
-    profiler.enable()
-    lgca.timeevo(timesteps=timesteps, recorddens=False, showprogress=False)
-    profiler.disable()
-    runtime = time.perf_counter() - start
-
-    stream = io.StringIO()
-    stats = pstats.Stats(profiler, stream=stream).sort_stats("cumulative")
-    stats.print_stats(10)
-    particle_count = int(lgca.nodes.sum())
-    return runtime, particle_count, stream.getvalue()
+    name: str
+    family: str
+    geometry: str
+    dims: tuple[int, ...]
+    interaction: str
+    density: float
+    steps: int
+    seed: int
+    kwargs: Mapping[str, Any] = field(default_factory=dict)
+    model_spec_operator: Mapping[str, Any] | None = None
 
 
-def parse_comma_separated(value: str, cast=str) -> List:
-    """Return a list from a comma-separated command line argument."""
-    return [cast(v) for v in value.split(',') if v]
+def default_scenarios() -> list[BenchmarkScenario]:
+    """Return small representative scenarios for maintained state families."""
+
+    common = {"density": 0.35, "steps": 20, "seed": 7}
+    return [
+        BenchmarkScenario(
+            "classical_1d_propagation", "classical_ve", "lin", (256,),
+            "only_propagation", kwargs={"ve": True}, **common,
+        ),
+        BenchmarkScenario(
+            "classical_square_random_walk", "classical_ve", "square", (64, 64),
+            "random_walk", kwargs={"ve": True, "restchannels": 1}, **common,
+        ),
+        BenchmarkScenario(
+            "classical_square_native_birth_death", "classical_ve", "square", (64, 64),
+            "birth_death", kwargs={"restchannels": 1},
+            model_spec_operator={
+                "name": "birth_death",
+                "parameters": {"birth_rate": 0.2, "death_rate": 0.05, "capacity": 5},
+            },
+            **common,
+        ),
+        BenchmarkScenario(
+            "classical_hex_random_walk", "classical_ve", "hex", (64, 64),
+            "random_walk", kwargs={"ve": True}, **common,
+        ),
+        BenchmarkScenario(
+            "classical_cubic_propagation", "classical_ve", "cubic", (16, 16, 16),
+            "only_propagation", kwargs={"ve": True}, **common,
+        ),
+        BenchmarkScenario(
+            "classical_moore_propagation", "classical_ve", "moore", (12, 12, 12),
+            "only_propagation", kwargs={"ve": True}, **common,
+        ),
+        BenchmarkScenario(
+            "nove_square_random_walk", "nove", "square", (64, 64),
+            "random_walk", kwargs={"ve": False, "restchannels": 1}, **common,
+        ),
+        BenchmarkScenario(
+            "identity_square_random_walk", "identity_ve", "square", (64, 64),
+            "random_walk", kwargs={"ve": True, "ib": True, "restchannels": 1}, **common,
+        ),
+        BenchmarkScenario(
+            "identity_nove_square_random_walk", "identity_nove", "square", (32, 32),
+            "random_walk", kwargs={"ve": False, "ib": True, "restchannels": 1}, **common,
+        ),
+        BenchmarkScenario(
+            "multispecies_square_birth", "multispecies", "square", (64, 64),
+            "birth", kwargs={"ve": False, "n_species": 3, "restchannels": 1,
+                              "capacity": 12, "r_b": [0.2, 0.2, 0.2]}, **common,
+        ),
+    ]
 
 
-def run_benchmarks(args: argparse.Namespace) -> None:
-    """Run profiling for all parameter combinations."""
-    dim_map = {"lin": 1, "square": 2, "hex": 2, "cubic": 3}
-    sizes = parse_comma_separated(args.sizes, int)
-    densities = parse_comma_separated(args.densities, float)
-    geometries = parse_comma_separated(args.geometries)
-    interactions = parse_comma_separated(args.interactions)
+def run_scenario(scenario: BenchmarkScenario, repeats: int = 3) -> dict[str, Any]:
+    """Run a scenario repeatedly and return median time and peak memory."""
 
-    results = []
-    for geom in geometries:
-        for interaction in interactions:
-            for size in sizes:
-                dims = (size,) * dim_map[geom]
-                for dens in densities:
-                    cfg = dict(
-                        geometry=geom,
-                        ib=args.ib,
-                        ve=args.ve,
-                        interaction=interaction,
-                        density=dens,
-                        dims=dims,
-                        restchannels=args.restchannels,
-                    )
-                    print(f"Profiling {cfg}")
-                    runtimes = []
-                    particle_count = None
-                    for _ in range(args.repeats):
-                        runtime, pcount, stats = profile_timeevo(
-                            cfg, timesteps=args.timesteps
-                        )
-                        runtimes.append(runtime)
-                        particle_count = pcount
-                        print(stats)
-                    avg_runtime = sum(runtimes) / len(runtimes)
-                    results.append(
-                        (
-                            geom,
-                            interaction,
-                            dims,
-                            dens,
-                            particle_count,
-                            avg_runtime,
-                        )
-                    )
-
-    if args.output:
-        with open(args.output, "w", encoding="utf-8", newline="") as fh:
-            writer = csv.writer(fh)
-            writer.writerow(
-                [
-                    "geometry",
-                    "interaction",
-                    "dims",
-                    "density",
-                    "particles",
-                    "time_sec",
-                ]
+    if isinstance(repeats, bool) or repeats < 1:
+        raise ValueError("repeats must be a positive integer")
+    runtimes = []
+    peak_memory = 0
+    particles_final = 0
+    for _ in range(int(repeats)):
+        if scenario.model_spec_operator is None:
+            lgca = get_lgca(
+                geometry=scenario.geometry,
+                dims=scenario.dims,
+                density=scenario.density,
+                interaction=scenario.interaction,
+                seed=scenario.seed,
+                **dict(scenario.kwargs),
             )
-            for row in results:
-                writer.writerow(row)
+            run = lambda: SimulationRunner(
+                lgca,
+                timesteps=scenario.steps,
+                observers=(),
+                showprogress=False,
+            ).run()
+        else:
+            state_kwargs = dict(scenario.kwargs)
+            restchannels = int(state_kwargs.pop("restchannels", 0))
+            if state_kwargs:
+                raise ValueError(
+                    "ModelSpec benchmark kwargs only support restchannels; "
+                    f"got {sorted(state_kwargs)}"
+                )
+            compiled = build_model(
+                ModelSpec(
+                    space=SpaceSpec(
+                        geometry=scenario.geometry,
+                        dims=scenario.dims,
+                        boundary="periodic",
+                    ),
+                    state=StateSpec(
+                        density=scenario.density,
+                        restchannels=restchannels,
+                    ),
+                    time=TimeSpec(steps=scenario.steps, seed=scenario.seed),
+                    dynamics=InteractionPipelineSpec(
+                        operators=[dict(scenario.model_spec_operator)]
+                    ),
+                )
+            )
+            lgca = compiled.lgca
+            run = lambda: compiled.run(showprogress=False)
+        tracemalloc.start()
+        start = time.perf_counter()
+        run()
+        runtimes.append(time.perf_counter() - start)
+        _, repeat_peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+        peak_memory = max(peak_memory, int(repeat_peak))
+        particles_final = int(np.asarray(lgca.cell_density[lgca.nonborder]).sum())
+
+    wall_seconds = float(statistics.median(runtimes))
+    try:
+        package_version = importlib.metadata.version("biolgca")
+    except importlib.metadata.PackageNotFoundError:
+        package_version = "0.1.0"
+    return {
+        "scenario": scenario.name,
+        "family": scenario.family,
+        "geometry": scenario.geometry,
+        "interaction": scenario.interaction,
+        "dims": list(scenario.dims),
+        "density": scenario.density,
+        "seed": scenario.seed,
+        "steps": scenario.steps,
+        "repeats": int(repeats),
+        "wall_seconds": wall_seconds,
+        "wall_seconds_per_step": wall_seconds / max(scenario.steps, 1),
+        "peak_memory_bytes": peak_memory,
+        "particles_final": particles_final,
+        "observer_policy": "none",
+        "python_version": platform.python_version(),
+        "numpy_version": np.__version__,
+        "biolgca_version": package_version,
+    }
+
+
+def write_results(results: Sequence[Mapping[str, Any]], path: str | Path) -> None:
+    """Write benchmark results as JSON or CSV according to the suffix."""
+
+    path = Path(path)
+    rows = [dict(result) for result in results]
+    if path.suffix.lower() == ".json":
+        path.write_text(json.dumps(rows, indent=2) + "\n", encoding="utf-8")
+        return
+    if path.suffix.lower() != ".csv":
+        raise ValueError("benchmark output must end in .json or .csv")
+    if not rows:
+        raise ValueError("cannot write an empty CSV benchmark result")
+    with path.open("w", encoding="utf-8", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Profile LGCA timeevo")
-    parser.add_argument(
-        "--geometries",
-        default="square",
-        help="Comma separated list of lattice geometries",
-    )
-    parser.add_argument(
-        "--interactions",
-        default="random_walk",
-        help="Comma separated list of interaction rules",
-    )
-    parser.add_argument("--sizes", default="20,40", help="Comma separated lattice sizes")
-    parser.add_argument("--densities", default="0.5,0.8", help="Comma separated densities")
-    parser.add_argument("--timesteps", type=int, default=100, help="Number of timesteps")
-    parser.add_argument("--restchannels", type=int, default=1, help="Number of rest channels")
-    parser.add_argument("--repeats", type=int, default=1, help="Repeat each configuration")
-    parser.add_argument("--ib", action="store_true", help="Use identity based LGCA")
-    parser.add_argument("--ve", action="store_true", default=False, help="Enable volume exclusion")
-    parser.add_argument("--output", help="File to write summary results")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--scenario", action="append", help="Scenario name; repeat to select several")
+    parser.add_argument("--repeats", type=int, default=3)
+    parser.add_argument("--output", type=Path, default=Path("benchmarks/results.json"))
     return parser
 
 
+def main(argv=None) -> int:
+    args = build_arg_parser().parse_args(argv)
+    scenarios = default_scenarios()
+    if args.scenario:
+        selected = set(args.scenario)
+        scenarios = [scenario for scenario in scenarios if scenario.name in selected]
+        unknown = selected - {scenario.name for scenario in scenarios}
+        if unknown:
+            raise SystemExit(f"unknown benchmark scenario(s): {', '.join(sorted(unknown))}")
+    results = [run_scenario(scenario, repeats=args.repeats) for scenario in scenarios]
+    write_results(results, args.output)
+    return 0
+
+
 if __name__ == "__main__":
-    parser = build_arg_parser()
-    run_benchmarks(parser.parse_args())
+    raise SystemExit(main())
