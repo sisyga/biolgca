@@ -26,6 +26,7 @@ from lgca.model import (
     TimeSpec,
 )
 from lgca.pipeline import InteractionPipelineSpec
+from lgca.plugins import PluginInfo, ReorientationOperator
 from lgca.simulation import DensityRecorder, NodeRecorder, PopulationRecorder
 
 
@@ -43,6 +44,37 @@ INFO = ExampleInfo(
 def rest_or_align(lgca) -> None:
     """Reorient particles using alignment and local resting-channel support."""
 
+    beta = float(lgca.interaction_params.get("beta", 2.0))
+    alpha = float(lgca.interaction_params.get("alpha", 2.0))
+    _apply_rest_or_align(lgca, beta=beta, alpha=alpha)
+
+
+class NativeRestOrAlignOperator(ReorientationOperator):
+    """Portable operator for the custom rest-or-align example."""
+
+    def __init__(self, info: PluginInfo, parameters=None):
+        super().__init__(info=info, parameters=parameters)
+        self.beta = 2.0
+        self.alpha = 2.0
+
+    def validate(self, context) -> None:
+        if not context.spec.state.volume_exclusion:
+            raise ValueError(f"{self.name} requires state.volume_exclusion=True")
+        if context.spec.state.identity_based:
+            raise ValueError(f"{self.name} does not support identity-based states")
+        if context.spec.state.n_species != 1:
+            raise ValueError(f"{self.name} does not support multispecies states")
+        self.beta = float(self.parameters.get("beta", 2.0))
+        self.alpha = float(self.parameters.get("alpha", 2.0))
+
+    def apply(self, context, step: int) -> None:
+        _apply_rest_or_align(context.lgca, beta=self.beta, alpha=self.alpha)
+
+    def dependencies(self) -> set[str]:
+        return {"boundary_nodes"}
+
+
+def _apply_rest_or_align(lgca, *, beta: float, alpha: float) -> None:
     newnodes = np.zeros_like(lgca.nodes)
     resting = lgca.nodes[..., lgca.velocitychannels :].sum(-1)
     resting = lgca.nb_sum(resting)
@@ -51,9 +83,6 @@ def rest_or_align(lgca) -> None:
         lgca.cell_density[lgca.nonborder] < lgca.K
     )
     coords = [axis[relevant] for axis in lgca.nonborder]
-    beta = float(lgca.interaction_params.get("beta", 2.0))
-    alpha = float(lgca.interaction_params.get("alpha", 2.0))
-
     for coord in zip(*coords):
         n_particles = int(lgca.cell_density[coord])
         try:

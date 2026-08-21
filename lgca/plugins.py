@@ -2058,18 +2058,33 @@ def _register_native_plugins() -> None:
     register_plugin(wetting_info, wetting_factory)
 
 
-def _register_legacy_plugins() -> None:
-    _register_legacy(
+def _register_example_plugins() -> None:
+    custom_rest_or_align_info = PluginInfo(
         name="custom.rest_or_align",
-        backend="classical",
-        module="lgca.examples.custom_rest_or_align",
-        function="rest_or_align",
-        legacy_interaction="alignment",
         operator_kind="reorientation",
-        default_parameters={"beta": 2.0, "alpha": 2.0},
+        backend_families=("classical",),
+        legacy_source=_legacy_source(
+            "lgca.examples.custom_rest_or_align", "rest_or_align"
+        ),
+        parameters={
+            "beta": {"default": 2.0, "type_label": "finite scalar"},
+            "alpha": {"default": 2.0, "type_label": "finite scalar"},
+        },
+        conservation_law=_law_for_kind("reorientation"),
+        port_status="native",
+        test_status="unit_tested",
         description="Alignment with an added resting-channel preference.",
     )
 
+    def custom_rest_or_align_factory(
+        parameters: Mapping[str, Any] | None = None,
+    ) -> InteractionOperator:
+        from .examples.custom_rest_or_align import NativeRestOrAlignOperator
+
+        return NativeRestOrAlignOperator(custom_rest_or_align_info, parameters)
+
+    register_plugin(custom_rest_or_align_info, custom_rest_or_align_factory)
+
 
 _register_native_plugins()
-_register_legacy_plugins()
+_register_example_plugins()
