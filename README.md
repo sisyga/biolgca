@@ -43,18 +43,50 @@ Current analysis possibilities include observer-based logging plus plots of:
 The internal state of the LGCA is always accessible for computational analysis.
 
 # Quick Start
-Clone the repository and install the package into your active Python environment:
+Clone the repository and install the package with the ordinary 1-D/2-D plotting
+stack:
+
 ```bash
 git clone https://github.com/sisyga/biolgca.git
 cd biolgca
-python -m pip install -e .
+python -m pip install -e ".[plot2d]"
 ```
-Run a short simulation to verify the setup:
+
+BioLGCA has two supported starting points.
+
+## 1. Explore interactively
+
+Use `get_lgca(...)` in Python or a notebook when you want to change parameters
+and inspect a simulation directly:
+
 ```python
 from lgca import get_lgca
-lgca = get_lgca()
-lgca.timeevo(timesteps=10)
+
+lgca = get_lgca(
+    geometry="hex",
+    interaction="alignment",
+    bc="reflecting",
+    seed=1,
+)
+lgca.timeevo(timesteps=50, record=True, showprogress=False)
+lgca.plot_density()
 ```
+
+## 2. Save and share a reproducible simulation
+
+Use a versioned ModelSpec file and the installed CLI when a simulation must be
+reviewed, rerun or shared:
+
+```bash
+biolgca examples export random_walk model.json
+biolgca validate model.json
+biolgca run model.json --output runs/random-walk-001
+```
+
+JSON is the canonical ModelSpec format; optional YAML is an authoring syntax for
+the same data model. The run directory contains the resolved model, runtime
+metadata and configured observer outputs. Existing output directories are
+rejected unless `--overwrite` is explicit.
 
 # Table of Contents
 - [Example usage](#example-usage)
@@ -160,16 +192,27 @@ observer outputs. Existing run directories are rejected unless
 `--overwrite` is explicit. Imported NPZ resources stay inside the model
 directory and generated files stay inside the run directory by default.
 
+Portable files carry `schema_version: 1` and contain only data plus registered
+plugin names; they never execute import paths or arbitrary Python. A ModelSpec
+is configuration, not a serialized trajectory. `model.resolved.json` and
+`metadata.json` capture reproducible configuration and provenance, but they are
+not restart checkpoints. Large numeric initial states can be stored in a
+companion NPZ file; identity-based checkpoints are not yet supported because
+particle properties must be restored together with their labels.
+
 Portable initial conditions support random density through `state.density`, a
 named `region` initializer, and numeric states loaded with `from_npz`.
 
 # Getting started
 #### Dependencies
 `biolgca` depends on `numpy`, `scipy`, and `tqdm` for running simulations.
-To enable plotting features, install the optional plotting extras:
+For ordinary 1-D/2-D plotting, install the Matplotlib-only extra:
 ```bash
-python -m pip install -e ".[plot]"
+python -m pip install -e ".[plot2d]"
 ```
+
+The `plot3d` extra installs Mayavi. The `plot`/`plotting` umbrella installs both
+renderer stacks and is intended only when 3-D plotting is required.
 
 For development, install test, lint, and documentation dependencies:
 ```bash
@@ -213,11 +256,11 @@ The [Tutorial](./BioLGCA.ipynb) guides you through the argument options.
 # Running tests and building docs
 Run the test-suite from the repository root with
 ```bash
-pytest
+python -m pytest -q
 ```
 Build the HTML documentation in `docs/_build` using
 ```bash
-python -m sphinx -b html docs/source docs/_build/html
+python -m sphinx -W -b html docs/source docs/_build/html
 ```
 
 # Questions/Contribute

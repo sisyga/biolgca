@@ -52,6 +52,20 @@ For ordinary 1D and 2D work, prefer ``plot2d``. The ``plot``/``plotting``
 umbrella also installs Mayavi and is intended only when both renderer stacks
 are needed.
 
+Choose a workflow
+-----------------
+
+BioLGCA has two supported entry paths:
+
+1. Use :func:`lgca.get_lgca` for interactive exploration in Python or a
+   notebook.
+2. Use a versioned ModelSpec file and the ``biolgca`` command for simulations
+   that must be reviewed, saved and shared.
+
+Both paths use the same lattice implementations. The ModelSpec path adds
+strict validation, registered interaction names and resolved run provenance;
+it does not require a GUI or XML configuration.
+
 Creating a simulator
 --------------------
 
@@ -123,6 +137,11 @@ writing observer outputs. ``run`` creates an explicit directory containing
 ``model.resolved.json``, ``metadata.json`` and any configured CSV or plot
 outputs. It refuses an existing directory unless ``--overwrite`` is supplied.
 
+JSON is the canonical ModelSpec format and every file carries
+``schema_version: 1``. YAML is optional authoring syntax for exactly the same
+data model. Model files contain data and registered names, never import paths
+or arbitrary Python code.
+
 Input resources such as ``from_npz`` states are relative to the model file and
 must remain inside its directory. Observer output paths are relative to the run
 directory. Absolute paths and ``..`` escapes are rejected; the
@@ -159,6 +178,12 @@ named ``nodes`` with the exact spatial-plus-channel shape and reference it with
 Identity-based NPZ checkpoints are deliberately rejected for now because
 particle properties must be restored together with their labels.
 
+A model file is configuration, and a run directory contains resolved
+configuration, provenance and requested outputs. Neither is a general restart
+checkpoint or a serialized LGCA object. Keep restart/checkpoint data separate
+from the shareable model file until a backend-specific checkpoint contract is
+available.
+
 Running tests
 -------------
 
@@ -176,7 +201,7 @@ Install the docs extra and build the HTML documentation locally:
 .. code-block:: bash
 
    python -m pip install -e ".[docs]"
-   python -m sphinx -b html docs/source docs/_build/html
+   python -m sphinx -W -b html docs/source docs/_build/html
 
 Read the Docs uses the same Sphinx configuration from ``docs/source/conf.py``
 and installs the ``docs`` extra through ``.readthedocs.yaml``.

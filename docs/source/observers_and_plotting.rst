@@ -45,6 +45,32 @@ Observers can run every step, every ``n`` steps or at an explicit set of steps.
    density_every_ten = DensityRecorder(schedule=Schedule(every=10))
    density_at_steps = DensityRecorder(schedule=Schedule(steps={0, 25, 50}))
 
+For lightweight Python callbacks, wrap a function in
+:class:`lgca.simulation.CallbackObserver`. The callback receives the LGCA and
+the absolute simulation step. Use :func:`functools.partial` or a closure for
+additional arguments:
+
+.. code-block:: python
+
+   from functools import partial
+
+   from lgca.simulation import CallbackObserver, Schedule, SimulationRunner
+
+   def report_population(lgca, step, sink):
+       sink.append((step, int(lgca.cell_density[lgca.nonborder].sum())))
+
+   samples = []
+   callback = CallbackObserver(
+       partial(report_population, sink=samples),
+       schedule=Schedule(every=10),
+   )
+   SimulationRunner(
+       lgca, timesteps=50, observers=[callback], showprogress=False
+   ).run()
+
+Callbacks are trusted Python code and therefore cannot be embedded in a
+portable JSON or YAML ModelSpec.
+
 Built-in recorder observers include:
 
 .. list-table::
@@ -67,6 +93,36 @@ Built-in recorder observers include:
    * - ``FamilyPopulationRecorder``
      - ``lgca.fam_pop_t`` for supported family-tracking runs
 
+Dense and sparse recorder results
+---------------------------------
+
+The default schedule records every step, including step zero, and preserves
+the familiar ``timesteps + 1`` leading dimension. A sparse schedule stores
+only the selected samples. Each array recorder publishes the corresponding
+absolute step vector:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Values
+     - Steps
+   * - ``nodes_t``
+     - ``nodes_steps``
+   * - ``dens_t``
+     - ``dens_steps``
+   * - ``n_t``
+     - ``n_steps``
+   * - ``channel_pop_t``
+     - ``channel_pop_steps``
+   * - ``velcells_t`` / ``restcells_t``
+     - ``velcells_steps`` / ``restcells_steps``
+   * - ``fam_pop_t``
+     - ``fam_pop_steps``
+
+Always pair a sparse result with its step vector instead of interpreting its
+row index as simulation time. Implicit animation of a sparse history is
+rejected; pass an explicit history when custom timing is intended.
+
 Plotting module
 ---------------
 
@@ -83,6 +139,16 @@ LGCA instances.
    lgca.timeevo(timesteps=25, showprogress=False)
 
    plot(lgca, kind="density")
+
+For multi-species models, density plots aggregate all species by default.
+Select one species explicitly with ``species=<zero-based index>``. Static and
+animated density paths use the same selection rule:
+
+.. code-block:: python
+
+   plot(lgca, kind="density")             # aggregate density
+   plot(lgca, kind="density", species=1)  # species 1 only
+   lgca.animate_density(species=1)
 
 Snapshot and movie observers
 ----------------------------

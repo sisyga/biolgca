@@ -71,6 +71,12 @@ optional authoring syntax for the same data model; install it with
 * an optional ``state.initializer`` contains a registered initializer name and
   parameters.
 
+Every portable file carries the top-level ``schema_version``. The current
+value is ``1``. Unknown future versions are rejected instead of being guessed
+at. Legacy versionless data is normalized to version 1 before validation.
+Save and archive canonical JSON for reproducibility; YAML is a convenience
+syntax and resolves to the same ModelSpec.
+
 Model files never contain Python import paths and never execute arbitrary
 modules. A third-party interaction may be referenced after a trusted Python
 launcher imports and registers it, but standalone model loading resolves only
@@ -88,6 +94,23 @@ raise an actionable portability error if a caller tries to save them.
 The packaged ``model-spec-v1.schema.json`` is intended for editors and
 development-time validation. Runtime loading uses BioLGCA's dependency-light
 strict parser, so ``jsonschema`` is needed only by contributors and tooling.
+
+Configuration, outputs and checkpoints
+--------------------------------------
+
+A ModelSpec is configuration, not a serialized simulator or trajectory. Keep
+it small enough to review and version-control. Numeric initial channel states
+can live in a companion NPZ file referenced by the ``from_npz`` initializer;
+resource paths are resolved relative to the model file and cannot escape that
+directory unless trusted-path handling is explicitly enabled.
+
+The command-line runner writes ``model.resolved.json`` and ``metadata.json``
+plus configured observer outputs into an explicit run directory. The resolved
+model records the configuration that was actually compiled, while metadata
+records runtime provenance and the resolved operator schedule. These files do
+not constitute a restart checkpoint. In particular, identity-based particle
+properties are not yet supported by ``from_npz`` and must not be reconstructed
+from labels alone.
 
 Composed dynamics
 -----------------
@@ -216,3 +239,8 @@ the previous interaction semantics.
 
 Use plugin metadata when building UIs, validation reports, model provenance
 tables or migration audits.
+
+See :doc:`custom_interactions` for the supported extension contract, complete
+registration example and conservation guidance. Portable model files resolve
+registered names only; importing third-party Python remains the responsibility
+of a trusted launcher.

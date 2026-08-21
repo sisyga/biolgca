@@ -152,6 +152,8 @@ For reusable rules, prefer adding an :class:`lgca.plugins.InteractionOperator`
 subclass and registering it with :func:`lgca.plugins.register_plugin`. Plugin
 operators can validate the model context, advertise dependencies and outputs,
 declare conservation laws, and participate in :class:`lgca.model.ModelSpec`
-pipeline compilation. The existing native operators in :mod:`lgca.pipeline`
-are the most complete templates for new birth/death, phenotype-switch and
-reorientation rules.
+pipeline compilation. Follow :doc:`custom_interactions` for the complete
+extension recipe. :mod:`lgca.classical_operators` demonstrates a focused
+metadata/factory/operator slice; the remaining native families in
+:mod:`lgca.pipeline` provide examples of birth/death, phenotype-switch and
+composed reorientation rules.
