@@ -78,7 +78,6 @@ html_style = 'css/methods.css'
 # configured like https://github.com/JamesALeedham/Sphinx-Autosummary-Recursion/
 autosummary_generate = True  # Turn on sphinx.ext.autosummary
 autosummary_imported_members = False  # Do not include imported members
-autodoc_mock_imports = ["matplotlib", "mpl_toolkits"]
 numpydoc_show_class_members = False
 numpydoc_class_members_toctree = False
 

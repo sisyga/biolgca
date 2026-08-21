@@ -41,6 +41,8 @@ from .plot_data import (
 )
 from .plots import estimate_figsize, get_cmap
 
+__all__ = ["SquarePlotMixin"]
+
 
 class SquarePlotMixin:
     """Plotting helpers for square lattice LGCAs."""
