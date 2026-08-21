@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 
 from .list_utils import _copy_arr_of_lists, get_arr_of_empty_lists
+from .plot_data import reject_sparse_implicit_history
 from .simulation import Observer, Schedule
 
 __all__ = [
@@ -49,7 +50,7 @@ def animate(lgca, kind: str = "density", data=None, **kwargs):
     method_name, data_argument = _resolve_animation(kind)
     method = getattr(lgca, method_name)
     if data is None:
-        _reject_sparse_implicit_history(lgca, data_argument)
+        reject_sparse_implicit_history(lgca, data_argument)
         return method(**kwargs)
     return method(**{data_argument: data}, **kwargs)
 
@@ -183,6 +184,8 @@ def _close_figure(fig) -> None:
 def _capture_frame(lgca, kind: str):
     method_name, data_argument = _resolve_animation(kind)
     if data_argument == "density_t":
+        if hasattr(lgca, "species_density"):
+            return np.array(lgca.species_density[lgca.nonborder], copy=True)
         return np.array(lgca.cell_density[lgca.nonborder], copy=True)
     if data_argument == "nodes_t":
         nodes = lgca.nodes[lgca.nonborder]
@@ -202,20 +205,6 @@ def _frames_to_array(frames):
             arr[i, ...] = frame
         return arr
     return np.asarray(frames)
-
-
-def _reject_sparse_implicit_history(lgca, data_argument: str) -> None:
-    data_attr = "dens_t" if data_argument == "density_t" else data_argument
-    steps_attr = "dens_steps" if data_argument == "density_t" else "nodes_steps"
-    data = getattr(lgca, data_attr, None)
-    steps = getattr(lgca, steps_attr, None)
-    if data is None or steps is None:
-        return
-    if not np.array_equal(np.asarray(steps), np.arange(len(data))):
-        raise ValueError(
-            "Cannot infer animation times from sparse recorded history; "
-            "pass the recorded data explicitly and use its paired step array."
-        )
 
 
 def _validate_observer_backend(lgca) -> None:

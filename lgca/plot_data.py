@@ -71,6 +71,22 @@ def select_density_history(lgca, density_history, species=None):
     return density_history
 
 
+def reject_sparse_implicit_history(lgca, data_argument):
+    """Reject recorded histories whose frame indices are not simulation steps."""
+
+    data_attr = "dens_t" if data_argument == "density_t" else data_argument
+    steps_attr = "dens_steps" if data_argument == "density_t" else "nodes_steps"
+    data = getattr(lgca, data_attr, None)
+    steps = getattr(lgca, steps_attr, None)
+    if data is None or steps is None:
+        return
+    if not np.array_equal(np.asarray(steps), np.arange(len(data))):
+        raise ValueError(
+            "Cannot infer animation times from sparse recorded history; "
+            "pass the recorded data explicitly and use its paired step array."
+        )
+
+
 def select_scalar_field(lgca, field):
     """Return an unpadded scalar field with the model's spatial shape."""
 

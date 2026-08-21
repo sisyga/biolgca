@@ -33,6 +33,7 @@ except ImportError:  # pragma: no cover - handled at runtime
 from copy import copy
 
 from .plot_data import (
+    reject_sparse_implicit_history,
     select_density,
     select_density_history,
     select_scalar_field,
@@ -583,6 +584,7 @@ class SquarePlotMixin:
     def animate_density(self, density_t=None, interval=100, channels=slice(None), species=None, repeat=True, **kwargs):
 
         if density_t is None:
+            reject_sparse_implicit_history(self, "density_t")
             if hasattr(self, 'dens_t'):
                 if channels == slice(None):
                     density_t = self.dens_t

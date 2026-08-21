@@ -91,6 +91,15 @@ def test_sparse_recorded_history_is_rejected_by_implicit_animation():
         animate(lgca, kind="density", cbar=False)
 
 
+def test_sparse_recorded_history_is_rejected_by_direct_density_animation():
+    lgca = make_square_lgca(seed=14)
+    recorder = DensityRecorder(schedule=Schedule(every=2))
+    SimulationRunner(lgca, timesteps=4, observers=[recorder], showprogress=False).run()
+
+    with pytest.raises(ValueError, match="sparse recorded history"):
+        lgca.animate_density(cbar=False)
+
+
 def test_plot_snapshot_observer_reuse_resets_outputs(tmp_path):
     observer = PlotSnapshotObserver(
         kind="density", output_dir=tmp_path, retain_results=True, close=True, cbar=False
@@ -215,6 +224,27 @@ def test_multispecies_zero_step_animation_observer_uses_aggregate_density():
 
     assert observer.frame_steps == [0]
     assert isinstance(observer.animation, FuncAnimation)
+    observer.animation._draw_was_started = True
+    plt.close("all")
+
+
+def test_multispecies_animation_observer_selects_one_species():
+    lgca = get_lgca(
+        geometry="square", dims=(4, 4), density=0.5, n_species=2,
+        interaction="only_propagation", seed=15,
+    )
+    observer = AnimationObserver(
+        kind="density", species=1, interval=10, cbar=False, close=True
+    )
+
+    SimulationRunner(lgca, timesteps=0, observers=[observer], showprogress=False).run()
+
+    assert observer.frame_steps == [0]
+    assert isinstance(observer.animation, FuncAnimation)
+    np.testing.assert_array_equal(
+        np.asarray(observer.animation._fig.axes[0].images[0].get_array()).T,
+        lgca.species_density[lgca.nonborder][..., 1],
+    )
     observer.animation._draw_was_started = True
     plt.close("all")
 
