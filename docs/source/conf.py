@@ -102,6 +102,5 @@ add_module_names = True  # default True
 # to do: github button and read the rest
 html_theme_options = {
     'fixed_sidebar' : True,
-    'logo': '../images/biolgca_v2.png',
 }
-#html_logo = '../images/biolgca_v2.png'
+html_logo = '../images/biolgca_v2.png'
