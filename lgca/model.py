@@ -96,6 +96,7 @@ class TimeSpec:
 
     steps: int = 100
     seed: int | None = None
+    timing_trace: int = 0
 
 
 @dataclass(frozen=True)
@@ -147,6 +148,7 @@ def model_spec_to_dict(spec: ModelSpec) -> dict[str, Any]:
             "time": {
                 "steps": spec.time.steps,
                 "seed": spec.time.seed,
+                "timing_trace": spec.time.timing_trace,
             },
             "dynamics": {
                 "operators": [_operator_to_dict(operator) for operator in spec.dynamics.operators],
@@ -199,6 +201,7 @@ def model_spec_from_dict(data: Mapping[str, Any]) -> ModelSpec:
         time=TimeSpec(
             steps=time_spec.get("steps", 100),
             seed=time_spec.get("seed"),
+            timing_trace=time_spec.get("timing_trace", 0),
         ),
         dynamics=InteractionPipelineSpec(
             operators=tuple(_operator_from_dict(operator) for operator in dynamics.get("operators", ())),
@@ -349,7 +352,7 @@ def _validate_serialized_model(data: Mapping[str, Any]) -> None:
         },
         "model.state",
     )
-    _reject_unknown_keys(time_spec, {"steps", "seed"}, "model.time")
+    _reject_unknown_keys(time_spec, {"steps", "seed", "timing_trace"}, "model.time")
     _reject_unknown_keys(
         dynamics, {"operators", "propagation", "allow_custom_order"}, "model.dynamics"
     )
@@ -374,7 +377,7 @@ def _validate_serialized_model(data: Mapping[str, Any]) -> None:
         value = state.get(key)
         if value is not None and (isinstance(value, bool) or int(value) != value):
             raise TypeError(f"model.state.{key} must be an integer")
-    for key in ("steps", "seed"):
+    for key in ("steps", "seed", "timing_trace"):
         value = time_spec.get(key)
         if value is not None and (isinstance(value, bool) or int(value) != value):
             raise TypeError(f"model.time.{key} must be an integer")
@@ -782,6 +785,7 @@ def _validate_spec(spec: ModelSpec) -> None:
         isinstance(spec.time.seed, bool) or int(spec.time.seed) != spec.time.seed
     ):
         raise ValueError("model.time.seed must be an integer or null")
+    _validate_non_negative_integer("model.time.timing_trace", spec.time.timing_trace)
     if spec.state.nodes is not None and spec.state.density is not None:
         raise ValueError("model.state.nodes and model.state.density are mutually exclusive")
     _validate_non_negative_integer("model.state.restchannels", spec.state.restchannels)
@@ -954,6 +958,7 @@ def _metadata_from_spec(spec: ModelSpec, lgca=None) -> dict[str, Any]:
         "runtime": {
             "elapsed_seconds": 0.0,
             "operator_timings": [],
+            "timing_trace": [],
         },
     }
 
@@ -984,7 +989,8 @@ def _run_compiled_model(compiled: CompiledModel, showprogress: bool = True) -> M
     runner.run()
     compiled.metadata["runtime"] = {
         "elapsed_seconds": runner.elapsed_seconds,
-        "operator_timings": runner.operator_timings,
+        "operator_timings": list(runner.operator_timings.values()),
+        "timing_trace": runner.timing_trace,
     }
     compiled.metadata["output_paths"] = _collect_output_paths(observers)
     return ModelRunResult(
@@ -1004,7 +1010,9 @@ class _PipelineRunner:
         self.observers = list(observers)
         self.showprogress = showprogress
         self.elapsed_seconds = 0.0
-        self.operator_timings: list[dict[str, Any]] = []
+        self.operator_timings: dict[tuple[str, str], dict[str, Any]] = {}
+        self.timing_trace: list[dict[str, Any]] = []
+        self.timing_trace_limit = int(compiled.spec.time.timing_trace)
 
     def run(self):
         start = time.perf_counter()
@@ -1020,6 +1028,8 @@ class _PipelineRunner:
                 self.compiled.context,
                 step,
                 timing=self.operator_timings,
+                timing_trace=self.timing_trace,
+                timing_trace_limit=self.timing_trace_limit,
             )
             self._notify_observers(step)
 

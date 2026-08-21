@@ -149,6 +149,7 @@ class PluginInfo:
     )
     port_status: str = "legacy_wrapper"
     test_status: str = "unverified"
+    mutates_families: bool = False
     description: str = ""
 
     @property
@@ -1237,6 +1238,7 @@ def _register_native_plugins() -> None:
         conservation_law=_law_for_kind("birth_death"),
         port_status="native",
         test_status="unit_tested",
+        mutates_families=True,
         description=(
             "Identity-based go-and-grow interaction with passenger or driver "
             "family mutations."
@@ -1664,6 +1666,7 @@ def _register_native_plugins() -> None:
         conservation_law=_law_for_kind("birth_death"),
         port_status="native",
         test_status="unit_tested",
+        mutates_families=True,
         description=(
             "Identity no-volume-exclusion glioblastoma go-or-grow with family-level "
             "driver mutations and inherited switching sensitivity."
@@ -1734,6 +1737,7 @@ def _register_native_plugins() -> None:
         conservation_law=_law_for_kind("birth_death"),
         port_status="native",
         test_status="unit_tested",
+        mutates_families=True,
         description=(
             "Identity no-volume-exclusion steric evolution with family-level "
             "driver mutations and steric channel redistribution."

@@ -38,10 +38,19 @@ class Schedule:
     steps: frozenset[int] | None = None
 
     def __init__(self, every: int = 1, steps: Iterable[int] | None = None):
-        if every < 1:
+        if isinstance(every, bool) or int(every) != every or every < 1:
             raise ValueError("every must be a positive integer.")
+        if steps is not None:
+            steps = tuple(steps)
+            if any(
+                isinstance(step, bool) or int(step) != step or step < 0
+                for step in steps
+            ):
+                raise ValueError("steps must contain only non-negative integers.")
         object.__setattr__(self, "every", int(every))
-        object.__setattr__(self, "steps", None if steps is None else frozenset(steps))
+        object.__setattr__(
+            self, "steps", None if steps is None else frozenset(int(step) for step in steps)
+        )
 
     def should_run(self, step: int) -> bool:
         if self.steps is not None:
@@ -63,6 +72,21 @@ class Observer:
 
     def finalize(self, lgca, runner: "SimulationRunner") -> None:
         pass
+
+
+def _setup_sample_indices(observer, lgca, runner, step_attribute: str) -> int:
+    """Publish sampled steps and map absolute simulation steps to compact rows."""
+    steps = np.fromiter(
+        (
+            step
+            for step in range(runner.timesteps + 1)
+            if observer.schedule.should_run(step)
+        ),
+        dtype=int,
+    )
+    setattr(lgca, step_attribute, steps)
+    observer._sample_indices = {int(step): index for index, step in enumerate(steps)}
+    return len(steps)
 
 
 class SimulationRunner:
@@ -109,27 +133,30 @@ class NodeRecorder(Observer):
     """Record full node configurations in ``lgca.nodes_t``."""
 
     def setup(self, lgca, runner: SimulationRunner) -> None:
-        shape = (runner.timesteps + 1,) + lgca.nodes[lgca.nonborder].shape
+        length = _setup_sample_indices(self, lgca, runner, "nodes_steps")
+        shape = (length,) + lgca.nodes[lgca.nonborder].shape
         if lgca.nodes.dtype == object:
             lgca.nodes_t = get_arr_of_empty_lists(shape)
         else:
             lgca.nodes_t = np.zeros(shape, dtype=lgca.nodes.dtype)
 
     def on_step(self, lgca, step: int) -> None:
+        index = self._sample_indices[step]
         if lgca.nodes.dtype == object:
-            lgca.nodes_t[step, ...] = _copy_arr_of_lists(lgca.nodes[lgca.nonborder])
+            lgca.nodes_t[index, ...] = _copy_arr_of_lists(lgca.nodes[lgca.nonborder])
         else:
-            lgca.nodes_t[step, ...] = lgca.nodes[lgca.nonborder]
+            lgca.nodes_t[index, ...] = lgca.nodes[lgca.nonborder]
 
 
 class PopulationRecorder(Observer):
     """Record total population size in ``lgca.n_t``."""
 
     def setup(self, lgca, runner: SimulationRunner) -> None:
-        lgca.n_t = np.zeros(runner.timesteps + 1, dtype=np.uint)
+        length = _setup_sample_indices(self, lgca, runner, "n_steps")
+        lgca.n_t = np.zeros(length, dtype=np.uint)
 
     def on_step(self, lgca, step: int) -> None:
-        lgca.n_t[step] = lgca.cell_density[lgca.nonborder].sum()
+        lgca.n_t[self._sample_indices[step]] = lgca.cell_density[lgca.nonborder].sum()
 
 
 class DensityRecorder(Observer):
@@ -141,13 +168,14 @@ class DensityRecorder(Observer):
 
     def setup(self, lgca, runner: SimulationRunner) -> None:
         value = self._density(lgca)
+        length = _setup_sample_indices(self, lgca, runner, "dens_steps")
         if self.dtype is None:
-            lgca.dens_t = np.zeros((runner.timesteps + 1,) + value.shape)
+            lgca.dens_t = np.zeros((length,) + value.shape)
         else:
-            lgca.dens_t = np.zeros((runner.timesteps + 1,) + value.shape, dtype=self.dtype)
+            lgca.dens_t = np.zeros((length,) + value.shape, dtype=self.dtype)
 
     def on_step(self, lgca, step: int) -> None:
-        lgca.dens_t[step, ...] = self._density(lgca)
+        lgca.dens_t[self._sample_indices[step], ...] = self._density(lgca)
 
     @staticmethod
     def _density(lgca):
@@ -161,10 +189,11 @@ class ChannelDensityRecorder(Observer):
 
     def setup(self, lgca, runner: SimulationRunner) -> None:
         value = lgca.channel_pop[lgca.nonborder]
-        lgca.channel_pop_t = np.zeros((runner.timesteps + 1,) + value.shape, dtype=np.uint)
+        length = _setup_sample_indices(self, lgca, runner, "channel_pop_steps")
+        lgca.channel_pop_t = np.zeros((length,) + value.shape, dtype=np.uint)
 
     def on_step(self, lgca, step: int) -> None:
-        lgca.channel_pop_t[step, ...] = lgca.channel_pop[lgca.nonborder]
+        lgca.channel_pop_t[self._sample_indices[step], ...] = lgca.channel_pop[lgca.nonborder]
 
 
 class PerTypeRecorder(Observer):
@@ -172,13 +201,16 @@ class PerTypeRecorder(Observer):
 
     def setup(self, lgca, runner: SimulationRunner) -> None:
         velocity, resting = self._counts(lgca)
-        lgca.velcells_t = np.zeros((runner.timesteps + 1,) + velocity.shape)
-        lgca.restcells_t = np.zeros((runner.timesteps + 1,) + resting.shape)
+        length = _setup_sample_indices(self, lgca, runner, "velcells_steps")
+        lgca.restcells_steps = lgca.velcells_steps.copy()
+        lgca.velcells_t = np.zeros((length,) + velocity.shape)
+        lgca.restcells_t = np.zeros((length,) + resting.shape)
 
     def on_step(self, lgca, step: int) -> None:
         velocity, resting = self._counts(lgca)
-        lgca.velcells_t[step, ...] = velocity
-        lgca.restcells_t[step, ...] = resting
+        index = self._sample_indices[step]
+        lgca.velcells_t[index, ...] = velocity
+        lgca.restcells_t[index, ...] = resting
 
     @staticmethod
     def _counts(lgca):
@@ -193,17 +225,18 @@ class OrderParameterRecorder(Observer):
     """Record NoVE order parameters."""
 
     def setup(self, lgca, runner: SimulationRunner) -> None:
-        length = runner.timesteps + 1
+        length = _setup_sample_indices(self, lgca, runner, "order_parameter_steps")
         lgca.ent_t = np.zeros(length, dtype=float)
         lgca.normEnt_t = np.zeros(length, dtype=float)
         lgca.polAlParam_t = np.zeros(length, dtype=float)
         lgca.meanAlign_t = np.zeros(length, dtype=float)
 
     def on_step(self, lgca, step: int) -> None:
-        lgca.ent_t[step] = lgca.calc_entropy()
-        lgca.normEnt_t[step] = lgca.calc_normalized_entropy()
-        lgca.polAlParam_t[step] = lgca.calc_polar_alignment_parameter()
-        lgca.meanAlign_t[step] = lgca.calc_mean_alignment()
+        index = self._sample_indices[step]
+        lgca.ent_t[index] = lgca.calc_entropy()
+        lgca.normEnt_t[index] = lgca.calc_normalized_entropy()
+        lgca.polAlParam_t[index] = lgca.calc_polar_alignment_parameter()
+        lgca.meanAlign_t[index] = lgca.calc_mean_alignment()
 
 
 class FamilyPopulationRecorder(Observer):
@@ -214,18 +247,19 @@ class FamilyPopulationRecorder(Observer):
             raise RuntimeError(
                 "Interaction does not deal with families, family population can therefore not be recorded."
             )
-        self.is_mutating = self._is_mutating_family_interaction(lgca)
+        length = _setup_sample_indices(self, lgca, runner, "fam_pop_steps")
+        self.is_mutating = self._is_mutating_family_interaction(lgca, runner)
         if self.is_mutating:
             lgca.fam_pop_t = []
         else:
-            lgca.fam_pop_t = np.zeros((runner.timesteps + 1, lgca.maxfamily + 1))
+            lgca.fam_pop_t = np.zeros((length, lgca.maxfamily + 1))
 
     def on_step(self, lgca, step: int) -> None:
         if self.is_mutating:
             lgca.fam_pop_t.append(lgca.calc_family_pop_alive())
         else:
             try:
-                lgca.fam_pop_t[step, ...] = lgca.calc_family_pop_alive()
+                lgca.fam_pop_t[self._sample_indices[step], ...] = lgca.calc_family_pop_alive()
             except ValueError as exc:
                 raise ValueError(
                     "Number of families has increased, interaction must be included in the case "
@@ -237,7 +271,11 @@ class FamilyPopulationRecorder(Observer):
             lgca._straighten_family_populations()
 
     @staticmethod
-    def _is_mutating_family_interaction(lgca) -> bool:
+    def _is_mutating_family_interaction(lgca, runner) -> bool:
+        compiled = getattr(runner, "compiled", None)
+        pipeline = getattr(compiled, "pipeline", None)
+        if pipeline is not None:
+            return any(operator.info.mutates_families for operator in pipeline.operators)
         mutating_interactions = []
         try:
             from lgca.ib_interactions import go_and_grow_mutations
@@ -277,6 +315,7 @@ class CSVSnapshotObserver(Observer):
         self.paths: list[Path] = []
 
     def setup(self, lgca, runner: SimulationRunner) -> None:
+        self.paths = []
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def on_step(self, lgca, step: int) -> None:
@@ -301,6 +340,7 @@ class ScalarTimeSeriesRecorder(Observer):
         self.records: list[dict[str, Any]] = []
 
     def setup(self, lgca, runner: SimulationRunner) -> None:
+        self.records = []
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
 
     def on_step(self, lgca, step: int) -> None:

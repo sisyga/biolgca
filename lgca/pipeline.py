@@ -107,7 +107,14 @@ class CompiledPipeline:
             parts.append("Propagation (deterministic)")
         return " -> ".join(parts)
 
-    def execute_step(self, context, step: int, timing: list[dict[str, Any]] | None = None) -> None:
+    def execute_step(
+        self,
+        context,
+        step: int,
+        timing: dict[tuple[str, str], dict[str, Any]] | None = None,
+        timing_trace: list[dict[str, Any]] | None = None,
+        timing_trace_limit: int = 0,
+    ) -> None:
         lgca = context.lgca
         for operator in self.operators:
             if "boundary_nodes" in operator.dependencies():
@@ -117,30 +124,48 @@ class CompiledPipeline:
             operator.apply(context, step)
             if "nodes" in operator.outputs():
                 lgca.update_dynamic_fields()
+            elapsed = time.perf_counter() - start
             if timing is not None:
-                timing.append(
-                    {
-                        "step": step,
-                        "name": operator.name,
-                        "kind": operator.operator_kind,
-                        "elapsed_seconds": time.perf_counter() - start,
-                    }
+                _record_timing(timing, operator.name, operator.operator_kind, elapsed)
+            if timing_trace is not None and len(timing_trace) < timing_trace_limit:
+                timing_trace.append(
+                    {"step": step, "name": operator.name,
+                     "kind": operator.operator_kind, "elapsed_seconds": elapsed}
                 )
         lgca.apply_boundaries()
         if self.propagation not in (False, None, "none", "disabled"):
             start = time.perf_counter()
             lgca.propagation()
+            elapsed = time.perf_counter() - start
             if timing is not None:
-                timing.append(
-                    {
-                        "step": step,
-                        "name": "Propagation",
-                        "kind": "propagation",
-                        "elapsed_seconds": time.perf_counter() - start,
-                    }
+                _record_timing(timing, "Propagation", "propagation", elapsed)
+            if timing_trace is not None and len(timing_trace) < timing_trace_limit:
+                timing_trace.append(
+                    {"step": step, "name": "Propagation", "kind": "propagation",
+                     "elapsed_seconds": elapsed}
                 )
             lgca.apply_boundaries()
         lgca.update_dynamic_fields()
+
+
+def _record_timing(timing, name: str, kind: str, elapsed: float) -> None:
+    """Update a constant-space timing summary for one pipeline phase."""
+    key = (name, kind)
+    aggregate = timing.get(key)
+    if aggregate is None:
+        timing[key] = {
+            "name": name,
+            "kind": kind,
+            "count": 1,
+            "total_seconds": elapsed,
+            "min_seconds": elapsed,
+            "max_seconds": elapsed,
+        }
+        return
+    aggregate["count"] += 1
+    aggregate["total_seconds"] += elapsed
+    aggregate["min_seconds"] = min(aggregate["min_seconds"], elapsed)
+    aggregate["max_seconds"] = max(aggregate["max_seconds"], elapsed)
 
 
 class NativeOnlyPropagationOperator(InteractionOperator):

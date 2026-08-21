@@ -1,10 +1,13 @@
 import numpy as np
+import pytest
 
 from lgca import get_lgca
 from lgca.simulation import (
     DensityRecorder,
     NodeRecorder,
+    PerTypeRecorder,
     PopulationRecorder,
+    ScalarTimeSeriesRecorder,
     Schedule,
     SimulationRunner,
 )
@@ -90,3 +93,76 @@ def test_observer_schedule_runs_at_selected_steps():
     SimulationRunner(lgca, timesteps=5, observers=[collector], showprogress=False).run()
 
     assert collector.steps == [0, 2, 4]
+
+
+@pytest.mark.parametrize("every", [True, 1.5, 0, -1])
+def test_schedule_rejects_invalid_every_without_coercion(every):
+    with pytest.raises(ValueError, match="every"):
+        Schedule(every=every)
+
+
+@pytest.mark.parametrize("steps", [[True], [-1], [1.5]])
+def test_schedule_rejects_invalid_explicit_steps(steps):
+    with pytest.raises(ValueError, match="steps"):
+        Schedule(steps=steps)
+
+
+def test_sparse_array_recorders_store_only_samples_and_explicit_steps():
+    lgca = get_lgca(
+        geometry="square",
+        dims=(3, 4),
+        density=0.5,
+        restchannels=1,
+        interaction="only_propagation",
+        seed=4,
+    )
+    schedule = Schedule(every=2)
+
+    SimulationRunner(
+        lgca,
+        timesteps=4,
+        observers=[
+            NodeRecorder(schedule),
+            DensityRecorder(schedule),
+            PopulationRecorder(schedule),
+            PerTypeRecorder(schedule),
+        ],
+        showprogress=False,
+    ).run()
+
+    expected_steps = np.array([0, 2, 4])
+    for name in ("nodes_steps", "dens_steps", "n_steps", "velcells_steps", "restcells_steps"):
+        np.testing.assert_array_equal(getattr(lgca, name), expected_steps)
+    assert lgca.nodes_t.shape[0] == 3
+    assert lgca.dens_t.shape[0] == 3
+    assert lgca.n_t.shape == (3,)
+    assert lgca.velcells_t.shape[0] == 3
+    assert lgca.restcells_t.shape[0] == 3
+    assert np.all(lgca.n_t > 0)
+
+
+def test_default_dense_recorders_publish_dense_step_metadata():
+    lgca = get_lgca(
+        geometry="1d", dims=(4,), density=0.5, interaction="only_propagation", seed=5
+    )
+    SimulationRunner(
+        lgca,
+        timesteps=2,
+        observers=[NodeRecorder(), DensityRecorder(), PopulationRecorder()],
+        showprogress=False,
+    ).run()
+
+    for name in ("nodes_steps", "dens_steps", "n_steps"):
+        np.testing.assert_array_equal(getattr(lgca, name), [0, 1, 2])
+
+
+def test_scalar_recorder_can_be_reused_without_retaining_previous_run(tmp_path):
+    recorder = ScalarTimeSeriesRecorder(output_path=tmp_path / "population.csv")
+    lgca = get_lgca(
+        geometry="1d", dims=(4,), density=0.5, interaction="only_propagation", seed=6
+    )
+
+    SimulationRunner(lgca, timesteps=2, observers=[recorder], showprogress=False).run()
+    SimulationRunner(lgca, timesteps=1, observers=[recorder], showprogress=False).run()
+
+    assert [record["step"] for record in recorder.records] == [0, 1]

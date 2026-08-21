@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -14,7 +16,7 @@ from lgca.model import (
 )
 from lgca.pipeline import InteractionPipelineSpec
 from lgca.plugins import ConservationLaw, InteractionOperator, PluginInfo, describe_plugin, list_plugins
-from lgca.simulation import DensityRecorder, NodeRecorder
+from lgca.simulation import DensityRecorder, FamilyPopulationRecorder, NodeRecorder
 
 
 def _square_spec(*, operators=(), timesteps=3, seed=17):
@@ -284,7 +286,9 @@ def test_ib_go_and_grow_mutations_plugin_is_native_and_matches_legacy():
         dynamics=InteractionPipelineSpec(
             operators=[{"name": "ib.go_and_grow_mutations", "parameters": parameters}]
         ),
-        analysis=AnalysisSpec(observers=[NodeRecorder(), DensityRecorder()]),
+        analysis=AnalysisSpec(
+            observers=[NodeRecorder(), DensityRecorder(), FamilyPopulationRecorder()]
+        ),
     )
     result = run_model(spec, showprogress=False)
     legacy = get_lgca(
@@ -312,6 +316,38 @@ def test_ib_go_and_grow_mutations_plugin_is_native_and_matches_legacy():
     )
     assert result.lgca.family_props["descendants"] == legacy.family_props["descendants"]
     np.testing.assert_allclose(result.lgca.family_props["r_b"], legacy.family_props["r_b"])
+    assert result.lgca.fam_pop_t.shape[0] == 3
+
+
+def test_pipeline_timing_is_aggregated_in_constant_space():
+    spec = _square_spec(
+        operators=[{"name": "classical.random_walk"}], timesteps=100, seed=71
+    )
+
+    result = run_model(spec, showprogress=False)
+    timings = result.metadata["runtime"]["operator_timings"]
+
+    assert len(timings) == 2
+    assert {entry["name"] for entry in timings} == {"classical.random_walk", "Propagation"}
+    assert all(entry["count"] == 100 for entry in timings)
+
+
+def test_pipeline_timing_trace_is_explicit_and_bounded():
+    spec = _square_spec(
+        operators=[{"name": "classical.random_walk"}], timesteps=10, seed=72
+    )
+    spec = replace(spec, time=replace(spec.time, timing_trace=3))
+
+    result = run_model(spec, showprogress=False)
+    trace = result.metadata["runtime"]["timing_trace"]
+
+    assert len(trace) == 3
+    assert [entry["name"] for entry in trace] == [
+        "classical.random_walk",
+        "Propagation",
+        "classical.random_walk",
+    ]
+    assert [entry["step"] for entry in trace] == [1, 1, 2]
 
 
 def test_ib_go_or_grow_plugin_is_native_and_matches_legacy():
