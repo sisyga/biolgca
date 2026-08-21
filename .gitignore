@@ -60,6 +60,7 @@ __pycache__/
 *.patch
 *.tmp
 *.temp
+.worktrees/
 
 # OS files
 .DS_Store
