@@ -6,14 +6,12 @@ import importlib.metadata
 import importlib.resources
 import difflib
 import json
-import time
 import warnings
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import numpy as np
-from tqdm.auto import tqdm
 
 from . import get_lgca
 from .pipeline import (
@@ -24,6 +22,7 @@ from .pipeline import (
     ReorientationTermSpec,
     compile_pipeline,
 )
+from .simulation import SimulationRunner
 
 
 MODEL_SPEC_SCHEMA_VERSION = 1
@@ -1132,12 +1131,32 @@ def _observer_names(analysis: AnalysisSpec | None) -> list[str]:
 def _run_compiled_model(compiled: CompiledModel, showprogress: bool = True) -> ModelRunResult:
     lgca = compiled.lgca
     observers = list(compiled.spec.analysis.observers if compiled.spec.analysis is not None else [])
-    runner = _PipelineRunner(compiled=compiled, observers=observers, showprogress=showprogress)
+    operator_timings: dict[tuple[str, str], dict[str, Any]] = {}
+    timing_trace: list[dict[str, Any]] = []
+    timing_trace_limit = int(compiled.spec.time.timing_trace)
+
+    def execute_pipeline_step(_lgca, step, _runner):
+        compiled.pipeline.execute_step(
+            compiled.context,
+            step,
+            timing=operator_timings,
+            timing_trace=timing_trace,
+            timing_trace_limit=timing_trace_limit,
+        )
+
+    runner = SimulationRunner(
+        lgca,
+        timesteps=int(compiled.spec.time.steps),
+        observers=observers,
+        showprogress=showprogress,
+        step_function=execute_pipeline_step,
+        context=compiled,
+    )
     runner.run()
     compiled.metadata["runtime"] = {
         "elapsed_seconds": runner.elapsed_seconds,
-        "operator_timings": list(runner.operator_timings.values()),
-        "timing_trace": runner.timing_trace,
+        "operator_timings": list(operator_timings.values()),
+        "timing_trace": timing_trace,
     }
     compiled.metadata["output_paths"] = _collect_output_paths(observers)
     return ModelRunResult(
@@ -1147,51 +1166,6 @@ def _run_compiled_model(compiled: CompiledModel, showprogress: bool = True) -> M
         pipeline=compiled.pipeline,
         metadata=compiled.metadata,
     )
-
-
-class _PipelineRunner:
-    def __init__(self, compiled: CompiledModel, observers, showprogress: bool):
-        self.compiled = compiled
-        self.lgca = compiled.lgca
-        self.timesteps = int(compiled.spec.time.steps)
-        self.observers = list(observers)
-        self.showprogress = showprogress
-        self.elapsed_seconds = 0.0
-        self.operator_timings: dict[tuple[str, str], dict[str, Any]] = {}
-        self.timing_trace: list[dict[str, Any]] = []
-        self.timing_trace_limit = int(compiled.spec.time.timing_trace)
-
-    def run(self):
-        start = time.perf_counter()
-        self.lgca.update_dynamic_fields()
-        for observer in self.observers:
-            setup = getattr(observer, "setup", None)
-            if setup is not None:
-                setup(self.lgca, self)
-
-        self._notify_observers(0)
-        for step in tqdm(range(1, self.timesteps + 1), disable=not self.showprogress):
-            self.compiled.pipeline.execute_step(
-                self.compiled.context,
-                step,
-                timing=self.operator_timings,
-                timing_trace=self.timing_trace,
-                timing_trace_limit=self.timing_trace_limit,
-            )
-            self._notify_observers(step)
-
-        for observer in self.observers:
-            finalize = getattr(observer, "finalize", None)
-            if finalize is not None:
-                finalize(self.lgca, self)
-        self.elapsed_seconds = time.perf_counter() - start
-        return self.lgca
-
-    def _notify_observers(self, step: int) -> None:
-        for observer in self.observers:
-            schedule = getattr(observer, "schedule", None)
-            if schedule is None or schedule.should_run(step):
-                observer.on_step(self.lgca, step)
 
 
 def _package_version() -> str:

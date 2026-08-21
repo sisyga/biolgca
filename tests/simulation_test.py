@@ -95,6 +95,38 @@ def test_observer_schedule_runs_at_selected_steps():
     assert collector.steps == [0, 2, 4]
 
 
+def test_runner_uses_pluggable_step_function_with_same_lifecycle():
+    """A custom dynamics callback must share setup, scheduling, and finalization."""
+
+    lgca = get_lgca(
+        geometry="1d",
+        dims=(4,),
+        density=0.0,
+        interaction="only_propagation",
+        seed=31,
+    )
+    collector = StepCollector()
+    called_steps = []
+
+    def step_function(current_lgca, step, runner):
+        called_steps.append(step)
+        current_lgca.nodes[current_lgca.nonborder][0, 0] = True
+        current_lgca.update_dynamic_fields()
+
+    runner = SimulationRunner(
+        lgca,
+        timesteps=2,
+        observers=[collector],
+        showprogress=False,
+        step_function=step_function,
+    )
+
+    assert runner.run() is lgca
+    assert called_steps == [1, 2]
+    assert collector.steps == [0, 1, 2]
+    assert runner.elapsed_seconds >= 0.0
+
+
 @pytest.mark.parametrize("every", [True, 1.5, 0, -1])
 def test_schedule_rejects_invalid_every_without_coercion(every):
     with pytest.raises(ValueError, match="every"):

@@ -292,6 +292,26 @@ class LegacyInteractionOperator(InteractionOperator):
             lgca.interaction_params = previous_params
 
 
+from .operator_base import (  # noqa: E402 - compatibility facade after legacy definitions
+    BirthDeathOperator,
+    ConservationLaw,
+    InteractionOperator,
+    LegacyInteractionOperator,
+    ParameterSpec,
+    PhenotypeSwitchOperator,
+    PluginInfo,
+    ReorientationOperator,
+    ReorientationTerm,
+)
+
+
+_KIND_TO_BASE = {
+    "birth_death": BirthDeathOperator,
+    "phenotype_switch": PhenotypeSwitchOperator,
+    "reorientation": ReorientationOperator,
+}
+
+
 PluginFactory = Callable[[Mapping[str, Any] | None], InteractionOperator]
 
 
@@ -343,6 +363,9 @@ class PluginRegistry:
             [plugin for plugin in plugins if plugin.operator_kind == kind],
             key=lambda plugin: plugin.name,
         )
+
+
+from .operator_registry import PluginRegistry  # noqa: E402 - public compatibility facade
 
 
 default_registry = PluginRegistry()
@@ -1006,7 +1029,7 @@ def _register_native_plugins() -> None:
     )
 
     def classical_random_walk_factory(parameters: Mapping[str, Any] | None = None) -> InteractionOperator:
-        from .pipeline import NativeClassicalRandomWalkOperator
+        from .classical_operators import NativeClassicalRandomWalkOperator
 
         return NativeClassicalRandomWalkOperator(classical_random_walk_info, parameters)
 

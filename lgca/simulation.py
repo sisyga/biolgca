@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -92,18 +93,30 @@ def _setup_sample_indices(observer, lgca, runner, step_attribute: str) -> int:
 class SimulationRunner:
     """Run an LGCA simulation and notify observers separately from dynamics."""
 
-    def __init__(self, lgca, timesteps: int = 100, observers=None, showprogress: bool = True):
+    def __init__(
+        self,
+        lgca,
+        timesteps: int = 100,
+        observers=None,
+        showprogress: bool = True,
+        step_function=None,
+        context=None,
+    ):
         if timesteps < 0:
             raise ValueError("timesteps must be non-negative.")
         self.lgca = lgca
         self.timesteps = int(timesteps)
         self.observers = list(observers or [])
         self.showprogress = showprogress
+        self.step_function = step_function
+        self.context = context
+        self.elapsed_seconds = 0.0
 
     def add_observer(self, observer) -> None:
         self.observers.append(observer)
 
     def run(self):
+        start = time.perf_counter()
         lgca = self.lgca
         lgca.update_dynamic_fields()
         for observer in self.observers:
@@ -113,13 +126,17 @@ class SimulationRunner:
 
         self._notify_observers(0)
         for step in tqdm(range(1, self.timesteps + 1), disable=not self.showprogress):
-            lgca.timestep()
+            if self.step_function is None:
+                lgca.timestep()
+            else:
+                self.step_function(lgca, step, self)
             self._notify_observers(step)
 
         for observer in self.observers:
             finalize = getattr(observer, "finalize", None)
             if finalize is not None:
                 finalize(lgca, self)
+        self.elapsed_seconds = time.perf_counter() - start
         return lgca
 
     def _notify_observers(self, step: int) -> None:
@@ -272,7 +289,7 @@ class FamilyPopulationRecorder(Observer):
 
     @staticmethod
     def _is_mutating_family_interaction(lgca, runner) -> bool:
-        compiled = getattr(runner, "compiled", None)
+        compiled = getattr(runner, "context", None)
         pipeline = getattr(compiled, "pipeline", None)
         if pipeline is not None:
             return any(operator.info.mutates_families for operator in pipeline.operators)

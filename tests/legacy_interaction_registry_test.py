@@ -1,12 +1,41 @@
 import pytest
 
+from lgca.classical_operators import NativeClassicalRandomWalkOperator
+from lgca.operator_base import (
+    ConservationLaw as BaseConservationLaw,
+    ParameterSpec as BaseParameterSpec,
+    PluginInfo as BasePluginInfo,
+)
+from lgca.operator_registry import PluginRegistry as FocusedPluginRegistry
 from lgca.plugins import (
+    ConservationLaw,
+    ParameterSpec,
     PluginInfo,
     PluginRegistry,
+    create_plugin,
     describe_plugin,
     interaction_coverage_table,
     list_plugins,
 )
+
+
+def test_focused_extension_contract_keeps_plugins_facade_compatible():
+    """Moving contract types must not split public type identity."""
+
+    assert ParameterSpec is BaseParameterSpec
+    assert ConservationLaw is BaseConservationLaw
+    assert PluginInfo is BasePluginInfo
+    assert PluginRegistry is FocusedPluginRegistry
+
+
+def test_classical_random_walk_is_a_complete_extracted_vertical_slice():
+    """The registered factory must resolve the extracted implementation."""
+
+    operator = create_plugin("classical.random_walk")
+
+    assert type(operator) is NativeClassicalRandomWalkOperator
+    assert operator.info.name == "classical.random_walk"
+    assert operator.info.parameter_specs == {}
 
 
 EXPECTED_LEGACY_INTERACTIONS = {
