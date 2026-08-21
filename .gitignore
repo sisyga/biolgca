@@ -61,6 +61,7 @@ __pycache__/
 *.tmp
 *.temp
 .worktrees/
+.codex-pytest-*/
 
 # OS files
 .DS_Store
