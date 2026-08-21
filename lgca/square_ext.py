@@ -10,6 +10,8 @@ Includes identity-based and no-volume-exclusion simulators.
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 from lgca.ib_base import IBLGCA_base
 from lgca.list_utils import get_arr_of_empty_lists
@@ -24,17 +26,19 @@ try:  # optional plotting dependencies
     from matplotlib.collections import PatchCollection
     from matplotlib.colors import Normalize
     from matplotlib.patches import RegularPolygon, Circle, FancyArrowPatch
-    from matplotlib import cm
+    from matplotlib import cm, pyplot as plt
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 except ImportError:  # pragma: no cover - handled at runtime
     from lgca.base import _MissingPlotLib  # reuse stub
 
     animation = colors = mticker = FuncFormatter = PatchCollection = Normalize = (
         RegularPolygon
-    ) = Circle = FancyArrowPatch = cm = make_axes_locatable = _MissingPlotLib(
+    ) = Circle = FancyArrowPatch = cm = plt = make_axes_locatable = _MissingPlotLib(
         "matplotlib"
     )
 
+from .plot_data import reject_sparse_implicit_history, select_density_history
+from .plots import estimate_figsize, get_cmap
 
 
 class IBLGCA_Square(IBLGCA_base, LGCA_Square):
@@ -263,13 +267,16 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
         return ani
 
     def animate_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis', interval=200, vmax=None,
-                        tight_layout=True, edgecolor='None'):
+                        tight_layout=True, edgecolor='None', species=None):
         if density_t is None:
+            reject_sparse_implicit_history(self, "density_t")
             if hasattr(self, 'dens_t'):
                 density_t = self.dens_t
             else:
                 raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
                                    "in past LGCA run, call lgca.timeevo with keyword recorddens=True")
+
+        density_t = select_density_history(self, density_t, species=species)
 
         if vmax is not None:
             vmax_val = vmax

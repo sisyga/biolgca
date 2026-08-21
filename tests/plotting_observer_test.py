@@ -249,6 +249,45 @@ def test_multispecies_animation_observer_selects_one_species():
     plt.close("all")
 
 
+@pytest.mark.parametrize("species", [None, 1])
+def test_nove_multispecies_animation_observer_selects_density(species):
+    lgca = get_lgca(
+        geometry="square", dims=(4, 4), density=0.5, n_species=2, ve=False,
+        interaction="only_propagation", seed=16,
+    )
+    plotted = {}
+    plot_density = lgca.plot_density
+
+    def record_density(density, **kwargs):
+        plotted["density"] = np.array(density, copy=True)
+        return plot_density(density, **kwargs)
+
+    lgca.plot_density = record_density
+    observer = AnimationObserver(
+        kind="density", species=species, interval=10, close=True
+    )
+
+    SimulationRunner(lgca, timesteps=0, observers=[observer], showprogress=False).run()
+
+    expected = lgca.species_density[lgca.nonborder]
+    expected = expected.sum(-1) if species is None else expected[..., species]
+    np.testing.assert_array_equal(plotted["density"], expected)
+    observer.animation._draw_was_started = True
+    plt.close("all")
+
+
+def test_nove_sparse_recorded_history_is_rejected_by_direct_density_animation():
+    lgca = get_lgca(
+        geometry="square", dims=(4, 4), density=0.5, ve=False,
+        interaction="only_propagation", seed=17,
+    )
+    recorder = DensityRecorder(schedule=Schedule(every=2))
+    SimulationRunner(lgca, timesteps=4, observers=[recorder], showprogress=False).run()
+
+    with pytest.raises(ValueError, match="sparse recorded history"):
+        lgca.animate_density()
+
+
 def test_plotting_observers_reject_unsupported_3d_backend_early():
     class CubicStub:
         geometry = "cubic"
