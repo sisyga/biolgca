@@ -49,6 +49,7 @@ def animate(lgca, kind: str = "density", data=None, **kwargs):
     method_name, data_argument = _resolve_animation(kind)
     method = getattr(lgca, method_name)
     if data is None:
+        _reject_sparse_implicit_history(lgca, data_argument)
         return method(**kwargs)
     return method(**{data_argument: data}, **kwargs)
 
@@ -63,25 +64,31 @@ class PlotSnapshotObserver(Observer):
         output_dir=None,
         filename: str = "{kind}_{step:05d}.png",
         close: bool | None = None,
+        retain_results: bool = False,
         **plot_kwargs,
     ):
         super().__init__(schedule=schedule)
         self.kind = kind
         self.output_dir = None if output_dir is None else Path(output_dir)
         self.filename = filename
-        self.close = output_dir is not None if close is None else close
+        self.retain_results = retain_results
+        self.close = (output_dir is not None or not retain_results) if close is None else close
         self.plot_kwargs = plot_kwargs
         self.results = []
         self.paths = []
 
     def setup(self, lgca, runner) -> None:
+        _validate_observer_backend(lgca)
+        self.results = []
+        self.paths = []
         if self.output_dir is not None:
             self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def on_step(self, lgca, step: int) -> None:
         result = plot(lgca, kind=self.kind, **self.plot_kwargs)
         fig = _figure_from_result(result)
-        self.results.append((step, result))
+        if self.retain_results:
+            self.results.append((step, result))
 
         if self.output_dir is not None:
             path = self.output_dir / self.filename.format(kind=self.kind, step=step)
@@ -111,14 +118,23 @@ class AnimationObserver(Observer):
         self.close = close
         self.animation_kwargs = animation_kwargs
         self.frames = []
+        self.frame_steps = []
+        self.animation = None
+
+    def setup(self, lgca, runner) -> None:
+        _validate_observer_backend(lgca)
+        self.frames = []
+        self.frame_steps = []
         self.animation = None
 
     def on_step(self, lgca, step: int) -> None:
         self.frames.append(_capture_frame(lgca, self.kind))
+        self.frame_steps.append(step)
 
     def finalize(self, lgca, runner) -> None:
         data = _frames_to_array(self.frames)
         self.animation = animate(lgca, kind=self.kind, data=data, **self.animation_kwargs)
+        self.frames = []
         if self.save_path is not None:
             self.save_path.parent.mkdir(parents=True, exist_ok=True)
             self.animation.save(str(self.save_path), **self.save_kwargs)
@@ -167,8 +183,6 @@ def _close_figure(fig) -> None:
 def _capture_frame(lgca, kind: str):
     method_name, data_argument = _resolve_animation(kind)
     if data_argument == "density_t":
-        if hasattr(lgca, "species_density"):
-            return np.array(lgca.species_density[lgca.nonborder], copy=True)
         return np.array(lgca.cell_density[lgca.nonborder], copy=True)
     if data_argument == "nodes_t":
         nodes = lgca.nodes[lgca.nonborder]
@@ -188,3 +202,25 @@ def _frames_to_array(frames):
             arr[i, ...] = frame
         return arr
     return np.asarray(frames)
+
+
+def _reject_sparse_implicit_history(lgca, data_argument: str) -> None:
+    data_attr = "dens_t" if data_argument == "density_t" else data_argument
+    steps_attr = "dens_steps" if data_argument == "density_t" else "nodes_steps"
+    data = getattr(lgca, data_attr, None)
+    steps = getattr(lgca, steps_attr, None)
+    if data is None or steps is None:
+        return
+    if not np.array_equal(np.asarray(steps), np.arange(len(data))):
+        raise ValueError(
+            "Cannot infer animation times from sparse recorded history; "
+            "pass the recorded data explicitly and use its paired step array."
+        )
+
+
+def _validate_observer_backend(lgca) -> None:
+    if getattr(lgca, "geometry", None) in {"cubic", "moore"}:
+        raise NotImplementedError(
+            "Plotting observers do not yet support the 3-D Mayavi lifecycle; "
+            "call the cubic plotting method directly."
+        )

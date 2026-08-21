@@ -73,12 +73,12 @@ class SquarePlotMixin:
         if figindex is None:
             fig = plt.gcf()
             fig.set_size_inches(figsize)
-            fig.set_tight_layout(tight_layout)
+            fig.set_layout_engine("tight" if tight_layout else None)
 
         else:
             fig = plt.figure(num=figindex)
             fig.set_size_inches(figsize)
-            fig.set_tight_layout(tight_layout)
+            fig.set_layout_engine("tight" if tight_layout else None)
 
         # retrieve drawing axis and scale
         ax = plt.gca()
@@ -391,7 +391,7 @@ class SquarePlotMixin:
 
         return fig, pc, cmap
 
-    def plot_density(self, density=None, channels=slice(None), figindex=None, figsize=None, tight_layout=True,
+    def plot_density(self, density=None, channels=slice(None), species=None, figindex=None, figsize=None, tight_layout=True,
                      cmap='viridis', vmax=None, edgecolor='None', cbar=True, cbarlabel='Particle number $n$'):
         """
         Plot particle density in the lattice. A color bar on the right side shows the color coding of density values.
@@ -443,7 +443,23 @@ class SquarePlotMixin:
         # set image content
         if density is None:
             nodes = self.nodes[self.nonborder]
-            density = nodes[..., channels].sum(-1)
+            if nodes.ndim == len(self.dims) + 2:
+                species = self._validate_plot_species(species)
+                if species is None:
+                    density = nodes[..., channels].sum(axis=(-2, -1))
+                else:
+                    density = nodes[..., species, channels].sum(-1)
+            else:
+                if species is not None:
+                    raise ValueError("species selection requires a multispecies LGCA")
+                density = nodes[..., channels].sum(-1)
+        else:
+            density = np.asarray(density)
+            if density.ndim == len(self.dims) + 1:
+                species = self._validate_plot_species(species)
+                density = density.sum(-1) if species is None else density[..., species]
+            elif species is not None:
+                raise ValueError("species can only select a species axis in density data")
 
         # specify image size
         if figsize is None:
@@ -483,6 +499,16 @@ class SquarePlotMixin:
             plt.sca(ax)
 
         return fig, pc, cmap
+
+    def _validate_plot_species(self, species):
+        if species is None:
+            return None
+        n_species = getattr(self, "n_species", 1)
+        if isinstance(species, bool) or not isinstance(species, (int, np.integer)):
+            raise ValueError("species must be an integer index")
+        if not 0 <= int(species) < n_species:
+            raise ValueError(f"species must be between 0 and {n_species - 1}")
+        return int(species)
 
     def plot_vectorfield(self, x, y, vfx, vfy, figindex=None, figsize=None, tight_layout=True, cmap='viridis'):
         l = np.sqrt(vfx ** 2 + vfy ** 2)
@@ -537,7 +563,7 @@ class SquarePlotMixin:
 
         return fig, pc, cmap
 
-    def animate_density(self, density_t=None, interval=100, channels=slice(None), repeat=True, **kwargs):
+    def animate_density(self, density_t=None, interval=100, channels=slice(None), species=None, repeat=True, **kwargs):
 
         if density_t is None:
             if hasattr(self, 'dens_t'):
@@ -554,6 +580,13 @@ class SquarePlotMixin:
             else:
                 raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
                                    "in past LGCA run, call lgca.timeevo with keyword recorddens=True")
+
+        density_t = np.asarray(density_t)
+        if density_t.ndim == len(self.dims) + 2:
+            species = self._validate_plot_species(species)
+            density_t = density_t.sum(-1) if species is None else density_t[..., species]
+        elif species is not None:
+            raise ValueError("species can only select a species axis in density data")
 
         fig, pc, cmap = self.plot_density(density_t[0], **kwargs)
         title = plt.title('Time $k =$0')
