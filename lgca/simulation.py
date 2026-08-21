@@ -15,6 +15,7 @@ from .list_utils import _copy_arr_of_lists, get_arr_of_empty_lists
 
 
 __all__ = [
+    "CallbackObserver",
     "CSVSnapshotObserver",
     "ChannelDensityRecorder",
     "DensityRecorder",
@@ -73,6 +74,19 @@ class Observer:
 
     def finalize(self, lgca, runner: "SimulationRunner") -> None:
         pass
+
+
+class CallbackObserver(Observer):
+    """Call a Python function with ``(lgca, step)`` at scheduled steps."""
+
+    def __init__(self, callback, schedule: Schedule | None = None):
+        if not callable(callback):
+            raise TypeError("callback must be callable")
+        super().__init__(schedule=schedule)
+        self.callback = callback
+
+    def on_step(self, lgca, step: int) -> None:
+        self.callback(lgca, step)
 
 
 def _setup_sample_indices(observer, lgca, runner, step_attribute: str) -> int:

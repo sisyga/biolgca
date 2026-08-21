@@ -3,6 +3,7 @@ import pytest
 
 from lgca import get_lgca
 from lgca.simulation import (
+    CallbackObserver,
     DensityRecorder,
     NodeRecorder,
     PerTypeRecorder,
@@ -93,6 +94,39 @@ def test_observer_schedule_runs_at_selected_steps():
     SimulationRunner(lgca, timesteps=5, observers=[collector], showprogress=False).run()
 
     assert collector.steps == [0, 2, 4]
+
+
+def test_callback_observer_calls_function_with_lgca_and_selected_step():
+    """Removing callback invocation or scheduling must fail this test."""
+
+    lgca = get_lgca(
+        geometry="1d",
+        dims=(6,),
+        density=0.5,
+        interaction="only_propagation",
+        seed=30,
+    )
+    calls = []
+
+    def collect(current_lgca, step):
+        calls.append((current_lgca, step))
+
+    observer = CallbackObserver(collect, schedule=Schedule(every=2))
+    SimulationRunner(
+        lgca,
+        timesteps=3,
+        observers=[observer],
+        showprogress=False,
+    ).run()
+
+    assert calls == [(lgca, 0), (lgca, 2)]
+
+
+def test_callback_observer_rejects_non_callable_during_construction():
+    """A bad callback must fail before a simulation starts."""
+
+    with pytest.raises(TypeError, match="callback must be callable"):
+        CallbackObserver(None)
 
 
 def test_runner_uses_pluggable_step_function_with_same_lifecycle():
