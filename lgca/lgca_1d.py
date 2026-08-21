@@ -794,11 +794,11 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
         """
         newnodes = get_arr_of_empty_lists(self.nodes.shape)
 
-        # prop. to the left
-        newnodes[1:, 0] = self.nodes[:-1, 1]
-
         # prop. to the right
-        newnodes[:-1, 1] = self.nodes[1:, 0]
+        newnodes[1:, 0] = self.nodes[:-1, 0]
+
+        # prop. to the left
+        newnodes[:-1, 1] = self.nodes[1:, 1]
 
         # resting cells stay
         newnodes[:, -1] = self.nodes[:, -1]
