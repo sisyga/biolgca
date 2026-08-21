@@ -38,7 +38,7 @@ except ImportError:  # pragma: no cover - handled at runtime
         "matplotlib"
     )
 
-from .plot_data import _reject_sparse_implicit_history, select_density_history
+from .plot_data import _reject_sparse_implicit_history, select_density, select_density_history
 from .plots import estimate_figsize, get_cmap
 
 
@@ -211,11 +211,9 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
             self.apply_boundaries()
 
     def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
-                     edgecolor='None', cbar=True, cbarlabel='Particle number $n$', channels=slice(None)):
+                     edgecolor='None', cbar=True, cbarlabel='Particle number $n$', channels=slice(None), species=None):
 
-        if density is None:
-            nodes = self.nodes[self.nonborder]
-            density = nodes[..., channels].sum(-1)
+        density = select_density(self, density=density, channels=channels, species=species)
 
         if figsize is None:
             figsize = estimate_figsize(density, cbar=cbar, dy=self.dy)

@@ -288,6 +288,23 @@ def test_nove_sparse_recorded_history_is_rejected_by_direct_density_animation():
         lgca.animate_density()
 
 
+@pytest.mark.parametrize("species", [None, 1])
+def test_nove_multispecies_density_plot_selects_density(species):
+    lgca = get_lgca(
+        geometry="square", dims=(4, 4), density=0.5, n_species=2, ve=False,
+        interaction="only_propagation", seed=18,
+    )
+
+    fig, collection, cmap = lgca.plot_density(species=species, cbar=False)
+
+    expected = lgca.species_density[lgca.nonborder]
+    expected = expected.sum(-1) if species is None else expected[..., species]
+    np.testing.assert_allclose(
+        collection.get_facecolors(), cmap.to_rgba(expected.ravel())
+    )
+    plt.close(fig)
+
+
 def test_plotting_observers_reject_unsupported_3d_backend_early():
     class CubicStub:
         geometry = "cubic"
