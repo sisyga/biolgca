@@ -855,11 +855,25 @@ class ModelRunResult:
     metadata: dict[str, Any]
 
 
-def build_model(spec: ModelSpec) -> CompiledModel:
+def build_model(
+    spec: ModelSpec,
+    *,
+    resource_base: str | Path | None = None,
+    trusted_paths: bool = False,
+) -> CompiledModel:
     """Build an LGCA instance and compile its interaction pipeline."""
 
     spec = _normalize_and_validate_spec(spec)
     lgca = _build_lgca(spec)
+    if spec.state.initializer is not None:
+        from .initializers import apply_initializer
+
+        apply_initializer(
+            lgca,
+            spec.state.initializer,
+            resource_base=resource_base,
+            trusted_paths=trusted_paths,
+        )
     _validate_field_names(lgca, spec.state.fields)
     metadata = _metadata_from_spec(spec, lgca=lgca)
     context = ModelContext(
@@ -884,10 +898,18 @@ def build_model(spec: ModelSpec) -> CompiledModel:
     )
 
 
-def run_model(spec: ModelSpec, showprogress: bool = True) -> ModelRunResult:
+def run_model(
+    spec: ModelSpec,
+    showprogress: bool = True,
+    *,
+    resource_base: str | Path | None = None,
+    trusted_paths: bool = False,
+) -> ModelRunResult:
     """Build and run a declarative LGCA model."""
 
-    compiled = build_model(spec)
+    compiled = build_model(
+        spec, resource_base=resource_base, trusted_paths=trusted_paths
+    )
     return compiled.run(showprogress=showprogress)
 
 
@@ -1041,6 +1063,8 @@ def _build_lgca(spec: ModelSpec):
         kwargs["nodes"] = spec.state.nodes
     elif spec.state.density is not None:
         kwargs["density"] = spec.state.density
+    elif spec.state.initializer is not None:
+        kwargs["density"] = 0.0
     if spec.state.capacity is not None:
         kwargs["capacity"] = spec.state.capacity
     kwargs.update(dict(spec.state.parameters))

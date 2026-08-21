@@ -77,6 +77,9 @@ Homepage = "https://github.com/sisyga/biolgca"
 Issues = "https://github.com/sisyga/biolgca/issues"
 Documentation = "https://sisyga.github.io/biolgca/"
 
+[project.scripts]
+biolgca = "lgca.cli:main"
+
 [tool.setuptools]
 packages = ["lgca", "lgca.examples", "lgca.schemas"]
 

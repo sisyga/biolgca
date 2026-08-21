@@ -145,6 +145,24 @@ result.lgca.plot_density()
 See the [ModelSpec and plugin guide](docs/source/model_specs_and_plugins.rst)
 and the [observer/plotting guide](docs/source/observers_and_plotting.rst).
 
+Model specs can also be exported, validated, shared, and run without writing a
+Python launcher:
+
+```bash
+biolgca examples list
+biolgca examples export random_walk model.json
+biolgca validate model.json
+biolgca run model.json --output runs/random-walk-001
+```
+
+The run directory contains the resolved model, runtime metadata, and configured
+observer outputs. Existing run directories are rejected unless
+`--overwrite` is explicit. Imported NPZ resources stay inside the model
+directory and generated files stay inside the run directory by default.
+
+Portable initial conditions support random density through `state.density`, a
+named `region` initializer, and numeric states loaded with `from_npz`.
+
 # Getting started
 #### Dependencies
 `biolgca` depends on `numpy`, `scipy`, and `tqdm` for running simulations.
@@ -156,6 +174,13 @@ python -m pip install -e ".[plot]"
 For development, install test, lint, and documentation dependencies:
 ```bash
 python -m pip install -e ".[dev]"
+```
+
+YAML model files are optional; JSON works with the core installation. Enable
+YAML with:
+
+```bash
+python -m pip install -e ".[yaml]"
 ```
 
 #### Installation

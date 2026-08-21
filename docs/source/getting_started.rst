@@ -28,6 +28,9 @@ are declared in ``pyproject.toml``:
    * - ``docs``
      - Sphinx documentation build
      - ``python -m pip install -e ".[docs]"``
+   * - ``yaml``
+     - Optional YAML model-file syntax
+     - ``python -m pip install -e ".[yaml]"``
    * - ``plot2d``
      - 2D plotting with Matplotlib
      - ``python -m pip install -e ".[plot2d]"``
@@ -96,6 +99,61 @@ separate sections:
 
 See :doc:`model_specs_and_plugins` for composed interaction phases and
 :doc:`observers_and_plotting` for recorders, snapshots and movies.
+
+Shareable command-line workflow
+-------------------------------
+
+The installed ``biolgca`` command exports curated templates and runs the same
+strict ModelSpec pipeline used from Python:
+
+.. code-block:: bash
+
+   biolgca examples list
+   biolgca examples export random_walk model.json
+   biolgca validate model.json
+   biolgca run model.json --output runs/random-walk-001
+
+``validate`` parses the complete model, resolves registered interactions,
+checks initializers and compiles the pipeline without evolving a trajectory or
+writing observer outputs. ``run`` creates an explicit directory containing
+``model.resolved.json``, ``metadata.json`` and any configured CSV or plot
+outputs. It refuses an existing directory unless ``--overwrite`` is supplied.
+
+Input resources such as ``from_npz`` states are relative to the model file and
+must remain inside its directory. Observer output paths are relative to the run
+directory. Absolute paths and ``..`` escapes are rejected; the
+``--trusted-paths`` option is reserved for intentionally trusted local models.
+
+Initial-condition presets
+-------------------------
+
+Random initialization remains the shortest form:
+
+.. code-block:: json
+
+   "state": {"density": 0.2, "restchannels": 1}
+
+A portable model can instead request a centered, left-aligned or corner region:
+
+.. code-block:: json
+
+   "state": {
+     "restchannels": 1,
+     "initializer": {
+       "name": "region",
+       "parameters": {
+         "placement": "center",
+         "extent": [20, 20],
+         "density": 1.0
+       }
+     }
+   }
+
+Large numeric channel states belong in NPZ rather than JSON. Store an array
+named ``nodes`` with the exact spatial-plus-channel shape and reference it with
+``{"name": "from_npz", "parameters": {"path": "states/start.npz"}}``.
+Identity-based NPZ checkpoints are deliberately rejected for now because
+particle properties must be restored together with their labels.
 
 Running tests
 -------------
