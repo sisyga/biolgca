@@ -72,13 +72,23 @@ def _resolve_mutation_matrix(lgca, trait_name=None, std_name=None):
     return np.eye(lgca.n_species)
 
 
-def _offspring_by_species(lgca, births_by_parent):
-    mutation_matrix = lgca.interaction_params["mutation_matrix"]
-    offspring_by_parent = lgca.rng.multinomial(
-        np.asarray(births_by_parent, dtype=np.int64),
-        mutation_matrix,
-    )
+def _sample_offspring_by_species(rng, births_by_parent, mutation_matrix):
+    """Sample offspring phenotypes, avoiding work for deterministic identity mutation."""
+
+    births_by_parent = np.asarray(births_by_parent, dtype=np.int64)
+    mutation_matrix = np.asarray(mutation_matrix, dtype=float)
+    if np.array_equal(mutation_matrix, np.eye(mutation_matrix.shape[0])):
+        return births_by_parent.copy()
+    offspring_by_parent = rng.multinomial(births_by_parent, mutation_matrix)
     return offspring_by_parent.sum(axis=-2)
+
+
+def _offspring_by_species(lgca, births_by_parent):
+    return _sample_offspring_by_species(
+        lgca.rng,
+        births_by_parent,
+        lgca.interaction_params["mutation_matrix"],
+    )
 
 
 def _redistribute_species_counts(lgca, species_counts, channel_weights=None):

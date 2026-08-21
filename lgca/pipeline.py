@@ -2530,11 +2530,11 @@ class NativeMultispeciesBirthOperator(BirthDeathOperator):
         return matrix
 
     def _offspring_by_species(self, lgca, births_by_parent):
-        offspring_by_parent = lgca.rng.multinomial(
-            np.asarray(births_by_parent, dtype=np.int64),
-            self.mutation_matrix,
+        from .ms_interactions import _sample_offspring_by_species
+
+        return _sample_offspring_by_species(
+            lgca.rng, births_by_parent, self.mutation_matrix
         )
-        return offspring_by_parent.sum(axis=-2)
 
 
 class NativeMultispeciesGoOrGrowOperator(BirthDeathOperator):
@@ -2646,11 +2646,11 @@ class NativeMultispeciesGoOrGrowOperator(BirthDeathOperator):
         return matrix
 
     def _offspring_by_species(self, lgca, births_by_parent):
-        offspring_by_parent = lgca.rng.multinomial(
-            np.asarray(births_by_parent, dtype=np.int64),
-            self.mutation_matrix,
+        from .ms_interactions import _sample_offspring_by_species
+
+        return _sample_offspring_by_species(
+            lgca.rng, births_by_parent, self.mutation_matrix
         )
-        return offspring_by_parent.sum(axis=-2)
 
 
 class NativeMultispeciesExcitableMediumOperator(BirthDeathOperator):
@@ -2775,14 +2775,19 @@ class NativeBirthDeathOperator(BirthDeathOperator):
 
     def apply(self, context, step: int) -> None:
         lgca = context.lgca
+        if getattr(lgca, "n_species", 1) == 1:
+            interior = lgca.nodes[lgca.nonborder]
+            lgca.nodes[lgca.nonborder] = self._apply_single_species_lattice(
+                interior,
+                self.birth_rate[0],
+                self.death_rate[0],
+                lgca.rng,
+                self.capacity,
+            )
+            return
         for spatial in np.ndindex(lgca.dims):
             coord = tuple(index + lgca.r_int for index in spatial)
-            if getattr(lgca, "n_species", 1) > 1:
-                lgca.nodes[coord] = self._apply_multispecies_node(lgca.nodes[coord], lgca.rng)
-            else:
-                lgca.nodes[coord] = self._apply_species_node(
-                    lgca.nodes[coord], self.birth_rate[0], self.death_rate[0], lgca.rng, self.capacity
-                )
+            lgca.nodes[coord] = self._apply_multispecies_node(lgca.nodes[coord], lgca.rng)
 
     def _rates(self, name: str, n_species: int) -> np.ndarray:
         value = self.parameters.get(name, 0.0)
@@ -2818,6 +2823,32 @@ class NativeBirthDeathOperator(BirthDeathOperator):
         after_death = self._apply_death(node.copy(), death_rate, rng)
         remaining_capacity = capacity - int(after_death.sum())
         return self._apply_birth(after_death, birth_rate, rng, remaining_capacity)
+
+    @staticmethod
+    def _apply_single_species_lattice(nodes, birth_rate, death_rate, rng, capacity):
+        """Apply independent local turnover without a Python loop over sites."""
+
+        after_death = nodes.copy()
+        if death_rate > 0.0:
+            after_death &= rng.random(nodes.shape) >= death_rate
+        particle_counts = after_death.sum(axis=-1)
+        if birth_rate == 0.0:
+            return after_death
+
+        births = rng.binomial(particle_counts, birth_rate)
+        empty_counts = (~after_death).sum(axis=-1)
+        remaining_capacity = np.maximum(capacity - particle_counts, 0)
+        births = np.minimum(births, np.minimum(empty_counts, remaining_capacity))
+        if not np.any(births):
+            return after_death
+
+        scores = rng.random(nodes.shape)
+        scores[after_death] = np.inf
+        order = np.argsort(scores, axis=-1)
+        ranks = np.empty_like(order)
+        np.put_along_axis(ranks, order, np.arange(nodes.shape[-1]), axis=-1)
+        after_death |= ranks < births[..., None]
+        return after_death
 
     @staticmethod
     def _apply_death(node, death_rate, rng):

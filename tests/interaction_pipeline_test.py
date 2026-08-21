@@ -21,6 +21,7 @@ from lgca.pipeline import (
     ReorientationTermSpec,
 )
 from lgca.plugins import PluginInfo, ReorientationOperator, describe_plugin
+from lgca.pipeline import NativeBirthDeathOperator
 from lgca.simulation import NodeRecorder
 from lgca.simulation import DensityRecorder, PopulationRecorder
 
@@ -74,6 +75,27 @@ def test_native_birth_death_changes_total_mass_within_capacity():
     assert result.lgca.nodes_t[0].sum() == 1
     assert result.lgca.nodes_t[1].sum() == 2
     assert result.lgca.nodes_t[1].sum(axis=-1).max() <= 2
+
+
+def test_single_species_birth_death_lattice_kernel_preserves_local_capacity():
+    nodes = np.zeros((2, 3, 5), dtype=bool)
+    nodes[..., 0] = True
+    operator = NativeBirthDeathOperator(
+        {"birth_rate": 1.0, "death_rate": 0.0, "capacity": 3}
+    )
+
+    result = operator._apply_single_species_lattice(
+        nodes,
+        birth_rate=1.0,
+        death_rate=0.0,
+        rng=np.random.default_rng(37),
+        capacity=3,
+    )
+
+    assert result.shape == nodes.shape
+    assert result.dtype == nodes.dtype
+    np.testing.assert_array_equal(result.sum(axis=-1), np.full((2, 3), 2))
+    assert result.sum(axis=-1).max() <= 3
 
 
 def test_native_birth_death_supports_species_specific_rates():

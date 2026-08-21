@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from lgca import get_lgca
+from lgca.ms_interactions import _sample_offspring_by_species
 
 
 GEOMS = {
@@ -330,6 +331,31 @@ def test_multispecies_nove_birth_routes_offspring_through_explicit_mutation_matr
     species_counts = lgca.nodes[lgca.nonborder].sum(axis=(0, 2))
     assert species_counts[0] == 30
     assert species_counts[1] > 0
+
+
+def test_identity_mutation_returns_parent_species_counts_without_rng_allocation():
+    births = np.array([[[2, 0, 3], [1, 4, 0]]], dtype=np.int64)
+    rng = np.random.default_rng(23)
+    expected_next_random = np.random.default_rng(23).random()
+
+    offspring = _sample_offspring_by_species(rng, births, np.eye(3))
+
+    np.testing.assert_array_equal(offspring, births)
+    assert not np.shares_memory(offspring, births)
+    assert rng.random() == expected_next_random
+
+
+def test_general_mutation_sampling_retains_multinomial_semantics():
+    births = np.array([[4, 3]], dtype=np.int64)
+    mutation_matrix = np.array([[0.75, 0.25], [0.2, 0.8]])
+    expected_rng = np.random.default_rng(29)
+    expected = expected_rng.multinomial(births, mutation_matrix).sum(axis=-2)
+
+    actual = _sample_offspring_by_species(
+        np.random.default_rng(29), births, mutation_matrix
+    )
+
+    np.testing.assert_array_equal(actual, expected)
 
 
 def test_multispecies_nove_birth_growth_uses_total_density_for_capacity_limit():
