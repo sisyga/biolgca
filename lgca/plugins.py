@@ -194,11 +194,20 @@ class InteractionOperator:
         raise NotImplementedError
 
     def dependencies(self) -> set[str]:
-        """Fields or state entries read by this operator."""
+        """Fields or state entries read by this operator.
+
+        The reserved dependency ``"boundary_nodes"`` requests valid ghost
+        nodes before execution. Dynamic fields named here are kept current by
+        the compiled pipeline whenever an earlier operator outputs ``nodes``.
+        """
         return set()
 
     def outputs(self) -> set[str]:
-        """Fields or state entries written by this operator."""
+        """Fields or state entries written by this operator.
+
+        Operators are node-mutating by default. A read-only/no-op operator must
+        explicitly return an empty set.
+        """
         return {"nodes"}
 
 

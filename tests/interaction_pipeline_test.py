@@ -19,7 +19,7 @@ from lgca.pipeline import (
     ReorientationSpec,
     ReorientationTermSpec,
 )
-from lgca.plugins import describe_plugin
+from lgca.plugins import PluginInfo, ReorientationOperator, describe_plugin
 from lgca.simulation import NodeRecorder
 from lgca.simulation import DensityRecorder, PopulationRecorder
 
@@ -472,6 +472,97 @@ def test_operator_order_is_validated_before_simulation():
 
     with pytest.raises(ValueError, match=r"dynamics\.operators\[1\].*order"):
         build_model(spec)
+
+
+def test_pipeline_refreshes_density_between_birth_and_go_or_rest():
+    nodes = np.zeros((1, 1, 5), dtype=bool)
+    nodes[0, 0, 1] = True
+    spec = ModelSpec(
+        description=Description(title="dynamic field freshness"),
+        space=SpaceSpec(geometry="square", boundary="periodic"),
+        state=StateSpec(nodes=nodes, restchannels=1),
+        time=TimeSpec(steps=1, seed=0),
+        dynamics=InteractionPipelineSpec(
+            operators=[
+                {"name": "classical.birth", "parameters": {"r_b": 1.0}},
+                {
+                    "name": "classical.go_or_rest",
+                    "parameters": {"kappa": 50.0, "theta": 0.3},
+                },
+            ],
+            propagation=False,
+        ),
+        analysis=AnalysisSpec(),
+    )
+    composed = build_model(spec)
+    explicitly_refreshed = build_model(spec)
+
+    composed.pipeline.execute_step(composed.context, 1)
+    explicitly_refreshed.pipeline.operators[0].apply(explicitly_refreshed.context, 1)
+    explicitly_refreshed.lgca.update_dynamic_fields()
+    explicitly_refreshed.pipeline.operators[1].apply(explicitly_refreshed.context, 1)
+    explicitly_refreshed.lgca.apply_boundaries()
+    explicitly_refreshed.lgca.update_dynamic_fields()
+
+    actual = composed.lgca.nodes[composed.lgca.nonborder].reshape(-1)
+    reference = explicitly_refreshed.lgca.nodes[
+        explicitly_refreshed.lgca.nonborder
+    ].reshape(-1)
+    np.testing.assert_array_equal(actual, reference)
+    assert actual.astype(int).tolist() == [0, 1, 0, 0, 1]
+
+
+def test_pipeline_refreshes_species_density_after_phenotype_switch():
+    class SpeciesDensityReader(ReorientationOperator):
+        def __init__(self):
+            super().__init__(
+                PluginInfo(
+                    name="test.species_density_reader",
+                    operator_kind="reorientation",
+                    backend_families=("multispecies",),
+                )
+            )
+            self.observed = None
+            self.observed_boundary = None
+
+        def dependencies(self):
+            return {"boundary_nodes", "species_density"}
+
+        def outputs(self):
+            return set()
+
+        def apply(self, context, step):
+            self.observed = context.lgca.species_density[
+                context.lgca.nonborder
+            ].copy()
+            self.observed_boundary = context.lgca.nodes[-1, -1, 1].copy()
+
+    nodes = np.zeros((1, 1, 2, 4), dtype=bool)
+    nodes[0, 0, 0, 0] = True
+    reader = SpeciesDensityReader()
+    spec = ModelSpec(
+        description=Description(title="species density freshness"),
+        space=SpaceSpec(geometry="square", boundary="periodic"),
+        state=StateSpec(nodes=nodes, n_species=2),
+        time=TimeSpec(steps=1, seed=0),
+        dynamics=InteractionPipelineSpec(
+            operators=[
+                PhenotypeSwitchSpec(
+                    name="phenotype_switch",
+                    parameters={"rates": [[0.0, 1.0], [0.0, 0.0]]},
+                ),
+                reader,
+            ],
+            propagation=False,
+        ),
+        analysis=AnalysisSpec(),
+    )
+
+    compiled = build_model(spec)
+    compiled.pipeline.execute_step(compiled.context, 1)
+
+    assert reader.observed.reshape(-1, 2).tolist() == [[0, 1]]
+    assert reader.observed_boundary.sum() == 1
 
 
 def test_unknown_reorientation_term_reports_modelspec_path():

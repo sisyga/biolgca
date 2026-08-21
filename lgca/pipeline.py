@@ -110,8 +110,13 @@ class CompiledPipeline:
     def execute_step(self, context, step: int, timing: list[dict[str, Any]] | None = None) -> None:
         lgca = context.lgca
         for operator in self.operators:
+            if "boundary_nodes" in operator.dependencies():
+                lgca.apply_boundaries()
+                lgca.update_dynamic_fields()
             start = time.perf_counter()
             operator.apply(context, step)
+            if "nodes" in operator.outputs():
+                lgca.update_dynamic_fields()
             if timing is not None:
                 timing.append(
                     {
@@ -295,6 +300,9 @@ class _NematicAlignmentTerm(_ReorientationTerm):
         dot_sq = (lgca.c.T @ lgca.c) ** 2
         return candidates[:, : lgca.velocitychannels] @ dot_sq @ neighbor_channels
 
+    def dependencies(self) -> set[str]:
+        return {"boundary_nodes"}
+
 
 class _PersistentWalkTerm(_ReorientationTerm):
     def score(self, candidates, node, lgca, coord):
@@ -319,6 +327,9 @@ class _AggregationTerm(_ReorientationTerm):
         gradient = lgca.gradient(density)[coord]
         candidate_flux = candidates[:, : lgca.velocitychannels] @ lgca.c.T
         return candidate_flux @ gradient
+
+    def dependencies(self) -> set[str]:
+        return {"boundary_nodes", "cell_density"}
 
 
 class _ContactGuidanceTerm(_ReorientationTerm):
@@ -1737,6 +1748,15 @@ class NativeClassicalReorientationOperator(ReorientationOperator):
         newnodes[lgca.nonborder] = nb_nodes
         lgca.nodes = newnodes
 
+    def dependencies(self) -> set[str]:
+        if self.mode == "alignment":
+            return {"boundary_nodes"}
+        if self.mode == "aggregation":
+            return {"boundary_nodes", "cell_density"}
+        if self.mode == "persistent_walk":
+            return {"nodes"}
+        return set()
+
     def _field(self, lgca):
         if self.mode == "alignment":
             return lgca.nb_sum(lgca.calc_flux(lgca.nodes))
@@ -1847,6 +1867,11 @@ class NativeClassicalTensorReorientationOperator(ReorientationOperator):
 
         newnodes[lgca.nonborder] = nb_nodes
         lgca.nodes = newnodes
+
+    def dependencies(self) -> set[str]:
+        if self.mode == "nematic":
+            return {"boundary_nodes"}
+        return set()
 
     def _tensors(self, lgca):
         if self.mode == "nematic":
