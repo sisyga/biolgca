@@ -1,21 +1,24 @@
-Beginner example gallery
-========================
+Example gallery
+===============
 
-The fastest way to learn BioLGCA is to start from a model that already runs,
-read the full model setup, then change one parameter at a time. This page
-collects the curated ``ModelSpec`` examples exposed by :mod:`lgca.examples`.
+The maintained :doc:`tutorials/index` teach how to construct and combine
+interactions in visible notebook cells. This gallery is the reference catalog
+to use afterward: it collects complete, tested ``ModelSpec`` examples exposed
+by :mod:`lgca.examples`.
 
 The gallery is inspired by the old :download:`BioLGCA.ipynb <../../BioLGCA.ipynb>`
 and :download:`Evolutionary LGCA.ipynb <../../Evolutionary LGCA.ipynb>` tours,
 and by the Morpheus habit of keeping examples discoverable by modeling question.
-Each example has its own source file under ``lgca/examples``.
+Each example has its own source file under ``lgca/examples``. The source files
+are useful recipes and regression-tested starting points, but they do not
+replace the explanatory notebooks.
 
 Study one example file
 ----------------------
 
-Each teaching file declares metadata, builds a ``ModelSpec`` in ``build_spec``,
-and runs it with ``run_model``. The package-level helpers are useful for tests
-and scripts, but the source files are the best place for students to start.
+Each example file declares metadata, builds a ``ModelSpec`` in ``build_spec``,
+and runs it with ``run_model``. The package-level helpers are useful for tests,
+scripts and project scaffolding once you have worked through the tutorials.
 
 Use :func:`lgca.examples.example_gallery` to browse model cards:
 

@@ -4,8 +4,7 @@ Getting started
 Installation
 ------------
 
-Clone the repository and install the package into your active Python
-environment:
+Clone the repository and install BioLGCA into an active Python environment:
 
 .. code-block:: bash
 
@@ -13,116 +12,60 @@ environment:
    cd biolgca
    python -m pip install -e .
 
-The core package depends on ``numpy``, ``scipy`` and ``tqdm``. Optional extras
-are declared in ``pyproject.toml``:
+A normal installation includes NumPy, SciPy, tqdm, Matplotlib and JupyterLab,
+so it is sufficient for the maintained tutorials and ordinary one- and
+two-dimensional analysis.
 
-.. list-table::
-   :header-rows: 1
+Launch JupyterLab from the repository root:
 
-   * - Extra
-     - Purpose
-     - Install command
-   * - ``test``
-     - Test runner dependencies
-     - ``python -m pip install -e ".[test]"``
-   * - ``docs``
-     - Sphinx documentation build
-     - ``python -m pip install -e ".[docs]"``
-   * - ``yaml``
-     - Optional YAML model-file syntax
-     - ``python -m pip install -e ".[yaml]"``
-   * - ``plot2d``
-     - 2D plotting with Matplotlib
-     - ``python -m pip install -e ".[plot2d]"``
-   * - ``plot3d``
-     - 3D plotting with Mayavi
-     - ``python -m pip install -e ".[plot3d]"``
-   * - ``plot`` or ``plotting``
-     - Matplotlib plus the optional Mayavi 3D stack
-     - ``python -m pip install -e ".[plot]"``
-   * - ``dev``
-     - Development, testing, docs and 2D plotting
-     - ``python -m pip install -e ".[dev]"``
+.. code-block:: bash
 
-The legacy ``requirements.txt``, ``documentation_requirements.txt`` and
-``plotting-requirements.txt`` files are still present for older workflows, but
-the extras above are the preferred installation interface.
+   jupyter lab
 
-For ordinary 1D and 2D work, prefer ``plot2d``. The ``plot``/``plotting``
-umbrella also installs Mayavi and is intended only when both renderer stacks
-are needed.
+Then open ``docs/source/tutorials/01_fundamentals.ipynb``. The six
+:doc:`tutorials/index` notebooks progress from a first random walk to a
+reproducible student project.
 
-Choose a workflow
------------------
+Your first model specification
+------------------------------
 
-BioLGCA has two supported entry paths:
-
-1. Use :func:`lgca.get_lgca` for interactive exploration in Python or a
-   notebook.
-2. Use a versioned ModelSpec file and the ``biolgca`` command for simulations
-   that must be reviewed, saved and shared.
-
-Both paths use the same lattice implementations. The ModelSpec path adds
-strict validation, registered interaction names and resolved run provenance;
-it does not require a GUI or XML configuration.
-
-Creating a simulator
---------------------
-
-Use :func:`lgca.get_lgca` to choose a model family, geometry, initial condition
-and interaction rule:
-
-.. code-block:: python
-
-   from lgca import get_lgca
-
-   lgca = get_lgca(
-       geometry="1d",
-       ib=True,
-       ve=True,
-       interaction="random_walk",
-       dims=50,
-       seed=1,
-   )
-   lgca.timeevo(timesteps=50, record=True, showprogress=False)
-
-The :doc:`factory_reference` page lists the supported factory switches and
-class families.
-
-Declarative simulations
------------------------
-
-For reproducible model setup, use :class:`lgca.model.ModelSpec`. A model spec
-keeps lattice setup, interaction dynamics and observer-based logging in
-separate sections:
+The tutorials use :class:`lgca.model.ModelSpec`. Its sections make the lattice,
+initial state, time horizon, interaction pipeline and recorded data explicit:
 
 .. code-block:: python
 
    from lgca.model import AnalysisSpec, ModelSpec, SpaceSpec, StateSpec, TimeSpec, run_model
    from lgca.pipeline import InteractionPipelineSpec
-   from lgca.simulation import DensityRecorder
+   from lgca.simulation import DensityRecorder, PopulationRecorder
 
    spec = ModelSpec(
-       space=SpaceSpec(geometry="hex", dims=(20, 20), boundary="reflecting"),
-       state=StateSpec(density=0.2, restchannels=0),
-       time=TimeSpec(steps=50, seed=1),
+       space=SpaceSpec(geometry="square", dims=(20, 20), boundary="periodic"),
+       state=StateSpec(density=0.15, restchannels=0),
+       time=TimeSpec(steps=30, seed=1),
        dynamics=InteractionPipelineSpec(
            operators=[{"name": "classical.random_walk"}],
        ),
-       analysis=AnalysisSpec(observers=[DensityRecorder()]),
+       analysis=AnalysisSpec(
+           observers=[DensityRecorder(), PopulationRecorder()],
+       ),
    )
 
    result = run_model(spec, showprogress=False)
-   print(result.lgca.dens_t.shape)
+   print(result.lgca.n_t)
+   result.lgca.plot_density()
 
-See :doc:`model_specs_and_plugins` for composed interaction phases and
-:doc:`observers_and_plotting` for recorders, snapshots and movies.
+The explicit seed makes stochastic comparisons repeatable. The interaction
+entry is visible and can be replaced or composed; lessons 2--4 show the
+supported patterns.
 
-Shareable command-line workflow
--------------------------------
+Saving and sharing a model
+--------------------------
 
-The installed ``biolgca`` command exports curated templates and runs the same
-strict ModelSpec pipeline used from Python:
+JSON is the canonical, versioned ModelSpec format. YAML is optional authoring
+syntax for the same data model. Model files contain data and registered names,
+never arbitrary import paths or Python code.
+
+The installed command can export, validate and run curated starting points:
 
 .. code-block:: bash
 
@@ -131,92 +74,58 @@ strict ModelSpec pipeline used from Python:
    biolgca validate model.json
    biolgca run model.json --output runs/random-walk-001
 
-``validate`` parses the complete model, resolves registered interactions,
-checks initializers and compiles the pipeline without evolving a trajectory or
-writing observer outputs. ``run`` creates an explicit directory containing
-``model.resolved.json``, ``metadata.json`` and any configured CSV or plot
-outputs. It refuses an existing directory unless ``--overwrite`` is supplied.
+The run directory contains ``model.resolved.json``, ``metadata.json`` and the
+requested observer outputs. See :doc:`how_to/model_specs_and_plugins` for
+pipeline composition, input-path rules and model-file details.
 
-JSON is the canonical ModelSpec format and every file carries
-``schema_version: 1``. YAML is optional authoring syntax for exactly the same
-data model. Model files contain data and registered names, never import paths
-or arbitrary Python code.
+Optional dependencies
+---------------------
 
-Input resources such as ``from_npz`` states are relative to the model file and
-must remain inside its directory. Observer output paths are relative to the run
-directory. Absolute paths and ``..`` escapes are rejected; the
-``--trusted-paths`` option is reserved for intentionally trusted local models.
+Only specialized or contributor workflows use extras:
 
-Initial-condition presets
--------------------------
+.. list-table::
+   :header-rows: 1
 
-Random initialization remains the shortest form:
+   * - Extra
+     - Purpose
+     - Install command
+   * - ``yaml``
+     - YAML model-file syntax
+     - ``python -m pip install -e ".[yaml]"``
+   * - ``plot3d``
+     - Mayavi-based three-dimensional plotting
+     - ``python -m pip install -e ".[plot3d]"``
+   * - ``test``
+     - Test runner
+     - ``python -m pip install -e ".[test]"``
+   * - ``docs``
+     - Sphinx/MyST-NB documentation build
+     - ``python -m pip install -e ".[docs]"``
+   * - ``dev``
+     - Development, tests and documentation tools
+     - ``python -m pip install -e ".[dev]"``
 
-.. code-block:: json
+The old ``plot2d`` extra remains as an empty compatibility name; Matplotlib is
+now installed normally. ``plot`` and ``plotting`` remain aliases for the
+optional Mayavi stack.
 
-   "state": {"density": 0.2, "restchannels": 1}
-
-A portable model can instead request a centered, left-aligned or corner region:
-
-.. code-block:: json
-
-   "state": {
-     "restchannels": 1,
-     "initializer": {
-       "name": "region",
-       "parameters": {
-         "placement": "center",
-         "extent": [20, 20],
-         "density": 1.0
-       }
-     }
-   }
-
-Large numeric channel states belong in NPZ rather than JSON. Store an array
-named ``nodes`` with the exact spatial-plus-channel shape and reference it with
-``{"name": "from_npz", "parameters": {"path": "states/start.npz"}}``.
-Identity-based NPZ checkpoints are deliberately rejected for now because
-particle properties must be restored together with their labels.
-
-A model file is configuration, and a run directory contains resolved
-configuration, provenance and requested outputs. Neither is a general restart
-checkpoint or a serialized LGCA object. Keep restart/checkpoint data separate
-from the shareable model file until a backend-specific checkpoint contract is
-available.
-
-Running tests
--------------
-
-From the repository root:
-
-.. code-block:: bash
-
-   python -m pytest -q
-
-Building the documentation
+Legacy interactive factory
 --------------------------
 
-Install the docs extra and build the HTML documentation locally:
+The :func:`lgca.get_lgca` factory remains supported for existing code and quick
+interactive experiments. New teaching and reproducible projects use ModelSpec
+because it makes interactions, seeds and recorded data reviewable. See
+:doc:`reference/factory_reference` for the complete factory matrix.
+
+Developer checks
+----------------
+
+Run the test suite and strict documentation build from the repository root:
 
 .. code-block:: bash
 
-   python -m pip install -e ".[docs]"
-   python docs/build.py
+   conda run -n biolgca python -m pytest -q
+   conda run -n biolgca python docs/build.py
 
-The build command treats warnings as errors and removes stale generated
-autosummary pages before invoking Sphinx.
-
-Read the Docs uses the same Sphinx configuration from ``docs/source/conf.py``
-and installs the ``docs`` extra through ``.readthedocs.yaml``.
-
-Legacy notebook examples
-------------------------
-
-The repository includes older exploratory notebooks that predate the
-declarative API. They remain useful as factory-API tours, but they are not part
-of the tested example gallery and may require manual adaptation to current
-Jupyter or plotting environments. Start new simulations from
-:doc:`example_gallery` instead.
-
-- :download:`BioLGCA notebook <../../BioLGCA.ipynb>`
-- :download:`Evolutionary LGCA notebook <../../Evolutionary LGCA.ipynb>`
+The documentation build executes every maintained notebook from a clean kernel
+and treats cell exceptions and Sphinx warnings as failures.

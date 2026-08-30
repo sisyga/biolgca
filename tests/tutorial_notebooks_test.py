@@ -7,6 +7,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
 
 
 ROOT = Path(__file__).resolve().parents[1]
+DOCS_SOURCE = ROOT / "docs" / "source"
 
 
 def _project_metadata():
@@ -28,8 +29,41 @@ def test_normal_install_includes_notebook_runtime():
 
 
 def test_sphinx_force_executes_notebooks():
-    conf = (ROOT / "docs" / "source" / "conf.py").read_text(encoding="utf-8")
+    conf = (DOCS_SOURCE / "conf.py").read_text(encoding="utf-8")
 
     assert "'myst_nb'" in conf or '"myst_nb"' in conf
     assert 'nb_execution_mode = "force"' in conf
     assert "nb_execution_raise_on_error = True" in conf
+
+
+def test_primary_documentation_navigation_is_task_oriented():
+    index = (DOCS_SOURCE / "index.rst").read_text(encoding="utf-8")
+    toctree = index.split(".. toctree::", 1)[1]
+    expected = (
+        "getting_started",
+        "tutorials/index",
+        "how_to/index",
+        "concepts/index",
+        "example_gallery",
+        "reference/index",
+    )
+
+    positions = [toctree.index(name) for name in expected]
+    assert positions == sorted(positions)
+
+
+def test_reference_pages_have_section_owners():
+    assert (DOCS_SOURCE / "how_to" / "model_specs_and_plugins.rst").exists()
+    assert (DOCS_SOURCE / "concepts" / "lgca_types.rst").exists()
+    assert (DOCS_SOURCE / "reference" / "full_api.rst").exists()
+
+
+def test_interaction_concepts_page_covers_every_reorientation_term():
+    from lgca.pipeline import list_reorientation_terms
+
+    text = (DOCS_SOURCE / "concepts" / "interactions.rst").read_text(encoding="utf-8")
+    for name in list_reorientation_terms():
+        assert f"``{name}``" in text
+    assert "one sampled reorientation transition" in text
+    assert "sequential pipeline" in text
+    assert "N(s') = N(s)" in text

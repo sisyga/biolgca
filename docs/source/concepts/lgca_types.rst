@@ -77,7 +77,7 @@ Use this family with:
                    interaction="excitable_medium_ms")
 
 The current multi-species interaction library is intentionally small. See
-:doc:`interactions_summary` for supported rules.
+:doc:`/reference/interactions_summary` for supported rules.
 
 Data model summary
 ------------------

@@ -101,7 +101,7 @@ provenance or migration reports:
    coverage = interaction_coverage_table()
 
 The ``operator_kind`` field maps plugins to the pipeline phases documented in
-:doc:`model_specs_and_plugins`. This is the preferred interface for tools that
+:doc:`/how_to/model_specs_and_plugins`. This is the preferred interface for tools that
 need to reason about conservation laws or whether a rule changes particle
 number, phenotype identity or channel occupancy.
 
@@ -152,7 +152,7 @@ For reusable rules, prefer adding an :class:`lgca.plugins.InteractionOperator`
 subclass and registering it with :func:`lgca.plugins.register_plugin`. Plugin
 operators can validate the model context, advertise dependencies and outputs,
 declare conservation laws, and participate in :class:`lgca.model.ModelSpec`
-pipeline compilation. Follow :doc:`custom_interactions` for the complete
+pipeline compilation. Follow :doc:`/how_to/custom_interactions` for the complete
 extension recipe. :mod:`lgca.classical_operators` demonstrates a focused
 metadata/factory/operator slice; the remaining native families in
 :mod:`lgca.pipeline` provide examples of birth/death, phenotype-switch and

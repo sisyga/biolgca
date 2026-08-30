@@ -8,8 +8,8 @@ Custom interactions
 -------------------
 
 The supported callable and registered-plugin paths are described in
-:doc:`custom_interactions`, :doc:`interactions_summary` and
-:doc:`model_specs_and_plugins`. A future packaging cookbook may add an
+:doc:`/how_to/custom_interactions`, :doc:`interactions_summary` and
+:doc:`/how_to/model_specs_and_plugins`. A future packaging cookbook may add an
 end-to-end external distribution example. Arbitrary imports from model files
 remain intentionally unsupported.
 
@@ -24,7 +24,7 @@ Plotting cookbook
 -----------------
 
 The observer and plotting dispatch APIs are described in
-:doc:`observers_and_plotting`. Square scalar fields use image artists and
+:doc:`/how_to/observers_and_plotting`. Square scalar fields use image artists and
 multi-species density selection is shared across static and animated paths.
 Remaining work includes consistent absolute/relative normalization, scalable
 colorbar tick locators, a documented slicing matrix, 3-D renderer lifecycle
@@ -34,7 +34,7 @@ Custom initial conditions
 -------------------------
 
 Named region and numeric NPZ initializers are documented in
-:doc:`getting_started`. A complete advanced guide should still describe raw
+:doc:`/getting_started`. A complete advanced guide should still describe raw
 ``nodes`` shapes for classical, identity-based, NoVE and multi-species models
 in each geometry. Identity-based checkpoint loading remains unsupported until
 particle properties and labels can be restored atomically.

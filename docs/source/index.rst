@@ -1,62 +1,33 @@
-#####################################
-Welcome to the biolgca Documentation!
-#####################################
+BioLGCA
+*******
 
-`biolgca <https://github.com/sisyga/biolgca>`_ is a Python package for
-simulating lattice-gas cellular automata (LGCA) in biological contexts.
-Simulations can be built with the traditional :func:`lgca.get_lgca` factory or
-with declarative :class:`lgca.model.ModelSpec` objects that separate model
-setup, interaction plugins, observer-based logging and plotting.
+`BioLGCA <https://github.com/sisyga/biolgca>`_ is a Python package for
+simulating lattice-gas cellular automata in biological contexts. It supports
+classical, identity-based, volume-exclusion-free and multi-species models on
+one-, two- and three-dimensional lattices.
 
-LGCA
-----
+Start with the notebooks
+------------------------
 
-LGCA are cellular automata with an extended channel state space. Particles or
-cells occupy velocity channels, so the lattice state records both the number of
-cells at each node and their movement directions. The package supports
-classical, identity-based, volume-exclusion-free and multi-species LGCA models.
+The maintained :doc:`tutorials/index` are the primary learning path. They show
+every model specification and interaction in editable cells, beginning with a
+random walk and progressing to combined directional cues, population dynamics,
+evolution and a reproducible student project.
 
-For a broader modelling introduction, see the
-`BIO-LGCA Wikipedia article <https://en.wikipedia.org/wiki/BIO-LGCA>`_ and the
-BIO-LGCA method paper:
-`Deutsch et al. 2021 <https://doi.org/10.1371/journal.pcbi.1009066>`_.
+After installing the repository, launch JupyterLab:
 
-Supported models
-----------------
+.. code-block:: bash
 
-The :func:`lgca.get_lgca` factory selects a simulator class from these axes:
+   python -m pip install -e .
+   jupyter lab
 
-- classical LGCA with volume exclusion
-- identity-based LGCA with volume exclusion
-- classical LGCA without volume exclusion
-- identity-based LGCA without volume exclusion
-- classical multi-species LGCA with or without volume exclusion
+Open ``docs/source/tutorials/01_fundamentals.ipynb`` for the first lesson.
 
-Supported geometries are 1D linear, 2D square, 2D hexagonal, 3D cubic and 3D
-Moore lattices. Multi-species identity-based LGCA are not implemented yet.
+A reproducible model in Python
+------------------------------
 
-Current analysis helpers include observer recorders for lattice state, density,
-population and identity-based family summaries, plus density, flux, flow,
-state-space, scalar-field, vector-field, property and family-population plots.
-Plotting features require the optional plotting dependencies.
-
-Quick example
--------------
-
-.. code-block:: python
-
-   from lgca import get_lgca
-
-   lgca = get_lgca(geometry="hex", interaction="alignment", bc="refl", seed=1)
-   lgca.timeevo(timesteps=132, record=True)
-   lgca.plot_flux()
-
-.. figure:: ../images/alignment_small.png
-
-   Alignment interaction on a hexagonal lattice.
-
-Declarative example
--------------------
+BioLGCA separates lattice setup, state, time, interactions and analysis in a
+:class:`lgca.model.ModelSpec`:
 
 .. code-block:: python
 
@@ -65,11 +36,11 @@ Declarative example
    from lgca.simulation import DensityRecorder
 
    spec = ModelSpec(
-       space=SpaceSpec(geometry="hex", dims=(20, 20), boundary="reflecting"),
-       state=StateSpec(density=0.2, restchannels=0),
-       time=TimeSpec(steps=100, seed=1),
+       space=SpaceSpec(geometry="square", dims=(20, 20), boundary="periodic"),
+       state=StateSpec(density=0.15, restchannels=0),
+       time=TimeSpec(steps=30, seed=1),
        dynamics=InteractionPipelineSpec(
-           operators=[{"name": "classical.alignment", "parameters": {"beta": 2.0}}],
+           operators=[{"name": "classical.random_walk"}],
        ),
        analysis=AnalysisSpec(observers=[DensityRecorder()]),
    )
@@ -77,48 +48,33 @@ Declarative example
    result = run_model(spec, showprogress=False)
    result.lgca.plot_density()
 
-More examples
--------------
+The :doc:`how_to/model_specs_and_plugins` guide explains shareable JSON/YAML
+models and composed pipelines. The traditional :func:`lgca.get_lgca` factory
+remains supported and is documented in :doc:`reference/factory_reference`.
 
-.. list-table::
+Scientific background
+---------------------
 
-   * - .. figure:: ../images/excitable_medium_small.png
-
-          Excitable medium
-
-     - .. figure:: ../images/go_and_grow_density_small.png
-
-          Go-or-grow density
-
-     - .. figure:: ../images/go_and_grow_rb_small.png
-
-          Go-or-grow birth rate
+LGCA are cellular automata with an extended channel state space. Particles or
+cells occupy velocity and optional rest channels, so the state records both
+cell number and movement direction. See the
+`BIO-LGCA overview <https://en.wikipedia.org/wiki/BIO-LGCA>`_ and the method
+paper `Deutsch et al. 2021 <https://doi.org/10.1371/journal.pcbi.1009066>`_.
 
 Questions and contributions
 ---------------------------
 
-Issues are tracked on the `GitHub issue tracker <https://github.com/sisyga/biolgca/issues>`_.
-For contribution notes, see the repository ``AGENTS.md`` and GitHub wiki.
-
-Contact:
-
-- Simon Syga: simon.syga@tu-dresden.de
-- Bianca Güttner: bianca.guettner@nct-dresden.de
-
-License
--------
-
-BSD 3-clause license. See ``LICENSE.txt`` in the repository.
-
-Copyright (C) 2018-2026 Technische Universität Dresden.
+Issues are tracked on the
+`GitHub issue tracker <https://github.com/sisyga/biolgca/issues>`_. BioLGCA is
+distributed under the BSD 3-clause license.
 
 .. toctree::
    :maxdepth: 4
    :hidden:
 
    getting_started
-   user_guide
-   examples
+   tutorials/index
+   how_to/index
+   concepts/index
    example_gallery
-   custom_interactions
-   full_api
+   reference/index

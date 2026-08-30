@@ -35,6 +35,6 @@ def test_beginner_example_gallery_documents_all_curated_examples_and_helpers():
 
 
 def test_example_info_api_page_has_explicit_toctree_owner():
-    text = (DOCS_SOURCE / "full_api.rst").read_text(encoding="utf-8")
+    text = (DOCS_SOURCE / "reference" / "full_api.rst").read_text(encoding="utf-8")
 
     assert "lgca.examples.ExampleInfo" in text
