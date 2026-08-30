@@ -106,3 +106,26 @@ def test_collective_notebook_compares_four_mechanisms():
     ):
         assert name in source
     assert "polarization" in source.lower()
+
+
+def test_composition_notebook_builds_one_multi_term_sampler():
+    source = _source(_notebook("03_combining_interactions.ipynb"))
+
+    assert "ReorientationSpec(" in source
+    assert source.count("ReorientationTermSpec(") >= 4
+    assert "one sampled" in source.lower()
+    assert "sequential" in source.lower()
+    assert "chemotaxis" in source
+    assert "contact_guidance" in source
+
+
+def test_population_notebook_teaches_atomic_conserving_switch():
+    source = _source(_notebook("04_population_dynamics.ipynb"))
+    code_source = _source(_notebook("04_population_dynamics.ipynb"), "code")
+
+    assert "BirthDeathSpec(" in code_source
+    assert "PhenotypeSwitchSpec(" in code_source
+    assert "s -> s'" in source or "s → s′" in source
+    assert "before.sum() == after.sum()" in code_source
+    population_pipeline = code_source.split("population_spec = ModelSpec", 1)[1]
+    assert population_pipeline.index("BirthDeathSpec(") < population_pipeline.index("PhenotypeSwitchSpec(")
