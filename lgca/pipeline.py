@@ -407,6 +407,12 @@ _REORIENTATION_TERMS = {
 }
 
 
+def list_reorientation_terms() -> tuple[str, ...]:
+    """Return the supported reorientation-term names in deterministic order."""
+
+    return tuple(sorted(_REORIENTATION_TERMS))
+
+
 class BoltzmannReorientationOperator(ReorientationOperator):
     """Native mass-preserving reorientation sampler."""
 

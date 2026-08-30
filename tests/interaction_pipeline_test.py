@@ -26,6 +26,24 @@ from lgca.simulation import NodeRecorder
 from lgca.simulation import DensityRecorder, PopulationRecorder
 
 
+def test_reorientation_term_names_are_public_and_stable():
+    from lgca.pipeline import list_reorientation_terms
+
+    assert list_reorientation_terms() == (
+        "aggregation",
+        "alignment",
+        "chemotaxis",
+        "contact_guidance",
+        "nematic",
+        "nematic_alignment",
+        "persistent_motion",
+        "persistent_walk",
+        "random_walk",
+        "resting_bias",
+        "uniform",
+    )
+
+
 def test_native_uniform_reorientation_preserves_total_mass():
     spec = ModelSpec(
         description=Description(title="native uniform reorientation"),
