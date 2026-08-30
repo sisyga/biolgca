@@ -20,18 +20,21 @@ def test_clean_generated_removes_stale_autosummary_and_html(tmp_path):
     autosummary_dir.mkdir(parents=True)
     reference_autosummary_dir.mkdir(parents=True)
     output_dir.mkdir(parents=True)
+    notebook_cache_dir = output_dir.parent / ".jupyter_cache"
+    notebook_cache_dir.mkdir()
     (autosummary_dir / "removed_api.rst").write_text("stale", encoding="utf-8")
     (reference_autosummary_dir / "removed_api.rst").write_text(
         "stale", encoding="utf-8"
     )
     (output_dir / "index.html").write_text("stale", encoding="utf-8")
+    (notebook_cache_dir / "cache.db").write_text("stale", encoding="utf-8")
 
     build = _load_docs_build_module()
     build.clean_generated(source_dir, output_dir)
 
     assert not autosummary_dir.exists()
     assert not reference_autosummary_dir.exists()
-    assert not output_dir.exists()
+    assert not output_dir.parent.exists()
 
 
 def test_clean_generated_propagates_removal_failures(tmp_path, monkeypatch):

@@ -11,7 +11,7 @@ def clean_generated(source_dir: Path, output_dir: Path) -> None:
     for generated_dir in (
         source_dir / "_autosummary",
         source_dir / "reference" / "_autosummary",
-        output_dir,
+        output_dir.parent,
     ):
         if generated_dir.exists():
             shutil.rmtree(generated_dir)
