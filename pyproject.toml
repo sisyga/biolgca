@@ -30,6 +30,8 @@ dependencies = [
     "numpy",
     "scipy",
     "tqdm",
+    "matplotlib",
+    "jupyterlab",
 ]
 
 [project.optional-dependencies]
@@ -44,20 +46,16 @@ docs = [
     "sphinx-autodoc-typehints",
     "alabaster",
     "numpydoc",
-    "matplotlib",
+    "myst-nb",
 ]
-plot2d = [
-    "matplotlib",
-]
+plot2d = []
 plot3d = [
     "mayavi",
 ]
 plot = [
-    "matplotlib",
     "mayavi",
 ]
 plotting = [
-    "matplotlib",
     "mayavi",
 ]
 dev = [
@@ -68,7 +66,7 @@ dev = [
     "sphinx-autodoc-typehints",
     "alabaster",
     "numpydoc",
-    "matplotlib",
+    "myst-nb",
     "build",
     "jsonschema>=4",
 ]

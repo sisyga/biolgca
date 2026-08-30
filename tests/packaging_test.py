@@ -12,8 +12,10 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_pyproject_defines_issue_86_extras():
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     extras = pyproject["project"]["optional-dependencies"]
+    dependencies = set(pyproject["project"]["dependencies"])
 
-    assert {"matplotlib", "mayavi"} <= set(extras["plot"])
+    assert "matplotlib" in dependencies
+    assert "mayavi" in extras["plot"]
     assert "ruff" in extras["dev"]
 
 

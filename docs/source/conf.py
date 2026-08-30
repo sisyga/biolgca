@@ -41,7 +41,8 @@ extensions = [
 	'sphinx.ext.autodoc',
 	'sphinx.ext.autosummary',
 	'numpydoc',
-	'sphinx_autodoc_typehints'
+	'sphinx_autodoc_typehints',
+	'myst_nb',
 	#'sphinx.ext.napoleon'  # enable numpydoc-style docstring parsing
 	#'myst_parser'
 	#'m2r2'
@@ -89,6 +90,12 @@ add_module_names = False # Remove namespaces from class/method signatures
 
 # change root document
 root_doc = 'index'
+
+# Execute maintained tutorial notebooks from a clean kernel during every docs
+# build. Cell exceptions are documentation build failures.
+nb_execution_mode = "force"
+nb_execution_timeout = 120
+nb_execution_raise_on_error = True
 
 # formatting
 add_function_parentheses = True  # default True
