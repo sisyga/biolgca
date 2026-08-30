@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import nbformat
+
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
@@ -8,6 +10,19 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS_SOURCE = ROOT / "docs" / "source"
+TUTORIALS = DOCS_SOURCE / "tutorials"
+
+
+def _notebook(name: str):
+    return nbformat.read(TUTORIALS / name, as_version=4)
+
+
+def _source(notebook, cell_type: str | None = None) -> str:
+    return "\n".join(
+        cell.source
+        for cell in notebook.cells
+        if cell_type is None or cell.cell_type == cell_type
+    )
 
 
 def _project_metadata():
@@ -67,3 +82,27 @@ def test_interaction_concepts_page_covers_every_reorientation_term():
     assert "one sampled reorientation transition" in text
     assert "sequential pipeline" in text
     assert "N(s') = N(s)" in text
+
+
+def test_fundamentals_notebook_teaches_complete_first_spec():
+    source = _source(_notebook("01_fundamentals.ipynb"))
+
+    assert "ModelSpec(" in source
+    assert "InteractionPipelineSpec(" in source
+    assert '"classical.random_walk"' in source
+    assert "boundary" in source
+    assert "seed" in source
+    assert "Exercise" in source
+
+
+def test_collective_notebook_compares_four_mechanisms():
+    source = _source(_notebook("02_collective_movement.ipynb"))
+
+    for name in (
+        "classical.random_walk",
+        "classical.alignment",
+        "classical.aggregation",
+        "classical.nematic",
+    ):
+        assert name in source
+    assert "polarization" in source.lower()
