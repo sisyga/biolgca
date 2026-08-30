@@ -16,15 +16,21 @@ def test_clean_generated_removes_stale_autosummary_and_html(tmp_path):
     source_dir = tmp_path / "source"
     output_dir = tmp_path / "_build" / "html"
     autosummary_dir = source_dir / "_autosummary"
+    reference_autosummary_dir = source_dir / "reference" / "_autosummary"
     autosummary_dir.mkdir(parents=True)
+    reference_autosummary_dir.mkdir(parents=True)
     output_dir.mkdir(parents=True)
     (autosummary_dir / "removed_api.rst").write_text("stale", encoding="utf-8")
+    (reference_autosummary_dir / "removed_api.rst").write_text(
+        "stale", encoding="utf-8"
+    )
     (output_dir / "index.html").write_text("stale", encoding="utf-8")
 
     build = _load_docs_build_module()
     build.clean_generated(source_dir, output_dir)
 
     assert not autosummary_dir.exists()
+    assert not reference_autosummary_dir.exists()
     assert not output_dir.exists()
 
 

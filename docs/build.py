@@ -8,7 +8,11 @@ from pathlib import Path
 
 def clean_generated(source_dir: Path, output_dir: Path) -> None:
     """Remove generated autosummary sources and rendered documentation."""
-    for generated_dir in (source_dir / "_autosummary", output_dir):
+    for generated_dir in (
+        source_dir / "_autosummary",
+        source_dir / "reference" / "_autosummary",
+        output_dir,
+    ):
         if generated_dir.exists():
             shutil.rmtree(generated_dir)
 
