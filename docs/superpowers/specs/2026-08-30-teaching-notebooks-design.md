@@ -37,7 +37,8 @@ reproducibility guidance.
 6. Render the notebooks in the existing Sphinx documentation and execute them
    from a clean kernel in CI.
 7. Keep maintenance realistic for a one-person scientific software project by
-   reusing tested example builders and avoiding a second documentation system.
+   drawing on validated example scenarios without hiding model construction,
+   and by avoiding a second documentation system.
 8. Make a normal BioLGCA installation sufficient to open and run the teaching
    notebooks, without requiring a separate teaching extra.
 
@@ -102,8 +103,9 @@ and reproducibility checkpoint.
 - Explain the biological interpretation and assumptions of each mechanism.
 - Use a suitable observable, such as polarization or a clustering measure, so
   the comparison is not based only on visual inspection.
-- Reuse existing curated example builders where their model definitions match
-  the lesson.
+- Use the scientific scenarios and parameter choices from existing curated
+  examples where they fit, but reconstruct each `ModelSpec` visibly in the
+  notebook instead of importing a finished example specification.
 
 ### 3. Combining directional cues
 
@@ -213,10 +215,19 @@ the tutorial sequence but will not be converted into sixteen notebooks.
 
 ## Source-of-truth and code boundaries
 
-- Existing `lgca.examples.*.build_spec()` functions remain the source for
-  curated model definitions when a notebook uses the same scenario.
-- A notebook may build a small specification inline when seeing the complete
-  specification is itself part of the lesson.
+- Every maintained notebook will construct its relevant `ModelSpec`,
+  `InteractionPipelineSpec`, operators, and reorientation terms in visible code
+  cells. The model-building code is part of the lesson, not setup to hide behind
+  an example loader.
+- Maintained notebooks will not import `lgca.examples.*.build_spec()` or
+  `get_example_spec()`. Existing examples may supply scientifically established
+  scenarios, parameter choices, and expected behavior, but students will see
+  those choices translated into explicit specification code.
+- Each successive notebook will show only the complete specifications needed
+  for its lesson and will explain what changed relative to the previous model.
+  A notebook may define a small local factory function when several variants in
+  that same notebook differ by one named parameter, but the function body must
+  remain visible and include the interaction construction.
 - Notebook cells will not copy library implementations.
 - Reusable analysis code will move into a tested Python function only when it is
   used by more than one notebook and represents a generally useful observable.
@@ -320,9 +331,10 @@ The goal is complete when:
   particle-number-conserving transitions;
 - every notebook contains a biological application, quantitative
   interpretation, and an exercise or investigation prompt;
+- every maintained notebook shows its interaction and pipeline construction in
+  visible cells and none loads a finished specification from `lgca.examples`;
 - a normal package installation includes JupyterLab and Matplotlib;
 - the historical notebooks remain accessible but cannot be mistaken for the
   maintained learner path; and
 - the full tests, strict documentation build, package build, and clean-wheel
   smoke checks pass.
-
