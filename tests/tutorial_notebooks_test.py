@@ -174,3 +174,23 @@ def test_student_project_notebook_saves_spec_and_tests_custom_invariant():
     assert "save_model_spec(" in source
     assert "conserv" in source.lower()
     assert "assert" in source
+
+
+def test_legacy_and_research_notebooks_are_clearly_separated():
+    assert not list(ROOT.glob("*.ipynb"))
+    assert (ROOT / "notebooks" / "legacy" / "BioLGCA.ipynb").exists()
+    assert (ROOT / "notebooks" / "legacy" / "Evolutionary LGCA.ipynb").exists()
+    assert (ROOT / "notebooks" / "research_projects" / "SRP_Notebook.ipynb").exists()
+
+    readme = (ROOT / "notebooks" / "README.md").read_text(encoding="utf-8")
+    assert "Maintained tutorials" in readme
+    assert "Historical notebooks" in readme
+    assert "Research-project example" in readme
+
+
+def test_root_readme_leads_to_the_maintained_curriculum():
+    text = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "docs/source/tutorials/01_fundamentals.ipynb" in text
+    assert text.index("ModelSpec") < text.index("get_lgca")
+    assert "jupyter lab" in text.lower()

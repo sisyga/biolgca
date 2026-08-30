@@ -2,3 +2,4 @@ Sphinx
 sphinx-autodoc-typehints
 alabaster
 numpydoc
+myst-nb

@@ -41,3 +41,21 @@ def test_readme_has_ci_badge():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
     assert "actions/workflows/ci.yml/badge.svg" in readme
+
+
+def test_legacy_requirement_files_match_supported_install_paths():
+    normal = {
+        line.strip()
+        for line in (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.startswith("#")
+    }
+    documentation = {
+        line.strip()
+        for line in (ROOT / "documentation_requirements.txt")
+        .read_text(encoding="utf-8")
+        .splitlines()
+        if line.strip() and not line.startswith("#")
+    }
+
+    assert {"numpy", "scipy", "tqdm", "matplotlib", "jupyterlab"} <= normal
+    assert "myst-nb" in documentation

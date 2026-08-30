@@ -6,8 +6,9 @@ interactions in visible notebook cells. This gallery is the reference catalog
 to use afterward: it collects complete, tested ``ModelSpec`` examples exposed
 by :mod:`lgca.examples`.
 
-The gallery is inspired by the old :download:`BioLGCA.ipynb <../../BioLGCA.ipynb>`
-and :download:`Evolutionary LGCA.ipynb <../../Evolutionary LGCA.ipynb>` tours,
+The gallery is inspired by the old :download:`BioLGCA.ipynb
+<../../notebooks/legacy/BioLGCA.ipynb>` and :download:`Evolutionary LGCA.ipynb
+<../../notebooks/legacy/Evolutionary LGCA.ipynb>` tours,
 and by the Morpheus habit of keeping examples discoverable by modeling question.
 Each example has its own source file under ``lgca/examples``. The source files
 are useful recipes and regression-tested starting points, but they do not

@@ -14,18 +14,23 @@ This file records notable user-facing changes. Changes remain under
   adding and inspecting reusable interactions.
 - Observer-based simulation output, plotting snapshots and movies, scheduled
   callbacks, curated runnable examples, and repeatable performance benchmarks.
+- Six maintained, executable teaching notebooks covering LGCA fundamentals,
+  collective movement, interaction composition, population dynamics,
+  evolutionary LGCA, and reproducible student projects.
 - Focused regression coverage for propagation, boundary conditions,
   initialization, time evolution, interactions, plotting contracts, model
   persistence, the CLI, and installed-package smoke tests.
 
 ### Changed
 
-- Plotting and recording are explicit optional layers; headless core imports do
-  not require a plotting backend.
+- Matplotlib and JupyterLab are part of the normal installation so students can
+  open the maintained notebooks and plot results without selecting extras.
+  Three-dimensional Mayavi rendering remains optional.
 - Documentation builds now start from clean generated sources and treat Sphinx
-  warnings as errors.
-- Repository notebooks are identified as legacy exploratory factory-API tours.
-  New simulations should start from the tested ModelSpec example gallery.
+  warnings and notebook execution failures as errors.
+- Maintained notebooks construct `ModelSpec` and interaction pipelines in
+  visible cells. Historical factory-API notebooks and the research-project
+  example now live in clearly labelled archive directories.
 
 ### Fixed
 
