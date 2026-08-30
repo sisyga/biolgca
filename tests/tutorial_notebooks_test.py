@@ -11,6 +11,14 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
 ROOT = Path(__file__).resolve().parents[1]
 DOCS_SOURCE = ROOT / "docs" / "source"
 TUTORIALS = DOCS_SOURCE / "tutorials"
+EXPECTED_NOTEBOOKS = (
+    "01_fundamentals.ipynb",
+    "02_collective_movement.ipynb",
+    "03_combining_interactions.ipynb",
+    "04_population_dynamics.ipynb",
+    "05_evolutionary_lgca.ipynb",
+    "06_student_project.ipynb",
+)
 
 
 def _notebook(name: str):
@@ -129,3 +137,40 @@ def test_population_notebook_teaches_atomic_conserving_switch():
     assert "before.sum() == after.sum()" in code_source
     population_pipeline = code_source.split("population_spec = ModelSpec", 1)[1]
     assert population_pipeline.index("BirthDeathSpec(") < population_pipeline.index("PhenotypeSwitchSpec(")
+
+
+def test_maintained_notebook_set_is_exact_and_clean():
+    assert tuple(sorted(path.name for path in TUTORIALS.glob("*.ipynb"))) == EXPECTED_NOTEBOOKS
+    for name in EXPECTED_NOTEBOOKS:
+        notebook = _notebook(name)
+        for cell in notebook.cells:
+            if cell.cell_type == "code":
+                assert cell.execution_count is None
+                assert cell.outputs == []
+
+
+def test_notebooks_show_specs_instead_of_loading_example_specs():
+    for name in EXPECTED_NOTEBOOKS:
+        code_source = _source(_notebook(name), "code")
+        assert "ModelSpec(" in code_source
+        assert "InteractionPipelineSpec(" in code_source
+        assert "get_example_spec" not in code_source
+        assert "lgca.examples" not in code_source
+
+
+def test_evolutionary_notebook_runs_replicates():
+    source = _source(_notebook("05_evolutionary_lgca.ipynb"))
+
+    assert '"ib.birthdeath"' in source
+    assert "seeds" in source
+    assert "replicate" in source.lower()
+    assert "scientific conclusion" in source.lower()
+
+
+def test_student_project_notebook_saves_spec_and_tests_custom_invariant():
+    source = _source(_notebook("06_student_project.ipynb"))
+
+    assert "register_plugin(" in source
+    assert "save_model_spec(" in source
+    assert "conserv" in source.lower()
+    assert "assert" in source
