@@ -31,6 +31,29 @@ GEOMETRIES = {
 }
 
 
+@pytest.mark.parametrize("geometry", GEOMETRIES)
+def test_identity_boolean_initialization_assigns_unique_physical_ids(geometry):
+    template = _make_lgca("identity_ve", geometry)
+    nodes = np.ones(template.dims + (template.K,), dtype=bool)
+    lgca = get_lgca(geometry=geometry, nodes=nodes, ib=True,
+                    interaction="only_propagation")
+    labels = lgca.nodes[lgca.nonborder].ravel()
+    np.testing.assert_array_equal(np.sort(labels), np.arange(1, nodes.size + 1))
+    assert lgca.maxlabel == nodes.size
+    lgca.timestep()
+    np.testing.assert_array_equal(np.sort(lgca.nodes[lgca.nonborder].ravel()),
+                                  np.arange(1, nodes.size + 1))
+    with pytest.raises(ValueError, match="unique"):
+        get_lgca(geometry=geometry, nodes=np.ones_like(nodes, dtype=int),
+                 ib=True, interaction="only_propagation")
+
+
+@pytest.mark.parametrize("nodes", [np.array([[1., 2.]]), np.array([[-1, 2]])])
+def test_identity_initialization_rejects_invalid_labels(nodes):
+    with pytest.raises(ValueError, match="non-negative integer"):
+        get_lgca(geometry="lin", nodes=nodes, ib=True, interaction="only_propagation")
+
+
 def _make_lgca(family, geometry, *, bc="pbc", density=0):
     kwargs = dict(FAMILIES[family])
     # Identity-based NoVE models have exactly one rest channel by definition.

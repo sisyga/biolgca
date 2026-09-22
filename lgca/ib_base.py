@@ -167,6 +167,16 @@ class IBLGCA_base(LGCA_base, ABC):
         # initialize lattice
         # define self.K, self.restchannels, self.dims, self.l or self.lx and self.ly
         restchannels = _validate_nonnegative_int(restchannels, "restchannels")
+        if nodes is not None:
+            nodes = np.asarray(nodes)
+            if nodes.dtype == bool:
+                nodes = self.convert_bool_to_ib(nodes)
+            else:
+                if not np.issubdtype(nodes.dtype, np.integer) or np.any(nodes < 0):
+                    raise ValueError("identity nodes must contain non-negative integer labels")
+                labels = nodes[nodes > 0]
+                if np.unique(labels).size != labels.size:
+                    raise ValueError("identity nodes must have unique positive particle labels")
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes)
         self._validate_model_setup(nodes=nodes)
         if nodes is None:
