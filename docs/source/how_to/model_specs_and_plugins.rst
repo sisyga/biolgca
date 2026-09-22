@@ -307,6 +307,15 @@ Multiple identity growth operators are supported for ``ib.birth``,
 during compilation because their daughter-property lifecycles are not shared;
 use one growth operator on those backends.
 
+Capacity precedence for native NoVE identity operators is owned by
+``lgca.plugins.resolve_operator_capacity``: an explicit operator value wins,
+otherwise ``state.capacity`` supplies the value, otherwise the operator's
+documented default applies. Factories leave an omitted capacity absent;
+``validate_plugin_parameters`` rejects a genuinely conflicting explicit override
+before the operator resolves its capacity. ``model._normalize_and_validate_spec`` owns
+the deprecated state-parameter alias, and the constructor receives the normalized
+state capacity. Runtime metadata records the resulting active operator capacity.
+
 The first shared identity kernel is ``lgca.identity_kernels.apply_identity_birth``.
 Both ``ib_interactions.birth`` and ``NativeIdentityBirthOperator`` call it. The
 kernel owns birth attempts, daughter ID/property updates, and final shuffling;

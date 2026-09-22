@@ -123,6 +123,16 @@ def validate_plugin_parameters(
         _validate_parameter_value(info, name, spec, parameters[name], context)
 
 
+def resolve_operator_capacity(context, parameters, default):
+    """Resolve an explicit override, canonical state capacity, then default.
+
+    Parameter validation rejects conflicting explicit overrides. Factories must
+    leave absent capacity parameters absent until this resolution step.
+    """
+    canonical = context.spec.state.capacity
+    return parameters.get("capacity", canonical if canonical is not None else default)
+
+
 def _validate_parameter_value(
     info: PluginInfo,
     name: str,
@@ -1121,7 +1131,7 @@ def _register_native_plugins() -> None:
         ) -> InteractionOperator:
             from .pipeline import NativeNoVEIdentityBirthDeathOperator
 
-            merged_parameters = dict(parameter_defaults)
+            merged_parameters = {key: value for key, value in parameter_defaults.items() if key != "capacity"}
             merged_parameters.update(dict(parameters or {}))
             return NativeNoVEIdentityBirthDeathOperator(
                 info=info,
@@ -1181,7 +1191,6 @@ def _register_native_plugins() -> None:
         from .pipeline import NativeNoVEIdentityGoOrGrowOperator
 
         merged_parameters = {
-            "capacity": 8,
             "r_b": 0.2,
             "r_d": 0.01,
             "kappa": 5.0,
@@ -1243,7 +1252,6 @@ def _register_native_plugins() -> None:
         from .pipeline import NativeNoVEIdentityGoOrGrowKappaOperator
 
         merged_parameters = {
-            "capacity": 8,
             "r_b": 0.2,
             "r_d": 0.01,
             "kappa": 5.0,
@@ -1308,7 +1316,6 @@ def _register_native_plugins() -> None:
         from .pipeline import NativeNoVEIdentityGoOrGrowKappaChemoOperator
 
         merged_parameters = {
-            "capacity": 8,
             "r_b": 0.2,
             "r_d": 0.01,
             "kappa": 5.0,
@@ -1382,7 +1389,6 @@ def _register_native_plugins() -> None:
         from .pipeline import NativeNoVEIdentityGoOrGrowGlioblastomaOperator
 
         merged_parameters = {
-            "capacity": 8,
             "r_b": 0.2,
             "r_d": 0.01,
             "r_m": 0.001,
@@ -1453,7 +1459,6 @@ def _register_native_plugins() -> None:
         from .pipeline import NativeNoVEIdentityEvoStericOperator
 
         merged_parameters = {
-            "capacity": 512,
             "r_b": 0.1,
             "r_m": 0.001,
             "alpha": 2.0,
@@ -1523,7 +1528,6 @@ def _register_native_plugins() -> None:
         from .pipeline import NativeNoVEIdentityCancerDFEBirthDeathOperator
 
         merged_parameters = {
-            "capacity": 8,
             "r_b": 0.2,
             "r_d": 0.02,
             "p_d": 1.4e-5,

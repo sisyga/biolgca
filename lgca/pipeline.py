@@ -19,6 +19,7 @@ from .plugins import (
     PluginInfo,
     ReorientationOperator,
     create_plugin,
+    resolve_operator_capacity,
 )
 
 
@@ -743,7 +744,7 @@ class NativeNoVEIdentityBirthDeathOperator(BirthDeathOperator):
             raise ValueError(f"{self.name} requires state.identity_based=True")
         if context.spec.state.n_species != 1:
             raise ValueError(f"{self.name} does not support multispecies states")
-        self.capacity = int(self.parameters.get("capacity", 8))
+        self.capacity = int(resolve_operator_capacity(context, self.parameters, 8))
         if self.capacity <= 0:
             raise ValueError("capacity must be a positive integer")
         self.r_b = NativeClassicalBirthOperator._probability(
@@ -878,7 +879,7 @@ class NativeNoVEIdentityGoOrGrowOperator(BirthDeathOperator):
             raise ValueError(f"{self.name} requires state.identity_based=True")
         if context.spec.state.n_species != 1:
             raise ValueError(f"{self.name} does not support multispecies states")
-        self.capacity = int(self.parameters.get("capacity", 8))
+        self.capacity = int(resolve_operator_capacity(context, self.parameters, 8))
         if self.capacity <= 0:
             raise ValueError("capacity must be a positive integer")
         self.r_b = NativeClassicalBirthOperator._probability(
@@ -1008,7 +1009,7 @@ class NativeNoVEIdentityGoOrGrowKappaOperator(BirthDeathOperator):
             raise ValueError(f"{self.name} requires state.identity_based=True")
         if context.spec.state.n_species != 1:
             raise ValueError(f"{self.name} does not support multispecies states")
-        self.capacity = int(self.parameters.get("capacity", 8))
+        self.capacity = int(resolve_operator_capacity(context, self.parameters, 8))
         if self.capacity <= 0:
             raise ValueError("capacity must be a positive integer")
         self.r_b = NativeClassicalBirthOperator._probability(
@@ -1180,7 +1181,7 @@ class NativeNoVEIdentityGoOrGrowGlioblastomaOperator(BirthDeathOperator):
             raise ValueError(f"{self.name} requires state.identity_based=True")
         if context.spec.state.n_species != 1:
             raise ValueError(f"{self.name} does not support multispecies states")
-        self.capacity = int(self.parameters.get("capacity", 8))
+        self.capacity = int(resolve_operator_capacity(context, self.parameters, 8))
         if self.capacity <= 0:
             raise ValueError("capacity must be a positive integer")
         self.r_b = NativeClassicalBirthOperator._probability(
@@ -1304,7 +1305,7 @@ class NativeNoVEIdentityEvoStericOperator(BirthDeathOperator):
             raise ValueError(f"{self.name} requires state.identity_based=True")
         if context.spec.state.n_species != 1:
             raise ValueError(f"{self.name} does not support multispecies states")
-        self.capacity = int(self.parameters.get("capacity", 512))
+        self.capacity = int(resolve_operator_capacity(context, self.parameters, 512))
         if self.capacity <= 0:
             raise ValueError("capacity must be a positive integer")
         self.r_b = NativeClassicalBirthOperator._probability(

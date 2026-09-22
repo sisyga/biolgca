@@ -1688,3 +1688,23 @@ def test_nove_go_or_plugins_are_native_and_match_legacy(
     assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
+@pytest.mark.parametrize("operator", ["nove_ib.birth", "nove_ib.birthdeath", "nove_ib.birthdeath_cancerdfe",
+                                    "nove_ib.go_or_grow", "nove_ib.go_or_grow_kappa",
+                                    "nove_ib.go_or_grow_kappa_chemo", "nove_ib.go_or_grow_glioblastoma",
+                                    "nove_ib.evo_steric"])
+@pytest.mark.parametrize("override", [None, 3, 7])
+def test_nove_identity_capacity_precedence(operator, override):
+    parameters = {} if override is None else {"capacity": override}
+    spec = ModelSpec(space=SpaceSpec(geometry="lin", dims=3),
+                     state=StateSpec(volume_exclusion=False, identity_based=True,
+                                     restchannels=1, density=1, capacity=3),
+                     time=TimeSpec(steps=1, seed=138),
+                     dynamics=InteractionPipelineSpec(operators=[{"name": operator, "parameters": parameters}]))
+    if override == 7:
+        with pytest.raises(ValueError, match="conflicts"):
+            build_model(spec)
+    else:
+        compiled = build_model(spec)
+        assert compiled.pipeline.operators[0].capacity == 3
+        assert compiled.lgca.capacity == compiled.metadata["capacity"] == 3
+        compiled.run(False)
