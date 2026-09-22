@@ -100,7 +100,7 @@ volume-exclusion interactions such as random walk, alignment and chemotaxis.
 The population-dynamics tutorial demonstrates the invariant directly.
 
 Polar versus nematic composition
--------------------------------
+--------------------------------
 
 ``polar_alignment`` scores candidate flux dotted with the sum of neighboring
 fluxes. Opposite headings cancel. ``nematic_alignment`` instead sums squared
