@@ -80,6 +80,31 @@ def test_scalar_metric_serialization_preserves_semantics():
         model_spec_to_dict(replace(spec, analysis=AnalysisSpec(observers=[custom])))
 
 
+@pytest.mark.parametrize("n_species", [1, 2])
+@pytest.mark.parametrize("canonical", [False, True])
+def test_ve_growth_capacity_configuration_and_metadata(n_species, canonical):
+    shape = (1, 2) if n_species == 1 else (1, 2, 2)
+    nodes = np.zeros(shape, dtype=bool)
+    nodes[..., 0] = True
+    capacity = n_species + 1
+    parameters = {"birth_rate": 1}
+    if not canonical:
+        parameters["capacity"] = capacity
+    spec = ModelSpec(space=SpaceSpec(geometry="lin"),
+        state=StateSpec(nodes=nodes, n_species=n_species, capacity=capacity if canonical else None),
+        time=TimeSpec(steps=1, seed=122),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "birth_death", "parameters": parameters}], propagation=False))
+    result = run_model(model_spec_from_json(model_spec_to_json(spec)), showprogress=False)
+    assert result.lgca.total_population() == capacity
+    assert result.metadata["capacity"] == capacity
+    assert result.metadata["channel_capacity"] == 2
+    assert result.metadata["growth_capacities"][0]["capacity"] == capacity
+    conflict = replace(spec, state=replace(spec.state, capacity=capacity + 1))
+    if not canonical:
+        with pytest.raises(ValueError, match="conflicts"):
+            build_model(conflict)
+
+
 def _square_spec(*, operators=(), timesteps=3, seed=17):
     return ModelSpec(
         description=Description(title="registry driven square LGCA"),

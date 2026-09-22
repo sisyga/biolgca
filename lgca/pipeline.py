@@ -2775,7 +2775,8 @@ class NativeBirthDeathOperator(BirthDeathOperator):
         n_species = context.spec.state.n_species
         self.birth_rate = self._rates("birth_rate", n_species)
         self.death_rate = self._rates("death_rate", n_species)
-        capacity = self.parameters.get("capacity", n_species * context.lgca.K)
+        canonical = context.spec.state.capacity
+        capacity = self.parameters.get("capacity", canonical if canonical is not None else n_species * context.lgca.K)
         if int(capacity) != capacity or capacity < 1:
             raise ValueError("capacity must be a positive integer")
         self.capacity = int(capacity)

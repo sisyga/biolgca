@@ -896,6 +896,15 @@ def build_model(
     metadata["reorientation_term_names"] = pipeline.reorientation_term_names
     metadata["observer_names"] = _observer_names(spec.analysis)
     metadata["schedule"] = pipeline.describe_schedule()
+    metadata["channel_capacity"] = lgca.K
+    growth_capacities = [
+        {"operator_index": index, "name": operator.name, "capacity": operator.capacity}
+        for index, operator in enumerate(pipeline.operators)
+        if operator.name == "birth_death"
+    ]
+    metadata["growth_capacities"] = growth_capacities
+    if len(growth_capacities) == 1:
+        metadata["capacity"] = growth_capacities[0]["capacity"]
     compiled = CompiledModel(
         lgca=lgca,
         spec=spec,
@@ -1082,7 +1091,7 @@ def _build_lgca(spec: ModelSpec):
         kwargs["density"] = spec.state.density
     elif spec.state.initializer is not None:
         kwargs["density"] = 0.0
-    if spec.state.capacity is not None:
+    if spec.state.capacity is not None and not spec.state.volume_exclusion:
         kwargs["capacity"] = spec.state.capacity
     kwargs.update(dict(spec.state.parameters))
     return get_lgca(

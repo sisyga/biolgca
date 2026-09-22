@@ -282,3 +282,10 @@ dynamics. Their ``lgca.timestep()``, ``lgca.timeevo(...)`` and live animations
 advance that same pipeline, preserving RNG state and cumulative operator time.
 ``compiled.step()`` advances one step. Each recording run still starts its
 observer schedule at local step zero and replaces that run's history arrays.
+
+``state.capacity`` supplies the carrying capacity for NoVE models and the shared
+birth limit for native VE ``birth_death``. An operator capacity that conflicts
+with it is rejected. VE channel occupancy remains limited by ``K`` per species.
+Metadata records ``channel_capacity`` separately from per-operator
+``growth_capacities``; with one native birth/death operator, ``capacity`` reports
+its active configured limit.
