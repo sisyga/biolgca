@@ -132,6 +132,20 @@ def test_bounded_candidate_batches_preserve_seeded_trajectory(name, monkeypatch)
     assert max(len(batch[0]) for batch in batches) == 1
 
 
+def test_multiline_yaml_is_not_probed_as_a_filesystem_path(monkeypatch):
+    from pathlib import Path
+    from lgca.model import model_spec_from_yaml, model_spec_to_yaml
+
+    text = model_spec_to_yaml(_square_spec())
+
+    def reject_path_probe(path):
+        raise AssertionError("Inline model text must not be passed to Path.exists")
+
+    monkeypatch.setattr(Path, "exists", reject_path_probe)
+    restored = model_spec_from_yaml(text)
+    assert restored.space.dims == (4, 5)
+
+
 def _square_spec(*, operators=(), timesteps=3, seed=17):
     return ModelSpec(
         description=Description(title="registry driven square LGCA"),

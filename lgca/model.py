@@ -745,7 +745,7 @@ def _read_text_source(source: str | Path) -> str:
             raise FileNotFoundError(f"Could not find model spec file: {source}")
         return source.read_text(encoding="utf-8")
     text = str(source)
-    if text.lstrip().startswith(("{", "[")):
+    if text.lstrip().startswith(("{", "[")) or "\n" in text or "\r" in text:
         return text
     path = Path(text)
     if path.exists():
