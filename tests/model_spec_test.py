@@ -69,6 +69,17 @@ def test_live_animation_uses_compiled_death_operator():
     plt.close(animation._fig)
 
 
+def test_scalar_metric_serialization_preserves_semantics():
+    from lgca.simulation import ScalarTimeSeriesRecorder, _total_population
+
+    spec = ModelSpec(analysis=AnalysisSpec(observers=[ScalarTimeSeriesRecorder()]))
+    restored = model_spec_from_json(model_spec_to_json(spec))
+    assert restored.analysis.observers[0].metrics["population"] is _total_population
+    custom = ScalarTimeSeriesRecorder(metrics={"population": lambda lgca: 123})
+    with pytest.raises(TypeError, match="default population metric"):
+        model_spec_to_dict(replace(spec, analysis=AnalysisSpec(observers=[custom])))
+
+
 def _square_spec(*, operators=(), timesteps=3, seed=17):
     return ModelSpec(
         description=Description(title="registry driven square LGCA"),

@@ -672,7 +672,9 @@ def _observer_to_dict(observer) -> dict[str, Any]:
             }
         )
     elif observer.__class__.__name__ == "ScalarTimeSeriesRecorder":
-        if set(observer.metrics) != {"population"}:
+        from .simulation import _total_population
+
+        if set(observer.metrics) != {"population"} or observer.metrics["population"] is not _total_population:
             raise TypeError("ScalarTimeSeriesRecorder serialization only supports the default population metric.")
         data["output_path"] = str(observer.output_path)
     return data
