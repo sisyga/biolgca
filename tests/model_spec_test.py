@@ -43,6 +43,32 @@ def test_dimension_errors_identify_model_field(dims):
         build_model(ModelSpec(space=SpaceSpec(geometry="square", dims=dims)))
 
 
+def test_legacy_stepping_continues_compiled_dynamics_and_rng():
+    spec = _square_spec(operators=[{"name": "classical.random_walk"}], timesteps=4)
+    spec = replace(spec, dynamics=replace(spec.dynamics, propagation=False))
+    expected = run_model(spec, showprogress=False).lgca.nodes.copy()
+    compiled = build_model(replace(spec, time=replace(spec.time, steps=2)))
+    compiled.run(showprogress=False)
+    compiled.lgca.timestep()
+    compiled.lgca.timeevo(1, showprogress=False)
+    np.testing.assert_array_equal(compiled.lgca.nodes, expected)
+    assert compiled._step == 4
+    assert compiled.lgca.enable_propagation is False
+
+
+def test_live_animation_uses_compiled_death_operator():
+    import matplotlib.pyplot as plt
+
+    compiled = build_model(_square_spec(operators=[{
+        "name": "birth_death", "parameters": {"death_rate": 1}
+    }], timesteps=0))
+    animation = compiled.lgca.live_animate_flux()
+    animation._func(0)
+    assert compiled.lgca.total_population() == 0
+    animation._draw_was_started = True
+    plt.close(animation._fig)
+
+
 def _square_spec(*, operators=(), timesteps=3, seed=17):
     return ModelSpec(
         description=Description(title="registry driven square LGCA"),

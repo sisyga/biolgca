@@ -276,3 +276,9 @@ The CLI archives a portable ``model.resolved.json`` with relative observer paths
 NPZ initializer inputs are copied to ``resources/initial_state.npz`` and the
 archived declaration points there. Move the whole run directory together, then
 validate or rerun its model into a new output directory without ``--trusted-paths``.
+
+Objects returned by ``build_model`` and ``run_model`` retain their compiled
+dynamics. Their ``lgca.timestep()``, ``lgca.timeevo(...)`` and live animations
+advance that same pipeline, preserving RNG state and cumulative operator time.
+``compiled.step()`` advances one step. Each recording run still starts its
+observer schedule at local step zero and replaces that run's history arrays.

@@ -838,6 +838,12 @@ class CompiledModel:
     context: ModelContext
     pipeline: Any
     metadata: dict[str, Any]
+    _step: int = 0
+
+    def step(self, **timing):
+        """Advance the compiled dynamics once, retaining RNG and model time."""
+        self.pipeline.execute_step(self.context, self._step + 1, **timing)
+        self._step += 1
 
     def run(self, showprogress: bool = True):
         return _run_compiled_model(self, showprogress=showprogress)
@@ -888,13 +894,16 @@ def build_model(
     metadata["reorientation_term_names"] = pipeline.reorientation_term_names
     metadata["observer_names"] = _observer_names(spec.analysis)
     metadata["schedule"] = pipeline.describe_schedule()
-    return CompiledModel(
+    compiled = CompiledModel(
         lgca=lgca,
         spec=spec,
         context=context,
         pipeline=pipeline,
         metadata=metadata,
     )
+    lgca._compiled_model = compiled
+    lgca.enable_propagation = spec.dynamics.propagation not in (False, None, "none", "disabled")
+    return compiled
 
 
 def run_model(
@@ -1143,9 +1152,7 @@ def _run_compiled_model(compiled: CompiledModel, showprogress: bool = True) -> M
     timing_trace_limit = int(compiled.spec.time.timing_trace)
 
     def execute_pipeline_step(_lgca, step, _runner):
-        compiled.pipeline.execute_step(
-            compiled.context,
-            step,
+        compiled.step(
             timing=operator_timings,
             timing_trace=timing_trace,
             timing_trace_limit=timing_trace_limit,

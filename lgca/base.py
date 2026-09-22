@@ -1045,6 +1045,9 @@ class LGCA_base(ABC):
         """
         Update the state of the LGCA from time k to k+1. Includes the interaction and propagation steps.
         """
+        if hasattr(self, "_compiled_model"):
+            self._compiled_model.step()
+            return
         self.interaction(self)
         self.apply_boundaries()
         if getattr(self, "enable_propagation", True):
