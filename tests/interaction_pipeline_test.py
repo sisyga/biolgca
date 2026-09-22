@@ -213,6 +213,26 @@ def test_nematic_scores_count_neighbors_and_ignore_empty_extra_species(geometry,
     np.testing.assert_allclose(multiple, expected)
 
 
+@pytest.mark.parametrize("propagation", [False, True])
+def test_custom_rest_or_align_conserves_empty_partial_and_full_sites(propagation):
+    nodes = np.array([[False, False, False], [True, False, False],
+                      [True, True, True], [False, True, True]])
+    spec = ModelSpec(
+        space=SpaceSpec(geometry="lin", boundary="periodic"),
+        state=StateSpec(nodes=nodes, restchannels=1),
+        time=TimeSpec(steps=4, seed=12),
+        dynamics=InteractionPipelineSpec(
+            operators=[{"name": "custom.rest_or_align"}], propagation=propagation,
+        ),
+        analysis=AnalysisSpec(observers=[NodeRecorder()]),
+    )
+    result = run_model(spec, showprogress=False)
+    history = result.lgca.nodes_t
+    np.testing.assert_array_equal(history.sum(axis=(1, 2)), 6)
+    if not propagation:
+        np.testing.assert_array_equal(history.sum(axis=-1), np.tile([0, 1, 3, 2], (5, 1)))
+
+
 def test_nematic_alignment_term_favors_neighbor_axis_in_one_sampler():
     nodes = np.zeros((3, 3, 5), dtype=bool)
     nodes[1, 1, 1] = True
