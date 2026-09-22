@@ -291,9 +291,9 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         field
         summed up and normalized over all lattice sites.
 
-        .. warning::
-
-           This calculation is known to be unreliable.
+        Periodic neighbors wrap around the physical lattice. Reflecting and
+        absorbing walls have no exterior particles and contribute zero director
+        flux. The measurement never modifies particle channels or random state.
 
         Returns
         -------
@@ -313,13 +313,12 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         norm_factor = np.broadcast_to(norm_factor, flux.shape)
         # # normalise flux at each node with number of cells in the node
         dir_field = np.multiply(flux, norm_factor)  # max element value: 1
-        # # apply boundary conditions -
-        # #  (not clean, but this is the only application of applying bc to anything but nodes so far)
-        temp = self.nodes
-        self.nodes = dir_field
-        self.apply_boundaries()
-        dir_field = self.nodes
-        self.nodes = temp
+        # Boundary operations on particle channels are not valid for vectors.
+        # Reconstruct the field halo from physical sites without touching nodes.
+        padding = [(self.r_int, self.r_int)] * len(self.dims)
+        padding += [(0, 0)] * (dir_field.ndim - len(self.dims))
+        dir_field = np.pad(dir_field[self.nonborder], padding,
+                           mode="wrap" if self.bc == "periodic" else "constant")
         # # sum fluxes over neighbours
         dir_field = self.nb_sum(dir_field)  # max element value: no. of neighbours
 
