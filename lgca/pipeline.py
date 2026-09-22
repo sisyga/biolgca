@@ -2267,7 +2267,7 @@ class NativePhenotypeSwitchOperator(PhenotypeSwitchOperator):
                     "description": "Off-diagonal phenotype transition probabilities.",
                 }
             },
-            conservation_law=ConservationLaw(True, False, True, ("species identity",)),
+            conservation_law=ConservationLaw(True, False, False, ("species identity", "channel occupancy")),
             port_status="native",
             description="Atomic phenotype transition with collision-safe channel resampling.",
         )
