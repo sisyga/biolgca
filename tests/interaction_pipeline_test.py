@@ -265,6 +265,23 @@ def test_composed_spatial_fields_are_computed_once_per_step(size, n_species, mon
     np.testing.assert_array_equal(model.lgca.nodes[model.lgca.nonborder].sum(axis=-1), 1)
 
 
+@pytest.mark.parametrize("name", ["persistent_walk", "resting_bias", "nematic_alignment", "aggregation"])
+def test_single_species_scoped_terms_match_unscoped_seeded_evolution(name):
+    results = []
+    for species in (None, 0):
+        result = run_model(ModelSpec(
+            space=SpaceSpec(geometry="square", dims=(4, 4)),
+            state=StateSpec(density=1, restchannels=1),
+            time=TimeSpec(steps=4, seed=117),
+            dynamics=InteractionPipelineSpec(operators=[ReorientationSpec(terms=[
+                ReorientationTermSpec(name, beta=5, species=species)
+            ])]),
+            analysis=AnalysisSpec(observers=[NodeRecorder()]),
+        ), showprogress=False)
+        results.append(result.lgca.nodes_t)
+    np.testing.assert_array_equal(*results)
+
+
 def test_nematic_alignment_term_favors_neighbor_axis_in_one_sampler():
     nodes = np.zeros((3, 3, 5), dtype=bool)
     nodes[1, 1, 1] = True

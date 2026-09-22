@@ -459,7 +459,7 @@ class BoltzmannReorientationOperator(ReorientationOperator):
                 if getattr(lgca, "n_species", 1) > 1:
                     lgca.nodes[coord] = self._sample_multispecies_node(node, lgca, coord)
                 else:
-                    lgca.nodes[coord] = self._sample_node(node, lgca, coord, species=None)
+                    lgca.nodes[coord] = self._sample_node(node, lgca, coord, species=0)
         finally:
             del lgca._reorientation_source_nodes
 
