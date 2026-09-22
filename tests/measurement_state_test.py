@@ -48,3 +48,21 @@ def test_uniform_directors_have_hand_computed_wall_alignment(bc, expected):
                      interaction="only_propagation")
     # Four neighbors per periodic site; an open 4x4 grid has 48 directed edges.
     assert model.calc_mean_alignment() == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("populations,expected", [([[2, 0], [0, 2]], 0),
+                                                  ([[2, 0], [2, 0]], 1),
+                                                  ([[2, 0], [0, 0]], 1),
+                                                  ([[0, 0], [0, 0]], 0),
+                                                  ([[3, 0], [0, 1]], .5)])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_global_polarization_sums_species_before_norm(populations, expected, reverse):
+    nodes = np.tile(np.array(populations)[None], (3, 1, 1))
+    if reverse:
+        nodes = nodes[:, ::-1]
+    model = get_lgca(geometry="lin", ve=False, n_species=2, nodes=nodes,
+                     interaction="only_propagation")
+    aggregate = get_lgca(geometry="lin", ve=False, nodes=nodes.sum(axis=1),
+                         interaction="only_propagation")
+    assert model.calc_polar_alignment_parameter() == pytest.approx(expected)
+    assert aggregate.calc_polar_alignment_parameter() == pytest.approx(expected)

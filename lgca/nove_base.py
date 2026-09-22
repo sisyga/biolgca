@@ -276,8 +276,8 @@ class NoVE_LGCA_base(LGCA_base, ABC):
             return 0.0
         # calculate flux only for non-boundary nodes, result is a flux vector at each node position
         flux = self.calc_flux(self.nodes[self.nonborder])
-        # calculate along which axes the lattice needs to be summed up, e.g. axes=(0) for 1D, axes=(0,1) for 2D
-        axes = tuple(np.arange(self.c.shape[0]))
+        # Sum every particle population, including species, before the vector norm.
+        axes = tuple(range(flux.ndim - 1))
         # sum fluxes up accordingly
         flux = np.sum(flux, axis=axes)
         # take Euclidean norm and normalise by number of particles
