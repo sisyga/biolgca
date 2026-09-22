@@ -101,6 +101,7 @@ def _run(args) -> int:
     spec = load_model_spec(model_path)
     portable_spec = deepcopy(spec)
     _resolve_output_paths(spec, output_dir, trusted_paths=args.trusted_paths)
+    _preflight_output_namespace(spec, output_dir, trusted_paths=args.trusted_paths)
     compiled = build_model(
         spec,
         resource_base=model_path.parent,
@@ -195,6 +196,45 @@ def _validate_relative_output(path, *, trusted_paths: bool) -> None:
             "Generated output paths must be relative and may not contain '..'; "
             "use --trusted-paths only for trusted local models."
         )
+
+
+def _preflight_output_namespace(spec, output_dir, *, trusted_paths):
+    """Reject file collisions before any archive or observer output is written."""
+    targets = {}
+    directories = {}
+
+    def reserve(path, owner):
+        # Case folding also protects archives intended for case-insensitive OSes.
+        resolved = path.resolve()
+        key = resolved.as_posix().casefold()
+        parents = [parent.as_posix().casefold() for parent in resolved.parents]
+        previous_owner = targets.get(key) or directories.get(key)
+        previous_owner = previous_owner or next((targets[parent] for parent in parents if parent in targets), None)
+        if previous_owner is not None:
+            raise ValueError(f"Output collision: {owner} and {previous_owner} at {path}")
+        targets[key] = owner
+        for parent in parents:
+            directories[parent] = owner
+
+    for name in ("model.resolved.json", "metadata.json", "measurements.npz", "resources/initial_state.npz"):
+        reserve(output_dir / name, "reserved archive " + name)
+    if spec.analysis is None:
+        return
+    for index, observer in enumerate(spec.analysis.observers):
+        owner = f"observer {index} ({type(observer).__name__})"
+        if isinstance(observer, CSVSnapshotObserver):
+            schedule = observer.schedule
+            steps = (range(0, spec.time.steps + 1, schedule.every) if schedule.steps is None
+                     else sorted(step for step in schedule.steps if step <= spec.time.steps))
+            for step in steps:
+                filename = observer.filename.format(kind=observer.kind, step=step)
+                _validate_relative_output(filename, trusted_paths=trusted_paths)
+                path = (observer.output_dir / filename).resolve()
+                if not trusted_paths and not path.is_relative_to(output_dir):
+                    raise ValueError("Snapshot output path escapes the run directory")
+                reserve(path, f"{owner} step {step}")
+        elif isinstance(observer, ScalarTimeSeriesRecorder):
+            reserve(observer.output_path, owner)
 
 
 def _output_path(path, output_dir: Path, *, trusted_paths: bool) -> Path:

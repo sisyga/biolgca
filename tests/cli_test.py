@@ -20,6 +20,42 @@ from lgca.pipeline import InteractionPipelineSpec
 from lgca.simulation import CSVSnapshotObserver
 
 
+@pytest.mark.parametrize("target", ["model.resolved.json", "metadata.json", "measurements.npz",
+                                    "resources/initial_state.npz", "MODEL.RESOLVED.JSON",
+                                    "model.resolved.json/nested.csv"])
+def test_output_collision_preflight_preserves_archive_sentinels(tmp_path, target, monkeypatch, capsys):
+    output = tmp_path / "run"
+    output.mkdir()
+    sentinel = output / "model.resolved.json"
+    sentinel.write_text("preserve me")
+    model = _write_tiny_model(tmp_path / "input.json", observer=CSVSnapshotObserver(filename=target))
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("collision must be rejected before model construction")
+
+    monkeypatch.setattr(importlib.import_module("lgca.cli"), "build_model", forbidden)
+    assert _main(["run", str(model), "--output", str(output), "--overwrite"]) == 2
+    assert "collision" in capsys.readouterr().err
+    assert sentinel.read_text() == "preserve me"
+    assert list(output.iterdir()) == [sentinel]
+
+
+@pytest.mark.parametrize("same_observer", [False, True])
+def test_duplicate_observer_targets_rejected_before_output(tmp_path, same_observer, capsys):
+    from lgca.simulation import ScalarTimeSeriesRecorder
+
+    observers = [CSVSnapshotObserver(filename="shared.csv")]
+    if not same_observer:
+        observers.append(ScalarTimeSeriesRecorder(output_path="shared.csv"))
+    spec = ModelSpec(space=SpaceSpec(geometry="lin", dims=2), time=TimeSpec(steps=1),
+                     analysis=AnalysisSpec(observers=observers))
+    path = save_model_spec(spec, tmp_path / "input.json")
+    output = tmp_path / "run"
+    assert _main(["run", str(path), "--output", str(output)]) == 2
+    assert "collision" in capsys.readouterr().err
+    assert not output.exists()
+
+
 def test_cli_subprocess_persists_measurements_and_sample_steps(tmp_path):
     from lgca.simulation import NodeRecorder, DensityRecorder, PopulationRecorder, Schedule
 
