@@ -121,7 +121,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     def random_reset(self, density):
         """Populate the lattice from a Poisson distribution with mean ``density`` per node."""
         _validate_density(density)
-        lam = density / self.capacity
+        lam = density / self.K
         numbers = self.rng.poisson(lam=lam, size=self.dims + (self.K,))
         tempnodes = self.convert_int_to_ib(numbers)
         self.nodes[self.nonborder] = tempnodes

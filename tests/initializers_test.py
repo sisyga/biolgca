@@ -42,6 +42,32 @@ def test_region_initializer_populates_only_requested_region(placement, expected_
     np.testing.assert_array_equal(density, expected)
 
 
+@pytest.mark.parametrize("capacity", [2, 5, 10])
+@pytest.mark.parametrize("family", ["ordinary", "identity", "multispecies"])
+@pytest.mark.parametrize("region", [False, True])
+def test_nove_density_is_independent_of_capacity(capacity, family, region):
+    initializer = None
+    if region:
+        initializer = {"name": "region", "parameters": {
+            "placement": "corner", "extent": [40, 80], "density": 10,
+        }}
+    spec = ModelSpec(
+        space=SpaceSpec(geometry="square", dims=(80, 80)),
+        state=StateSpec(volume_exclusion=False, identity_based=family == "identity",
+                        n_species=2 if family == "multispecies" else 1,
+                        restchannels=1, capacity=capacity, density=None if region else 10,
+                        initializer=initializer),
+        time=TimeSpec(steps=0, seed=107),
+    )
+    lgca = build_model(spec).lgca
+    density = lgca.cell_density[lgca.nonborder]
+    if region:
+        assert not density[40:].any()
+        density = density[:40]
+    # A sum of independent Poisson channels is Poisson(10); allow six SEs.
+    assert density.mean() == pytest.approx(10, abs=6 * np.sqrt(10 / density.size))
+
+
 def test_region_initializer_uses_model_rng_deterministically():
     initializer = {
         "name": "region",

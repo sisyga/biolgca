@@ -184,7 +184,7 @@ class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
         """Populate a total density distributed over all species."""
         _validate_density(density)
         density = density / self.n_species
-        density = density / self.capacity
+        density = density / max(self.capacity, self.K)
         draw1 = self.rng.poisson(lam=density, size=self.nodes.shape)
         if self.capacity > self.K:
             draw2 = self.rng.poisson(lam=density, size=self.nodes.shape[:-1] + ((self.capacity - self.K),))

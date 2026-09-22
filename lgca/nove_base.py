@@ -221,7 +221,8 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         """Populate the lattice from a Poisson distribution with mean ``density`` per node."""
 
         _validate_density(density)
-        density = density / self.capacity
+        normalization = max(self.capacity, self.K)
+        density = density / normalization
         draw1 = self.rng.poisson(lam=density, size=self.nodes.shape)
         if self.capacity > self.K:
             draw2 = self.rng.poisson(lam=density, size=self.nodes.shape[:-1] + ((self.capacity - self.K),))
@@ -230,7 +231,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         self.apply_boundaries()
         self.update_dynamic_fields()
         eff_dens = self.nodes[self.nonborder].sum() / self.cell_density[self.nonborder].size
-        print("Required density: {:.3f}, Achieved density: {:.3f}".format(density * self.capacity, eff_dens))
+        print("Required density: {:.3f}, Achieved density: {:.3f}".format(density * normalization, eff_dens))
 
 
     def calc_entropy(self, base=None):
