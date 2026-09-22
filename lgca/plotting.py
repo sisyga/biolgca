@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 
 from .list_utils import _copy_arr_of_lists, get_arr_of_empty_lists
-from .plot_data import history_steps
+from .plot_data import resolve_animation_history
 from .simulation import Observer, Schedule
 
 __all__ = [
@@ -49,24 +49,9 @@ def animate(lgca, kind: str = "density", data=None, steps=None, **kwargs):
 
     method_name, data_argument = _resolve_animation(kind)
     method = getattr(lgca, method_name)
-    implicit = data is None
-    attribute = "dens_t" if data_argument == "density_t" else "nodes_t"
-    if implicit:
-        data = getattr(lgca, attribute)
-    times = history_steps(lgca, len(data), "dens_steps" if attribute == "dens_t" else "nodes_steps",
-                          steps, implicit=implicit)
-    animation = method(**{data_argument: data}, **kwargs)
-    update = animation._func
-    axis = animation._fig.axes[0]
-
-    def update_with_time(frame, *args):
-        artists = update(frame, *args)
-        axis.set_title(f"Time $k =${times[frame]}")
-        return artists
-
-    animation._func = update_with_time
-    axis.set_title(f"Time $k =${times[0]}")
-    return animation
+    channels = kwargs.pop("channels", slice(None)) if data_argument == "density_t" else slice(None)
+    data, times = resolve_animation_history(lgca, data_argument, data, steps, channels)
+    return method(**{data_argument: data}, steps=times, **kwargs)
 
 
 class PlotSnapshotObserver(Observer):
@@ -138,18 +123,24 @@ class AnimationObserver(Observer):
 
     def setup(self, lgca, runner) -> None:
         _validate_observer_backend(lgca)
+        if self.schedule.steps is not None and not any(step <= runner.timesteps for step in self.schedule.steps):
+            raise ValueError("Animation schedule selects no frames in this run; "
+                             f"include a local step between 0 and {runner.timesteps}")
         self.frames = []
         self.frame_steps = []
         self.animation = None
 
     def on_step(self, lgca, step: int) -> None:
-        self.frames.append(_capture_frame(lgca, self.kind))
+        self.frames.append(_capture_frame(lgca, self.kind, self.animation_kwargs.get("channels", slice(None))))
         self.frame_steps.append(step)
 
     def finalize(self, lgca, runner) -> None:
         data = _frames_to_array(self.frames)
+        kwargs = dict(self.animation_kwargs)
+        if _resolve_animation(self.kind)[1] == "density_t":
+            kwargs.pop("channels", None)  # Frame capture already selected the channels.
         self.animation = animate(lgca, kind=self.kind, data=data, steps=self.frame_steps,
-                                 **self.animation_kwargs)
+                                 **kwargs)
         self.frames = []
         if self.save_path is not None:
             self.save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -196,9 +187,16 @@ def _close_figure(fig) -> None:
     plt.close(fig)
 
 
-def _capture_frame(lgca, kind: str):
+def _capture_frame(lgca, kind: str, channels=slice(None)):
     method_name, data_argument = _resolve_animation(kind)
     if data_argument == "density_t":
+        if channels != slice(None):
+            nodes = lgca.nodes[lgca.nonborder][..., channels]
+            if nodes.dtype == object:
+                nodes = lgca.length_checker(nodes)
+            elif hasattr(lgca, "occupied"):
+                nodes = nodes > 0
+            return np.array(nodes.sum(-1), copy=True)
         if hasattr(lgca, "species_density"):
             return np.array(lgca.species_density[lgca.nonborder], copy=True)
         return np.array(lgca.cell_density[lgca.nonborder], copy=True)

@@ -3,6 +3,25 @@
 import numpy as np
 
 
+def inherit_missing_properties(lgca, parent):
+    """Complete the newest daughter's property row by copying its parent.
+
+    The growth operator first appends any explicitly mutated traits. All other
+    cell properties, including family membership, inherit unchanged. This
+    helper consumes no randomness and preserves existing mutation draw order.
+    """
+    label = int(lgca.maxlabel)
+    for name, values in lgca.props.items():
+        if len(values) == label:
+            value = values[int(parent)]
+            if isinstance(values, np.ndarray):
+                lgca.props[name] = np.append(values, value)
+            else:
+                values.append(value)
+        elif len(values) != label + 1:
+            raise ValueError(f"Property {name!r} has no contiguous row for daughter {label}")
+
+
 def apply_identity_birth(lgca, *, a_max, std):
     """Apply VE identity birth, mutation and final channel shuffling in order."""
     from .ib_interactions import trunc_gauss
@@ -24,5 +43,6 @@ def apply_identity_birth(lgca, *, a_max, std):
                 lgca.props["r_b"].append(
                     float(trunc_gauss(0, a_max, r_b, sigma=std, rng=lgca.rng))
                 )
+                inherit_missing_properties(lgca, label)
         lgca.nodes[coord] = node
     lgca.nodes = lgca.rng.permuted(lgca.nodes, axis=-1)

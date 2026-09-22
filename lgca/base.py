@@ -170,6 +170,22 @@ def _validate_count_nodes(nodes):
     return nodes
 
 
+def _sampling_totals(nodes):
+    """Sum channel counts in the signed range required by NumPy samplers."""
+    counts = _validate_count_nodes(nodes)
+    limit = np.iinfo(np.int64).max
+    if (counts.dtype.kind == "f" and np.any(counts >= 2**63)
+            or counts.dtype.kind in "iu" and np.any(counts > limit)):
+        raise ValueError("nodes population exceeds the sampler's signed int64 range")
+    counts = counts.astype(np.int64)
+    totals = np.zeros(counts.shape[:-1], dtype=np.int64)
+    for channel in np.moveaxis(counts, -1, 0):
+        if np.any(channel > limit - totals):
+            raise ValueError("nodes population exceeds the sampler's signed int64 range")
+        totals += channel
+    return totals
+
+
 def _validate_density(density, max_density=None):
     """Validate random-initialization density before it is used as a probability or rate."""
     arr = _as_numeric_array(density, "density")
@@ -1054,10 +1070,17 @@ class LGCA_base(ABC):
         """
         self.cell_density = self.nodes.sum(-1)
 
+    def _validate_evolution(self):
+        """Reject unsupported transport domains before any interaction runs."""
+        if self.geometry == "hex" and self.bc == "periodic" and self.dims[1] % 2:
+            raise ValueError("Periodic hexagonal evolution requires an even number of rows; "
+                             "odd-row domains are available for static plotting only")
+
     def timestep(self):
         """
         Update the state of the LGCA from time k to k+1. Includes the interaction and propagation steps.
         """
+        self._validate_evolution()
         if hasattr(self, "_compiled_model"):
             self._compiled_model.step()
             return

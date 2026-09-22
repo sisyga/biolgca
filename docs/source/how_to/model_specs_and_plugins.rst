@@ -282,6 +282,12 @@ dynamics. Their ``lgca.timestep()``, ``lgca.timeevo(...)`` and live animations
 advance that same pipeline, preserving RNG state and cumulative operator time.
 ``compiled.step()`` advances one step. Each recording run still starts its
 observer schedule at local step zero and replaces that run's history arrays.
+The cumulative interval is recorded as ``runtime.start_step`` and
+``runtime.end_step`` in result/CLI metadata, with ``sample_time_origin='local'``.
+Add the start step to each paired recorder step array to combine continuations;
+drop the duplicate shared endpoint. A result's metadata remains a snapshot after
+subsequent runs. Direct runners publish ``lgca.recording_start_step`` and
+``lgca.recording_end_step`` for the same purpose.
 
 ``state.capacity`` supplies the carrying capacity for NoVE models and the shared
 birth limit for native VE ``birth_death``. An operator capacity that conflicts
@@ -292,6 +298,37 @@ its active configured limit.
 
 Numerical implementation ownership
 ----------------------------------
+
+``lgca.identity_kernels.inherit_missing_properties`` owns completion of a
+volume-exclusion daughter's property row. The native and legacy VE growth
+operators first append their explicitly mutated traits, then call this helper
+to inherit every other cell property from the parent, without additional RNG
+draws. Thus composed growth and downstream property consumers see complete rows.
+Family membership is inherited unless the growth rule explicitly creates a new
+family. Family-level mutation rules remain owned by the corresponding operator.
+
+Multiple identity growth operators are supported for ``ib.birth``,
+``ib.birthdeath``, ``ib.birthdeath_discrete``, ``ib.go_or_grow`` and
+``ib.go_and_grow_mutations``. Other identity growth combinations are rejected
+during compilation because their daughter-property lifecycles are not shared;
+use one growth operator on those backends.
+
+Capacity precedence for native NoVE identity operators is owned by
+``lgca.plugins.resolve_operator_capacity``: an explicit operator value wins,
+otherwise ``state.capacity`` supplies the value, otherwise the operator's
+documented default applies. Factories leave an omitted capacity absent;
+``validate_plugin_parameters`` rejects a genuinely conflicting explicit override
+before the operator resolves its capacity. ``model._normalize_and_validate_spec`` owns
+the deprecated state-parameter alias, and the constructor receives the normalized
+state capacity. Runtime metadata records the resulting active operator capacity.
+
+Ordinary and multispecies NoVE initialization draw the excess rest contribution
+as one Poisson variable with the summed mean. Initialization uses one represented
+channel array plus one spatial (and, if present, species) array; memory does not
+grow with carrying capacity. Poisson additivity preserves the distribution, but
+for capacities above the channel count the random draw order and therefore exact
+trajectories for historical seeds change. Repeated runs of the new implementation
+with the same seed remain reproducible.
 
 The first shared identity kernel is ``lgca.identity_kernels.apply_identity_birth``.
 Both ``ib_interactions.birth`` and ``NativeIdentityBirthOperator`` call it. The
@@ -333,3 +370,15 @@ dynamically growing family histories, model state and renderer buffers cost extr
 Dedicated vector, tensor and wetting reorientation samplers process candidate
 scores in batches with a conservative 32 MiB temporary budget. This preserves
 site order and RNG draws; it does not change the transition model.
+
+Composed Boltzmann reorientation also batches sites by occupancy and caches
+candidate flux, nematic scores and rest occupancy once per group. Score batches
+and cached candidate features each have a 32 MiB budget; these are temporary
+array limits, not a total process-memory limit. Candidate enumeration has its
+own size guard. The sampler retains one categorical uniform draw per nonempty
+site/species in spatial order, including fully occupied sites. Scalar-reference
+regressions preserve seeded trajectories for the tested mixed terms and species.
+Floating-point matrix evaluation can differ in its final bits across numerical
+libraries, so cross-platform bitwise trajectories are not promised. Boltzmann
+transition weights are unchanged. See ``benchmarks/composed_reorientation.py``
+and the reopened milestone validation report for repeated multi-step timings.

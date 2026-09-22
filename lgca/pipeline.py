@@ -9,6 +9,8 @@ from typing import Any, Mapping, Sequence
 
 import numpy as np
 
+from .base import _sampling_totals
+from .identity_kernels import inherit_missing_properties
 from .plugins import (
     BirthDeathOperator,
     ConservationLaw,
@@ -17,6 +19,7 @@ from .plugins import (
     PluginInfo,
     ReorientationOperator,
     create_plugin,
+    resolve_operator_capacity,
 )
 
 
@@ -117,6 +120,7 @@ class CompiledPipeline:
         timing_trace_limit: int = 0,
     ) -> None:
         lgca = context.lgca
+        lgca._validate_evolution()
         for operator in self.operators:
             if "boundary_nodes" in operator.dependencies():
                 lgca.apply_boundaries()
@@ -199,6 +203,17 @@ def compile_pipeline(spec: InteractionPipelineSpec | None, context) -> CompiledP
             raise ValueError(f"dynamics.operators[{index}]{separator}{message}") from exc
     if not spec.allow_custom_order:
         _validate_operator_order(operators)
+    growth = [operator for operator in operators if operator.operator_kind == "birth_death"]
+    shared_property_operators = {"ib.birth", "ib.birthdeath", "ib.birthdeath_discrete",
+                                "ib.go_or_grow", "ib.go_and_grow_mutations"}
+    if context.spec.state.identity_based and len(growth) > 1:
+        if any(operator.name not in shared_property_operators for operator in growth):
+            raise ValueError(
+                "Identity growth composition requires a shared daughter-property lifecycle; "
+                "currently supported for ib.birth, ib.birthdeath, ib.birthdeath_discrete, "
+                "ib.go_or_grow and ib.go_and_grow_mutations. Use one growth operator "
+                "for other identity backends."
+            )
     pipeline = CompiledPipeline(operators=operators, propagation=spec.propagation)
     pipeline.setup(context)
     return pipeline
@@ -296,7 +311,12 @@ class _ReorientationTerm:
             raise ValueError(f"species index {self.species} exceeds state.n_species")
 
     def score(self, candidates, node, lgca, coord):
-        return np.zeros(candidates.shape[0], dtype=float)
+        coords = tuple(np.asarray([index]) for index in coord)
+        return np.broadcast_to(self.score_batch(_candidate_features(candidates, lgca), lgca, coords),
+                               (1, len(candidates)))[0]
+
+    def score_batch(self, features, lgca, coords):
+        return 0.0
 
     def prepare(self, lgca, source_channels):
         """Prepare spatial fields once from the frozen operator input."""
@@ -310,8 +330,29 @@ class _UniformTerm(_ReorientationTerm):
 
 
 class _RestingBiasTerm(_ReorientationTerm):
-    def score(self, candidates, node, lgca, coord):
-        return candidates[:, lgca.velocitychannels :].sum(axis=1)
+    def score_batch(self, features, lgca, coords):
+        return features["rest"]
+
+
+def _physical_field_gradient(lgca, field):
+    """Differentiate a prescribed field in physical lattice coordinates.
+
+    Centered interior and one-sided edge differences do not wrap the prescribed
+    field across particle boundaries. Singleton axes have zero derivative.
+    The coordinate Jacobian removes the hexagonal row staggering and spacing.
+    """
+    ndim = len(lgca.dims)
+    coordinates = [getattr(lgca, name) for name in ("xcoords", "ycoords", "zcoords")[:ndim]]
+    derivatives = np.zeros(field.shape + (ndim,))
+    jacobian = np.zeros(field.shape + (ndim, ndim))
+    for axis, size in enumerate(lgca.dims):
+        if size == 1:
+            jacobian[..., axis, axis] = 1
+            continue
+        derivatives[..., axis] = np.gradient(field, axis=axis)
+        for component, coordinate in enumerate(coordinates):
+            jacobian[..., axis, component] = np.gradient(coordinate, axis=axis)
+    return np.linalg.solve(jacobian, derivatives[..., None])[..., 0]
 
 
 class _ChemotaxisTerm(_ReorientationTerm):
@@ -332,18 +373,18 @@ class _ChemotaxisTerm(_ReorientationTerm):
             raise ValueError(
                 f"state.fields.{self.field_name} must have shape {expected}, got {field.shape}"
             )
-        gradients = np.gradient(field)
-        if isinstance(gradients, np.ndarray):
-            gradients = [gradients]
-        self.gradient = np.stack(gradients, axis=-1)
+        self.gradient = _physical_field_gradient(context.lgca, field)
 
-    def score(self, candidates, node, lgca, coord):
-        if self.gradient is None:
-            return np.zeros(candidates.shape[0], dtype=float)
-        spatial = tuple(index - lgca.r_int for index in coord)
-        gradient = self.gradient[spatial]
-        flux = candidates[:, : lgca.velocitychannels] @ lgca.c.T
-        return flux @ gradient
+    def prepare(self, lgca, source_channels):
+        field = np.asarray(getattr(lgca, self.field_name), dtype=float)
+        field = field[lgca.nonborder]
+        if field.shape != tuple(lgca.dims) or not np.isfinite(field).all():
+            raise ValueError(f"Field {self.field_name!r} must contain finite scalar values on the lattice")
+        self.gradient = _physical_field_gradient(lgca, field)
+
+    def score_batch(self, features, lgca, coords):
+        spatial = tuple(index - lgca.r_int for index in coords)
+        return self.gradient[spatial] @ features["flux"].T
 
     def dependencies(self) -> set[str]:
         return set() if not self.field_name else {self.field_name}
@@ -354,10 +395,9 @@ class _NematicAlignmentTerm(_ReorientationTerm):
         self.neighbor_channels = lgca.nb_sum(
             source_channels[..., : lgca.velocitychannels].astype(np.int64)
         )
-        self.dot_sq = (lgca.c.T @ lgca.c) ** 2
 
-    def score(self, candidates, node, lgca, coord):
-        return candidates[:, : lgca.velocitychannels] @ self.dot_sq @ self.neighbor_channels[coord]
+    def score_batch(self, features, lgca, coords):
+        return self.neighbor_channels[coords] @ features["nematic"].T
 
     def dependencies(self) -> set[str]:
         return {"boundary_nodes"}
@@ -367,9 +407,8 @@ class _PersistentWalkTerm(_ReorientationTerm):
     def prepare(self, lgca, source_channels):
         self.local_flux = source_channels[..., : lgca.velocitychannels] @ lgca.c.T
 
-    def score(self, candidates, node, lgca, coord):
-        candidate_flux = candidates[:, : lgca.velocitychannels] @ lgca.c.T
-        return candidate_flux @ self.local_flux[coord]
+    def score_batch(self, features, lgca, coords):
+        return self.local_flux[coords] @ features["flux"].T
 
 
 class _PolarAlignmentTerm(_PersistentWalkTerm):
@@ -386,9 +425,8 @@ class _AggregationTerm(_ReorientationTerm):
         density = source_channels.sum(axis=-1)
         self.gradient = lgca.gradient(density)
 
-    def score(self, candidates, node, lgca, coord):
-        candidate_flux = candidates[:, : lgca.velocitychannels] @ lgca.c.T
-        return candidate_flux @ self.gradient[coord]
+    def score_batch(self, features, lgca, coords):
+        return self.gradient[coords] @ features["flux"].T
 
     def dependencies(self) -> set[str]:
         return {"boundary_nodes", "cell_density"}
@@ -415,15 +453,18 @@ class _ContactGuidanceTerm(_ReorientationTerm):
         norm = np.linalg.norm(field, axis=-1, keepdims=True)
         self.director = np.divide(field, norm, out=np.zeros_like(field), where=norm > 0)
 
-    def score(self, candidates, node, lgca, coord):
-        if self.director is None:
-            return np.zeros(candidates.shape[0], dtype=float)
-        spatial = tuple(index - lgca.r_int for index in coord)
-        director = self.director[spatial]
-        if not np.any(director):
-            return np.zeros(candidates.shape[0], dtype=float)
-        channel_alignment = lgca.c.T @ director
-        return candidates[:, : lgca.velocitychannels] @ (channel_alignment ** 2)
+    def prepare(self, lgca, source_channels):
+        field = np.asarray(getattr(lgca, self.field_name), dtype=float)[lgca.nonborder]
+        expected = tuple(lgca.dims) + (lgca.c.shape[0],)
+        if field.shape != expected or not np.isfinite(field).all():
+            raise ValueError(f"Field {self.field_name!r} must contain finite vectors of shape {expected}")
+        norm = np.linalg.norm(field, axis=-1, keepdims=True)
+        self.director = np.divide(field, norm, out=np.zeros_like(field), where=norm > 0)
+
+    def score_batch(self, features, lgca, coords):
+        spatial = tuple(index - lgca.r_int for index in coords)
+        alignment = self.director[spatial] @ lgca.c
+        return alignment**2 @ features["channels"].T
 
     def dependencies(self) -> set[str]:
         return {self.field_name} if self.field_name else set()
@@ -449,6 +490,18 @@ def list_reorientation_terms() -> tuple[str, ...]:
     """Return the supported reorientation-term names in deterministic order."""
 
     return tuple(sorted(_REORIENTATION_TERMS))
+
+
+def _candidate_features(candidates, lgca):
+    """Cache candidate-only quantities for one occupancy group."""
+    feature_bytes = len(candidates) * (2 * lgca.velocitychannels + lgca.c.shape[0] + 1) * 8
+    if feature_bytes > _MAX_CANDIDATE_BATCH_BYTES:
+        raise ValueError(f"Candidate features require {feature_bytes:,} bytes; "
+                         "reduce channels or use a non-enumerating interaction")
+    channels = candidates[:, :lgca.velocitychannels].astype(float)
+    return {"channels": channels, "flux": channels @ lgca.c.T,
+            "nematic": channels @ (lgca.c.T @ lgca.c)**2,
+            "rest": candidates[:, lgca.velocitychannels:].sum(axis=1)}
 
 
 class BoltzmannReorientationOperator(ReorientationOperator):
@@ -498,13 +551,7 @@ class BoltzmannReorientationOperator(ReorientationOperator):
                 source_channels = source_channels.sum(axis=-2)
             for term in self.terms:
                 term.prepare(lgca, source_channels)
-            for spatial in np.ndindex(lgca.dims):
-                coord = tuple(index + lgca.r_int for index in spatial)
-                node = lgca._reorientation_source_nodes[coord]
-                if getattr(lgca, "n_species", 1) > 1:
-                    lgca.nodes[coord] = self._sample_multispecies_node(node, lgca, coord)
-                else:
-                    lgca.nodes[coord] = self._sample_node(node, lgca, coord, species=0)
+            self._sample_batches(lgca)
         finally:
             del lgca._reorientation_source_nodes
 
@@ -530,28 +577,36 @@ class BoltzmannReorientationOperator(ReorientationOperator):
             terms.append(_UniformTerm(ReorientationTermSpec(name="random_walk")))
         return terms
 
-    def _sample_multispecies_node(self, node, lgca, coord):
-        new_node = np.zeros_like(node)
-        for species in range(node.shape[0]):
-            new_node[species] = self._sample_node(node[species], lgca, coord, species=species)
-        return new_node
-
-    def _sample_node(self, node, lgca, coord, species: int | None):
-        n_particles = int(node.sum())
-        if n_particles == 0:
-            return np.zeros_like(node)
-        if n_particles > lgca.K:
-            raise ValueError("native reorientation requires at most one particle per channel")
-        candidates = lgca.get_permutations(n_particles)
-        scores = np.zeros(candidates.shape[0], dtype=float)
-        for term in self.terms:
-            if term.species is None or term.species == species:
-                scores += term.beta * term.score(candidates, node, lgca, coord)
-        scores -= scores.max()
-        weights = np.exp(scores)
-        weights /= weights.sum()
-        choice = lgca.rng.choice(candidates.shape[0], p=weights)
-        return candidates[choice].astype(node.dtype)
+    def _sample_batches(self, lgca):
+        nodes = lgca._reorientation_source_nodes[lgca.nonborder]
+        counts = nodes.sum(axis=-1)
+        sampled = np.zeros_like(nodes)
+        # Preserve the former spatial-then-species categorical draw order,
+        # including full sites, while grouping computation by occupancy.
+        draws = np.zeros(counts.shape)
+        draws[counts > 0] = lgca.rng.random(np.count_nonzero(counts))
+        ndim = len(lgca.dims)
+        multispecies = getattr(lgca, "n_species", 1) > 1
+        for count in np.unique(counts[counts > 0]):
+            candidates = lgca.get_permutations(int(count))
+            features = _candidate_features(candidates, lgca)
+            for indices in _candidate_batches(counts == count, len(candidates)):
+                coords = tuple(axis + lgca.r_int for axis in indices[:ndim])
+                scores = np.zeros((len(indices[0]), len(candidates)))
+                species = indices[-1] if multispecies else np.zeros(len(indices[0]), dtype=int)
+                for term in self.terms:
+                    if term.beta == 0:
+                        continue
+                    contribution = term.beta * term.score_batch(features, lgca, coords)
+                    if term.species is not None:
+                        contribution = contribution * (species == term.species)[:, None]
+                    scores += contribution
+                probabilities = _softmax_last_axis(scores)
+                cumulative = np.cumsum(probabilities, axis=-1)
+                cumulative /= cumulative[:, -1:]
+                choices = (cumulative <= draws[indices][:, None]).sum(axis=-1)
+                sampled[indices] = candidates[choices]
+        lgca.nodes[lgca.nonborder] = sampled
 
 
 from .classical_operators import NativeClassicalRandomWalkOperator
@@ -697,7 +752,7 @@ class NativeNoVEIdentityBirthDeathOperator(BirthDeathOperator):
             raise ValueError(f"{self.name} requires state.identity_based=True")
         if context.spec.state.n_species != 1:
             raise ValueError(f"{self.name} does not support multispecies states")
-        self.capacity = int(self.parameters.get("capacity", 8))
+        self.capacity = int(resolve_operator_capacity(context, self.parameters, 8))
         if self.capacity <= 0:
             raise ValueError("capacity must be a positive integer")
         self.r_b = NativeClassicalBirthOperator._probability(
@@ -832,7 +887,7 @@ class NativeNoVEIdentityGoOrGrowOperator(BirthDeathOperator):
             raise ValueError(f"{self.name} requires state.identity_based=True")
         if context.spec.state.n_species != 1:
             raise ValueError(f"{self.name} does not support multispecies states")
-        self.capacity = int(self.parameters.get("capacity", 8))
+        self.capacity = int(resolve_operator_capacity(context, self.parameters, 8))
         if self.capacity <= 0:
             raise ValueError("capacity must be a positive integer")
         self.r_b = NativeClassicalBirthOperator._probability(
@@ -962,7 +1017,7 @@ class NativeNoVEIdentityGoOrGrowKappaOperator(BirthDeathOperator):
             raise ValueError(f"{self.name} requires state.identity_based=True")
         if context.spec.state.n_species != 1:
             raise ValueError(f"{self.name} does not support multispecies states")
-        self.capacity = int(self.parameters.get("capacity", 8))
+        self.capacity = int(resolve_operator_capacity(context, self.parameters, 8))
         if self.capacity <= 0:
             raise ValueError("capacity must be a positive integer")
         self.r_b = NativeClassicalBirthOperator._probability(
@@ -1134,7 +1189,7 @@ class NativeNoVEIdentityGoOrGrowGlioblastomaOperator(BirthDeathOperator):
             raise ValueError(f"{self.name} requires state.identity_based=True")
         if context.spec.state.n_species != 1:
             raise ValueError(f"{self.name} does not support multispecies states")
-        self.capacity = int(self.parameters.get("capacity", 8))
+        self.capacity = int(resolve_operator_capacity(context, self.parameters, 8))
         if self.capacity <= 0:
             raise ValueError("capacity must be a positive integer")
         self.r_b = NativeClassicalBirthOperator._probability(
@@ -1258,7 +1313,7 @@ class NativeNoVEIdentityEvoStericOperator(BirthDeathOperator):
             raise ValueError(f"{self.name} requires state.identity_based=True")
         if context.spec.state.n_species != 1:
             raise ValueError(f"{self.name} does not support multispecies states")
-        self.capacity = int(self.parameters.get("capacity", 512))
+        self.capacity = int(resolve_operator_capacity(context, self.parameters, 512))
         if self.capacity <= 0:
             raise ValueError("capacity must be a positive integer")
         self.r_b = NativeClassicalBirthOperator._probability(
@@ -1439,6 +1494,7 @@ class NativeIdentityBirthDeathOperator(BirthDeathOperator):
                     if self.track_inheritance:
                         fam = lgca.props["family"][label]
                         lgca.props["family"].append(fam)
+                    inherit_missing_properties(lgca, label)
             lgca.nodes[coord] = node
 
         lgca.nodes[dying] = 0
@@ -1521,6 +1577,7 @@ class NativeIdentityBirthDeathDiscreteOperator(BirthDeathOperator):
                                 p=(self.pmut / 2, 1 - self.pmut / 2),
                             )
                         )
+                    inherit_missing_properties(lgca, label)
             lgca.nodes[coord] = node
 
         lgca.nodes = lgca.rng.permuted(lgca.nodes, axis=-1)
@@ -1609,6 +1666,7 @@ class NativeIdentityGoAndGrowMutationsOperator(BirthDeathOperator):
                             )
                     else:
                         lgca.props["family"].append(family)
+                    inherit_missing_properties(lgca, label)
             lgca.nodes[coord] = node
 
         lgca.nodes = lgca.rng.permuted(lgca.nodes, axis=-1)
@@ -1721,6 +1779,7 @@ class NativeIdentityGoOrGrowOperator(BirthDeathOperator):
                         lgca.props["theta"].append(
                             lgca.rng.normal(loc=theta, scale=self.theta_std)
                         )
+                    inherit_missing_properties(lgca, cell)
 
             v_channels = lgca.rng.permutation(vel)
             r_channels = lgca.rng.permutation(rest)
@@ -2215,7 +2274,7 @@ class NativePhenotypeSwitchOperator(PhenotypeSwitchOperator):
                     "description": "Off-diagonal phenotype transition probabilities.",
                 }
             },
-            conservation_law=ConservationLaw(True, False, True, ("species identity",)),
+            conservation_law=ConservationLaw(True, False, False, ("species identity", "channel occupancy")),
             port_status="native",
             description="Atomic phenotype transition with collision-safe channel resampling.",
         )
@@ -2322,6 +2381,9 @@ class NativeNoVEAlignmentOperator(ReorientationOperator):
         self.beta = 2.0
         self.include_center = False
 
+    def dependencies(self) -> set[str]:
+        return {"boundary_nodes", "cell_density"}
+
     def validate(self, context) -> None:
         if context.spec.state.volume_exclusion:
             raise ValueError(f"{self.name} requires state.volume_exclusion=False")
@@ -2336,6 +2398,7 @@ class NativeNoVEAlignmentOperator(ReorientationOperator):
 
     def apply(self, context, step: int) -> None:
         lgca = context.lgca
+        density = _sampling_totals(lgca.nodes[lgca.nonborder])
         g = lgca.calc_flux(lgca.nodes)
         if self.include_center:
             g += lgca.nb_sum(g)
@@ -2352,7 +2415,6 @@ class NativeNoVEAlignmentOperator(ReorientationOperator):
 
         weights = _softmax_last_axis(self.beta * np.einsum("...i,ij->...j", g, lgca.c))
         newnodes = lgca.nodes.copy()
-        density = lgca.cell_density[lgca.nonborder]
         newnodes[lgca.nonborder] = lgca.rng.multinomial(density, weights[lgca.nonborder])
         lgca.nodes = newnodes
 
@@ -2375,7 +2437,7 @@ class NativeNoVERandomWalkOperator(ReorientationOperator):
         lgca = context.lgca
         newnodes = lgca.nodes.copy()
         weights = np.full(lgca.K, 1 / lgca.K)
-        density = lgca.cell_density[lgca.nonborder]
+        density = _sampling_totals(lgca.nodes[lgca.nonborder])
         newnodes[lgca.nonborder] = lgca.rng.multinomial(density, weights)
         lgca.nodes = newnodes
 

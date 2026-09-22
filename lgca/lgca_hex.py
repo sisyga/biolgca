@@ -154,8 +154,6 @@ class LGCA_Hex(LGCA_Square):
         [(1, 1), (1, 2), (2, 1), (2, 2)]
 
         """
-        if self.ly % 2 != 0:
-            print('Warning: uneven number of rows; only use for plotting - boundary conditions do not work!')
         x = np.arange(self.lx) + self.r_int
         y = np.arange(self.ly) + self.r_int
         xx, yy = np.meshgrid(x, y, indexing='ij')
@@ -261,6 +259,7 @@ class LGCA_Hex(LGCA_Square):
         output annotation). The resting particle stayed in its channel in node (1,1).
 
         """
+        self._validate_evolution()
         newcellnodes = np.zeros(self.nodes.shape, dtype=self.nodes.dtype)
         newcellnodes[..., 6:] = self.nodes[..., 6:]
 
@@ -499,6 +498,7 @@ class NoVE_LGCA_Hex(NoVE_LGCA_Square, LGCA_Hex):
 class NoVE_IBLGCA_Hex(NoVE_IBLGCA_Square, LGCA_Hex):
 
     def propagation(self):
+        self._validate_evolution()
         newcellnodes = get_arr_of_empty_lists(self.nodes.shape)
         newcellnodes[..., 6:] = self.nodes[..., 6:]
 

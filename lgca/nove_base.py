@@ -228,8 +228,8 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         density = density / normalization
         draw1 = self.rng.poisson(lam=density, size=self.nodes.shape)
         if self.capacity > self.K:
-            draw2 = self.rng.poisson(lam=density, size=self.nodes.shape[:-1] + ((self.capacity - self.K),))
-            draw1[..., -1] += draw2.sum(-1)
+            draw2 = self.rng.poisson(lam=density * (self.capacity - self.K), size=self.nodes.shape[:-1])
+            draw1[..., -1] += draw2
         self.nodes = draw1
         self.apply_boundaries()
         self.update_dynamic_fields()
@@ -276,8 +276,8 @@ class NoVE_LGCA_base(LGCA_base, ABC):
             return 0.0
         # calculate flux only for non-boundary nodes, result is a flux vector at each node position
         flux = self.calc_flux(self.nodes[self.nonborder])
-        # calculate along which axes the lattice needs to be summed up, e.g. axes=(0) for 1D, axes=(0,1) for 2D
-        axes = tuple(np.arange(self.c.shape[0]))
+        # Sum every particle population, including species, before the vector norm.
+        axes = tuple(range(flux.ndim - 1))
         # sum fluxes up accordingly
         flux = np.sum(flux, axis=axes)
         # take Euclidean norm and normalise by number of particles
@@ -291,9 +291,9 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         field
         summed up and normalized over all lattice sites.
 
-        .. warning::
-
-           This calculation is known to be unreliable.
+        Periodic neighbors wrap around the physical lattice. Reflecting and
+        absorbing walls have no exterior particles and contribute zero director
+        flux. The measurement never modifies particle channels or random state.
 
         Returns
         -------
@@ -313,13 +313,12 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         norm_factor = np.broadcast_to(norm_factor, flux.shape)
         # # normalise flux at each node with number of cells in the node
         dir_field = np.multiply(flux, norm_factor)  # max element value: 1
-        # # apply boundary conditions -
-        # #  (not clean, but this is the only application of applying bc to anything but nodes so far)
-        temp = self.nodes
-        self.nodes = dir_field
-        self.apply_boundaries()
-        dir_field = self.nodes
-        self.nodes = temp
+        # Boundary operations on particle channels are not valid for vectors.
+        # Reconstruct the field halo from physical sites without touching nodes.
+        padding = [(self.r_int, self.r_int)] * len(self.dims)
+        padding += [(0, 0)] * (dir_field.ndim - len(self.dims))
+        dir_field = np.pad(dir_field[self.nonborder], padding,
+                           mode="wrap" if self.bc == "periodic" else "constant")
         # # sum fluxes over neighbours
         dir_field = self.nb_sum(dir_field)  # max element value: no. of neighbours
 

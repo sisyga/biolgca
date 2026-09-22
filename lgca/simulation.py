@@ -128,7 +128,7 @@ class CallbackObserver(Observer):
 
 
 def _setup_sample_indices(observer, lgca, runner, step_attribute: str) -> int:
-    """Publish sampled steps and map absolute simulation steps to compact rows."""
+    """Publish local run steps and map them to compact sample rows."""
     steps = np.fromiter(
         (
             step
@@ -162,7 +162,7 @@ class SimulationRunner:
         self.observers = list(observers or [])
         self.showprogress = showprogress
         self.step_function = step_function
-        self.context = context
+        self.context = context if context is not None else getattr(lgca, "_compiled_model", None)
         self.max_recording_bytes = max_recording_bytes
         self.elapsed_seconds = 0.0
 
@@ -170,6 +170,8 @@ class SimulationRunner:
         self.observers.append(observer)
 
     def run(self):
+        self.start_step = int(getattr(self.context, "_step", 0))
+        self.end_step = self.start_step + self.timesteps
         recorder_types = (NodeRecorder, DensityRecorder, PopulationRecorder,
                           ChannelDensityRecorder, PerTypeRecorder, OrderParameterRecorder,
                           FamilyPopulationRecorder)
@@ -189,6 +191,8 @@ class SimulationRunner:
                              "a smaller dtype, CSV streaming, or explicitly increase max_recording_bytes.")
         start = time.perf_counter()
         lgca = self.lgca
+        lgca.recording_start_step = self.start_step
+        lgca.recording_end_step = self.end_step
         lgca.update_dynamic_fields()
         for observer in self.observers:
             setup = getattr(observer, "setup", None)

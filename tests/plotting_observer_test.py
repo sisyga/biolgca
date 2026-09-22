@@ -24,6 +24,55 @@ def make_square_lgca(seed=1):
     )
 
 
+@pytest.mark.parametrize("steps", [[], [10], [0], [2]])
+def test_animation_schedule_is_checked_before_dynamics(steps):
+    from copy import deepcopy
+
+    lgca = make_square_lgca()
+    observer = AnimationObserver(schedule=Schedule(steps=steps), cbar=False)
+    before = lgca.nodes.copy()
+    rng = deepcopy(lgca.rng.bit_generator.state)
+    runner = SimulationRunner(lgca, timesteps=2, observers=[observer], showprogress=False)
+    if not steps or steps == [10]:
+        with pytest.raises(ValueError, match="schedule selects no frames"):
+            runner.run()
+        np.testing.assert_array_equal(lgca.nodes, before)
+        assert lgca.rng.bit_generator.state == rng
+        assert observer.animation is None
+    else:
+        runner.run()
+        assert observer.frame_steps == steps
+        assert observer.animation is not None
+        observer.animation._draw_was_started = True
+    plt.close("all")
+
+
+@pytest.mark.parametrize("entry", ["facade", "direct"])
+@pytest.mark.parametrize("moving", [False, True])
+@pytest.mark.parametrize("channels,expected_rest", [(slice(0, 4), False), (slice(4, 5), True)])
+def test_density_facade_uses_channel_history_and_its_times(entry, moving, channels, expected_rest):
+    nodes = np.zeros((2, 2, 5), dtype=bool)
+    nodes[..., 4] = True
+    nodes[..., 0] = moving
+    lgca = get_lgca(geometry="square", nodes=nodes, interaction="only_propagation")
+    lgca.nodes_t = np.stack([nodes] * 3)
+    lgca.nodes_steps = np.array([0, 3, 20])
+    lgca.dens_t = np.stack([nodes.sum(-1)] * 2)
+    lgca.dens_steps = np.array([0, 20])
+    render = lambda: (animate(lgca, channels=channels, cbar=False) if entry == "facade"
+                      else lgca.animate_density(channels=channels, cbar=False))
+    animation = render()
+    animation._func(2)
+    ax = animation._fig.axes[0]
+    np.testing.assert_array_equal(ax.images[0].get_array(), 1 if expected_rest else int(moving))
+    assert ax.get_title() == "Time $k =$20"
+    animation._draw_was_started = True
+    del lgca.nodes_t
+    with pytest.raises(RuntimeError, match="NodeRecorder"):
+        render()
+    plt.close("all")
+
+
 def test_plot_snapshot_observer_records_results_and_paths(tmp_path):
     lgca = make_square_lgca()
     observer = PlotSnapshotObserver(
@@ -135,13 +184,16 @@ def test_sparse_recorded_history_uses_paired_steps_in_animation():
     plt.close(animation._fig)
 
 
-def test_sparse_recorded_history_is_rejected_by_direct_density_animation():
+def test_sparse_recorded_history_is_supported_by_direct_density_animation():
     lgca = make_square_lgca(seed=14)
     recorder = DensityRecorder(schedule=Schedule(every=2))
     SimulationRunner(lgca, timesteps=4, observers=[recorder], showprogress=False).run()
 
-    with pytest.raises(ValueError, match="sparse recorded history"):
-        lgca.animate_density(cbar=False)
+    animation = lgca.animate_density(cbar=False)
+    animation._func(2)
+    assert animation._fig.axes[0].get_title() == "Time $k =$4"
+    animation._draw_was_started = True
+    plt.close(animation._fig)
 
 
 def test_plot_snapshot_observer_reuse_resets_outputs(tmp_path):
@@ -320,7 +372,7 @@ def test_nove_multispecies_animation_observer_selects_density(species):
     plt.close("all")
 
 
-def test_nove_sparse_recorded_history_is_rejected_by_direct_density_animation():
+def test_nove_sparse_recorded_history_is_supported_by_direct_density_animation():
     lgca = get_lgca(
         geometry="square", dims=(4, 4), density=0.5, ve=False,
         interaction="only_propagation", seed=17,
@@ -328,8 +380,11 @@ def test_nove_sparse_recorded_history_is_rejected_by_direct_density_animation():
     recorder = DensityRecorder(schedule=Schedule(every=2))
     SimulationRunner(lgca, timesteps=4, observers=[recorder], showprogress=False).run()
 
-    with pytest.raises(ValueError, match="sparse recorded history"):
-        lgca.animate_density()
+    animation = lgca.animate_density()
+    animation._func(2)
+    assert animation._fig.axes[0].get_title() == "Time $k =$4"
+    animation._draw_was_started = True
+    plt.close(animation._fig)
 
 
 @pytest.mark.parametrize("species", [None, 1])

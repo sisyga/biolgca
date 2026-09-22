@@ -1,0 +1,149 @@
+{
+  "results": [
+    {
+      "size": 64,
+      "initial_occupancy": 1,
+      "route": "dedicated",
+      "steps": 5,
+      "seconds": [
+        0.011031800000637304,
+        0.006407000000763219,
+        0.005732400000852067
+      ],
+      "median_seconds": 0.006407000000763219
+    },
+    {
+      "size": 64,
+      "initial_occupancy": 1,
+      "route": "composed",
+      "steps": 5,
+      "seconds": [
+        0.006854600000224309,
+        0.006633799999690382,
+        0.006678399997326778
+      ],
+      "median_seconds": 0.006678399997326778
+    },
+    {
+      "size": 64,
+      "initial_occupancy": 1,
+      "route": "combined",
+      "steps": 5,
+      "seconds": [
+        0.0076966000015090685,
+        0.007526199999119854,
+        0.007534500000474509
+      ],
+      "median_seconds": 0.007534500000474509
+    },
+    {
+      "size": 64,
+      "initial_occupancy": 2,
+      "route": "dedicated",
+      "steps": 5,
+      "seconds": [
+        0.006121999998867977,
+        0.006182599998282967,
+        0.0059861000008822884
+      ],
+      "median_seconds": 0.006121999998867977
+    },
+    {
+      "size": 64,
+      "initial_occupancy": 2,
+      "route": "composed",
+      "steps": 5,
+      "seconds": [
+        0.007083000000420725,
+        0.007140700003219536,
+        0.006918699997186195
+      ],
+      "median_seconds": 0.007083000000420725
+    },
+    {
+      "size": 64,
+      "initial_occupancy": 2,
+      "route": "combined",
+      "steps": 5,
+      "seconds": [
+        0.007957900001201779,
+        0.008099899998342153,
+        0.008175500002835179
+      ],
+      "median_seconds": 0.008099899998342153
+    },
+    {
+      "size": 128,
+      "initial_occupancy": 1,
+      "route": "dedicated",
+      "steps": 5,
+      "seconds": [
+        0.020446599999559112,
+        0.01954969999860623,
+        0.01912850000007893
+      ],
+      "median_seconds": 0.01954969999860623
+    },
+    {
+      "size": 128,
+      "initial_occupancy": 1,
+      "route": "composed",
+      "steps": 5,
+      "seconds": [
+        0.020819099998334423,
+        0.02063060000000405,
+        0.021047700000053737
+      ],
+      "median_seconds": 0.020819099998334423
+    },
+    {
+      "size": 128,
+      "initial_occupancy": 1,
+      "route": "combined",
+      "steps": 5,
+      "seconds": [
+        0.024592400000983616,
+        0.02398189999803435,
+        0.02415629999813973
+      ],
+      "median_seconds": 0.02415629999813973
+    },
+    {
+      "size": 128,
+      "initial_occupancy": 2,
+      "route": "dedicated",
+      "steps": 5,
+      "seconds": [
+        0.021518000001378823,
+        0.021255700001347577,
+        0.02041359999930137
+      ],
+      "median_seconds": 0.021255700001347577
+    },
+    {
+      "size": 128,
+      "initial_occupancy": 2,
+      "route": "composed",
+      "steps": 5,
+      "seconds": [
+        0.024045599999226397,
+        0.023124600000301143,
+        0.02335049999965122
+      ],
+      "median_seconds": 0.02335049999965122
+    },
+    {
+      "size": 128,
+      "initial_occupancy": 2,
+      "route": "combined",
+      "steps": 5,
+      "seconds": [
+        0.02832219999982044,
+        0.02804429999741842,
+        0.02745359999971697
+      ],
+      "median_seconds": 0.02804429999741842
+    }
+  ],
+  "profile": "         796 function calls (704 primitive calls) in 0.002 seconds\n\n   Ordered by: cumulative time\n   List reduced from 155 to 18 due to restriction <18>\n\n   ncalls  tottime  percall  cumtime  percall filename:lineno(function)\n        1    0.000    0.000    0.002    0.002 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\model.py:851(run)\n        1    0.000    0.000    0.002    0.002 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\model.py:1164(_run_compiled_model)\n        1    0.000    0.000    0.002    0.002 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\simulation.py:172(run)\n        1    0.000    0.000    0.002    0.002 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\model.py:1172(execute_pipeline_step)\n        1    0.000    0.000    0.002    0.002 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\model.py:846(step)\n        1    0.000    0.000    0.002    0.002 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\pipeline.py:114(execute_step)\n        1    0.000    0.000    0.001    0.001 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\pipeline.py:541(apply)\n        1    0.000    0.000    0.001    0.001 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\pipeline.py:576(_sample_batches)\n       10    0.000    0.000    0.000    0.000 {method 'reduce' of 'numpy.ufunc' objects}\n        9    0.000    0.000    0.000    0.000 {method 'sum' of 'numpy.ndarray' objects}\n        9    0.000    0.000    0.000    0.000 C:\\Users\\simon\\Anaconda3\\envs\\biolgca\\Lib\\site-packages\\numpy\\_core\\_methods.py:47(_sum)\n        1    0.000    0.000    0.000    0.000 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\pipeline.py:268(_softmax_last_axis)\n        4    0.000    0.000    0.000    0.000 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\base.py:1065(update_dynamic_fields)\n        1    0.000    0.000    0.000    0.000 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\pipeline.py:424(prepare)\n     90/1    0.000    0.000    0.000    0.000 C:\\Users\\simon\\Anaconda3\\envs\\biolgca\\Lib\\copy.py:119(deepcopy)\n      4/1    0.000    0.000    0.000    0.000 C:\\Users\\simon\\Anaconda3\\envs\\biolgca\\Lib\\copy.py:218(_deepcopy_dict)\n        1    0.000    0.000    0.000    0.000 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\pipeline.py:399(score_batch)\n        1    0.000    0.000    0.000    0.000 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\lgca_square.py:497(gradient)\n\n\n"
+}

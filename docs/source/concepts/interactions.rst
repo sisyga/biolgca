@@ -86,6 +86,24 @@ specifications and backwards compatibility.
      - No additional input.
      - Unbiased sampler term.
 
+Prescribed chemotaxis fields are differentiated in physical lattice coordinates,
+including hexagonal row staggering and vertical spacing. Interior differences
+are centered and edge differences are one-sided; scalar fields do not implicitly
+wrap with the particle boundary condition. A singleton axis has zero derivative.
+Thus a physical linear ramp has the same gradient at boundary and interior sites.
+
+Named chemotaxis and contact-guidance fields are read from their current padded
+``lgca.<field_name>`` arrays once before each reorientation operator. Update their
+physical sites via ``field[lgca.nonborder]`` between steps or in a preceding custom
+operator. Derived gradients and normalized directors refresh once per operator,
+not per site. Contact guidance is nematic: negating a director preserves its axis;
+rotating that axis changes the cue.
+
+Periodic hexagonal evolution requires an even number of rows so opposite-channel
+transport is reciprocal across the seam. Odd-row models can be constructed for
+static plotting, but stepping (including direct propagation) rejects them before
+state or random-number changes.
+
 Particle-conserving phenotype switching
 ---------------------------------------
 

@@ -47,7 +47,7 @@ Observers can run every step, every ``n`` steps or at an explicit set of steps.
 
 For lightweight Python callbacks, wrap a function in
 :class:`lgca.simulation.CallbackObserver`. The callback receives the LGCA and
-the absolute simulation step. Use :func:`functools.partial` or a closure for
+the local step within this run, starting at zero. Use :func:`functools.partial` or a closure for
 additional arguments:
 
 .. code-block:: python
@@ -99,7 +99,7 @@ Dense and sparse recorder results
 The default schedule records every step, including step zero, and preserves
 the familiar ``timesteps + 1`` leading dimension. A sparse schedule stores
 only the selected samples. Each array recorder publishes the corresponding
-absolute step vector:
+local step vector:
 
 .. list-table::
    :header-rows: 1
@@ -120,8 +120,35 @@ absolute step vector:
      - ``fam_pop_steps``
 
 Always pair a sparse result with its step vector instead of interpreting its
-row index as simulation time. Implicit animation of a sparse history is
-rejected; pass an explicit history when custom timing is intended.
+row index as simulation time. Both direct ``animate_config``, ``animate_flux``,
+``animate_flow`` and ``animate_density`` methods and the ``animate`` facade use
+the paired recorded times, including nonuniform schedules. Explicit arrays use
+``steps=...`` when supplied and dense indices otherwise. Renderers receive these
+times explicitly and own their title artists.
+
+Density ``channels=...`` selection uses node history and its ``nodes_steps``,
+even if a differently sampled density history also exists. Missing node history
+raises an actionable error. Explicit density arrays are already reduced: select
+their channels before passing them. AnimationObserver captures selected density
+channels directly from each observed state.
+
+Square/hexagonal Matplotlib renderers are exercised with configuration, flux,
+flow and density data across classical, identity and NoVE backends. Cubic Mayavi
+configuration/density/flux methods use the same resolver and explicit timing
+interface; they retain their existing interactive ``show``/``None`` return
+contract. Adapter tests validate timing without requiring a display, but do not
+constitute a real Mayavi rendering test. Plot/movie observers support Matplotlib
+backends only. Linear models retain their space-time plot methods.
+
+On a compiled model, the operator clock continues across runs while observer
+schedules and callbacks restart at local zero. ``result.metadata['runtime']``
+records ``start_step``, ``end_step`` and ``sample_time_origin='local'``; the CLI
+persists them in ``metadata.json``. Add ``start_step`` to a recorded step vector
+to reconstruct cumulative time, and omit the duplicate shared endpoint when
+joining consecutive histories. Copy each history before the next run replaces
+the arrays. Result metadata is a snapshot and is not changed by later runs.
+Direct runners and ``timeevo`` expose the same offset as
+``lgca.recording_start_step`` (and the endpoint as ``recording_end_step``).
 
 Plotting module
 ---------------

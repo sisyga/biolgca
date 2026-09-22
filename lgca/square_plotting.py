@@ -33,7 +33,7 @@ except ImportError:  # pragma: no cover - handled at runtime
 from copy import copy
 
 from .plot_data import (
-    _reject_sparse_implicit_history,
+    resolve_animation_history,
     select_density,
     select_density_history,
     select_scalar_field,
@@ -178,16 +178,11 @@ class SquarePlotMixin:
 
         return fig, arrows, circles, texts
 
-    def animate_config(self, nodes_t=None, interval=100, **kwargs):
-        if nodes_t is None:
-            if hasattr(self, 'nodes_t'):
-                nodes_t = self.nodes_t
-            else:
-                raise RuntimeError("Channel-wise state of the lattice required for plotting the configuration but not "+
-                                   "recorded in past LGCA run, call lgca.timeevo with keyword record=True")
+    def animate_config(self, nodes_t=None, interval=100, steps=None, **kwargs):
+        nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
 
         fig, arrows, circles, texts = self.plot_config(nodes=nodes_t[0], **kwargs)
-        title = plt.title('Time $k =$0')
+        title = arrows.axes.set_title(f'Time $k =${steps[0]}')
         arrow_color = np.zeros(nodes_t[..., :self.velocitychannels].shape)
         arrow_color = arrow_color.reshape(nodes_t.shape[0], -1)
         arrow_color = np.moveaxis(nodes_t[..., :self.velocitychannels], -1, 1).reshape(nodes_t.shape[0], -1)
@@ -201,7 +196,7 @@ class SquarePlotMixin:
             resting_t = nodes_t[..., self.velocitychannels:].sum(-1).reshape(nodes_t.shape[0], -1)
 
             def update(n):
-                title.set_text('Time $k =${}'.format(n))
+                title.set_text('Time $k =${}'.format(steps[n]))
                 arrows.set(alpha=arrow_color[n])
                 circles.set(alpha=circle_color[n])
                 for text, i in zip(texts, resting_t[n]):
@@ -214,12 +209,13 @@ class SquarePlotMixin:
 
         else:
             def update(n):
-                title.set_text('Time $k =${}'.format(n))
+                title.set_text('Time $k =${}'.format(steps[n]))
                 arrows.set(alpha=arrow_color[n])
                 return arrows, title
 
             ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
             return ani
+
 
     def live_animate_config(self, interval=100, **kwargs):
         fig, arrows, circles, texts = self.plot_config(**kwargs)
@@ -328,28 +324,24 @@ class SquarePlotMixin:
         #                   pivot='mid', angles='xy', scale_units='xy', scale=1./self.r_poly)
         return fig, plot
 
-    def animate_flow(self, nodes_t=None, interval=100, cbar=False, **kwargs):
-        if nodes_t is None:
-            if hasattr(self, 'nodes_t'):
-                nodes_t = self.nodes_t
-            else:
-                raise RuntimeError("Channel-wise state of the lattice required for flow calculation but not recorded " +
-                                   "in past LGCA run, call lgca.timeevo with keyword record=True")
+    def animate_flow(self, nodes_t=None, interval=100, cbar=False, steps=None, **kwargs):
+        nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
 
         nodes = nodes_t.astype(float)
         density = nodes.sum(-1)
         jx, jy = np.moveaxis(self.calc_flux(nodes.astype(float)), -1, 0)
 
         fig, plot = self.plot_flow(nodes[0], cbar=cbar, **kwargs)
-        title = plt.title('Time $k =$0')
+        title = plot.axes.set_title(f'Time $k =${steps[0]}')
 
         def update(n):
-            title.set_text('Time $k =${}'.format(n))
+            title.set_text('Time $k =${}'.format(steps[n]))
             plot.set_UVC(jx[n], jy[n], density[n])
             return plot, title
 
         ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
         return ani
+
 
     def live_animate_flow(self, interval=100, **kwargs):
         fig, plot = self.plot_flow(**kwargs)
@@ -583,32 +575,17 @@ class SquarePlotMixin:
 
         return fig, pc, cmap
 
-    def animate_density(self, density_t=None, interval=100, channels=slice(None), species=None, repeat=True, **kwargs):
+    def animate_density(self, density_t=None, interval=100, channels=slice(None), species=None, repeat=True, steps=None, **kwargs):
 
-        if density_t is None:
-            _reject_sparse_implicit_history(self, "density_t")
-            if hasattr(self, 'dens_t'):
-                if channels == slice(None):
-                    density_t = self.dens_t
-                else:
-                    if hasattr(self, 'nodes_t'):
-                        nodes_t = self.nodes_t[..., channels]
-                        density_t = nodes_t.sum(-1)
-                    else:
-                        raise RuntimeError(
-                            "Channel-wise state of the lattice required for density plotting for required channels only " +
-                            "but not recorded in past LGCA run, call lgca.timeevo with keyword record=True")
-            else:
-                raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
-                                   "in past LGCA run, call lgca.timeevo with keyword recorddens=True")
+        density_t, steps = resolve_animation_history(self, "density_t", density_t, steps, channels)
 
         density_t = select_density_history(self, density_t, species=species)
 
         fig, pc, cmap = self.plot_density(density_t[0], **kwargs)
-        title = plt.title('Time $k =$0')
+        title = pc.axes.set_title(f'Time $k =${steps[0]}')
 
         def update(n):
-            title.set_text('Time $k =${}'.format(n))
+            title.set_text('Time $k =${}'.format(steps[n]))
             if hasattr(pc, 'set_data'):
                 pc.set_data(density_t[n, ...].T)
             else:
@@ -618,13 +595,9 @@ class SquarePlotMixin:
         ani = animation.FuncAnimation(fig, update, interval=interval, frames=density_t.shape[0], repeat=repeat)
         return ani
 
-    def animate_flux(self, nodes_t=None, interval=100, **kwargs):
-        if nodes_t is None:
-            if hasattr(self, 'nodes_t'):
-                nodes_t = self.nodes_t
-            else:
-                raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
-                                   "in past LGCA run, call lgca.timeevo with keyword record=True")
+
+    def animate_flux(self, nodes_t=None, interval=100, steps=None, **kwargs):
+        nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
 
         nodes = nodes_t.astype(float)
         density = nodes.sum(-1) / self.K
@@ -638,15 +611,16 @@ class SquarePlotMixin:
         angle = cmap.to_rgba(angle[None, ...])[0]
         angle[..., -1] = np.sign(density)
         angle[(jx ** 2 + jy ** 2) < 1e-6, :3] = 0.5
-        title = plt.title('Time $k =$ 0')
+        title = pc.axes.set_title(f'Time $k =${steps[0]}')
 
         def update(n):
-            title.set_text('Time $k =${}'.format(n))
+            title.set_text('Time $k =${}'.format(steps[n]))
             pc.set(facecolor=angle[n, ...].reshape(-1, 4))
             return pc, title
 
         ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
         return ani
+
 
     def live_animate_flux(self, figindex=None, figsize=None, cmap='viridis', interval=100, tight_layout=True,
                           edgecolor='None'):

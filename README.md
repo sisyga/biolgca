@@ -72,7 +72,7 @@ from lgca.pipeline import ReorientationSpec, ReorientationTermSpec
 
 combined = ReorientationSpec(
     terms=[
-        ReorientationTermSpec(name="alignment", beta=1.0),
+        ReorientationTermSpec(name="polar_alignment", beta=1.0),
         ReorientationTermSpec(
             name="chemotaxis",
             beta=0.5,
@@ -84,6 +84,8 @@ combined = ReorientationSpec(
 
 See the [interaction-composition explanation](docs/source/concepts/interactions.rst)
 and [ModelSpec guide](docs/source/how_to/model_specs_and_plugins.rst).
+`polar_alignment` favors the same heading; `nematic_alignment` favors the same
+axis, treating opposite headings equally. Choose the mechanism explicitly.
 
 ## Save and share simulations
 
@@ -119,6 +121,9 @@ optional `plot3d` dependency.
 ## Legacy factory API
 
 Existing code can continue to use `get_lgca` for direct interactive setup:
+Its legacy `interaction="alignment"` is polar, matching the composed
+`polar_alignment` term above. The deprecated composed term `"alignment"` retains
+its historical **nematic** meaning for compatibility; avoid that alias in new models.
 
 ```python
 from lgca import get_lgca
