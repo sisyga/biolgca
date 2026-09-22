@@ -321,7 +321,9 @@ class _NematicAlignmentTerm(_ReorientationTerm):
             source_channels = source_nodes.sum(axis=-2)
         else:
             source_channels = source_nodes
-        neighbor_channels = lgca.nb_sum(source_channels[..., : lgca.velocitychannels])[coord]
+        neighbor_channels = lgca.nb_sum(
+            source_channels[..., : lgca.velocitychannels].astype(np.int64)
+        )[coord]
         dot_sq = (lgca.c.T @ lgca.c) ** 2
         return candidates[:, : lgca.velocitychannels] @ dot_sq @ neighbor_channels
 

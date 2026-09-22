@@ -186,6 +186,33 @@ def test_native_reorientation_preserves_multispecies_mass_by_species():
     assert result.metadata["reorientation_term_names"] == ["random_walk", "resting_bias"]
 
 
+@pytest.mark.parametrize("geometry,dims,neighbors", [
+    ("lin", (5,), 2), ("square", (5, 5), 4),
+    ("hex", (5, 6), 6), ("cubic", (5, 5, 5), 6),
+])
+def test_nematic_scores_count_neighbors_and_ignore_empty_extra_species(geometry, dims, neighbors):
+    from lgca.pipeline import _NematicAlignmentTerm
+
+    lgca = get_lgca(geometry=geometry, dims=dims, density=0,
+                    interaction="only_propagation")
+    lgca.nodes[..., 0] = True
+    coord = tuple(lgca.r_int + 2 for _ in dims)
+    neighbor = (coord[0] + 1,) + coord[1:]
+    lgca.nodes[neighbor + (1,)] = True
+    candidates = np.eye(lgca.K, dtype=bool)
+    term = _NematicAlignmentTerm(ReorientationTermSpec(name="nematic_alignment"))
+    expected = neighbors * (lgca.c.T @ lgca.c[:, 0]) ** 2
+    expected += (lgca.c.T @ lgca.c[:, 1]) ** 2
+    single = term.score(candidates, lgca.nodes[coord], lgca, coord)
+    np.testing.assert_allclose(single, expected)
+    lgca._reorientation_source_nodes = np.stack(
+        [lgca.nodes, np.zeros_like(lgca.nodes)], axis=-2
+    )
+    lgca.n_species = 2
+    multiple = term.score(candidates, lgca.nodes[coord], lgca, coord)
+    np.testing.assert_allclose(multiple, expected)
+
+
 def test_nematic_alignment_term_favors_neighbor_axis_in_one_sampler():
     nodes = np.zeros((3, 3, 5), dtype=bool)
     nodes[1, 1, 1] = True
