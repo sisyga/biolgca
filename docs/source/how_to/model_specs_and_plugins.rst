@@ -289,3 +289,29 @@ with it is rejected. VE channel occupancy remains limited by ``K`` per species.
 Metadata records ``channel_capacity`` separately from per-operator
 ``growth_capacities``; with one native birth/death operator, ``capacity`` reports
 its active configured limit.
+
+Numerical implementation ownership
+----------------------------------
+
+The first shared identity kernel is ``lgca.identity_kernels.apply_identity_birth``.
+Both ``ib_interactions.birth`` and ``NativeIdentityBirthOperator`` call it. The
+kernel owns birth attempts, daughter ID/property updates, and final shuffling;
+adapters own setup and parameter sourcing. RNG draw order remains unchanged.
+The existing ``ib_interactions.trunc_gauss`` helper remains the mutation sampler.
+
+The remaining duplication inventory is intentionally incremental:
+
+* Identity VE birth/death, go-or-grow, and mutation rules occur in
+  ``ib_interactions`` and native classes in ``pipeline``.
+* NoVE/identity-NoVE alignment, birth/death and switching occur in their legacy
+  interaction modules and native pipeline classes.
+* Classical reorientation has legacy score code and dedicated pipeline operators;
+  composed spatial terms now prepare fields once per application.
+* ``classical_operators`` owns the previously extracted classical random walk.
+
+``operator_base`` owns lifecycle contracts and metadata types;
+``operator_registry`` owns name/alias resolution; ``plugins`` re-exports these
+public types and owns registration/parameter contracts. For subsequent slices,
+put numerical updates in the relevant focused kernel module, keep legacy and
+native adapters small, and retain independent scientific invariants alongside
+seeded parity tests. Do not move unrelated kernels as part of a correctness fix.

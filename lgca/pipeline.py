@@ -1332,28 +1332,9 @@ class NativeIdentityBirthOperator(BirthDeathOperator):
         lgca.props.update(r_b=[0.0] + [self.r_b] * int(lgca.maxlabel))
 
     def apply(self, context, step: int) -> None:
-        from .ib_interactions import trunc_gauss
+        from .identity_kernels import apply_identity_birth
 
-        lgca = context.lgca
-        relevant = (lgca.cell_density[lgca.nonborder] > 0) & (
-            lgca.cell_density[lgca.nonborder] < lgca.K
-        )
-        coords = [axis_indices[relevant] for axis_indices in lgca.nonborder]
-        for coord in zip(*coords):
-            node = lgca.nodes[coord]
-            r_bs = np.array([lgca.props["r_b"][label] for label in node])
-            proliferating = lgca.rng.random(lgca.K) < r_bs
-            for label in node[proliferating]:
-                ind = lgca.rng.choice(lgca.K)
-                if node[ind] == 0:
-                    lgca.maxlabel += 1
-                    node[ind] = lgca.maxlabel
-                    r_b = lgca.props["r_b"][label]
-                    lgca.props["r_b"].append(
-                        float(trunc_gauss(0, self.a_max, r_b, sigma=self.std, rng=lgca.rng))
-                    )
-            lgca.nodes[coord] = node
-        lgca.nodes = lgca.rng.permuted(lgca.nodes, axis=-1)
+        apply_identity_birth(context.lgca, a_max=self.a_max, std=self.std)
 
 
 class NativeIdentityBirthDeathOperator(BirthDeathOperator):
