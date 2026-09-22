@@ -47,9 +47,10 @@ def test_animation_schedule_is_checked_before_dynamics(steps):
     plt.close("all")
 
 
+@pytest.mark.parametrize("entry", ["facade", "direct"])
 @pytest.mark.parametrize("moving", [False, True])
 @pytest.mark.parametrize("channels,expected_rest", [(slice(0, 4), False), (slice(4, 5), True)])
-def test_density_facade_uses_channel_history_and_its_times(moving, channels, expected_rest):
+def test_density_facade_uses_channel_history_and_its_times(entry, moving, channels, expected_rest):
     nodes = np.zeros((2, 2, 5), dtype=bool)
     nodes[..., 4] = True
     nodes[..., 0] = moving
@@ -58,7 +59,9 @@ def test_density_facade_uses_channel_history_and_its_times(moving, channels, exp
     lgca.nodes_steps = np.array([0, 3, 20])
     lgca.dens_t = np.stack([nodes.sum(-1)] * 2)
     lgca.dens_steps = np.array([0, 20])
-    animation = animate(lgca, channels=channels, cbar=False)
+    render = lambda: (animate(lgca, channels=channels, cbar=False) if entry == "facade"
+                      else lgca.animate_density(channels=channels, cbar=False))
+    animation = render()
     animation._func(2)
     ax = animation._fig.axes[0]
     np.testing.assert_array_equal(ax.images[0].get_array(), 1 if expected_rest else int(moving))
@@ -66,7 +69,7 @@ def test_density_facade_uses_channel_history_and_its_times(moving, channels, exp
     animation._draw_was_started = True
     del lgca.nodes_t
     with pytest.raises(RuntimeError, match="NodeRecorder"):
-        animate(lgca, channels=channels)
+        render()
     plt.close("all")
 
 
@@ -181,13 +184,16 @@ def test_sparse_recorded_history_uses_paired_steps_in_animation():
     plt.close(animation._fig)
 
 
-def test_sparse_recorded_history_is_rejected_by_direct_density_animation():
+def test_sparse_recorded_history_is_supported_by_direct_density_animation():
     lgca = make_square_lgca(seed=14)
     recorder = DensityRecorder(schedule=Schedule(every=2))
     SimulationRunner(lgca, timesteps=4, observers=[recorder], showprogress=False).run()
 
-    with pytest.raises(ValueError, match="sparse recorded history"):
-        lgca.animate_density(cbar=False)
+    animation = lgca.animate_density(cbar=False)
+    animation._func(2)
+    assert animation._fig.axes[0].get_title() == "Time $k =$4"
+    animation._draw_was_started = True
+    plt.close(animation._fig)
 
 
 def test_plot_snapshot_observer_reuse_resets_outputs(tmp_path):
@@ -366,7 +372,7 @@ def test_nove_multispecies_animation_observer_selects_density(species):
     plt.close("all")
 
 
-def test_nove_sparse_recorded_history_is_rejected_by_direct_density_animation():
+def test_nove_sparse_recorded_history_is_supported_by_direct_density_animation():
     lgca = get_lgca(
         geometry="square", dims=(4, 4), density=0.5, ve=False,
         interaction="only_propagation", seed=17,
@@ -374,8 +380,11 @@ def test_nove_sparse_recorded_history_is_rejected_by_direct_density_animation():
     recorder = DensityRecorder(schedule=Schedule(every=2))
     SimulationRunner(lgca, timesteps=4, observers=[recorder], showprogress=False).run()
 
-    with pytest.raises(ValueError, match="sparse recorded history"):
-        lgca.animate_density()
+    animation = lgca.animate_density()
+    animation._func(2)
+    assert animation._fig.axes[0].get_title() == "Time $k =$4"
+    animation._draw_was_started = True
+    plt.close(animation._fig)
 
 
 @pytest.mark.parametrize("species", [None, 1])

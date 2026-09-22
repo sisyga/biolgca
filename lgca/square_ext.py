@@ -38,7 +38,7 @@ except ImportError:  # pragma: no cover - handled at runtime
         "matplotlib"
     )
 
-from .plot_data import _reject_sparse_implicit_history, select_density, select_density_history
+from .plot_data import resolve_animation_history, select_density, select_density_history
 from .plots import estimate_figsize, get_cmap
 
 
@@ -84,11 +84,9 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
         fig, pc, cmap = LGCA_Square.plot_density(self, density=density, channels=channels, **kwargs)
         return fig, pc, cmap
 
-    def animate_config(self, nodes_t=None, interval=100, **kwargs):
-        if nodes_t is None:
-            nodes_t = self.nodes_t.astype(bool)
-
-        return super().animate_config(nodes_t=nodes_t, interval=interval, **kwargs)
+    def animate_config(self, nodes_t=None, steps=None, **kwargs):
+        nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
+        return super().animate_config(nodes_t=nodes_t.astype(bool), steps=steps, **kwargs)
 
     def plot_config(self, nodes=None, **kwargs):
         if nodes is None:
@@ -233,13 +231,8 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
         return fig, pc, cmap
 
     def animate_flux(self, nodes_t=None, figindex=None, figsize=None, interval=200, tight_layout=True,
-                     edgecolor='None', cbar=True):
-        if nodes_t is None:
-            if hasattr(self, 'nodes_t'):
-                nodes_t = self.nodes_t
-            else:
-                raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
-                                   "in past LGCA run, call mylgca.timeevo with keyword record=True")
+                     edgecolor='None', cbar=True, steps=None):
+        nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
 
         nodes = nodes_t.astype(float)
         density = nodes.sum(-1) / self.K
@@ -255,25 +248,20 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
         angle[..., -1] = np.sign(density)
 
         angle[(jx ** 2 + jy ** 2) < 1e-6, :3] = 0.
-        title = plt.title('Time $k =$ 0')
+        title = pc.axes.set_title(f'Time $k =${steps[0]}')
 
         def update(n):
-            title.set_text('Time $k =${}'.format(n))
+            title.set_text('Time $k =${}'.format(steps[n]))
             pc.set(facecolor=angle[n, ...].reshape(-1, 4))
             return pc, title
 
         ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
         return ani
 
+
     def animate_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis', interval=200, vmax=None,
-                        tight_layout=True, edgecolor='None', species=None):
-        if density_t is None:
-            _reject_sparse_implicit_history(self, "density_t")
-            if hasattr(self, 'dens_t'):
-                density_t = self.dens_t
-            else:
-                raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
-                                   "in past LGCA run, call lgca.timeevo with keyword recorddens=True")
+                        tight_layout=True, edgecolor='None', species=None, steps=None, channels=slice(None)):
+        density_t, steps = resolve_animation_history(self, "density_t", density_t, steps, channels)
 
         density_t = select_density_history(self, density_t, species=species)
 
@@ -284,15 +272,16 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
 
         fig, pc, cmap = self.plot_density(density_t[0], figindex=figindex, figsize=figsize, cmap=cmap, vmax=vmax_val,
                                           tight_layout=tight_layout, edgecolor=edgecolor)
-        title = plt.title('Time $k =$0')
+        title = pc.axes.set_title(f'Time $k =${steps[0]}')
 
         def update(n):
-            title.set_text('Time $k =${}'.format(n))
+            title.set_text('Time $k =${}'.format(steps[n]))
             pc.set(facecolor=cmap.to_rgba(density_t[n, ...].ravel()))
             return pc, title
 
         ani = animation.FuncAnimation(fig, update, interval=interval, frames=density_t.shape[0])
         return ani
+
 
     def live_animate_density(self, interval=100, channels=slice(None), **kwargs):
         # colourbar update is an issue
@@ -357,25 +346,19 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
 
         return fig, arrows, circles, cmap
 
-    def animate_config(self, nodes_t=None, interval=100, **kwargs):
-        if nodes_t is None:
-            if hasattr(self, 'nodes_t'):
-                nodes_t = self.nodes_t
-            else:
-                raise RuntimeError(
-                    "Channel-wise state of the lattice required for plotting the configuration but not " +
-                    "recorded in past LGCA run, call lgca.timeevo with keyword record=True")
+    def animate_config(self, nodes_t=None, interval=100, steps=None, **kwargs):
+        nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
 
         tmax = nodes_t.shape[0]
         fig, arrows, circles, cmap = self.plot_config(nodes=nodes_t[0], vmax=nodes_t.max(), **kwargs)
-        title = plt.title('Time $k =$0')
+        title = arrows.axes.set_title(f'Time $k =${steps[0]}')
         arrow_color = cmap.to_rgba(np.moveaxis(nodes_t[..., :self.velocitychannels], -1, 1)[None, ...]).reshape(tmax, -1, 4)
 
         if self.restchannels:
             circle_color = cmap.to_rgba(nodes_t[..., self.velocitychannels:].sum(-1)[None, ...]).reshape(tmax, -1, 4)
 
             def update(n):
-                title.set_text('Time $k =${}'.format(n))
+                title.set_text('Time $k =${}'.format(steps[n]))
                 arrows.set(color=arrow_color[n])
                 circles.set(facecolor=circle_color[n])
                 return arrows, circles, title
@@ -385,12 +368,13 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
 
         else:
             def update(n):
-                title.set_text('Time $k =${}'.format(n))
+                title.set_text('Time $k =${}'.format(steps[n]))
                 arrows.set(color=arrow_color[n])
                 return arrows, title
 
             ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
             return ani
+
 
 
     def live_animate_config(self, interval=100, **kwargs):
@@ -484,25 +468,17 @@ class NoVE_IBLGCA_Square(NoVE_IBLGCA_base, NoVE_LGCA_Square):
 
         return super().plot_config(nodes=nodes, **kwargs)
 
-    def animate_config(self, nodes_t=None, **kwargs):
-        if nodes_t is None:
-            if hasattr(self, 'nodes_t'):
-                nodes = self.length_checker(self.nodes_t)
-            else:
-                raise RuntimeError("Channel-wise state of the lattice required for config calculation but not recorded " +
-                                   "in past LGCA run, call mylgca.timeevo with keyword record=True")
+    def animate_config(self, nodes_t=None, steps=None, **kwargs):
+        nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
+        return super().animate_config(nodes_t=self.length_checker(nodes_t), steps=steps, **kwargs)
 
-        return super().animate_config(nodes_t=nodes, **kwargs)
+    def animate_flux(self, nodes_t=None, steps=None, **kwargs):
+        nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
+        return super().animate_flux(nodes_t=self.length_checker(nodes_t), steps=steps, **kwargs)
 
-    def animate_flux(self, nodes_t=None, **kwargs):
-        if nodes_t is None:
-            if hasattr(self, 'nodes_t'):
-                nodes = self.length_checker(self.nodes_t)
-            else:
-                raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
-                                   "in past LGCA run, call mylgca.timeevo with keyword record=True")
-
-        return super().animate_flux(nodes_t=nodes, **kwargs)
+    def animate_flow(self, nodes_t=None, steps=None, **kwargs):
+        nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
+        return super().animate_flow(nodes_t=self.length_checker(nodes_t), steps=steps, **kwargs)
 
     def plot_prop_spatial(self, nodes=None, props=None, propname=None, **kwargs):
         if nodes is None:

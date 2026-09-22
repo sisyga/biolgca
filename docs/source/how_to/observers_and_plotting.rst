@@ -120,8 +120,25 @@ local step vector:
      - ``fam_pop_steps``
 
 Always pair a sparse result with its step vector instead of interpreting its
-row index as simulation time. Implicit animation of a sparse history is
-rejected; pass an explicit history when custom timing is intended.
+row index as simulation time. Both direct ``animate_config``, ``animate_flux``,
+``animate_flow`` and ``animate_density`` methods and the ``animate`` facade use
+the paired recorded times, including nonuniform schedules. Explicit arrays use
+``steps=...`` when supplied and dense indices otherwise. Renderers receive these
+times explicitly and own their title artists.
+
+Density ``channels=...`` selection uses node history and its ``nodes_steps``,
+even if a differently sampled density history also exists. Missing node history
+raises an actionable error. Explicit density arrays are already reduced: select
+their channels before passing them. AnimationObserver captures selected density
+channels directly from each observed state.
+
+Square/hexagonal Matplotlib renderers are exercised with configuration, flux,
+flow and density data across classical, identity and NoVE backends. Cubic Mayavi
+configuration/density/flux methods use the same resolver and explicit timing
+interface; they retain their existing interactive ``show``/``None`` return
+contract. Adapter tests validate timing without requiring a display, but do not
+constitute a real Mayavi rendering test. Plot/movie observers support Matplotlib
+backends only. Linear models retain their space-time plot methods.
 
 On a compiled model, the operator clock continues across runs while observer
 schedules and callbacks restart at local zero. ``result.metadata['runtime']``

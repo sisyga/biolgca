@@ -6,6 +6,7 @@
 """
 
 
+from .plot_data import resolve_animation_history
 from lgca.base import LGCA_base, _MissingPlotLib, np
 try:  # optional plotting dependency
     from mayavi import mlab
@@ -660,18 +661,11 @@ class LGCA_Cubic(LGCA_base):
             scatter,
         )
 
-    def animate_config(self, nodes_t=None, interval=100, **kwargs):
-        if nodes_t is None:
-            if hasattr(self, "nodes_t"):
-                nodes_t = self.nodes_t
-            else:
-                raise RuntimeError(
-                    "Channel-wise state of the lattice required for plotting the configuration but not "
-                    + "recorded in past LGCA run, call lgca.timeevo with keyword record=True"
-                )
+    def animate_config(self, nodes_t=None, interval=100, steps=None, **kwargs):
+        nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
 
         fig, quiver, scatter = self.plot_config(nodes=nodes_t[0], **kwargs)
-        mlab.title("Time 0", size=0.4, color=(0, 0, 0))
+        mlab.title(f"Time {steps[0]}", size=0.4, color=(0, 0, 0))
         u = (
             0.5
             * self.c[None, None, None, None, 0]
@@ -697,11 +691,12 @@ class LGCA_Cubic(LGCA_base):
                 quiver.mlab_source.set(u=u[i], v=v[i], w=w[i])
                 if self.restchannels > 0:
                     scatter.mlab_source.set(scalars=rest[i])
-                mlab.title(f"Time {i}", size=0.4)
+                mlab.title(f"Time {steps[i]}", size=0.4)
                 yield
 
         anim()
         mlab.show()
+
 
     def animate_density(
         self,
@@ -710,7 +705,7 @@ class LGCA_Cubic(LGCA_base):
         opacity=0.5,
         cbar=True,
         interval=100,
-        **kwargs,
+        steps=None, channels=slice(None), **kwargs,
     ):
         """
         Animate the density surface over time using Mayavi.
@@ -734,13 +729,7 @@ class LGCA_Cubic(LGCA_base):
         -------
         None
         """
-        if density_t is None:
-            if hasattr(self, "dens_t"):
-                density_t = self.dens_t
-            else:
-                raise RuntimeError(
-                    "Density time series not found. Ensure to record density during simulation."
-                )
+        density_t, steps = resolve_animation_history(self, "density_t", density_t, steps, channels)
 
         fig, contour = self.plot_density(
             density=density_t[0],
@@ -749,17 +738,18 @@ class LGCA_Cubic(LGCA_base):
             cbar=cbar,
             **kwargs,
         )
-        mlab.title("Time 0", size=0.4, color=(0, 0, 0))
+        mlab.title(f"Time {steps[0]}", size=0.4, color=(0, 0, 0))
 
         @mlab.animate(delay=interval)
         def anim():
             for i in range(density_t.shape[0]):
                 contour.mlab_source.set(scalars=density_t[i], vmin=0, vmax=self.K)
-                mlab.title(f"Time {i}", size=0.4)
+                mlab.title(f"Time {steps[i]}", size=0.4)
                 yield
 
         anim()
         mlab.show()
+
 
     def animate_flux(
         self,
@@ -768,7 +758,7 @@ class LGCA_Cubic(LGCA_base):
         opacity=0.6,
         interval=100,
         cbar=False,
-        **kwargs,
+        steps=None, **kwargs,
     ):
         """
         Animate the flux vectors over time in the 3D lattice using Mayavi.
@@ -791,19 +781,12 @@ class LGCA_Cubic(LGCA_base):
         -------
         None
         """
-        if nodes_t is None:
-            if hasattr(self, "nodes_t"):
-                nodes_t = self.nodes_t
-            else:
-                raise RuntimeError(
-                    "Channel-wise state of the lattice required for flux calculation but not recorded. "
-                    "Call lgca.timeevo with keyword record=True"
-                )
+        nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
 
         flux_t = self.calc_flux(nodes_t.astype(float))
         time_steps = flux_t.shape[0]
         scatter_sizes = (
-            (1 - np.sign(np.linalg.norm(flux_t, axis=-1))) * self.dens_t / self.K
+            (1 - np.sign(np.linalg.norm(flux_t, axis=-1))) * nodes_t.sum(axis=-1) / self.K
         )
 
         fig, quiver, scatter = self.plot_flux(
@@ -813,7 +796,7 @@ class LGCA_Cubic(LGCA_base):
             cbar=cbar,
             **kwargs,
         )
-        mlab.title("Flux at Time 0", size=0.4)
+        mlab.title(f"Flux at Time {steps[0]}", size=0.4)
 
         @mlab.animate(delay=interval)
         def anim():
@@ -822,11 +805,12 @@ class LGCA_Cubic(LGCA_base):
                     u=flux_t[i, ..., 0], v=flux_t[i, ..., 1], w=flux_t[i, ..., 2]
                 )
                 scatter.mlab_source.set(scalars=scatter_sizes[i])
-                mlab.title(f"Flux at Time {i}", size=0.4)
+                mlab.title(f"Flux at Time {steps[i]}", size=0.4)
                 yield
 
         anim()
         mlab.show()
+
 
     def live_animate_flux(self, scale_factor=1.0, opacity=0.5, cbar=False, **kwargs):
         """
