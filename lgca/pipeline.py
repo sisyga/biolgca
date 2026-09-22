@@ -2730,7 +2730,11 @@ class NativeMultispeciesExcitableMediumOperator(BirthDeathOperator):
 
 
 class NativeBirthDeathOperator(BirthDeathOperator):
-    """Native volume-exclusion birth/death operator."""
+    """Native volume-exclusion birth/death operator.
+
+    Deaths precede births. Species compete for shared birth capacity in a fresh
+    uniformly random order at each site, without a species-index priority.
+    """
 
     def __init__(self, parameters: Mapping[str, Any] | None = None):
         info = PluginInfo(
@@ -2815,7 +2819,7 @@ class NativeBirthDeathOperator(BirthDeathOperator):
             new_node[species] = self._apply_death(new_node[species], self.death_rate[species], rng)
             remaining_capacity += before - int(new_node[species].sum())
 
-        for species in range(new_node.shape[0]):
+        for species in rng.permutation(new_node.shape[0]):
             before = int(new_node[species].sum())
             new_node[species] = self._apply_birth(
                 new_node[species], self.birth_rate[species], rng, remaining_capacity

@@ -473,6 +473,29 @@ def test_saturated_phenotype_switch_preserves_forbidden_species_under_relabeling
         assert result.sum() == 3
 
 
+@pytest.mark.parametrize("order", [(0, 1, 2), (2, 0, 1), (1, 2, 0)])
+def test_shared_birth_capacity_has_exchangeable_competition(order):
+    from lgca.pipeline import NativeBirthDeathOperator
+
+    operator = NativeBirthDeathOperator()
+    operator.birth_rate = np.array([1., 1., 0.])[list(order)]
+    operator.death_rate = np.zeros(3)
+    operator.capacity = 3
+    node = np.array([[True, False], [True, False], [False, False]])[list(order)]
+    rng = np.random.default_rng(108)
+    winners = np.zeros(3, dtype=int)
+    for _ in range(2000):
+        result = operator._apply_multispecies_node(node, rng)
+        assert result.dtype == bool
+        assert result.sum() == 3
+        counts = result.sum(axis=-1)[np.argsort(order)]
+        assert counts[2] == 0
+        winners += counts == 2
+    # Each identical species wins with probability 1/2 (six standard errors).
+    assert winners[0] / 2000 == pytest.approx(.5, abs=6 * np.sqrt(.25 / 2000))
+    assert winners[1] == 2000 - winners[0]
+
+
 def test_phenotype_switch_zero_rates_leave_complete_state_unchanged():
     for state in (
         np.array([[True, False], [False, True]]),
