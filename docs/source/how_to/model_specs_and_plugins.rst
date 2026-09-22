@@ -316,6 +316,14 @@ before the operator resolves its capacity. ``model._normalize_and_validate_spec`
 the deprecated state-parameter alias, and the constructor receives the normalized
 state capacity. Runtime metadata records the resulting active operator capacity.
 
+Ordinary and multispecies NoVE initialization draw the excess rest contribution
+as one Poisson variable with the summed mean. Initialization uses one represented
+channel array plus one spatial (and, if present, species) array; memory does not
+grow with carrying capacity. Poisson additivity preserves the distribution, but
+for capacities above the channel count the random draw order and therefore exact
+trajectories for historical seeds change. Repeated runs of the new implementation
+with the same seed remain reproducible.
+
 The first shared identity kernel is ``lgca.identity_kernels.apply_identity_birth``.
 Both ``ib_interactions.birth`` and ``NativeIdentityBirthOperator`` call it. The
 kernel owns birth attempts, daughter ID/property updates, and final shuffling;

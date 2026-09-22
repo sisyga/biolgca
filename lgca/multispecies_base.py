@@ -187,8 +187,8 @@ class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
         density = density / max(self.capacity, self.K)
         draw1 = self.rng.poisson(lam=density, size=self.nodes.shape)
         if self.capacity > self.K:
-            draw2 = self.rng.poisson(lam=density, size=self.nodes.shape[:-1] + ((self.capacity - self.K),))
-            draw1[..., -1] += draw2.sum(-1)
+            draw2 = self.rng.poisson(lam=density * (self.capacity - self.K), size=self.nodes.shape[:-1])
+            draw1[..., -1] += draw2
         self.nodes = draw1
         self.apply_boundaries()
         self.update_dynamic_fields()
