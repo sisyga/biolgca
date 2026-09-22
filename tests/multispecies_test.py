@@ -58,7 +58,7 @@ def test_multispecies_propagation_preserves_species_axis(geom):
         density=0,
         restchannels=1,
         interaction="only_propagation",
-        dims=3,
+        dims=4 if geom == "hex" else 3,
     )
     lgca.nodes.fill(False)
     center = (lgca.r_int,) * len(lgca.dims)
@@ -155,7 +155,7 @@ def test_multispecies_nove_propagation_preserves_counts(geom):
         restchannels=1,
         density=0,
         interaction="only_propagation",
-        dims=3,
+        dims=4 if geom == "hex" else 3,
     )
     lgca.nodes.fill(0)
     center = (lgca.r_int,) * len(lgca.dims)
