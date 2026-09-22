@@ -48,7 +48,8 @@ def test_identity_boolean_initialization_assigns_unique_physical_ids(geometry):
                  ib=True, interaction="only_propagation")
 
 
-@pytest.mark.parametrize("nodes", [np.array([[1., 2.]]), np.array([[-1, 2]])])
+@pytest.mark.parametrize("nodes", [np.array([[1.5, 2.]]), np.array([[-1, 2]]),
+                                  np.array([[np.nan, 2.]]), np.array([[np.inf, 2.]])])
 def test_identity_initialization_rejects_invalid_labels(nodes):
     with pytest.raises(ValueError, match="non-negative integer"):
         get_lgca(geometry="lin", nodes=nodes, ib=True, interaction="only_propagation")

@@ -172,7 +172,10 @@ class IBLGCA_base(LGCA_base, ABC):
             if nodes.dtype == bool:
                 nodes = self.convert_bool_to_ib(nodes)
             else:
-                if not np.issubdtype(nodes.dtype, np.integer) or np.any(nodes < 0):
+                if (not np.issubdtype(nodes.dtype, np.number)
+                        or not np.all(np.isfinite(nodes)) or np.any(nodes < 0)
+                        or np.any(nodes != np.floor(nodes))
+                        or np.any(nodes >= 2 ** (np.dtype(np.uint).itemsize * 8))):
                     raise ValueError("identity nodes must contain non-negative integer labels")
                 labels = nodes[nodes > 0]
                 if np.unique(labels).size != labels.size:
