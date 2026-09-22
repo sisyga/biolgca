@@ -2,6 +2,7 @@ import importlib
 import json
 import subprocess
 import sys
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -37,6 +38,31 @@ def test_cli_subprocess_persists_measurements_and_sample_steps(tmp_path):
             np.testing.assert_array_equal(data[name], [0, 2])
         np.testing.assert_array_equal(data["nodes_t"].sum(axis=-1), data["dens_t"])
         np.testing.assert_array_equal(data["dens_t"].sum(axis=-1), data["n_t"])
+
+
+def test_moved_cli_archive_replays_companion_resource_without_touching_first_run(tmp_path):
+    nodes = np.array([[True, False], [False, True], [True, False]])
+    np.savez(tmp_path / "input.npz", nodes=nodes)
+    spec = ModelSpec(space=SpaceSpec(geometry="lin", dims=3),
+        state=StateSpec(initializer={"name": "from_npz", "parameters": {"path": "input.npz"}}),
+        time=TimeSpec(steps=2, seed=115),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "classical.random_walk"}]),
+        analysis=AnalysisSpec(observers=[CSVSnapshotObserver(output_dir="snapshots")]))
+    model = save_model_spec(spec, tmp_path / "model.json")
+    first = tmp_path / "first"
+    assert _main(["run", str(model), "--output", str(first)]) == 0
+    before = {p.relative_to(first): p.read_bytes() for p in first.rglob("*") if p.is_file()}
+    moved = tmp_path / "moved"
+    shutil.copytree(first, moved)
+    (tmp_path / "input.npz").unlink()
+    archived = moved / "model.resolved.json"
+    assert _main(["validate", str(archived)]) == 0
+    second = tmp_path / "second"
+    assert _main(["run", str(archived), "--output", str(second)]) == 0
+    for relative, content in before.items():
+        assert (first / relative).read_bytes() == content
+    for original in (first / "snapshots").glob("*.csv"):
+        assert (second / "snapshots" / original.name).read_bytes() == original.read_bytes()
 
 
 def _main(argv):

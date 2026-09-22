@@ -5,6 +5,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import shutil
+from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path, PureWindowsPath
 
 import numpy as np
@@ -96,6 +99,7 @@ def _run(args) -> int:
         )
 
     spec = load_model_spec(model_path)
+    portable_spec = deepcopy(spec)
     _resolve_output_paths(spec, output_dir, trusted_paths=args.trusted_paths)
     compiled = build_model(
         spec,
@@ -104,7 +108,21 @@ def _run(args) -> int:
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    save_model_spec(compiled.spec, output_dir / "model.resolved.json")
+    initializer = portable_spec.state.initializer
+    if initializer is not None and initializer["name"] == "from_npz":
+        from .initializers import resolve_resource_path
+
+        parameters = dict(initializer.get("parameters", {}))
+        source = resolve_resource_path(parameters["path"], resource_base=model_path.parent,
+                                       trusted_paths=args.trusted_paths)
+        target = output_dir / "resources" / "initial_state.npz"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if source != target.resolve():
+            shutil.copyfile(source, target)
+        parameters["path"] = "resources/initial_state.npz"
+        portable_spec = replace(portable_spec, state=replace(portable_spec.state,
+            initializer={"name": "from_npz", "parameters": parameters}))
+    save_model_spec(portable_spec, output_dir / "model.resolved.json")
     result = compiled.run(showprogress=args.show_progress)
     measurements = {}
     for data_name, steps_name in (

@@ -271,3 +271,8 @@ Sparse 1D history images label actual times on sample rows; distances between ro
 represent samples, not elapsed time. Property/family histories and the
 ``lgca.plotting.animate(..., steps=...)`` facade use paired simulation times.
 Explicit history data defaults to dense times when ``steps`` is omitted.
+
+The CLI archives a portable ``model.resolved.json`` with relative observer paths.
+NPZ initializer inputs are copied to ``resources/initial_state.npz`` and the
+archived declaration points there. Move the whole run directory together, then
+validate or rerun its model into a new output directory without ``--trusted-paths``.
