@@ -1,5 +1,7 @@
 import importlib
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -15,6 +17,26 @@ from lgca.model import (
 )
 from lgca.pipeline import InteractionPipelineSpec
 from lgca.simulation import CSVSnapshotObserver
+
+
+def test_cli_subprocess_persists_measurements_and_sample_steps(tmp_path):
+    from lgca.simulation import NodeRecorder, DensityRecorder, PopulationRecorder, Schedule
+
+    schedule = Schedule(steps=[0, 2])
+    spec = ModelSpec(space=SpaceSpec(geometry="lin", dims=3),
+                     state=StateSpec(density=1), time=TimeSpec(steps=2, seed=114),
+                     analysis=AnalysisSpec(observers=[NodeRecorder(schedule),
+                         DensityRecorder(schedule), PopulationRecorder(schedule)]))
+    path = save_model_spec(spec, tmp_path / "model.json")
+    output = tmp_path / "run"
+    result = subprocess.run([sys.executable, "-m", "lgca.cli", "run", str(path),
+                             "--output", str(output)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    with np.load(output / "measurements.npz", allow_pickle=False) as data:
+        for name in ("nodes_steps", "dens_steps", "n_steps"):
+            np.testing.assert_array_equal(data[name], [0, 2])
+        np.testing.assert_array_equal(data["nodes_t"].sum(axis=-1), data["dens_t"])
+        np.testing.assert_array_equal(data["dens_t"].sum(axis=-1), data["n_t"])
 
 
 def _main(argv):

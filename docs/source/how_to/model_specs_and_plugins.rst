@@ -244,3 +244,30 @@ See :doc:`custom_interactions` for the supported extension contract, complete
 registration example and conservation guidance. Portable model files resolve
 registered names only; importing third-party Python remains the responsibility
 of a trusted launcher.
+
+CLI measurement files
+---------------------
+
+CLI runs persist numeric recorder outputs in ``measurements.npz`` next to
+``metadata.json``. Array names match the Python attributes: ``nodes_t``,
+``dens_t``, ``n_t``, ``channel_pop_t``, ``velcells_t``, ``restcells_t``,
+``fam_pop_t``, and the four order-parameter arrays. Each includes its paired
+``*_steps`` array (order parameters share ``order_parameter_steps``).
+CSV snapshot and scalar observers continue to write their declared CSV files.
+Identity-based NoVE node histories contain Python lists and are rejected before
+CLI execution; use channel-density or density recording for portable numeric data.
+
+.. code-block:: python
+
+   import numpy as np
+   import matplotlib.pyplot as plt
+
+   with np.load("run/measurements.npz", allow_pickle=False) as data:
+       plt.plot(data["n_steps"], data["n_t"])
+   plt.xlabel("Simulation step")
+   plt.ylabel("Population")
+
+Sparse 1D history images label actual times on sample rows; distances between rows
+represent samples, not elapsed time. Property/family histories and the
+``lgca.plotting.animate(..., steps=...)`` facade use paired simulation times.
+Explicit history data defaults to dense times when ``steps`` is omitted.

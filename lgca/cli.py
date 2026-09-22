@@ -106,6 +106,20 @@ def _run(args) -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
     save_model_spec(compiled.spec, output_dir / "model.resolved.json")
     result = compiled.run(showprogress=args.show_progress)
+    measurements = {}
+    for data_name, steps_name in (
+        ("nodes_t", "nodes_steps"), ("dens_t", "dens_steps"), ("n_t", "n_steps"),
+        ("channel_pop_t", "channel_pop_steps"), ("velcells_t", "velcells_steps"),
+        ("restcells_t", "restcells_steps"), ("fam_pop_t", "fam_pop_steps"),
+        ("ent_t", "order_parameter_steps"), ("normEnt_t", "order_parameter_steps"),
+        ("polAlParam_t", "order_parameter_steps"), ("meanAlign_t", "order_parameter_steps"),
+    ):
+        if hasattr(result.lgca, data_name):
+            measurements[data_name] = getattr(result.lgca, data_name)
+            measurements[steps_name] = getattr(result.lgca, steps_name)
+    if measurements:
+        np.savez_compressed(output_dir / "measurements.npz", **measurements)
+        result.metadata["measurements_file"] = "measurements.npz"
     metadata_path = output_dir / "metadata.json"
     metadata_path.write_text(
         json.dumps(_json_safe(result.metadata), indent=2), encoding="utf-8"
@@ -125,6 +139,10 @@ def _validate_output_declarations(spec, *, trusted_paths: bool) -> None:
     if spec.analysis is None:
         return
     for observer in spec.analysis.observers:
+        if (observer.__class__.__name__ == "NodeRecorder" and spec.state.identity_based
+                and not spec.state.volume_exclusion):
+            raise ValueError("CLI NodeRecorder cannot persist identity NoVE list states; "
+                             "use ChannelDensityRecorder or DensityRecorder instead")
         if isinstance(observer, CSVSnapshotObserver):
             _validate_relative_output(observer.output_dir, trusted_paths=trusted_paths)
             _validate_relative_output(
