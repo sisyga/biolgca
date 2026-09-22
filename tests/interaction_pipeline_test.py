@@ -411,6 +411,21 @@ def test_phenotype_switch_preserves_every_two_species_two_channel_ve_state(mask,
         assert result.sum() == state.sum()
 
 
+@pytest.mark.parametrize("order", [(0, 1, 2), (0, 2, 1), (1, 0, 2), (1, 2, 0), (2, 0, 1), (2, 1, 0)])
+def test_saturated_phenotype_switch_preserves_forbidden_species_under_relabeling(order):
+    state = np.array([[True, False], [True, True], [False, False]])
+    rates = np.array([[0., 1., 0.], [0., 0., 0.], [0., 0., 0.]])
+    order = np.asarray(order)
+    for seed in range(32):
+        result = NativePhenotypeSwitchOperator._sample_state(
+            state[order], rates[np.ix_(order, order)], np.random.default_rng(seed)
+        )
+        # The sole permitted destination is full: every attempted switch stays.
+        np.testing.assert_array_equal(result, state[order])
+        assert result.dtype == bool
+        assert result.sum() == 3
+
+
 def test_phenotype_switch_zero_rates_leave_complete_state_unchanged():
     for state in (
         np.array([[True, False], [False, True]]),

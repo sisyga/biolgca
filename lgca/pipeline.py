@@ -2163,8 +2163,10 @@ class NativePhenotypeSwitchOperator(PhenotypeSwitchOperator):
     It guarantees ``N(s') == N(s)`` and, for Boolean states, at most one
     particle per species/channel slot. If at least one phenotype changes, all
     channel positions are resampled; if none changes, the state is unchanged.
-    Volume-exclusion capacity is enforced while targets are sampled, so
-    collisions cannot merge or delete particles.
+    Each particle retains its source capacity until processed in random order.
+    A sampled switch into a full species is rejected and the particle stays
+    in its source species, even when its configured stay probability is zero.
+    Collisions therefore cannot merge particles or create forbidden switches.
     """
 
     def __init__(self, parameters: Mapping[str, Any] | None = None):
@@ -2234,22 +2236,16 @@ class NativePhenotypeSwitchOperator(PhenotypeSwitchOperator):
             if sources.size == 0:
                 return state.copy()
             rng.shuffle(sources)
-            remaining = np.full(n_species, n_channels, dtype=int)
+            counts = state.sum(axis=1).astype(int)
             targets = np.empty(sources.size, dtype=int)
             changed = False
             for index, source in enumerate(sources):
-                available = remaining > 0
-                constrained = probabilities[source] * available
-                if constrained.sum() == 0.0:
-                    if available[source]:
-                        target = int(source)
-                    else:
-                        target = int(rng.choice(np.flatnonzero(available)))
-                else:
-                    constrained /= constrained.sum()
-                    target = int(rng.choice(n_species, p=constrained))
+                target = int(rng.choice(n_species, p=probabilities[source]))
+                if target != source and counts[target] >= n_channels:
+                    target = int(source)
                 targets[index] = target
-                remaining[target] -= 1
+                counts[source] -= 1
+                counts[target] += 1
                 changed |= target != source
 
             if not changed:
