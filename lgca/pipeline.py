@@ -327,6 +327,27 @@ class _RestingBiasTerm(_ReorientationTerm):
         return candidates[:, lgca.velocitychannels :].sum(axis=1)
 
 
+def _physical_field_gradient(lgca, field):
+    """Differentiate a prescribed field in physical lattice coordinates.
+
+    Centered interior and one-sided edge differences do not wrap the prescribed
+    field across particle boundaries. Singleton axes have zero derivative.
+    The coordinate Jacobian removes the hexagonal row staggering and spacing.
+    """
+    ndim = len(lgca.dims)
+    coordinates = [getattr(lgca, name) for name in ("xcoords", "ycoords", "zcoords")[:ndim]]
+    derivatives = np.zeros(field.shape + (ndim,))
+    jacobian = np.zeros(field.shape + (ndim, ndim))
+    for axis, size in enumerate(lgca.dims):
+        if size == 1:
+            jacobian[..., axis, axis] = 1
+            continue
+        derivatives[..., axis] = np.gradient(field, axis=axis)
+        for component, coordinate in enumerate(coordinates):
+            jacobian[..., axis, component] = np.gradient(coordinate, axis=axis)
+    return np.linalg.solve(jacobian, derivatives[..., None])[..., 0]
+
+
 class _ChemotaxisTerm(_ReorientationTerm):
     def __init__(self, spec: ReorientationTermSpec):
         super().__init__(spec)
@@ -345,10 +366,7 @@ class _ChemotaxisTerm(_ReorientationTerm):
             raise ValueError(
                 f"state.fields.{self.field_name} must have shape {expected}, got {field.shape}"
             )
-        gradients = np.gradient(field)
-        if isinstance(gradients, np.ndarray):
-            gradients = [gradients]
-        self.gradient = np.stack(gradients, axis=-1)
+        self.gradient = _physical_field_gradient(context.lgca, field)
 
     def score(self, candidates, node, lgca, coord):
         if self.gradient is None:

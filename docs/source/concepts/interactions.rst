@@ -86,6 +86,12 @@ specifications and backwards compatibility.
      - No additional input.
      - Unbiased sampler term.
 
+Prescribed chemotaxis fields are differentiated in physical lattice coordinates,
+including hexagonal row staggering and vertical spacing. Interior differences
+are centered and edge differences are one-sided; scalar fields do not implicitly
+wrap with the particle boundary condition. A singleton axis has zero derivative.
+Thus a physical linear ramp has the same gradient at boundary and interior sites.
+
 Particle-conserving phenotype switching
 ---------------------------------------
 
