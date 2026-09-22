@@ -24,6 +24,29 @@ def make_square_lgca(seed=1):
     )
 
 
+@pytest.mark.parametrize("steps", [[], [10], [0], [2]])
+def test_animation_schedule_is_checked_before_dynamics(steps):
+    from copy import deepcopy
+
+    lgca = make_square_lgca()
+    observer = AnimationObserver(schedule=Schedule(steps=steps), cbar=False)
+    before = lgca.nodes.copy()
+    rng = deepcopy(lgca.rng.bit_generator.state)
+    runner = SimulationRunner(lgca, timesteps=2, observers=[observer], showprogress=False)
+    if not steps or steps == [10]:
+        with pytest.raises(ValueError, match="schedule selects no frames"):
+            runner.run()
+        np.testing.assert_array_equal(lgca.nodes, before)
+        assert lgca.rng.bit_generator.state == rng
+        assert observer.animation is None
+    else:
+        runner.run()
+        assert observer.frame_steps == steps
+        assert observer.animation is not None
+        observer.animation._draw_was_started = True
+    plt.close("all")
+
+
 @pytest.mark.parametrize("moving", [False, True])
 @pytest.mark.parametrize("channels,expected_rest", [(slice(0, 4), False), (slice(4, 5), True)])
 def test_density_facade_uses_channel_history_and_its_times(moving, channels, expected_rest):

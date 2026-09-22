@@ -134,6 +134,9 @@ class AnimationObserver(Observer):
 
     def setup(self, lgca, runner) -> None:
         _validate_observer_backend(lgca)
+        if self.schedule.steps is not None and not any(step <= runner.timesteps for step in self.schedule.steps):
+            raise ValueError("Animation schedule selects no frames in this run; "
+                             f"include a local step between 0 and {runner.timesteps}")
         self.frames = []
         self.frame_steps = []
         self.animation = None
