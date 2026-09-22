@@ -1088,7 +1088,10 @@ def _build_lgca(spec: ModelSpec):
     if spec.time.seed is not None:
         kwargs["seed"] = spec.time.seed
     if spec.state.nodes is not None:
-        kwargs["nodes"] = spec.state.nodes
+        try:
+            kwargs["nodes"] = np.asarray(spec.state.nodes)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("model.state.nodes must be a rectangular state array") from exc
     elif spec.state.density is not None:
         kwargs["density"] = spec.state.density
     elif spec.state.initializer is not None:
