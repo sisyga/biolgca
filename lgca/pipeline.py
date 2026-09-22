@@ -311,7 +311,12 @@ class _ReorientationTerm:
             raise ValueError(f"species index {self.species} exceeds state.n_species")
 
     def score(self, candidates, node, lgca, coord):
-        return np.zeros(candidates.shape[0], dtype=float)
+        coords = tuple(np.asarray([index]) for index in coord)
+        return np.broadcast_to(self.score_batch(_candidate_features(candidates, lgca), lgca, coords),
+                               (1, len(candidates)))[0]
+
+    def score_batch(self, features, lgca, coords):
+        return 0.0
 
     def prepare(self, lgca, source_channels):
         """Prepare spatial fields once from the frozen operator input."""
@@ -325,8 +330,8 @@ class _UniformTerm(_ReorientationTerm):
 
 
 class _RestingBiasTerm(_ReorientationTerm):
-    def score(self, candidates, node, lgca, coord):
-        return candidates[:, lgca.velocitychannels :].sum(axis=1)
+    def score_batch(self, features, lgca, coords):
+        return features["rest"]
 
 
 def _physical_field_gradient(lgca, field):
@@ -377,13 +382,9 @@ class _ChemotaxisTerm(_ReorientationTerm):
             raise ValueError(f"Field {self.field_name!r} must contain finite scalar values on the lattice")
         self.gradient = _physical_field_gradient(lgca, field)
 
-    def score(self, candidates, node, lgca, coord):
-        if self.gradient is None:
-            return np.zeros(candidates.shape[0], dtype=float)
-        spatial = tuple(index - lgca.r_int for index in coord)
-        gradient = self.gradient[spatial]
-        flux = candidates[:, : lgca.velocitychannels] @ lgca.c.T
-        return flux @ gradient
+    def score_batch(self, features, lgca, coords):
+        spatial = tuple(index - lgca.r_int for index in coords)
+        return self.gradient[spatial] @ features["flux"].T
 
     def dependencies(self) -> set[str]:
         return set() if not self.field_name else {self.field_name}
@@ -394,10 +395,9 @@ class _NematicAlignmentTerm(_ReorientationTerm):
         self.neighbor_channels = lgca.nb_sum(
             source_channels[..., : lgca.velocitychannels].astype(np.int64)
         )
-        self.dot_sq = (lgca.c.T @ lgca.c) ** 2
 
-    def score(self, candidates, node, lgca, coord):
-        return candidates[:, : lgca.velocitychannels] @ self.dot_sq @ self.neighbor_channels[coord]
+    def score_batch(self, features, lgca, coords):
+        return self.neighbor_channels[coords] @ features["nematic"].T
 
     def dependencies(self) -> set[str]:
         return {"boundary_nodes"}
@@ -407,9 +407,8 @@ class _PersistentWalkTerm(_ReorientationTerm):
     def prepare(self, lgca, source_channels):
         self.local_flux = source_channels[..., : lgca.velocitychannels] @ lgca.c.T
 
-    def score(self, candidates, node, lgca, coord):
-        candidate_flux = candidates[:, : lgca.velocitychannels] @ lgca.c.T
-        return candidate_flux @ self.local_flux[coord]
+    def score_batch(self, features, lgca, coords):
+        return self.local_flux[coords] @ features["flux"].T
 
 
 class _PolarAlignmentTerm(_PersistentWalkTerm):
@@ -426,9 +425,8 @@ class _AggregationTerm(_ReorientationTerm):
         density = source_channels.sum(axis=-1)
         self.gradient = lgca.gradient(density)
 
-    def score(self, candidates, node, lgca, coord):
-        candidate_flux = candidates[:, : lgca.velocitychannels] @ lgca.c.T
-        return candidate_flux @ self.gradient[coord]
+    def score_batch(self, features, lgca, coords):
+        return self.gradient[coords] @ features["flux"].T
 
     def dependencies(self) -> set[str]:
         return {"boundary_nodes", "cell_density"}
@@ -463,15 +461,10 @@ class _ContactGuidanceTerm(_ReorientationTerm):
         norm = np.linalg.norm(field, axis=-1, keepdims=True)
         self.director = np.divide(field, norm, out=np.zeros_like(field), where=norm > 0)
 
-    def score(self, candidates, node, lgca, coord):
-        if self.director is None:
-            return np.zeros(candidates.shape[0], dtype=float)
-        spatial = tuple(index - lgca.r_int for index in coord)
-        director = self.director[spatial]
-        if not np.any(director):
-            return np.zeros(candidates.shape[0], dtype=float)
-        channel_alignment = lgca.c.T @ director
-        return candidates[:, : lgca.velocitychannels] @ (channel_alignment ** 2)
+    def score_batch(self, features, lgca, coords):
+        spatial = tuple(index - lgca.r_int for index in coords)
+        alignment = self.director[spatial] @ lgca.c
+        return alignment**2 @ features["channels"].T
 
     def dependencies(self) -> set[str]:
         return {self.field_name} if self.field_name else set()
@@ -497,6 +490,18 @@ def list_reorientation_terms() -> tuple[str, ...]:
     """Return the supported reorientation-term names in deterministic order."""
 
     return tuple(sorted(_REORIENTATION_TERMS))
+
+
+def _candidate_features(candidates, lgca):
+    """Cache candidate-only quantities for one occupancy group."""
+    feature_bytes = len(candidates) * (2 * lgca.velocitychannels + lgca.c.shape[0] + 1) * 8
+    if feature_bytes > _MAX_CANDIDATE_BATCH_BYTES:
+        raise ValueError(f"Candidate features require {feature_bytes:,} bytes; "
+                         "reduce channels or use a non-enumerating interaction")
+    channels = candidates[:, :lgca.velocitychannels].astype(float)
+    return {"channels": channels, "flux": channels @ lgca.c.T,
+            "nematic": channels @ (lgca.c.T @ lgca.c)**2,
+            "rest": candidates[:, lgca.velocitychannels:].sum(axis=1)}
 
 
 class BoltzmannReorientationOperator(ReorientationOperator):
@@ -546,13 +551,7 @@ class BoltzmannReorientationOperator(ReorientationOperator):
                 source_channels = source_channels.sum(axis=-2)
             for term in self.terms:
                 term.prepare(lgca, source_channels)
-            for spatial in np.ndindex(lgca.dims):
-                coord = tuple(index + lgca.r_int for index in spatial)
-                node = lgca._reorientation_source_nodes[coord]
-                if getattr(lgca, "n_species", 1) > 1:
-                    lgca.nodes[coord] = self._sample_multispecies_node(node, lgca, coord)
-                else:
-                    lgca.nodes[coord] = self._sample_node(node, lgca, coord, species=0)
+            self._sample_batches(lgca)
         finally:
             del lgca._reorientation_source_nodes
 
@@ -578,28 +577,36 @@ class BoltzmannReorientationOperator(ReorientationOperator):
             terms.append(_UniformTerm(ReorientationTermSpec(name="random_walk")))
         return terms
 
-    def _sample_multispecies_node(self, node, lgca, coord):
-        new_node = np.zeros_like(node)
-        for species in range(node.shape[0]):
-            new_node[species] = self._sample_node(node[species], lgca, coord, species=species)
-        return new_node
-
-    def _sample_node(self, node, lgca, coord, species: int | None):
-        n_particles = int(node.sum())
-        if n_particles == 0:
-            return np.zeros_like(node)
-        if n_particles > lgca.K:
-            raise ValueError("native reorientation requires at most one particle per channel")
-        candidates = lgca.get_permutations(n_particles)
-        scores = np.zeros(candidates.shape[0], dtype=float)
-        for term in self.terms:
-            if term.species is None or term.species == species:
-                scores += term.beta * term.score(candidates, node, lgca, coord)
-        scores -= scores.max()
-        weights = np.exp(scores)
-        weights /= weights.sum()
-        choice = lgca.rng.choice(candidates.shape[0], p=weights)
-        return candidates[choice].astype(node.dtype)
+    def _sample_batches(self, lgca):
+        nodes = lgca._reorientation_source_nodes[lgca.nonborder]
+        counts = nodes.sum(axis=-1)
+        sampled = np.zeros_like(nodes)
+        # Preserve the former spatial-then-species categorical draw order,
+        # including full sites, while grouping computation by occupancy.
+        draws = np.zeros(counts.shape)
+        draws[counts > 0] = lgca.rng.random(np.count_nonzero(counts))
+        ndim = len(lgca.dims)
+        multispecies = getattr(lgca, "n_species", 1) > 1
+        for count in np.unique(counts[counts > 0]):
+            candidates = lgca.get_permutations(int(count))
+            features = _candidate_features(candidates, lgca)
+            for indices in _candidate_batches(counts == count, len(candidates)):
+                coords = tuple(axis + lgca.r_int for axis in indices[:ndim])
+                scores = np.zeros((len(indices[0]), len(candidates)))
+                species = indices[-1] if multispecies else np.zeros(len(indices[0]), dtype=int)
+                for term in self.terms:
+                    if term.beta == 0:
+                        continue
+                    contribution = term.beta * term.score_batch(features, lgca, coords)
+                    if term.species is not None:
+                        contribution = contribution * (species == term.species)[:, None]
+                    scores += contribution
+                probabilities = _softmax_last_axis(scores)
+                cumulative = np.cumsum(probabilities, axis=-1)
+                cumulative /= cumulative[:, -1:]
+                choices = (cumulative <= draws[indices][:, None]).sum(axis=-1)
+                sampled[indices] = candidates[choices]
+        lgca.nodes[lgca.nonborder] = sampled
 
 
 from .classical_operators import NativeClassicalRandomWalkOperator

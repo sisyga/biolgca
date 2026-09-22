@@ -1,0 +1,149 @@
+{
+  "results": [
+    {
+      "size": 64,
+      "initial_occupancy": 1,
+      "route": "dedicated",
+      "steps": 5,
+      "seconds": [
+        0.01120009999795002,
+        0.005656000001181383,
+        0.005784799999673851
+      ],
+      "median_seconds": 0.005784799999673851
+    },
+    {
+      "size": 64,
+      "initial_occupancy": 1,
+      "route": "composed",
+      "steps": 5,
+      "seconds": [
+        0.5392787999990105,
+        0.5408386000017344,
+        0.5369351999979699
+      ],
+      "median_seconds": 0.5392787999990105
+    },
+    {
+      "size": 64,
+      "initial_occupancy": 1,
+      "route": "combined",
+      "steps": 5,
+      "seconds": [
+        0.6631544999981998,
+        0.6617455000014161,
+        0.6581985999982862
+      ],
+      "median_seconds": 0.6617455000014161
+    },
+    {
+      "size": 64,
+      "initial_occupancy": 2,
+      "route": "dedicated",
+      "steps": 5,
+      "seconds": [
+        0.006313300000329036,
+        0.00609719999920344,
+        0.006080899998778477
+      ],
+      "median_seconds": 0.00609719999920344
+    },
+    {
+      "size": 64,
+      "initial_occupancy": 2,
+      "route": "composed",
+      "steps": 5,
+      "seconds": [
+        0.6759095999987039,
+        0.6751455999983591,
+        0.674520599997777
+      ],
+      "median_seconds": 0.6751455999983591
+    },
+    {
+      "size": 64,
+      "initial_occupancy": 2,
+      "route": "combined",
+      "steps": 5,
+      "seconds": [
+        0.802561100001185,
+        0.8028101999989303,
+        0.7959164000021701
+      ],
+      "median_seconds": 0.802561100001185
+    },
+    {
+      "size": 128,
+      "initial_occupancy": 1,
+      "route": "dedicated",
+      "steps": 5,
+      "seconds": [
+        0.019381399997655535,
+        0.019156999998813262,
+        0.018514899998990586
+      ],
+      "median_seconds": 0.019156999998813262
+    },
+    {
+      "size": 128,
+      "initial_occupancy": 1,
+      "route": "composed",
+      "steps": 5,
+      "seconds": [
+        2.1609175999983563,
+        2.162883699998929,
+        2.1550944999980857
+      ],
+      "median_seconds": 2.1609175999983563
+    },
+    {
+      "size": 128,
+      "initial_occupancy": 1,
+      "route": "combined",
+      "steps": 5,
+      "seconds": [
+        2.6471984999989218,
+        2.6342861999983143,
+        2.6311072999997123
+      ],
+      "median_seconds": 2.6342861999983143
+    },
+    {
+      "size": 128,
+      "initial_occupancy": 2,
+      "route": "dedicated",
+      "steps": 5,
+      "seconds": [
+        0.020922400002746144,
+        0.02113159999862546,
+        0.020714099999167956
+      ],
+      "median_seconds": 0.020922400002746144
+    },
+    {
+      "size": 128,
+      "initial_occupancy": 2,
+      "route": "composed",
+      "steps": 5,
+      "seconds": [
+        2.6944330999976955,
+        2.692003400003159,
+        2.695017599999119
+      ],
+      "median_seconds": 2.6944330999976955
+    },
+    {
+      "size": 128,
+      "initial_occupancy": 2,
+      "route": "combined",
+      "steps": 5,
+      "seconds": [
+        3.193543299999874,
+        3.191713100000925,
+        3.191342199999781
+      ],
+      "median_seconds": 3.191713100000925
+    }
+  ],
+  "profile": "         127700 function calls (127608 primitive calls) in 0.217 seconds\n\n   Ordered by: cumulative time\n   List reduced from 130 to 18 due to restriction <18>\n\n   ncalls  tottime  percall  cumtime  percall filename:lineno(function)\n        1    0.000    0.000    0.217    0.217 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\model.py:851(run)\n        1    0.000    0.000    0.217    0.217 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\model.py:1164(_run_compiled_model)\n        1    0.000    0.000    0.216    0.216 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\simulation.py:172(run)\n        1    0.000    0.000    0.216    0.216 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\model.py:1172(execute_pipeline_step)\n        1    0.000    0.000    0.216    0.216 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\model.py:846(step)\n        1    0.000    0.000    0.216    0.216 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\pipeline.py:114(execute_step)\n        1    0.018    0.018    0.216    0.216 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\pipeline.py:540(apply)\n     4096    0.101    0.000    0.194    0.000 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\pipeline.py:587(_sample_node)\n    12293    0.024    0.000    0.024    0.000 {method 'reduce' of 'numpy.ufunc' objects}\n     4096    0.023    0.000    0.023    0.000 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\pipeline.py:429(score)\n     8197    0.003    0.000    0.021    0.000 {method 'sum' of 'numpy.ndarray' objects}\n     8197    0.002    0.000    0.018    0.000 C:\\Users\\simon\\Anaconda3\\envs\\biolgca\\Lib\\site-packages\\numpy\\_core\\_methods.py:47(_sum)\n     4096    0.017    0.000    0.017    0.000 C:\\Users\\simon\\.codex\\worktrees\\33dd\\biolgca\\lgca\\pipeline.py:399(score)\n     4098    0.005    0.000    0.011    0.000 C:\\Users\\simon\\Anaconda3\\envs\\biolgca\\Lib\\site-packages\\numpy\\_core\\numerictypes.py:475(issubdtype)\n     4096    0.002    0.000    0.011    0.000 {method 'max' of 'numpy.ndarray' objects}\n     4096    0.001    0.000    0.009    0.000 C:\\Users\\simon\\Anaconda3\\envs\\biolgca\\Lib\\site-packages\\numpy\\_core\\_methods.py:39(_amax)\n     8196    0.004    0.000    0.006    0.000 C:\\Users\\simon\\Anaconda3\\envs\\biolgca\\Lib\\site-packages\\numpy\\_core\\numerictypes.py:293(issubclass_)\n     8192    0.002    0.000    0.004    0.000 C:\\Users\\simon\\Anaconda3\\envs\\biolgca\\Lib\\site-packages\\numpy\\_core\\getlimits.py:178(__new__)\n\n\n"
+}

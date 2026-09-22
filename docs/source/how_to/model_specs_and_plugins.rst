@@ -370,3 +370,15 @@ dynamically growing family histories, model state and renderer buffers cost extr
 Dedicated vector, tensor and wetting reorientation samplers process candidate
 scores in batches with a conservative 32 MiB temporary budget. This preserves
 site order and RNG draws; it does not change the transition model.
+
+Composed Boltzmann reorientation also batches sites by occupancy and caches
+candidate flux, nematic scores and rest occupancy once per group. Score batches
+and cached candidate features each have a 32 MiB budget; these are temporary
+array limits, not a total process-memory limit. Candidate enumeration has its
+own size guard. The sampler retains one categorical uniform draw per nonempty
+site/species in spatial order, including fully occupied sites. Scalar-reference
+regressions preserve seeded trajectories for the tested mixed terms and species.
+Floating-point matrix evaluation can differ in its final bits across numerical
+libraries, so cross-platform bitwise trajectories are not promised. Boltzmann
+transition weights are unchanged. See ``benchmarks/composed_reorientation.py``
+and the reopened milestone validation report for repeated multi-step timings.
