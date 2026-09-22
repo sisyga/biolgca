@@ -368,6 +368,13 @@ class _ChemotaxisTerm(_ReorientationTerm):
             )
         self.gradient = _physical_field_gradient(context.lgca, field)
 
+    def prepare(self, lgca, source_channels):
+        field = np.asarray(getattr(lgca, self.field_name), dtype=float)
+        field = field[lgca.nonborder]
+        if field.shape != tuple(lgca.dims) or not np.isfinite(field).all():
+            raise ValueError(f"Field {self.field_name!r} must contain finite scalar values on the lattice")
+        self.gradient = _physical_field_gradient(lgca, field)
+
     def score(self, candidates, node, lgca, coord):
         if self.gradient is None:
             return np.zeros(candidates.shape[0], dtype=float)
@@ -443,6 +450,14 @@ class _ContactGuidanceTerm(_ReorientationTerm):
             raise ValueError(
                 f"state.fields.{self.field_name} must have shape {expected}, got {field.shape}"
             )
+        norm = np.linalg.norm(field, axis=-1, keepdims=True)
+        self.director = np.divide(field, norm, out=np.zeros_like(field), where=norm > 0)
+
+    def prepare(self, lgca, source_channels):
+        field = np.asarray(getattr(lgca, self.field_name), dtype=float)[lgca.nonborder]
+        expected = tuple(lgca.dims) + (lgca.c.shape[0],)
+        if field.shape != expected or not np.isfinite(field).all():
+            raise ValueError(f"Field {self.field_name!r} must contain finite vectors of shape {expected}")
         norm = np.linalg.norm(field, axis=-1, keepdims=True)
         self.director = np.divide(field, norm, out=np.zeros_like(field), where=norm > 0)
 
