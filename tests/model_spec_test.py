@@ -23,6 +23,26 @@ from lgca.simulation import DensityRecorder, FamilyPopulationRecorder, NodeRecor
 from lgca.simulation import Observer
 
 
+@pytest.mark.parametrize("geometry,dims", [("lin", [3]), ("square", [3, 4]),
+    ("hex", [3, 4]), ("cubic", [3, 4, 5]), ("moore", [3, 4, 5])])
+def test_plain_json_and_yaml_dimension_arrays(geometry, dims):
+    import json
+    from lgca.model import model_spec_from_yaml
+
+    data = {"schema_version": 1, "model": {"space": {"geometry": geometry, "dims": dims},
+            "state": {"density": 0}, "time": {"steps": 0}}}
+    for spec in (model_spec_from_json(json.dumps(data)),
+                 model_spec_from_yaml(f"schema_version: 1\nmodel:\n  space:\n    geometry: {geometry}\n    dims: {dims}\n  state:\n    density: 0\n  time:\n    steps: 0\n"),
+                 ModelSpec(space=SpaceSpec(geometry=geometry, dims=dims), state=StateSpec(density=0))):
+        assert build_model(spec).lgca.dims == tuple(dims)
+
+
+@pytest.mark.parametrize("dims", [[3], [3, 4, 5], [], [0, 3], [True, 3], [1.5, 3]])
+def test_dimension_errors_identify_model_field(dims):
+    with pytest.raises(ValueError, match="model.space.dims"):
+        build_model(ModelSpec(space=SpaceSpec(geometry="square", dims=dims)))
+
+
 def _square_spec(*, operators=(), timesteps=3, seed=17):
     return ModelSpec(
         description=Description(title="registry driven square LGCA"),

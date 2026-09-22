@@ -985,6 +985,12 @@ def _normalize_and_validate_spec(spec: ModelSpec) -> ModelSpec:
     if not isinstance(boundary, str) or boundary.lower() not in _BOUNDARY_ALIASES:
         raise ValueError("model.space.boundary must name a supported boundary condition")
     _validate_dims(spec.space.dims)
+    dims = spec.space.dims
+    if dims is not None and np.asarray(dims).ndim != 0:
+        dims = tuple(int(value) for value in dims)
+        dimension = {"lin": 1, "square": 2, "hex": 2, "cubic": 3, "moore": 3}[_GEOMETRY_ALIASES[geometry.lower()]]
+        if len(dims) != dimension:
+            raise ValueError(f"model.space.dims must contain {dimension} dimensions for {geometry}")
 
     parameters = dict(spec.state.parameters)
     for name in sorted(set(parameters) & _RESERVED_STATE_PARAMETERS):
@@ -1010,6 +1016,7 @@ def _normalize_and_validate_spec(spec: ModelSpec) -> ModelSpec:
         space=replace(
             spec.space,
             geometry=_GEOMETRY_ALIASES[geometry.lower()],
+            dims=dims,
             boundary=_BOUNDARY_ALIASES[boundary.lower()],
         ),
         state=replace(spec.state, parameters=parameters, capacity=capacity),
