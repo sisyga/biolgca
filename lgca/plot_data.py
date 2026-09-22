@@ -16,6 +16,41 @@ def history_steps(lgca, length, attribute, steps=None, *, implicit=False):
     return values
 
 
+def resolve_animation_history(lgca, data_argument, data=None, steps=None,
+                              channels=slice(None)):
+    """Resolve frames and paired times without dropping channel selection.
+
+    Explicit arrays default to dense times. Density arrays are already reduced
+    and cannot be channel-selected; implicit selection requires node history.
+    """
+    implicit = data is None
+    selected = channels != slice(None)
+    attribute = "dens_t" if data_argument == "density_t" else "nodes_t"
+    if implicit:
+        if data_argument == "density_t" and selected:
+            attribute = "nodes_t"
+        if not hasattr(lgca, attribute):
+            raise RuntimeError(f"Animation requires recorded {attribute}; "
+                               "use NodeRecorder for channel selection or DensityRecorder for total density")
+        data = getattr(lgca, attribute)
+        if data_argument == "density_t" and selected:
+            data = np.asarray(data)[..., channels]
+            if data.dtype == object:
+                data = np.fromiter((len(cell) for cell in data.flat), dtype=int,
+                                   count=data.size).reshape(data.shape)
+            elif hasattr(lgca, "occupied"):
+                data = data > 0
+            data = data.sum(axis=-1)
+    elif data_argument == "density_t" and selected:
+        raise ValueError("Explicit density data is already reduced; select channels before passing data")
+    data = np.asarray(data)
+    if not len(data):
+        raise ValueError("Animation requires at least one sampled frame")
+    times = history_steps(lgca, len(data), "dens_steps" if attribute == "dens_t" else "nodes_steps",
+                          steps, implicit=implicit)
+    return data, times
+
+
 def label_history_axis(ax, steps, offset=0):
     """Label image sample rows with their actual, possibly nonuniform times."""
     indices = np.unique(np.linspace(0, len(steps) - 1, min(8, len(steps))).astype(int))

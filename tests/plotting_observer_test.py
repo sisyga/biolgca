@@ -24,6 +24,29 @@ def make_square_lgca(seed=1):
     )
 
 
+@pytest.mark.parametrize("moving", [False, True])
+@pytest.mark.parametrize("channels,expected_rest", [(slice(0, 4), False), (slice(4, 5), True)])
+def test_density_facade_uses_channel_history_and_its_times(moving, channels, expected_rest):
+    nodes = np.zeros((2, 2, 5), dtype=bool)
+    nodes[..., 4] = True
+    nodes[..., 0] = moving
+    lgca = get_lgca(geometry="square", nodes=nodes, interaction="only_propagation")
+    lgca.nodes_t = np.stack([nodes] * 3)
+    lgca.nodes_steps = np.array([0, 3, 20])
+    lgca.dens_t = np.stack([nodes.sum(-1)] * 2)
+    lgca.dens_steps = np.array([0, 20])
+    animation = animate(lgca, channels=channels, cbar=False)
+    animation._func(2)
+    ax = animation._fig.axes[0]
+    np.testing.assert_array_equal(ax.images[0].get_array(), 1 if expected_rest else int(moving))
+    assert ax.get_title() == "Time $k =$20"
+    animation._draw_was_started = True
+    del lgca.nodes_t
+    with pytest.raises(RuntimeError, match="NodeRecorder"):
+        animate(lgca, channels=channels)
+    plt.close("all")
+
+
 def test_plot_snapshot_observer_records_results_and_paths(tmp_path):
     lgca = make_square_lgca()
     observer = PlotSnapshotObserver(

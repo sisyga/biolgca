@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 
 from .list_utils import _copy_arr_of_lists, get_arr_of_empty_lists
-from .plot_data import history_steps
+from .plot_data import resolve_animation_history
 from .simulation import Observer, Schedule
 
 __all__ = [
@@ -49,12 +49,8 @@ def animate(lgca, kind: str = "density", data=None, steps=None, **kwargs):
 
     method_name, data_argument = _resolve_animation(kind)
     method = getattr(lgca, method_name)
-    implicit = data is None
-    attribute = "dens_t" if data_argument == "density_t" else "nodes_t"
-    if implicit:
-        data = getattr(lgca, attribute)
-    times = history_steps(lgca, len(data), "dens_steps" if attribute == "dens_t" else "nodes_steps",
-                          steps, implicit=implicit)
+    channels = kwargs.pop("channels", slice(None)) if data_argument == "density_t" else slice(None)
+    data, times = resolve_animation_history(lgca, data_argument, data, steps, channels)
     animation = method(**{data_argument: data}, **kwargs)
     update = animation._func
     axis = animation._fig.axes[0]
