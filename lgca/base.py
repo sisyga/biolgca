@@ -1070,10 +1070,17 @@ class LGCA_base(ABC):
         """
         self.cell_density = self.nodes.sum(-1)
 
+    def _validate_evolution(self):
+        """Reject unsupported transport domains before any interaction runs."""
+        if self.geometry == "hex" and self.bc == "periodic" and self.dims[1] % 2:
+            raise ValueError("Periodic hexagonal evolution requires an even number of rows; "
+                             "odd-row domains are available for static plotting only")
+
     def timestep(self):
         """
         Update the state of the LGCA from time k to k+1. Includes the interaction and propagation steps.
         """
+        self._validate_evolution()
         if hasattr(self, "_compiled_model"):
             self._compiled_model.step()
             return

@@ -120,6 +120,7 @@ class CompiledPipeline:
         timing_trace_limit: int = 0,
     ) -> None:
         lgca = context.lgca
+        lgca._validate_evolution()
         for operator in self.operators:
             if "boundary_nodes" in operator.dependencies():
                 lgca.apply_boundaries()

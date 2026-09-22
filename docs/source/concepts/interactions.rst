@@ -99,6 +99,11 @@ operator. Derived gradients and normalized directors refresh once per operator,
 not per site. Contact guidance is nematic: negating a director preserves its axis;
 rotating that axis changes the cue.
 
+Periodic hexagonal evolution requires an even number of rows so opposite-channel
+transport is reciprocal across the seam. Odd-row models can be constructed for
+static plotting, but stepping (including direct propagation) rejects them before
+state or random-number changes.
+
 Particle-conserving phenotype switching
 ---------------------------------------
 
