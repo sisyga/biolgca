@@ -167,7 +167,7 @@
             ]
           }
         },
-        "propagation": {"$ref": "#/$defs/jsonValue"},
+        "propagation": {"enum": [true, false, null, "default", "none", "disabled"]},
         "allow_custom_order": {"type": "boolean"}
       }
     },

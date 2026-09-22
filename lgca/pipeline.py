@@ -182,6 +182,9 @@ def compile_pipeline(spec: InteractionPipelineSpec | None, context) -> CompiledP
     """Compile a pipeline spec into executable operators."""
 
     spec = spec or InteractionPipelineSpec()
+    if not (spec.propagation is None or isinstance(spec.propagation, bool)
+            or isinstance(spec.propagation, str) and spec.propagation in {"default", "none", "disabled"}):
+        raise ValueError("dynamics.propagation must be a boolean, null, 'default', 'none', or 'disabled'")
     operators = []
     for index, operator_spec in enumerate(spec.operators):
         try:
@@ -255,9 +258,18 @@ def _softmax_last_axis(scores: np.ndarray) -> np.ndarray:
 class _ReorientationTerm:
     def __init__(self, spec: ReorientationTermSpec):
         self.name = spec.name
+        if isinstance(spec.beta, (bool, str)) or np.asarray(spec.beta).ndim != 0 or not np.isfinite(spec.beta):
+            raise ValueError("beta must be a finite numeric scalar")
         self.beta = float(spec.beta)
         self.parameters = dict(spec.parameters)
         self.species = spec.species
+        if self.species is not None and (isinstance(self.species, bool)
+                or not isinstance(self.species, (int, np.integer)) or self.species < 0):
+            raise ValueError("species must be a nonnegative integer index")
+        allowed = {"field"} if self.name in {"chemotaxis", "contact_guidance"} else set()
+        unknown = set(self.parameters) - allowed
+        if unknown:
+            raise ValueError(f"parameters contains unknown keys: {sorted(unknown)}")
 
     def validate(self, context) -> None:
         if self.species is not None and self.species >= context.spec.state.n_species:
@@ -436,8 +448,11 @@ class BoltzmannReorientationOperator(ReorientationOperator):
             raise ValueError("native reorientation does not yet support identity-based states")
         if not context.spec.state.volume_exclusion:
             raise ValueError("native reorientation currently requires volume exclusion")
-        for term in self.terms:
-            term.validate(context)
+        for index, term in enumerate(self.terms):
+            try:
+                term.validate(context)
+            except ValueError as exc:
+                raise ValueError(f"terms[{index}] {exc}") from exc
 
     def setup(self, context) -> None:
         lgca = context.lgca
@@ -477,7 +492,10 @@ class BoltzmannReorientationOperator(ReorientationOperator):
                 term_cls = _REORIENTATION_TERMS[term_spec.name]
             except KeyError as exc:
                 raise ValueError(f".terms[{index}] unknown reorientation term {term_spec.name!r}") from exc
-            terms.append(term_cls(term_spec))
+            try:
+                terms.append(term_cls(term_spec))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f".terms[{index}] {exc}") from exc
         if not terms:
             terms.append(_UniformTerm(ReorientationTermSpec(name="random_walk")))
         return terms

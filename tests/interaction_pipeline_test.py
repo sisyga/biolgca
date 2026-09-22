@@ -282,6 +282,26 @@ def test_single_species_scoped_terms_match_unscoped_seeded_evolution(name):
     np.testing.assert_array_equal(*results)
 
 
+@pytest.mark.parametrize("term,field", [
+    (ReorientationTermSpec("persistent_walk", parameters={"betta": 100}), "parameters"),
+    (ReorientationTermSpec("persistent_walk", species=-1), "species"),
+    (ReorientationTermSpec("persistent_walk", species=True), "species"),
+    (ReorientationTermSpec("persistent_walk", species=.5), "species"),
+    (ReorientationTermSpec("persistent_walk", beta=np.nan), "beta"),
+    (ReorientationTermSpec("persistent_walk", beta=np.inf), "beta"),
+    (ReorientationTermSpec("persistent_walk", beta="2"), "beta"),
+])
+def test_composed_term_invalid_fields_fail_independently(term, field):
+    with pytest.raises(ValueError, match=rf"terms\[0\].*{field}"):
+        build_model(ModelSpec(dynamics=InteractionPipelineSpec(operators=[ReorientationSpec(terms=[term])])))
+
+
+@pytest.mark.parametrize("propagation", ["flase", 1, 0, [], {}])
+def test_pipeline_rejects_invalid_propagation(propagation):
+    with pytest.raises(ValueError, match="dynamics.propagation"):
+        build_model(ModelSpec(dynamics=InteractionPipelineSpec(propagation=propagation)))
+
+
 def test_nematic_alignment_term_favors_neighbor_axis_in_one_sampler():
     nodes = np.zeros((3, 3, 5), dtype=bool)
     nodes[1, 1, 1] = True

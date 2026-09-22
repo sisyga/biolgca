@@ -105,6 +105,20 @@ def test_ve_growth_capacity_configuration_and_metadata(n_species, canonical):
             build_model(conflict)
 
 
+@pytest.mark.parametrize("field,value", [("beta", float("inf")), ("species", -1),
+                                        ("parameters", {"betta": 3})])
+def test_serialized_composed_term_contracts(field, value):
+    import json
+    from lgca.model import model_spec_from_yaml
+
+    term = {"name": "persistent_walk", field: value}
+    data = {"schema_version": 1, "model": {"space": {"geometry": "lin", "dims": 2},
+            "dynamics": {"operators": [{"type": "reorientation", "terms": [term]}]}}}
+    for loader in (model_spec_from_json, model_spec_from_yaml):
+        with pytest.raises(ValueError, match=field):
+            build_model(loader(json.dumps(data)))
+
+
 def _square_spec(*, operators=(), timesteps=3, seed=17):
     return ModelSpec(
         description=Description(title="registry driven square LGCA"),
