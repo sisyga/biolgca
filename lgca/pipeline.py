@@ -9,6 +9,7 @@ from typing import Any, Mapping, Sequence
 
 import numpy as np
 
+from .base import _sampling_totals
 from .plugins import (
     BirthDeathOperator,
     ConservationLaw,
@@ -2336,6 +2337,7 @@ class NativeNoVEAlignmentOperator(ReorientationOperator):
 
     def apply(self, context, step: int) -> None:
         lgca = context.lgca
+        density = _sampling_totals(lgca.nodes[lgca.nonborder])
         g = lgca.calc_flux(lgca.nodes)
         if self.include_center:
             g += lgca.nb_sum(g)
@@ -2352,7 +2354,6 @@ class NativeNoVEAlignmentOperator(ReorientationOperator):
 
         weights = _softmax_last_axis(self.beta * np.einsum("...i,ij->...j", g, lgca.c))
         newnodes = lgca.nodes.copy()
-        density = lgca.cell_density[lgca.nonborder]
         newnodes[lgca.nonborder] = lgca.rng.multinomial(density, weights[lgca.nonborder])
         lgca.nodes = newnodes
 
@@ -2375,7 +2376,7 @@ class NativeNoVERandomWalkOperator(ReorientationOperator):
         lgca = context.lgca
         newnodes = lgca.nodes.copy()
         weights = np.full(lgca.K, 1 / lgca.K)
-        density = lgca.cell_density[lgca.nonborder]
+        density = _sampling_totals(lgca.nodes[lgca.nonborder])
         newnodes[lgca.nonborder] = lgca.rng.multinomial(density, weights)
         lgca.nodes = newnodes
 
