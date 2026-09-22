@@ -162,7 +162,7 @@ class SimulationRunner:
         self.observers = list(observers or [])
         self.showprogress = showprogress
         self.step_function = step_function
-        self.context = context
+        self.context = context if context is not None else getattr(lgca, "_compiled_model", None)
         self.max_recording_bytes = max_recording_bytes
         self.elapsed_seconds = 0.0
 
