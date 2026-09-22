@@ -7,6 +7,7 @@ import importlib.resources
 import difflib
 import json
 import warnings
+from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -1186,6 +1187,9 @@ def _run_compiled_model(compiled: CompiledModel, showprogress: bool = True,
     )
     runner.run()
     compiled.metadata["runtime"] = {
+        "start_step": runner.start_step,
+        "end_step": runner.end_step,
+        "sample_time_origin": "local",
         "estimated_recording_bytes": runner.estimated_recording_bytes,
         "elapsed_seconds": runner.elapsed_seconds,
         "operator_timings": list(operator_timings.values()),
@@ -1197,7 +1201,7 @@ def _run_compiled_model(compiled: CompiledModel, showprogress: bool = True,
         spec=compiled.spec,
         context=compiled.context,
         pipeline=compiled.pipeline,
-        metadata=compiled.metadata,
+        metadata=deepcopy(compiled.metadata),
     )
 
 

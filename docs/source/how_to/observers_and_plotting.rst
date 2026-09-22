@@ -47,7 +47,7 @@ Observers can run every step, every ``n`` steps or at an explicit set of steps.
 
 For lightweight Python callbacks, wrap a function in
 :class:`lgca.simulation.CallbackObserver`. The callback receives the LGCA and
-the absolute simulation step. Use :func:`functools.partial` or a closure for
+the local step within this run, starting at zero. Use :func:`functools.partial` or a closure for
 additional arguments:
 
 .. code-block:: python
@@ -99,7 +99,7 @@ Dense and sparse recorder results
 The default schedule records every step, including step zero, and preserves
 the familiar ``timesteps + 1`` leading dimension. A sparse schedule stores
 only the selected samples. Each array recorder publishes the corresponding
-absolute step vector:
+local step vector:
 
 .. list-table::
    :header-rows: 1
@@ -122,6 +122,16 @@ absolute step vector:
 Always pair a sparse result with its step vector instead of interpreting its
 row index as simulation time. Implicit animation of a sparse history is
 rejected; pass an explicit history when custom timing is intended.
+
+On a compiled model, the operator clock continues across runs while observer
+schedules and callbacks restart at local zero. ``result.metadata['runtime']``
+records ``start_step``, ``end_step`` and ``sample_time_origin='local'``; the CLI
+persists them in ``metadata.json``. Add ``start_step`` to a recorded step vector
+to reconstruct cumulative time, and omit the duplicate shared endpoint when
+joining consecutive histories. Copy each history before the next run replaces
+the arrays. Result metadata is a snapshot and is not changed by later runs.
+Direct runners and ``timeevo`` expose the same offset as
+``lgca.recording_start_step`` (and the endpoint as ``recording_end_step``).
 
 Plotting module
 ---------------

@@ -46,3 +46,32 @@ def test_compiled_family_growth_recording_and_continuation(entry):
     np.testing.assert_array_equal(model.lgca.nodes, uninterrupted.lgca.nodes)
     assert model.lgca.props == uninterrupted.lgca.props
     assert model.lgca.rng.bit_generator.state == uninterrupted.lgca.rng.bit_generator.state
+
+
+def test_sparse_continuation_metadata_reconstructs_serialized_sample_times(tmp_path):
+    import json
+    from lgca.simulation import Schedule
+
+    model = build_model(ModelSpec(
+        space=SpaceSpec(geometry="lin", dims=3),
+        time=TimeSpec(steps=4, seed=146, timing_trace=10),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "classical.random_walk"}]),
+        analysis=AnalysisSpec(observers=[NodeRecorder(Schedule(steps=[0, 1, 4]))]),
+    ))
+    first = model.run(False)
+    first_steps = model.lgca.nodes_steps.copy()
+    second = model.run(False)
+    assert first.metadata["runtime"]["start_step"] == 0
+    assert first.metadata["runtime"]["end_step"] == 4
+    assert second.metadata["runtime"]["start_step"] == 4
+    assert second.metadata["runtime"]["end_step"] == 8
+    assert second.metadata["runtime"]["sample_time_origin"] == "local"
+    np.savez(tmp_path / "measurements.npz", nodes_steps=model.lgca.nodes_steps)
+    (tmp_path / "metadata.json").write_text(json.dumps(second.metadata))
+    saved = json.loads((tmp_path / "metadata.json").read_text())
+    with np.load(tmp_path / "measurements.npz") as archive:
+        cumulative = archive["nodes_steps"] + saved["runtime"]["start_step"]
+    np.testing.assert_array_equal(np.concatenate((first_steps, cumulative[1:])), [0, 1, 4, 5, 8])
+    assert model.lgca.recording_start_step == 4
+    assert model.lgca.recording_end_step == 8
+    assert set(row["step"] for row in second.metadata["runtime"]["timing_trace"]) == {5, 6, 7, 8}

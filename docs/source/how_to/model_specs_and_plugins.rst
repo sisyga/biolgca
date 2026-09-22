@@ -282,6 +282,12 @@ dynamics. Their ``lgca.timestep()``, ``lgca.timeevo(...)`` and live animations
 advance that same pipeline, preserving RNG state and cumulative operator time.
 ``compiled.step()`` advances one step. Each recording run still starts its
 observer schedule at local step zero and replaces that run's history arrays.
+The cumulative interval is recorded as ``runtime.start_step`` and
+``runtime.end_step`` in result/CLI metadata, with ``sample_time_origin='local'``.
+Add the start step to each paired recorder step array to combine continuations;
+drop the duplicate shared endpoint. A result's metadata remains a snapshot after
+subsequent runs. Direct runners publish ``lgca.recording_start_step`` and
+``lgca.recording_end_step`` for the same purpose.
 
 ``state.capacity`` supplies the carrying capacity for NoVE models and the shared
 birth limit for native VE ``birth_death``. An operator capacity that conflicts
