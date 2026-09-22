@@ -38,6 +38,7 @@ def test_reorientation_term_names_are_public_and_stable():
         "nematic_alignment",
         "persistent_motion",
         "persistent_walk",
+        "polar_alignment",
         "random_walk",
         "resting_bias",
         "uniform",
@@ -300,6 +301,22 @@ def test_composed_term_invalid_fields_fail_independently(term, field):
 def test_pipeline_rejects_invalid_propagation(propagation):
     with pytest.raises(ValueError, match="dynamics.propagation"):
         build_model(ModelSpec(dynamics=InteractionPipelineSpec(propagation=propagation)))
+
+
+def test_opposite_neighbors_distinguish_polar_and_nematic_scores():
+    from lgca.pipeline import _PolarAlignmentTerm, _NematicAlignmentTerm
+
+    lgca = get_lgca(geometry="square", dims=(3, 3), density=0, interaction="only_propagation")
+    lgca.nodes[1, 2, 0] = True  # east
+    lgca.nodes[3, 2, 2] = True  # west
+    candidates = np.eye(4, dtype=bool)
+    for kind, name, expected in (
+        (_PolarAlignmentTerm, "polar_alignment", [0, 0, 0, 0]),
+        (_NematicAlignmentTerm, "nematic_alignment", [2, 0, 2, 0]),
+    ):
+        term = kind(ReorientationTermSpec(name))
+        term.prepare(lgca, lgca.nodes)
+        np.testing.assert_allclose(term.score(candidates, lgca.nodes[2, 2], lgca, (2, 2)), expected)
 
 
 def test_nematic_alignment_term_favors_neighbor_axis_in_one_sampler():

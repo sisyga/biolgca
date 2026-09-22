@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+import warnings
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
@@ -258,6 +259,10 @@ def _softmax_last_axis(scores: np.ndarray) -> np.ndarray:
 class _ReorientationTerm:
     def __init__(self, spec: ReorientationTermSpec):
         self.name = spec.name
+        if self.name == "alignment":
+            warnings.warn("The composed 'alignment' alias means nematic_alignment; "
+                          "use 'nematic_alignment' or 'polar_alignment' explicitly",
+                          DeprecationWarning, stacklevel=3)
         if isinstance(spec.beta, (bool, str)) or np.asarray(spec.beta).ndim != 0 or not np.isfinite(spec.beta):
             raise ValueError("beta must be a finite numeric scalar")
         self.beta = float(spec.beta)
@@ -352,6 +357,15 @@ class _PersistentWalkTerm(_ReorientationTerm):
         return candidate_flux @ self.local_flux[coord]
 
 
+class _PolarAlignmentTerm(_PersistentWalkTerm):
+    def prepare(self, lgca, source_channels):
+        neighbors = lgca.nb_sum(source_channels[..., :lgca.velocitychannels].astype(np.int64))
+        self.local_flux = neighbors @ lgca.c.T
+
+    def dependencies(self) -> set[str]:
+        return {"boundary_nodes"}
+
+
 class _AggregationTerm(_ReorientationTerm):
     def prepare(self, lgca, source_channels):
         density = source_channels.sum(axis=-1)
@@ -409,6 +423,7 @@ _REORIENTATION_TERMS = {
     "nematic_alignment": _NematicAlignmentTerm,
     "persistent_motion": _PersistentWalkTerm,
     "persistent_walk": _PersistentWalkTerm,
+    "polar_alignment": _PolarAlignmentTerm,
     "random_walk": _UniformTerm,
     "uniform": _UniformTerm,
     "resting_bias": _RestingBiasTerm,
