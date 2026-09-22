@@ -266,6 +266,9 @@ class _ReorientationTerm:
     def score(self, candidates, node, lgca, coord):
         return np.zeros(candidates.shape[0], dtype=float)
 
+    def prepare(self, lgca, source_channels):
+        """Prepare spatial fields once from the frozen operator input."""
+
     def dependencies(self) -> set[str]:
         return set()
 
@@ -315,45 +318,36 @@ class _ChemotaxisTerm(_ReorientationTerm):
 
 
 class _NematicAlignmentTerm(_ReorientationTerm):
-    def score(self, candidates, node, lgca, coord):
-        source_nodes = getattr(lgca, "_reorientation_source_nodes", lgca.nodes)
-        if getattr(lgca, "n_species", 1) > 1 and source_nodes.ndim == len(lgca.dims) + 2:
-            source_channels = source_nodes.sum(axis=-2)
-        else:
-            source_channels = source_nodes
-        neighbor_channels = lgca.nb_sum(
+    def prepare(self, lgca, source_channels):
+        self.neighbor_channels = lgca.nb_sum(
             source_channels[..., : lgca.velocitychannels].astype(np.int64)
-        )[coord]
-        dot_sq = (lgca.c.T @ lgca.c) ** 2
-        return candidates[:, : lgca.velocitychannels] @ dot_sq @ neighbor_channels
+        )
+        self.dot_sq = (lgca.c.T @ lgca.c) ** 2
+
+    def score(self, candidates, node, lgca, coord):
+        return candidates[:, : lgca.velocitychannels] @ self.dot_sq @ self.neighbor_channels[coord]
 
     def dependencies(self) -> set[str]:
         return {"boundary_nodes"}
 
 
 class _PersistentWalkTerm(_ReorientationTerm):
+    def prepare(self, lgca, source_channels):
+        self.local_flux = source_channels[..., : lgca.velocitychannels] @ lgca.c.T
+
     def score(self, candidates, node, lgca, coord):
-        source_nodes = getattr(lgca, "_reorientation_source_nodes", lgca.nodes)
-        if getattr(lgca, "n_species", 1) > 1 and source_nodes.ndim == len(lgca.dims) + 2:
-            source_channels = source_nodes.sum(axis=-2)
-        else:
-            source_channels = source_nodes
-        local_flux = source_channels[coord][..., : lgca.velocitychannels] @ lgca.c.T
         candidate_flux = candidates[:, : lgca.velocitychannels] @ lgca.c.T
-        return candidate_flux @ local_flux
+        return candidate_flux @ self.local_flux[coord]
 
 
 class _AggregationTerm(_ReorientationTerm):
-    def score(self, candidates, node, lgca, coord):
-        source_nodes = getattr(lgca, "_reorientation_source_nodes", lgca.nodes)
-        if getattr(lgca, "n_species", 1) > 1 and source_nodes.ndim == len(lgca.dims) + 2:
-            source_channels = source_nodes.sum(axis=-2)
-        else:
-            source_channels = source_nodes
+    def prepare(self, lgca, source_channels):
         density = source_channels.sum(axis=-1)
-        gradient = lgca.gradient(density)[coord]
+        self.gradient = lgca.gradient(density)
+
+    def score(self, candidates, node, lgca, coord):
         candidate_flux = candidates[:, : lgca.velocitychannels] @ lgca.c.T
-        return candidate_flux @ gradient
+        return candidate_flux @ self.gradient[coord]
 
     def dependencies(self) -> set[str]:
         return {"boundary_nodes", "cell_density"}
@@ -454,6 +448,11 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         lgca = context.lgca
         lgca._reorientation_source_nodes = lgca.nodes.copy()
         try:
+            source_channels = lgca._reorientation_source_nodes
+            if getattr(lgca, "n_species", 1) > 1:
+                source_channels = source_channels.sum(axis=-2)
+            for term in self.terms:
+                term.prepare(lgca, source_channels)
             for spatial in np.ndindex(lgca.dims):
                 coord = tuple(index + lgca.r_int for index in spatial)
                 node = lgca._reorientation_source_nodes[coord]

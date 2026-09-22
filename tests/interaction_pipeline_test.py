@@ -203,12 +203,14 @@ def test_nematic_scores_count_neighbors_and_ignore_empty_extra_species(geometry,
     term = _NematicAlignmentTerm(ReorientationTermSpec(name="nematic_alignment"))
     expected = neighbors * (lgca.c.T @ lgca.c[:, 0]) ** 2
     expected += (lgca.c.T @ lgca.c[:, 1]) ** 2
+    term.prepare(lgca, lgca.nodes)
     single = term.score(candidates, lgca.nodes[coord], lgca, coord)
     np.testing.assert_allclose(single, expected)
     lgca._reorientation_source_nodes = np.stack(
         [lgca.nodes, np.zeros_like(lgca.nodes)], axis=-2
     )
     lgca.n_species = 2
+    term.prepare(lgca, lgca._reorientation_source_nodes.sum(axis=-2))
     multiple = term.score(candidates, lgca.nodes[coord], lgca, coord)
     np.testing.assert_allclose(multiple, expected)
 
@@ -231,6 +233,36 @@ def test_custom_rest_or_align_conserves_empty_partial_and_full_sites(propagation
     np.testing.assert_array_equal(history.sum(axis=(1, 2)), 6)
     if not propagation:
         np.testing.assert_array_equal(history.sum(axis=-1), np.tile([0, 1, 3, 2], (5, 1)))
+
+
+@pytest.mark.parametrize("size", [4, 8])
+@pytest.mark.parametrize("n_species", [1, 2])
+def test_composed_spatial_fields_are_computed_once_per_step(size, n_species, monkeypatch):
+    shape = (size, size) + (() if n_species == 1 else (n_species,)) + (4,)
+    nodes = np.zeros(shape, dtype=bool)
+    nodes[..., 0] = True
+    model = build_model(ModelSpec(
+        space=SpaceSpec(geometry="square"),
+        state=StateSpec(nodes=nodes, n_species=n_species),
+        time=TimeSpec(steps=2, seed=111),
+        dynamics=InteractionPipelineSpec(operators=[ReorientationSpec(terms=[
+            ReorientationTermSpec("nematic_alignment"),
+            ReorientationTermSpec("aggregation"),
+            ReorientationTermSpec("persistent_walk"),
+        ])], propagation=False),
+    ))
+    calls = {"nb_sum": 0, "gradient": 0}
+    for name in calls:
+        original = getattr(model.lgca, name)
+
+        def counted(*args, _name=name, _original=original, **kwargs):
+            calls[_name] += 1
+            return _original(*args, **kwargs)
+
+        monkeypatch.setattr(model.lgca, name, counted)
+    model.run(showprogress=False)
+    assert calls == {"nb_sum": 2, "gradient": 2}
+    np.testing.assert_array_equal(model.lgca.nodes[model.lgca.nonborder].sum(axis=-1), 1)
 
 
 def test_nematic_alignment_term_favors_neighbor_axis_in_one_sampler():

@@ -18,7 +18,7 @@ import numpy as np
 
 from lgca import get_lgca
 from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
-from lgca.pipeline import InteractionPipelineSpec
+from lgca.pipeline import InteractionPipelineSpec, ReorientationSpec, ReorientationTermSpec
 from lgca.simulation import SimulationRunner
 
 
@@ -35,7 +35,7 @@ class BenchmarkScenario:
     steps: int
     seed: int
     kwargs: Mapping[str, Any] = field(default_factory=dict)
-    model_spec_operator: Mapping[str, Any] | None = None
+    model_spec_operator: Mapping[str, Any] | ReorientationSpec | None = None
 
 
 def default_scenarios() -> list[BenchmarkScenario]:
@@ -63,6 +63,13 @@ def default_scenarios() -> list[BenchmarkScenario]:
         BenchmarkScenario(
             "classical_hex_random_walk", "classical_ve", "hex", (64, 64),
             "random_walk", kwargs={"ve": True}, **common,
+        ),
+        BenchmarkScenario(
+            "classical_square_composed_cues", "classical_ve", "square", (32, 32),
+            "composed_reorientation", model_spec_operator=ReorientationSpec(terms=[
+                ReorientationTermSpec("nematic_alignment"),
+                ReorientationTermSpec("aggregation"),
+            ]), **common,
         ),
         BenchmarkScenario(
             "classical_cubic_propagation", "classical_ve", "cubic", (16, 16, 16),
@@ -137,7 +144,7 @@ def run_scenario(scenario: BenchmarkScenario, repeats: int = 3) -> dict[str, Any
                     ),
                     time=TimeSpec(steps=scenario.steps, seed=scenario.seed),
                     dynamics=InteractionPipelineSpec(
-                        operators=[dict(scenario.model_spec_operator)]
+                        operators=[scenario.model_spec_operator]
                     ),
                 )
             )
