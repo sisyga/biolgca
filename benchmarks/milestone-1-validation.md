@@ -35,4 +35,15 @@ Benchmarks report diagnostic machine-specific timings, not performance gates.
 
 ## Final verification
 
-Full suite and clean Sphinx/notebook execution are recorded here after completion.
+- Windows, Conda `biolgca`, Python 3.13.5 / NumPy 2.4.6: full suite at
+  `267250f` passed **973 tests**, with **1 symlink-privilege skip** and 30 warnings.
+- The six exhaustive matrix cases added in `3999426` separately passed; no
+  production code changed between these two test runs.
+- Clean `python docs/build.py` passed with Sphinx warnings treated as errors;
+  all six maintained notebooks executed in clean kernels. In this uninstalled
+  worktree, `PYTHONPATH` was explicitly set to the repository root.
+- Composed nematic/aggregation with density recording every two steps, 32x32,
+  20 steps, seed 7, one diagnostic repeat: **0.864 s**, **758906 bytes** peak
+  Python-tracked memory. This is not a bound on total process memory.
+- `git diff --check` passed. GitHub PR #128 targets `aidevelop` and runs the
+  existing Python 3.10-3.13, installed-wheel/CLI and documentation checks.
