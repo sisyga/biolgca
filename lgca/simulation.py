@@ -245,7 +245,7 @@ class PerTypeRecorder(Observer):
 
     @staticmethod
     def _counts(lgca):
-        channel_pop = getattr(lgca, "channel_pop", lgca.nodes)
+        channel_pop = getattr(lgca, "channel_pop", getattr(lgca, "occupied", lgca.nodes))
         nodes = channel_pop[lgca.nonborder]
         velocity = nodes[..., :lgca.velocitychannels].sum(-1)
         resting = nodes[..., lgca.velocitychannels:].sum(-1)

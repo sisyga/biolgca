@@ -14,6 +14,17 @@ from lgca.simulation import (
 )
 
 
+def test_per_type_recorder_counts_sparse_identity_labels():
+    lgca = get_lgca(geometry="lin", ib=True, restchannels=1,
+                    nodes=np.array([[1, 7, 2], [0, 0, 0]], dtype=np.uint),
+                    interaction="only_propagation")
+    SimulationRunner(lgca, timesteps=2, observers=[PerTypeRecorder(), PopulationRecorder()],
+                     showprogress=False).run()
+    np.testing.assert_array_equal(lgca.velcells_t[0], [2, 0])
+    np.testing.assert_array_equal(lgca.restcells_t[0], [1, 0])
+    np.testing.assert_array_equal((lgca.velcells_t + lgca.restcells_t).sum(axis=-1), lgca.n_t)
+
+
 class StepCollector:
     def __init__(self, schedule=None):
         self.schedule = schedule
