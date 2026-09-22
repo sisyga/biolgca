@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import time
+import math
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
 from typing import Any, Iterable, Mapping
@@ -12,6 +13,43 @@ import numpy as np
 from tqdm.auto import tqdm
 
 from .list_utils import _copy_arr_of_lists, get_arr_of_empty_lists
+
+
+DEFAULT_RECORDING_LIMIT_BYTES = 512 * 1024 ** 2
+
+
+def estimate_recording_bytes(lgca, timesteps, observers):
+    """Estimate fixed recorder buffers in bytes before allocation.
+
+    Object-state payloads and dynamically growing families are additional to
+    this estimate. Sparse schedules count only their selected sample times.
+    """
+    total = 0
+    spatial = math.prod(lgca.dims)
+    channels = math.prod(lgca.nodes.shape[len(lgca.dims):])
+    species = getattr(lgca, "n_species", 1)
+    for observer in observers:
+        schedule = getattr(observer, "schedule", None) or Schedule()
+        samples = (timesteps // schedule.every + 1 if schedule.steps is None
+                   else sum(step <= timesteps for step in schedule.steps))
+        if isinstance(observer, NodeRecorder):
+            per_frame = spatial * channels * lgca.nodes.dtype.itemsize
+        elif isinstance(observer, DensityRecorder):
+            per_frame = spatial * species * np.dtype(observer.dtype or float).itemsize
+        elif isinstance(observer, PopulationRecorder):
+            per_frame = np.dtype(np.uint).itemsize
+        elif isinstance(observer, ChannelDensityRecorder):
+            per_frame = spatial * channels * np.dtype(np.uint).itemsize
+        elif isinstance(observer, PerTypeRecorder):
+            per_frame = spatial * species * 2 * np.dtype(float).itemsize
+        elif isinstance(observer, OrderParameterRecorder):
+            per_frame = 4 * np.dtype(float).itemsize
+        elif isinstance(observer, FamilyPopulationRecorder):
+            per_frame = (int(getattr(lgca, "maxfamily", 0)) + 1) * np.dtype(float).itemsize
+        else:
+            continue
+        total += samples * (per_frame + np.dtype(int).itemsize)
+    return total
 
 
 __all__ = [
@@ -115,6 +153,7 @@ class SimulationRunner:
         showprogress: bool = True,
         step_function=None,
         context=None,
+        max_recording_bytes=DEFAULT_RECORDING_LIMIT_BYTES,
     ):
         if timesteps < 0:
             raise ValueError("timesteps must be non-negative.")
@@ -124,6 +163,7 @@ class SimulationRunner:
         self.showprogress = showprogress
         self.step_function = step_function
         self.context = context
+        self.max_recording_bytes = max_recording_bytes
         self.elapsed_seconds = 0.0
 
     def add_observer(self, observer) -> None:
@@ -141,6 +181,12 @@ class SimulationRunner:
                     raise ValueError(f"Multiple {kind.__name__} instances share LGCA output arrays; "
                                      "use one recorder per type and select samples afterward")
                 seen.add(kind)
+        self.estimated_recording_bytes = estimate_recording_bytes(self.lgca, self.timesteps, self.observers)
+        if (self.max_recording_bytes is not None
+                and self.estimated_recording_bytes > self.max_recording_bytes):
+            raise ValueError(f"Recording requires at least {self.estimated_recording_bytes:,} bytes; "
+                             f"limit is {self.max_recording_bytes:,}. Use sparse schedules, "
+                             "a smaller dtype, CSV streaming, or explicitly increase max_recording_bytes.")
         start = time.perf_counter()
         lgca = self.lgca
         lgca.update_dynamic_fields()

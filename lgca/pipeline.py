@@ -256,6 +256,21 @@ def _softmax_last_axis(scores: np.ndarray) -> np.ndarray:
     return weights / weights.sum(axis=-1, keepdims=True)
 
 
+_MAX_CANDIDATE_BATCH_BYTES = 32 * 1024 ** 2
+
+
+def _candidate_batches(mask, candidates):
+    """Bound score/softmax/cumulative temporaries conservatively to 32 MiB."""
+    bytes_per_site = int(candidates) * np.dtype(float).itemsize * 6
+    batch_size = max(1, _MAX_CANDIDATE_BATCH_BYTES // bytes_per_site)
+    if bytes_per_site > _MAX_CANDIDATE_BATCH_BYTES:
+        raise ValueError(f"One candidate calculation requires about {bytes_per_site:,} bytes; "
+                         "reduce channels or use a non-enumerating interaction")
+    sites = np.flatnonzero(mask)
+    for start in range(0, len(sites), batch_size):
+        yield np.unravel_index(sites[start:start + batch_size], mask.shape)
+
+
 class _ReorientationTerm:
     def __init__(self, spec: ReorientationTermSpec):
         self.name = spec.name
@@ -1770,11 +1785,12 @@ class NativeClassicalReorientationOperator(ReorientationOperator):
         for n_particles in unique:
             mask = density == n_particles
             j = lgca.get_flux_permutations(n_particles)
-            weights = _softmax_last_axis(self.beta * (flux[mask] @ j))
-            cumw = weights.cumsum(axis=1)
-            rnd = lgca.rng.random(mask.sum())
-            ind = (rnd[:, None] < cumw).argmax(axis=1)
-            nb_nodes[mask] = lgca.get_permutations(n_particles)[ind]
+            for batch in _candidate_batches(mask, len(lgca.get_permutations(n_particles))):
+                weights = _softmax_last_axis(self.beta * (flux[batch] @ j))
+                cumw = weights.cumsum(axis=1)
+                rnd = lgca.rng.random(len(batch[0]))
+                ind = (rnd[:, None] < cumw).argmax(axis=1)
+                nb_nodes[batch] = lgca.get_permutations(n_particles)[ind]
 
         newnodes[lgca.nonborder] = nb_nodes
         lgca.nodes = newnodes
@@ -1888,13 +1904,14 @@ class NativeClassicalTensorReorientationOperator(ReorientationOperator):
         for n_particles in unique:
             mask = density == n_particles
             si = lgca.get_si_permutations(n_particles)
-            weights = _softmax_last_axis(
-                self.beta * np.einsum("nij,pij->np", tensors[mask], si)
-            )
-            cumw = weights.cumsum(axis=1)
-            rnd = lgca.rng.random(mask.sum())
-            ind = (rnd[:, None] < cumw).argmax(axis=1)
-            nb_nodes[mask] = lgca.get_permutations(n_particles)[ind]
+            for batch in _candidate_batches(mask, len(lgca.get_permutations(n_particles))):
+                weights = _softmax_last_axis(
+                    self.beta * np.einsum("nij,pij->np", tensors[batch], si)
+                )
+                cumw = weights.cumsum(axis=1)
+                rnd = lgca.rng.random(len(batch[0]))
+                ind = (rnd[:, None] < cumw).argmax(axis=1)
+                nb_nodes[batch] = lgca.get_permutations(n_particles)[ind]
 
         newnodes[lgca.nonborder] = nb_nodes
         lgca.nodes = newnodes
@@ -2003,17 +2020,18 @@ class NativeClassicalWettingOperator(ReorientationOperator):
             perms = lgca.get_permutations(n_particles)
             restc = perms[:, lgca.velocitychannels :].sum(-1)
             j = lgca.get_flux_permutations(n_particles)
-            weights = _softmax_last_axis(
-                self.beta * (flux[mask] @ j) / lgca.velocitychannels / 2
-                + self.beta * rest_nb[mask, None] * restc
-                + self.beta * np.einsum("nd,dp->np", g_adh_nb[mask], j)
-                + restc * ecm_nb[mask, None]
-                + self.gamma * np.einsum("nd,dp->np", g_press_nb[mask], j)
-            )
-            cumw = weights.cumsum(axis=1)
-            rnd = lgca.rng.random(mask.sum())
-            ind = (rnd[:, None] < cumw).argmax(axis=1)
-            nb_nodes[mask] = perms[ind]
+            for batch in _candidate_batches(mask, len(lgca.get_permutations(n_particles))):
+                weights = _softmax_last_axis(
+                    self.beta * (flux[batch] @ j) / lgca.velocitychannels / 2
+                    + self.beta * rest_nb[batch][..., None] * restc
+                    + self.beta * np.einsum("nd,dp->np", g_adh_nb[batch], j)
+                    + restc * ecm_nb[batch][..., None]
+                    + self.gamma * np.einsum("nd,dp->np", g_press_nb[batch], j)
+                )
+                cumw = weights.cumsum(axis=1)
+                rnd = lgca.rng.random(len(batch[0]))
+                ind = (rnd[:, None] < cumw).argmax(axis=1)
+                nb_nodes[batch] = perms[ind]
 
         newnodes[lgca.nonborder] = nb_nodes
         lgca.nodes = newnodes

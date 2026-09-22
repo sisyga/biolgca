@@ -44,6 +44,25 @@ def test_duplicate_recorders_fail_before_state_or_output_changes(same_schedule, 
         assert not hasattr(lgca, "nodes_t")
 
 
+def test_recording_estimate_and_budget_precede_allocation():
+    from types import SimpleNamespace
+    from lgca.simulation import estimate_recording_bytes
+
+    fake = SimpleNamespace(dims=(128, 128, 128), nodes=np.empty((0, 0, 0, 6), dtype=bool))
+    assert estimate_recording_bytes(fake, 1000, [DensityRecorder()]) == 1001 * (128**3 * 8 + 8)
+    assert estimate_recording_bytes(fake, 1000, [DensityRecorder(Schedule(every=100))]) == 11 * (128**3 * 8 + 8)
+    lgca = get_lgca(geometry="lin", dims=3, density=1, seed=127, interaction="random_walk")
+    before = lgca.nodes.copy()
+    with pytest.raises(ValueError, match="Recording requires"):
+        SimulationRunner(lgca, timesteps=3, observers=[DensityRecorder()],
+                         max_recording_bytes=1, showprogress=False).run()
+    assert not hasattr(lgca, "dens_t")
+    np.testing.assert_array_equal(lgca.nodes, before)
+    SimulationRunner(lgca, timesteps=3, observers=[DensityRecorder()],
+                     max_recording_bytes=None, showprogress=False).run()
+    assert lgca.dens_t.shape == (4, 3)
+
+
 class StepCollector:
     def __init__(self, schedule=None):
         self.schedule = schedule

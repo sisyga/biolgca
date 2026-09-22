@@ -119,6 +119,19 @@ def test_serialized_composed_term_contracts(field, value):
             build_model(loader(json.dumps(data)))
 
 
+@pytest.mark.parametrize("name", ["classical.alignment", "classical.aggregation", "classical.nematic"])
+def test_bounded_candidate_batches_preserve_seeded_trajectory(name, monkeypatch):
+    import lgca.pipeline as pipeline
+
+    spec = _square_spec(operators=[{"name": name}], timesteps=3, seed=127)
+    expected = run_model(spec, showprogress=False).lgca.nodes_t.copy()
+    monkeypatch.setattr(pipeline, "_MAX_CANDIDATE_BATCH_BYTES", 480)
+    actual = run_model(spec, showprogress=False).lgca.nodes_t
+    np.testing.assert_array_equal(actual, expected)
+    batches = list(pipeline._candidate_batches(np.ones((4, 4), dtype=bool), 10))
+    assert max(len(batch[0]) for batch in batches) == 1
+
+
 def _square_spec(*, operators=(), timesteps=3, seed=17):
     return ModelSpec(
         description=Description(title="registry driven square LGCA"),

@@ -21,3 +21,8 @@ the harness and its output schema.
 The matrix covers classical volume exclusion, NoVE, identity-based VE,
 identity-based NoVE, and multispecies states. It also includes propagation
 scenarios for 1-D, square/hex, cubic, and Moore geometries where meaningful.
+
+The ``classical_square_composed_cues`` scenario includes composed nematic and
+aggregation terms plus sparse density recording every two steps. Its
+``observer_policy`` distinguishes this retained-history benchmark from the
+unrecorded dynamics baselines.

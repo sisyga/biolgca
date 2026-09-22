@@ -315,3 +315,21 @@ public types and owns registration/parameter contracts. For subsequent slices,
 put numerical updates in the relevant focused kernel module, keep legacy and
 native adapters small, and retain independent scientific invariants alongside
 seeded parity tests. Do not move unrelated kernels as part of a correctness fix.
+
+Recording and temporary-memory budgets
+--------------------------------------
+
+``lgca.simulation.estimate_recording_bytes(lgca, timesteps, observers)`` reports
+fixed numeric buffers and sample-time arrays before allocation. Runners reject
+estimates above 512 MiB before observer setup. Reduce the horizon, use
+``Schedule(every=...)`` or explicit sample steps, select a smaller density dtype,
+or stream snapshots with ``CSVSnapshotObserver``. No samples are silently dropped.
+For a deliberate larger allocation, use
+``compiled.run(max_recording_bytes=your_budget)`` or the same keyword on
+``SimulationRunner``; ``None`` disables this guard.
+
+The estimate is a lower bound: Python sample-index maps, object/list payloads,
+dynamically growing family histories, model state and renderer buffers cost extra.
+Dedicated vector, tensor and wetting reorientation samplers process candidate
+scores in batches with a conservative 32 MiB temporary budget. This preserves
+site order and RNG draws; it does not change the transition model.

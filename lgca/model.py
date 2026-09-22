@@ -22,7 +22,7 @@ from .pipeline import (
     ReorientationTermSpec,
     compile_pipeline,
 )
-from .simulation import SimulationRunner
+from .simulation import SimulationRunner, DEFAULT_RECORDING_LIMIT_BYTES
 
 
 MODEL_SPEC_SCHEMA_VERSION = 1
@@ -847,8 +847,10 @@ class CompiledModel:
         self.pipeline.execute_step(self.context, self._step + 1, **timing)
         self._step += 1
 
-    def run(self, showprogress: bool = True):
-        return _run_compiled_model(self, showprogress=showprogress)
+    def run(self, showprogress: bool = True, *, max_recording_bytes=DEFAULT_RECORDING_LIMIT_BYTES):
+        """Run with an explicit fixed-buffer recording budget (None disables it)."""
+        return _run_compiled_model(self, showprogress=showprogress,
+                                   max_recording_bytes=max_recording_bytes)
 
 
 @dataclass
@@ -1155,7 +1157,8 @@ def _observer_names(analysis: AnalysisSpec | None) -> list[str]:
     return [observer.__class__.__name__ for observer in analysis.observers]
 
 
-def _run_compiled_model(compiled: CompiledModel, showprogress: bool = True) -> ModelRunResult:
+def _run_compiled_model(compiled: CompiledModel, showprogress: bool = True,
+                        *, max_recording_bytes=DEFAULT_RECORDING_LIMIT_BYTES) -> ModelRunResult:
     lgca = compiled.lgca
     observers = list(compiled.spec.analysis.observers if compiled.spec.analysis is not None else [])
     operator_timings: dict[tuple[str, str], dict[str, Any]] = {}
@@ -1176,9 +1179,11 @@ def _run_compiled_model(compiled: CompiledModel, showprogress: bool = True) -> M
         showprogress=showprogress,
         step_function=execute_pipeline_step,
         context=compiled,
+        max_recording_bytes=max_recording_bytes,
     )
     runner.run()
     compiled.metadata["runtime"] = {
+        "estimated_recording_bytes": runner.estimated_recording_bytes,
         "elapsed_seconds": runner.elapsed_seconds,
         "operator_timings": list(operator_timings.values()),
         "timing_trace": timing_trace,

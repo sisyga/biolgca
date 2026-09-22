@@ -17,9 +17,9 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 
 from lgca import get_lgca
-from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
+from lgca.model import AnalysisSpec, ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
 from lgca.pipeline import InteractionPipelineSpec, ReorientationSpec, ReorientationTermSpec
-from lgca.simulation import SimulationRunner
+from lgca.simulation import DensityRecorder, Schedule, SimulationRunner
 
 
 @dataclass(frozen=True)
@@ -36,6 +36,7 @@ class BenchmarkScenario:
     seed: int
     kwargs: Mapping[str, Any] = field(default_factory=dict)
     model_spec_operator: Mapping[str, Any] | ReorientationSpec | None = None
+    record_every: int | None = None
 
 
 def default_scenarios() -> list[BenchmarkScenario]:
@@ -69,7 +70,7 @@ def default_scenarios() -> list[BenchmarkScenario]:
             "composed_reorientation", model_spec_operator=ReorientationSpec(terms=[
                 ReorientationTermSpec("nematic_alignment"),
                 ReorientationTermSpec("aggregation"),
-            ]), **common,
+            ]), record_every=2, **common,
         ),
         BenchmarkScenario(
             "classical_cubic_propagation", "classical_ve", "cubic", (16, 16, 16),
@@ -108,6 +109,8 @@ def run_scenario(scenario: BenchmarkScenario, repeats: int = 3) -> dict[str, Any
     peak_memory = 0
     particles_final = 0
     for _ in range(int(repeats)):
+        observers = ([] if scenario.record_every is None
+                     else [DensityRecorder(Schedule(every=scenario.record_every))])
         if scenario.model_spec_operator is None:
             lgca = get_lgca(
                 geometry=scenario.geometry,
@@ -120,7 +123,7 @@ def run_scenario(scenario: BenchmarkScenario, repeats: int = 3) -> dict[str, Any
             run = lambda: SimulationRunner(
                 lgca,
                 timesteps=scenario.steps,
-                observers=(),
+                observers=observers,
                 showprogress=False,
             ).run()
         else:
@@ -143,6 +146,7 @@ def run_scenario(scenario: BenchmarkScenario, repeats: int = 3) -> dict[str, Any
                         restchannels=restchannels,
                     ),
                     time=TimeSpec(steps=scenario.steps, seed=scenario.seed),
+                    analysis=AnalysisSpec(observers=observers),
                     dynamics=InteractionPipelineSpec(
                         operators=[scenario.model_spec_operator]
                     ),
@@ -178,7 +182,7 @@ def run_scenario(scenario: BenchmarkScenario, repeats: int = 3) -> dict[str, Any
         "wall_seconds_per_step": wall_seconds / max(scenario.steps, 1),
         "peak_memory_bytes": peak_memory,
         "particles_final": particles_final,
-        "observer_policy": "none",
+        "observer_policy": "none" if scenario.record_every is None else f"density_every_{scenario.record_every}",
         "python_version": platform.python_version(),
         "numpy_version": np.__version__,
         "biolgca_version": package_version,
