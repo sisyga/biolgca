@@ -130,6 +130,17 @@ class SimulationRunner:
         self.observers.append(observer)
 
     def run(self):
+        recorder_types = (NodeRecorder, DensityRecorder, PopulationRecorder,
+                          ChannelDensityRecorder, PerTypeRecorder, OrderParameterRecorder,
+                          FamilyPopulationRecorder)
+        seen = set()
+        for observer in self.observers:
+            kind = next((kind for kind in recorder_types if isinstance(observer, kind)), None)
+            if kind is not None:
+                if kind in seen:
+                    raise ValueError(f"Multiple {kind.__name__} instances share LGCA output arrays; "
+                                     "use one recorder per type and select samples afterward")
+                seen.add(kind)
         start = time.perf_counter()
         lgca = self.lgca
         lgca.update_dynamic_fields()

@@ -25,6 +25,25 @@ def test_per_type_recorder_counts_sparse_identity_labels():
     np.testing.assert_array_equal((lgca.velcells_t + lgca.restcells_t).sum(axis=-1), lgca.n_t)
 
 
+@pytest.mark.parametrize("same_schedule", [False, True])
+@pytest.mark.parametrize("dtype", [None, np.float32])
+def test_duplicate_recorders_fail_before_state_or_output_changes(same_schedule, dtype):
+    from lgca.simulation import ChannelDensityRecorder, OrderParameterRecorder, FamilyPopulationRecorder
+
+    lgca = get_lgca(geometry="lin", dims=3, density=1, seed=119, interaction="random_walk")
+    before = lgca.nodes.copy()
+    for kind in (NodeRecorder, DensityRecorder, PopulationRecorder, ChannelDensityRecorder,
+                 PerTypeRecorder, OrderParameterRecorder, FamilyPopulationRecorder):
+        first = kind(Schedule(every=2))
+        second = kind(Schedule(every=2) if same_schedule else Schedule(steps=[0, 3]))
+        if kind is DensityRecorder:
+            second.dtype = dtype
+        with pytest.raises(ValueError, match=f"Multiple {kind.__name__}"):
+            SimulationRunner(lgca, timesteps=4, observers=[first, second], showprogress=False).run()
+        np.testing.assert_array_equal(lgca.nodes, before)
+        assert not hasattr(lgca, "nodes_t")
+
+
 class StepCollector:
     def __init__(self, schedule=None):
         self.schedule = schedule
