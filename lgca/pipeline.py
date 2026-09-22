@@ -10,6 +10,7 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 
 from .base import _sampling_totals
+from .identity_kernels import inherit_missing_properties
 from .plugins import (
     BirthDeathOperator,
     ConservationLaw,
@@ -200,6 +201,17 @@ def compile_pipeline(spec: InteractionPipelineSpec | None, context) -> CompiledP
             raise ValueError(f"dynamics.operators[{index}]{separator}{message}") from exc
     if not spec.allow_custom_order:
         _validate_operator_order(operators)
+    growth = [operator for operator in operators if operator.operator_kind == "birth_death"]
+    shared_property_operators = {"ib.birth", "ib.birthdeath", "ib.birthdeath_discrete",
+                                "ib.go_or_grow", "ib.go_and_grow_mutations"}
+    if context.spec.state.identity_based and len(growth) > 1:
+        if any(operator.name not in shared_property_operators for operator in growth):
+            raise ValueError(
+                "Identity growth composition requires a shared daughter-property lifecycle; "
+                "currently supported for ib.birth, ib.birthdeath, ib.birthdeath_discrete, "
+                "ib.go_or_grow and ib.go_and_grow_mutations. Use one growth operator "
+                "for other identity backends."
+            )
     pipeline = CompiledPipeline(operators=operators, propagation=spec.propagation)
     pipeline.setup(context)
     return pipeline
@@ -1440,6 +1452,7 @@ class NativeIdentityBirthDeathOperator(BirthDeathOperator):
                     if self.track_inheritance:
                         fam = lgca.props["family"][label]
                         lgca.props["family"].append(fam)
+                    inherit_missing_properties(lgca, label)
             lgca.nodes[coord] = node
 
         lgca.nodes[dying] = 0
@@ -1522,6 +1535,7 @@ class NativeIdentityBirthDeathDiscreteOperator(BirthDeathOperator):
                                 p=(self.pmut / 2, 1 - self.pmut / 2),
                             )
                         )
+                    inherit_missing_properties(lgca, label)
             lgca.nodes[coord] = node
 
         lgca.nodes = lgca.rng.permuted(lgca.nodes, axis=-1)
@@ -1610,6 +1624,7 @@ class NativeIdentityGoAndGrowMutationsOperator(BirthDeathOperator):
                             )
                     else:
                         lgca.props["family"].append(family)
+                    inherit_missing_properties(lgca, label)
             lgca.nodes[coord] = node
 
         lgca.nodes = lgca.rng.permuted(lgca.nodes, axis=-1)
@@ -1722,6 +1737,7 @@ class NativeIdentityGoOrGrowOperator(BirthDeathOperator):
                         lgca.props["theta"].append(
                             lgca.rng.normal(loc=theta, scale=self.theta_std)
                         )
+                    inherit_missing_properties(lgca, cell)
 
             v_channels = lgca.rng.permutation(vel)
             r_channels = lgca.rng.permutation(rest)

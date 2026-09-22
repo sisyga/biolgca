@@ -7,6 +7,7 @@ Interaction functions and helper functions for identity-based LGCA with volume e
 """
 
 import numpy as np
+from .identity_kernels import inherit_missing_properties
 from scipy.stats import truncnorm
 
 from lgca.interactions import tanh_switch
@@ -129,6 +130,7 @@ def birthdeath(lgca):
                 if lgca.interaction_params['track_inheritance']:
                     fam = lgca.props['family'][label]
                     lgca.props['family'].append(fam)
+                inherit_missing_properties(lgca, label)
         lgca.nodes[coord] = node
 
     lgca.nodes[dying] = 0
@@ -190,6 +192,7 @@ def birthdeath_discrete(lgca):
                         p=(lgca.interaction_params['pmut'] / 2,
                            1 - lgca.interaction_params['pmut'] / 2),
                     ))
+                inherit_missing_properties(lgca, label)
 
         lgca.nodes[coord] = node
 
@@ -270,6 +273,7 @@ def go_or_grow(lgca):
                     lgca.props['theta'].append(theta)
                 else:
                     lgca.props['theta'].append(lgca.rng.normal(loc=theta, scale=lgca.interaction_params['theta_std']))
+                inherit_missing_properties(lgca, cell)
 
         v_channels = lgca.rng.permutation(vel)
         r_channels = lgca.rng.permutation(rest)
@@ -344,6 +348,7 @@ def go_and_grow_mutations(lgca):
                 else:
                     # record family of new cell = family of mother cell
                     lgca.props['family'].append(fam)
+                inherit_missing_properties(lgca, label)
         lgca.nodes[coord] = node
 
     random_walk(lgca)

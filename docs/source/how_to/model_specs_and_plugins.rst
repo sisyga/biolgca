@@ -293,6 +293,20 @@ its active configured limit.
 Numerical implementation ownership
 ----------------------------------
 
+``lgca.identity_kernels.inherit_missing_properties`` owns completion of a
+volume-exclusion daughter's property row. The native and legacy VE growth
+operators first append their explicitly mutated traits, then call this helper
+to inherit every other cell property from the parent, without additional RNG
+draws. Thus composed growth and downstream property consumers see complete rows.
+Family membership is inherited unless the growth rule explicitly creates a new
+family. Family-level mutation rules remain owned by the corresponding operator.
+
+Multiple identity growth operators are supported for ``ib.birth``,
+``ib.birthdeath``, ``ib.birthdeath_discrete``, ``ib.go_or_grow`` and
+``ib.go_and_grow_mutations``. Other identity growth combinations are rejected
+during compilation because their daughter-property lifecycles are not shared;
+use one growth operator on those backends.
+
 The first shared identity kernel is ``lgca.identity_kernels.apply_identity_birth``.
 Both ``ib_interactions.birth`` and ``NativeIdentityBirthOperator`` call it. The
 kernel owns birth attempts, daughter ID/property updates, and final shuffling;
