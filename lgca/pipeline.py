@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+import warnings
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
@@ -182,6 +183,9 @@ def compile_pipeline(spec: InteractionPipelineSpec | None, context) -> CompiledP
     """Compile a pipeline spec into executable operators."""
 
     spec = spec or InteractionPipelineSpec()
+    if not (spec.propagation is None or isinstance(spec.propagation, bool)
+            or isinstance(spec.propagation, str) and spec.propagation in {"default", "none", "disabled"}):
+        raise ValueError("dynamics.propagation must be a boolean, null, 'default', 'none', or 'disabled'")
     operators = []
     for index, operator_spec in enumerate(spec.operators):
         try:
@@ -252,12 +256,40 @@ def _softmax_last_axis(scores: np.ndarray) -> np.ndarray:
     return weights / weights.sum(axis=-1, keepdims=True)
 
 
+_MAX_CANDIDATE_BATCH_BYTES = 32 * 1024 ** 2
+
+
+def _candidate_batches(mask, candidates):
+    """Bound score/softmax/cumulative temporaries conservatively to 32 MiB."""
+    bytes_per_site = int(candidates) * np.dtype(float).itemsize * 6
+    batch_size = max(1, _MAX_CANDIDATE_BATCH_BYTES // bytes_per_site)
+    if bytes_per_site > _MAX_CANDIDATE_BATCH_BYTES:
+        raise ValueError(f"One candidate calculation requires about {bytes_per_site:,} bytes; "
+                         "reduce channels or use a non-enumerating interaction")
+    sites = np.flatnonzero(mask)
+    for start in range(0, len(sites), batch_size):
+        yield np.unravel_index(sites[start:start + batch_size], mask.shape)
+
+
 class _ReorientationTerm:
     def __init__(self, spec: ReorientationTermSpec):
         self.name = spec.name
+        if self.name == "alignment":
+            warnings.warn("The composed 'alignment' alias means nematic_alignment; "
+                          "use 'nematic_alignment' or 'polar_alignment' explicitly",
+                          DeprecationWarning, stacklevel=3)
+        if isinstance(spec.beta, (bool, str)) or np.asarray(spec.beta).ndim != 0 or not np.isfinite(spec.beta):
+            raise ValueError("beta must be a finite numeric scalar")
         self.beta = float(spec.beta)
         self.parameters = dict(spec.parameters)
         self.species = spec.species
+        if self.species is not None and (isinstance(self.species, bool)
+                or not isinstance(self.species, (int, np.integer)) or self.species < 0):
+            raise ValueError("species must be a nonnegative integer index")
+        allowed = {"field"} if self.name in {"chemotaxis", "contact_guidance"} else set()
+        unknown = set(self.parameters) - allowed
+        if unknown:
+            raise ValueError(f"parameters contains unknown keys: {sorted(unknown)}")
 
     def validate(self, context) -> None:
         if self.species is not None and self.species >= context.spec.state.n_species:
@@ -265,6 +297,9 @@ class _ReorientationTerm:
 
     def score(self, candidates, node, lgca, coord):
         return np.zeros(candidates.shape[0], dtype=float)
+
+    def prepare(self, lgca, source_channels):
+        """Prepare spatial fields once from the frozen operator input."""
 
     def dependencies(self) -> set[str]:
         return set()
@@ -315,43 +350,45 @@ class _ChemotaxisTerm(_ReorientationTerm):
 
 
 class _NematicAlignmentTerm(_ReorientationTerm):
+    def prepare(self, lgca, source_channels):
+        self.neighbor_channels = lgca.nb_sum(
+            source_channels[..., : lgca.velocitychannels].astype(np.int64)
+        )
+        self.dot_sq = (lgca.c.T @ lgca.c) ** 2
+
     def score(self, candidates, node, lgca, coord):
-        source_nodes = getattr(lgca, "_reorientation_source_nodes", lgca.nodes)
-        if getattr(lgca, "n_species", 1) > 1 and source_nodes.ndim == len(lgca.dims) + 2:
-            source_channels = source_nodes.sum(axis=-2)
-        else:
-            source_channels = source_nodes
-        neighbor_channels = lgca.nb_sum(source_channels[..., : lgca.velocitychannels])[coord]
-        dot_sq = (lgca.c.T @ lgca.c) ** 2
-        return candidates[:, : lgca.velocitychannels] @ dot_sq @ neighbor_channels
+        return candidates[:, : lgca.velocitychannels] @ self.dot_sq @ self.neighbor_channels[coord]
 
     def dependencies(self) -> set[str]:
         return {"boundary_nodes"}
 
 
 class _PersistentWalkTerm(_ReorientationTerm):
+    def prepare(self, lgca, source_channels):
+        self.local_flux = source_channels[..., : lgca.velocitychannels] @ lgca.c.T
+
     def score(self, candidates, node, lgca, coord):
-        source_nodes = getattr(lgca, "_reorientation_source_nodes", lgca.nodes)
-        if getattr(lgca, "n_species", 1) > 1 and source_nodes.ndim == len(lgca.dims) + 2:
-            source_channels = source_nodes.sum(axis=-2)
-        else:
-            source_channels = source_nodes
-        local_flux = source_channels[coord][..., : lgca.velocitychannels] @ lgca.c.T
         candidate_flux = candidates[:, : lgca.velocitychannels] @ lgca.c.T
-        return candidate_flux @ local_flux
+        return candidate_flux @ self.local_flux[coord]
+
+
+class _PolarAlignmentTerm(_PersistentWalkTerm):
+    def prepare(self, lgca, source_channels):
+        neighbors = lgca.nb_sum(source_channels[..., :lgca.velocitychannels].astype(np.int64))
+        self.local_flux = neighbors @ lgca.c.T
+
+    def dependencies(self) -> set[str]:
+        return {"boundary_nodes"}
 
 
 class _AggregationTerm(_ReorientationTerm):
-    def score(self, candidates, node, lgca, coord):
-        source_nodes = getattr(lgca, "_reorientation_source_nodes", lgca.nodes)
-        if getattr(lgca, "n_species", 1) > 1 and source_nodes.ndim == len(lgca.dims) + 2:
-            source_channels = source_nodes.sum(axis=-2)
-        else:
-            source_channels = source_nodes
+    def prepare(self, lgca, source_channels):
         density = source_channels.sum(axis=-1)
-        gradient = lgca.gradient(density)[coord]
+        self.gradient = lgca.gradient(density)
+
+    def score(self, candidates, node, lgca, coord):
         candidate_flux = candidates[:, : lgca.velocitychannels] @ lgca.c.T
-        return candidate_flux @ gradient
+        return candidate_flux @ self.gradient[coord]
 
     def dependencies(self) -> set[str]:
         return {"boundary_nodes", "cell_density"}
@@ -401,6 +438,7 @@ _REORIENTATION_TERMS = {
     "nematic_alignment": _NematicAlignmentTerm,
     "persistent_motion": _PersistentWalkTerm,
     "persistent_walk": _PersistentWalkTerm,
+    "polar_alignment": _PolarAlignmentTerm,
     "random_walk": _UniformTerm,
     "uniform": _UniformTerm,
     "resting_bias": _RestingBiasTerm,
@@ -440,8 +478,11 @@ class BoltzmannReorientationOperator(ReorientationOperator):
             raise ValueError("native reorientation does not yet support identity-based states")
         if not context.spec.state.volume_exclusion:
             raise ValueError("native reorientation currently requires volume exclusion")
-        for term in self.terms:
-            term.validate(context)
+        for index, term in enumerate(self.terms):
+            try:
+                term.validate(context)
+            except ValueError as exc:
+                raise ValueError(f"terms[{index}] {exc}") from exc
 
     def setup(self, context) -> None:
         lgca = context.lgca
@@ -452,13 +493,18 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         lgca = context.lgca
         lgca._reorientation_source_nodes = lgca.nodes.copy()
         try:
+            source_channels = lgca._reorientation_source_nodes
+            if getattr(lgca, "n_species", 1) > 1:
+                source_channels = source_channels.sum(axis=-2)
+            for term in self.terms:
+                term.prepare(lgca, source_channels)
             for spatial in np.ndindex(lgca.dims):
                 coord = tuple(index + lgca.r_int for index in spatial)
                 node = lgca._reorientation_source_nodes[coord]
                 if getattr(lgca, "n_species", 1) > 1:
                     lgca.nodes[coord] = self._sample_multispecies_node(node, lgca, coord)
                 else:
-                    lgca.nodes[coord] = self._sample_node(node, lgca, coord, species=None)
+                    lgca.nodes[coord] = self._sample_node(node, lgca, coord, species=0)
         finally:
             del lgca._reorientation_source_nodes
 
@@ -476,7 +522,10 @@ class BoltzmannReorientationOperator(ReorientationOperator):
                 term_cls = _REORIENTATION_TERMS[term_spec.name]
             except KeyError as exc:
                 raise ValueError(f".terms[{index}] unknown reorientation term {term_spec.name!r}") from exc
-            terms.append(term_cls(term_spec))
+            try:
+                terms.append(term_cls(term_spec))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f".terms[{index}] {exc}") from exc
         if not terms:
             terms.append(_UniformTerm(ReorientationTermSpec(name="random_walk")))
         return terms
@@ -1313,28 +1362,9 @@ class NativeIdentityBirthOperator(BirthDeathOperator):
         lgca.props.update(r_b=[0.0] + [self.r_b] * int(lgca.maxlabel))
 
     def apply(self, context, step: int) -> None:
-        from .ib_interactions import trunc_gauss
+        from .identity_kernels import apply_identity_birth
 
-        lgca = context.lgca
-        relevant = (lgca.cell_density[lgca.nonborder] > 0) & (
-            lgca.cell_density[lgca.nonborder] < lgca.K
-        )
-        coords = [axis_indices[relevant] for axis_indices in lgca.nonborder]
-        for coord in zip(*coords):
-            node = lgca.nodes[coord]
-            r_bs = np.array([lgca.props["r_b"][label] for label in node])
-            proliferating = lgca.rng.random(lgca.K) < r_bs
-            for label in node[proliferating]:
-                ind = lgca.rng.choice(lgca.K)
-                if node[ind] == 0:
-                    lgca.maxlabel += 1
-                    node[ind] = lgca.maxlabel
-                    r_b = lgca.props["r_b"][label]
-                    lgca.props["r_b"].append(
-                        float(trunc_gauss(0, self.a_max, r_b, sigma=self.std, rng=lgca.rng))
-                    )
-            lgca.nodes[coord] = node
-        lgca.nodes = lgca.rng.permuted(lgca.nodes, axis=-1)
+        apply_identity_birth(context.lgca, a_max=self.a_max, std=self.std)
 
 
 class NativeIdentityBirthDeathOperator(BirthDeathOperator):
@@ -1755,11 +1785,12 @@ class NativeClassicalReorientationOperator(ReorientationOperator):
         for n_particles in unique:
             mask = density == n_particles
             j = lgca.get_flux_permutations(n_particles)
-            weights = _softmax_last_axis(self.beta * (flux[mask] @ j))
-            cumw = weights.cumsum(axis=1)
-            rnd = lgca.rng.random(mask.sum())
-            ind = (rnd[:, None] < cumw).argmax(axis=1)
-            nb_nodes[mask] = lgca.get_permutations(n_particles)[ind]
+            for batch in _candidate_batches(mask, len(lgca.get_permutations(n_particles))):
+                weights = _softmax_last_axis(self.beta * (flux[batch] @ j))
+                cumw = weights.cumsum(axis=1)
+                rnd = lgca.rng.random(len(batch[0]))
+                ind = (rnd[:, None] < cumw).argmax(axis=1)
+                nb_nodes[batch] = lgca.get_permutations(n_particles)[ind]
 
         newnodes[lgca.nonborder] = nb_nodes
         lgca.nodes = newnodes
@@ -1873,13 +1904,14 @@ class NativeClassicalTensorReorientationOperator(ReorientationOperator):
         for n_particles in unique:
             mask = density == n_particles
             si = lgca.get_si_permutations(n_particles)
-            weights = _softmax_last_axis(
-                self.beta * np.einsum("nij,pij->np", tensors[mask], si)
-            )
-            cumw = weights.cumsum(axis=1)
-            rnd = lgca.rng.random(mask.sum())
-            ind = (rnd[:, None] < cumw).argmax(axis=1)
-            nb_nodes[mask] = lgca.get_permutations(n_particles)[ind]
+            for batch in _candidate_batches(mask, len(lgca.get_permutations(n_particles))):
+                weights = _softmax_last_axis(
+                    self.beta * np.einsum("nij,pij->np", tensors[batch], si)
+                )
+                cumw = weights.cumsum(axis=1)
+                rnd = lgca.rng.random(len(batch[0]))
+                ind = (rnd[:, None] < cumw).argmax(axis=1)
+                nb_nodes[batch] = lgca.get_permutations(n_particles)[ind]
 
         newnodes[lgca.nonborder] = nb_nodes
         lgca.nodes = newnodes
@@ -1988,17 +2020,18 @@ class NativeClassicalWettingOperator(ReorientationOperator):
             perms = lgca.get_permutations(n_particles)
             restc = perms[:, lgca.velocitychannels :].sum(-1)
             j = lgca.get_flux_permutations(n_particles)
-            weights = _softmax_last_axis(
-                self.beta * (flux[mask] @ j) / lgca.velocitychannels / 2
-                + self.beta * rest_nb[mask, None] * restc
-                + self.beta * np.einsum("nd,dp->np", g_adh_nb[mask], j)
-                + restc * ecm_nb[mask, None]
-                + self.gamma * np.einsum("nd,dp->np", g_press_nb[mask], j)
-            )
-            cumw = weights.cumsum(axis=1)
-            rnd = lgca.rng.random(mask.sum())
-            ind = (rnd[:, None] < cumw).argmax(axis=1)
-            nb_nodes[mask] = perms[ind]
+            for batch in _candidate_batches(mask, len(lgca.get_permutations(n_particles))):
+                weights = _softmax_last_axis(
+                    self.beta * (flux[batch] @ j) / lgca.velocitychannels / 2
+                    + self.beta * rest_nb[batch][..., None] * restc
+                    + self.beta * np.einsum("nd,dp->np", g_adh_nb[batch], j)
+                    + restc * ecm_nb[batch][..., None]
+                    + self.gamma * np.einsum("nd,dp->np", g_press_nb[batch], j)
+                )
+                cumw = weights.cumsum(axis=1)
+                rnd = lgca.rng.random(len(batch[0]))
+                ind = (rnd[:, None] < cumw).argmax(axis=1)
+                nb_nodes[batch] = perms[ind]
 
         newnodes[lgca.nonborder] = nb_nodes
         lgca.nodes = newnodes
@@ -2163,8 +2196,10 @@ class NativePhenotypeSwitchOperator(PhenotypeSwitchOperator):
     It guarantees ``N(s') == N(s)`` and, for Boolean states, at most one
     particle per species/channel slot. If at least one phenotype changes, all
     channel positions are resampled; if none changes, the state is unchanged.
-    Volume-exclusion capacity is enforced while targets are sampled, so
-    collisions cannot merge or delete particles.
+    Each particle retains its source capacity until processed in random order.
+    A sampled switch into a full species is rejected and the particle stays
+    in its source species, even when its configured stay probability is zero.
+    Collisions therefore cannot merge particles or create forbidden switches.
     """
 
     def __init__(self, parameters: Mapping[str, Any] | None = None):
@@ -2234,22 +2269,16 @@ class NativePhenotypeSwitchOperator(PhenotypeSwitchOperator):
             if sources.size == 0:
                 return state.copy()
             rng.shuffle(sources)
-            remaining = np.full(n_species, n_channels, dtype=int)
+            counts = state.sum(axis=1).astype(int)
             targets = np.empty(sources.size, dtype=int)
             changed = False
             for index, source in enumerate(sources):
-                available = remaining > 0
-                constrained = probabilities[source] * available
-                if constrained.sum() == 0.0:
-                    if available[source]:
-                        target = int(source)
-                    else:
-                        target = int(rng.choice(np.flatnonzero(available)))
-                else:
-                    constrained /= constrained.sum()
-                    target = int(rng.choice(n_species, p=constrained))
+                target = int(rng.choice(n_species, p=probabilities[source]))
+                if target != source and counts[target] >= n_channels:
+                    target = int(source)
                 targets[index] = target
-                remaining[target] -= 1
+                counts[source] -= 1
+                counts[target] += 1
                 changed |= target != source
 
             if not changed:
@@ -2732,7 +2761,11 @@ class NativeMultispeciesExcitableMediumOperator(BirthDeathOperator):
 
 
 class NativeBirthDeathOperator(BirthDeathOperator):
-    """Native volume-exclusion birth/death operator."""
+    """Native volume-exclusion birth/death operator.
+
+    Deaths precede births. Species compete for shared birth capacity in a fresh
+    uniformly random order at each site, without a species-index priority.
+    """
 
     def __init__(self, parameters: Mapping[str, Any] | None = None):
         info = PluginInfo(
@@ -2774,7 +2807,8 @@ class NativeBirthDeathOperator(BirthDeathOperator):
         n_species = context.spec.state.n_species
         self.birth_rate = self._rates("birth_rate", n_species)
         self.death_rate = self._rates("death_rate", n_species)
-        capacity = self.parameters.get("capacity", n_species * context.lgca.K)
+        canonical = context.spec.state.capacity
+        capacity = self.parameters.get("capacity", canonical if canonical is not None else n_species * context.lgca.K)
         if int(capacity) != capacity or capacity < 1:
             raise ValueError("capacity must be a positive integer")
         self.capacity = int(capacity)
@@ -2817,7 +2851,7 @@ class NativeBirthDeathOperator(BirthDeathOperator):
             new_node[species] = self._apply_death(new_node[species], self.death_rate[species], rng)
             remaining_capacity += before - int(new_node[species].sum())
 
-        for species in range(new_node.shape[0]):
+        for species in rng.permutation(new_node.shape[0]):
             before = int(new_node[species].sum())
             new_node[species] = self._apply_birth(
                 new_node[species], self.birth_rate[species], rng, remaining_capacity

@@ -98,3 +98,18 @@ could collide, merge particles or accidentally create an invalid state.
 The same full-state principle is already used by particle-conserving
 volume-exclusion interactions such as random walk, alignment and chemotaxis.
 The population-dynamics tutorial demonstrates the invariant directly.
+
+Polar versus nematic composition
+--------------------------------
+
+``polar_alignment`` scores candidate flux dotted with the sum of neighboring
+fluxes. Opposite headings cancel. ``nematic_alignment`` instead sums squared
+velocity dot products, weighted by numeric neighboring channel counts; opposite
+headings reinforce the same axis. Both can be combined with the other cues.
+The registered ``classical.alignment`` operator is polar.
+
+For compatibility, existing composed ``alignment`` declarations retain nematic
+semantics and emit a deprecation warning. Replace that alias with
+``nematic_alignment`` to preserve an old model, or explicitly choose
+``polar_alignment`` when directed collective motion is intended. Tutorial 3
+uses the explicit nematic name; this differs from tutorial 2's polar mechanism.

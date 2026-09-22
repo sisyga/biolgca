@@ -22,7 +22,7 @@ from .pipeline import (
     ReorientationTermSpec,
     compile_pipeline,
 )
-from .simulation import SimulationRunner
+from .simulation import SimulationRunner, DEFAULT_RECORDING_LIMIT_BYTES
 
 
 MODEL_SPEC_SCHEMA_VERSION = 1
@@ -672,7 +672,9 @@ def _observer_to_dict(observer) -> dict[str, Any]:
             }
         )
     elif observer.__class__.__name__ == "ScalarTimeSeriesRecorder":
-        if set(observer.metrics) != {"population"}:
+        from .simulation import _total_population
+
+        if set(observer.metrics) != {"population"} or observer.metrics["population"] is not _total_population:
             raise TypeError("ScalarTimeSeriesRecorder serialization only supports the default population metric.")
         data["output_path"] = str(observer.output_path)
     return data
@@ -743,7 +745,7 @@ def _read_text_source(source: str | Path) -> str:
             raise FileNotFoundError(f"Could not find model spec file: {source}")
         return source.read_text(encoding="utf-8")
     text = str(source)
-    if text.lstrip().startswith(("{", "[")):
+    if text.lstrip().startswith(("{", "[")) or "\n" in text or "\r" in text:
         return text
     path = Path(text)
     if path.exists():
@@ -838,9 +840,17 @@ class CompiledModel:
     context: ModelContext
     pipeline: Any
     metadata: dict[str, Any]
+    _step: int = 0
 
-    def run(self, showprogress: bool = True):
-        return _run_compiled_model(self, showprogress=showprogress)
+    def step(self, **timing):
+        """Advance the compiled dynamics once, retaining RNG and model time."""
+        self.pipeline.execute_step(self.context, self._step + 1, **timing)
+        self._step += 1
+
+    def run(self, showprogress: bool = True, *, max_recording_bytes=DEFAULT_RECORDING_LIMIT_BYTES):
+        """Run with an explicit fixed-buffer recording budget (None disables it)."""
+        return _run_compiled_model(self, showprogress=showprogress,
+                                   max_recording_bytes=max_recording_bytes)
 
 
 @dataclass
@@ -888,13 +898,25 @@ def build_model(
     metadata["reorientation_term_names"] = pipeline.reorientation_term_names
     metadata["observer_names"] = _observer_names(spec.analysis)
     metadata["schedule"] = pipeline.describe_schedule()
-    return CompiledModel(
+    metadata["channel_capacity"] = lgca.K
+    growth_capacities = [
+        {"operator_index": index, "name": operator.name, "capacity": operator.capacity}
+        for index, operator in enumerate(pipeline.operators)
+        if operator.name == "birth_death"
+    ]
+    metadata["growth_capacities"] = growth_capacities
+    if len(growth_capacities) == 1:
+        metadata["capacity"] = growth_capacities[0]["capacity"]
+    compiled = CompiledModel(
         lgca=lgca,
         spec=spec,
         context=context,
         pipeline=pipeline,
         metadata=metadata,
     )
+    lgca._compiled_model = compiled
+    lgca.enable_propagation = spec.dynamics.propagation not in (False, None, "none", "disabled")
+    return compiled
 
 
 def run_model(
@@ -985,6 +1007,12 @@ def _normalize_and_validate_spec(spec: ModelSpec) -> ModelSpec:
     if not isinstance(boundary, str) or boundary.lower() not in _BOUNDARY_ALIASES:
         raise ValueError("model.space.boundary must name a supported boundary condition")
     _validate_dims(spec.space.dims)
+    dims = spec.space.dims
+    if dims is not None and np.asarray(dims).ndim != 0:
+        dims = tuple(int(value) for value in dims)
+        dimension = {"lin": 1, "square": 2, "hex": 2, "cubic": 3, "moore": 3}[_GEOMETRY_ALIASES[geometry.lower()]]
+        if len(dims) != dimension:
+            raise ValueError(f"model.space.dims must contain {dimension} dimensions for {geometry}")
 
     parameters = dict(spec.state.parameters)
     for name in sorted(set(parameters) & _RESERVED_STATE_PARAMETERS):
@@ -1010,6 +1038,7 @@ def _normalize_and_validate_spec(spec: ModelSpec) -> ModelSpec:
         space=replace(
             spec.space,
             geometry=_GEOMETRY_ALIASES[geometry.lower()],
+            dims=dims,
             boundary=_BOUNDARY_ALIASES[boundary.lower()],
         ),
         state=replace(spec.state, parameters=parameters, capacity=capacity),
@@ -1064,7 +1093,7 @@ def _build_lgca(spec: ModelSpec):
         kwargs["density"] = spec.state.density
     elif spec.state.initializer is not None:
         kwargs["density"] = 0.0
-    if spec.state.capacity is not None:
+    if spec.state.capacity is not None and not spec.state.volume_exclusion:
         kwargs["capacity"] = spec.state.capacity
     kwargs.update(dict(spec.state.parameters))
     return get_lgca(
@@ -1128,7 +1157,8 @@ def _observer_names(analysis: AnalysisSpec | None) -> list[str]:
     return [observer.__class__.__name__ for observer in analysis.observers]
 
 
-def _run_compiled_model(compiled: CompiledModel, showprogress: bool = True) -> ModelRunResult:
+def _run_compiled_model(compiled: CompiledModel, showprogress: bool = True,
+                        *, max_recording_bytes=DEFAULT_RECORDING_LIMIT_BYTES) -> ModelRunResult:
     lgca = compiled.lgca
     observers = list(compiled.spec.analysis.observers if compiled.spec.analysis is not None else [])
     operator_timings: dict[tuple[str, str], dict[str, Any]] = {}
@@ -1136,9 +1166,7 @@ def _run_compiled_model(compiled: CompiledModel, showprogress: bool = True) -> M
     timing_trace_limit = int(compiled.spec.time.timing_trace)
 
     def execute_pipeline_step(_lgca, step, _runner):
-        compiled.pipeline.execute_step(
-            compiled.context,
-            step,
+        compiled.step(
             timing=operator_timings,
             timing_trace=timing_trace,
             timing_trace_limit=timing_trace_limit,
@@ -1151,9 +1179,11 @@ def _run_compiled_model(compiled: CompiledModel, showprogress: bool = True) -> M
         showprogress=showprogress,
         step_function=execute_pipeline_step,
         context=compiled,
+        max_recording_bytes=max_recording_bytes,
     )
     runner.run()
     compiled.metadata["runtime"] = {
+        "estimated_recording_bytes": runner.estimated_recording_bytes,
         "elapsed_seconds": runner.elapsed_seconds,
         "operator_timings": list(operator_timings.values()),
         "timing_trace": timing_trace,

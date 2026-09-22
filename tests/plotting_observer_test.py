@@ -68,6 +68,48 @@ def test_plot_snapshot_observer_uses_schedule():
     plt.close("all")
 
 
+@pytest.mark.parametrize("steps", [[0, 1, 2], [0, 10, 20], [0, 3, 20]])
+def test_animation_observer_displays_actual_sample_times(steps):
+    lgca = make_square_lgca()
+    observer = AnimationObserver(schedule=Schedule(steps=steps), cbar=False)
+    SimulationRunner(lgca, timesteps=steps[-1], observers=[observer], showprogress=False).run()
+    for index, step in enumerate(steps):
+        observer.animation._func(index)
+        assert observer.animation._fig.axes[0].get_title() == f"Time $k =${step}"
+    observer.animation._draw_was_started = True
+    plt.close("all")
+
+
+def test_sparse_1d_density_and_property_history_use_sample_times():
+    from lgca.simulation import NodeRecorder
+
+    lgca = get_lgca(geometry="lin", nodes=np.array([[1, 0], [0, 7]]), ib=True,
+                    interaction="only_propagation")
+    lgca.props["trait"] = np.arange(8)
+    schedule = Schedule(steps=[0, 3, 10])
+    SimulationRunner(lgca, timesteps=10,
+                     observers=[DensityRecorder(schedule), NodeRecorder(schedule)],
+                     showprogress=False).run()
+    plot = lgca.plot_density(cbar=False)
+    assert [label.get_text() for label in plot.axes.get_yticklabels()] == ["0", "3", "10"]
+    line, _ = lgca.plot_prop_timecourse(propname="trait")
+    np.testing.assert_array_equal(line.get_xdata(), [0, 3, 10])
+    plt.close("all")
+
+
+def test_family_history_uses_paired_nonuniform_times(monkeypatch):
+    import lgca.ib_base as module
+
+    lgca = get_lgca(geometry="lin", nodes=np.array([[1, 0]]), ib=True,
+                    interaction="only_propagation")
+    lgca.family_props = {"ancestor": [0, 0], "descendants": [[1], []]}
+    lgca.fam_pop_t = np.array([[0, 1], [0, 2], [0, 3]])
+    lgca.fam_pop_steps = np.array([0, 3, 20])
+    monkeypatch.setattr(module, "muller_plot", lambda root, population, children, parents, timeline, **kw: timeline)
+    np.testing.assert_array_equal(lgca.muller_plot(t_slice=slice(1, None)), [3, 20])
+    np.testing.assert_array_equal(lgca.muller_plot(t_slice=slice(1, None), t_start_index=10), [10, 27])
+
+
 def test_animation_observer_collects_runner_frames_and_builds_animation():
     lgca = make_square_lgca(seed=3)
     observer = AnimationObserver(kind="density", interval=10, cbar=False, close=True)
@@ -82,13 +124,15 @@ def test_animation_observer_collects_runner_frames_and_builds_animation():
     plt.close("all")
 
 
-def test_sparse_recorded_history_is_rejected_by_implicit_animation():
+def test_sparse_recorded_history_uses_paired_steps_in_animation():
     lgca = make_square_lgca(seed=4)
     recorder = DensityRecorder(schedule=Schedule(every=2))
     SimulationRunner(lgca, timesteps=4, observers=[recorder], showprogress=False).run()
 
-    with pytest.raises(ValueError, match="sparse recorded history"):
-        animate(lgca, kind="density", cbar=False)
+    animation = animate(lgca, kind="density", cbar=False)
+    animation._func(2)
+    assert animation._fig.axes[0].get_title() == "Time $k =$4"
+    plt.close(animation._fig)
 
 
 def test_sparse_recorded_history_is_rejected_by_direct_density_animation():

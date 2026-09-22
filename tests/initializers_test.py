@@ -6,6 +6,28 @@ import pytest
 from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
 
 
+@pytest.mark.parametrize("value", [-1, .5, np.nan, np.inf, float(2**64)])
+@pytest.mark.parametrize("n_species", [1, 2])
+def test_invalid_count_inputs_rejected_across_entry_points(tmp_path, value, n_species):
+    from lgca import get_lgca
+
+    shape = (1, 2) if n_species == 1 else (1, n_species, 2)
+    nodes = np.zeros(shape)
+    nodes.flat[0] = value
+    with pytest.raises(ValueError, match="nodes"):
+        get_lgca(geometry="lin", ve=False, nodes=nodes, n_species=n_species,
+                 interaction="only_propagation")
+    state = StateSpec(volume_exclusion=False, nodes=nodes, n_species=n_species)
+    with pytest.raises(ValueError, match="nodes"):
+        build_model(ModelSpec(space=SpaceSpec(geometry="lin"), state=state))
+    np.savez(tmp_path / "invalid.npz", nodes=nodes)
+    state = replace(state, nodes=None, initializer={"name": "from_npz",
+                    "parameters": {"path": "invalid.npz"}})
+    with pytest.raises(ValueError, match="nodes"):
+        build_model(ModelSpec(space=SpaceSpec(geometry="lin", dims=1), state=state),
+                    resource_base=tmp_path)
+
+
 def _initializer_spec(initializer, *, dims=(6, 5), seed=41):
     return ModelSpec(
         space=SpaceSpec(geometry="square", dims=dims, boundary="periodic"),
@@ -40,6 +62,32 @@ def test_region_initializer_populates_only_requested_region(placement, expected_
     expected[expected_slices] = 5
 
     np.testing.assert_array_equal(density, expected)
+
+
+@pytest.mark.parametrize("capacity", [2, 5, 10])
+@pytest.mark.parametrize("family", ["ordinary", "identity", "multispecies"])
+@pytest.mark.parametrize("region", [False, True])
+def test_nove_density_is_independent_of_capacity(capacity, family, region):
+    initializer = None
+    if region:
+        initializer = {"name": "region", "parameters": {
+            "placement": "corner", "extent": [40, 80], "density": 10,
+        }}
+    spec = ModelSpec(
+        space=SpaceSpec(geometry="square", dims=(80, 80)),
+        state=StateSpec(volume_exclusion=False, identity_based=family == "identity",
+                        n_species=2 if family == "multispecies" else 1,
+                        restchannels=1, capacity=capacity, density=None if region else 10,
+                        initializer=initializer),
+        time=TimeSpec(steps=0, seed=107),
+    )
+    lgca = build_model(spec).lgca
+    density = lgca.cell_density[lgca.nonborder]
+    if region:
+        assert not density[40:].any()
+        density = density[:40]
+    # A sum of independent Poisson channels is Poisson(10); allow six SEs.
+    assert density.mean() == pytest.approx(10, abs=6 * np.sqrt(10 / density.size))
 
 
 def test_region_initializer_uses_model_rng_deterministically():

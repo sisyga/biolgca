@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 
 from .list_utils import _copy_arr_of_lists, get_arr_of_empty_lists
-from .plot_data import _reject_sparse_implicit_history
+from .plot_data import history_steps
 from .simulation import Observer, Schedule
 
 __all__ = [
@@ -44,15 +44,29 @@ def plot(lgca, kind: str = "density", **kwargs):
     return method(**kwargs)
 
 
-def animate(lgca, kind: str = "density", data=None, **kwargs):
-    """Create an animation using the model's animation renderer."""
+def animate(lgca, kind: str = "density", data=None, steps=None, **kwargs):
+    """Animate frames with paired simulation ``steps`` (dense if unspecified)."""
 
     method_name, data_argument = _resolve_animation(kind)
     method = getattr(lgca, method_name)
-    if data is None:
-        _reject_sparse_implicit_history(lgca, data_argument)
-        return method(**kwargs)
-    return method(**{data_argument: data}, **kwargs)
+    implicit = data is None
+    attribute = "dens_t" if data_argument == "density_t" else "nodes_t"
+    if implicit:
+        data = getattr(lgca, attribute)
+    times = history_steps(lgca, len(data), "dens_steps" if attribute == "dens_t" else "nodes_steps",
+                          steps, implicit=implicit)
+    animation = method(**{data_argument: data}, **kwargs)
+    update = animation._func
+    axis = animation._fig.axes[0]
+
+    def update_with_time(frame, *args):
+        artists = update(frame, *args)
+        axis.set_title(f"Time $k =${times[frame]}")
+        return artists
+
+    animation._func = update_with_time
+    axis.set_title(f"Time $k =${times[0]}")
+    return animation
 
 
 class PlotSnapshotObserver(Observer):
@@ -134,7 +148,8 @@ class AnimationObserver(Observer):
 
     def finalize(self, lgca, runner) -> None:
         data = _frames_to_array(self.frames)
-        self.animation = animate(lgca, kind=self.kind, data=data, **self.animation_kwargs)
+        self.animation = animate(lgca, kind=self.kind, data=data, steps=self.frame_steps,
+                                 **self.animation_kwargs)
         self.frames = []
         if self.save_path is not None:
             self.save_path.parent.mkdir(parents=True, exist_ok=True)

@@ -157,6 +157,19 @@ def _validate_positive(value, name):
     return value
 
 
+def _validate_count_nodes(nodes):
+    """Validate numeric particle counts before conversion to unsigned state."""
+    nodes = np.asarray(nodes)
+    if (nodes.dtype.kind not in "biuf" or not np.all(np.isfinite(nodes))
+            or np.any(nodes < 0) or np.any(nodes != np.floor(nodes))):
+        raise ValueError("nodes must contain finite non-negative integer counts")
+    if nodes.dtype.kind == "f" and np.any(nodes >= 2 ** (np.dtype(np.uint).itemsize * 8)):
+        raise ValueError("nodes counts exceed the representable unsigned range")
+    if nodes.dtype.kind in "iu" and np.any(nodes > np.iinfo(np.uint).max):
+        raise ValueError("nodes counts exceed the representable unsigned range")
+    return nodes
+
+
 def _validate_density(density, max_density=None):
     """Validate random-initialization density before it is used as a probability or rate."""
     arr = _as_numeric_array(density, "density")
@@ -1045,6 +1058,9 @@ class LGCA_base(ABC):
         """
         Update the state of the LGCA from time k to k+1. Includes the interaction and propagation steps.
         """
+        if hasattr(self, "_compiled_model"):
+            self._compiled_model.step()
+            return
         self.interaction(self)
         self.apply_boundaries()
         if getattr(self, "enable_propagation", True):

@@ -75,7 +75,7 @@ class NativeRestOrAlignOperator(ReorientationOperator):
 
 
 def _apply_rest_or_align(lgca, *, beta: float, alpha: float) -> None:
-    newnodes = np.zeros_like(lgca.nodes)
+    newnodes = lgca.nodes.copy()
     resting = lgca.nodes[..., lgca.velocitychannels :].sum(-1)
     resting = lgca.nb_sum(resting)
     flux = lgca.nb_sum(lgca.calc_flux(lgca.nodes))

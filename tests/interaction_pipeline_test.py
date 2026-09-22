@@ -38,6 +38,7 @@ def test_reorientation_term_names_are_public_and_stable():
         "nematic_alignment",
         "persistent_motion",
         "persistent_walk",
+        "polar_alignment",
         "random_walk",
         "resting_bias",
         "uniform",
@@ -184,6 +185,138 @@ def test_native_reorientation_preserves_multispecies_mass_by_species():
 
     np.testing.assert_array_equal(after, before)
     assert result.metadata["reorientation_term_names"] == ["random_walk", "resting_bias"]
+
+
+@pytest.mark.parametrize("geometry,dims,neighbors", [
+    ("lin", (5,), 2), ("square", (5, 5), 4),
+    ("hex", (5, 6), 6), ("cubic", (5, 5, 5), 6),
+])
+def test_nematic_scores_count_neighbors_and_ignore_empty_extra_species(geometry, dims, neighbors):
+    from lgca.pipeline import _NematicAlignmentTerm
+
+    lgca = get_lgca(geometry=geometry, dims=dims, density=0,
+                    interaction="only_propagation")
+    lgca.nodes[..., 0] = True
+    coord = tuple(lgca.r_int + 2 for _ in dims)
+    neighbor = (coord[0] + 1,) + coord[1:]
+    lgca.nodes[neighbor + (1,)] = True
+    candidates = np.eye(lgca.K, dtype=bool)
+    term = _NematicAlignmentTerm(ReorientationTermSpec(name="nematic_alignment"))
+    expected = neighbors * (lgca.c.T @ lgca.c[:, 0]) ** 2
+    expected += (lgca.c.T @ lgca.c[:, 1]) ** 2
+    term.prepare(lgca, lgca.nodes)
+    single = term.score(candidates, lgca.nodes[coord], lgca, coord)
+    np.testing.assert_allclose(single, expected)
+    lgca._reorientation_source_nodes = np.stack(
+        [lgca.nodes, np.zeros_like(lgca.nodes)], axis=-2
+    )
+    lgca.n_species = 2
+    term.prepare(lgca, lgca._reorientation_source_nodes.sum(axis=-2))
+    multiple = term.score(candidates, lgca.nodes[coord], lgca, coord)
+    np.testing.assert_allclose(multiple, expected)
+
+
+@pytest.mark.parametrize("propagation", [False, True])
+def test_custom_rest_or_align_conserves_empty_partial_and_full_sites(propagation):
+    nodes = np.array([[False, False, False], [True, False, False],
+                      [True, True, True], [False, True, True]])
+    spec = ModelSpec(
+        space=SpaceSpec(geometry="lin", boundary="periodic"),
+        state=StateSpec(nodes=nodes, restchannels=1),
+        time=TimeSpec(steps=4, seed=12),
+        dynamics=InteractionPipelineSpec(
+            operators=[{"name": "custom.rest_or_align"}], propagation=propagation,
+        ),
+        analysis=AnalysisSpec(observers=[NodeRecorder()]),
+    )
+    result = run_model(spec, showprogress=False)
+    history = result.lgca.nodes_t
+    np.testing.assert_array_equal(history.sum(axis=(1, 2)), 6)
+    if not propagation:
+        np.testing.assert_array_equal(history.sum(axis=-1), np.tile([0, 1, 3, 2], (5, 1)))
+
+
+@pytest.mark.parametrize("size", [4, 8])
+@pytest.mark.parametrize("n_species", [1, 2])
+def test_composed_spatial_fields_are_computed_once_per_step(size, n_species, monkeypatch):
+    shape = (size, size) + (() if n_species == 1 else (n_species,)) + (4,)
+    nodes = np.zeros(shape, dtype=bool)
+    nodes[..., 0] = True
+    model = build_model(ModelSpec(
+        space=SpaceSpec(geometry="square"),
+        state=StateSpec(nodes=nodes, n_species=n_species),
+        time=TimeSpec(steps=2, seed=111),
+        dynamics=InteractionPipelineSpec(operators=[ReorientationSpec(terms=[
+            ReorientationTermSpec("nematic_alignment"),
+            ReorientationTermSpec("aggregation"),
+            ReorientationTermSpec("persistent_walk"),
+        ])], propagation=False),
+    ))
+    calls = {"nb_sum": 0, "gradient": 0}
+    for name in calls:
+        original = getattr(model.lgca, name)
+
+        def counted(*args, _name=name, _original=original, **kwargs):
+            calls[_name] += 1
+            return _original(*args, **kwargs)
+
+        monkeypatch.setattr(model.lgca, name, counted)
+    model.run(showprogress=False)
+    assert calls == {"nb_sum": 2, "gradient": 2}
+    np.testing.assert_array_equal(model.lgca.nodes[model.lgca.nonborder].sum(axis=-1), 1)
+
+
+@pytest.mark.parametrize("name", ["persistent_walk", "resting_bias", "nematic_alignment", "aggregation"])
+def test_single_species_scoped_terms_match_unscoped_seeded_evolution(name):
+    results = []
+    for species in (None, 0):
+        result = run_model(ModelSpec(
+            space=SpaceSpec(geometry="square", dims=(4, 4)),
+            state=StateSpec(density=1, restchannels=1),
+            time=TimeSpec(steps=4, seed=117),
+            dynamics=InteractionPipelineSpec(operators=[ReorientationSpec(terms=[
+                ReorientationTermSpec(name, beta=5, species=species)
+            ])]),
+            analysis=AnalysisSpec(observers=[NodeRecorder()]),
+        ), showprogress=False)
+        results.append(result.lgca.nodes_t)
+    np.testing.assert_array_equal(*results)
+
+
+@pytest.mark.parametrize("term,field", [
+    (ReorientationTermSpec("persistent_walk", parameters={"betta": 100}), "parameters"),
+    (ReorientationTermSpec("persistent_walk", species=-1), "species"),
+    (ReorientationTermSpec("persistent_walk", species=True), "species"),
+    (ReorientationTermSpec("persistent_walk", species=.5), "species"),
+    (ReorientationTermSpec("persistent_walk", beta=np.nan), "beta"),
+    (ReorientationTermSpec("persistent_walk", beta=np.inf), "beta"),
+    (ReorientationTermSpec("persistent_walk", beta="2"), "beta"),
+])
+def test_composed_term_invalid_fields_fail_independently(term, field):
+    with pytest.raises(ValueError, match=rf"terms\[0\].*{field}"):
+        build_model(ModelSpec(dynamics=InteractionPipelineSpec(operators=[ReorientationSpec(terms=[term])])))
+
+
+@pytest.mark.parametrize("propagation", ["flase", 1, 0, [], {}])
+def test_pipeline_rejects_invalid_propagation(propagation):
+    with pytest.raises(ValueError, match="dynamics.propagation"):
+        build_model(ModelSpec(dynamics=InteractionPipelineSpec(propagation=propagation)))
+
+
+def test_opposite_neighbors_distinguish_polar_and_nematic_scores():
+    from lgca.pipeline import _PolarAlignmentTerm, _NematicAlignmentTerm
+
+    lgca = get_lgca(geometry="square", dims=(3, 3), density=0, interaction="only_propagation")
+    lgca.nodes[1, 2, 0] = True  # east
+    lgca.nodes[3, 2, 2] = True  # west
+    candidates = np.eye(4, dtype=bool)
+    for kind, name, expected in (
+        (_PolarAlignmentTerm, "polar_alignment", [0, 0, 0, 0]),
+        (_NematicAlignmentTerm, "nematic_alignment", [2, 0, 2, 0]),
+    ):
+        term = kind(ReorientationTermSpec(name))
+        term.prepare(lgca, lgca.nodes)
+        np.testing.assert_allclose(term.score(candidates, lgca.nodes[2, 2], lgca, (2, 2)), expected)
 
 
 def test_nematic_alignment_term_favors_neighbor_axis_in_one_sampler():
@@ -409,6 +542,44 @@ def test_phenotype_switch_preserves_every_two_species_two_channel_ve_state(mask,
         assert result.shape == state.shape
         assert result.dtype == state.dtype
         assert result.sum() == state.sum()
+
+
+@pytest.mark.parametrize("order", [(0, 1, 2), (0, 2, 1), (1, 0, 2), (1, 2, 0), (2, 0, 1), (2, 1, 0)])
+def test_saturated_phenotype_switch_preserves_forbidden_species_under_relabeling(order):
+    state = np.array([[True, False], [True, True], [False, False]])
+    rates = np.array([[0., 1., 0.], [0., 0., 0.], [0., 0., 0.]])
+    order = np.asarray(order)
+    for seed in range(32):
+        result = NativePhenotypeSwitchOperator._sample_state(
+            state[order], rates[np.ix_(order, order)], np.random.default_rng(seed)
+        )
+        # The sole permitted destination is full: every attempted switch stays.
+        np.testing.assert_array_equal(result, state[order])
+        assert result.dtype == bool
+        assert result.sum() == 3
+
+
+@pytest.mark.parametrize("order", [(0, 1, 2), (2, 0, 1), (1, 2, 0)])
+def test_shared_birth_capacity_has_exchangeable_competition(order):
+    from lgca.pipeline import NativeBirthDeathOperator
+
+    operator = NativeBirthDeathOperator()
+    operator.birth_rate = np.array([1., 1., 0.])[list(order)]
+    operator.death_rate = np.zeros(3)
+    operator.capacity = 3
+    node = np.array([[True, False], [True, False], [False, False]])[list(order)]
+    rng = np.random.default_rng(108)
+    winners = np.zeros(3, dtype=int)
+    for _ in range(2000):
+        result = operator._apply_multispecies_node(node, rng)
+        assert result.dtype == bool
+        assert result.sum() == 3
+        counts = result.sum(axis=-1)[np.argsort(order)]
+        assert counts[2] == 0
+        winners += counts == 2
+    # Each identical species wins with probability 1/2 (six standard errors).
+    assert winners[0] / 2000 == pytest.approx(.5, abs=6 * np.sqrt(.25 / 2000))
+    assert winners[1] == 2000 - winners[0]
 
 
 def test_phenotype_switch_zero_rates_leave_complete_state_unchanged():

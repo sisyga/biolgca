@@ -5,6 +5,24 @@ from __future__ import annotations
 import numpy as np
 
 
+def history_steps(lgca, length, attribute, steps=None, *, implicit=False):
+    """Return validated sample times; explicit data defaults to dense steps."""
+    if steps is None and implicit:
+        steps = getattr(lgca, attribute, None)
+    values = np.arange(length) if steps is None else np.asarray(steps)
+    if (values.shape != (length,) or not np.all(np.isfinite(values))
+            or np.any(np.diff(values) <= 0)):
+        raise ValueError("steps must contain one strictly increasing finite time per sample")
+    return values
+
+
+def label_history_axis(ax, steps, offset=0):
+    """Label image sample rows with their actual, possibly nonuniform times."""
+    indices = np.unique(np.linspace(0, len(steps) - 1, min(8, len(steps))).astype(int))
+    ax.set_yticks(indices + offset, labels=[str(steps[index]) for index in indices])
+    ax.set_ylabel("Recorded time step (sample rows)")
+
+
 def validate_species(lgca, species):
     """Validate and normalize an optional species index."""
 

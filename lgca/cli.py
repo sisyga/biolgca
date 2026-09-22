@@ -5,7 +5,10 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from pathlib import Path
+import shutil
+from copy import deepcopy
+from dataclasses import replace
+from pathlib import Path, PureWindowsPath
 
 import numpy as np
 
@@ -96,6 +99,7 @@ def _run(args) -> int:
         )
 
     spec = load_model_spec(model_path)
+    portable_spec = deepcopy(spec)
     _resolve_output_paths(spec, output_dir, trusted_paths=args.trusted_paths)
     compiled = build_model(
         spec,
@@ -104,8 +108,36 @@ def _run(args) -> int:
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    save_model_spec(compiled.spec, output_dir / "model.resolved.json")
+    initializer = portable_spec.state.initializer
+    if initializer is not None and initializer["name"] == "from_npz":
+        from .initializers import resolve_resource_path
+
+        parameters = dict(initializer.get("parameters", {}))
+        source = resolve_resource_path(parameters["path"], resource_base=model_path.parent,
+                                       trusted_paths=args.trusted_paths)
+        target = output_dir / "resources" / "initial_state.npz"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if source != target.resolve():
+            shutil.copyfile(source, target)
+        parameters["path"] = "resources/initial_state.npz"
+        portable_spec = replace(portable_spec, state=replace(portable_spec.state,
+            initializer={"name": "from_npz", "parameters": parameters}))
+    save_model_spec(portable_spec, output_dir / "model.resolved.json")
     result = compiled.run(showprogress=args.show_progress)
+    measurements = {}
+    for data_name, steps_name in (
+        ("nodes_t", "nodes_steps"), ("dens_t", "dens_steps"), ("n_t", "n_steps"),
+        ("channel_pop_t", "channel_pop_steps"), ("velcells_t", "velcells_steps"),
+        ("restcells_t", "restcells_steps"), ("fam_pop_t", "fam_pop_steps"),
+        ("ent_t", "order_parameter_steps"), ("normEnt_t", "order_parameter_steps"),
+        ("polAlParam_t", "order_parameter_steps"), ("meanAlign_t", "order_parameter_steps"),
+    ):
+        if hasattr(result.lgca, data_name):
+            measurements[data_name] = getattr(result.lgca, data_name)
+            measurements[steps_name] = getattr(result.lgca, steps_name)
+    if measurements:
+        np.savez_compressed(output_dir / "measurements.npz", **measurements)
+        result.metadata["measurements_file"] = "measurements.npz"
     metadata_path = output_dir / "metadata.json"
     metadata_path.write_text(
         json.dumps(_json_safe(result.metadata), indent=2), encoding="utf-8"
@@ -125,13 +157,22 @@ def _validate_output_declarations(spec, *, trusted_paths: bool) -> None:
     if spec.analysis is None:
         return
     for observer in spec.analysis.observers:
+        if (observer.__class__.__name__ == "NodeRecorder" and spec.state.identity_based
+                and not spec.state.volume_exclusion):
+            raise ValueError("CLI NodeRecorder cannot persist identity NoVE list states; "
+                             "use ChannelDensityRecorder or DensityRecorder instead")
         if isinstance(observer, CSVSnapshotObserver):
             _validate_relative_output(observer.output_dir, trusted_paths=trusted_paths)
+            _validate_relative_output(
+                observer.filename.format(kind=observer.kind, step=0),
+                trusted_paths=trusted_paths,
+            )
         elif isinstance(observer, ScalarTimeSeriesRecorder):
             _validate_relative_output(observer.output_path, trusted_paths=trusted_paths)
 
 
 def _resolve_output_paths(spec, output_dir: Path, *, trusted_paths: bool) -> None:
+    _validate_output_declarations(spec, trusted_paths=trusted_paths)
     if spec.analysis is None:
         return
     for observer in spec.analysis.observers:
@@ -139,6 +180,7 @@ def _resolve_output_paths(spec, output_dir: Path, *, trusted_paths: bool) -> Non
             observer.output_dir = _output_path(
                 observer.output_dir, output_dir, trusted_paths=trusted_paths
             )
+            observer._output_root = None if trusted_paths else output_dir
         elif isinstance(observer, ScalarTimeSeriesRecorder):
             observer.output_path = _output_path(
                 observer.output_path, output_dir, trusted_paths=trusted_paths
@@ -147,7 +189,8 @@ def _resolve_output_paths(spec, output_dir: Path, *, trusted_paths: bool) -> Non
 
 def _validate_relative_output(path, *, trusted_paths: bool) -> None:
     raw = Path(path)
-    if not trusted_paths and (raw.is_absolute() or ".." in raw.parts):
+    windows = PureWindowsPath(path)
+    if not trusted_paths and (raw.anchor or windows.anchor or ".." in raw.parts or ".." in windows.parts):
         raise ValueError(
             "Generated output paths must be relative and may not contain '..'; "
             "use --trusted-paths only for trusted local models."

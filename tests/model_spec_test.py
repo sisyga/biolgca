@@ -23,6 +23,129 @@ from lgca.simulation import DensityRecorder, FamilyPopulationRecorder, NodeRecor
 from lgca.simulation import Observer
 
 
+@pytest.mark.parametrize("geometry,dims", [("lin", [3]), ("square", [3, 4]),
+    ("hex", [3, 4]), ("cubic", [3, 4, 5]), ("moore", [3, 4, 5])])
+def test_plain_json_and_yaml_dimension_arrays(geometry, dims):
+    import json
+    from lgca.model import model_spec_from_yaml
+
+    data = {"schema_version": 1, "model": {"space": {"geometry": geometry, "dims": dims},
+            "state": {"density": 0}, "time": {"steps": 0}}}
+    for spec in (model_spec_from_json(json.dumps(data)),
+                 model_spec_from_yaml(f"schema_version: 1\nmodel:\n  space:\n    geometry: {geometry}\n    dims: {dims}\n  state:\n    density: 0\n  time:\n    steps: 0\n"),
+                 ModelSpec(space=SpaceSpec(geometry=geometry, dims=dims), state=StateSpec(density=0))):
+        assert build_model(spec).lgca.dims == tuple(dims)
+
+
+@pytest.mark.parametrize("dims", [[3], [3, 4, 5], [], [0, 3], [True, 3], [1.5, 3]])
+def test_dimension_errors_identify_model_field(dims):
+    with pytest.raises(ValueError, match="model.space.dims"):
+        build_model(ModelSpec(space=SpaceSpec(geometry="square", dims=dims)))
+
+
+def test_legacy_stepping_continues_compiled_dynamics_and_rng():
+    spec = _square_spec(operators=[{"name": "classical.random_walk"}], timesteps=4)
+    spec = replace(spec, dynamics=replace(spec.dynamics, propagation=False))
+    expected = run_model(spec, showprogress=False).lgca.nodes.copy()
+    compiled = build_model(replace(spec, time=replace(spec.time, steps=2)))
+    compiled.run(showprogress=False)
+    compiled.lgca.timestep()
+    compiled.lgca.timeevo(1, showprogress=False)
+    np.testing.assert_array_equal(compiled.lgca.nodes, expected)
+    assert compiled._step == 4
+    assert compiled.lgca.enable_propagation is False
+
+
+def test_live_animation_uses_compiled_death_operator():
+    import matplotlib.pyplot as plt
+
+    compiled = build_model(_square_spec(operators=[{
+        "name": "birth_death", "parameters": {"death_rate": 1}
+    }], timesteps=0))
+    animation = compiled.lgca.live_animate_flux()
+    animation._func(0)
+    assert compiled.lgca.total_population() == 0
+    animation._draw_was_started = True
+    plt.close(animation._fig)
+
+
+def test_scalar_metric_serialization_preserves_semantics():
+    from lgca.simulation import ScalarTimeSeriesRecorder, _total_population
+
+    spec = ModelSpec(analysis=AnalysisSpec(observers=[ScalarTimeSeriesRecorder()]))
+    restored = model_spec_from_json(model_spec_to_json(spec))
+    assert restored.analysis.observers[0].metrics["population"] is _total_population
+    custom = ScalarTimeSeriesRecorder(metrics={"population": lambda lgca: 123})
+    with pytest.raises(TypeError, match="default population metric"):
+        model_spec_to_dict(replace(spec, analysis=AnalysisSpec(observers=[custom])))
+
+
+@pytest.mark.parametrize("n_species", [1, 2])
+@pytest.mark.parametrize("canonical", [False, True])
+def test_ve_growth_capacity_configuration_and_metadata(n_species, canonical):
+    shape = (1, 2) if n_species == 1 else (1, 2, 2)
+    nodes = np.zeros(shape, dtype=bool)
+    nodes[..., 0] = True
+    capacity = n_species + 1
+    parameters = {"birth_rate": 1}
+    if not canonical:
+        parameters["capacity"] = capacity
+    spec = ModelSpec(space=SpaceSpec(geometry="lin"),
+        state=StateSpec(nodes=nodes, n_species=n_species, capacity=capacity if canonical else None),
+        time=TimeSpec(steps=1, seed=122),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "birth_death", "parameters": parameters}], propagation=False))
+    result = run_model(model_spec_from_json(model_spec_to_json(spec)), showprogress=False)
+    assert result.lgca.total_population() == capacity
+    assert result.metadata["capacity"] == capacity
+    assert result.metadata["channel_capacity"] == 2
+    assert result.metadata["growth_capacities"][0]["capacity"] == capacity
+    conflict = replace(spec, state=replace(spec.state, capacity=capacity + 1))
+    if not canonical:
+        with pytest.raises(ValueError, match="conflicts"):
+            build_model(conflict)
+
+
+@pytest.mark.parametrize("field,value", [("beta", float("inf")), ("species", -1),
+                                        ("parameters", {"betta": 3})])
+def test_serialized_composed_term_contracts(field, value):
+    import json
+    from lgca.model import model_spec_from_yaml
+
+    term = {"name": "persistent_walk", field: value}
+    data = {"schema_version": 1, "model": {"space": {"geometry": "lin", "dims": 2},
+            "dynamics": {"operators": [{"type": "reorientation", "terms": [term]}]}}}
+    for loader in (model_spec_from_json, model_spec_from_yaml):
+        with pytest.raises(ValueError, match=field):
+            build_model(loader(json.dumps(data)))
+
+
+@pytest.mark.parametrize("name", ["classical.alignment", "classical.aggregation", "classical.nematic"])
+def test_bounded_candidate_batches_preserve_seeded_trajectory(name, monkeypatch):
+    import lgca.pipeline as pipeline
+
+    spec = _square_spec(operators=[{"name": name}], timesteps=3, seed=127)
+    expected = run_model(spec, showprogress=False).lgca.nodes_t.copy()
+    monkeypatch.setattr(pipeline, "_MAX_CANDIDATE_BATCH_BYTES", 480)
+    actual = run_model(spec, showprogress=False).lgca.nodes_t
+    np.testing.assert_array_equal(actual, expected)
+    batches = list(pipeline._candidate_batches(np.ones((4, 4), dtype=bool), 10))
+    assert max(len(batch[0]) for batch in batches) == 1
+
+
+def test_multiline_yaml_is_not_probed_as_a_filesystem_path(monkeypatch):
+    from pathlib import Path
+    from lgca.model import model_spec_from_yaml, model_spec_to_yaml
+
+    text = model_spec_to_yaml(_square_spec())
+
+    def reject_path_probe(path):
+        raise AssertionError("Inline model text must not be passed to Path.exists")
+
+    monkeypatch.setattr(Path, "exists", reject_path_probe)
+    restored = model_spec_from_yaml(text)
+    assert restored.space.dims == (4, 5)
+
+
 def _square_spec(*, operators=(), timesteps=3, seed=17):
     return ModelSpec(
         description=Description(title="registry driven square LGCA"),

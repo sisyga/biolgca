@@ -14,6 +14,55 @@ from lgca.simulation import (
 )
 
 
+def test_per_type_recorder_counts_sparse_identity_labels():
+    lgca = get_lgca(geometry="lin", ib=True, restchannels=1,
+                    nodes=np.array([[1, 7, 2], [0, 0, 0]], dtype=np.uint),
+                    interaction="only_propagation")
+    SimulationRunner(lgca, timesteps=2, observers=[PerTypeRecorder(), PopulationRecorder()],
+                     showprogress=False).run()
+    np.testing.assert_array_equal(lgca.velcells_t[0], [2, 0])
+    np.testing.assert_array_equal(lgca.restcells_t[0], [1, 0])
+    np.testing.assert_array_equal((lgca.velcells_t + lgca.restcells_t).sum(axis=-1), lgca.n_t)
+
+
+@pytest.mark.parametrize("same_schedule", [False, True])
+@pytest.mark.parametrize("dtype", [None, np.float32])
+def test_duplicate_recorders_fail_before_state_or_output_changes(same_schedule, dtype):
+    from lgca.simulation import ChannelDensityRecorder, OrderParameterRecorder, FamilyPopulationRecorder
+
+    lgca = get_lgca(geometry="lin", dims=3, density=1, seed=119, interaction="random_walk")
+    before = lgca.nodes.copy()
+    for kind in (NodeRecorder, DensityRecorder, PopulationRecorder, ChannelDensityRecorder,
+                 PerTypeRecorder, OrderParameterRecorder, FamilyPopulationRecorder):
+        first = kind(Schedule(every=2))
+        second = kind(Schedule(every=2) if same_schedule else Schedule(steps=[0, 3]))
+        if kind is DensityRecorder:
+            second.dtype = dtype
+        with pytest.raises(ValueError, match=f"Multiple {kind.__name__}"):
+            SimulationRunner(lgca, timesteps=4, observers=[first, second], showprogress=False).run()
+        np.testing.assert_array_equal(lgca.nodes, before)
+        assert not hasattr(lgca, "nodes_t")
+
+
+def test_recording_estimate_and_budget_precede_allocation():
+    from types import SimpleNamespace
+    from lgca.simulation import estimate_recording_bytes
+
+    fake = SimpleNamespace(dims=(128, 128, 128), nodes=np.empty((0, 0, 0, 6), dtype=bool))
+    assert estimate_recording_bytes(fake, 1000, [DensityRecorder()]) == 1001 * (128**3 * 8 + 8)
+    assert estimate_recording_bytes(fake, 1000, [DensityRecorder(Schedule(every=100))]) == 11 * (128**3 * 8 + 8)
+    lgca = get_lgca(geometry="lin", dims=3, density=1, seed=127, interaction="random_walk")
+    before = lgca.nodes.copy()
+    with pytest.raises(ValueError, match="Recording requires"):
+        SimulationRunner(lgca, timesteps=3, observers=[DensityRecorder()],
+                         max_recording_bytes=1, showprogress=False).run()
+    assert not hasattr(lgca, "dens_t")
+    np.testing.assert_array_equal(lgca.nodes, before)
+    SimulationRunner(lgca, timesteps=3, observers=[DensityRecorder()],
+                     max_recording_bytes=None, showprogress=False).run()
+    assert lgca.dens_t.shape == (4, 3)
+
+
 class StepCollector:
     def __init__(self, schedule=None):
         self.schedule = schedule

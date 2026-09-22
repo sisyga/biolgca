@@ -1,7 +1,12 @@
 import importlib
 import json
+import subprocess
+import sys
+import shutil
+from pathlib import Path
 
 import numpy as np
+import pytest
 
 from lgca.model import (
     AnalysisSpec,
@@ -13,6 +18,51 @@ from lgca.model import (
 )
 from lgca.pipeline import InteractionPipelineSpec
 from lgca.simulation import CSVSnapshotObserver
+
+
+def test_cli_subprocess_persists_measurements_and_sample_steps(tmp_path):
+    from lgca.simulation import NodeRecorder, DensityRecorder, PopulationRecorder, Schedule
+
+    schedule = Schedule(steps=[0, 2])
+    spec = ModelSpec(space=SpaceSpec(geometry="lin", dims=3),
+                     state=StateSpec(density=1), time=TimeSpec(steps=2, seed=114),
+                     analysis=AnalysisSpec(observers=[NodeRecorder(schedule),
+                         DensityRecorder(schedule), PopulationRecorder(schedule)]))
+    path = save_model_spec(spec, tmp_path / "model.json")
+    output = tmp_path / "run"
+    result = subprocess.run([sys.executable, "-m", "lgca.cli", "run", str(path),
+                             "--output", str(output)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    with np.load(output / "measurements.npz", allow_pickle=False) as data:
+        for name in ("nodes_steps", "dens_steps", "n_steps"):
+            np.testing.assert_array_equal(data[name], [0, 2])
+        np.testing.assert_array_equal(data["nodes_t"].sum(axis=-1), data["dens_t"])
+        np.testing.assert_array_equal(data["dens_t"].sum(axis=-1), data["n_t"])
+
+
+def test_moved_cli_archive_replays_companion_resource_without_touching_first_run(tmp_path):
+    nodes = np.array([[True, False], [False, True], [True, False]])
+    np.savez(tmp_path / "input.npz", nodes=nodes)
+    spec = ModelSpec(space=SpaceSpec(geometry="lin", dims=3),
+        state=StateSpec(initializer={"name": "from_npz", "parameters": {"path": "input.npz"}}),
+        time=TimeSpec(steps=2, seed=115),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "classical.random_walk"}]),
+        analysis=AnalysisSpec(observers=[CSVSnapshotObserver(output_dir="snapshots")]))
+    model = save_model_spec(spec, tmp_path / "model.json")
+    first = tmp_path / "first"
+    assert _main(["run", str(model), "--output", str(first)]) == 0
+    before = {p.relative_to(first): p.read_bytes() for p in first.rglob("*") if p.is_file()}
+    moved = tmp_path / "moved"
+    shutil.copytree(first, moved)
+    (tmp_path / "input.npz").unlink()
+    archived = moved / "model.resolved.json"
+    assert _main(["validate", str(archived)]) == 0
+    second = tmp_path / "second"
+    assert _main(["run", str(archived), "--output", str(second)]) == 0
+    for relative, content in before.items():
+        assert (first / relative).read_bytes() == content
+    for original in (first / "snapshots").glob("*.csv"):
+        assert (second / "snapshots" / original.name).read_bytes() == original.read_bytes()
 
 
 def _main(argv):
@@ -82,6 +132,51 @@ def test_run_writes_resolved_spec_metadata_and_observer_outputs(tmp_path):
     first_csv = (first_dir / "snapshots" / "density_00001.csv").read_text()
     second_csv = (second_dir / "snapshots" / "density_00001.csv").read_text()
     assert first_csv == second_csv
+
+
+@pytest.mark.parametrize("filename", ["../sentinel.csv", "..\\sentinel.csv", "/sentinel.csv",
+                                      "C:\\sentinel.csv", "C:sentinel.csv", "\\sentinel.csv"])
+def test_csv_snapshot_rejects_filename_escape_before_writing(tmp_path, filename):
+    sentinel = tmp_path / "sentinel.csv"
+    sentinel.write_text("untouched", encoding="utf-8")
+    model = _write_tiny_model(tmp_path / "model.json",
+                              observer=CSVSnapshotObserver(filename=filename))
+    assert _main(["run", str(model), "--output", str(tmp_path / "run")]) == 2
+    assert sentinel.read_text(encoding="utf-8") == "untouched"
+    assert not (tmp_path / "run").exists()
+
+
+def test_csv_snapshot_checks_final_resolved_target(tmp_path, monkeypatch):
+    output = tmp_path / "run"
+    sentinel = tmp_path / "sentinel.csv"
+    sentinel.write_text("untouched", encoding="utf-8")
+    model = _write_tiny_model(tmp_path / "model.json",
+                              observer=CSVSnapshotObserver(filename="snapshot.csv"))
+    original = Path.resolve
+
+    def resolve(path, *args, **kwargs):
+        if path == output / "snapshot.csv":
+            return sentinel
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", resolve)
+    assert _main(["run", str(model), "--output", str(output)]) == 2
+    assert sentinel.read_text(encoding="utf-8") == "untouched"
+
+
+def test_csv_snapshot_rejects_resolved_symlink_escape(tmp_path):
+    output = tmp_path / "run"
+    output.mkdir()
+    sentinel = tmp_path / "sentinel.csv"
+    sentinel.write_text("untouched", encoding="utf-8")
+    try:
+        (output / "snapshot.csv").symlink_to(sentinel)
+    except OSError:
+        pytest.skip("Creating symlinks requires OS privileges")
+    model = _write_tiny_model(tmp_path / "model.json",
+                              observer=CSVSnapshotObserver(filename="snapshot.csv"))
+    assert _main(["run", str(model), "--output", str(output), "--overwrite"]) == 2
+    assert sentinel.read_text(encoding="utf-8") == "untouched"
 
 
 def test_run_rejects_existing_output_without_explicit_overwrite(tmp_path, capsys):

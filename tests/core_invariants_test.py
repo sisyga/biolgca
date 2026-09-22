@@ -31,6 +31,48 @@ GEOMETRIES = {
 }
 
 
+@pytest.mark.parametrize("geometry", GEOMETRIES)
+def test_identity_boolean_initialization_assigns_unique_physical_ids(geometry):
+    template = _make_lgca("identity_ve", geometry)
+    nodes = np.ones(template.dims + (template.K,), dtype=bool)
+    lgca = get_lgca(geometry=geometry, nodes=nodes, ib=True,
+                    interaction="only_propagation")
+    labels = lgca.nodes[lgca.nonborder].ravel()
+    np.testing.assert_array_equal(np.sort(labels), np.arange(1, nodes.size + 1))
+    assert lgca.maxlabel == nodes.size
+    lgca.timestep()
+    np.testing.assert_array_equal(np.sort(lgca.nodes[lgca.nonborder].ravel()),
+                                  np.arange(1, nodes.size + 1))
+    with pytest.raises(ValueError, match="unique"):
+        get_lgca(geometry=geometry, nodes=np.ones_like(nodes, dtype=int),
+                 ib=True, interaction="only_propagation")
+
+
+@pytest.mark.parametrize("nodes", [np.array([[1.5, 2.]]), np.array([[-1, 2]]),
+                                  np.array([[np.nan, 2.]]), np.array([[np.inf, 2.]])])
+def test_identity_initialization_rejects_invalid_labels(nodes):
+    with pytest.raises(ValueError, match="non-negative integer"):
+        get_lgca(geometry="lin", nodes=nodes, ib=True, interaction="only_propagation")
+
+
+def test_shared_identity_birth_kernel_preserves_ids_and_indexes_new_properties():
+    from lgca.identity_kernels import apply_identity_birth
+
+    lgca = get_lgca(geometry="lin", ib=True, nodes=np.array([[1, 0], [2, 3], [0, 0]]),
+                    interaction="only_propagation", seed=125)
+    lgca.props["r_b"] = [0., 1., 1., 1.]
+    for _ in range(10):
+        apply_identity_birth(lgca, a_max=1, std=.01)
+        lgca.update_dynamic_fields()
+    labels = lgca.nodes[lgca.nonborder]
+    living = labels[labels > 0]
+    assert set(living) == {1, 2, 3, 4}
+    assert len(living) == len(set(living))
+    assert not labels[2].any()
+    assert len(lgca.props["r_b"]) == int(lgca.maxlabel) + 1 == 5
+    assert 0 <= lgca.props["r_b"][4] <= 1
+
+
 def _make_lgca(family, geometry, *, bc="pbc", density=0):
     kwargs = dict(FAMILIES[family])
     # Identity-based NoVE models have exactly one rest channel by definition.

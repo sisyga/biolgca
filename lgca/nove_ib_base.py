@@ -14,11 +14,14 @@ from abc import ABC
 from copy import copy, deepcopy
 
 import numpy as np
+from .plot_data import history_steps
 from numpy import random as npr
 from tqdm.auto import tqdm
 
 from .base import (
+    plt,
     LGCA_base,
+    _validate_count_nodes,
     _validate_density,
     _validate_nonnegative_int,
     _validate_positive,
@@ -82,6 +85,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.set_bc(bc)
         self.interaction_params = {}
         restchannels = _validate_nonnegative_int(restchannels, "restchannels")
+        if nodes is not None and np.asarray(nodes).dtype != object:
+            nodes = _validate_count_nodes(nodes)
         if restchannels != 1:
             restchannels = 1
             warnings.warn("There can only be one rest channel in this LGCA class. Setting to 1 to prevent issues")
@@ -121,7 +126,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     def random_reset(self, density):
         """Populate the lattice from a Poisson distribution with mean ``density`` per node."""
         _validate_density(density)
-        lam = density / self.capacity
+        lam = density / self.K
         numbers = self.rng.poisson(lam=lam, size=self.dims + (self.K,))
         tempnodes = self.convert_int_to_ib(numbers)
         self.nodes[self.nonborder] = tempnodes
@@ -563,6 +568,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         :return:
         """
 
+        implicit = nodes_t is None
+        steps = kwargs.pop("steps", None)
         if nodes_t is None:
             nodes_t = self.nodes_t
 
@@ -588,7 +595,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
 
         tmax = nodes_t.shape[0]
         yerr = std_mean_prop_t
-        x = np.arange(tmax)
+        x = history_steps(self, tmax, "nodes_steps", steps, implicit=implicit)
         y = mean_prop_t
 
         plt.xlabel('$t$')

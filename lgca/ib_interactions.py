@@ -71,29 +71,10 @@ def birth(lgca):
     and width ``interaction_params['std']``.
     """
 
-    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-               (lgca.cell_density[lgca.nonborder] < lgca.K)
-    coords = [a[relevant] for a in lgca.nonborder]
-    for coord in zip(*coords):
-        node = lgca.nodes[coord]
+    from .identity_kernels import apply_identity_birth
 
-        # choose cells that proliferate
-        r_bs = np.array([lgca.props['r_b'][i] for i in node])
-        proliferating = lgca.rng.random(lgca.K) < r_bs
-
-        # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
-        for label in node[proliferating]:
-            ind = lgca.rng.choice(lgca.K)
-            if node[ind] == 0:
-                lgca.maxlabel += 1
-                node[ind] = lgca.maxlabel
-                r_b = lgca.props['r_b'][label]
-                lgca.props['r_b'].append(float(trunc_gauss(0, lgca.interaction_params['a_max'], r_b,
-                                                           sigma=lgca.interaction_params['std'],
-                                                           rng=lgca.rng)))
-
-        lgca.nodes[coord] = node
-    random_walk(lgca)
+    apply_identity_birth(lgca, a_max=lgca.interaction_params['a_max'],
+                         std=lgca.interaction_params['std'])
 
 
 def birthdeath(lgca):

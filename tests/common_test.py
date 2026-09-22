@@ -171,12 +171,22 @@ class T_LGCA_Common(ABC):
 
     def t_propagation_template(self, geom, nodes, expected_output, bc='pbc'):
         # check that propagation and rest channels work: all particles should move into one node within one timestep
+        labels = nodes[nodes > 0]
+        occupancy_fixture = self.ib and (nodes.dtype == bool or np.unique(labels).size != labels.size)
+        if occupancy_fixture:
+            # Classical boundary fixtures describe occupancy, not particle IDs.
+            nodes = nodes.astype(bool)
         lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib, nodes=nodes, bc=bc, interaction='only_propagation')
         lgca.timeevo(timesteps=1, recorddens=False, showprogress=False)
         print(lgca.__class__.__name__)
 
-        assert lgca.nodes[lgca.nonborder].sum() == expected_output.sum(), "Particles appear or disappear"
-        assert np.array_equal(lgca.nodes[lgca.nonborder],
+        actual = lgca.nodes[lgca.nonborder]
+        if occupancy_fixture:
+            living = actual[actual > 0]
+            assert np.unique(living).size == living.size
+            actual = actual.astype(bool)
+        assert actual.sum() == expected_output.sum(), "Particles appear or disappear"
+        assert np.array_equal(actual,
                               expected_output), "Node configuration after propagation not correct"
         if self.ib:
             assert np.array_equal(lgca.occupied[lgca.nonborder].sum(-1), lgca.cell_density[lgca.nonborder]), \
