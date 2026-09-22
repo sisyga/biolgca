@@ -14,10 +14,12 @@ from abc import ABC
 from copy import copy, deepcopy
 
 import numpy as np
+from .plot_data import history_steps
 from numpy import random as npr
 from tqdm.auto import tqdm
 
 from .base import (
+    plt,
     LGCA_base,
     _validate_density,
     _validate_nonnegative_int,
@@ -647,6 +649,8 @@ class IBLGCA_base(LGCA_base, ABC):
 
         """
         # set lattice configuration over time
+        implicit = nodes_t is None
+        steps = kwargs.pop("steps", None)
         if nodes_t is None:
             nodes_t = self.nodes_t
 
@@ -668,7 +672,7 @@ class IBLGCA_base(LGCA_base, ABC):
             fig.set_size_inches(figsize)
 
         tmax = nodes_t.shape[0]
-        x = np.arange(tmax)
+        x = history_steps(self, tmax, "nodes_steps", steps, implicit=implicit)
         y = mean_prop_t
         yerr = std_mean_prop_t
         plt.xlabel('$t$')
@@ -851,12 +855,9 @@ class IBLGCA_base(LGCA_base, ABC):
         else:
             fam_pop_t = self.fam_pop_t
         cum_pop_t = self.propagate_pop_to_parents(fam_pop_t[t_slice], parent_list)
-        if t_start_index is None:
-            if t_slice.start is not None:
-                t_start_index = t_slice.start
-            else:
-                t_start_index = 0
-        timeline = np.arange(cum_pop_t.shape[0]) + t_start_index
+        timeline = history_steps(self, len(fam_pop_t), "fam_pop_steps", implicit=True)[t_slice]
+        if t_start_index is not None:
+            timeline = timeline - timeline[0] + t_start_index
 
         # choose drawing mode depending on keyword arguments
         if 'facecolour' not in kwargs:

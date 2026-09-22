@@ -15,6 +15,8 @@ Supported LGCA types:
 - identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_1D`)
 """
 
+from .plot_data import history_steps, label_history_axis
+
 try:  # optional plotting dependency
     import matplotlib.ticker as mticker
     from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -454,6 +456,8 @@ class LGCA_1D(LGCA_base):
         """
 
         # set image content
+        implicit_history = density_t is None
+        sample_steps = kwargs.pop("steps", None)
         if density_t is None:
             if hasattr(self, 'dens_t'):
                 density_t = self.dens_t
@@ -482,7 +486,10 @@ class LGCA_1D(LGCA_base):
 
             cbar.set_label('Particle number $n$')
         plt.sca(ax)
+        times = history_steps(self, len(density_t), "dens_steps", sample_steps, implicit=implicit_history)
+        label_history_axis(ax, times)
         return plot
+
 
     def plot_flux(self, nodes_t=None, cbar=True, colorbarwidth=0.03, **kwargs):
         """
@@ -518,6 +525,8 @@ class LGCA_1D(LGCA_base):
         """
 
         # set image content
+        implicit_history = nodes_t is None
+        sample_steps = kwargs.pop("steps", None)
         if nodes_t is None:
             if hasattr(self, 'nodes_t'):
                 nodes_t = self.nodes_t
@@ -561,7 +570,10 @@ class LGCA_1D(LGCA_base):
             cbar_handle.set_ticklabels(['empty', 'left', 'no flux', 'right'])
             cbar_handle.set_label('Flux direction')
             plt.sca(ax)
+        times = history_steps(self, len(nodes_t), "nodes_steps", sample_steps, implicit=implicit_history)
+        label_history_axis(ax, times)
         return plot
+
 
 
 class IBLGCA_1D(IBLGCA_base, LGCA_1D):
@@ -600,6 +612,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         if nodes_t is None:
             if hasattr(self, 'nodes_t'):
                 nodes_t = self.nodes_t.astype('bool')
+                kwargs.setdefault("steps", getattr(self, "nodes_steps", None))
             else:
                 raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
                                    "in past LGCA run, call lgca.timeevo() with keyword record=True")
@@ -609,6 +622,8 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         LGCA_1D.plot_flux(self, nodes_t, **kwargs)
 
     def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', figkwargs={}, **kwargs):
+        implicit_history = nodes_t is None
+        sample_steps = kwargs.pop("steps", None)
         if nodes_t is None:
             nodes_t = self.nodes_t
 
@@ -628,7 +643,10 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
         cbar.set_label(r'Property ${}$'.format(propname))
         plt.sca(ax)
+        times = history_steps(self, len(nodes_t), "nodes_steps", sample_steps, implicit=implicit_history)
+        label_history_axis(ax, times)
         return plot
+
 
 
 class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
@@ -721,6 +739,8 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         x_has_offset = offset_x != 0 and isinstance(offset_x, int)
         t_has_offset = offset_t != 0 and isinstance(offset_t, int)
         # set values for unused arguments
+        implicit_history = density_t is None
+        sample_steps = kwargs.pop("steps", None)
         if density_t is None:
             if hasattr(self, 'dens_t'):
                 density_t = self.dens_t
@@ -730,6 +750,8 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
             if x_has_offset:
                 density_t = density_t[:, offset_x:]
             if t_has_offset:
+                sample_steps = history_steps(self, len(density_t), "dens_steps", sample_steps,
+                                             implicit=True)[offset_t:]
                 density_t = density_t[offset_t:, :]
         if figsize is None:
             figsize = estimate_figsize(density_t.T, cbar=True)
@@ -766,7 +788,10 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         ax.xaxis.set_label_position('top')
         ax.xaxis.tick_top()
         plt.tight_layout()
+        times = history_steps(self, len(density_t), "dens_steps", sample_steps, implicit=implicit_history)
+        label_history_axis(ax, times, offset=offset_t)
         return plot
+
 
     def nb_sum(self, qty, addCenter=False):
         """
@@ -848,6 +873,7 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
         if nodes_t is None:
             if hasattr(self, 'nodes_t'):
                 nodes_t = self.length_checker(self.nodes_t)
+                kwargs.setdefault("steps", getattr(self, "nodes_steps", None))
             else:
                 raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
                                    "in past LGCA run, call lgca.timeevo() with keyword record=True")
@@ -869,6 +895,8 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
         :param kwargs:
         :return:
         """
+        implicit_history = nodes_t is None
+        sample_steps = kwargs.pop("steps", None)
         if nodes_t is None:
             nodes_t = self.nodes_t
         if props is None:
@@ -893,5 +921,8 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
             else:
                 cbar.set_label(cbarlabel)
         plt.sca(ax)
+        times = history_steps(self, len(nodes_t), "nodes_steps", sample_steps, implicit=implicit_history)
+        label_history_axis(ax, times)
         return plot
+
 

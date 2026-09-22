@@ -14,10 +14,12 @@ from abc import ABC
 from copy import copy, deepcopy
 
 import numpy as np
+from .plot_data import history_steps
 from numpy import random as npr
 from tqdm.auto import tqdm
 
 from .base import (
+    plt,
     LGCA_base,
     _validate_density,
     _validate_nonnegative_int,
@@ -563,6 +565,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         :return:
         """
 
+        implicit = nodes_t is None
+        steps = kwargs.pop("steps", None)
         if nodes_t is None:
             nodes_t = self.nodes_t
 
@@ -588,7 +592,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
 
         tmax = nodes_t.shape[0]
         yerr = std_mean_prop_t
-        x = np.arange(tmax)
+        x = history_steps(self, tmax, "nodes_steps", steps, implicit=implicit)
         y = mean_prop_t
 
         plt.xlabel('$t$')
