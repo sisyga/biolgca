@@ -7,6 +7,30 @@ import pytest
 
 from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
 from lgca.pipeline import InteractionPipelineSpec
+from lgca.operator_base import InteractionOperator, PluginInfo
+
+
+@pytest.mark.parametrize("operator", ["nove.dd_alignment", "nove.di_alignment"])
+@pytest.mark.parametrize("propagation", [False, True])
+def test_sequential_reverse_then_align_refreshes_periodic_edges(operator, propagation):
+    class Reverse(InteractionOperator):
+        def __init__(self):
+            super().__init__(PluginInfo("reverse", "reorientation", ("nove",)))
+
+        def apply(self, context, step):
+            model = context.lgca
+            model.nodes[model.nonborder] = model.nodes[model.nonborder][..., ::-1]
+
+    model = build_model(ModelSpec(
+        space=SpaceSpec(geometry="lin", dims=4),
+        state=StateSpec(volume_exclusion=False, nodes=np.array([[10, 0]] * 4)),
+        time=TimeSpec(steps=1, seed=1),
+        dynamics=InteractionPipelineSpec(operators=[Reverse(), {
+            "name": operator, "parameters": {"beta": 100},
+        }], propagation=propagation),
+    ))
+    model.run(False)
+    np.testing.assert_array_equal(model.lgca.nodes[model.lgca.nonborder], [[0, 10]] * 4)
 
 
 @pytest.mark.parametrize("operator", ["nove.random_walk", "nove.dd_alignment", "nove.di_alignment"])

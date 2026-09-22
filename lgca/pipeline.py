@@ -2323,6 +2323,9 @@ class NativeNoVEAlignmentOperator(ReorientationOperator):
         self.beta = 2.0
         self.include_center = False
 
+    def dependencies(self) -> set[str]:
+        return {"boundary_nodes", "cell_density"}
+
     def validate(self, context) -> None:
         if context.spec.state.volume_exclusion:
             raise ValueError(f"{self.name} requires state.volume_exclusion=False")
