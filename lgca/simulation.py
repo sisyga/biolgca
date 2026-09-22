@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 import time
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Iterable, Mapping
 
 import numpy as np
@@ -344,6 +344,7 @@ class CSVSnapshotObserver(Observer):
         self.output_dir = Path("." if output_dir is None else output_dir)
         self.filename = filename
         self.paths: list[Path] = []
+        self._output_root = None
 
     def setup(self, lgca, runner: SimulationRunner) -> None:
         self.paths = []
@@ -351,7 +352,13 @@ class CSVSnapshotObserver(Observer):
 
     def on_step(self, lgca, step: int) -> None:
         values = _snapshot_values(lgca, self.kind)
-        path = self.output_dir / self.filename.format(kind=self.kind, step=step)
+        filename = self.filename.format(kind=self.kind, step=step)
+        path = (self.output_dir / filename).resolve()
+        if self._output_root is not None:
+            windows = PureWindowsPath(filename)
+            if (Path(filename).anchor or windows.anchor or ".." in Path(filename).parts
+                    or ".." in windows.parts or not path.is_relative_to(self._output_root)):
+                raise ValueError("Snapshot output path escapes the run directory")
         _write_array_csv(path, values)
         self.paths.append(path)
 

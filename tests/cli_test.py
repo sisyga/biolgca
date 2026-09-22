@@ -1,7 +1,9 @@
 import importlib
 import json
+from pathlib import Path
 
 import numpy as np
+import pytest
 
 from lgca.model import (
     AnalysisSpec,
@@ -82,6 +84,51 @@ def test_run_writes_resolved_spec_metadata_and_observer_outputs(tmp_path):
     first_csv = (first_dir / "snapshots" / "density_00001.csv").read_text()
     second_csv = (second_dir / "snapshots" / "density_00001.csv").read_text()
     assert first_csv == second_csv
+
+
+@pytest.mark.parametrize("filename", ["../sentinel.csv", "..\\sentinel.csv", "/sentinel.csv",
+                                      "C:\\sentinel.csv", "C:sentinel.csv", "\\sentinel.csv"])
+def test_csv_snapshot_rejects_filename_escape_before_writing(tmp_path, filename):
+    sentinel = tmp_path / "sentinel.csv"
+    sentinel.write_text("untouched", encoding="utf-8")
+    model = _write_tiny_model(tmp_path / "model.json",
+                              observer=CSVSnapshotObserver(filename=filename))
+    assert _main(["run", str(model), "--output", str(tmp_path / "run")]) == 2
+    assert sentinel.read_text(encoding="utf-8") == "untouched"
+    assert not (tmp_path / "run").exists()
+
+
+def test_csv_snapshot_checks_final_resolved_target(tmp_path, monkeypatch):
+    output = tmp_path / "run"
+    sentinel = tmp_path / "sentinel.csv"
+    sentinel.write_text("untouched", encoding="utf-8")
+    model = _write_tiny_model(tmp_path / "model.json",
+                              observer=CSVSnapshotObserver(filename="snapshot.csv"))
+    original = Path.resolve
+
+    def resolve(path, *args, **kwargs):
+        if path == output / "snapshot.csv":
+            return sentinel
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", resolve)
+    assert _main(["run", str(model), "--output", str(output)]) == 2
+    assert sentinel.read_text(encoding="utf-8") == "untouched"
+
+
+def test_csv_snapshot_rejects_resolved_symlink_escape(tmp_path):
+    output = tmp_path / "run"
+    output.mkdir()
+    sentinel = tmp_path / "sentinel.csv"
+    sentinel.write_text("untouched", encoding="utf-8")
+    try:
+        (output / "snapshot.csv").symlink_to(sentinel)
+    except OSError:
+        pytest.skip("Creating symlinks requires OS privileges")
+    model = _write_tiny_model(tmp_path / "model.json",
+                              observer=CSVSnapshotObserver(filename="snapshot.csv"))
+    assert _main(["run", str(model), "--output", str(output), "--overwrite"]) == 2
+    assert sentinel.read_text(encoding="utf-8") == "untouched"
 
 
 def test_run_rejects_existing_output_without_explicit_overwrite(tmp_path, capsys):

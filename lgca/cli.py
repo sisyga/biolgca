@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import numpy as np
 
@@ -127,11 +127,16 @@ def _validate_output_declarations(spec, *, trusted_paths: bool) -> None:
     for observer in spec.analysis.observers:
         if isinstance(observer, CSVSnapshotObserver):
             _validate_relative_output(observer.output_dir, trusted_paths=trusted_paths)
+            _validate_relative_output(
+                observer.filename.format(kind=observer.kind, step=0),
+                trusted_paths=trusted_paths,
+            )
         elif isinstance(observer, ScalarTimeSeriesRecorder):
             _validate_relative_output(observer.output_path, trusted_paths=trusted_paths)
 
 
 def _resolve_output_paths(spec, output_dir: Path, *, trusted_paths: bool) -> None:
+    _validate_output_declarations(spec, trusted_paths=trusted_paths)
     if spec.analysis is None:
         return
     for observer in spec.analysis.observers:
@@ -139,6 +144,7 @@ def _resolve_output_paths(spec, output_dir: Path, *, trusted_paths: bool) -> Non
             observer.output_dir = _output_path(
                 observer.output_dir, output_dir, trusted_paths=trusted_paths
             )
+            observer._output_root = None if trusted_paths else output_dir
         elif isinstance(observer, ScalarTimeSeriesRecorder):
             observer.output_path = _output_path(
                 observer.output_path, output_dir, trusted_paths=trusted_paths
@@ -147,7 +153,8 @@ def _resolve_output_paths(spec, output_dir: Path, *, trusted_paths: bool) -> Non
 
 def _validate_relative_output(path, *, trusted_paths: bool) -> None:
     raw = Path(path)
-    if not trusted_paths and (raw.is_absolute() or ".." in raw.parts):
+    windows = PureWindowsPath(path)
+    if not trusted_paths and (raw.anchor or windows.anchor or ".." in raw.parts or ".." in windows.parts):
         raise ValueError(
             "Generated output paths must be relative and may not contain '..'; "
             "use --trusted-paths only for trusted local models."
