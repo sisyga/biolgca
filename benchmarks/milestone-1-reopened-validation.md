@@ -81,5 +81,13 @@ bits across numerical libraries, so universal bitwise compatibility is not claim
 
 ## Final validation
 
-Full-suite, clean documentation and remote CI results are recorded after the
-final acceptance audit, in the integrating pull request and issue comments.
+- Windows `biolgca` Conda environment: **1,379 passed, 1 skipped**, 53 warnings,
+  using `python -m pytest -q --basetemp=.pytest-tmp-reopened-final`.
+  The skip requires Windows symlink privileges. The first full run identified
+  two old odd-row hex transport fixtures; they now use supported even-row grids
+  without changing their species/count assertions.
+- `python docs/build.py`: clean Sphinx build with warnings treated as errors
+  succeeded, forcing all six maintained tutorial notebooks through fresh kernels.
+- `git diff --check 5b9efe7`: clean.
+- Remote Python 3.10-3.13, installed wheel/CLI and documentation CI results are
+  recorded in PR #151 and final issue comments before milestone closure.
