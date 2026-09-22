@@ -6,6 +6,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Mapping
 
 import numpy as np
+from .base import _validate_count_nodes
 
 
 __all__ = ["apply_initializer", "list_initializers", "resolve_resource_path"]
@@ -184,10 +185,7 @@ def _validate_node_values(nodes: np.ndarray, target_dtype) -> None:
         if not np.all((nodes == 0) | (nodes == 1)):
             raise ValueError("Volume-exclusion NPZ nodes must contain only 0 or 1")
         return
-    if not np.issubdtype(nodes.dtype, np.number):
-        raise ValueError("NPZ nodes must use a numeric dtype")
-    if np.any(~np.isfinite(nodes)) or np.any(nodes < 0) or np.any(nodes != np.floor(nodes)):
-        raise ValueError("No-volume-exclusion NPZ nodes must be non-negative integers")
+    _validate_count_nodes(nodes)
 
 
 def _reject_unknown(parameters, allowed, name: str) -> None:

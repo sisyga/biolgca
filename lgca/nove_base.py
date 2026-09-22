@@ -19,6 +19,7 @@ from tqdm.auto import tqdm
 
 from .base import (
     LGCA_base,
+    _validate_count_nodes,
     _validate_density,
     _validate_nonnegative_int,
     _validate_positive,
@@ -65,6 +66,8 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         self.rng = npr.default_rng(seed=seed)
         self.set_bc(bc)
         restchannels = _validate_nonnegative_int(restchannels, "restchannels")
+        if nodes is not None:
+            nodes = _validate_count_nodes(nodes)
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes, capacity=capacity)
         self._validate_model_setup(nodes=nodes)
         if nodes is None:

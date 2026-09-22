@@ -21,6 +21,7 @@ from tqdm.auto import tqdm
 from .base import (
     plt,
     LGCA_base,
+    _validate_count_nodes,
     _validate_density,
     _validate_nonnegative_int,
     _validate_positive,
@@ -84,6 +85,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.set_bc(bc)
         self.interaction_params = {}
         restchannels = _validate_nonnegative_int(restchannels, "restchannels")
+        if nodes is not None and np.asarray(nodes).dtype != object:
+            nodes = _validate_count_nodes(nodes)
         if restchannels != 1:
             restchannels = 1
             warnings.warn("There can only be one rest channel in this LGCA class. Setting to 1 to prevent issues")

@@ -6,6 +6,28 @@ import pytest
 from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
 
 
+@pytest.mark.parametrize("value", [-1, .5, np.nan, np.inf, float(2**64)])
+@pytest.mark.parametrize("n_species", [1, 2])
+def test_invalid_count_inputs_rejected_across_entry_points(tmp_path, value, n_species):
+    from lgca import get_lgca
+
+    shape = (1, 2) if n_species == 1 else (1, n_species, 2)
+    nodes = np.zeros(shape)
+    nodes.flat[0] = value
+    with pytest.raises(ValueError, match="nodes"):
+        get_lgca(geometry="lin", ve=False, nodes=nodes, n_species=n_species,
+                 interaction="only_propagation")
+    state = StateSpec(volume_exclusion=False, nodes=nodes, n_species=n_species)
+    with pytest.raises(ValueError, match="nodes"):
+        build_model(ModelSpec(space=SpaceSpec(geometry="lin"), state=state))
+    np.savez(tmp_path / "invalid.npz", nodes=nodes)
+    state = replace(state, nodes=None, initializer={"name": "from_npz",
+                    "parameters": {"path": "invalid.npz"}})
+    with pytest.raises(ValueError, match="nodes"):
+        build_model(ModelSpec(space=SpaceSpec(geometry="lin", dims=1), state=state),
+                    resource_base=tmp_path)
+
+
 def _initializer_spec(initializer, *, dims=(6, 5), seed=41):
     return ModelSpec(
         space=SpaceSpec(geometry="square", dims=dims, boundary="periodic"),
