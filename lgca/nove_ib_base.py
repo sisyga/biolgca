@@ -38,6 +38,10 @@ from .list_utils import get_arr_of_empty_lists, _copy_arr_of_lists
 class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     """
     Base class for identity-based LGCA without volume exclusion.
+
+    Explicit object-array channels contain lists of unique non-negative integer
+    particle IDs. ID zero denotes a particle in this backend. Uniqueness applies
+    to physical sites before boundary copies are added.
     """
     interactions = [
         'go_or_grow',
@@ -85,8 +89,23 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.set_bc(bc)
         self.interaction_params = {}
         restchannels = _validate_nonnegative_int(restchannels, "restchannels")
-        if nodes is not None and np.asarray(nodes).dtype != object:
-            nodes = _validate_count_nodes(nodes)
+        if nodes is not None:
+            nodes = np.asarray(nodes)
+            if nodes.dtype != object:
+                nodes = _validate_count_nodes(nodes)
+            else:
+                seen = set()
+                for channel in nodes.flat:
+                    if not isinstance(channel, list):
+                        raise ValueError("nodes identity channels must contain lists of integer IDs")
+                    for label in channel:
+                        if (isinstance(label, (bool, np.bool_))
+                                or not isinstance(label, (int, np.integer))
+                                or not 0 <= label < np.iinfo(np.intp).max):
+                            raise ValueError("nodes particle IDs must be non-negative indexable integers")
+                        if int(label) in seen:
+                            raise ValueError("nodes particle IDs must be unique on the physical lattice")
+                        seen.add(int(label))
         if restchannels != 1:
             restchannels = 1
             warnings.warn("There can only be one rest channel in this LGCA class. Setting to 1 to prevent issues")
