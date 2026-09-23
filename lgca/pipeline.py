@@ -25,7 +25,19 @@ from .plugins import (
 
 @dataclass(frozen=True)
 class BirthDeathSpec:
-    """Specification for a particle-number changing operator."""
+    """A registered interaction that creates or removes cells.
+
+    Equivalent to ``{"name": name, "parameters": parameters}`` in
+    :attr:`InteractionPipelineSpec.operators`.
+
+    Attributes
+    ----------
+    name : str
+        Registered name, e.g. ``"birth_death"`` or ``"classical.go_or_grow"``;
+        see :func:`lgca.plugins.list_plugins`.
+    parameters : mapping, default={}
+        Interaction parameters; omitted ones take their documented defaults.
+    """
 
     name: str
     parameters: Mapping[str, Any] = field(default_factory=dict)
@@ -33,7 +45,21 @@ class BirthDeathSpec:
 
 @dataclass(frozen=True)
 class PhenotypeSwitchSpec:
-    """Specification for a phenotype/species-changing operator."""
+    """A registered interaction that changes the phenotype or species of cells.
+
+    ``PhenotypeSwitchSpec(name="phenotype_switch", parameters={"rates": R})``
+    switches each cell of species ``a`` to species ``b`` with probability
+    ``R[a][b]`` per time step (the diagonal is ignored). The number of cells
+    at a node is conserved: a switch into a species whose channels at that
+    node are full is rejected.
+
+    Attributes
+    ----------
+    name : str
+        Registered name, e.g. ``"phenotype_switch"`` or ``"classical.go_or_rest"``.
+    parameters : mapping, default={}
+        Interaction parameters.
+    """
 
     name: str
     parameters: Mapping[str, Any] = field(default_factory=dict)
@@ -41,7 +67,47 @@ class PhenotypeSwitchSpec:
 
 @dataclass(frozen=True)
 class ReorientationTermSpec:
-    """Weighted term inside a reorientation operator."""
+    """One directional cue in a :class:`ReorientationSpec`.
+
+    Each term scores every candidate channel state ``s'`` of a node. The
+    sampler adds the scores weighted by ``beta``; see :class:`ReorientationSpec`.
+    ``J(s')`` is the flux of the candidate state (the sum of the velocity
+    vectors of its occupied channels) and gradients are in lattice units.
+
+    ``"random_walk"`` (alias ``"uniform"``)
+        Score 0: all states are equally likely.
+    ``"persistent_walk"`` (alias ``"persistent_motion"``)
+        ``J(s) · J(s')``: cells keep the direction they had at this node.
+    ``"polar_alignment"``
+        ``J_nb · J(s')``, with ``J_nb`` the flux of the neighbouring nodes:
+        cells move in the direction of their neighbours.
+    ``"nematic_alignment"`` (alias ``"nematic"``)
+        Rewards sharing an axis with neighbouring cells; opposite directions
+        count the same.
+    ``"aggregation"``
+        ``∇ρ · J(s')``: cells move up the gradient of the cell density ``ρ``.
+    ``"chemotaxis"``
+        ``∇f · J(s')`` for the scalar field named by ``parameters["field"]``
+        in :attr:`StateSpec.fields <lgca.model.StateSpec.fields>`.
+    ``"contact_guidance"``
+        ``Σ (d · c_i)²`` over occupied velocity channels ``i``: cells move along
+        the axis of the director field ``d`` named by ``parameters["field"]``
+        (default ``"director"``).
+    ``"resting_bias"``
+        Number of cells in rest channels: cells prefer to rest.
+
+    Attributes
+    ----------
+    name : str
+        One of the names above; :func:`list_reorientation_terms` lists them.
+    beta : float, default=1.0
+        Weight (sensitivity) of the term; 0 switches it off, negative values
+        reverse the preference.
+    parameters : mapping, default={}
+        ``{"field": name}`` for ``chemotaxis`` and ``contact_guidance``.
+    species : int, optional
+        Apply the term only to cells of this species (zero-based index).
+    """
 
     name: str
     beta: float = 1.0
@@ -51,7 +117,31 @@ class ReorientationTermSpec:
 
 @dataclass(frozen=True)
 class ReorientationSpec:
-    """Specification for a mass-preserving reorientation sampler."""
+    """Stochastic reorientation that combines several directional cues.
+
+    At every node, the cells choose a new channel state ``s'`` among all states
+    with the same number of cells, with probability
+    ``P(s') ∝ exp(Σ_k beta_k · G_k(s'))``, where ``G_k`` are the scores of the
+    terms. All terms thus act in one decision instead of one after another.
+    The number of cells is conserved. Supported for classical models with
+    volume exclusion, including several species.
+
+    Attributes
+    ----------
+    terms : sequence of ReorientationTermSpec, default=()
+        The cues. Without terms, the reorientation is a random walk.
+    sampler : str, default="boltzmann"
+        The sampling rule; only ``"boltzmann"`` is available.
+    parameters : mapping, default={}
+        Reserved; must be empty.
+
+    Examples
+    --------
+    >>> ReorientationSpec(terms=[
+    ...     ReorientationTermSpec(name="polar_alignment", beta=1.5),
+    ...     ReorientationTermSpec(name="chemotaxis", beta=5, parameters={"field": "signal"}),
+    ... ])  # doctest: +SKIP
+    """
 
     terms: Sequence[ReorientationTermSpec] = field(default_factory=tuple)
     sampler: str = "boltzmann"
@@ -60,7 +150,31 @@ class ReorientationSpec:
 
 @dataclass(frozen=True)
 class InteractionPipelineSpec:
-    """Ordered interaction phase followed by deterministic propagation."""
+    """The interactions of one time step, followed by propagation.
+
+    Every time step applies the operators in order and then moves the cells
+    along their velocity channels (propagation). Operators must follow the
+    order birth/death, then phenotype switching, then reorientation.
+
+    Attributes
+    ----------
+    operators : sequence, default=()
+        Each entry is one of
+
+        - a mapping ``{"name": ..., "parameters": {...}}`` naming a registered
+          interaction (see :func:`lgca.plugins.list_plugins`);
+        - a :class:`ReorientationSpec` combining directional cues;
+        - a :class:`BirthDeathSpec` or :class:`PhenotypeSwitchSpec`;
+        - an :class:`~lgca.operator_base.InteractionOperator` instance (Python
+          only; it cannot be saved to a model file).
+    propagation : bool or str, default="default"
+        ``"default"`` or ``True`` moves the cells after the interactions;
+        ``False``, ``None``, ``"none"`` or ``"disabled"`` keeps them in place,
+        e.g. to test an interaction on its own.
+    allow_custom_order : bool, default=False
+        Allow operators in another order than birth/death, switching,
+        reorientation, for models in which the order itself is studied.
+    """
 
     operators: Sequence[Any] = field(default_factory=tuple)
     propagation: str | bool = "default"

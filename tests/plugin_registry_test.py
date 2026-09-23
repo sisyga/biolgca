@@ -76,3 +76,21 @@ def test_replacing_a_plugin_of_another_module_requires_replace():
 
     registry.register(info, _other_module_factory, replace=True)
     assert registry.resolve("builtin") is _other_module_factory
+
+
+def test_every_builtin_parameter_is_explained():
+    from lgca.plugins import list_plugins
+
+    missing = [f"{plugin.name}.{name}" for plugin in list_plugins()
+               for name, spec in plugin.parameter_specs.items() if not spec.description]
+
+    assert missing == []
+
+
+def test_plugin_card_shows_defaults_and_meanings():
+    from lgca.plugins import describe_plugin
+
+    card = str(describe_plugin("classical.go_or_grow"))
+
+    assert "kappa (default 5.0)" in card
+    assert "Positive kappa makes crowded cells rest" in card

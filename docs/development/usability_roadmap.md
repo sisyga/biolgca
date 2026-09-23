@@ -61,6 +61,7 @@ Severity: **H** blocks or misleads a typical student, **M** costs hours,
 | B5 | M | Curated examples are tuned for test speed, not science. `go_or_grow` (κ=4, θ=0.75, 15 steps) shrinks from 12 to 4 cells in 150 steps and cannot answer its stated question. Examples use a `sys.path` workaround (`ensure_project_root_on_path`). |
 | B6 | M | Parameter meaning, sign and scale (κ sign, θ, β after the gradient unification) are not shown where a user picks them; `describe_plugin` shows validator strings. |
 | B7 | H | No support for studying a model: changing one setting needs nested `dataclasses.replace`; no replicate or parallel runner; results are attributes set on `result.lgca` (`n_t`, `dens_t`) instead of a table. |
+| B9 | M | A run without `time.seed` draws an unrecorded seed: metadata and `model.resolved.json` store `seed: null`, so the run cannot be repeated. Draw a seed, use it and record it. |
 | B8 | M | Model files: numeric fields are stored inline in JSON with `__tuple__` wrappers (a 50×50 field is 88 KB). The CLI cannot load a custom plugin module, so models with custom rules cannot be rerun with `biolgca run`. |
 
 ### C. Writing a new interaction
@@ -162,6 +163,14 @@ Independent, low-risk items, in order.
   node, β scale, κ sign).
 - Plugin parameter descriptions in plain language; `describe_plugin` prints a
   readable card.
+- Status (2026-09-23): done. Descriptions of built-in parameters live in a
+  glossary in `lgca/plugins.py` (shared meanings plus per-plugin overrides);
+  a test requires one for every built-in parameter.
+
+**0.8 Record the seed of every run** (B9)
+- If `time.seed` is missing, draw one from `numpy.random.SeedSequence`, use it,
+  and write it to the run metadata and `model.resolved.json`, so every run can
+  be repeated.
 
 **0.7 Example audit** (B5)
 - Each example must show its effect at its default settings (e.g. go-or-grow

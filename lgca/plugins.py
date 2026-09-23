@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import difflib
 import warnings
+from dataclasses import replace
 from typing import Any, Callable, Mapping
 
 import numpy as np
@@ -578,7 +579,7 @@ def _register_native_plugins() -> None:
         conservation_law=_law_for_kind("phenotype_switch"),
         port_status="native",
         test_status="unit_tested",
-        description="Channel-preserving stochastic phenotype/species transition operator.",
+        description="Stochastic switching of cells between species; conserves the number of cells at each node.",
     )
 
     def phenotype_switch_factory(parameters: Mapping[str, Any] | None = None) -> InteractionOperator:
@@ -1764,5 +1765,93 @@ def _register_example_plugins() -> None:
     register_plugin(custom_rest_or_align_info, custom_rest_or_align_factory)
 
 
+# Plain-language meaning of built-in interaction parameters, shown by
+# describe_plugin(). Entries keyed by (plugin, parameter) override the
+# shared meaning of a parameter name.
+_SWITCH = ("Steepness of the density-dependent switch between moving and resting. "
+           "The probability that a moving cell starts resting is "
+           "(1 + tanh(kappa * (rho - theta))) / 2, with rho the number of cells at the node "
+           "divided by its capacity. Positive kappa makes crowded cells rest, negative kappa "
+           "makes them move.")
+_PARAMETER_MEANINGS = {
+    "r_b": "Probability per time step that a cell divides.",
+    "r_d": "Probability per time step that a cell dies.",
+    "birth_rate": "Probability per time step that a cell divides into a free channel of its node; "
+                  "one value per species or a single value for all.",
+    "death_rate": "Probability per time step that a cell dies; one value per species or a single "
+                  "value for all.",
+    "beta": "Sensitivity to the directional cue: the weight of its score in the reorientation "
+            "probability, P(state) ~ exp(beta * score). 0 gives a random walk.",
+    "kappa": _SWITCH,
+    "theta": "Relative density rho at which moving and resting are equally likely (see kappa).",
+    "kappa_std": "Standard deviation of the random change of kappa that daughter cells inherit.",
+    "theta_std": "Standard deviation of the random change of theta that daughter cells inherit.",
+    "std": "Standard deviation of the random change of the birth probability r_b that daughter "
+           "cells inherit (a normal distribution truncated to [0, a_max]).",
+    "a_max": "Upper limit of the birth probability r_b after mutation.",
+    "capacity": "Carrying capacity: the number of cells per node at which birth stops. "
+                "Defaults to state.capacity.",
+    "gamma": "Preference of cells for the rest channel when they are distributed over the "
+             "channels of a node (log-weight of the rest channel relative to a velocity channel).",
+    "N": "Number of repetitions of the fast reaction in every time step.",
+    "alpha": "Excitability of the medium.",
+    "drb": "Amount by which a mutation raises or lowers a daughter cell's birth probability r_b.",
+    "pmut": "Probability that a daughter cell's birth probability r_b mutates (by +drb or -drb).",
+    "effect": "'passenger_mutation' leaves the birth probability unchanged; 'driver_mutation' "
+              "multiplies it by fitness_increase.",
+    "fitness_increase": "Factor by which a driver mutation multiplies the birth probability r_b.",
+    "r_m": "Probability that a daughter cell acquires a mutation (founding a new family).",
+    "p_d": "Probability that a daughter cell acquires a driver mutation, which raises r_b.",
+    "p_p": "Probability that a daughter cell acquires a passenger mutation, which lowers r_b.",
+    "s_d": "Mean increase of r_b by a driver mutation (exponentially distributed).",
+    "s_p": "Mean decrease of r_b by a passenger mutation (exponentially distributed).",
+    "mutation_matrix": "Probability that a daughter of species a belongs to species b "
+                       "(entry [a][b]; rows sum to 1). The identity matrix means no mutation.",
+    "include_center": "Count the cells at the node itself in its neighbourhood, in addition to "
+                      "the neighbouring nodes.",
+    "track_inheritance": "Record which family (lineage) every cell belongs to.",
+    "r_int": "Interaction radius: the number of nodes around a node that count as its "
+             "neighbourhood.",
+    "gradient": "Gradient of the attractant signal at every node; defaults to a built-in "
+                "linear signal.",
+    "rates": "Matrix of switch probabilities per time step: entry [a][b] is the probability "
+             "that a cell of species a becomes species b. Off-diagonal row sums must be <= 1.",
+}
+_PLUGIN_PARAMETER_MEANINGS = {
+    ("classical.birth", "r_b"): "Birth probability: a free channel of a node is filled with "
+                                "probability r_b * n / K, where n is the number of cells at the "
+                                "node and K the number of channels.",
+    ("classical.birthdeath", "r_b"): "Birth probability: a free channel of a node is filled with "
+                                     "probability r_b * n / K, where n is the number of cells at "
+                                     "the node and K the number of channels.",
+    ("classical.go_or_grow", "r_b"): "Probability per time step that a resting cell divides into "
+                                     "a free rest channel.",
+    ("nove.go_or_grow", "r_b"): "Division probability of a resting cell per time step at low "
+                                "density; the probability is r_b * (1 - n / capacity) for n cells "
+                                "at the node.",
+    ("ib.go_or_grow", "r_b"): "Probability per time step that a resting cell divides.",
+    ("nove_ib.evo_steric", "alpha"): "Strength with which cells avoid moving towards crowded "
+                                     "neighbouring nodes.",
+    ("custom.rest_or_align", "alpha"): "Preference for resting over alignment.",
+}
+
+
+def _with_parameter_meanings(info: PluginInfo) -> PluginInfo:
+    """Fill empty parameter descriptions of a built-in plugin from the glossary."""
+    parameters = {}
+    for name, spec in info.parameter_specs.items():
+        if not spec.description:
+            meaning = _PLUGIN_PARAMETER_MEANINGS.get((info.name, name), _PARAMETER_MEANINGS.get(name, ""))
+            spec = replace(spec, description=meaning)
+        parameters[name] = spec
+    return replace(info, parameters=parameters)
+
+
+
+def _describe_builtin_plugins() -> None:
+    for name, (info, factory) in list(default_registry._plugins.items()):
+        default_registry._plugins[name] = (_with_parameter_meanings(info), factory)
+
 _register_native_plugins()
 _register_example_plugins()
+_describe_builtin_plugins()

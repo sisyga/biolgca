@@ -58,7 +58,17 @@ __all__ = [
 
 @dataclass(frozen=True)
 class Description:
-    """Human-facing model metadata."""
+    """Human-readable description of a model, stored with its files and results.
+
+    Attributes
+    ----------
+    title : str
+        Short name of the model.
+    details : str, default=""
+        Free text: the question, assumptions or references.
+    tags : tuple of str, default=()
+        Keywords for finding the model later.
+    """
 
     title: str
     details: str = ""
@@ -71,7 +81,24 @@ class Description:
 
 @dataclass(frozen=True)
 class SpaceSpec:
-    """Lattice geometry and boundary configuration."""
+    """Lattice geometry, size and boundary condition.
+
+    Attributes
+    ----------
+    geometry : str, default="hex"
+        ``"lin"`` (1D, 2 velocity channels), ``"square"`` (4), ``"hex"``
+        (hexagonal, 6), ``"cubic"`` (3D, 6) or ``"moore"`` (3D Moore
+        neighbourhood, 26). Aliases such as ``"1d"`` or ``"hexagonal"`` are
+        accepted and normalized.
+    dims : int or tuple of int, optional
+        Number of nodes along each axis, e.g. ``(50, 50)``. Defaults to 100
+        nodes in 1D, 50 x 50 in 2D and 10 x 10 x 10 in 3D. Periodic hexagonal
+        lattices need an even number of rows.
+    boundary : str, default="periodic"
+        ``"periodic"`` (opposite edges connected), ``"reflecting"`` (no-flux
+        walls; cells bounce back) or ``"absorbing"`` (cells leaving the domain
+        are lost). Aliases such as ``"pbc"`` or ``"refl"`` are accepted.
+    """
 
     geometry: str = "hex"
     dims: Any = None
@@ -80,7 +107,57 @@ class SpaceSpec:
 
 @dataclass(frozen=True)
 class StateSpec:
-    """Initial state and backend family selection."""
+    """Model family, channels and initial state.
+
+    ``volume_exclusion``, ``identity_based`` and ``n_species`` select the
+    model family. At most one of ``density``, ``nodes`` and ``initializer``
+    may be given; without any of them, cells are placed at random with a mean
+    of 0.1 cells per node.
+
+    Attributes
+    ----------
+    density : float, optional
+        Mean number of cells per node, not the fraction of occupied channels.
+        With volume exclusion, each channel is occupied independently with
+        probability ``density / K``, where ``K`` is the number of channels per
+        node (velocity plus rest channels), so ``density <= K``. Without volume
+        exclusion, channel populations are Poisson distributed.
+    nodes : array_like, optional
+        Explicit initial channel state of shape ``dims + (K,)``, or
+        ``dims + (n_species, K)`` for several species. Values are occupation
+        (0/1) with volume exclusion, cell counts without, and cell labels
+        (0 for empty) in identity-based models.
+    restchannels : int, default=0
+        Number of rest channels per node, in addition to the velocity channels
+        of the geometry. Resting cells do not move; several growth and
+        switching interactions need at least one rest channel. Identity-based
+        models without volume exclusion always use one rest channel.
+    volume_exclusion : bool, default=True
+        With volume exclusion, each channel holds at most one cell. Without
+        it, channels hold any number of cells, up to ``capacity`` per node for
+        the interactions that use one.
+    identity_based : bool, default=False
+        Track individual cells with labels and heritable properties (e.g. a
+        birth rate that mutates), as needed for evolutionary models.
+    n_species : int, default=1
+        Number of cell species (classical models only).
+    capacity : int, optional
+        Carrying capacity: the number of cells per node at which birth stops.
+        Used by models without volume exclusion and by the ``birth_death``
+        interaction.
+    initializer : mapping, optional
+        A named initial condition, e.g. a fully occupied square in the centre:
+        ``{"name": "region", "parameters": {"extent": 5, "density": 4}}``, or
+        ``{"name": "from_npz", "parameters": {"path": "state.npz"}}``.
+    parameters : mapping, default={}
+        Further keyword arguments for the LGCA constructor, such as
+        ``r_int`` (interaction radius).
+    fields : mapping, default={}
+        Named arrays that interactions can use, e.g. a scalar signal of shape
+        ``dims`` for ``chemotaxis`` or a director field of shape
+        ``dims + (d,)`` for ``contact_guidance``. Each field becomes an
+        attribute of the LGCA object.
+    """
 
     density: float | None = None
     nodes: Any = None
@@ -96,7 +173,21 @@ class StateSpec:
 
 @dataclass(frozen=True)
 class TimeSpec:
-    """Time horizon and random seed."""
+    """Number of time steps and random seed.
+
+    Attributes
+    ----------
+    steps : int, default=100
+        Number of time steps to simulate. Each step applies the interactions
+        and then moves the cells (propagation).
+    seed : int, optional
+        Seed of the random number generator. The same seed and model give
+        the same trajectory. Without a seed, every run differs and cannot be
+        repeated, so set one for any result you want to keep.
+    timing_trace : int, default=0
+        Number of per-operator timing records to keep in the run metadata,
+        for profiling.
+    """
 
     steps: int = 100
     seed: int | None = None
@@ -105,14 +196,55 @@ class TimeSpec:
 
 @dataclass(frozen=True)
 class AnalysisSpec:
-    """Observers and post-processing hooks."""
+    """What to record during a run.
+
+    Attributes
+    ----------
+    observers : sequence of observers, default=()
+        Recorders and plotting observers from :mod:`lgca.simulation` and
+        :mod:`lgca.plotting`, e.g. ``[DensityRecorder(), PopulationRecorder()]``.
+        Recorded data is stored on ``result.lgca`` (``dens_t``, ``n_t``, ...)
+        and, for command-line runs, in ``measurements.npz``. Without observers
+        only the final state is available.
+    """
 
     observers: Sequence[Any] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
 class ModelSpec:
-    """Complete declarative LGCA model specification."""
+    """Complete, shareable description of a simulation.
+
+    A model specification holds data only. Run it with :func:`run_model`, save
+    it with :func:`save_model_spec` and load it with :func:`load_model_spec`.
+
+    Attributes
+    ----------
+    description : Description
+        Title, details and tags.
+    space : SpaceSpec
+        Lattice geometry, size and boundary condition.
+    state : StateSpec
+        Model family, channels and initial state.
+    time : TimeSpec
+        Number of steps and random seed.
+    dynamics : InteractionPipelineSpec
+        The interactions applied in every time step, before propagation.
+    analysis : AnalysisSpec or None
+        What to record during the run.
+
+    Examples
+    --------
+    >>> from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, run_model
+    >>> from lgca.pipeline import InteractionPipelineSpec
+    >>> spec = ModelSpec(
+    ...     space=SpaceSpec(geometry="square", dims=(20, 20)),
+    ...     state=StateSpec(density=0.5),
+    ...     time=TimeSpec(steps=50, seed=1),
+    ...     dynamics=InteractionPipelineSpec(operators=[{"name": "classical.random_walk"}]),
+    ... )
+    >>> result = run_model(spec, showprogress=False)
+    """
 
     description: Description = field(default_factory=lambda: Description(title="LGCA model"))
     space: SpaceSpec = field(default_factory=SpaceSpec)

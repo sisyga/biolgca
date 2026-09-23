@@ -8,6 +8,7 @@ operators do not need to import the built-in plugin catalogue.
 from __future__ import annotations
 
 import importlib
+import textwrap
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
@@ -147,6 +148,37 @@ class PluginInfo:
             name: ParameterSpec.from_metadata(metadata)
             for name, metadata in self.parameters.items()
         }
+
+    def __str__(self) -> str:
+        """Readable summary: purpose, pipeline phase, model families and parameters."""
+        lines = [self.name, f"  {self.description}" if self.description else None,
+                 f"  Phase: {self.operator_kind}. Model families: {', '.join(self.backend_families)}."]
+        if self.aliases:
+            lines.append(f"  Also available as: {', '.join(self.aliases)}.")
+        law = self.conservation_law
+        quantities = {"number of cells": law.conserves_total_particles,
+                      "cells per species or phenotype": law.conserves_phenotype_particles,
+                      "momentum": law.conserves_momentum}
+        conserved = [name for name, kept in quantities.items() if kept is True]
+        changed = [name for name, kept in quantities.items() if kept is False]
+        changed += [change for change in law.changes if change not in ("particle number",)]
+        if conserved:
+            lines.append(f"  Conserves: {', '.join(conserved)}.")
+        if changed:
+            lines.append(f"  Changes: {', '.join(changed)}.")
+        specs = self.parameter_specs
+        if specs:
+            lines.append("  Parameters:")
+            for name, spec in specs.items():
+                default = "required" if spec.required else f"default {spec.default!r}"
+                lines.append(f"    {name} ({default})")
+                if spec.description:
+                    lines.extend(textwrap.wrap(spec.description, width=88, initial_indent="        ",
+                                               subsequent_indent="        "))
+        return "\n".join(line for line in lines if line is not None)
+
+    def _repr_pretty_(self, printer, cycle) -> None:
+        printer.text(str(self))
 
 
 class InteractionOperator:

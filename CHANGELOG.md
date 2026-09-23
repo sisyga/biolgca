@@ -7,6 +7,15 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- The model and pipeline specifications (`SpaceSpec`, `StateSpec`,
+  `TimeSpec`, `ModelSpec`, `InteractionPipelineSpec`, `ReorientationSpec`,
+  `ReorientationTermSpec`, ...) document every field, including defaults and
+  units: `density` is the mean number of cells per node, and each
+  reorientation term states the score it adds.
+- Every parameter of the built-in interactions has a plain-language
+  description, and `describe_plugin(name)` prints a readable summary of an
+  interaction: purpose, phase, model families, what it conserves and its
+  parameters with defaults.
 - 1D and 2D plots accept `ax=` to draw into a given axes, e.g. one panel of
   `plt.subplots`. In figures with constrained layout, colour bars stay inside
   their panel.
@@ -129,6 +138,8 @@ This file records notable user-facing changes. Changes remain under
 
 ### Fixed
 
+- The registry described `phenotype_switch` as channel-preserving; a switch
+  resamples the channel positions at the node and conserves the number of cells.
 - Hexagonal lattice plots placed y-axis ticks between rows and labelled them
   with truncated row numbers (e.g. 49 instead of 50); ticks are now on whole
   rows at round intervals.
