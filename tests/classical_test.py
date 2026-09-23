@@ -1018,3 +1018,11 @@ class Test_LGCA_classical(T_LGCA_Common):
         assert np.max(lgca.nodes_t.astype(int)) <= 1, "Volume exclusion principle is not respected"
         if lgca.nodes_t[-1].max() == 0 and lgca.nodes_t[0].max() != 0 and bc!='abc':
             warnings.warn("System died out in " + str(interaction))
+
+
+def test_legacy_and_model_spec_chemotaxis_share_the_default_sensitivity():
+    from lgca.plugins import describe_plugin
+
+    lgca = get_lgca(geometry="square", dims=4, interaction="chemotaxis", seed=1)
+
+    assert lgca.interaction_params["beta"] == describe_plugin("classical.chemotaxis").parameter_specs["beta"].default

@@ -775,7 +775,7 @@ class LGCA_base(ABC):
                 if 'beta' in kwargs:
                     self.interaction_params['beta'] = kwargs['beta']
                 else:
-                    self.interaction_params['beta'] = 5.
+                    self.interaction_params['beta'] = 2.
                     print('sensitivity set to beta = ', self.interaction_params['beta'])
 
                 if 'gradient' in kwargs:
