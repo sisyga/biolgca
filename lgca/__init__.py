@@ -27,7 +27,7 @@ References
 
 import difflib
 import logging
-import warnings
+from ._warnings import warn_user
 from typing import Tuple, Any
 
 # Library loggers stay silent unless the application configures logging.
@@ -160,22 +160,13 @@ def _warn_on_node_mismatch(nodes, dims_arg, rest_arg, density_arg, geom_key, n_s
 
     dims_translated = _translate_dims(dims_arg, geom_key)
     if dims_translated is not None and dims_from_nodes != tuple(dims_translated):
-        warnings.warn(
-            f"Provided nodes with dimensions {dims_from_nodes} override ``dims``={dims_arg}.",
-            UserWarning,
-        )
+        warn_user(f"Provided nodes with dimensions {dims_from_nodes} override ``dims``={dims_arg}.")
 
     if rest_arg is not None and rest_from_nodes is not None and rest_from_nodes != rest_arg:
-        warnings.warn(
-            f"Provided nodes imply {rest_from_nodes} rest channels but ``restchannels``={rest_arg} was passed.",
-            UserWarning,
-        )
+        warn_user(f"Provided nodes imply {rest_from_nodes} rest channels but ``restchannels``={rest_arg} was passed.")
 
     if density_arg is not None:
-        warnings.warn(
-            f"Provided nodes override ``density``={density_arg}.",
-            UserWarning,
-        )
+        warn_user(f"Provided nodes override ``density``={density_arg}.")
 
 
 

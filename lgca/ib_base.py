@@ -10,7 +10,6 @@ volume exclusion.
 
 
 import logging
-import warnings
 from abc import ABC
 from copy import copy, deepcopy
 

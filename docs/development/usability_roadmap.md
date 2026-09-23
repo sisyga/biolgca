@@ -138,8 +138,8 @@ Independent, low-risk items, in order.
 - Accept: `get_lgca(...)` and `timeevo` print nothing by default;
   `logging.basicConfig(level="INFO")` shows the chosen defaults.
 - Status (2026-09-23): done. Warnings use `lgca.base.warn_user`, which points
-  at the first caller outside the package. Remaining `warnings.warn` calls
-  without a useful stack level can move to it when touched.
+  at the first caller outside the package. All library warnings, including
+  deprecations, now use it (`lgca/_warnings.py`).
 
 **0.5 Plotting that behaves in scripts and notebooks** (D2, D3, D4)
 - `setup_figure` opens a new figure unless `figindex` or a new `ax=` argument

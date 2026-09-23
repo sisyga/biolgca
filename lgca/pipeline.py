@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-import warnings
+from ._warnings import warn_user
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
@@ -407,9 +407,8 @@ class _ReorientationTerm:
     def __init__(self, spec: ReorientationTermSpec):
         self.name = spec.name
         if self.name == "alignment":
-            warnings.warn("The composed 'alignment' alias means nematic_alignment; "
-                          "use 'nematic_alignment' or 'polar_alignment' explicitly",
-                          DeprecationWarning, stacklevel=3)
+            warn_user("The composed 'alignment' alias means nematic_alignment; "
+                          "use 'nematic_alignment' or 'polar_alignment' explicitly", DeprecationWarning)
         if isinstance(spec.beta, (bool, str)) or np.asarray(spec.beta).ndim != 0 or not np.isfinite(spec.beta):
             raise ValueError("beta must be a finite numeric scalar")
         self.beta = float(spec.beta)

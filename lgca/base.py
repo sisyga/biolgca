@@ -16,9 +16,6 @@ Supported LGCA types:
 """
 
 import logging
-import os
-import sys
-import warnings
 from abc import ABC, abstractmethod
 from copy import copy, deepcopy
 import difflib
@@ -39,16 +36,8 @@ class _MissingPlotLib:
 import numpy as np
 
 logger = logging.getLogger(__name__)
-_PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-
-def warn_user(message, category=UserWarning):
-    """Warn and point at the first caller outside the lgca package."""
-    if sys.version_info >= (3, 12):
-        warnings.warn(message, category, skip_file_prefixes=(_PACKAGE_DIR,))
-    else:
-        warnings.warn(message, category, stacklevel=3)
-
+from ._warnings import warn_user  # noqa: E402  (re-exported for the model classes)
 
 try:  # optional plotting dependencies
     import matplotlib.colors as colors
@@ -552,19 +541,13 @@ class LGCA_base(ABC):
             return
         expected = self.dims + (self.K,)
         if nodes.shape != expected:
-            warnings.warn(
-                f"Provided nodes have shape {nodes.shape}, expected {expected}.",
-                UserWarning,
-            )
+            warn_user(f"Provided nodes have shape {nodes.shape}, expected {expected}.")
 
     def _ensure_bool_nodes(self, nodes):
         """Return ``nodes`` as boolean array, warn if non-boolean values found."""
         if not np.isin(nodes, [0, 1]).all():
-            warnings.warn(
-                "Provided nodes contain values other than 0 or 1. "
-                "Interpreting values as booleans.",
-                UserWarning,
-            )
+            warn_user("Provided nodes contain values other than 0 or 1. "
+                "Interpreting values as booleans.")
         return nodes.astype(bool)
 
     @classmethod
@@ -603,12 +586,8 @@ class LGCA_base(ABC):
             return
         if interaction_name in self._LOCAL_ENSEMBLE_INTERACTIONS:
             return
-        warnings.warn(
-            "Disabling propagation is intended for local interactions only. "
-            f"The interaction {interaction_name!r} may depend on neighbourhood state.",
-            UserWarning,
-            stacklevel=3,
-        )
+        warn_user("Disabling propagation is intended for local interactions only. "
+            f"The interaction {interaction_name!r} may depend on neighbourhood state.")
 
     def __init__(self, nodes=None, dims=None, restchannels=0, density=0.1,
                  bc='periodic', seed=None, propagation=True, **kwargs):

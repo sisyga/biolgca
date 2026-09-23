@@ -10,7 +10,6 @@ volume exclusion.
 
 
 import logging
-import warnings
 from abc import ABC
 from copy import copy, deepcopy
 from itertools import chain
@@ -200,7 +199,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                 if 'r_d' in kwargs:
                     self.interaction_params['r_d'] = kwargs['r_d']
                     if interaction == 'birth':
-                        warnings.warn("Death rate defined but not used in birth interaction.")
+                        warn_user("Death rate defined but not used in birth interaction.")
                 else:
                     if interaction == 'birthdeath':
                         self.interaction_params['r_d'] = 0.02

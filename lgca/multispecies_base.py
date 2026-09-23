@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import warnings
+from ._warnings import warn_user
 from typing import Any
 
 import numpy as np
@@ -113,10 +113,7 @@ class MultiSpeciesLGCA_base(LGCA_base):
             return
         expected = self.dims + (self.n_species, self.K)
         if nodes.shape != expected:
-            warnings.warn(
-                f"Provided nodes have shape {nodes.shape}, expected {expected}.",
-                UserWarning,
-            )
+            warn_user(f"Provided nodes have shape {nodes.shape}, expected {expected}.")
 
     def set_interaction(self, **kwargs):
         _require_legacy_interaction(self, kwargs.get("interaction", "random_walk"))
@@ -206,10 +203,7 @@ class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
             return
         expected = self.dims + (self.n_species, self.K)
         if nodes.shape != expected:
-            warnings.warn(
-                f"Provided nodes have shape {nodes.shape}, expected {expected}.",
-                UserWarning,
-            )
+            warn_user(f"Provided nodes have shape {nodes.shape}, expected {expected}.")
 
     def random_reset(self, density):
         """Populate a total density distributed over all species."""
@@ -253,7 +247,7 @@ class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
                 if interaction == "birthdeath":
                     self.interaction_params["r_d"] = kwargs.get("r_d", 0.02)
                 elif "r_d" in kwargs:
-                    warnings.warn("Death rate defined but not used in birth interaction.")
+                    warn_user("Death rate defined but not used in birth interaction.")
 
                 gamma = kwargs.get("gamma", 0.0)
                 self.interaction_params["gamma"] = gamma

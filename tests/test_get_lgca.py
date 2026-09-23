@@ -182,3 +182,18 @@ def test_default_nove_model_builds_and_runs(geometry):
     lgca.timeevo(timesteps=2, record=False, showprogress=False)
 
     assert lgca.restchannels == 0
+
+
+def test_deprecation_warnings_point_at_the_callers_line():
+    from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, run_model
+    from lgca.pipeline import InteractionPipelineSpec
+
+    spec = ModelSpec(space=SpaceSpec(geometry="lin", dims=5),
+                     state=StateSpec(density=1, volume_exclusion=False, parameters={"capacity": 4}),
+                     time=TimeSpec(steps=1, seed=1),
+                     dynamics=InteractionPipelineSpec(operators=[{"name": "nove.random_walk"}]))
+
+    with pytest.warns(DeprecationWarning, match="state.capacity") as record:
+        run_model(spec, showprogress=False)
+
+    assert record[0].filename == __file__

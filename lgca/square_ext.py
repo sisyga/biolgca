@@ -11,7 +11,6 @@ Includes identity-based and no-volume-exclusion simulators.
 from __future__ import annotations
 
 import logging
-import warnings
 
 import numpy as np
 from lgca.base import warn_user, plt
@@ -291,7 +290,7 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
 
     def live_animate_density(self, interval=100, channels=slice(None), **kwargs):
         # colourbar update is an issue
-        warnings.warn("Live density animation not available for LGCA without volume exclusion yet.")
+        warn_user("Live density animation not available for LGCA without volume exclusion yet.")
 
     def plot_config(self, nodes=None, figsize=None, grid=False, ec='none', rel_arrowlen=0.6, cmap='viridis', cbar=True,
                     cbarlabel='Particle number $n$', vmax=None, **kwargs):
@@ -388,7 +387,7 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
 
 
     def live_animate_config(self, interval=100, **kwargs):
-        warnings.warn("Live config animation not available for LGCA without volume exclusion yet.")
+        warn_user("Live config animation not available for LGCA without volume exclusion yet.")
 
 
 class NoVE_IBLGCA_Square(NoVE_IBLGCA_base, NoVE_LGCA_Square):

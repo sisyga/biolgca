@@ -10,7 +10,7 @@ or transitional interaction functions.
 from __future__ import annotations
 
 import difflib
-import warnings
+from ._warnings import warn_user
 from dataclasses import replace
 from typing import Any, Callable, Mapping
 
@@ -116,11 +116,7 @@ def validate_plugin_parameters(
             raise ValueError(
                 f"{info.name}.capacity conflicts with model.state.capacity={canonical_capacity}"
             )
-        warnings.warn(
-            f"{info.name}.capacity duplicates model.state.capacity and is deprecated",
-            DeprecationWarning,
-            stacklevel=3,
-        )
+        warn_user(f"{info.name}.capacity duplicates model.state.capacity and is deprecated", DeprecationWarning)
 
     for name, spec in parameter_specs.items():
         if spec.required and name not in parameters:

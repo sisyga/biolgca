@@ -4,7 +4,7 @@
 # The full license notice is found in the file lgca/__init__.py.
 """Utilities for plotting properties and outputs of all LGCA types."""
 
-import warnings
+from ._warnings import warn_user
 import numpy as np
 import random
 from itertools import cycle
@@ -445,7 +445,7 @@ def muller_plot(root_ID, cum_pop_t, children_nlist, parent_list, timeline, facec
     if label_map is None:
         if facecolour == 'property':
             l_map = lambda fam_ID: None
-            warnings.warn("Labels overwritten by property colour coding!", stacklevel=2)
+            warn_user("Labels overwritten by property colour coding!")
         else:
             l_map = lambda fam_ID: None if fam_ID == 0 else fam_ID
     # label wedges according to custom function

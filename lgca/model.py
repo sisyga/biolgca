@@ -6,7 +6,7 @@ import importlib.metadata
 import importlib.resources
 import difflib
 import json
-import warnings
+from ._warnings import warn_user
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -1176,11 +1176,7 @@ def _normalize_and_validate_spec(spec: ModelSpec) -> ModelSpec:
                 "model.state.parameters.capacity conflicts with model.state.capacity"
             )
         capacity = legacy_capacity if capacity is None else capacity
-        warnings.warn(
-            "model.state.parameters.capacity is deprecated; use model.state.capacity",
-            DeprecationWarning,
-            stacklevel=3,
-        )
+        warn_user("model.state.parameters.capacity is deprecated; use model.state.capacity", DeprecationWarning)
 
     normalized = replace(
         spec,

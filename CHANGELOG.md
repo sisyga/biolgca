@@ -86,8 +86,9 @@ This file records notable user-facing changes. Changes remain under
 - The library no longer prints. Messages about default interaction parameters
   are logged at INFO level under the `lgca` logger (enable them with
   `logging.basicConfig(level=logging.INFO)`), and problems such as too few rest
-  channels for go-or-grow are raised as `UserWarning` pointing at the calling
-  line.
+  channels for go-or-grow are raised as `UserWarning`. All warnings,
+  including deprecations, point at the user's line that caused them instead of
+  a line inside BioLGCA.
 - Registering a plugin name again from the module that registered it replaces
   the entry, so notebook cells that define plugins can be rerun. Replacing a
   plugin of another module, such as a built-in, requires
