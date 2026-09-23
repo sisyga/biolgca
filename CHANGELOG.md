@@ -7,6 +7,14 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- `lgca.LatticeState`: the interior of a classical model with a species axis
+  (`dims + (n_species, K)`, also for one species) and operations with a
+  defined meaning per cell: `remove_cells`, `divide_cells`, `add_cells`,
+  `switch_phenotype` and `shuffle_cells`. Each works the same with and
+  without volume exclusion (without it, cells in one channel die, divide and
+  switch one by one), respects free channels and node capacity, and draws
+  from the model's random generator. `commit()` checks the conservation law
+  of the interaction's kind and writes the state back.
 - The model and pipeline specifications (`SpaceSpec`, `StateSpec`,
   `TimeSpec`, `ModelSpec`, `InteractionPipelineSpec`, `ReorientationSpec`,
   `ReorientationTermSpec`, ...) document every field, including defaults and

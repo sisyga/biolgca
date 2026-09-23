@@ -30,6 +30,8 @@ import logging
 from ._warnings import warn_user
 from typing import Tuple, Any
 
+from .lattice_state import LatticeState
+
 # Library loggers stay silent unless the application configures logging.
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 

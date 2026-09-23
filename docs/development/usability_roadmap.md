@@ -302,6 +302,7 @@ differences between model families:
 state.counts              # cells per channel, shape dims + (n_species, K)
 state.density             # cells per node, shape dims
 state.species_density     # cells per node and species, shape dims + (n_species,)
+state.flux                # sum of cell velocities per node, shape dims + (d,)
 state.neighbor_sum(a)     # sum of a over the interaction neighbourhood
 state.gradient(f)         # physical gradient in lattice units
 state.field("signal")     # named field from StateSpec.fields
@@ -314,6 +315,7 @@ state.divide_cells(p, channels="rest")         # every cell divides with probabi
 state.add_cells(n, channels="rest")            # n new cells per node and species, capacity respected
 state.switch_phenotype(rates, channels=...)    # rates[a][b]: probability that a cell of species a becomes b;
                                                # switched cells go to free channels of the given set
+state.shuffle_cells("velocity", species=0)     # random walk of one species within a channel set
 state.counts = new                             # expert access: replace the whole state (checked)
 ```
 
@@ -328,6 +330,28 @@ state.counts = new                             # expert access: replace the whol
   conservation law of the kind (reorientation keeps cells per node and
   species; a phenotype switch keeps cells per node).
 - Only `state.rng` is available for randomness, so runs stay reproducible.
+- Status (2026-09-24): done in `lgca/lattice_state.py` (`lgca.LatticeState`),
+  tested on every geometry with and without volume exclusion and with one and
+  two species (`tests/lattice_state_test.py`). Decisions made on the way:
+  - `capacity` limits the cells per node only with volume exclusion (default
+    `n_species * K`). Without it, `capacity` is the crowding scale that rules
+    use (`density / capacity`) and is not enforced, as in the existing NoVE
+    rules and initial states.
+  - When several species ask for more cells than a node can take, the cells
+    that fit are a uniformly random subset of all requested cells
+    (multivariate hypergeometric), so no species is favoured.
+  - With volume exclusion, a phenotype switch needs a channel that was free
+    for the new species before the switch; competing cells are chosen at
+    random, and the rest keep their species. `channels="same"` keeps each
+    cell in its channel.
+  - `divide_cells(channels="same")` (daughter in the mother's channel) exists
+    only without volume exclusion.
+  - `neighbor_sum` wraps around periodic boundaries and sees zeros beyond
+    reflecting and absorbing walls, as the model's own `nb_sum` does after
+    its boundary conditions. `gradient` uses the physical-coordinate
+    convention of the chemotaxis term (one-sided at the lattice edge).
+  - `commit()` checks the conservation law of the kind and writes the
+    interior; the pipeline integration comes with the decorator (1.4).
 
 **1.4 `@interaction` decorator** (C1)
 
