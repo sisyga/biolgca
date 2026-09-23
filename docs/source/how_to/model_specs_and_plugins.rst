@@ -218,27 +218,33 @@ proliferation rates and switching sensitivities:
    result = run_model(spec, showprogress=False)
    family_rates = result.lgca.family_props["r_b"]
 
+Several identity growth operators can be combined only when they share the
+daughter-property bookkeeping: ``ib.birth``, ``ib.birthdeath``,
+``ib.birthdeath_discrete``, ``ib.go_or_grow`` and ``ib.go_and_grow_mutations``.
+Other combinations are rejected when the model is built; use one growth
+operator for the other identity-based backends.
+
 Plugin registry
 ---------------
 
-The registry provides the machine-readable interaction catalogue. All built-in
-registered interactions are native operators and have unit-test coverage against
-the previous interaction semantics.
+The registry provides the machine-readable interaction catalogue: names,
+parameters with defaults, the pipeline phase and the conservation law of every
+registered interaction.
 
 .. code-block:: python
 
    from lgca.plugins import describe_plugin, interaction_coverage_table, list_plugins
 
    for plugin in list_plugins(kind="interaction"):
-       print(plugin.name, plugin.operator_kind, plugin.port_status)
+       print(plugin.name, plugin.operator_kind, plugin.description)
 
    info = describe_plugin("nove_ib.go_or_grow_kappa_chemo")
    print(info.parameters)
 
    rows = interaction_coverage_table()
 
-Use plugin metadata when building UIs, validation reports, model provenance
-tables or migration audits.
+Use plugin metadata when building UIs, validation reports or model provenance
+tables.
 
 See :doc:`custom_interactions` for the supported extension contract, complete
 registration example and conservation guidance. Portable model files resolve
@@ -296,63 +302,6 @@ Metadata records ``channel_capacity`` separately from per-operator
 ``growth_capacities``; with one native birth/death operator, ``capacity`` reports
 its active configured limit.
 
-Numerical implementation ownership
-----------------------------------
-
-``lgca.identity_kernels.inherit_missing_properties`` owns completion of a
-volume-exclusion daughter's property row. The native and legacy VE growth
-operators first append their explicitly mutated traits, then call this helper
-to inherit every other cell property from the parent, without additional RNG
-draws. Thus composed growth and downstream property consumers see complete rows.
-Family membership is inherited unless the growth rule explicitly creates a new
-family. Family-level mutation rules remain owned by the corresponding operator.
-
-Multiple identity growth operators are supported for ``ib.birth``,
-``ib.birthdeath``, ``ib.birthdeath_discrete``, ``ib.go_or_grow`` and
-``ib.go_and_grow_mutations``. Other identity growth combinations are rejected
-during compilation because their daughter-property lifecycles are not shared;
-use one growth operator on those backends.
-
-Capacity precedence for native NoVE identity operators is owned by
-``lgca.plugins.resolve_operator_capacity``: an explicit operator value wins,
-otherwise ``state.capacity`` supplies the value, otherwise the operator's
-documented default applies. Factories leave an omitted capacity absent;
-``validate_plugin_parameters`` rejects a genuinely conflicting explicit override
-before the operator resolves its capacity. ``model._normalize_and_validate_spec`` owns
-the deprecated state-parameter alias, and the constructor receives the normalized
-state capacity. Runtime metadata records the resulting active operator capacity.
-
-Ordinary and multispecies NoVE initialization draw the excess rest contribution
-as one Poisson variable with the summed mean. Initialization uses one represented
-channel array plus one spatial (and, if present, species) array; memory does not
-grow with carrying capacity. Poisson additivity preserves the distribution, but
-for capacities above the channel count the random draw order and therefore exact
-trajectories for historical seeds change. Repeated runs of the new implementation
-with the same seed remain reproducible.
-
-The first shared identity kernel is ``lgca.identity_kernels.apply_identity_birth``.
-Both ``ib_interactions.birth`` and ``NativeIdentityBirthOperator`` call it. The
-kernel owns birth attempts, daughter ID/property updates, and final shuffling;
-adapters own setup and parameter sourcing. RNG draw order remains unchanged.
-The existing ``ib_interactions.trunc_gauss`` helper remains the mutation sampler.
-
-The remaining duplication inventory is intentionally incremental:
-
-* Identity VE birth/death, go-or-grow, and mutation rules occur in
-  ``ib_interactions`` and native classes in ``pipeline``.
-* NoVE/identity-NoVE alignment, birth/death and switching occur in their legacy
-  interaction modules and native pipeline classes.
-* Classical reorientation has legacy score code and dedicated pipeline operators;
-  composed spatial terms now prepare fields once per application.
-* ``classical_operators`` owns the previously extracted classical random walk.
-
-``operator_base`` owns lifecycle contracts and metadata types;
-``operator_registry`` owns name/alias resolution; ``plugins`` re-exports these
-public types and owns registration/parameter contracts. For subsequent slices,
-put numerical updates in the relevant focused kernel module, keep legacy and
-native adapters small, and retain independent scientific invariants alongside
-seeded parity tests. Do not move unrelated kernels as part of a correctness fix.
-
 Recording and temporary-memory budgets
 --------------------------------------
 
@@ -367,18 +316,3 @@ For a deliberate larger allocation, use
 
 The estimate is a lower bound: Python sample-index maps, object/list payloads,
 dynamically growing family histories, model state and renderer buffers cost extra.
-Dedicated vector and tensor reorientation samplers process candidate
-scores in batches with a conservative 32 MiB temporary budget. This preserves
-site order and RNG draws; it does not change the transition model.
-
-Composed Boltzmann reorientation also batches sites by occupancy and caches
-candidate flux, nematic scores and rest occupancy once per group. Score batches
-and cached candidate features each have a 32 MiB budget; these are temporary
-array limits, not a total process-memory limit. Candidate enumeration has its
-own size guard. The sampler retains one categorical uniform draw per nonempty
-site/species in spatial order, including fully occupied sites. Scalar-reference
-regressions preserve seeded trajectories for the tested mixed terms and species.
-Floating-point matrix evaluation can differ in its final bits across numerical
-libraries, so cross-platform bitwise trajectories are not promised. Boltzmann
-transition weights are unchanged. See ``benchmarks/composed_reorientation.py``
-and the reopened milestone validation report for repeated multi-step timings.

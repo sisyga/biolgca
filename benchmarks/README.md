@@ -3,7 +3,7 @@
 Run the end-to-end benchmark matrix from the repository root:
 
 ```bash
-uv run python profiling.py --repeats 3 --output benchmarks/results.json
+uv run python benchmarks/profiling.py --repeats 3 --output benchmarks/results.json
 ```
 
 Use repeated `--scenario NAME` options to select a subset. Results include the

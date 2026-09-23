@@ -1,7 +1,7 @@
 import csv
 import json
 
-from profiling import BenchmarkScenario, run_scenario, write_results
+from benchmarks.profiling import BenchmarkScenario, run_scenario, write_results
 
 
 EXPECTED_RESULT_KEYS = {
