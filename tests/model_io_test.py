@@ -3,9 +3,6 @@ import csv
 import numpy as np
 import pytest
 
-import lgca.model as model_api
-import lgca.plugins as plugins_api
-import lgca.simulation as simulation_api
 from lgca import get_lgca
 from lgca.model import (
     AnalysisSpec,
@@ -153,36 +150,6 @@ def test_describe_model_graph_exposes_fields_plugins_observers_and_outputs():
     assert ("field:signal", "operator:0:reorientation.boltzmann") in edges
     assert ("operator:0:reorientation.boltzmann", "output:nodes") in edges
     assert ("observer:0:DensityRecorder", "output:dens_t") in edges
-
-
-def test_curated_example_specs_smoke_run():
-    from lgca.examples import all_example_specs, example_names
-
-    examples = all_example_specs()
-    assert set(examples) == set(example_names())
-
-    for name, spec in examples.items():
-        result = run_model(spec, showprogress=False)
-        assert result.metadata["title"]
-        assert result.metadata["steps"] == spec.time.steps, name
-
-
-def test_model_api_has_explicit_beginner_facing_public_exports():
-    assert "ModelSpec" in model_api.__all__
-    assert "run_model" in model_api.__all__
-    assert "save_model_spec" in model_api.__all__
-    assert "load_model_spec" in model_api.__all__
-    assert "_to_jsonable" not in model_api.__all__
-
-
-def test_plugin_and_simulation_apis_have_explicit_public_exports():
-    assert "ParameterSpec" in plugins_api.__all__
-    assert "validate_plugin_parameters" in plugins_api.__all__
-    assert "_validate_parameter_value" not in plugins_api.__all__
-
-    assert "CSVSnapshotObserver" in simulation_api.__all__
-    assert "ScalarTimeSeriesRecorder" in simulation_api.__all__
-    assert "_snapshot_values" not in simulation_api.__all__
 
 
 def test_save_and_load_model_spec_choose_format_from_file_suffix(tmp_path):

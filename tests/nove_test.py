@@ -783,3 +783,23 @@ class Test_LGCA_NoVE(T_LGCA_Common):
         out_hex_brbound[0, 0, 2] = 7
         out_hex_brbound[1, 0, 2] = 8
         self.t_propagation_template("hex", nodes_hex_brbound, out_hex_brbound, bc="rbc")
+
+
+@pytest.mark.parametrize("geometry,dims", [("lin", 400), ("square", 30), ("hex", (30, 30))])
+def test_nove_capacity_without_rest_channel_initializes_isotropically(geometry, dims):
+    lgca = get_lgca(geometry=geometry, dims=dims, ve=False, restchannels=0, capacity=20,
+                    density=8, interaction="dd_alignment", seed=3)
+
+    channel_means = lgca.nodes[lgca.nonborder].reshape(-1, lgca.K).mean(axis=0)
+
+    np.testing.assert_allclose(channel_means, 8 / lgca.K, rtol=0.1)
+
+
+def test_nove_capacity_surplus_goes_to_rest_channel():
+    lgca = get_lgca(geometry="square", dims=30, ve=False, restchannels=1, capacity=20,
+                    density=8, interaction="go_or_rest", seed=3)
+
+    channel_means = lgca.nodes[lgca.nonborder].reshape(-1, lgca.K).mean(axis=0)
+
+    np.testing.assert_allclose(channel_means[:4], 8 / 20, rtol=0.1)
+    np.testing.assert_allclose(channel_means[4], 8 * 16 / 20, rtol=0.05)

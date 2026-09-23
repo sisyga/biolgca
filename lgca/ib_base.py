@@ -103,8 +103,6 @@ class IBLGCA_base(LGCA_base, ABC):
         Flux for each possible channel configuration. Dimensions: ``(lgca.K + 1, len(lgca.c))``.
     K : int
         Number of channels per node. Equal to ``lgca.velocitychannels + lgca.restchannels``.
-    n_crit
-        Internal variable for the wetting interaction.
     n_t : :py:class:`numpy.ndarray`
         Sum of particles in the lattice for all timesteps in the previous simulation.
         Only available after a simulation performed with ``timeevo(recordN=True)``. Dimensions: ``(timesteps,)``.
@@ -518,10 +516,11 @@ class IBLGCA_base(LGCA_base, ABC):
             Array of flux vectors at each lattice site. Dimensions: ``nodes.shape[:-1] + (len(self.c),)``.
 
         """
-        if nodes.dtype != 'bool':
-            nodes = nodes.astype('bool')
+        return super().calc_flux(self._channel_counts(nodes))
 
-        return super().calc_flux(nodes)
+    def _channel_counts(self, nodes, history=False):
+        """Return channel occupancy for particle labels (0 marks an empty channel)."""
+        return np.asarray(nodes) > 0
 
     def get_prop(self, nodes=None, props=None, propname=None):
         """

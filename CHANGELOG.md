@@ -23,6 +23,31 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- The development environment is managed with uv. A committed `uv.lock` and
+  `.python-version` pin the complete environment; `uv sync` installs it and CI
+  tests against the lock file. Test, documentation and lint tools moved from
+  the `test`, `docs` and `dev` extras to PEP 735 dependency groups of the same
+  names. The redundant `requirements*.txt` files and the `plot2d`, `plot` and
+  `plotting` extras were removed; use the `plot3d` extra for Mayavi.
+- Identity-based birth and birth-death interactions (with and without volume
+  exclusion) draw all daughter birth rates of a time step in one vectorized
+  truncated-normal call, which makes them about 10x faster. Runs remain fully
+  reproducible from their seed, but seeded trajectories differ from those of
+  earlier versions. Legacy functions and ModelSpec operators share the same
+  kernels in `lgca.identity_kernels`.
+- `lgca.gradient` returns the physical gradient in lattice units on every
+  geometry, matching the composed chemotaxis term. Previously 1D, square,
+  cubic and Moore lattices returned twice and hexagonal lattices three times
+  the gradient. Aggregation, the default 2D and 3D chemotaxis fields,
+  `go_or_grow_kappa_chemo` and `calc_vorticity` inherit the new scale: at the
+  same `beta`, the effective sensitivity is half the previous value (a third
+  on hexagonal lattices). Multiply earlier `beta` values by 2 (hex: 3) to
+  reproduce previous results. The normalized 1D default chemotaxis field is
+  unchanged.
+- `DensityRecorder` stores densities as signed integers by default: `int16`
+  with volume exclusion and `int32` (widened to `int64` on demand) without,
+  instead of `float64`. This cuts recording memory by 4x or 2x. Pass
+  `dtype=float` to keep floating-point output.
 - Matplotlib and JupyterLab are part of the normal installation so students can
   open the maintained notebooks and plot results without selecting extras.
   Three-dimensional Mayavi rendering remains optional.
@@ -42,6 +67,28 @@ This file records notable user-facing changes. Changes remain under
   non-volume-excluding model families.
 - Stale generated autosummary pages causing strict documentation failures in
   reused working directories.
+- NoVE lattices with `capacity` above the channel count and no rest channel
+  started with the surplus particles in one velocity channel, i.e. strongly
+  polarized. They now start isotropic.
+- NoVE interactions raised `TypeError` on the first step when the initial
+  state was given explicitly instead of drawn at random.
+- `get_lgca` with `n_species > 1` accepted single-species interactions that
+  crashed on the first step; it now rejects them at construction.
+- Legacy chemotaxis defaulted to `beta=5`, the ModelSpec plugin to `beta=2`;
+  both now use 2.
+- Plotting: 1D `plot_density` with its default colour bar, flux, flow and
+  configuration plots of identity-based and multi-species models (labels were
+  plotted instead of counts or the species axis was rejected), square live
+  density animations, stale NoVE identity-based property plots,
+  `plot_prop_2dhist` without seaborn, and `list_families_alive` for crowded
+  nodes.
+
+### Removed
+
+- The unused `lgca.interactions.disarrange` helper.
+- The legacy `wetting` interaction and its `classical.wetting` ModelSpec
+  port. The model is planned as an advanced tutorial with a new
+  implementation; see the planned documentation topics.
 
 ### Compatibility
 

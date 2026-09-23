@@ -6,36 +6,8 @@
 Interaction functions and helper functions for classical LGCA with volume exclusion.
 """
 
-from bisect import bisect_left
 from scipy.special import binom as binom_coeff, softmax
 import numpy as np
-
-
-def disarrange(a: np.ndarray, axis=-1):
-    """
-    Shuffle a in-place along the given axis.
-
-    Apply numpy.random.shuffle to the given axis of a. Each one-dimensional
-    slice is shuffled independently.
-
-    THIS IS A LEGACY FUNCTION, USE THE RANDOM WALK FUNCTION INSTEAD FOR A MORE EFFICIENT IMPLEMENTATION!
-
-    Parameters
-    ----------
-    a : numpy.ndarray
-        The array to shuffle
-    axis : int, optional, default: -1
-           Along which axis to shuffle `a`. The default is -1, which implies the
-           last axis.
-    """
-    b = a.swapaxes(axis, -1)
-    # Shuffle `b` in-place along the last axis. `b` is a view of `a`,
-    # so `a` is shuffled in place, too.
-    rng = npr.default_rng()
-    shp = b.shape[:-1]
-    for ndx in np.ndindex(shp):
-        rng.shuffle(b[ndx])
-    return
 
 
 def tanh_switch(rho, kappa=5., theta=0.8):
@@ -396,87 +368,6 @@ def aggregation(lgca):
     lgca.nodes = newnodes
 
 
-def wetting(lgca):
-    """Model wetting dynamics on an adhesive surface.
-
-    Parameters
-    ----------
-    lgca : LGCA
-        Lattice gas cellular automaton instance.
-
-    Other Parameters
-    ----------------
-    r_b : float
-        Birth probability used inside the spheroid region.
-    rho_0 : float
-        Homeostatic density determining the pressure gradient.
-    alpha : float
-        ECM degradation rate.
-    beta : float
-        Adhesion strength weighting flux alignment.
-    gamma : float
-        Strength of the pressure gradient term.
-
-    Notes
-    -----
-    The ``lgca`` object is modified in place.
-
-    Returns
-    -------
-    None
-    """
-    if hasattr(lgca, 'spheroid'):
-        birth = lgca.rng.random(lgca.nodes[lgca.spheroid].shape) < lgca.interaction_params['r_b']
-        ds = (1 - lgca.nodes[lgca.spheroid]) * birth
-        lgca.nodes[lgca.spheroid, :] = np.add(lgca.nodes[lgca.spheroid, :], ds, casting='unsafe')
-        lgca.update_dynamic_fields()
-
-    newnodes = lgca.nodes.copy()
-    nb_nodes = newnodes[lgca.nonborder]
-
-    nbs = lgca.nb_sum(lgca.cell_density).astype(float)
-    nbs *= np.clip(1 - nbs / lgca.n_crit, a_min=0, a_max=None) / lgca.n_crit * 2
-    g_adh = lgca.gradient(nbs)
-    pressure = (np.clip(lgca.cell_density - lgca.interaction_params['rho_0'], a_min=0., a_max=None) /
-                (lgca.K - lgca.interaction_params['rho_0']))
-    g_pressure = -lgca.gradient(pressure)
-
-    resting = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
-    resting = lgca.nb_sum(resting) / lgca.velocitychannels / lgca.interaction_params['rho_0']
-    g = lgca.nb_sum(lgca.calc_flux(lgca.nodes))
-
-    density = lgca.cell_density[lgca.nonborder]
-    flux = g[lgca.nonborder]
-    rest_nb = resting[lgca.nonborder]
-    g_adh_nb = g_adh[lgca.nonborder]
-    g_press_nb = g_pressure[lgca.nonborder]
-    ecm_nb = lgca.ecm[lgca.nonborder]
-
-    unique = np.unique(density)
-    unique = unique[(unique > 0) & (unique < lgca.K)]
-    for n in unique:
-        mask = density == n
-        perms = lgca.get_permutations(n)
-        restc = perms[:, lgca.velocitychannels:].sum(-1)
-        j = lgca.j[n]
-        weights = softmax(
-            lgca.interaction_params['beta'] * (flux[mask] @ j) / lgca.velocitychannels / 2
-            + lgca.interaction_params['beta'] * rest_nb[mask, None] * restc
-            + lgca.interaction_params['beta'] * np.einsum('nd,dp->np', g_adh_nb[mask], j)
-            + restc * ecm_nb[mask, None]
-            + lgca.interaction_params['gamma'] * np.einsum('nd,dp->np', g_press_nb[mask], j),
-            axis=1,
-        )
-        cumw = weights.cumsum(axis=1)
-        rnd = lgca.rng.random(mask.sum())
-        ind = (rnd[:, None] < cumw).argmax(axis=1)
-        nb_nodes[mask] = perms[ind]
-
-    newnodes[lgca.nonborder] = nb_nodes
-    lgca.nodes = newnodes
-    lgca.ecm -= lgca.interaction_params['alpha'] * lgca.ecm * lgca.cell_density / lgca.K
-
-
 def excitable_medium(lgca):
     """Simulate an excitable medium following Barkley's model.
 
@@ -533,7 +424,14 @@ def excitable_medium(lgca):
 
 
 def go_or_grow(lgca):
-    """Perform the go-or-grow switching interaction.
+    """Switch cells between moving and resting, then apply death and resting-cell birth.
+
+    Moving cells switch to free rest channels with probability
+    ``tanh_switch(rho, kappa, theta)``, where ``rho`` is the node density
+    divided by ``K``; resting cells switch to free velocity channels with the
+    complementary probability. Every cell then dies with probability ``r_d``,
+    and each resting cell divides into a free rest channel with probability
+    ``r_b``. Moving cells are finally shuffled over the velocity channels.
 
     Parameters
     ----------
@@ -542,22 +440,18 @@ def go_or_grow(lgca):
 
     Other Parameters
     ----------------
-    r_b : float # This parameter is not used in the provided snippet for go_or_grow, but kept for consistency if it
-    was intended.
-        Birth probability for resting cells.
-    r_d : float # This parameter is not used in the provided snippet for go_or_grow
-        Death probability for both states.
-    beta : float # Renamed from kappa in some contexts, this is the sensitivity for switching
-        Steepness of the switching function / sensitivity to entropy change.
-    theta : float # This parameter is not used here, tanh_switch is not directly called for entropy part
-        Threshold density for switching.
+    r_b : float
+        Division probability of a resting cell per time step.
+    r_d : float
+        Death probability of every cell per time step.
+    kappa : float
+        Steepness of the density-dependent switch.
+    theta : float
+        Relative density at which the switch probability is one half.
 
     Notes
     -----
     The ``lgca`` object is modified in place.
-    This version attempts to use the entropy-based switching logic.
-    Assumes lgca.velocitychannels and lgca.restchannels are defined.
-    Uses a placeholder `_s_binom_entropy_like` for the undefined `s_binom`.
     """
     n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
     n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)

@@ -30,7 +30,7 @@ class _MissingPlotLib:
 
     def __getattr__(self, _):
         raise ImportError(
-            f"Plotting requires {self._name}. Install extras with 'pip install -r plotting-requirements.txt'."
+            f"Plotting requires {self._name}. Reinstall BioLGCA with 'uv sync' or 'python -m pip install -e .'."
         )
 
 
@@ -85,7 +85,6 @@ _VALID_CONSTRUCTOR_KWARGS = {
     "r_int",
     "r_m",
     "restchannels",
-    "rho_0",
     "s_d",
     "s_p",
     "seed",
@@ -312,8 +311,6 @@ class LGCA_base(ABC):
         Flux for each possible channel configuration. Dimensions: ``(lgca.K + 1, len(lgca.c))``.
     K : int
         Number of channels per node. Equal to ``lgca.velocitychannels + lgca.restchannels``.
-    n_crit
-        Internal variable for the wetting interaction.
     n_t : :py:class:`numpy.ndarray`
         Sum of particles in the lattice for all timesteps in the previous simulation.
         Only available after a simulation performed with ``timeevo(recordN=True)``. Dimensions: ``(timesteps,)``.
@@ -425,12 +422,12 @@ class LGCA_base(ABC):
     @abstractmethod
     def gradient(self, qty):
         """
-        Compute the gradient of qty along all axes.
+        Compute the spatial gradient of qty in lattice units.
 
         Parameters
         ----------
         qty : :py:class:`numpy.ndarray`
-            Quantity to take the gradient of. Needs to have the same number of dimensions as :py:attr:`self.nodes`.
+            Quantity to take the gradient of. Its leading axes are the lattice axes of :py:attr:`self.nodes`.
             If ``qty.shape == self.nodes.shape[:-1]`` the result can be indexed with the LGCA coordinates (see example).
 
         Returns
@@ -442,13 +439,13 @@ class LGCA_base(ABC):
 
         Notes
         -----
-        The gradient is calculated using :py:func:`numpy.gradient()` with stepwidth h=0.5
-        (s.t. no normalization takes place).
-        It is computed as the central finite difference with equidistant support points and supports one-sided
-        differences at the boundaries.
+        The gradient is the derivative with respect to physical coordinates, with a lattice spacing of one, on
+        every geometry. Interaction sensitivities such as ``beta`` in aggregation therefore have the same meaning on
+        all lattices. On 1D, square, cubic and Moore lattices it is computed with :py:func:`numpy.gradient` as
+        central differences, with one-sided differences at the array edges. On the hexagonal lattice it is the
+        neighbour sum :math:`\sum_i c_i q(r + c_i)` divided by :math:`b/2`, which is exact for linear fields.
 
-        In most cases this yields the simple difference between the two closest array elements in the given direction.
-        For example, the gradient at position 1 of ``np.array([1, 2, 4])`` would be (4 - 1)/(2 * 0.5) = 3.
+        For example, the gradient at position 1 of ``np.array([1, 2, 4])`` is (4 - 1)/2 = 1.5.
 
         Examples
         --------
@@ -462,9 +459,9 @@ class LGCA_base(ABC):
         >>> lgca.nodes.shape  # (xdim, ydim, number of channels)
         (4, 5, 4)
         >>> my_qty = np.array([[0,0,0,0,0],
-        >>>                    [1,1,1,1,1],
-        >>>                    [2,2,2,3,2],
-        >>>                    [3,3,3,3,3]])
+        ...                    [1,1,1,1,1],
+        ...                    [2,2,2,3,2],
+        ...                    [3,3,3,3,3]])
         >>> my_qty.shape  # (xdim, ydim)
         (4, 5)
         >>> grad = lgca.gradient(my_qty)
@@ -473,12 +470,9 @@ class LGCA_base(ABC):
         >>> # address like internal LGCA fields: first dimension is x (printed vertically),
         >>> # second dimension is y (printed horizontally), this can be a bit confusing
         >>> for coord in lgca.coord_pairs:
-        >>>     if np.any(grad[coord]>2):
-        >>>         print("Gradient at index", coord, "is ", grad[coord])
-        >>>         print("Configuration at index ", coord, " is ", lgca.nodes[coord],
-        >>>               ", with cell density ", lgca.cell_density[coord])
-        Gradient at index (1, 3) is  [3. 0.]
-        Configuration at index  (1, 3)  is  [False False False  True] , with cell density  1
+        ...     if np.any(grad[coord] > 1):
+        ...         print("Gradient at index", coord, "is", grad[coord])
+        Gradient at index (1, 3) is [1.5 0. ]
 
         The first element of the gradient holds the gradient in x direction, the second element the gradient in
         y direction. Note that ``(1, 3)`` is the index corresponding to a logical non-border coordinate ``(0, 2)``
@@ -486,7 +480,7 @@ class LGCA_base(ABC):
         non-border indices will be "felt" by the particles in the LGCA if the interaction is defined accordingly,
         but border nodes can be used to specify the field's boundary conditions.
 
-        The gradient in x direction is 3 = (3 - 0)/1. In y direction it is 0 = (1 - 1)/1.
+        The gradient in x direction is 1.5 = (3 - 0)/2. In y direction it is 0 = (1 - 1)/2.
 
         """
         ...
@@ -695,7 +689,7 @@ class LGCA_base(ABC):
 
         """
         from lgca.interactions import go_or_grow, go_or_rest, birth, alignment, persistent_walk, chemotaxis, \
-                contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium, \
+                contact_guidance, nematic, aggregation, random_walk, birthdeath, excitable_medium, \
                 only_propagation
         from lgca.ms_interactions import excitable_medium_ms
         if 'interaction' in kwargs:
@@ -775,7 +769,7 @@ class LGCA_base(ABC):
                 if 'beta' in kwargs:
                     self.interaction_params['beta'] = kwargs['beta']
                 else:
-                    self.interaction_params['beta'] = 5.
+                    self.interaction_params['beta'] = 2.
                     print('sensitivity set to beta = ', self.interaction_params['beta'])
 
                 if 'gradient' in kwargs:
@@ -860,35 +854,6 @@ class LGCA_base(ABC):
                 else:
                     self.interaction_params['beta'] = 2.
                     print('sensitivity set to beta = ', self.interaction_params['beta'])
-
-            elif interaction == 'wetting':
-                self.interaction = wetting
-                self.calc_permutations()
-                self.set_r_int(2)
-
-                if 'beta' in kwargs:
-                    self.interaction_params['beta'] = kwargs['beta']
-                else:
-                    self.interaction_params['beta'] = 2.
-                    print('adhesion sensitivity set to beta = ', self.interaction_params['beta'])
-
-                if 'alpha' in kwargs:
-                    self.interaction_params['alpha'] = kwargs['alpha']
-                else:
-                    self.interaction_params['alpha'] = 2.
-                    print('substrate sensitivity set to alpha = ', self.interaction_params['alpha'])
-
-                if 'gamma' in kwargs:
-                    self.interaction_params['gamma'] = kwargs['gamma']
-                else:
-                    self.interaction_params['gamma'] = 2.
-                    print('pressure sensitivity set to gamma = ', self.interaction_params['gamma'])
-
-                if 'rho_0' in kwargs:
-                    self.interaction_params['rho_0'] = kwargs['rho_0']
-                else:
-                    self.interaction_params['rho_0'] = self.restchannels // 2
-                self.n_crit = (self.velocitychannels + 1) * self.interaction_params['rho_0']
 
             elif interaction == 'random_walk':
                 self.interaction = random_walk
@@ -1035,6 +1000,16 @@ class LGCA_base(ABC):
         # 1st+ dim: lattice sites, last dim: channels
         # dot product between c vectors and actual configuration of site
         return np.einsum('ij,...j', self.c, nodes[..., :self.velocitychannels])
+
+    def _channel_counts(self, nodes, history=False):
+        """Return the number of particles in each channel of ``nodes`` for plotting.
+
+        ``nodes`` is one lattice state or, with ``history=True``, a time series of
+        states. Classical states already store occupancy or counts. Identity-based
+        classes convert labels or label lists and multi-species classes sum over
+        species. Arrays that already hold counts are returned unchanged.
+        """
+        return np.asarray(nodes)
 
     def print_interactions(self):
         """Print the list of pre-implemented interactions for this LGCA type."""

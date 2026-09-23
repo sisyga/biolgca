@@ -6,7 +6,6 @@
 
 import numpy as np
 import random
-from copy import copy
 from itertools import cycle
 try:  # optional plotting dependencies
     import matplotlib.colors as mplcolors
@@ -524,7 +523,7 @@ def colorbar_index(ncolors: int, cmap, use_gridspec: bool=False, cax=None):
     cmap = cmap_discretize(cmap, ncolors)
 
     # map colors to values
-    mappable = ScalarMappable(cmap=cmap)
+    mappable = cm.ScalarMappable(cmap=cmap)
     mappable.set_array([])
     mappable.set_clim(-0.5, ncolors - 0.5)
 
@@ -535,7 +534,7 @@ def colorbar_index(ncolors: int, cmap, use_gridspec: bool=False, cax=None):
     )
 
     # configure ticks and labels using locators and formatters
-    locator = MaxNLocator(nbins="auto", integer=True)
+    locator = ticker.MaxNLocator(nbins="auto", integer=True)
     formatter = FuncFormatter(lambda val, pos: int(val))
     colorbar.ax.yaxis.set_major_locator(locator)
     colorbar.ax.yaxis.set_major_formatter(formatter)
@@ -641,8 +640,7 @@ def get_cmap(
     else:
         K = vmax
 
-    cmap = copy(plt.get_cmap(cmap))  # do not modify a globally registered colormap in matplotlib > 3.3.2
-    cmap.set_under(alpha=0.0)
+    cmap = plt.get_cmap(cmap).with_extremes(under=(0, 0, 0, 0))
     cmap_scaled = False
 
     if 1 < K <= cmap.N:

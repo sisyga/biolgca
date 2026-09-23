@@ -2,8 +2,8 @@
 
 Run the end-to-end benchmark matrix from the repository root:
 
-```powershell
-conda run -n biolgca python profiling.py --repeats 3 --output benchmarks/results.json
+```bash
+uv run python profiling.py --repeats 3 --output benchmarks/results.json
 ```
 
 Use repeated `--scenario NAME` options to select a subset. Results include the

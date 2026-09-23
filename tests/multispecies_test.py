@@ -547,3 +547,26 @@ def test_multispecies_nove_go_or_grow_runs_on_multidimensional_lattices(geom, di
     rest_counts = lgca.nodes[lgca.nonborder][..., lgca.velocitychannels:].sum(axis=tuple(range(len(dims))) + (-1,))
     assert rest_counts[0] == 0
     assert rest_counts[1] == 40
+
+
+@pytest.mark.parametrize(
+    "ve,interaction",
+    [(True, "birth"), (True, "alignment"), (False, "random_walk"), (False, "dd_alignment"), (False, None)],
+)
+def test_factory_rejects_interactions_without_multispecies_implementation(ve, interaction):
+    kwargs = {} if interaction is None else {"interaction": interaction}
+    with pytest.raises(ValueError, match="not supported|No interaction was given"):
+        get_lgca(geometry="square", dims=4, ve=ve, n_species=2, restchannels=1, seed=1, **kwargs)
+
+
+@pytest.mark.parametrize(
+    "ve,interaction",
+    [(True, None), (True, "only_propagation"), (False, "birth"), (False, "birthdeath"), (False, "go_or_grow")],
+)
+def test_factory_builds_supported_multispecies_interactions(ve, interaction):
+    kwargs = {} if interaction is None else {"interaction": interaction}
+    lgca = get_lgca(geometry="square", dims=4, ve=ve, n_species=2, restchannels=1, seed=1, **kwargs)
+
+    lgca.timestep()
+
+    assert interaction is None or interaction in lgca.interactions

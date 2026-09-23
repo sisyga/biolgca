@@ -317,6 +317,8 @@ class LGCA_Hex(LGCA_Square):
 
     def gradient(self, qty):
         # documented in parent class
+        # The neighbour sum sum_i c_i qty(r + c_i) approximates (sum_i c_i c_i^T) grad qty = (b / 2) grad qty
+        # on the hexagonal lattice; dividing by b / 2 gives the gradient in lattice units.
         gx = np.zeros_like(qty, dtype=float)
         gy = np.zeros_like(qty, dtype=float)
 
@@ -350,8 +352,7 @@ class LGCA_Hex(LGCA_Square):
         gy[:-1, 1::2, ...] += self.ciy[5] * qty[1:, :-1:2, ...]
         gy[:, 2::2, ...] += self.ciy[5] * qty[:, 1:-1:2, ...]
 
-        g = np.moveaxis(np.array([gx, gy]), 0, -1)
-        return g
+        return np.stack((gx, gy), axis=-1) / (self.velocitychannels / 2)
 
     def channel_weight(self, qty):
         """

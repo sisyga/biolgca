@@ -34,12 +34,22 @@ dependencies = [
     "jupyterlab",
 ]
 
+# Optional user-facing features: `uv sync --extra yaml` or `pip install -e ".[yaml]"`.
 [project.optional-dependencies]
-test = [
-    "pytest>=8",
-]
 yaml = [
     "PyYAML>=6",
+]
+plot3d = [
+    "mayavi",
+]
+
+# Contributor tooling (PEP 735). `uv sync` installs the `dev` group by default.
+[dependency-groups]
+test = [
+    "pytest>=8",
+    "jsonschema>=4",
+    "PyYAML>=6",
+    "tomli; python_version < '3.11'",
 ]
 docs = [
     "Sphinx",
@@ -48,27 +58,10 @@ docs = [
     "numpydoc",
     "myst-nb",
 ]
-plot2d = []
-plot3d = [
-    "mayavi",
-]
-plot = [
-    "mayavi",
-]
-plotting = [
-    "mayavi",
-]
 dev = [
-    "pytest>=8",
-    "tomli; python_version < '3.11'",
+    { include-group = "test" },
+    { include-group = "docs" },
     "ruff",
-    "Sphinx",
-    "sphinx-autodoc-typehints",
-    "alabaster",
-    "numpydoc",
-    "myst-nb",
-    "build",
-    "jsonschema>=4",
 ]
 
 [project.urls]

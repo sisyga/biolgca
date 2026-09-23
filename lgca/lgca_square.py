@@ -433,11 +433,11 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
 
         Update :py:attr:`self.nodes`, using the shadow border nodes and respecting the geometry.
 
-        Boundary condition for an inflow from x=0, y=:, with reflecting boundary conditions along the y axis and
-        periodic boundaries along the x axis. Nodes at (x=0, y) are set to a homogeneous state with a constant average
-        density given by the attribute ``0 <= self.inflow <= 1``.
+        Boundary condition for an inflow from the left edge (x=0): reflecting boundaries at the two x edges and
+        periodic boundaries along the y axis. Every call resets the first column of nodes to a homogeneous random
+        state in which each channel is occupied with probability ``0 <= self.inflow <= 1``.
 
-        If there is no such attribute, the nodes are filled with the maximum density.
+        If there is no such attribute, the first column is filled completely.
 
         """
         self._apply_rbcx()
@@ -496,7 +496,7 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
 
     def gradient(self, qty):
         # documented in parent class
-        return np.moveaxis(np.asarray(np.gradient(qty, 0.5)), 0, -1)
+        return np.stack(np.gradient(qty, axis=(0, 1)), axis=-1)
 
     def channel_weight(self, qty):
         """

@@ -15,7 +15,7 @@ Supported LGCA types:
 - identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_1D`)
 """
 
-from .plot_data import history_steps, label_history_axis
+from .plot_data import history_steps, label_history_axis, select_density_history
 
 try:  # optional plotting dependency
     import matplotlib.ticker as mticker
@@ -328,8 +328,7 @@ class LGCA_1D(LGCA_base):
 
     def gradient(self, qty):
         # documented in parent class
-        return np.gradient(qty, 0.5)[..., None]
-        # None adds a new axis to the ndarray and keeps the remaining array unchanged
+        return np.gradient(qty, axis=0)[..., None]
 
     def channel_weight(self, qty):
         """
@@ -389,17 +388,17 @@ class LGCA_1D(LGCA_base):
         if figindex is None:
             fig = plt.gcf()
             fig.set_size_inches(figsize)
-            fig.set_tight_layout(tight_layout)
+            fig.set_layout_engine("tight" if tight_layout else None)
 
         else:
             fig = plt.figure(num=figindex)
             fig.set_size_inches(figsize)
-            fig.set_tight_layout(tight_layout)
+            fig.set_layout_engine("tight" if tight_layout else None)
 
         # retrieve drawing axis and scale
         ax = plt.gca()
-        xmax = self.xcoords.max() + 0.5 * self.r_int
-        xmin = self.xcoords.min() - 0.5 * self.r_int
+        xmax = self.xcoords.max() + 0.5
+        xmin = self.xcoords.min() - 0.5
         ymax = tmax - 0.5
         ymin = -0.5
         plt.xlim(xmin, xmax)
@@ -422,7 +421,8 @@ class LGCA_1D(LGCA_base):
 
         return fig, ax
 
-    def plot_density(self, density_t=None, cmap='hot_r', vmax='auto', colorbarwidth=0.03, cbar=True, **kwargs):
+    def plot_density(self, density_t=None, cmap='hot_r', vmax='auto', colorbarwidth=0.03, cbar=True, species=None,
+                     **kwargs):
         """
         Plot particle density over time. X axis: 1D lattice, y axis: time. A color bar on the right side shows the
         color coding of density values. Empty nodes are white.
@@ -441,6 +441,8 @@ class LGCA_1D(LGCA_base):
             Maximum density value for the color scaling. The minimum value is zero. All density values higher than
             `vmax` are drawn in the color at the end of the color bar. If None, `vmax` is set to the number of channels
             ``self.K``. 'auto' sets it to the maximum value found in `density_t`.
+        species : int, optional
+            For multi-species LGCA, plot only this species. By default all species are summed.
         **kwargs
             Arguments to be passed on to :py:meth:`setup_figure`.
 
@@ -464,6 +466,7 @@ class LGCA_1D(LGCA_base):
             else:
                 raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
                                    "in past LGCA run, call lgca.timeevo with keyword recorddens=True")
+        density_t = select_density_history(self, density_t, species=species)
 
         # prepare plot
         tmax = density_t.shape[0]
@@ -533,6 +536,7 @@ class LGCA_1D(LGCA_base):
             else:
                 raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
                                    "in past LGCA run, call lgca.timeevo() with keyword record=True")
+        nodes_t = self._channel_counts(nodes_t, history=True)
         dens_t = nodes_t.sum(-1)
         tmax, l = dens_t.shape
         flux_t = nodes_t[..., 0].astype(int) - nodes_t[..., 1].astype(int)
@@ -617,9 +621,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                 raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
                                    "in past LGCA run, call lgca.timeevo() with keyword record=True")
 
-        if nodes_t.dtype != 'bool':
-            nodes_t = nodes_t.astype('bool')
-        LGCA_1D.plot_flux(self, nodes_t, **kwargs)
+        return LGCA_1D.plot_flux(self, self._channel_counts(nodes_t), **kwargs)
 
     def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', figkwargs={}, **kwargs):
         implicit_history = nodes_t is None
@@ -726,7 +728,7 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
             self.apply_boundaries()
 
     def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='hot_r', relative_max=None, cbar=True,
-                     absolute_max=None, offset_t=0, offset_x=0, cbarlabel=None, **kwargs):
+                     absolute_max=None, offset_t=0, offset_x=0, cbarlabel=None, species=None, **kwargs):
         """
         Create a plot showing the number of particles per lattice site.
         :param density_t: particle number per lattice site (ndarray of dimension (timesteps + 1,) + self.dims)
@@ -743,7 +745,7 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         sample_steps = kwargs.pop("steps", None)
         if density_t is None:
             if hasattr(self, 'dens_t'):
-                density_t = self.dens_t
+                density_t = select_density_history(self, self.dens_t, species=species)
             else:
                 raise RuntimeError("Node-wise state of the lattice required for density plotting but not recorded " +
                                    "in past LGCA run, call lgca.timeevo with keyword recorddens=True")
@@ -872,15 +874,13 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
     def plot_flux(self, nodes_t=None, **kwargs):
         if nodes_t is None:
             if hasattr(self, 'nodes_t'):
-                nodes_t = self.length_checker(self.nodes_t)
+                nodes_t = self.nodes_t
                 kwargs.setdefault("steps", getattr(self, "nodes_steps", None))
             else:
                 raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
                                    "in past LGCA run, call lgca.timeevo() with keyword record=True")
 
-        if nodes_t.dtype != 'int':
-            nodes_t = self.length_checker(self.nodes_t)
-        LGCA_1D.plot_flux(self, nodes_t, **kwargs)
+        return LGCA_1D.plot_flux(self, self._channel_counts(nodes_t), **kwargs)
 
     def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', cbarlabel=None, cbar=True,
                           figkwargs={}, **kwargs):
@@ -904,12 +904,9 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
         if propname is None:
             propname = next(iter(props))
 
-        if self.mean_prop_t == {}:
-            self.calc_prop_mean_spatiotemp()
-
         tmax, l, _ = nodes_t.shape
         fig, ax = self.setup_figure(tmax, **figkwargs)
-        mean_prop_t = self.mean_prop_t[propname]
+        mean_prop_t = self.calc_prop_mean(propname=propname, props=props, nodes=nodes_t)
 
         plot = plt.imshow(mean_prop_t, interpolation='none', cmap=cmap, aspect='equal', **kwargs)
         if cbar:

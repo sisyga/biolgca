@@ -12,6 +12,7 @@ volume exclusion.
 import warnings
 from abc import ABC
 from copy import copy, deepcopy
+from itertools import chain
 
 import numpy as np
 from .plot_data import history_steps
@@ -33,6 +34,11 @@ from .plots import muller_plot
 from .ib_base import IBLGCA_base
 from .nove_base import NoVE_LGCA_base
 from .list_utils import get_arr_of_empty_lists, _copy_arr_of_lists
+
+
+def _flatten_ids(nodes):
+    """Return all particle IDs stored in an object array of label lists."""
+    return np.fromiter(chain.from_iterable(np.asarray(nodes, dtype=object).flat), dtype=np.intp)
 
 
 class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
@@ -124,6 +130,13 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     def update_dynamic_fields(self):
         self.channel_pop = self.length_checker(self.nodes)  # population of a channel
         self.cell_density = self.channel_pop.sum(-1)  # population of a node
+
+    def _channel_counts(self, nodes, history=False):
+        """Return channel populations for label lists; count arrays pass through."""
+        nodes = np.asarray(nodes)
+        if nodes.dtype == object:
+            return self.length_checker(nodes)
+        return nodes
 
     def convert_int_to_ib(self, occ):
         """
@@ -505,7 +518,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         if recordN:
             observers.append(PopulationRecorder())
         if recorddens:
-            observers.append(DensityRecorder(dtype=np.uint))
+            observers.append(DensityRecorder())
         if recordchanneldens:
             observers.append(ChannelDensityRecorder())
         if recordfampop:
@@ -513,11 +526,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         run_timeevo(self, timesteps=timesteps, observers=observers, showprogress=showprogress)
 
     def calc_max_label(self):
-        cells = self.nodes.sum()
-        if len(cells) == 0:
-            self.maxlabel = 0
-
-        else: self.maxlabel = max(cells)
+        cells = _flatten_ids(self.nodes)
+        self.maxlabel = int(cells.max()) if cells.size else 0
 
     def get_prop(self, nodes=None, props=None, propname=None):
         """
@@ -534,7 +544,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
             propname = next(iter(self.props))
 
         prop = np.array(props[propname])
-        proparray = prop[nodes.sum()]
+        proparray = prop[_flatten_ids(nodes)]
         return proparray
 
     def calc_prop_mean(self, nodes=None, props=None, propname=None):
@@ -564,7 +574,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         if props is None:
             props = self.props
         tmax = nodes_t.shape[0]
-        for key in self.props:
+        for key in props:
             self.mean_prop_t[key] = np.ma.masked_all((tmax, *self.dims))
             # self.mean_prop_vel_t[key] = np.zeros([tmax,l])
             # self.mean_prop_rest_t[key] = np.zeros([tmax,l])
@@ -599,7 +609,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
             propname = next(iter(self.props))
 
         proparray = np.array(props[propname])
-        prop_t = [proparray[nodes.sum()] for nodes in nodes_t]
+        prop_t = [proparray[_flatten_ids(nodes)] for nodes in nodes_t]
         mean_prop_t = np.array([np.mean(prop) if len(prop) > 0 else np.nan for prop in prop_t])
         std_mean_prop_t = np.array \
             ([np.std(prop, ddof=1) / np.sqrt(len(prop)) if len(prop) > 0 else np.nan for prop in prop_t])
@@ -643,40 +653,67 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         if propname is None:
             propname = next(iter(props))
 
-        propvals = [props[propname][id] for id in nodes.sum()]
+        propvals = np.asarray(props[propname])[_flatten_ids(nodes)]
         plt.figure(num=figindex, figsize=figsize)
         plt.hist(propvals, **kwargs)
         plt.xlabel('{}'.format(propname))
         plt.ylabel('Count')
 
-    def plot_prop_2dhist(self, nodes=None, props=None, propnames=None, figindex=None, figsize=None, **kwargs):
+    def plot_prop_2dhist(self, nodes=None, props=None, propnames=None, figindex=None, figsize=None, bins=20,
+                         **kwargs):
         """
-        Plot a 2d-histogram of two cell properties given by 'propnames' of all cells in 'nodes'. By default, the current
-        lgca state is used and the first two properties are shown.
-        :param nodes:
-        :param props:
-        :param propnames:
-        :param figindex:
-        :param figsize:
-        :param kwargs:
-        :return:
+        Plot a 2D histogram of two cell properties with marginal histograms.
+
+        Parameters
+        ----------
+        nodes : numpy.ndarray, optional
+            Object array of cell-ID lists. Defaults to the current physical lattice.
+        props : dict, optional
+            Property dictionary. Defaults to ``self.props``.
+        propnames : sequence of two str, optional
+            Properties shown on the x and y axes. Defaults to the first two properties.
+        figindex : int or str, optional
+            Figure identifier passed to :func:`matplotlib.pyplot.figure`.
+        figsize : tuple of float, optional
+            Figure size in inches.
+        bins : int or sequence, default=20
+            Bins for the joint and the marginal histograms.
+        **kwargs
+            Further arguments for :meth:`matplotlib.axes.Axes.hist2d`.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+        axes : tuple of matplotlib.axes.Axes
+            Joint, top-marginal and right-marginal axes.
         """
-        import seaborn as sns
         if nodes is None:
             nodes = self.nodes[self.nonborder]
         if props is None:
             props = self.props
         if propnames is None:
-            names = iter(props)
-            propname1 = next(names)
-            propname2 = next(names)
+            propnames = list(props)[:2]
+        if len(propnames) != 2:
+            raise ValueError("plot_prop_2dhist requires exactly two property names.")
+        propname1, propname2 = propnames
 
-        ids = [id for id in nodes.sum()]
-        propvals1, propvals2 = [props[propname1][id] for id in ids], [props[propname2][id] for id in ids]
-        # plt.figure(num=figindex, figsize=figsize)
-        sns.jointplot(x=propvals1, y=propvals2, marginal_ticks=True, kind='hist', **kwargs)
-        plt.xlabel('{}'.format(propname1))
-        plt.ylabel('{}'.format(propname2))
+        ids = _flatten_ids(nodes)
+        propvals1 = np.asarray(props[propname1])[ids]
+        propvals2 = np.asarray(props[propname2])[ids]
+
+        fig = plt.figure(num=figindex, figsize=figsize)
+        grid = fig.add_gridspec(2, 2, width_ratios=(4, 1), height_ratios=(1, 4), wspace=0.05, hspace=0.05)
+        ax = fig.add_subplot(grid[1, 0])
+        ax_top = fig.add_subplot(grid[0, 0], sharex=ax)
+        ax_right = fig.add_subplot(grid[1, 1], sharey=ax)
+        ax.hist2d(propvals1, propvals2, bins=bins, **kwargs)
+        ax_top.hist(propvals1, bins=bins)
+        ax_right.hist(propvals2, bins=bins, orientation='horizontal')
+        ax_top.tick_params(labelbottom=False)
+        ax_right.tick_params(labelleft=False)
+        ax.set_xlabel(str(propname1))
+        ax.set_ylabel(str(propname2))
+        return fig, (ax, ax_top, ax_right)
 
     def calc_family_pop_alive(self):
         """
@@ -706,9 +743,9 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         Calculate which families are alive.
         :returns: np.ndarray - array of family IDs in ascending order
         """
-        cells_alive = np.array(self.nodes[self.nonborder].sum(-1))  # indices of live cells # nonborder needed for uniqueness
+        cells_alive = _flatten_ids(self.nodes[self.nonborder])  # nonborder needed for uniqueness
         cell_fam = np.array(self.props['family'])  # convert for indexing
-        cell_fam_alive = cell_fam[cells_alive.astype(int)]  # filter family array for families of live cells
+        cell_fam_alive = cell_fam[cells_alive]  # filter family array for families of live cells
         return np.unique(cell_fam_alive) # remove duplicate entries
 
 

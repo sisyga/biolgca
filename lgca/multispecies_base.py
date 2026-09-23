@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 from tqdm.auto import tqdm
 
-from .nove_base import NoVE_LGCA_base
+from .nove_base import NoVE_LGCA_base, _poisson_channel_populations
 from .base import LGCA_base, _validate_density
 
 
@@ -21,8 +21,23 @@ _SPATIAL_NDIMS = {
 }
 
 
+def _require_legacy_interaction(lgca, interaction) -> None:
+    """Reject interactions without a multispecies implementation in the legacy factory path."""
+    name = None if interaction is None else str(interaction).replace(" ", "_")
+    if name in lgca.interactions:
+        return
+    requested = "No interaction was given" if name is None else f"Interaction {name!r} is not supported"
+    raise ValueError(
+        f"{requested} for multispecies models built with get_lgca (legacy construction). "
+        f"Supported multispecies interactions: {', '.join(lgca.interactions)}. "
+        "Build other multispecies dynamics with a ModelSpec interaction pipeline."
+    )
+
+
 class MultiSpeciesLGCA_base(LGCA_base):
     """Classical LGCA supporting multiple species."""
+
+    interactions = ["random_walk", "only_propagation", "excitable_medium_ms"]
 
     def __init__(self, *, n_species: int = 1, **kwargs: Any) -> None:
         if isinstance(n_species, bool) or int(n_species) != n_species or n_species < 1:
@@ -101,6 +116,17 @@ class MultiSpeciesLGCA_base(LGCA_base):
                 UserWarning,
             )
 
+    def set_interaction(self, **kwargs):
+        _require_legacy_interaction(self, kwargs.get("interaction", "random_walk"))
+        super().set_interaction(**kwargs)
+
+    def _channel_counts(self, nodes, history=False):
+        """Return channel populations summed over species; summed arrays pass through."""
+        nodes = np.asarray(nodes)
+        if nodes.ndim == len(self.dims) + int(history) + 2:
+            return nodes.sum(axis=-2)
+        return nodes
+
     def random_reset(self, density):
         """Randomly initialize a total density distributed over all species."""
         _validate_density(density, max_density=self.n_species * self.K)
@@ -138,6 +164,8 @@ class MultiSpeciesLGCA_base(LGCA_base):
 class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
     """No-volume-exclusion LGCA with multiple species."""
 
+    interactions = ["birth", "birthdeath", "go_or_grow", "only_propagation"]
+
     _LOCAL_ENSEMBLE_INTERACTIONS = NoVE_LGCA_base._LOCAL_ENSEMBLE_INTERACTIONS | {
         "birth",
         "birthdeath",
@@ -156,6 +184,7 @@ class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
         return valid
 
     _spatial_ndim = MultiSpeciesLGCA_base._spatial_ndim
+    _channel_counts = MultiSpeciesLGCA_base._channel_counts
     _set_spatial_shape = MultiSpeciesLGCA_base._set_spatial_shape
     _set_dims_from_nodes = MultiSpeciesLGCA_base._set_dims_from_nodes
 
@@ -183,19 +212,14 @@ class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
     def random_reset(self, density):
         """Populate a total density distributed over all species."""
         _validate_density(density)
-        density = density / self.n_species
-        density = density / max(self.capacity, self.K)
-        draw1 = self.rng.poisson(lam=density, size=self.nodes.shape)
-        if self.capacity > self.K:
-            draw2 = self.rng.poisson(lam=density * (self.capacity - self.K), size=self.nodes.shape[:-1])
-            draw1[..., -1] += draw2
-        self.nodes = draw1
+        self.nodes = _poisson_channel_populations(self, density / self.n_species, self.nodes.shape)
         self.apply_boundaries()
         self.update_dynamic_fields()
 
     def set_interaction(self, **kwargs):
         if kwargs.get("interaction") == "excitable_medium_ms":
             raise ValueError("excitable_medium_ms requires volume exclusion.")
+        _require_legacy_interaction(self, kwargs.get("interaction"))
         interaction = kwargs.get("interaction", "").replace(" ", "_")
         if interaction in {"birth", "birthdeath", "go_or_grow"}:
             from lgca.ms_interactions import (

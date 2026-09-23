@@ -271,9 +271,8 @@ class LGCA_Cubic(LGCA_base):
         return sum
 
     def gradient(self, qty):
-        # Calculate the gradient of a quantity in the lattice
-        gx, gy, gz = np.gradient(qty, 0.5)
-        return np.stack((gx, gy, gz), axis=-1)
+        # documented in parent class
+        return np.stack(np.gradient(qty, axis=(0, 1, 2)), axis=-1)
 
     def channel_weight(self, qty):
         """
@@ -357,10 +356,11 @@ class LGCA_Cubic(LGCA_base):
         if nodes is None:
             nodes = self.nodes[self.nonborder]
 
-        flux = self.calc_flux(nodes.astype(float))
+        nodes = self._channel_counts(nodes).astype(float)
+        flux = self.calc_flux(nodes)
         flux_norm = np.linalg.norm(flux, axis=-1)
         scatter_size = (
-            (1 - np.sign(flux_norm)) * self.cell_density[self.nonborder] / self.K
+            (1 - np.sign(flux_norm)) * nodes.sum(-1) / self.K
         )
 
         x = self.xcoords
@@ -783,7 +783,8 @@ class LGCA_Cubic(LGCA_base):
         """
         nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
 
-        flux_t = self.calc_flux(nodes_t.astype(float))
+        nodes_t = self._channel_counts(nodes_t, history=True).astype(float)
+        flux_t = self.calc_flux(nodes_t)
         time_steps = flux_t.shape[0]
         scatter_sizes = (
             (1 - np.sign(np.linalg.norm(flux_t, axis=-1))) * nodes_t.sum(axis=-1) / self.K
@@ -851,8 +852,8 @@ class LGCA_Cubic(LGCA_base):
                 self.timestep()
 
                 # Update flux
-                nodes = self.nodes[self.nonborder]
-                flux = self.calc_flux(nodes.astype(float))
+                nodes = self._channel_counts(self.nodes[self.nonborder]).astype(float)
+                flux = self.calc_flux(nodes)
 
                 quiver.mlab_source.set(
                     u=flux[..., 0],

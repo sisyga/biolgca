@@ -12,7 +12,6 @@ class MSLGCA_Hex(MultiSpeciesLGCA_base, LGCA_Hex):
     """Classical multi-species LGCA on a hexagonal lattice."""
 
     geometry = "hex"
-    interactions = LGCA_Hex.interactions + ["excitable_medium_ms"]
 
     def init_nodes(self, density: float = 0.1, nodes: np.ndarray | None = None, **kwargs) -> None:
         self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.n_species, self.K), dtype=bool)

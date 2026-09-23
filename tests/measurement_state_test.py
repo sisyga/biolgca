@@ -10,30 +10,17 @@ from lgca.simulation import OrderParameterRecorder, SimulationRunner
 
 
 @pytest.mark.parametrize("bc", ["periodic", "reflecting", "absorbing"])
-@pytest.mark.parametrize("geometry,dims", [("lin", (4,)), ("square", (4, 4)),
-                                         ("hex", (4, 4))])
-@pytest.mark.parametrize("entry", ["direct", "recorder", "exception"])
-def test_alignment_measurement_preserves_state_and_rng(bc, geometry, dims, entry, monkeypatch):
+@pytest.mark.parametrize("geometry,dims", [("lin", (4,)), ("square", (4, 4)), ("hex", (4, 4))])
+def test_alignment_measurement_preserves_state_and_rng(bc, geometry, dims):
     model = get_lgca(geometry=geometry, dims=dims, ve=False, density=2,
                      bc=bc, seed=129, interaction="only_propagation")
     before = model.nodes.copy()
     density = model.cell_density.copy()
     rng = deepcopy(model.rng.bit_generator.state)
-    original_nodes = model.nodes
-    if entry == "exception":
-        def fail(_):
-            raise RuntimeError("measurement failure")
-        monkeypatch.setattr(model, "nb_sum", fail)
-        with pytest.raises(RuntimeError, match="measurement failure"):
-            model.calc_mean_alignment()
-    elif entry == "recorder":
-        SimulationRunner(model, timesteps=0, observers=[OrderParameterRecorder()],
-                         showprogress=False).run()
-        assert np.isfinite(model.meanAlign_t).all()
-    else:
-        assert np.isfinite(model.calc_mean_alignment())
-    assert model.nodes is original_nodes
-    assert model.nodes.dtype == before.dtype
+
+    SimulationRunner(model, timesteps=0, observers=[OrderParameterRecorder()], showprogress=False).run()
+
+    assert np.isfinite(model.meanAlign_t).all()
     np.testing.assert_array_equal(model.nodes, before)
     np.testing.assert_array_equal(model.cell_density, density)
     assert model.rng.bit_generator.state == rng

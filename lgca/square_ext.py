@@ -113,7 +113,7 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
                     text.set(alpha=bool(i))
                 return arrows, circles, texts, title
 
-            ani = animation.FuncAnimation(fig, update, interval=interval)
+            ani = animation.FuncAnimation(fig, update, interval=interval, cache_frame_data=False)
             return ani
 
         else:
@@ -125,7 +125,7 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
                 arrows.set(alpha=arrow_color)
                 return arrows, title
 
-            ani = animation.FuncAnimation(fig, update, interval=interval)
+            ani = animation.FuncAnimation(fig, update, interval=interval, cache_frame_data=False)
             return ani
 
 
@@ -294,6 +294,7 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
         bbox_props = None
         if nodes is None:
             nodes = self.nodes[self.nonborder]
+        nodes = self._channel_counts(nodes)
 
         density = nodes.sum(-1)
         if figsize is None:
@@ -349,13 +350,14 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
     def animate_config(self, nodes_t=None, interval=100, steps=None, **kwargs):
         nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
 
-        tmax = nodes_t.shape[0]
-        fig, arrows, circles, cmap = self.plot_config(nodes=nodes_t[0], vmax=nodes_t.max(), **kwargs)
+        counts_t = self._channel_counts(nodes_t, history=True)
+        tmax = counts_t.shape[0]
+        fig, arrows, circles, cmap = self.plot_config(nodes=nodes_t[0], vmax=counts_t.max(), **kwargs)
         title = arrows.axes.set_title(f'Time $k =${steps[0]}')
-        arrow_color = cmap.to_rgba(np.moveaxis(nodes_t[..., :self.velocitychannels], -1, 1)[None, ...]).reshape(tmax, -1, 4)
+        arrow_color = cmap.to_rgba(np.moveaxis(counts_t[..., :self.velocitychannels], -1, 1)[None, ...]).reshape(tmax, -1, 4)
 
         if self.restchannels:
-            circle_color = cmap.to_rgba(nodes_t[..., self.velocitychannels:].sum(-1)[None, ...]).reshape(tmax, -1, 4)
+            circle_color = cmap.to_rgba(counts_t[..., self.velocitychannels:].sum(-1)[None, ...]).reshape(tmax, -1, 4)
 
             def update(n):
                 title.set_text('Time $k =${}'.format(steps[n]))
@@ -488,10 +490,7 @@ class NoVE_IBLGCA_Square(NoVE_IBLGCA_base, NoVE_LGCA_Square):
         if propname is None:
             propname = next(iter(props))
 
-        if self.mean_prop_t == {}:
-            self.calc_prop_mean_spatiotemp()
-
-        mean_prop = self.mean_prop_t[propname][-1]
+        mean_prop = self.calc_prop_mean(propname=propname, props=props, nodes=nodes)
         if 'cbarlabel' not in kwargs:
             kwargs.update({'cbarlabel': str(propname)})
 

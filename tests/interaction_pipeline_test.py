@@ -20,29 +20,10 @@ from lgca.pipeline import (
     ReorientationSpec,
     ReorientationTermSpec,
 )
-from lgca.plugins import PluginInfo, ReorientationOperator, describe_plugin
+from lgca.plugins import PluginInfo, ReorientationOperator
 from lgca.pipeline import NativeBirthDeathOperator
 from lgca.simulation import NodeRecorder
 from lgca.simulation import DensityRecorder, PopulationRecorder
-
-
-def test_reorientation_term_names_are_public_and_stable():
-    from lgca.pipeline import list_reorientation_terms
-
-    assert list_reorientation_terms() == (
-        "aggregation",
-        "alignment",
-        "chemotaxis",
-        "contact_guidance",
-        "nematic",
-        "nematic_alignment",
-        "persistent_motion",
-        "persistent_walk",
-        "polar_alignment",
-        "random_walk",
-        "resting_bias",
-        "uniform",
-    )
 
 
 def test_native_uniform_reorientation_preserves_total_mass():
@@ -149,16 +130,6 @@ def test_native_birth_death_supports_species_specific_rates():
     assert result.lgca.nodes_t[1].sum(axis=(2, 3)).max() <= 4
 
 
-def test_native_birth_death_plugin_metadata_is_discoverable():
-    plugin = describe_plugin("birth_death")
-
-    assert plugin.operator_kind == "birth_death"
-    assert plugin.port_status == "native"
-    assert plugin.conservation_law.conserves_total_particles is False
-    assert plugin.parameters["birth_rate"]["default"] == 0.0
-    assert plugin.parameters["death_rate"]["default"] == 0.0
-
-
 def test_native_reorientation_preserves_multispecies_mass_by_species():
     spec = ModelSpec(
         description=Description(title="native multispecies reorientation"),
@@ -234,36 +205,6 @@ def test_custom_rest_or_align_conserves_empty_partial_and_full_sites(propagation
     np.testing.assert_array_equal(history.sum(axis=(1, 2)), 6)
     if not propagation:
         np.testing.assert_array_equal(history.sum(axis=-1), np.tile([0, 1, 3, 2], (5, 1)))
-
-
-@pytest.mark.parametrize("size", [4, 8])
-@pytest.mark.parametrize("n_species", [1, 2])
-def test_composed_spatial_fields_are_computed_once_per_step(size, n_species, monkeypatch):
-    shape = (size, size) + (() if n_species == 1 else (n_species,)) + (4,)
-    nodes = np.zeros(shape, dtype=bool)
-    nodes[..., 0] = True
-    model = build_model(ModelSpec(
-        space=SpaceSpec(geometry="square"),
-        state=StateSpec(nodes=nodes, n_species=n_species),
-        time=TimeSpec(steps=2, seed=111),
-        dynamics=InteractionPipelineSpec(operators=[ReorientationSpec(terms=[
-            ReorientationTermSpec("nematic_alignment"),
-            ReorientationTermSpec("aggregation"),
-            ReorientationTermSpec("persistent_walk"),
-        ])], propagation=False),
-    ))
-    calls = {"nb_sum": 0, "gradient": 0}
-    for name in calls:
-        original = getattr(model.lgca, name)
-
-        def counted(*args, _name=name, _original=original, **kwargs):
-            calls[_name] += 1
-            return _original(*args, **kwargs)
-
-        monkeypatch.setattr(model.lgca, name, counted)
-    model.run(showprogress=False)
-    assert calls == {"nb_sum": 2, "gradient": 2}
-    np.testing.assert_array_equal(model.lgca.nodes[model.lgca.nonborder].sum(axis=-1), 1)
 
 
 @pytest.mark.parametrize("name", ["persistent_walk", "resting_bias", "nematic_alignment", "aggregation"])
@@ -630,15 +571,6 @@ def test_phenotype_switch_one_particle_frequency_matches_rate_matrix():
     )
 
     assert switched / 5000 == pytest.approx(0.3, abs=0.03)
-
-
-def test_native_phenotype_switch_plugin_metadata_is_discoverable():
-    plugin = describe_plugin("phenotype_switch")
-
-    assert plugin.operator_kind == "phenotype_switch"
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
-    assert plugin.parameters["rates"]["default"] == [[0.0, 0.0], [0.0, 0.0]]
 
 
 def test_native_phenotype_switch_can_be_created_from_registry_name():

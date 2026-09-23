@@ -13,7 +13,6 @@ class MSLGCA_Square(MultiSpeciesLGCA_base, LGCA_Square):
     """Classical multi-species LGCA on a square lattice."""
 
     geometry = "square"
-    interactions = LGCA_Square.interactions + ["excitable_medium_ms"]
 
     def init_nodes(self, density: float = 0.1, nodes: np.ndarray | None = None, **kwargs) -> None:
         self.nodes = np.zeros(

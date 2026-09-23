@@ -282,10 +282,11 @@ class NoVE_LGCA_Cubic(LGCA_Cubic, NoVE_LGCA_base):
         if nodes is None:
             nodes = self.nodes[self.nonborder]
 
-        flux = self.calc_flux(nodes.astype(float))
+        nodes = self._channel_counts(nodes).astype(float)
+        flux = self.calc_flux(nodes)
         flux_norm = np.linalg.norm(flux, axis=-1)
         scatter_size = (
-            (1 - np.sign(flux_norm)) * self.cell_density[self.nonborder] / self.K
+            (1 - np.sign(flux_norm)) * nodes.sum(-1) / self.K
         )
 
         x = self.xcoords
@@ -655,9 +656,10 @@ class NoVE_LGCA_Cubic(LGCA_Cubic, NoVE_LGCA_base):
                     "Call lgca.timeevo with keyword record=True"
                 )
 
-        flux_t = self.calc_flux(nodes_t.astype(float))
+        nodes_t = self._channel_counts(nodes_t, history=True).astype(float)
+        flux_t = self.calc_flux(nodes_t)
         time_steps = flux_t.shape[0]
-        scatter_sizes = (1 - np.sign(np.linalg.norm(flux_t, axis=-1))) * self.dens_t
+        scatter_sizes = (1 - np.sign(np.linalg.norm(flux_t, axis=-1))) * nodes_t.sum(-1)
 
         fig, quiver, scatter = self.plot_flux(
             nodes=nodes_t[0],
@@ -720,8 +722,8 @@ class NoVE_LGCA_Cubic(LGCA_Cubic, NoVE_LGCA_base):
                 self.timestep()
 
                 # Update flux
-                nodes = self.nodes[self.nonborder]
-                flux = self.calc_flux(nodes.astype(float))
+                nodes = self._channel_counts(self.nodes[self.nonborder]).astype(float)
+                flux = self.calc_flux(nodes)
 
                 quiver.mlab_source.set(
                     u=flux[..., 0], v=flux[..., 1], w=flux[..., 2], vmin=0
@@ -942,10 +944,7 @@ class NoVE_IBLGCA_Cubic(NoVE_IBLGCA_base, LGCA_Cubic):
         if propname is None:
             propname = next(iter(props))
 
-        if self.mean_prop_t == {}:
-            self.calc_prop_mean_spatiotemp()
-
-        mean_prop = self.mean_prop_t[propname][-1]
+        mean_prop = self.calc_prop_mean(propname=propname, props=props, nodes=nodes)
         if "cbarlabel" not in kwargs:
             kwargs.update({"cbarlabel": str(propname)})
 

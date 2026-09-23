@@ -13,7 +13,6 @@ class MSLGCA_Moore(MultiSpeciesLGCA_base, LGCA_3dMoore):
     """Classical multi-species LGCA on a 3D Moore lattice."""
 
     geometry = "moore"
-    interactions = LGCA_3dMoore.interactions + ["excitable_medium_ms"]
 
     def init_nodes(self, density: float = 0.1, nodes: np.ndarray | None = None, **kwargs) -> None:
         self.nodes = np.zeros(

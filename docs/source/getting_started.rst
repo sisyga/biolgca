@@ -4,27 +4,42 @@ Getting started
 Installation
 ------------
 
-Clone the repository and install BioLGCA into an active Python environment:
+BioLGCA uses `uv <https://docs.astral.sh/uv/>`_ to manage Python and all
+dependencies. The repository contains a lock file, ``uv.lock``, that pins every
+package version, so everyone who runs ``uv sync`` works in the same environment
+as the test suite.
+
+`Install uv <https://docs.astral.sh/uv/getting-started/installation/>`_ once,
+then clone the repository and create the environment:
 
 .. code-block:: bash
 
    git clone https://github.com/sisyga/biolgca.git
    cd biolgca
-   python -m pip install -e .
+   uv sync
 
-A normal installation includes NumPy, SciPy, tqdm, Matplotlib and JupyterLab,
-so it is sufficient for the maintained tutorials and ordinary one- and
-two-dimensional analysis.
+``uv sync`` creates ``.venv/`` with the Python version named in
+``.python-version``, installs BioLGCA in editable mode and adds the test and
+documentation tools. If your uv does not download Python automatically, which
+is the case for some Linux distribution packages, run ``uv python install``
+first.
 
-Launch JupyterLab from the repository root:
+The installation includes NumPy, SciPy, tqdm, Matplotlib and JupyterLab, so it
+is sufficient for the maintained tutorials and ordinary one- and
+two-dimensional analysis. Launch JupyterLab from the repository root:
 
 .. code-block:: bash
 
-   jupyter lab
+   uv run jupyter lab
 
 Then open ``docs/source/tutorials/01_fundamentals.ipynb``. The six
 :doc:`tutorials/index` notebooks progress from a first random walk to a
-reproducible student project.
+reproducible student project. Run your own scripts the same way, for example
+``uv run python my_simulation.py``, or activate ``.venv`` as usual.
+
+Without uv, BioLGCA installs into any Python 3.10+ environment with
+``python -m pip install -e .``. This resolves the newest compatible package
+versions instead of the locked ones.
 
 Your first model specification
 ------------------------------
@@ -65,7 +80,8 @@ JSON is the canonical, versioned ModelSpec format. YAML is optional authoring
 syntax for the same data model. Model files contain data and registered names,
 never arbitrary import paths or Python code.
 
-The installed command can export, validate and run curated starting points:
+The installed command can export, validate and run curated starting points.
+Prefix each command with ``uv run`` unless ``.venv`` is activated:
 
 .. code-block:: bash
 
@@ -81,7 +97,7 @@ pipeline composition, input-path rules and model-file details.
 Optional dependencies
 ---------------------
 
-Only specialized or contributor workflows use extras:
+Two specialized features are optional extras:
 
 .. list-table::
    :header-rows: 1
@@ -91,23 +107,15 @@ Only specialized or contributor workflows use extras:
      - Install command
    * - ``yaml``
      - YAML model-file syntax
-     - ``python -m pip install -e ".[yaml]"``
+     - ``uv sync --extra yaml``
    * - ``plot3d``
      - Mayavi-based three-dimensional plotting
-     - ``python -m pip install -e ".[plot3d]"``
-   * - ``test``
-     - Test runner
-     - ``python -m pip install -e ".[test]"``
-   * - ``docs``
-     - Sphinx/MyST-NB documentation build
-     - ``python -m pip install -e ".[docs]"``
-   * - ``dev``
-     - Development, tests and documentation tools
-     - ``python -m pip install -e ".[dev]"``
+     - ``uv sync --extra plot3d``
 
-The old ``plot2d`` extra remains as an empty compatibility name; Matplotlib is
-now installed normally. ``plot`` and ``plotting`` remain aliases for the
-optional Mayavi stack.
+With pip, use ``python -m pip install -e ".[yaml]"`` and so on. Contributor
+tools are dependency groups rather than extras: ``test``, ``docs`` and ``dev``
+(both). ``uv sync`` installs ``dev`` by default; ``uv sync --no-default-groups
+--group docs`` installs only the documentation tools.
 
 Legacy interactive factory
 --------------------------
@@ -124,8 +132,10 @@ Run the test suite and strict documentation build from the repository root:
 
 .. code-block:: bash
 
-   conda run -n biolgca python -m pytest -q
-   conda run -n biolgca python docs/build.py
+   uv run pytest -q
+   uv run python docs/build.py
 
 The documentation build executes every maintained notebook from a clean kernel
-and treats cell exceptions and Sphinx warnings as failures.
+and treats cell exceptions and Sphinx warnings as failures. After changing
+dependencies in ``pyproject.toml``, run ``uv lock`` and commit the updated
+``uv.lock``.
