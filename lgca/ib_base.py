@@ -518,10 +518,11 @@ class IBLGCA_base(LGCA_base, ABC):
             Array of flux vectors at each lattice site. Dimensions: ``nodes.shape[:-1] + (len(self.c),)``.
 
         """
-        if nodes.dtype != 'bool':
-            nodes = nodes.astype('bool')
+        return super().calc_flux(self._channel_counts(nodes))
 
-        return super().calc_flux(nodes)
+    def _channel_counts(self, nodes):
+        """Return channel occupancy for particle labels (0 marks an empty channel)."""
+        return np.asarray(nodes) > 0
 
     def get_prop(self, nodes=None, props=None, propname=None):
         """

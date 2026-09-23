@@ -1036,6 +1036,14 @@ class LGCA_base(ABC):
         # dot product between c vectors and actual configuration of site
         return np.einsum('ij,...j', self.c, nodes[..., :self.velocitychannels])
 
+    def _channel_counts(self, nodes):
+        """Return the number of particles in each channel of ``nodes``.
+
+        Classical states already store occupancy or counts. Identity-based
+        classes override this to convert labels or label lists to counts.
+        """
+        return np.asarray(nodes)
+
     def print_interactions(self):
         """Print the list of pre-implemented interactions for this LGCA type."""
         print(self.interactions)

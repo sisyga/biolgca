@@ -524,7 +524,7 @@ def colorbar_index(ncolors: int, cmap, use_gridspec: bool=False, cax=None):
     cmap = cmap_discretize(cmap, ncolors)
 
     # map colors to values
-    mappable = ScalarMappable(cmap=cmap)
+    mappable = cm.ScalarMappable(cmap=cmap)
     mappable.set_array([])
     mappable.set_clim(-0.5, ncolors - 0.5)
 
@@ -535,7 +535,7 @@ def colorbar_index(ncolors: int, cmap, use_gridspec: bool=False, cax=None):
     )
 
     # configure ticks and labels using locators and formatters
-    locator = MaxNLocator(nbins="auto", integer=True)
+    locator = ticker.MaxNLocator(nbins="auto", integer=True)
     formatter = FuncFormatter(lambda val, pos: int(val))
     colorbar.ax.yaxis.set_major_locator(locator)
     colorbar.ax.yaxis.set_major_formatter(formatter)

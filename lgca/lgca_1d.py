@@ -398,8 +398,8 @@ class LGCA_1D(LGCA_base):
 
         # retrieve drawing axis and scale
         ax = plt.gca()
-        xmax = self.xcoords.max() + 0.5 * self.r_int
-        xmin = self.xcoords.min() - 0.5 * self.r_int
+        xmax = self.xcoords.max() + 0.5
+        xmin = self.xcoords.min() - 0.5
         ymax = tmax - 0.5
         ymin = -0.5
         plt.xlim(xmin, xmax)
@@ -617,9 +617,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
                 raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
                                    "in past LGCA run, call lgca.timeevo() with keyword record=True")
 
-        if nodes_t.dtype != 'bool':
-            nodes_t = nodes_t.astype('bool')
-        LGCA_1D.plot_flux(self, nodes_t, **kwargs)
+        return LGCA_1D.plot_flux(self, self._channel_counts(nodes_t), **kwargs)
 
     def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', figkwargs={}, **kwargs):
         implicit_history = nodes_t is None
@@ -872,15 +870,13 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
     def plot_flux(self, nodes_t=None, **kwargs):
         if nodes_t is None:
             if hasattr(self, 'nodes_t'):
-                nodes_t = self.length_checker(self.nodes_t)
+                nodes_t = self.nodes_t
                 kwargs.setdefault("steps", getattr(self, "nodes_steps", None))
             else:
                 raise RuntimeError("Channel-wise state of the lattice required for flux calculation but not recorded " +
                                    "in past LGCA run, call lgca.timeevo() with keyword record=True")
 
-        if nodes_t.dtype != 'int':
-            nodes_t = self.length_checker(self.nodes_t)
-        LGCA_1D.plot_flux(self, nodes_t, **kwargs)
+        return LGCA_1D.plot_flux(self, self._channel_counts(nodes_t), **kwargs)
 
     def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', cbarlabel=None, cbar=True,
                           figkwargs={}, **kwargs):
@@ -904,12 +900,9 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
         if propname is None:
             propname = next(iter(props))
 
-        if self.mean_prop_t == {}:
-            self.calc_prop_mean_spatiotemp()
-
         tmax, l, _ = nodes_t.shape
         fig, ax = self.setup_figure(tmax, **figkwargs)
-        mean_prop_t = self.mean_prop_t[propname]
+        mean_prop_t = self.calc_prop_mean(propname=propname, props=props, nodes=nodes_t)
 
         plot = plt.imshow(mean_prop_t, interpolation='none', cmap=cmap, aspect='equal', **kwargs)
         if cbar:

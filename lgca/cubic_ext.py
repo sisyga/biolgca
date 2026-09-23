@@ -942,10 +942,7 @@ class NoVE_IBLGCA_Cubic(NoVE_IBLGCA_base, LGCA_Cubic):
         if propname is None:
             propname = next(iter(props))
 
-        if self.mean_prop_t == {}:
-            self.calc_prop_mean_spatiotemp()
-
-        mean_prop = self.mean_prop_t[propname][-1]
+        mean_prop = self.calc_prop_mean(propname=propname, props=props, nodes=nodes)
         if "cbarlabel" not in kwargs:
             kwargs.update({"cbarlabel": str(propname)})
 

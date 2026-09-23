@@ -280,7 +280,7 @@ class SquarePlotMixin:
         else:
             K = vmax
 
-        nodes = nodes.astype(float)
+        nodes = self._channel_counts(nodes).astype(float)
         density = nodes.sum(-1)
         xx, yy = self.xcoords, self.ycoords
         jx, jy = np.moveaxis(self.calc_flux(nodes), -1, 0)
@@ -327,9 +327,9 @@ class SquarePlotMixin:
     def animate_flow(self, nodes_t=None, interval=100, cbar=False, steps=None, **kwargs):
         nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
 
-        nodes = nodes_t.astype(float)
+        nodes = self._channel_counts(nodes_t).astype(float)
         density = nodes.sum(-1)
-        jx, jy = np.moveaxis(self.calc_flux(nodes.astype(float)), -1, 0)
+        jx, jy = np.moveaxis(self.calc_flux(nodes), -1, 0)
 
         fig, plot = self.plot_flow(nodes[0], cbar=cbar, **kwargs)
         title = plot.axes.set_title(f'Time $k =${steps[0]}')
@@ -538,7 +538,7 @@ class SquarePlotMixin:
         if nodes is None:
             nodes = self.nodes[self.nonborder]
 
-        nodes = nodes.astype(np.int8)
+        nodes = self._channel_counts(nodes)
         density = nodes.sum(-1).astype(float) / self.K
 
         if figsize is None:
@@ -599,7 +599,7 @@ class SquarePlotMixin:
     def animate_flux(self, nodes_t=None, interval=100, steps=None, **kwargs):
         nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
 
-        nodes = nodes_t.astype(float)
+        nodes = self._channel_counts(nodes_t).astype(float)
         density = nodes.sum(-1) / self.K
         jx, jy = np.moveaxis(self.calc_flux(nodes), -1, 0)
 
