@@ -56,6 +56,11 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- The `birth_death` interaction of multispecies models processes all nodes at
+  once instead of looping over them in Python, which makes it about 45x faster
+  (100 steps on 50 x 50 nodes: 0.17 s instead of 7.7 s). Runs remain
+  reproducible from their seed, but seeded trajectories differ from earlier
+  versions.
 - Standalone 1D and 2D plots use Matplotlib's constrained layout with colour
   bars as inset axes, so axis labels, colour bars and their labels stay inside
   the figure; animations keep the layout of their first frame. Default figure
@@ -74,7 +79,7 @@ This file records notable user-facing changes. Changes remain under
   100 instead of 15 steps so that its Allee effect (a small colony shrinks) is
   visible, and `build_spec(kappa=-4.0)` gives the invading contrast case, and
   the identity-based tumour starts from a seed, grows and mutates its
-  switching steepness. The multispecies example runs on a 30 x 30 lattice.
+  switching steepness.
   `tests/examples_effect_test.py` checks each effect. Examples no longer
   modify `sys.path`, and the gallery lost its output listings of one-step runs.
 - 1D and 2D plots open a new figure instead of drawing into the current one,

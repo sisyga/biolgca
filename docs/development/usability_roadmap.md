@@ -180,14 +180,12 @@ Independent, low-risk items, in order.
   weak); go-or-grow runs 100 steps so its Allee effect is visible and takes
   `build_spec(kappa=...)` for the invading contrast case; the
   identity tumour is seeded, grows and mutates kappa, and uses
-  `state.capacity` instead of the deprecated parameter; the multispecies
-  example runs on 30 x 30 because `birth_death` loops over nodes in Python
-  (7.7 s on 50 x 50; see the performance note below). `tests/examples_effect_test.py`
+  `state.capacity` instead of the deprecated parameter. `tests/examples_effect_test.py`
   checks each promised effect. The gallery lost its stale "run(steps=1)"
   output blocks.
-- Performance note: `NativeBirthDeathOperator` applies multispecies birth and
-  death node by node (`_apply_multispecies_node`); vectorizing it is the next
-  low-hanging performance fix.
+- Performance note: `NativeBirthDeathOperator` applied multispecies birth and
+  death node by node. Done: it is vectorized over sites (45x faster) and the
+  example is back to 50 x 50.
 
 **0.8 Record the seed of every run** (B9)
 - If `time.seed` is missing, draw one from `numpy.random.SeedSequence`, use it,

@@ -2860,9 +2860,8 @@ class NativeBirthDeathOperator(BirthDeathOperator):
                 self.capacity,
             )
             return
-        for spatial in np.ndindex(lgca.dims):
-            coord = tuple(index + lgca.r_int for index in spatial)
-            lgca.nodes[coord] = self._apply_multispecies_node(lgca.nodes[coord], lgca.rng)
+        interior = lgca.nodes[lgca.nonborder]
+        lgca.nodes[lgca.nonborder] = self._apply_multispecies_lattice(interior, lgca.rng)
 
     def _rates(self, name: str, n_species: int) -> np.ndarray:
         value = self.parameters.get(name, 0.0)
@@ -2875,29 +2874,38 @@ class NativeBirthDeathOperator(BirthDeathOperator):
             raise ValueError(f"{name} entries must be probabilities")
         return rates
 
-    def _apply_multispecies_node(self, node, rng):
-        new_node = node.copy()
-        remaining_capacity = self.capacity
-        for species in range(new_node.shape[0]):
-            remaining_capacity -= int(new_node[species].sum())
+    def _apply_multispecies_lattice(self, nodes, rng):
+        """Apply turnover to all sites at once; nodes have shape ``dims + (n_species, K)``.
 
-        for species in range(new_node.shape[0]):
-            before = int(new_node[species].sum())
-            new_node[species] = self._apply_death(new_node[species], self.death_rate[species], rng)
-            remaining_capacity += before - int(new_node[species].sum())
+        At every site, cells die independently, then each species draws its
+        births from a binomial distribution in its cell number. Species claim
+        the site's remaining capacity in a random order, and births occupy
+        uniformly chosen free channels of their species.
+        """
+        n_species = nodes.shape[-2]
+        after_death = nodes.copy()
+        if np.any(self.death_rate > 0.0):
+            after_death &= rng.random(nodes.shape) >= self.death_rate[:, None]
+        counts = after_death.sum(axis=-1)
+        if not np.any(self.birth_rate > 0.0):
+            return after_death
 
-        for species in rng.permutation(new_node.shape[0]):
-            before = int(new_node[species].sum())
-            new_node[species] = self._apply_birth(
-                new_node[species], self.birth_rate[species], rng, remaining_capacity
-            )
-            remaining_capacity -= int(new_node[species].sum()) - before
-        return new_node
+        wanted = np.minimum(rng.binomial(counts, self.birth_rate), nodes.shape[-1] - counts)
+        remaining = np.maximum(self.capacity - counts.sum(axis=-1), 0)
+        births = np.zeros_like(wanted)
+        order = np.argsort(rng.random(counts.shape), axis=-1)
+        for position in range(n_species):
+            species = order[..., position:position + 1]
+            granted = np.minimum(np.take_along_axis(wanted, species, axis=-1)[..., 0], remaining)
+            np.put_along_axis(births, species, granted[..., None], axis=-1)
+            remaining -= granted
+        if not np.any(births):
+            return after_death
 
-    def _apply_species_node(self, node, birth_rate, death_rate, rng, capacity):
-        after_death = self._apply_death(node.copy(), death_rate, rng)
-        remaining_capacity = capacity - int(after_death.sum())
-        return self._apply_birth(after_death, birth_rate, rng, remaining_capacity)
+        scores = rng.random(nodes.shape)
+        scores[after_death] = np.inf
+        ranks = np.argsort(np.argsort(scores, axis=-1), axis=-1)
+        return after_death | (ranks < births[..., None])
 
     @staticmethod
     def _apply_single_species_lattice(nodes, birth_rate, death_rate, rng, capacity):
@@ -2924,25 +2932,3 @@ class NativeBirthDeathOperator(BirthDeathOperator):
         np.put_along_axis(ranks, order, np.arange(nodes.shape[-1]), axis=-1)
         after_death |= ranks < births[..., None]
         return after_death
-
-    @staticmethod
-    def _apply_death(node, death_rate, rng):
-        occupied = np.flatnonzero(node)
-        if occupied.size == 0 or death_rate == 0.0:
-            return node
-        survivors = rng.random(occupied.size) >= death_rate
-        node[occupied[~survivors]] = False
-        return node
-
-    @staticmethod
-    def _apply_birth(node, birth_rate, rng, remaining_capacity):
-        occupied = np.flatnonzero(node)
-        empty = np.flatnonzero(~node)
-        if occupied.size == 0 or empty.size == 0 or remaining_capacity <= 0 or birth_rate == 0.0:
-            return node
-        n_births = rng.binomial(occupied.size, birth_rate)
-        n_births = min(int(n_births), int(remaining_capacity), empty.size)
-        if n_births > 0:
-            chosen = rng.choice(empty, size=n_births, replace=False)
-            node[chosen] = True
-        return node

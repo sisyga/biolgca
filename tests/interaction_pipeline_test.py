@@ -509,15 +509,15 @@ def test_shared_birth_capacity_has_exchangeable_competition(order):
     operator.death_rate = np.zeros(3)
     operator.capacity = 3
     node = np.array([[True, False], [True, False], [False, False]])[list(order)]
-    rng = np.random.default_rng(108)
-    winners = np.zeros(3, dtype=int)
-    for _ in range(2000):
-        result = operator._apply_multispecies_node(node, rng)
-        assert result.dtype == bool
-        assert result.sum() == 3
-        counts = result.sum(axis=-1)[np.argsort(order)]
-        assert counts[2] == 0
-        winners += counts == 2
+    lattice = np.broadcast_to(node, (2000,) + node.shape).copy()
+
+    result = operator._apply_multispecies_lattice(lattice, np.random.default_rng(108))
+
+    assert result.dtype == bool
+    assert (result.sum(axis=(-2, -1)) == 3).all()
+    counts = result.sum(axis=-1)[:, np.argsort(order)]
+    assert (counts[:, 2] == 0).all()
+    winners = (counts == 2).sum(axis=0)
     # Each identical species wins with probability 1/2 (six standard errors).
     assert winners[0] / 2000 == pytest.approx(.5, abs=6 * np.sqrt(.25 / 2000))
     assert winners[1] == 2000 - winners[0]
@@ -930,3 +930,22 @@ def test_lazy_permutation_cache_evicts_by_bytes(monkeypatch):
     )
 
     assert list(cache) == [1]
+
+
+def test_multispecies_turnover_matches_its_rates():
+    from lgca.pipeline import NativeBirthDeathOperator
+
+    rng = np.random.default_rng(3)
+    operator = NativeBirthDeathOperator()
+    operator.capacity = 100  # never limiting
+
+    operator.death_rate, operator.birth_rate = np.array([0.2, 0.5]), np.zeros(2)
+    full = np.ones((4000, 2, 4), dtype=bool)
+    survivors = operator._apply_multispecies_lattice(full, rng).mean(axis=(0, 2))
+    np.testing.assert_allclose(survivors, [0.8, 0.5], atol=0.01)
+
+    operator.death_rate, operator.birth_rate = np.zeros(2), np.array([0.1, 0.4])
+    one_cell = np.zeros((20000, 2, 4), dtype=bool)
+    one_cell[..., 0] = True
+    births = operator._apply_multispecies_lattice(one_cell, rng).sum(axis=-1).mean(axis=0) - 1
+    np.testing.assert_allclose(births, [0.1, 0.4], atol=0.01)

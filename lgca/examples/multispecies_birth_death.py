@@ -3,7 +3,7 @@
 Two species share the lattice and its free channels. Species 0 divides faster
 (birth rate 0.05) than species 1 (0.02); both die at rate 0.01. Both grow
 while free channels remain, and the faster species ends up with most of the
-cells (about 3700 of 4000 after 100 steps).
+cells (about 10400 of 10900 after 100 steps).
 Change the rates to explore coexistence and competitive exclusion.
 """
 
@@ -43,7 +43,7 @@ def build_spec() -> ModelSpec:
             details="Two species share a lattice but use different birth rates.",
             tags=("example", "multispecies", "birth-death"),
         ),
-        space=SpaceSpec(geometry="square", dims=(30, 30), boundary="periodic"),
+        space=SpaceSpec(geometry="square", dims=(50, 50), boundary="periodic"),
         state=StateSpec(density=0.2, restchannels=1, n_species=2),
         time=TimeSpec(steps=100, seed=104),
         dynamics=InteractionPipelineSpec(
