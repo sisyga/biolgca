@@ -29,6 +29,12 @@ This file records notable user-facing changes. Changes remain under
   the `test`, `docs` and `dev` extras to PEP 735 dependency groups of the same
   names. The redundant `requirements*.txt` files and the `plot2d`, `plot` and
   `plotting` extras were removed; use the `plot3d` extra for Mayavi.
+- Identity-based birth and birth-death interactions (with and without volume
+  exclusion) draw all daughter birth rates of a time step in one vectorized
+  truncated-normal call, which makes them about 10x faster. Runs remain fully
+  reproducible from their seed, but seeded trajectories differ from those of
+  earlier versions. Legacy functions and ModelSpec operators share the same
+  kernels in `lgca.identity_kernels`.
 - Matplotlib and JupyterLab are part of the normal installation so students can
   open the maintained notebooks and plot results without selecting extras.
   Three-dimensional Mayavi rendering remains optional.

@@ -7,8 +7,7 @@ Interaction functions and helper functions for identity-based LGCA with volume e
 """
 
 import numpy as np
-from .identity_kernels import inherit_missing_properties
-from scipy.stats import truncnorm
+from .identity_kernels import inherit_missing_properties, sample_truncated_normal
 
 from lgca.interactions import tanh_switch
 
@@ -43,18 +42,19 @@ def trunc_gauss(lower, upper, mu, sigma=.1, size=1, rng=None):
         Standard deviation of the distribution.
     size : int, default=1
         Number of samples to draw.
+    rng : numpy.random.Generator, optional
+        Random number generator, normally ``lgca.rng``.
 
     Returns
     -------
     float or :class:`numpy.ndarray`
         ``float`` if ``size`` equals ``1`` or an array of samples otherwise.
     """
-    a = (lower - mu) / sigma
-    b = (upper - mu) / sigma
-    vals = truncnorm(a, b, loc=mu, scale=sigma).rvs(size, random_state=rng)
+    vals = sample_truncated_normal(lower, upper, np.full(size, mu, dtype=float), sigma, rng)
     if size != 1:
         return vals
-    return float(np.asarray(vals).item())
+    return float(vals[0])
+
 
 def birth(lgca):
     """Create daughter cells according to individual proliferation rates.
@@ -67,9 +67,9 @@ def birth(lgca):
     Notes
     -----
     ``lgca.nodes`` and ``lgca.props['r_b']`` are changed in place.  The
-    proliferation rate of each daughter cell is drawn from
-    :func:`trunc_gauss` with limits ``0`` and ``interaction_params['a_max']``
-    and width ``interaction_params['std']``.
+    proliferation rate of each daughter cell is drawn from a truncated normal
+    distribution around the mother's rate with limits ``0`` and
+    ``interaction_params['a_max']`` and width ``interaction_params['std']``.
     """
 
     from .identity_kernels import apply_identity_birth
@@ -83,9 +83,9 @@ def birthdeath(lgca):
 
     Cells die with probability ``interaction_params['r_d']``. Surviving cells
     proliferate according to their individual ``r_b``. The proliferation rate
-    of newborns is drawn from :func:`trunc_gauss`. If
-    ``interaction_params['track_inheritance']`` is ``True`` the family index of
-    the mother cell is copied to the daughter.
+    of newborns is drawn from a truncated normal distribution around the
+    mother's rate. Daughters copy all other properties of the mother, including
+    the family index if ``interaction_params['track_inheritance']`` is ``True``.
 
     Parameters
     ----------
@@ -96,46 +96,11 @@ def birthdeath(lgca):
     -----
     ``lgca`` and its property lists are altered in place.
     """
-    # death process, remember who will die but give them the chance to proliferate
-    dying = (lgca.rng.random(size=lgca.nodes.shape) < lgca.interaction_params['r_d']) & lgca.occupied
+    from .identity_kernels import apply_identity_birthdeath
 
-    # birth
-    relevant = (lgca.cell_density[lgca.nonborder] > 0) & \
-               (lgca.cell_density[lgca.nonborder] < lgca.K)
-    coords = [a[relevant] for a in lgca.nonborder]
-    for coord in zip(*coords):
-        node = lgca.nodes[coord]
-        occ = lgca.occupied[coord]
+    apply_identity_birthdeath(lgca, r_d=lgca.interaction_params['r_d'],
+                              a_max=lgca.interaction_params['a_max'], std=lgca.interaction_params['std'])
 
-        # choose cells that proliferate
-        r_bs = np.array([lgca.props['r_b'][i] for i in node])
-        proliferating = (lgca.rng.random(lgca.K) * occ) < r_bs
-        n_p = proliferating.sum()
-        if n_p == 0:
-            continue
-        targetchannels = lgca.rng.choice(lgca.K, size=n_p, replace=False)
-        # pick a random channel for each proliferating cell. If it is empty, place the daughter cell there
-        for i, label in enumerate(node[proliferating]):
-            ind = targetchannels[i]
-            if node[ind] == 0:
-                lgca.maxlabel += 1
-                node[ind] = lgca.maxlabel
-                r_b = lgca.props['r_b'][label]
-                if lgca.interaction_params['std'] > 0:
-                    lgca.props['r_b'].append(float(trunc_gauss(0, lgca.interaction_params['a_max'], r_b,
-                                                               sigma=lgca.interaction_params['std'],
-                                                               rng=lgca.rng)))
-                else:
-                    lgca.props['r_b'].append(r_b)
-                if lgca.interaction_params['track_inheritance']:
-                    fam = lgca.props['family'][label]
-                    lgca.props['family'].append(fam)
-                inherit_missing_properties(lgca, label)
-        lgca.nodes[coord] = node
-
-    lgca.nodes[dying] = 0
-    lgca.update_dynamic_fields()
-    random_walk(lgca)
 
 def birthdeath_discrete(lgca):
     """Birth-death process with discrete proliferation-rate mutations.

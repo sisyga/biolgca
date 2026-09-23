@@ -165,3 +165,54 @@ def test_dense_recorders_have_one_row_per_simulation_step(family, tmp_path):
     assert lgca.dens_t.shape[0] == 3
     assert lgca.n_t.shape == (3,)
     assert [record["step"] for record in scalar.records] == [0, 1, 2]
+
+
+def test_truncated_normal_sampler_respects_bounds_and_moments():
+    from lgca.identity_kernels import sample_truncated_normal
+
+    rng = np.random.default_rng(3)
+    means = np.repeat([0.0, 0.5, 1.5], 20000)
+    samples = sample_truncated_normal(0.0, 1.0, means, 0.05, rng)
+
+    assert samples.shape == means.shape
+    assert np.all((samples >= 0) & (samples <= 1))
+    centred = samples[means == 0.5]
+    np.testing.assert_allclose(centred.mean(), 0.5, atol=0.002)
+    np.testing.assert_allclose(centred.std(), 0.05, rtol=0.03)
+    # A normal truncated at its mean is half-normal with mean sigma * sqrt(2 / pi).
+    np.testing.assert_allclose(samples[means == 0.0].mean(), 0.05 * np.sqrt(2 / np.pi), rtol=0.03)
+    assert samples[means == 1.5].min() > 0.9
+    np.testing.assert_array_equal(sample_truncated_normal(0.0, 1.0, [0.2, 2.0], 0.0, rng), [0.2, 2.0])
+
+
+def test_daughter_properties_copy_untouched_traits_from_parents():
+    from types import SimpleNamespace
+
+    from lgca.identity_kernels import append_daughter_properties
+
+    lgca = SimpleNamespace(maxlabel=5, props={
+        "r_b": [0.0, 0.1, 0.2, 0.3],
+        "family": [0, 1, 1, 2],
+        "kappa": np.array([0.0, 4.0, 5.0, 6.0]),
+    })
+
+    append_daughter_properties(lgca, [3, 1], r_b=[0.35, 0.15])
+
+    assert lgca.props["r_b"] == [0.0, 0.1, 0.2, 0.3, 0.35, 0.15]
+    assert lgca.props["family"] == [0, 1, 1, 2, 2, 1]
+    np.testing.assert_array_equal(lgca.props["kappa"], [0, 4, 5, 6, 6, 4])
+
+
+@pytest.mark.parametrize("ve", [True, False])
+def test_seeded_identity_birthdeath_is_reproducible(ve):
+    def run():
+        lgca = get_lgca(geometry="square", dims=6, ib=True, ve=ve, restchannels=1, density=1,
+                        interaction="birthdeath", seed=11)
+        lgca.timeevo(timesteps=5, showprogress=False)
+        return lgca
+
+    first, second = run(), run()
+
+    assert list(first.props["r_b"]) == list(second.props["r_b"])
+    assert [list(np.atleast_1d(x)) for x in first.nodes.flat] == [list(np.atleast_1d(x)) for x in second.nodes.flat]
+    assert len(first.props["r_b"]) == int(first.maxlabel) + 1

@@ -10,7 +10,6 @@ Interaction functions and helper functions for identity-based LGCA without volum
 from itertools import chain
 
 import numpy as np
-from scipy.stats import truncnorm
 from lgca.interactions import tanh_switch
 
 
@@ -33,38 +32,6 @@ def _nb_sum(lgca, qty, add_center=False):
         if add_center:
             result = result + qty
         return result
-
-
-def trunc_gauss(lower, upper, mu, sigma=.1, size=1, rng=None):
-    """Draw samples from a truncated normal distribution.
-
-    Parameters
-    ----------
-    lower : float
-        Lower bound of the distribution.
-    upper : float
-        Upper bound of the distribution.
-    mu : float
-        Mean of the underlying normal distribution.
-    sigma : float, optional
-        Standard deviation of the underlying normal distribution. ``0.1`` by
-        default.
-    size : int, optional
-        Number of samples to draw. ``1`` by default.
-
-    Returns
-    -------
-    float or numpy.ndarray
-        If ``size`` equals ``1`` a single float is returned, otherwise an array
-        of shape ``(size,)`` with the drawn samples.
-    """
-    a = (lower - mu) / sigma
-    b = (upper - mu) / sigma
-    vals = truncnorm(a, b, loc=mu, scale=sigma).rvs(size, random_state=rng)
-    if size != 1:
-        return vals
-    else:
-        return vals[0]
 
 
 def random_walk(lgca):
@@ -169,27 +136,11 @@ def birth(lgca):
     -------
     None
     """
-    relevant = (lgca.cell_density[lgca.nonborder] > 0)
-    coords = [a[relevant] for a in lgca.nonborder]
-    for coord in zip(*coords):
-        density = lgca.cell_density[coord]
-        rho = density / lgca.interaction_params['capacity']
-        cells = _cells_from_node(lgca.nodes[coord])
-        newcells = cells.copy()
-        for cell in cells:
-            r_b = lgca.props['r_b'][cell]
-            if lgca.rng.random() < r_b * (1 - rho):
-                lgca.maxlabel += 1
-                newcells.append(lgca.maxlabel)
-                lgca.props['r_b'].append(float(trunc_gauss(0, lgca.interaction_params['a_max'], r_b,
-                                                           sigma=lgca.interaction_params['std'],
-                                                           rng=lgca.rng)))
+    from .identity_kernels import apply_nove_identity_birth
 
-        # channeldist = lgca.rng.multinomial(len(newcells), [1. / lgca.K] * lgca.K).cumsum()
-        channeldist = lgca.rng.multinomial(len(newcells), lgca.channel_weights).cumsum()
-        lgca.rng.shuffle(newcells)
-
-        lgca.nodes[coord] = _split_cells_into_channels(newcells, channeldist)
+    apply_nove_identity_birth(lgca, capacity=lgca.interaction_params['capacity'],
+                              a_max=lgca.interaction_params['a_max'], std=lgca.interaction_params['std'],
+                              channel_weights=lgca.channel_weights)
 
 
 def birthdeath(lgca):
@@ -209,30 +160,11 @@ def birthdeath(lgca):
     -------
     None
     """
-    relevant = (lgca.cell_density[lgca.nonborder] > 0)
-    coords = [a[relevant] for a in lgca.nonborder]
-    for coord in zip(*coords):
-        density = lgca.cell_density[coord]
-        rho = density / lgca.interaction_params['capacity']
-        cells = _cells_from_node(lgca.nodes[coord])
-        newcells = cells.copy()
-        for cell in cells:
-            if lgca.rng.random() < lgca.interaction_params['r_d']:
-                newcells.remove(cell)
+    from .identity_kernels import apply_nove_identity_birth
 
-            r_b = lgca.props['r_b'][cell]
-            if lgca.rng.random() < r_b * (1 - rho):
-                lgca.maxlabel += 1
-                newcells.append(lgca.maxlabel)
-                lgca.props['r_b'].append(float(trunc_gauss(0, lgca.interaction_params['a_max'], r_b,
-                                                           sigma=lgca.interaction_params['std'],
-                                                           rng=lgca.rng)))
-
-        # channeldist = lgca.rng.multinomial(len(newcells), [1. / lgca.K] * lgca.K).cumsum()
-        channeldist = lgca.rng.multinomial(len(newcells), lgca.channel_weights).cumsum()
-        lgca.rng.shuffle(newcells)
-
-        lgca.nodes[coord] = _split_cells_into_channels(newcells, channeldist)
+    apply_nove_identity_birth(lgca, capacity=lgca.interaction_params['capacity'],
+                              a_max=lgca.interaction_params['a_max'], std=lgca.interaction_params['std'],
+                              channel_weights=lgca.channel_weights, r_d=lgca.interaction_params['r_d'])
 
 def birthdeath_cancerdfe(lgca):
     """Birth--death step with driver and passenger mutations.

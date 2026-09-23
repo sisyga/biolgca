@@ -783,32 +783,16 @@ class NativeNoVEIdentityBirthDeathOperator(BirthDeathOperator):
         lgca.channel_weights = self.channel_weights
 
     def apply(self, context, step: int) -> None:
-        from .nove_ib_interactions import _cells_from_node, _split_cells_into_channels, trunc_gauss
+        from .identity_kernels import apply_nove_identity_birth
 
-        lgca = context.lgca
-        relevant = lgca.cell_density[lgca.nonborder] > 0
-        coords = [axis_indices[relevant] for axis_indices in lgca.nonborder]
-        for coord in zip(*coords):
-            density = lgca.cell_density[coord]
-            rho = density / self.capacity
-            cells = _cells_from_node(lgca.nodes[coord])
-            newcells = cells.copy()
-            for cell in cells:
-                if self.mode == "birthdeath" and lgca.rng.random() < self.r_d:
-                    newcells.remove(cell)
-
-                r_b = lgca.props["r_b"][cell]
-                if lgca.rng.random() < r_b * (1 - rho):
-                    lgca.maxlabel += 1
-                    newcells.append(lgca.maxlabel)
-                    lgca.props["r_b"].append(
-                        float(trunc_gauss(0, self.a_max, r_b, sigma=self.std, rng=lgca.rng))
-                    )
-
-            channeldist = lgca.rng.multinomial(len(newcells), self.channel_weights).cumsum()
-            lgca.rng.shuffle(newcells)
-            lgca.nodes[coord] = _split_cells_into_channels(newcells, channeldist)
-
+        apply_nove_identity_birth(
+            context.lgca,
+            capacity=self.capacity,
+            a_max=self.a_max,
+            std=self.std,
+            channel_weights=self.channel_weights,
+            r_d=self.r_d if self.mode == "birthdeath" else None,
+        )
 
 class NativeNoVEIdentityCancerDFEBirthDeathOperator(NativeNoVEIdentityBirthDeathOperator):
     """Native no-volume-exclusion identity birth-death with DFE mutations."""
@@ -1461,46 +1445,9 @@ class NativeIdentityBirthDeathOperator(BirthDeathOperator):
             lgca.init_families(type="heterogeneous", mutation=False)
 
     def apply(self, context, step: int) -> None:
-        from .ib_interactions import trunc_gauss
+        from .identity_kernels import apply_identity_birthdeath
 
-        lgca = context.lgca
-        dying = (lgca.rng.random(size=lgca.nodes.shape) < self.r_d) & lgca.occupied
-
-        relevant = (lgca.cell_density[lgca.nonborder] > 0) & (
-            lgca.cell_density[lgca.nonborder] < lgca.K
-        )
-        coords = [axis_indices[relevant] for axis_indices in lgca.nonborder]
-        for coord in zip(*coords):
-            node = lgca.nodes[coord]
-            occ = lgca.occupied[coord]
-            r_bs = np.array([lgca.props["r_b"][label] for label in node])
-            proliferating = (lgca.rng.random(lgca.K) * occ) < r_bs
-            n_p = proliferating.sum()
-            if n_p == 0:
-                continue
-            targetchannels = lgca.rng.choice(lgca.K, size=n_p, replace=False)
-            for index, label in enumerate(node[proliferating]):
-                channel = targetchannels[index]
-                if node[channel] == 0:
-                    lgca.maxlabel += 1
-                    node[channel] = lgca.maxlabel
-                    r_b = lgca.props["r_b"][label]
-                    if self.std > 0:
-                        lgca.props["r_b"].append(
-                            float(trunc_gauss(0, self.a_max, r_b, sigma=self.std, rng=lgca.rng))
-                        )
-                    else:
-                        lgca.props["r_b"].append(r_b)
-                    if self.track_inheritance:
-                        fam = lgca.props["family"][label]
-                        lgca.props["family"].append(fam)
-                    inherit_missing_properties(lgca, label)
-            lgca.nodes[coord] = node
-
-        lgca.nodes[dying] = 0
-        lgca.update_dynamic_fields()
-        lgca.nodes = lgca.rng.permuted(lgca.nodes, axis=-1)
-
+        apply_identity_birthdeath(context.lgca, r_d=self.r_d, a_max=self.a_max, std=self.std)
 
 class NativeIdentityBirthDeathDiscreteOperator(BirthDeathOperator):
     """Native identity birth-death with discrete proliferation-rate mutations."""
