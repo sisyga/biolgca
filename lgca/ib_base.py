@@ -518,7 +518,7 @@ class IBLGCA_base(LGCA_base, ABC):
         """
         return super().calc_flux(self._channel_counts(nodes))
 
-    def _channel_counts(self, nodes):
+    def _channel_counts(self, nodes, history=False):
         """Return channel occupancy for particle labels (0 marks an empty channel)."""
         return np.asarray(nodes) > 0
 

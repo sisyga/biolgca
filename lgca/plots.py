@@ -6,7 +6,6 @@
 
 import numpy as np
 import random
-from copy import copy
 from itertools import cycle
 try:  # optional plotting dependencies
     import matplotlib.colors as mplcolors
@@ -641,8 +640,7 @@ def get_cmap(
     else:
         K = vmax
 
-    cmap = copy(plt.get_cmap(cmap))  # do not modify a globally registered colormap in matplotlib > 3.3.2
-    cmap.set_under(alpha=0.0)
+    cmap = plt.get_cmap(cmap).with_extremes(under=(0, 0, 0, 0))
     cmap_scaled = False
 
     if 1 < K <= cmap.N:

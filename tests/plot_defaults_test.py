@@ -1,11 +1,14 @@
 """Plotting methods must run with their default arguments and show particle counts."""
 
+import warnings
+
 import numpy as np
 import pytest
 
 matplotlib = pytest.importorskip("matplotlib", reason="requires matplotlib for plotting tests")
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt
+from matplotlib.animation import Animation
 
 from lgca import get_lgca
 
@@ -15,13 +18,11 @@ FAMILIES = {
     "identity": dict(ve=True, ib=True, interaction="birth", restchannels=1),
     "nove": dict(ve=False, ib=False, interaction="dd_alignment", restchannels=0),
     "nove_identity": dict(ve=False, ib=True, interaction="go_or_grow", restchannels=1),
+    "multispecies": dict(ve=True, n_species=2, interaction="random_walk", restchannels=1),
+    "multispecies_nove": dict(ve=False, n_species=2, interaction="birth", restchannels=1),
 }
 GEOMETRIES = {"lin": 12, "square": 6, "hex": (6, 6)}
-DEFAULT_PLOTS = {
-    "lin": ["plot_density", "plot_flux"],
-    "square": ["plot_density", "plot_flux", "plot_flow", "plot_config"],
-    "hex": ["plot_density", "plot_flux", "plot_flow", "plot_config"],
-}
+NEEDS_ARGUMENTS = {"plot_scalarfield", "plot_vectorfield"}
 
 
 @pytest.fixture(autouse=True)
@@ -39,13 +40,39 @@ def _run(family, geometry, steps=4, seed=2):
 
 @pytest.mark.parametrize("geometry", GEOMETRIES)
 @pytest.mark.parametrize("family", FAMILIES)
-def test_plots_run_with_default_arguments(family, geometry):
+def test_every_plot_and_animation_runs_with_default_arguments(family, geometry):
     lgca = _run(family, geometry)
-    for name in DEFAULT_PLOTS[geometry]:
-        if name == "plot_config" and family in ("identity",):
-            continue  # plot_config needs a boolean configuration for identity lattices
-        getattr(lgca, name)()
+    names = sorted(name for name in dir(lgca)
+                   if name.startswith(("plot", "animate", "live_animate")) and name not in NEEDS_ARGUMENTS)
+    for name in names:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="Live .* not available")
+            result = getattr(lgca, name)()
+        if isinstance(result, Animation):
+            for frame in range(2):  # run the frame update, which is otherwise only executed when rendering
+                result._func(frame)
         plt.close("all")
+
+
+def test_multispecies_flow_shows_the_flux_summed_over_species():
+    nodes = np.zeros((3, 3, 2, 5), dtype=bool)
+    nodes[1, 1, :, 0] = True  # one particle of each species moving right
+    lgca = get_lgca(geometry="square", n_species=2, nodes=nodes, interaction="only_propagation")
+
+    _, quiver = lgca.plot_flow()
+
+    assert quiver.U.max() == 2
+    assert quiver.get_array().max() == 2
+
+
+def test_square_live_density_animation_shows_the_current_state():
+    lgca = _run("classical", "square")
+    animation = lgca.live_animate_density()
+
+    animation._func(1)
+
+    image = animation._fig.axes[0].get_images()[0]
+    np.testing.assert_array_equal(image.get_array(), lgca.cell_density[lgca.nonborder].T)
 
 
 def test_identity_flow_colours_arrows_by_cell_count_not_labels():

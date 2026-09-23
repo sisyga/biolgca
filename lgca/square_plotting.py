@@ -30,7 +30,6 @@ except ImportError:  # pragma: no cover - handled at runtime
         "matplotlib"
     )
 
-from copy import copy
 
 from .plot_data import (
     resolve_animation_history,
@@ -126,6 +125,7 @@ class SquarePlotMixin:
         bbox_props = None
         if nodes is None:
             nodes = self.nodes[self.nonborder]
+        nodes = self._channel_counts(nodes)
 
         if figsize is None:
             figsize = estimate_figsize(nodes[..., -1], cbar=False, dy=self.dy)
@@ -146,7 +146,7 @@ class SquarePlotMixin:
             cy = self.c[1, i] * 0.5
             arrows += [FancyArrowPatch((x + cx*(1-rel_arrowlen), y + cy*(1-rel_arrowlen)), (x + cx, y + cy),
                                        mutation_scale=.3, fc='k', ec=ec, lw=lw_arrow, alpha=occ)
-                       for x, y, occ in zip(xx.ravel(), yy.ravel(), nodes[..., i].astype(float).ravel())]
+                       for x, y, occ in zip(xx.ravel(), yy.ravel(), np.minimum(nodes[..., i], 1).astype(float).ravel())]
 
         arrows = PatchCollection(arrows, match_original=True)
         ax.add_collection(arrows)
@@ -183,17 +183,14 @@ class SquarePlotMixin:
 
         fig, arrows, circles, texts = self.plot_config(nodes=nodes_t[0], **kwargs)
         title = arrows.axes.set_title(f'Time $k =${steps[0]}')
-        arrow_color = np.zeros(nodes_t[..., :self.velocitychannels].shape)
-        arrow_color = arrow_color.reshape(nodes_t.shape[0], -1)
-        arrow_color = np.moveaxis(nodes_t[..., :self.velocitychannels], -1, 1).reshape(nodes_t.shape[0], -1)
+        counts_t = self._channel_counts(nodes_t, history=True)
+        frames = counts_t.shape[0]
+        arrow_color = np.minimum(np.moveaxis(counts_t[..., :self.velocitychannels], -1, 1), 1)
+        arrow_color = arrow_color.reshape(frames, -1).astype(float)
 
         if self.restchannels:
-            circle_color = np.zeros(nodes_t[..., 0].shape)
-            circle_color = circle_color.reshape(nodes_t.shape[0], -1)
-            circle_color = np.any(nodes_t[..., self.velocitychannels:], axis=-1).reshape(nodes_t.shape[0], -1).astype(float)
-            # circle_fcolor = np.ones(circle_color.shape)
-            # circle_fcolor[..., -1] = circle_color[..., -1]
-            resting_t = nodes_t[..., self.velocitychannels:].sum(-1).reshape(nodes_t.shape[0], -1)
+            circle_color = np.any(counts_t[..., self.velocitychannels:], axis=-1).reshape(frames, -1).astype(float)
+            resting_t = counts_t[..., self.velocitychannels:].sum(-1).reshape(frames, -1)
 
             def update(n):
                 title.set_text('Time $k =${}'.format(steps[n]))
@@ -220,15 +217,11 @@ class SquarePlotMixin:
     def live_animate_config(self, interval=100, **kwargs):
         fig, arrows, circles, texts = self.plot_config(**kwargs)
         title = plt.title('Time $k =$0')
-        nodes = self.nodes[self.nonborder]
-        arrow_color = np.zeros(nodes[..., :self.velocitychannels].ravel().shape)
         if self.restchannels:
-            circle_color = np.zeros(nodes[..., 0].ravel().shape)
-
             def update(n):
                 self.timestep()
-                nodes = self.nodes[self.nonborder]
-                arrow_color = np.moveaxis(nodes[..., :self.velocitychannels], -1, 0).ravel().astype(float)
+                nodes = self._channel_counts(self.nodes[self.nonborder])
+                arrow_color = np.minimum(np.moveaxis(nodes[..., :self.velocitychannels], -1, 0), 1).ravel().astype(float)
                 circle_color = np.any(nodes[..., self.velocitychannels:], axis=-1).ravel().astype(float)
                 resting_t = nodes[..., self.velocitychannels:].sum(-1).ravel()
                 title.set_text('Time $k =${}'.format(n))
@@ -239,19 +232,19 @@ class SquarePlotMixin:
                     text.set(alpha=bool(i))
                 return arrows, circles, texts, title
 
-            ani = animation.FuncAnimation(fig, update, interval=interval)
+            ani = animation.FuncAnimation(fig, update, interval=interval, cache_frame_data=False)
             return ani
 
         else:
             def update(n):
                 self.timestep()
-                nodes = self.nodes[self.nonborder]
-                arrow_color= np.moveaxis(nodes[..., :self.velocitychannels], -1, 0).ravel().astype(float)
+                nodes = self._channel_counts(self.nodes[self.nonborder])
+                arrow_color = np.minimum(np.moveaxis(nodes[..., :self.velocitychannels], -1, 0), 1).ravel().astype(float)
                 title.set_text('Time $k =${}'.format(n))
                 arrows.set(alpha=arrow_color)
                 return arrows, title
 
-            ani = animation.FuncAnimation(fig, update, interval=interval)
+            ani = animation.FuncAnimation(fig, update, interval=interval, cache_frame_data=False)
             return ani
 
     def live_animate_density(self, interval=100, channels=slice(None), **kwargs):
@@ -262,12 +255,14 @@ class SquarePlotMixin:
         def update(n):
             self.timestep()
             title.set_text('Time $k =${}'.format(n))
-            nodes = self.nodes[self.nonborder].astype('bool')  # makes it work for IBLGCA and doesn't hurt here
-            dens = nodes[..., channels].sum(-1)
-            pc.set(facecolor=cmap.to_rgba(dens.ravel()))
+            dens = self._channel_counts(self.nodes[self.nonborder])[..., channels].sum(-1)
+            if hasattr(pc, 'set_data'):
+                pc.set_data(dens.T)
+            else:
+                pc.set(facecolor=cmap.to_rgba(dens.ravel()))
             return pc, title
 
-        ani = animation.FuncAnimation(fig, update, interval=interval)
+        ani = animation.FuncAnimation(fig, update, interval=interval, cache_frame_data=False)
         return ani
     def plot_flow(self, nodes=None, figsize=None, cmap='viridis', vmax=None, cbar=False, **kwargs):
 
@@ -297,8 +292,7 @@ class SquarePlotMixin:
         if cbar:
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("right", size="5%", pad=0.1)
-            cmap = copy(plt.get_cmap(cmap))
-            cmap.set_under(alpha=0.0)
+            cmap = plt.get_cmap(cmap).with_extremes(under=(0, 0, 0, 0))
             plot.set_cmap(cmap)
             # cmap = plot.get_cmap()
             plot.set_clim([1, K])
@@ -311,8 +305,7 @@ class SquarePlotMixin:
             # cbar.set_ticklabels(1 + np.arange(K)) # np.arange(K+1)
             plt.sca(ax)
         else:
-            cmap = copy(plt.get_cmap('Greys'))
-            cmap.set_under(alpha=0.0)
+            cmap = plt.get_cmap('Greys').with_extremes(under=(0, 0, 0, 0))
             plot.set_cmap(cmap)
             # cmap = plot.get_cmap()
             plot.set_clim([0, 1])
@@ -327,11 +320,11 @@ class SquarePlotMixin:
     def animate_flow(self, nodes_t=None, interval=100, cbar=False, steps=None, **kwargs):
         nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
 
-        nodes = self._channel_counts(nodes_t).astype(float)
-        density = nodes.sum(-1)
-        jx, jy = np.moveaxis(self.calc_flux(nodes), -1, 0)
+        counts_t = self._channel_counts(nodes_t, history=True).astype(float)
+        density = counts_t.sum(-1)
+        jx, jy = np.moveaxis(self.calc_flux(counts_t), -1, 0)
 
-        fig, plot = self.plot_flow(nodes[0], cbar=cbar, **kwargs)
+        fig, plot = self.plot_flow(nodes_t[0], cbar=cbar, **kwargs)
         title = plot.axes.set_title(f'Time $k =${steps[0]}')
 
         def update(n):
@@ -349,13 +342,13 @@ class SquarePlotMixin:
 
         def update(n):
             self.timestep()
-            jx, jy = np.moveaxis(self.calc_flux(self.nodes[self.nonborder]), -1, 0)
-            density = self.cell_density[self.nonborder]
+            counts = self._channel_counts(self.nodes[self.nonborder])
+            jx, jy = np.moveaxis(self.calc_flux(counts), -1, 0)
             title.set_text('Time $k =${}'.format(n))
-            plot.set_UVC(jx, jy, density)
+            plot.set_UVC(jx, jy, counts.sum(-1))
             return plot, title
 
-        ani = animation.FuncAnimation(fig, update, interval=interval)
+        ani = animation.FuncAnimation(fig, update, interval=interval, cache_frame_data=False)
         return ani
 
     def plot_scalarfield(self, field, cmap='cividis', cbar=True, edgecolor='none', mask=None,
@@ -472,8 +465,7 @@ class SquarePlotMixin:
         # set up figure
         fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
         # set up density translation to color
-        color_map = copy(plt.get_cmap(cmap))  # do not modify a globally registered colormap in matplotlib > 3.3.2
-        color_map.set_under(alpha=0.0)
+        color_map = plt.get_cmap(cmap).with_extremes(under=(0, 0, 0, 0))
         if K > 1:
             norm = colors.BoundaryNorm(1 + np.arange(K + 1), color_map.N)
         else:
@@ -599,15 +591,15 @@ class SquarePlotMixin:
     def animate_flux(self, nodes_t=None, interval=100, steps=None, **kwargs):
         nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
 
-        nodes = self._channel_counts(nodes_t).astype(float)
-        density = nodes.sum(-1) / self.K
-        jx, jy = np.moveaxis(self.calc_flux(nodes), -1, 0)
+        counts_t = self._channel_counts(nodes_t, history=True).astype(float)
+        density = counts_t.sum(-1) / self.K
+        jx, jy = np.moveaxis(self.calc_flux(counts_t), -1, 0)
 
         angle = np.zeros(density.shape, dtype=complex)
         angle.real = jx
         angle.imag = jy
         angle = np.angle(angle, deg=True) % 360.
-        fig, pc, cmap = self.plot_flux(nodes=nodes[0], **kwargs)
+        fig, pc, cmap = self.plot_flux(nodes=nodes_t[0], **kwargs)
         angle = cmap.to_rgba(angle[None, ...])[0]
         angle[..., -1] = np.sign(density)
         angle[(jx ** 2 + jy ** 2) < 1e-6, :3] = 0.5
@@ -631,8 +623,9 @@ class SquarePlotMixin:
 
         def update(n):
             self.timestep()
-            jx, jy = np.moveaxis(self.calc_flux(self.nodes[self.nonborder]), -1, 0)
-            density = self.cell_density[self.nonborder] / self.K
+            counts = self._channel_counts(self.nodes[self.nonborder])
+            jx, jy = np.moveaxis(self.calc_flux(counts), -1, 0)
+            density = counts.sum(-1) / self.K
 
             angle = np.empty(density.shape, dtype=complex)
             angle.real = jx
@@ -645,5 +638,5 @@ class SquarePlotMixin:
             pc.set(facecolor=angle.reshape(-1, 4))
             return pc, title
 
-        ani = animation.FuncAnimation(fig, update, interval=interval)
+        ani = animation.FuncAnimation(fig, update, interval=interval, cache_frame_data=False)
         return ani

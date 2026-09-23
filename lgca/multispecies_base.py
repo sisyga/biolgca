@@ -120,6 +120,13 @@ class MultiSpeciesLGCA_base(LGCA_base):
         _require_legacy_interaction(self, kwargs.get("interaction", "random_walk"))
         super().set_interaction(**kwargs)
 
+    def _channel_counts(self, nodes, history=False):
+        """Return channel populations summed over species; summed arrays pass through."""
+        nodes = np.asarray(nodes)
+        if nodes.ndim == len(self.dims) + int(history) + 2:
+            return nodes.sum(axis=-2)
+        return nodes
+
     def random_reset(self, density):
         """Randomly initialize a total density distributed over all species."""
         _validate_density(density, max_density=self.n_species * self.K)
@@ -177,6 +184,7 @@ class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
         return valid
 
     _spatial_ndim = MultiSpeciesLGCA_base._spatial_ndim
+    _channel_counts = MultiSpeciesLGCA_base._channel_counts
     _set_spatial_shape = MultiSpeciesLGCA_base._set_spatial_shape
     _set_dims_from_nodes = MultiSpeciesLGCA_base._set_dims_from_nodes
 

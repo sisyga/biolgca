@@ -1004,11 +1004,13 @@ class LGCA_base(ABC):
         # dot product between c vectors and actual configuration of site
         return np.einsum('ij,...j', self.c, nodes[..., :self.velocitychannels])
 
-    def _channel_counts(self, nodes):
-        """Return the number of particles in each channel of ``nodes``.
+    def _channel_counts(self, nodes, history=False):
+        """Return the number of particles in each channel of ``nodes`` for plotting.
 
-        Classical states already store occupancy or counts. Identity-based
-        classes override this to convert labels or label lists to counts.
+        ``nodes`` is one lattice state or, with ``history=True``, a time series of
+        states. Classical states already store occupancy or counts. Identity-based
+        classes convert labels or label lists and multi-species classes sum over
+        species. Arrays that already hold counts are returned unchanged.
         """
         return np.asarray(nodes)
 

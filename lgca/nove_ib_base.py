@@ -131,7 +131,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.channel_pop = self.length_checker(self.nodes)  # population of a channel
         self.cell_density = self.channel_pop.sum(-1)  # population of a node
 
-    def _channel_counts(self, nodes):
+    def _channel_counts(self, nodes, history=False):
         """Return channel populations for label lists; count arrays pass through."""
         nodes = np.asarray(nodes)
         if nodes.dtype == object:
