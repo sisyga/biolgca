@@ -194,7 +194,7 @@ proliferation rates and switching sensitivities:
            restchannels=1,
            volume_exclusion=False,
            identity_based=True,
-           parameters={"capacity": 8},
+           capacity=8,
        ),
        time=TimeSpec(steps=100, seed=5),
        dynamics=InteractionPipelineSpec(

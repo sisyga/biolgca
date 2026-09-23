@@ -56,6 +56,14 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- Curated examples show their effect at their own settings: alignment and
+  nematic alignment run at density 0.5 with beta 3 and order visibly,
+  chemotaxis uses a steeper signal with reflecting walls, go-or-grow grows
+  (kappa -4 for 100 steps instead of 15 steps in which the colony shrank), and
+  the identity-based tumour starts from a seed, grows and mutates its
+  switching steepness. The multispecies example runs on a 30 x 30 lattice.
+  `tests/examples_effect_test.py` checks each effect. Examples no longer
+  modify `sys.path`, and the gallery lost its output listings of one-step runs.
 - 1D and 2D plots open a new figure instead of drawing into the current one,
   so consecutive plot calls in a script no longer overlay each other. An empty
   current figure (e.g. from `plt.figure(figsize=...)`) is still used. To place

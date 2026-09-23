@@ -1,20 +1,17 @@
 """Chemotaxis example.
 
-This keeps the notebook's chemotaxis interaction but makes the guidance field
-explicit so students can see where the directional cue enters the model.
+A signal increases from 0 at the left wall to 10 at the right wall. The
+chemotaxis term makes cells prefer to move up its gradient, so within 100
+steps more than half of the cells gather in the right fifth of the lattice. The signal is an explicit named
+field, so you can see where the directional cue enters the model; try another
+shape, e.g. a peak in the middle, or a smaller ``beta``.
 """
 
 from __future__ import annotations
 
-try:
-    from ._helpers import ensure_project_root_on_path, main
-except ImportError:
-    from _helpers import ensure_project_root_on_path, main
-
-ensure_project_root_on_path(__file__)
-
 import numpy as np
 
+from lgca.examples._helpers import main, run_spec
 from lgca.examples._types import ExampleInfo
 from lgca.model import (
     AnalysisSpec,
@@ -40,9 +37,9 @@ INFO = ExampleInfo(
 
 
 def build_signal_field() -> np.ndarray:
-    """Create a left-to-right signal gradient for the 50 by 50 lattice."""
+    """Create a signal rising from 0 at the left to 10 at the right of the 50 by 50 lattice."""
 
-    return np.linspace(0.0, 1.0, 50)[:, None] + np.zeros((50, 50))
+    return np.linspace(0.0, 10.0, 50)[:, None] + np.zeros((50, 50))
 
 
 def build_spec() -> ModelSpec:
@@ -51,10 +48,10 @@ def build_spec() -> ModelSpec:
     return ModelSpec(
         description=Description(
             title=INFO.title,
-            details="Chemotaxis uses a named state field and a term that reads it.",
+            details="Cells climb a linear signal gradient and gather near the right wall.",
             tags=("example", "chemotaxis", "signal-field"),
         ),
-        space=SpaceSpec(geometry="square", dims=(50, 50), boundary="periodic"),
+        space=SpaceSpec(geometry="square", dims=(50, 50), boundary="reflecting"),
         state=StateSpec(
             density=0.1,
             restchannels=0,
@@ -67,7 +64,7 @@ def build_spec() -> ModelSpec:
                     terms=[
                         ReorientationTermSpec(
                             name="chemotaxis",
-                            beta=1.0,
+                            beta=2.0,
                             parameters={"field": "signal"},
                         )
                     ],
@@ -83,14 +80,7 @@ def build_spec() -> ModelSpec:
 def run(steps: int | None = None, showprogress: bool = False):
     """Run this example and return a :class:`lgca.model.ModelRunResult`."""
 
-    from dataclasses import replace
-
-    from lgca.model import run_model
-
-    spec = build_spec()
-    if steps is not None:
-        spec = replace(spec, time=replace(spec.time, steps=int(steps)))
-    return run_model(spec, showprogress=showprogress)
+    return run_spec(build_spec, steps=steps, showprogress=showprogress)
 
 
 if __name__ == "__main__":

@@ -1,19 +1,15 @@
 """Multispecies birth-death example.
 
-This extends the notebook population-dynamics theme to two species with
-different birth rates. It is retained as a compact bridge from the canonical
-single-species notebook models toward multispecies BioLGCA use.
+Two species share the lattice and its free channels. Species 0 divides faster
+(birth rate 0.05) than species 1 (0.02); both die at rate 0.01. Both grow
+while free channels remain, and the faster species ends up with most of the
+cells (about 3700 of 4000 after 100 steps).
+Change the rates to explore coexistence and competitive exclusion.
 """
 
 from __future__ import annotations
 
-try:
-    from ._helpers import ensure_project_root_on_path, main
-except ImportError:
-    from _helpers import ensure_project_root_on_path, main
-
-ensure_project_root_on_path(__file__)
-
+from lgca.examples._helpers import main, run_spec
 from lgca.examples._types import ExampleInfo
 from lgca.model import (
     AnalysisSpec,
@@ -47,7 +43,7 @@ def build_spec() -> ModelSpec:
             details="Two species share a lattice but use different birth rates.",
             tags=("example", "multispecies", "birth-death"),
         ),
-        space=SpaceSpec(geometry="square", dims=(50, 50), boundary="periodic"),
+        space=SpaceSpec(geometry="square", dims=(30, 30), boundary="periodic"),
         state=StateSpec(density=0.2, restchannels=1, n_species=2),
         time=TimeSpec(steps=100, seed=104),
         dynamics=InteractionPipelineSpec(
@@ -67,14 +63,7 @@ def build_spec() -> ModelSpec:
 def run(steps: int | None = None, showprogress: bool = False):
     """Run this example and return a :class:`lgca.model.ModelRunResult`."""
 
-    from dataclasses import replace
-
-    from lgca.model import run_model
-
-    spec = build_spec()
-    if steps is not None:
-        spec = replace(spec, time=replace(spec.time, steps=int(steps)))
-    return run_model(spec, showprogress=showprogress)
+    return run_spec(build_spec, steps=steps, showprogress=showprogress)
 
 
 if __name__ == "__main__":

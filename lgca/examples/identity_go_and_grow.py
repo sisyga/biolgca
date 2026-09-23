@@ -6,15 +6,9 @@ This follows the one-dimensional identity-based go-and-grow section from
 
 from __future__ import annotations
 
-try:
-    from ._helpers import ensure_project_root_on_path, main
-except ImportError:
-    from _helpers import ensure_project_root_on_path, main
-
-ensure_project_root_on_path(__file__)
-
 import numpy as np
 
+from lgca.examples._helpers import main, run_spec
 from lgca.examples._types import ExampleInfo
 from lgca.model import (
     AnalysisSpec,
@@ -76,14 +70,7 @@ def build_spec() -> ModelSpec:
 def run(steps: int | None = None, showprogress: bool = False):
     """Run this example and return a :class:`lgca.model.ModelRunResult`."""
 
-    from dataclasses import replace
-
-    from lgca.model import run_model
-
-    spec = build_spec()
-    if steps is not None:
-        spec = replace(spec, time=replace(spec.time, steps=int(steps)))
-    return run_model(spec, showprogress=showprogress)
+    return run_spec(build_spec, steps=steps, showprogress=showprogress)
 
 
 if __name__ == "__main__":

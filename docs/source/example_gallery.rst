@@ -90,16 +90,6 @@ Start here if students are new to LGCA. The model has no directed cue and is
 useful for checking how density spreads under unbiased reorientation and
 propagation.
 
-Example output from ``run(steps=1)``:
-
-.. code-block:: text
-
-   title: Random walk example
-   steps: 1
-   operators: classical.random_walk
-   observers: DensityRecorder, PopulationRecorder
-   fields: -
-
 .. literalinclude:: ../../lgca/examples/random_walk.py
    :language: python
    :caption: lgca/examples/random_walk.py
@@ -112,17 +102,9 @@ alignment
 :Concepts: collective motion, flux, reorientation
 :Source: ``lgca/examples/alignment.py``
 
-Use this to discuss polar alignment: local flux biases the next channel choice.
-
-Example output from ``run(steps=1)``:
-
-.. code-block:: text
-
-   title: Alignment example
-   steps: 1
-   operators: classical.alignment
-   observers: NodeRecorder, DensityRecorder, PopulationRecorder
-   fields: -
+Cells reorient towards the mean direction of their neighbours. Random headings
+order into coherent streams within 100 steps; plot the result with
+``result.lgca.plot_flux()`` or ``animate_flux()``.
 
 .. literalinclude:: ../../lgca/examples/alignment.py
    :language: python
@@ -139,16 +121,6 @@ aggregation
 This mirrors the notebook aggregation example with a square lattice, moderate
 density and three rest channels.
 
-Example output from ``run(steps=1)``:
-
-.. code-block:: text
-
-   title: Aggregation example
-   steps: 1
-   operators: classical.aggregation
-   observers: NodeRecorder, DensityRecorder, PopulationRecorder
-   fields: -
-
 .. literalinclude:: ../../lgca/examples/aggregation.py
    :language: python
    :caption: lgca/examples/aggregation.py
@@ -161,18 +133,8 @@ nematic_interaction
 :Concepts: nematic alignment, orientation, flux
 :Source: ``lgca/examples/nematic_interaction.py``
 
-Use this after alignment to compare head-tail symmetric orientation with polar
-motion.
-
-Example output from ``run(steps=1)``:
-
-.. code-block:: text
-
-   title: Nematic interaction example
-   steps: 1
-   operators: classical.nematic
-   observers: NodeRecorder, DensityRecorder, PopulationRecorder
-   fields: -
+Use this after alignment: cells share an axis but not a direction, so lanes of
+opposite traffic form while the mean velocity stays near zero.
 
 .. literalinclude:: ../../lgca/examples/nematic_interaction.py
    :language: python
@@ -186,18 +148,8 @@ chemotaxis
 :Concepts: signal field, gradient sensing, reorientation
 :Source: ``lgca/examples/chemotaxis.py``
 
-This example includes an explicit static signal field and a reorientation term
-that reads the field.
-
-Example output from ``run(steps=1)``:
-
-.. code-block:: text
-
-   title: Chemotaxis example
-   steps: 1
-   operators: reorientation.boltzmann
-   observers: NodeRecorder, DensityRecorder, PopulationRecorder
-   fields: signal
+A named signal field rises from left to right, and a chemotaxis term makes
+cells climb its gradient: more than half of them gather near the right wall.
 
 .. literalinclude:: ../../lgca/examples/chemotaxis.py
    :language: python
@@ -212,16 +164,6 @@ persistent_movement
 :Source: ``lgca/examples/persistent_movement.py``
 
 This notebook-scale example starts with one cell on a small reflecting lattice.
-
-Example output from ``run(steps=1)``:
-
-.. code-block:: text
-
-   title: Persistent movement example
-   steps: 1
-   operators: classical.persistent_walk
-   observers: NodeRecorder, DensityRecorder, PopulationRecorder
-   fields: -
 
 .. literalinclude:: ../../lgca/examples/persistent_movement.py
    :language: python
@@ -238,16 +180,6 @@ contact_guidance
 The guiding director field is built explicitly so students can see the coupling
 between state fields and movement.
 
-Example output from ``run(steps=1)``:
-
-.. code-block:: text
-
-   title: Nematic contact guidance example
-   steps: 1
-   operators: reorientation.boltzmann
-   observers: NodeRecorder, DensityRecorder, PopulationRecorder
-   fields: director
-
 .. literalinclude:: ../../lgca/examples/contact_guidance.py
    :language: python
    :caption: lgca/examples/contact_guidance.py
@@ -263,16 +195,6 @@ go_and_grow
 This is the classical go-and-grow notebook example expressed as a birth model
 with a seeded center cell.
 
-Example output from ``run(steps=1)``:
-
-.. code-block:: text
-
-   title: Go-and-grow example
-   steps: 1
-   operators: classical.birth
-   observers: NodeRecorder, DensityRecorder, PopulationRecorder
-   fields: -
-
 .. literalinclude:: ../../lgca/examples/go_and_grow.py
    :language: python
    :caption: lgca/examples/go_and_grow.py
@@ -285,18 +207,9 @@ go_or_grow
 :Concepts: go-or-grow, phenotype switching, rest channels
 :Source: ``lgca/examples/go_or_grow.py``
 
-This keeps the short 15-step notebook scale and exposes the switching
-parameter in the model spec.
-
-Example output from ``run(steps=1)``:
-
-.. code-block:: text
-
-   title: Go-or-grow example
-   steps: 1
-   operators: classical.go_or_grow
-   observers: NodeRecorder, DensityRecorder, PopulationRecorder
-   fields: -
+Crowded cells migrate and resting cells divide, so one fully occupied node
+grows into a spreading colony. Reverse the sign of ``kappa`` to see the colony
+shrink.
 
 .. literalinclude:: ../../lgca/examples/go_or_grow.py
    :language: python
@@ -311,16 +224,6 @@ identity_go_and_grow
 :Source: ``lgca/examples/identity_go_and_grow.py``
 
 This ports the notebook's one-dimensional identity-based go-and-grow setup.
-
-Example output from ``run(steps=1)``:
-
-.. code-block:: text
-
-   title: Identity-based go-and-grow example
-   steps: 1
-   operators: ib.birthdeath
-   observers: NodeRecorder, DensityRecorder, PopulationRecorder
-   fields: -
 
 .. literalinclude:: ../../lgca/examples/identity_go_and_grow.py
    :language: python
@@ -337,16 +240,6 @@ excitable_medium
 The initial condition marks two lattice regions, matching the notebook's
 wave-propagation demonstration.
 
-Example output from ``run(steps=1)``:
-
-.. code-block:: text
-
-   title: Excitable medium example
-   steps: 1
-   operators: classical.excitable_medium
-   observers: NodeRecorder, DensityRecorder, PopulationRecorder
-   fields: -
-
 .. literalinclude:: ../../lgca/examples/excitable_medium.py
    :language: python
    :caption: lgca/examples/excitable_medium.py
@@ -362,16 +255,6 @@ custom_rest_or_align
 Use this when students are ready to inspect a custom interaction function and
 see how it can still live inside the ``ModelSpec`` runtime.
 
-Example output from ``run(steps=1)``:
-
-.. code-block:: text
-
-   title: Custom rest-or-align example
-   steps: 1
-   operators: custom.rest_or_align
-   observers: NodeRecorder, DensityRecorder, PopulationRecorder
-   fields: -
-
 .. literalinclude:: ../../lgca/examples/custom_rest_or_align.py
    :language: python
    :caption: lgca/examples/custom_rest_or_align.py
@@ -385,16 +268,6 @@ evolutionary_go_and_grow
 :Source: ``lgca/examples/evolutionary_go_and_grow.py``
 
 This follows the proof-of-principle setup from ``Evolutionary LGCA.ipynb``.
-
-Example output from ``run(steps=1)``:
-
-.. code-block:: text
-
-   title: Evolutionary go-and-grow example
-   steps: 1
-   operators: ib.birthdeath
-   observers: NodeRecorder, DensityRecorder, PopulationRecorder
-   fields: -
 
 .. literalinclude:: ../../lgca/examples/evolutionary_go_and_grow.py
    :language: python
@@ -410,16 +283,6 @@ evolutionary_go_or_grow
 
 This ports the evolutionary notebook's one-dimensional go-or-grow setup.
 
-Example output from ``run(steps=1)``:
-
-.. code-block:: text
-
-   title: Evolutionary go-or-grow example
-   steps: 1
-   operators: ib.go_or_grow
-   observers: NodeRecorder, DensityRecorder, PopulationRecorder
-   fields: -
-
 .. literalinclude:: ../../lgca/examples/evolutionary_go_or_grow.py
    :language: python
    :caption: lgca/examples/evolutionary_go_or_grow.py
@@ -432,18 +295,8 @@ multispecies_birth_death
 :Concepts: multispecies, birth, death
 :Source: ``lgca/examples/multispecies_birth_death.py``
 
-Use this to discuss how species-specific rates become explicit model
-assumptions.
-
-Example output from ``run(steps=1)``:
-
-.. code-block:: text
-
-   title: Multispecies birth-death example
-   steps: 1
-   operators: birth_death
-   observers: DensityRecorder, PopulationRecorder
-   fields: -
+Two species compete for free channels with different birth rates; the faster
+one ends up with most of the cells. The rates are explicit model assumptions.
 
 .. literalinclude:: ../../lgca/examples/multispecies_birth_death.py
    :language: python
@@ -457,18 +310,9 @@ identity_tumor_growth
 :Concepts: identity-based LGCA, go-or-grow, tumor growth
 :Source: ``lgca/examples/identity_tumor_growth.py``
 
-This two-dimensional identity-based NoVE model is a compact tumor-growth
-teaching example.
-
-Example output from ``run(steps=1)``:
-
-.. code-block:: text
-
-   title: Identity tumor growth example
-   steps: 1
-   operators: nove_ib.go_or_grow
-   observers: DensityRecorder, PopulationRecorder
-   fields: -
+A seeded tumour invades by go-or-grow without volume exclusion. Every cell
+carries its own switching steepness, which daughters inherit with random
+changes.
 
 .. literalinclude:: ../../lgca/examples/identity_tumor_growth.py
    :language: python

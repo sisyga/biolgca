@@ -3,20 +3,7 @@
 from __future__ import annotations
 
 import argparse
-import sys
 from dataclasses import replace
-from pathlib import Path
-
-
-def ensure_project_root_on_path(file_path: str) -> None:
-    """Allow ``python example.py`` from ``lgca/examples`` during development."""
-
-    if __package__:
-        return
-    project_root = Path(file_path).resolve().parents[2]
-    project_root_text = str(project_root)
-    if project_root_text not in sys.path:
-        sys.path.insert(0, project_root_text)
 
 
 def run_spec(build_spec, steps: int | None = None, showprogress: bool = False):

@@ -1,18 +1,16 @@
 """Identity-based tumor growth example.
 
-This is a compact two-dimensional identity-based go-or-grow model inspired by
-the BioLGCA go-or-grow notebook section.
+A small tumour of 64 cells grows without volume exclusion (up to 8 cells per
+node). Every cell carries its own switching steepness ``kappa``; daughters
+inherit it with a small random change (``kappa_std``). With ``kappa < 0``,
+crowded cells migrate and resting cells divide, so the tumour invades its
+surroundings and grows to about 3000 cells in 100 steps. Inspect the inherited
+trait with ``result.lgca.props["kappa"]``.
 """
 
 from __future__ import annotations
 
-try:
-    from ._helpers import ensure_project_root_on_path, main
-except ImportError:
-    from _helpers import ensure_project_root_on_path, main
-
-ensure_project_root_on_path(__file__)
-
+from lgca.examples._helpers import main, run_spec
 from lgca.examples._types import ExampleInfo
 from lgca.model import (
     AnalysisSpec,
@@ -43,28 +41,29 @@ def build_spec() -> ModelSpec:
     return ModelSpec(
         description=Description(
             title=INFO.title,
-            details="Identity-based tumor growth with a go-or-grow interaction.",
+            details="A seeded tumour invades by go-or-grow; each cell inherits a mutating switch steepness.",
             tags=("example", "identity-based", "tumor-growth"),
         ),
         space=SpaceSpec(geometry="square", dims=(50, 50), boundary="periodic"),
         state=StateSpec(
-            density=0.2,
             restchannels=1,
             volume_exclusion=False,
             identity_based=True,
-            parameters={"capacity": 8},
+            capacity=8,
+            # a 3 x 3 block of fully occupied nodes in the centre
+            initializer={"name": "region", "parameters": {"extent": 3, "density": 8}},
         ),
-        time=TimeSpec(steps=50, seed=105),
+        time=TimeSpec(steps=100, seed=105),
         dynamics=InteractionPipelineSpec(
             operators=[
                 {
                     "name": "nove_ib.go_or_grow",
                     "parameters": {
-                        "capacity": 8,
                         "r_b": 0.2,
                         "r_d": 0.01,
-                        "kappa": 5.0,
+                        "kappa": -5.0,
                         "theta": 0.5,
+                        "kappa_std": 0.2,
                     },
                 }
             ],
@@ -78,14 +77,7 @@ def build_spec() -> ModelSpec:
 def run(steps: int | None = None, showprogress: bool = False):
     """Run this example and return a :class:`lgca.model.ModelRunResult`."""
 
-    from dataclasses import replace
-
-    from lgca.model import run_model
-
-    spec = build_spec()
-    if steps is not None:
-        spec = replace(spec, time=replace(spec.time, steps=int(steps)))
-    return run_model(spec, showprogress=showprogress)
+    return run_spec(build_spec, steps=steps, showprogress=showprogress)
 
 
 if __name__ == "__main__":

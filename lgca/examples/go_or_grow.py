@@ -1,20 +1,19 @@
 """Go-or-grow example.
 
-This follows the ``BioLGCA.ipynb`` go-or-grow section with ``kappa=4`` and a
-fully occupied central node.
+Cells either migrate (velocity channels) or rest and divide (rest channels),
+and switch between the two depending on how crowded their node is. With
+``kappa < 0``, crowded cells start to migrate, so the colony spreads while its
+core keeps growing: one fully occupied node grows to several thousand cells in
+100 steps. With ``kappa > 0`` (e.g. ``kappa=4, theta=0.75``), isolated cells
+keep migrating and rarely divide, and a small colony shrinks. Compare both
+signs of ``kappa``.
 """
 
 from __future__ import annotations
 
-try:
-    from ._helpers import ensure_project_root_on_path, main
-except ImportError:
-    from _helpers import ensure_project_root_on_path, main
-
-ensure_project_root_on_path(__file__)
-
 import numpy as np
 
+from lgca.examples._helpers import main, run_spec
 from lgca.examples._types import ExampleInfo
 from lgca.model import (
     AnalysisSpec,
@@ -40,7 +39,7 @@ INFO = ExampleInfo(
 
 
 def build_initial_nodes() -> np.ndarray:
-    """Seed a fully occupied central node, as in the notebook."""
+    """Seed one fully occupied node in the centre."""
 
     nodes = np.zeros((50, 50, 12), dtype=bool)
     nodes[25, 25, :] = True
@@ -53,17 +52,17 @@ def build_spec() -> ModelSpec:
     return ModelSpec(
         description=Description(
             title=INFO.title,
-            details="Cells switch between moving and proliferating states.",
+            details="Crowded cells migrate, resting cells divide: a colony spreads from one node.",
             tags=("example", "go-or-grow", "phenotype-switching"),
         ),
         space=SpaceSpec(geometry="hex", dims=(50, 50), boundary="periodic"),
         state=StateSpec(nodes=build_initial_nodes(), restchannels=6),
-        time=TimeSpec(steps=15, seed=111),
+        time=TimeSpec(steps=100, seed=111),
         dynamics=InteractionPipelineSpec(
             operators=[
                 {
                     "name": "classical.go_or_grow",
-                    "parameters": {"r_b": 0.2, "r_d": 0.01, "kappa": 4.0, "theta": 0.75},
+                    "parameters": {"r_b": 0.2, "r_d": 0.01, "kappa": -4.0, "theta": 0.5},
                 }
             ],
         ),
@@ -76,14 +75,7 @@ def build_spec() -> ModelSpec:
 def run(steps: int | None = None, showprogress: bool = False):
     """Run this example and return a :class:`lgca.model.ModelRunResult`."""
 
-    from dataclasses import replace
-
-    from lgca.model import run_model
-
-    spec = build_spec()
-    if steps is not None:
-        spec = replace(spec, time=replace(spec.time, steps=int(steps)))
-    return run_model(spec, showprogress=showprogress)
+    return run_spec(build_spec, steps=steps, showprogress=showprogress)
 
 
 if __name__ == "__main__":

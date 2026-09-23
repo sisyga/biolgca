@@ -167,16 +167,28 @@ Independent, low-risk items, in order.
   glossary in `lgca/plugins.py` (shared meanings plus per-plugin overrides);
   a test requires one for every built-in parameter.
 
-**0.8 Record the seed of every run** (B9)
-- If `time.seed` is missing, draw one from `numpy.random.SeedSequence`, use it,
-  and write it to the run metadata and `model.resolved.json`, so every run can
-  be repeated.
-
 **0.7 Example audit** (B5)
 - Each example must show its effect at its default settings (e.g. go-or-grow
   grows) and produce one gallery figure. Keep fast variants for tests through
   a `steps` argument, not by shortening the example itself. Remove
   `ensure_project_root_on_path`.
+- Status (2026-09-23): done. At their own settings, alignment, nematic
+  alignment and chemotaxis now show their effect (they were too dilute or too
+  weak); go-or-grow grows (kappa -4, 100 steps) instead of shrinking; the
+  identity tumour is seeded, grows and mutates kappa, and uses
+  `state.capacity` instead of the deprecated parameter; the multispecies
+  example runs on 30 x 30 because `birth_death` loops over nodes in Python
+  (7.7 s on 50 x 50; see the performance note below). `tests/examples_effect_test.py`
+  checks each promised effect. The gallery lost its stale "run(steps=1)"
+  output blocks.
+- Performance note: `NativeBirthDeathOperator` applies multispecies birth and
+  death node by node (`_apply_multispecies_node`); vectorizing it is the next
+  low-hanging performance fix.
+
+**0.8 Record the seed of every run** (B9)
+- If `time.seed` is missing, draw one from `numpy.random.SeedSequence`, use it,
+  and write it to the run metadata and `model.resolved.json`, so every run can
+  be repeated.
 
 ### Phase 1: A simple way to add interactions (two to three weeks)
 
