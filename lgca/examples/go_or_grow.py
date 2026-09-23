@@ -1,12 +1,27 @@
-"""Go-or-grow example.
+"""Go-or-grow example: an emerging Allee effect.
 
 Cells either migrate (velocity channels) or rest and divide (rest channels),
-and switch between the two depending on how crowded their node is. With
-``kappa < 0``, crowded cells start to migrate, so the colony spreads while its
-core keeps growing: one fully occupied node grows to several thousand cells in
-100 steps. With ``kappa > 0`` (e.g. ``kappa=4, theta=0.75``), isolated cells
-keep migrating and rarely divide, and a small colony shrinks. Compare both
-signs of ``kappa``.
+and switch between the two depending on how crowded their node is: a moving
+cell starts resting with probability ``(1 + tanh(kappa * (rho - theta))) / 2``,
+where ``rho`` is the fraction of occupied channels.
+
+With the default ``kappa=4, theta=0.75``, cells in sparse regions keep
+migrating and rarely divide. A colony that starts from one fully occupied node
+spreads out, stops dividing and shrinks (from 12 to a handful of cells in 100
+steps):
+growth needs a minimum population, an Allee effect that emerges from the
+switching rule. Colonies of 25 x 25 fully occupied nodes, in contrast, grow.
+
+Compare with ``build_spec(kappa=-4.0)``: crowded cells now migrate and sparse
+cells rest and divide, and the same single node grows to more than a thousand
+cells. For example::
+
+    from lgca.examples.go_or_grow import build_spec
+    from lgca.model import run_model
+
+    allee = run_model(build_spec(), showprogress=False)
+    invasion = run_model(build_spec(kappa=-4.0), showprogress=False)
+    print(allee.lgca.n_t[-1], invasion.lgca.n_t[-1])
 """
 
 from __future__ import annotations
@@ -46,13 +61,20 @@ def build_initial_nodes() -> np.ndarray:
     return nodes
 
 
-def build_spec() -> ModelSpec:
-    """Build the model specification for this example."""
+def build_spec(kappa: float = 4.0) -> ModelSpec:
+    """Build the model specification for this example.
+
+    Parameters
+    ----------
+    kappa : float, default=4.0
+        Steepness of the switch between moving and resting. Positive values
+        make crowded cells rest (Allee effect), negative values make them move.
+    """
 
     return ModelSpec(
         description=Description(
             title=INFO.title,
-            details="Crowded cells migrate, resting cells divide: a colony spreads from one node.",
+            details="A small go-or-grow colony shrinks: an Allee effect emerges from density-dependent switching.",
             tags=("example", "go-or-grow", "phenotype-switching"),
         ),
         space=SpaceSpec(geometry="hex", dims=(50, 50), boundary="periodic"),
@@ -62,7 +84,7 @@ def build_spec() -> ModelSpec:
             operators=[
                 {
                     "name": "classical.go_or_grow",
-                    "parameters": {"r_b": 0.2, "r_d": 0.01, "kappa": -4.0, "theta": 0.5},
+                    "parameters": {"r_b": 0.2, "r_d": 0.01, "kappa": kappa, "theta": 0.75},
                 }
             ],
         ),

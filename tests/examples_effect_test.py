@@ -43,11 +43,16 @@ def test_chemotaxis_gathers_cells_at_high_signal():
     assert density[40:].sum() / density.sum() > 0.4
 
 
-def test_go_or_grow_colony_expands_from_one_node():
-    population = run_example("go_or_grow").lgca.n_t
+def test_go_or_grow_shows_an_allee_effect_that_negative_kappa_removes():
+    from lgca.examples.go_or_grow import build_spec
+    from lgca.model import run_model
 
-    assert population[0] == 12
-    assert population[-1] > 1000
+    allee = run_example("go_or_grow").lgca.n_t
+    invasion = run_model(build_spec(kappa=-4.0), showprogress=False).lgca.n_t
+
+    assert allee[0] == invasion[0] == 12
+    assert allee[-1] < allee[0]
+    assert invasion[-1] > 1000
 
 
 def test_identity_tumor_grows_and_its_trait_varies():

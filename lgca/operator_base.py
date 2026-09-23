@@ -151,8 +151,9 @@ class PluginInfo:
 
     def __str__(self) -> str:
         """Readable summary: purpose, pipeline phase, model families and parameters."""
-        lines = [self.name, f"  {self.description}" if self.description else None,
-                 f"  Phase: {self.operator_kind}. Model families: {', '.join(self.backend_families)}."]
+        lines = [self.name]
+        lines.extend(textwrap.wrap(self.description, width=90, initial_indent="  ", subsequent_indent="  "))
+        lines.append(f"  Phase: {self.operator_kind}. Model families: {', '.join(self.backend_families)}.")
         if self.aliases:
             lines.append(f"  Also available as: {', '.join(self.aliases)}.")
         law = self.conservation_law

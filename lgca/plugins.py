@@ -579,7 +579,9 @@ def _register_native_plugins() -> None:
         conservation_law=_law_for_kind("phenotype_switch"),
         port_status="native",
         test_status="unit_tested",
-        description="Stochastic switching of cells between species; conserves the number of cells at each node.",
+        description="Cells of a multispecies LGCA switch species at given rates; the number of cells "
+                    "at each node is conserved and a node's cells are redistributed over its channels "
+                    "when one of them switches.",
     )
 
     def phenotype_switch_factory(parameters: Mapping[str, Any] | None = None) -> InteractionOperator:

@@ -58,7 +58,7 @@ Severity: **H** blocks or misleads a typical student, **M** costs hours,
 | B2 | M | Plugin names encode the backend family (`classical.`, `nove.`, `ib.`, `nove_ib.`, `multispecies.`), plus unprefixed names (`birth_death`, `phenotype_switch`) and aliases. A student must learn the family taxonomy before choosing a mechanism. |
 | B3 | H | Mechanism coverage across families is sparse. Composed `ReorientationSpec` works only for classical volume exclusion. Chemotaxis, alignment and contact guidance are unavailable for NoVE and identity-based models; NoVE has no plain birth-death plugin; identity-based models only random-walk. "Evolution plus chemotaxis" cannot be built without writing an operator. Root cause: each mechanism is implemented per family (40 plugins; `pipeline.py` is 2800 lines) instead of once. |
 | B4 | M | `classical.birth` and `classical.birthdeath` contain a random walk, contradicting the documented phase order (growth, switching, reorientation, propagation). Combined with a reorientation operator, cells reorient twice. |
-| B5 | M | Curated examples are tuned for test speed, not science. `go_or_grow` (κ=4, θ=0.75, 15 steps) shrinks from 12 to 4 cells in 150 steps and cannot answer its stated question. Examples use a `sys.path` workaround (`ensure_project_root_on_path`). |
+| B5 | M | Curated examples are tuned for test speed, not science: alignment, nematic alignment and chemotaxis show almost no effect at their settings, and `go_or_grow` runs only 15 steps, too short to see its Allee effect. Examples use a `sys.path` workaround (`ensure_project_root_on_path`). |
 | B6 | M | Parameter meaning, sign and scale (κ sign, θ, β after the gradient unification) are not shown where a user picks them; `describe_plugin` shows validator strings. |
 | B7 | H | No support for studying a model: changing one setting needs nested `dataclasses.replace`; no replicate or parallel runner; results are attributes set on `result.lgca` (`n_t`, `dens_t`) instead of a table. |
 | B9 | M | A run without `time.seed` draws an unrecorded seed: metadata and `model.resolved.json` store `seed: null`, so the run cannot be repeated. Draw a seed, use it and record it. |
@@ -174,7 +174,8 @@ Independent, low-risk items, in order.
   `ensure_project_root_on_path`.
 - Status (2026-09-23): done. At their own settings, alignment, nematic
   alignment and chemotaxis now show their effect (they were too dilute or too
-  weak); go-or-grow grows (kappa -4, 100 steps) instead of shrinking; the
+  weak); go-or-grow runs 100 steps so its Allee effect is visible and takes
+  `build_spec(kappa=...)` for the invading contrast case; the
   identity tumour is seeded, grows and mutates kappa, and uses
   `state.capacity` instead of the deprecated parameter; the multispecies
   example runs on 30 x 30 because `birth_death` loops over nodes in Python

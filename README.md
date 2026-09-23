@@ -136,6 +136,10 @@ spec = ModelSpec(
 run_model(spec).lgca.plot_density()
 ```
 
+With `kappa=4`, crowded cells rest instead, and the same small colony shrinks:
+growth then needs a minimum population, an Allee effect that emerges from the
+switching rule.
+
 <br clear="right">
 
 ## Write your own interaction

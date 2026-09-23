@@ -63,8 +63,9 @@ This file records notable user-facing changes. Changes remain under
   could not be repeated.
 - Curated examples show their effect at their own settings: alignment and
   nematic alignment run at density 0.5 with beta 3 and order visibly,
-  chemotaxis uses a steeper signal with reflecting walls, go-or-grow grows
-  (kappa -4 for 100 steps instead of 15 steps in which the colony shrank), and
+  chemotaxis uses a steeper signal with reflecting walls, go-or-grow runs for
+  100 instead of 15 steps so that its Allee effect (a small colony shrinks) is
+  visible, and `build_spec(kappa=-4.0)` gives the invading contrast case, and
   the identity-based tumour starts from a seed, grows and mutates its
   switching steepness. The multispecies example runs on a 30 x 30 lattice.
   `tests/examples_effect_test.py` checks each effect. Examples no longer
@@ -151,8 +152,9 @@ This file records notable user-facing changes. Changes remain under
 
 ### Fixed
 
-- The registry described `phenotype_switch` as channel-preserving; a switch
-  resamples the channel positions at the node and conserves the number of cells.
+- The registry described `phenotype_switch` as channel-preserving. It lets
+  cells of a multispecies LGCA change species; the number of cells at a node is
+  conserved, but a switch redistributes the node's cells over its channels.
 - Hexagonal lattice plots placed y-axis ticks between rows and labelled them
   with truncated row numbers (e.g. 49 instead of 50); ticks are now on whole
   rows at round intervals.

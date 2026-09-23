@@ -45,13 +45,16 @@ class BirthDeathSpec:
 
 @dataclass(frozen=True)
 class PhenotypeSwitchSpec:
-    """A registered interaction that changes the phenotype or species of cells.
+    """A registered interaction in the phenotype-switching phase of a time step.
 
     ``PhenotypeSwitchSpec(name="phenotype_switch", parameters={"rates": R})``
-    switches each cell of species ``a`` to species ``b`` with probability
-    ``R[a][b]`` per time step (the diagonal is ignored). The number of cells
-    at a node is conserved: a switch into a species whose channels at that
-    node are full is rejected.
+    lets cells of a multispecies LGCA change their species: each cell of
+    species ``a`` becomes species ``b`` with probability ``R[a][b]`` per time
+    step (the diagonal is ignored). The number of cells at a node is
+    conserved; a switch into a species whose channels at that node are full is
+    rejected, and when a cell switches, the node's cells are redistributed over
+    its channels. Switching between moving and resting, as in go-or-grow, is a
+    different interaction (``classical.go_or_rest``, ``classical.go_or_grow``).
 
     Attributes
     ----------

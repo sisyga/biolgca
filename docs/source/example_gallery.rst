@@ -207,9 +207,10 @@ go_or_grow
 :Concepts: go-or-grow, phenotype switching, rest channels
 :Source: ``lgca/examples/go_or_grow.py``
 
-Crowded cells migrate and resting cells divide, so one fully occupied node
-grows into a spreading colony. Reverse the sign of ``kappa`` to see the colony
-shrink.
+With the default positive ``kappa``, cells in sparse regions keep migrating
+and rarely divide, so a colony grown from one node shrinks: an Allee effect
+emerges from the switching rule. ``build_spec(kappa=-4.0)`` reverses the switch
+and the same colony invades its surroundings.
 
 .. literalinclude:: ../../lgca/examples/go_or_grow.py
    :language: python
