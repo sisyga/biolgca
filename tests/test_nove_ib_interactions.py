@@ -1,219 +1,132 @@
-"""
-Tests for lgca/nove_ib_interactions.py
+"""Identity-based interactions without volume exclusion reproduce their stated rates.
 
-Covers: tanh_switch, random_walk, birth, birthdeath, go_or_grow, go_or_grow_kappa,
-birthdeath_cancerdfe.
-
-Usage note: ``nove_ib_interactions`` is designed for NoVE (no volume exclusion) +
-identity-based LGCA. The correct ``get_lgca`` flags are ``ve=False, ib=True``
-(NOT ``nove=True, ib=True`` — that was incorrect; nove is not an accepted kwarg).
-go_or_grow_kappa and birthdeath_cancerdfe are only dispatched via
-``NoVE_IBLGCA_base.set_interaction``; older stubs tried ``nove=True`` which silently
-fell through to vanilla ``IBLGCA_1D``.
+Most tests use many isolated nodes (propagation switched off), so every node is
+an independent sample of the local rule, and compare the measured rate with its
+exact expectation within four binomial standard deviations.
 """
+
 import numpy as np
 import pytest
-import warnings
+
+from lgca import get_lgca
+from lgca.nove_ib_interactions import tanh_switch
 
 
-def _lgca(interaction, dims=30, density=0.3, restchannels=0, seed=0, **kw):
-    """Helper: build a 1-D NoVE IB LGCA (ve=False, ib=True)."""
-    from lgca import get_lgca
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        return get_lgca(
-            ve=False, ib=True, geometry="lin",
-            interaction=interaction,
-            density=density, dims=dims,
-            restchannels=restchannels,
-            seed=seed,
-            **kw
-        )
+N_NODES = 400
 
 
-# ---------------------------------------------------------------------------
-# tanh_switch
-# ---------------------------------------------------------------------------
-
-class TestTanhSwitch:
-    """Unit tests for nove_ib_interactions.tanh_switch (sigmoid helper)."""
-
-    def test_scalar_midpoint_equals_half(self):
-        from lgca.nove_ib_interactions import tanh_switch
-        # At rho == theta the function must return exactly 0.5
-        assert abs(tanh_switch(0.8, kappa=5.0, theta=0.8) - 0.5) < 1e-10
-
-    def test_below_threshold_less_than_half(self):
-        from lgca.nove_ib_interactions import tanh_switch
-        assert tanh_switch(0.0) < 0.5
-
-    def test_above_threshold_greater_than_half(self):
-        from lgca.nove_ib_interactions import tanh_switch
-        assert tanh_switch(1.0) > 0.5
-
-    def test_output_in_unit_interval(self):
-        from lgca.nove_ib_interactions import tanh_switch
-        for rho in [0.0, 0.25, 0.5, 0.75, 1.0]:
-            val = tanh_switch(rho)
-            assert 0.0 <= val <= 1.0, f"tanh_switch({rho}) = {val} outside [0,1]"
-
-    def test_array_input_shape_preserved(self):
-        from lgca.nove_ib_interactions import tanh_switch
-        rho = np.array([0.0, 0.4, 0.8, 1.0])
-        assert tanh_switch(rho).shape == rho.shape
-
-    def test_monotonically_increasing(self):
-        from lgca.nove_ib_interactions import tanh_switch
-        rho = np.linspace(0.0, 1.0, 50)
-        vals = tanh_switch(rho)
-        assert np.all(np.diff(vals) > 0)
-
-    def test_higher_kappa_sharpens_transition(self):
-        from lgca.nove_ib_interactions import tanh_switch
-        val_low = tanh_switch(0.9, kappa=1.0, theta=0.8)
-        val_high = tanh_switch(0.9, kappa=20.0, theta=0.8)
-        assert val_high > val_low
-
-    def test_custom_theta_shifts_midpoint(self):
-        from lgca.nove_ib_interactions import tanh_switch
-        assert abs(tanh_switch(0.3, kappa=5.0, theta=0.3) - 0.5) < 1e-10
+def _isolated_nodes(interaction, cells_per_node, *, channel=-1, **params):
+    """1D lattice of N_NODES nodes that each start with ``cells_per_node`` cells in ``channel``."""
+    counts = np.zeros((N_NODES, 3), dtype=int)
+    counts[:, channel] = cells_per_node
+    return get_lgca(geometry="lin", ib=True, ve=False, nodes=counts, restchannels=1,
+                    interaction=interaction, propagation=False, seed=7, **params)
 
 
-# ---------------------------------------------------------------------------
-# random_walk
-# ---------------------------------------------------------------------------
-
-class TestRandomWalk:
-    """Tests for nove_ib_interactions.random_walk."""
-
-    def test_nonborder_cell_count_conserved(self):
-        """random_walk must not create or destroy cells in the non-border region."""
-        lgca = _lgca("random_walk", density=0.4, seed=42)
-        before = lgca.cell_density[lgca.nonborder].sum()
-        lgca.timeevo(timesteps=10)
-        after = lgca.cell_density[lgca.nonborder].sum()
-        assert before == after
-
-    def test_cells_can_move(self):
-        """After several timesteps spatial distribution should differ."""
-        lgca = _lgca("random_walk", density=0.4, seed=42)
-        density_before = lgca.cell_density.copy()
-        lgca.timeevo(timesteps=20)
-        assert not np.array_equal(density_before, lgca.cell_density)
-
-    def test_density_nonnegative(self):
-        lgca = _lgca("random_walk", density=0.4, seed=0)
-        lgca.timeevo(timesteps=5)
-        assert np.all(lgca.cell_density >= 0)
+def _node_cells(lgca):
+    return [np.concatenate([np.asarray(c, dtype=int) for c in node]) for node in lgca.nodes[lgca.nonborder]]
 
 
-# ---------------------------------------------------------------------------
-# birth
-# ---------------------------------------------------------------------------
-
-class TestBirth:
-    """Tests for nove_ib_interactions.birth."""
-
-    def test_population_grows_over_time(self):
-        lgca = _lgca("birth", density=0.1, seed=1)
-        before = lgca.cell_density.sum()
-        lgca.timeevo(timesteps=10)
-        after = lgca.cell_density.sum()
-        assert after >= before, "Population should not decrease under birth-only interaction"
-
-    def test_density_nonnegative(self):
-        lgca = _lgca("birth", density=0.1, seed=0)
-        lgca.timeevo(timesteps=5)
-        assert np.all(lgca.cell_density >= 0)
-
-    def test_population_respects_capacity(self):
-        lgca = _lgca("birth", density=0.1, seed=0)
-        capacity = lgca.interaction_params.get("capacity", 8)
-        lgca.timeevo(timesteps=30)
-        max_possible = lgca.cell_density[lgca.nonborder].size * capacity
-        assert lgca.cell_density.sum() <= max_possible + capacity  # small tolerance for border cells
+def _population(lgca):
+    return int(lgca.cell_density[lgca.nonborder].sum())
 
 
-# ---------------------------------------------------------------------------
-# birthdeath
-# ---------------------------------------------------------------------------
-
-class TestBirthdeath:
-    """Tests for nove_ib_interactions.birthdeath."""
-
-    def test_timeevo_completes_without_error(self):
-        lgca = _lgca("birthdeath", density=0.5, seed=0)
-        lgca.timeevo(timesteps=10)
-
-    def test_density_nonnegative(self):
-        lgca = _lgca("birthdeath", density=0.5, seed=0)
-        lgca.timeevo(timesteps=5)
-        assert np.all(lgca.cell_density >= 0)
-
-    def test_interaction_params_set(self):
-        lgca = _lgca("birthdeath", density=0.5, seed=0)
-        assert "r_b" in lgca.interaction_params
-        assert "r_d" in lgca.interaction_params
-        assert 0 < lgca.interaction_params["r_b"] <= 1.0
-        assert 0 < lgca.interaction_params["r_d"] <= 1.0
+def _assert_binomial_mean(observed, trials, probability):
+    expected = trials * probability
+    sd = np.sqrt(trials * probability * (1 - probability))
+    assert abs(observed - expected) < 4 * sd, (observed, expected, sd)
 
 
-# ---------------------------------------------------------------------------
-# go_or_grow
-# ---------------------------------------------------------------------------
+def test_tanh_switch_is_a_sigmoid_centred_on_theta():
+    rho = np.linspace(0, 1, 11)
+    values = tanh_switch(rho, kappa=5.0, theta=0.3)
 
-class TestGoOrGrow:
-    """Tests for nove_ib_interactions.go_or_grow (requires restchannels>=1)."""
-
-    def test_timeevo_completes(self):
-        lgca = _lgca("go_or_grow", density=0.4, restchannels=1, seed=7)
-        lgca.timeevo(timesteps=10)
-
-    def test_density_nonnegative(self):
-        lgca = _lgca("go_or_grow", density=0.4, restchannels=1, seed=7)
-        lgca.timeevo(timesteps=5)
-        assert np.all(lgca.cell_density >= 0)
-
-    def test_interaction_params_have_kappa_theta(self):
-        lgca = _lgca("go_or_grow", density=0.4, restchannels=1, seed=7)
-        assert "kappa" in lgca.interaction_params
-        assert "theta" in lgca.interaction_params
+    assert values[3] == pytest.approx(0.5)
+    assert np.all(np.diff(values) > 0)
+    assert np.all((values > 0) & (values < 1))
+    assert tanh_switch(0.4, kappa=20.0, theta=0.3) > tanh_switch(0.4, kappa=5.0, theta=0.3)
 
 
-# ---------------------------------------------------------------------------
-# go_or_grow_kappa
-# ---------------------------------------------------------------------------
+def test_random_walk_moves_cells_but_keeps_every_identity():
+    lgca = get_lgca(geometry="lin", ib=True, ve=False, dims=50, density=3, restchannels=1,
+                    interaction="random_walk", seed=1)
+    before = np.sort(np.concatenate(_node_cells(lgca)))
+    positions_before = [set(cells) for cells in _node_cells(lgca)]
 
-class TestGoOrGrowKappa:
-    """Tests for nove_ib_interactions.go_or_grow_kappa (NoVE_IBLGCA_1D)."""
+    lgca.timeevo(timesteps=10, showprogress=False)
 
-    def test_dispatched_correctly(self):
-        """Ensure go_or_grow_kappa is properly wired in NoVE_IBLGCA_1D."""
-        from lgca.nove_ib_interactions import go_or_grow_kappa
-        lgca = _lgca("go_or_grow_kappa", density=0.4, restchannels=1, seed=3)
-        assert lgca.interaction is go_or_grow_kappa
-
-    def test_single_step_does_not_raise(self):
-        lgca = _lgca("go_or_grow_kappa", density=0.4, restchannels=1, seed=3)
-        lgca.interaction(lgca)
-
-    def test_density_nonnegative_after_timeevo(self):
-        lgca = _lgca("go_or_grow_kappa", density=0.4, restchannels=1, seed=3)
-        lgca.timeevo(timesteps=5)
-        assert np.all(lgca.cell_density >= 0)
-
-    def test_interaction_params_include_kappa_std(self):
-        lgca = _lgca("go_or_grow_kappa", density=0.4, restchannels=1, seed=0)
-        assert "kappa_std" in lgca.interaction_params
+    np.testing.assert_array_equal(np.sort(np.concatenate(_node_cells(lgca))), before)
+    assert [set(cells) for cells in _node_cells(lgca)] != positions_before
 
 
-# ---------------------------------------------------------------------------
-# go_or_grow_glioblastoma
-# ---------------------------------------------------------------------------
+def test_birth_is_logistic_in_the_local_density():
+    lgca = _isolated_nodes("birth", 10, r_b=0.5, capacity=40, std=0.01, a_max=1.0)
+
+    lgca.timestep()
+
+    _assert_binomial_mean(_population(lgca) - 10 * N_NODES, 10 * N_NODES, 0.5 * (1 - 10 / 40))
+
+
+def test_birth_stops_at_capacity():
+    lgca = _isolated_nodes("birth", 10, r_b=1.0, capacity=10, std=0.01, a_max=1.0)
+
+    lgca.timestep()
+
+    assert _population(lgca) == 10 * N_NODES
+
+
+def test_daughters_inherit_the_birth_rate_of_their_own_mother():
+    lgca = _isolated_nodes("birth", 5, r_b=0.5, capacity=1000, std=0.01, a_max=1.0)
+    node_rates = np.linspace(0.2, 0.9, N_NODES)
+    for rate, cells in zip(node_rates, _node_cells(lgca)):
+        for cell in cells:
+            lgca.props["r_b"][cell] = rate
+    first_daughter = lgca.maxlabel + 1
+
+    lgca.timestep()
+
+    rates = np.asarray(lgca.props["r_b"])
+    daughters_seen = 0
+    for rate, cells in zip(node_rates, _node_cells(lgca)):
+        daughters = cells[cells >= first_daughter]
+        daughters_seen += daughters.size
+        np.testing.assert_allclose(rates[daughters], rate, atol=0.05)
+    assert daughters_seen > N_NODES
+
+
+def test_death_removes_the_expected_fraction_of_cells():
+    lgca = _isolated_nodes("birthdeath", 10, r_b=0.0, r_d=0.3, capacity=40, std=0.01, a_max=1.0)
+
+    lgca.timestep()
+
+    _assert_binomial_mean(_population(lgca), 10 * N_NODES, 0.7)
+
+
+def test_go_or_grow_switches_cells_to_rest_with_the_density_sigmoid():
+    lgca = _isolated_nodes("go_or_grow", 10, channel=0, r_b=0.0, r_d=0.0, capacity=20,
+                           kappa=5.0, theta=0.3, kappa_std=0.0, theta_std=0.0)
+
+    lgca.timestep()
+
+    resting = int(lgca.channel_pop[lgca.nonborder][:, -1].sum())
+    _assert_binomial_mean(resting, 10 * N_NODES, tanh_switch(10 / 20, kappa=5.0, theta=0.3))
+
+
+@pytest.mark.parametrize("driver,sign", [(True, 1), (False, -1)])
+def test_cancer_dfe_mutations_shift_daughter_rates_by_their_mean_effect(driver, sign):
+    lgca = _isolated_nodes("birthdeath_cancerdfe", 10, r_b=0.3, r_d=0.0, capacity=1000, a_max=1.0,
+                           p_d=1.0 if driver else 0.0, p_p=0.0 if driver else 1.0, s_d=0.05, s_p=0.05)
+    first_daughter = lgca.maxlabel + 1
+
+    lgca.timestep()
+
+    shifts = np.asarray(lgca.props["r_b"][first_daughter:]) - 0.3
+    assert shifts.size > 500
+    assert np.all(sign * shifts >= 0)
+    assert sign * shifts.mean() == pytest.approx(0.05, abs=0.01)
+
 
 def _single_resting_cell_glioblastoma_lgca(**kw):
-    from lgca import get_lgca
-
     nodes = np.zeros((3, 3), dtype=int)
     nodes[1, -1] = 1
     params = {
@@ -237,66 +150,34 @@ def _single_resting_cell_glioblastoma_lgca(**kw):
     return get_lgca(**params)
 
 
-class TestGoOrGrowGlioblastoma:
-    """Tests for clone-level go-or-grow glioblastoma dynamics."""
+def test_glioblastoma_initializes_one_family_per_founder_cell():
+    lgca = _single_resting_cell_glioblastoma_lgca(r_b=0.3, kappa=4.0)
 
-    def test_dispatched_correctly_and_initializes_family_properties(self):
-        from lgca.nove_ib_interactions import go_or_grow_glioblastoma
-
-        lgca = _single_resting_cell_glioblastoma_lgca(r_b=0.3, kappa=4.0)
-
-        assert lgca.interaction is go_or_grow_glioblastoma
-        assert lgca.props["family"][0] == 1
-        assert lgca.family_props["r_b"][1] == pytest.approx(0.3)
-        assert lgca.family_props["kappa"][1] == pytest.approx(4.0)
-
-    def test_forced_mutation_creates_new_family_with_inherited_properties(self):
-        lgca = _single_resting_cell_glioblastoma_lgca()
-
-        lgca.interaction(lgca)
-        lgca.update_dynamic_fields()
-
-        assert lgca.cell_density[lgca.nonborder].sum() == 2
-        assert lgca.maxlabel == 1
-        assert lgca.maxfamily == 2
-        assert lgca.props["family"][1] == 2
-        assert lgca.family_props["ancestor"][2] == 1
-        assert lgca.family_props["r_b"][2] == pytest.approx(1.5)
-        assert lgca.family_props["kappa"][2] == pytest.approx(2.0)
-
-    def test_recordfampop_handles_new_glioblastoma_families(self):
-        lgca = _single_resting_cell_glioblastoma_lgca()
-
-        lgca.timeevo(timesteps=1, recordfampop=True, showprogress=False)
-
-        assert lgca.fam_pop_t.shape == (2, lgca.maxfamily + 1)
-        assert lgca.fam_pop_t[0].sum() == 1
-        assert lgca.fam_pop_t[1].sum() == 2
+    assert lgca.props["family"][0] == 1
+    assert lgca.family_props["r_b"][1] == pytest.approx(0.3)
+    assert lgca.family_props["kappa"][1] == pytest.approx(4.0)
 
 
-# ---------------------------------------------------------------------------
-# birthdeath_cancerdfe
-# ---------------------------------------------------------------------------
+def test_glioblastoma_mutation_creates_a_fitter_family_with_inherited_traits():
+    lgca = _single_resting_cell_glioblastoma_lgca()
 
-class TestBirthdeath_CancerDFE:
-    """Tests for nove_ib_interactions.birthdeath_cancerdfe."""
+    lgca.interaction(lgca)
+    lgca.update_dynamic_fields()
 
-    def test_dispatched_correctly(self):
-        from lgca.nove_ib_interactions import birthdeath_cancerdfe
-        lgca = _lgca("birthdeath_cancerdfe", density=0.4, seed=1)
-        assert lgca.interaction is birthdeath_cancerdfe
+    assert lgca.cell_density[lgca.nonborder].sum() == 2
+    assert lgca.maxlabel == 1
+    assert lgca.maxfamily == 2
+    assert lgca.props["family"][1] == 2
+    assert lgca.family_props["ancestor"][2] == 1
+    assert lgca.family_props["r_b"][2] == pytest.approx(1.5)
+    assert lgca.family_props["kappa"][2] == pytest.approx(2.0)
 
-    def test_timeevo_completes(self):
-        lgca = _lgca("birthdeath_cancerdfe", density=0.4, seed=1)
-        lgca.timeevo(timesteps=5)
 
-    def test_density_nonnegative(self):
-        lgca = _lgca("birthdeath_cancerdfe", density=0.4, seed=1)
-        lgca.timeevo(timesteps=5)
-        assert np.all(lgca.cell_density >= 0)
+def test_glioblastoma_family_populations_are_recorded_as_families_appear():
+    lgca = _single_resting_cell_glioblastoma_lgca()
 
-    def test_interaction_params_set(self):
-        lgca = _lgca("birthdeath_cancerdfe", density=0.4, seed=0)
-        params = lgca.interaction_params
-        for key in ("r_b", "r_d", "p_d", "p_p", "s_d"):
-            assert key in params, f"Expected '{key}' in interaction_params"
+    lgca.timeevo(timesteps=1, recordfampop=True, showprogress=False)
+
+    assert lgca.fam_pop_t.shape == (2, lgca.maxfamily + 1)
+    assert lgca.fam_pop_t[0].sum() == 1
+    assert lgca.fam_pop_t[1].sum() == 2
