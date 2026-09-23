@@ -58,6 +58,21 @@ This file records notable user-facing changes. Changes remain under
   non-volume-excluding model families.
 - Stale generated autosummary pages causing strict documentation failures in
   reused working directories.
+- NoVE lattices with `capacity` above the channel count and no rest channel
+  started with the surplus particles in one velocity channel, i.e. strongly
+  polarized. They now start isotropic.
+- NoVE interactions raised `TypeError` on the first step when the initial
+  state was given explicitly instead of drawn at random.
+- `get_lgca` with `n_species > 1` accepted single-species interactions that
+  crashed on the first step; it now rejects them at construction.
+- Legacy chemotaxis defaulted to `beta=5`, the ModelSpec plugin to `beta=2`;
+  both now use 2.
+- Plotting: 1D `plot_density` with its default colour bar, flux, flow and
+  configuration plots of identity-based and multi-species models (labels were
+  plotted instead of counts or the species axis was rejected), square live
+  density animations, stale NoVE identity-based property plots,
+  `plot_prop_2dhist` without seaborn, and `list_families_alive` for crowded
+  nodes.
 
 ### Removed
 
