@@ -177,7 +177,7 @@ uv sync --extra yaml     # YAML model files
 uv sync --extra plot3d   # Mayavi-based 3D plotting
 ```
 
-Without uv, BioLGCA installs into any Python 3.10+ environment with
+Without uv, BioLGCA installs into any Python 3.11+ environment with
 `python -m pip install -e .` (add `".[yaml]"` for extras). This resolves the
 newest compatible package versions rather than the locked ones.
 

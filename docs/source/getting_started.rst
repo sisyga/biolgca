@@ -37,7 +37,7 @@ Then open ``docs/source/tutorials/01_fundamentals.ipynb``. The six
 reproducible student project. Run your own scripts the same way, for example
 ``uv run python my_simulation.py``, or activate ``.venv`` as usual.
 
-Without uv, BioLGCA installs into any Python 3.10+ environment with
+Without uv, BioLGCA installs into any Python 3.11+ environment with
 ``python -m pip install -e .``. This resolves the newest compatible package
 versions instead of the locked ones.
 

@@ -33,6 +33,15 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- BioLGCA requires Python 3.11 or newer and supports Python 3.14; Python 3.10
+  is no longer supported.
+- Runtime and optional dependencies declare the oldest versions the test suite
+  and tutorial notebooks pass with: numpy 1.24, scipy 1.9.2, matplotlib 3.7,
+  tqdm 4.64.1, JupyterLab 4.0, PyYAML 6, Mayavi 4.9 and PySide6 6.4. Previously
+  no minimum was declared, so pip could combine BioLGCA with releases that fail
+  at runtime. numpy 1.24 is needed to reject ragged node arrays, matplotlib 3.7
+  for inline plots in current Jupyter, and Mayavi 4.9 is the first release with
+  binary wheels (older versions no longer build against current VTK).
 - The development environment is managed with uv. A committed `uv.lock` and
   `.python-version` pin the complete environment; `uv sync` installs it and CI
   tests against the lock file. Test, documentation and lint tools moved from

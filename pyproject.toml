@@ -7,7 +7,7 @@ name = "biolgca"
 version = "0.1.0"
 description = "Biological lattice-gas cellular automata simulation tools"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "BSD-3-Clause"
 license-files = ["LICENSE.txt"]
 authors = [
@@ -20,18 +20,18 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering",
 ]
 dependencies = [
-    "numpy",
-    "scipy",
-    "tqdm",
-    "matplotlib",
-    "jupyterlab",
+    "numpy>=1.24",
+    "scipy>=1.9.2",
+    "tqdm>=4.64.1",
+    "matplotlib>=3.7",
+    "jupyterlab>=4.0",
 ]
 
 # Optional user-facing features: `uv sync --extra yaml` or `pip install -e ".[yaml]"`.
@@ -40,9 +40,9 @@ yaml = [
     "PyYAML>=6",
 ]
 plot3d = [
-    "mayavi",
+    "mayavi>=4.9",
     # Mayavi needs a Qt binding for on-screen windows and animations.
-    "PySide6",
+    "PySide6>=6.4",
 ]
 
 # Contributor tooling (PEP 735). `uv sync` installs the `dev` group by default.
@@ -51,7 +51,6 @@ test = [
     "pytest>=8",
     "jsonschema>=4",
     "PyYAML>=6",
-    "tomli; python_version < '3.11'",
 ]
 docs = [
     "Sphinx",
