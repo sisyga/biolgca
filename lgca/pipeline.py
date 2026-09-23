@@ -2322,8 +2322,8 @@ class NativeNoVEGoOrRestOperator(PhenotypeSwitchOperator):
     def apply(self, context, step: int) -> None:
         lgca = context.lgca
         nb_nodes = lgca.nodes[lgca.nonborder]
-        n_m = nb_nodes[..., : lgca.velocitychannels].sum(-1)
-        n_r = nb_nodes[..., lgca.velocitychannels :].sum(-1)
+        n_m = _sampling_totals(nb_nodes[..., : lgca.velocitychannels])
+        n_r = _sampling_totals(nb_nodes[..., lgca.velocitychannels :])
         rho = (n_m + n_r) / lgca.capacity
 
         prob = 0.5 * (1 + np.tanh(self.kappa * (rho - self.theta)))
@@ -2370,8 +2370,8 @@ class NativeNoVEGoOrGrowOperator(BirthDeathOperator):
     def apply(self, context, step: int) -> None:
         lgca = context.lgca
         nb_nodes = lgca.nodes[lgca.nonborder]
-        n_m = nb_nodes[..., : lgca.velocitychannels].sum(-1)
-        n_r = nb_nodes[..., lgca.velocitychannels :].sum(-1)
+        n_m = _sampling_totals(nb_nodes[..., : lgca.velocitychannels])
+        n_r = _sampling_totals(nb_nodes[..., lgca.velocitychannels :])
         rho = (n_m + n_r) / lgca.capacity
 
         prob = 0.5 * (1 + np.tanh(self.kappa * (rho - self.theta)))

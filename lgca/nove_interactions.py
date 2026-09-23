@@ -8,6 +8,7 @@ Interaction functions and helper functions for LGCA without volume exclusion.
 
 import numpy as np
 from scipy.special import softmax
+from lgca.base import _sampling_totals
 from lgca.interactions import tanh_switch
 
 def random_walk(lgca):
@@ -30,8 +31,8 @@ def random_walk(lgca):
     newnodes = lgca.nodes.copy()
     weights = np.full(lgca.K, 1 / lgca.K)
 
-    nb_nodes = lgca.cell_density[lgca.nonborder]
-    newnodes[lgca.nonborder] = lgca.rng.multinomial(nb_nodes, weights)
+    nb_density = _sampling_totals(lgca.nodes[lgca.nonborder])
+    newnodes[lgca.nonborder] = lgca.rng.multinomial(nb_density, weights)
 
     lgca.nodes = newnodes
 
@@ -66,7 +67,7 @@ def dd_alignment(lgca):
     weights = softmax(beta * np.einsum('...i,ij->...j', g, lgca.c), axis=-1)
 
     newnodes = lgca.nodes.copy()
-    nb_density = lgca.cell_density[lgca.nonborder]
+    nb_density = _sampling_totals(lgca.nodes[lgca.nonborder])
     newnodes[lgca.nonborder] = lgca.rng.multinomial(nb_density, weights[lgca.nonborder])
 
     lgca.nodes = newnodes
@@ -107,7 +108,7 @@ def di_alignment(lgca):
     weights = softmax(beta * np.einsum('...i,ij->...j', g, lgca.c), axis=-1)
 
     newnodes = lgca.nodes.copy()
-    nb_density = lgca.cell_density[lgca.nonborder]
+    nb_density = _sampling_totals(lgca.nodes[lgca.nonborder])
     newnodes[lgca.nonborder] = lgca.rng.multinomial(nb_density, weights[lgca.nonborder])
 
     lgca.nodes = newnodes
@@ -133,8 +134,8 @@ def go_or_grow(lgca):
     ``lgca.nodes`` is overwritten with the updated node configuration.
     """
     nb_nodes = lgca.nodes[lgca.nonborder]
-    n_m = nb_nodes[..., :lgca.velocitychannels].sum(-1)
-    n_r = nb_nodes[..., lgca.velocitychannels:].sum(-1)
+    n_m = _sampling_totals(nb_nodes[..., :lgca.velocitychannels])
+    n_r = _sampling_totals(nb_nodes[..., lgca.velocitychannels:])
     rho = (n_m + n_r) / lgca.capacity
 
     prob = tanh_switch(rho, kappa=lgca.interaction_params['kappa'], theta=lgca.interaction_params['theta'])
@@ -173,8 +174,8 @@ def go_or_rest(lgca):
     ``lgca.nodes`` is overwritten with the updated node configuration.
     """
     nb_nodes = lgca.nodes[lgca.nonborder]
-    n_m = nb_nodes[..., :lgca.velocitychannels].sum(-1)
-    n_r = nb_nodes[..., lgca.velocitychannels:].sum(-1)
+    n_m = _sampling_totals(nb_nodes[..., :lgca.velocitychannels])
+    n_r = _sampling_totals(nb_nodes[..., lgca.velocitychannels:])
     rho = (n_m + n_r) / lgca.capacity
 
     prob = tanh_switch(rho, kappa=lgca.interaction_params['kappa'], theta=lgca.interaction_params['theta'])
