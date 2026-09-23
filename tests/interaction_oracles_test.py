@@ -183,7 +183,8 @@ def test_birth_fills_empty_channels_in_proportion_to_local_density(entry):
 @pytest.mark.parametrize("theta,r_d,expected_moving,expected_resting", [
     (0.0, 0.0, 0, 2),  # density above threshold: both cells switch to rest
     (1.0, 0.0, 2, 0),  # density below threshold: both cells keep moving
-    (0.0, 1.0, 0, 0),  # certain death removes every cell
+    (0.0, 1.0, 0, 0),  # certain death removes resting cells
+    (1.0, 1.0, 0, 0),  # and moving cells
 ])
 def test_go_or_grow_switches_by_density_threshold_and_removes_dead_cells(entry, theta, r_d, expected_moving,
                                                                          expected_resting):
