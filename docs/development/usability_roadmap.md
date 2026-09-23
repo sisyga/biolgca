@@ -197,68 +197,97 @@ Independent, low-risk items, in order.
 
 ### Phase 1: A simple way to add interactions (three to four weeks)
 
-Three conventions make interactions easy to write and hard to get wrong:
+Four conventions make interactions easy to write and hard to get wrong:
 
-1. **Every model has a species axis.** Channel states always have the shape
+1. **Every model has a species axis internally.** Inside the library and in
+   the state that interactions see, channel states have the shape
    `dims + (n_species, K)`; a single-species model has `n_species = 1`. Code
-   written for one species then works unchanged for several.
-2. **Each pipeline phase has one meaning.**
+   written for one species then works unchanged for several. Public shapes do
+   not change: model files, `lgca.nodes`, recorded histories and
+   `measurements.npz` of single-species models keep `dims + (K,)`; the
+   conversion happens at the boundary.
+2. **Each kind of interaction has one meaning.**
    - *Birth/death* changes the number of cells.
-   - *Switching* changes what a cell is: its species in multispecies models,
-     or its parameters (e.g. its birth rate) in identity-based models.
-     Single-species classical models have no switching interactions.
-   - *Reorientation* redistributes the cells of a node over its channels and
-     conserves the number of cells of each species at the node. Moving
-     between velocity and rest channels is reorientation, so the "go" part of
-     go-or-grow is a reorientation.
-3. **Interactions use operations with a defined meaning, not raw arrays.**
+   - *Phenotype switch* changes what a cell is. In classical models, a
+     phenotype is a species, and a phenotype switch moves cells along the
+     species axis (for example from "migrating" to "resting" in go-or-grow).
+     In identity-based models, it changes a cell's parameters (Phase 2.2).
+     Single-species classical models have no phenotype switch.
+   - *Reorientation* rearranges the cells of a node over its channels and
+     conserves the number of cells of each species at the node. The
+     conservation law defines the kind, not the sampling method: Boltzmann
+     sampling of combined scores is the default and the way to combine
+     directional cues, but deterministic rules such as the HPP collision rule
+     (two cells meeting head-on turn by 90°) are reorientations too.
+3. **The order of interactions is part of the model.** The pipeline applies
+   interactions in the order they are listed, followed by propagation. The
+   fixed order birth/death, switch, reorientation is dropped.
+4. **Interactions use operations with a defined meaning, not raw arrays.**
    Without volume exclusion a channel holds several cells, so a rule that
    kills whole channels has the right mean but the wrong fluctuations (for 5
    cells per channel and a death probability of 0.5: variance 6.25 instead
-   of 1.25), and no consistency check catches it. Operations such as
-   "every cell dies with probability p" are implemented and tested once per
-   model family.
+   of 1.25), and no consistency check catches it. Operations such as "every
+   cell dies with probability p" are implemented and tested once per model
+   family.
 
-**1.1 Species axis and phase names** (B2)
-- `LatticeState` (1.3) always has the species axis. Phase 2 makes it the
-  storage format (2.1); until then the view adds it for single-species models.
-- Rename the middle phase from `phenotype_switch` to `switch`, and the
-  multispecies interaction from `phenotype_switch` to `species_switch` (today
-  an alias); `PhenotypeSwitchSpec` becomes `SpeciesSwitchSpec`. The old names
-  stay as deprecated aliases for one release.
-- `phenotype_switch` is kept for identity-based models, where it will change
-  individual cell parameters (Phase 2.2).
-- `classical.go_or_rest` and `nove.go_or_rest` move from the switching phase
-  to reorientation. Afterwards no single-species classical interaction sits in
-  the switching phase; compilation rejects a switching operator in a
-  single-species classical model with a message that points to reorientation.
-- Tutorial 4 and the ModelSpec guide use the new
-  names.
+Where cells may sit is up to each interaction. The library does not restrict
+species to channels; an interaction that needs it, such as go-or-grow keeping
+resting cells in rest channels, guarantees it itself.
 
-**1.2 Go-or-grow from birth/death and reorientation** (B4)
-- New reorientation term `rest_switch` with parameters `kappa` and `theta`:
-  it scores a candidate state by `h(rho) * n_rest(s')` with
-  `h = logit(tanh_switch(rho; kappa, theta))`, so that without full channels
-  each cell rests with probability `tanh_switch(rho)`, as in the current rule.
-- `birth_death` gains `dividing="rest"`: only resting cells divide, into free
-  rest channels.
-- Go-or-grow becomes the pipeline
-  `[birth_death(r_b, r_d, dividing="rest"), ReorientationSpec(terms=[rest_switch(kappa, theta)])]`.
-  `classical.go_or_grow` stays available as a named shortcut that expands to
-  this pipeline, so model files keep working.
-- Two differences to the current rule must be measured before switching over:
-  1. Order: the current rule switches, then kills, then divides; the pipeline
-     applies birth/death before reorientation.
-  2. With volume exclusion, a Boltzmann rest term also counts channel
-     arrangements, so it matches the current rule exactly only when rest and
-     velocity channels are not limiting.
+**1.1 Free order and interaction kinds** (B2, B4)
+- Operators run in list order; drop the order check and deprecate
+  `allow_custom_order` (accepted and ignored for one release, with a warning).
+  Propagation always comes last. The run metadata already records the
+  resolved schedule.
+- Documentation: the order is a modelling decision; two reorientation
+  operators in a row are two random decisions, while cues that should compete
+  belong as terms of one `ReorientationSpec`.
+- Keep the restriction on combining several identity-based growth operators
+  (it is about shared daughter-trait bookkeeping, not order).
+- The kind `phenotype_switch` keeps its name. Compilation rejects a phenotype
+  switch in a single-species classical model with a message that explains
+  the species axis. `classical.go_or_rest` and `nove.go_or_rest`, which move
+  cells between velocity and rest channels of one species, become
+  reorientations.
+- The concepts page defines the three kinds, the species axis and the
+  meaning of "phenotype" in classical and identity-based models.
 
-  Compare resting fraction versus density, population growth and the Allee
-  effect of the go-or-grow example (the example effect test must still pass);
-  document the result in the example.
-- Phase 1 covers classical volume exclusion (the combined sampler exists only
-  there). NoVE go-or-grow keeps its current operator until the NoVE sampler
-  (2.1); identity-based go-or-grow needs per-cell switching (2.1).
+**1.2 Go-or-grow as a two-species model**
+
+Migrating cells (species 0, in velocity channels) and resting cells (species
+1, in rest channels) are separate species. The model is the pipeline
+
+1. `go_or_grow_switch(kappa, theta)`: phenotype switch with density-dependent
+   rates. A migrating cell becomes resting with probability
+   `(1 + tanh(kappa * (rho - theta))) / 2` and a resting cell becomes
+   migrating with the complementary probability, where `rho` is the number of
+   cells at the node divided by its capacity. Switched cells are placed in
+   free rest or velocity channels respectively, so each species stays in its
+   channels.
+2. `birth_death`: both species die with their own death rate (default equal);
+   resting cells divide into free rest channels.
+3. `random_walk` for the migrating species, among the velocity channels.
+
+This order is the order of the current (legacy) rule. The formulation is more
+flexible: migrating and resting cells can have different death rates or
+motility, recorders and plots separate them, and the switch acts per cell
+from its current state.
+
+- The switch offers two ways to handle full target channels:
+  `capacity="legacy"` reproduces the current rule (the number of switching
+  cells is binomial over the cells that fit, and both directions are computed
+  from the counts before the step); `capacity="reject"` lets each cell try and
+  rejects a switch into full channels.
+- Validation before switching the example over: compare distributions with
+  the legacy rule (resting fraction versus density, population growth, the
+  Allee effect of the go-or-grow example). Seeded trajectories will differ
+  because random numbers are drawn in a different order.
+- `classical.go_or_grow` and `get_lgca(interaction="go_or_grow")` keep the
+  legacy single-species implementation until Phase 2.4; the example and
+  tutorial 4 move to the two-species model.
+- Phase 1 covers classical models with and without volume exclusion.
+  Identity-based go-or-grow, where every cell has its own `kappa` and
+  `theta`, follows with per-cell operations in Phase 2.
 
 **1.3 Lattice view with operations** (C4)
 
@@ -277,19 +306,24 @@ state.c, state.K, state.velocitychannels, state.restchannels, state.capacity
 state.rng, state.step, state.geometry, state.dims, state.n_species
 
 # operations; probabilities broadcast against dims or dims + (n_species,)
-state.remove_cells(p)                 # every cell dies independently with probability p
-state.divide_cells(p, into="rest")    # every cell divides with probability p into a free channel
-state.add_cells(n, into="rest")       # n new cells per node and species, capacity respected
-state.switch_species(rates)           # rates[a][b]: probability that a cell of species a becomes b
-state.counts = new                    # expert access: replace the whole state (checked)
+state.remove_cells(p)                          # every cell dies independently with probability p
+state.divide_cells(p, channels="rest")         # every cell divides with probability p into a free channel
+state.add_cells(n, channels="rest")            # n new cells per node and species, capacity respected
+state.switch_phenotype(rates, channels=...)    # rates[a][b]: probability that a cell of species a becomes b;
+                                               # switched cells go to free channels of the given set
+state.counts = new                             # expert access: replace the whole state (checked)
 ```
 
-- Each operation is implemented for volume exclusion (at most one cell per
-  channel) and without it (binomial and multinomial sampling per cell), and
-  respects the node capacity.
+- `channels=` selects where new or switched cells go: `"rest"`,
+  `"velocity"`, `"same"` (keep the channel if it is free for the new species)
+  or explicit channel indices. This is how an interaction keeps species in
+  their channels.
+- Each operation is implemented with volume exclusion (at most one cell per
+  channel and species) and without it (binomial and multinomial sampling per
+  cell), and respects the node capacity.
 - Writes are checked: capacity, non-negative integers, no NaN, and the
-  conservation law of the phase (reorientation keeps cells per node and
-  species; switching keeps cells per node).
+  conservation law of the kind (reorientation keeps cells per node and
+  species; a phenotype switch keeps cells per node).
 - Only `state.rng` is available for randomness, so runs stay reproducible.
 
 **1.4 `@interaction` decorator** (C1)
@@ -297,10 +331,15 @@ state.counts = new                    # expert access: replace the whole state (
 ```python
 from lgca import interaction
 
-@interaction(kind="birth_death", families=("classical", "multispecies"))
+@interaction(kind="birth_death", families=("classical",))
 def crowding_death(state, r_d=0.1):
     """Each cell dies with probability r_d * density / K."""
     state.remove_cells(r_d * state.density / state.K)
+
+@interaction(kind="reorientation", families=("classical",), geometries=("square",))
+def hpp_collision(state):
+    """Two cells meeting head-on leave at right angles (HPP rule)."""
+    ...  # deterministic rearrangement of state.counts; conservation is checked
 
 spec = ModelSpec(..., dynamics=InteractionPipelineSpec(
     operators=[crowding_death(r_d=0.2), {"name": "classical.random_walk"}]))
@@ -312,9 +351,11 @@ spec = ModelSpec(..., dynamics=InteractionPipelineSpec(
   the framework, not repeated by hand.
 - Calling the decorated function with parameters returns an operator entry
   for `operators=[...]`; the name also works in JSON.
-- `families=` is explicit. A model of another family is rejected at
-  compilation with a clear message instead of being assumed to work.
-  Identity-based families are not supported in Phase 1.
+- `families=` (and optionally `geometries=`) is explicit. A model of another
+  family is rejected at compilation with a clear message instead of being
+  assumed to work. Identity-based families are not supported in Phase 1.
+- `conserves=("momentum",)` declares further conservation laws, which the
+  test helper checks (HPP conserves momentum).
 - Drop `port_status`, `test_status` and `legacy_source` from the public
   `PluginInfo` (keep them internally until phase 2 removes the legacy code).
 - The class-based operator API stays for advanced cases (setup caches,
@@ -323,7 +364,8 @@ spec = ModelSpec(..., dynamics=InteractionPipelineSpec(
 **1.5 Public reorientation terms** (C3)
 
 Most BIO-LGCA biases couple a field to the candidate state in a few ways,
-which the existing terms already implement. Expose them:
+which the existing terms already implement. Expose them for the Boltzmann
+sampler:
 
 ```python
 from lgca import reorientation_term
@@ -336,12 +378,13 @@ ReorientationTermSpec(name="drift", beta=2.0, parameters={"direction": [0, 1]})
 ```
 
 Couplings: `"flux"` (vector field · flux of the candidate), `"nematic"`
-(tensor field : nematic tensor), `"rest"` (scalar · rest occupancy, used by
-`rest_switch`) and `"channels"` (per-channel weights). An advanced
-`score(features, state)` form stays available. Rewrite the built-in terms on
-the same public API. Like the combined sampler, terms work for classical
-models with volume exclusion (one or several species) in Phase 1; the NoVE
-sampler follows in 2.1.
+(tensor field : nematic tensor), `"rest"` (scalar · rest occupancy) and
+`"channels"` (per-channel weights). An advanced `score(features, state)` form
+stays available. Rewrite the built-in terms on the same public API. Like the
+combined sampler, terms work for classical models with volume exclusion (one
+or several species) in Phase 1; the sampler without volume exclusion follows
+in 2.1. Rules that are not Boltzmann samplers use `@interaction(kind=
+"reorientation")` instead.
 
 **1.6 Interaction test helper** (C5)
 
@@ -352,32 +395,37 @@ report = check_interaction(crowding_death, parameters={"r_d": 0.2})
 ```
 
 Runs the interaction on small seeded lattices of every supported geometry
-(1D, square, hex, cubic, Moore) and declared family, and checks: ghost nodes
-untouched after boundary application, capacity and dtype respected,
-conservation law of the phase, same seed gives same result, no NaN. With
+(1D, square, hex, cubic, Moore) and declared family, with one and two species,
+and checks: ghost nodes untouched after boundary application, capacity and
+dtype respected, conservation law of the kind and declared extra laws
+(e.g. momentum), same seed gives same result, no NaN. With
 `expected_rates=...` it also compares measured death, birth or switch
 frequencies with the declared ones. Raises with a readable report; usable as a
-one-line pytest. The built-in operations of 1.3 are tested this way across
-the full geometry-by-family matrix.
+one-line pytest. The operations of 1.3 are tested this way across the full
+geometry-by-family matrix; HPP serves as the test case for a deterministic
+reorientation.
 
 **1.7 Documentation**
 - Rewrite `how_to/custom_interactions.rst` around 1.3–1.6: a growth rule, a
-  movement bias, a test.
-- Tutorial 6 uses the decorator; add exercises that write a term.
-- Concepts page: the three phases and the species axis.
+  movement bias, a deterministic reorientation (HPP), a test.
+- Tutorial 4 builds go-or-grow as a two-species model; tutorial 6 uses the
+  decorator; add exercises that write a term.
+- Concepts page: the three kinds of interaction, the species axis, free order.
 
 **Supported in Phase 1**
 
-| | Birth/death | Switching | Reorientation |
+| | Birth/death | Phenotype switch | Reorientation |
 |---|---|---|---|
-| Classical, one species, VE and NoVE | decorator and operations | none by design | built-in operators; terms for VE |
-| Multispecies, VE and NoVE | decorator and operations | `species_switch`, decorator | built-in operators; terms for VE |
+| Classical, one species, VE and NoVE | decorator and operations | none by design | decorator (any conserving rule); Boltzmann terms for VE |
+| Classical, several species, VE and NoVE | decorator and operations | decorator and operations | decorator (any conserving rule); Boltzmann terms for VE |
 | Identity-based, VE and NoVE | built-in operators only | built-in operators only | built-in operators only |
 
-Accept: a student writes, registers, tests and sweeps a new death rule or a new
-bias in under 30 lines without reading library source; the same rule runs
-with one or several species and with or without volume exclusion; re-running
-every notebook cell works.
+Accept: a student writes, registers, tests and sweeps a new death rule, a new
+bias or a deterministic collision rule in under 30 lines without reading
+library source; the same rule runs with one or several species and with or
+without volume exclusion; the two-species go-or-grow model matches the legacy
+rule in distribution, including its Allee effect; re-running every notebook
+cell works.
 
 ### Phase 2: One mechanism for all model families (one to two months)
 
@@ -386,7 +434,7 @@ every notebook cell works.
 All classical families store channel counts as `dims + (n_species, K)`
 (`n_species = 1` for one species), so every mechanism has one implementation.
 Model files and results keep accepting and returning single-species arrays
-without the species axis (see open decision 5). Reorientation:
+without the species axis. Reorientation:
 
 - with volume exclusion: the existing Boltzmann sampler, which enumerates
   admissible channel states;
@@ -516,9 +564,9 @@ model with a custom rule reruns from the CLI.
 4. **Preferred citation.** `CITATION.cff` currently lists the software with the
    two papers as references; decide whether one paper should be the preferred
    citation.
-5. **Array shapes at the boundary.** With the species axis stored everywhere
-   (2.1), should `StateSpec.nodes`, `lgca.nodes_t` and `measurements.npz` of
-   single-species models keep their current shape `dims + (K,)` (converted at
-   the boundary, backward compatible) or switch to `dims + (1, K)`?
-6. **Name of the middle phase.** `switch` (proposed), `switching` or
-   `species_switch` for the phase that holds species and phenotype switching.
+
+Decided (2026-09-23): the species axis is internal only and public shapes stay
+backward compatible; the kind that changes species or cell parameters keeps
+the name `phenotype_switch`; interactions run in the order they are listed;
+Boltzmann sampling is the default for reorientation, not a requirement; the
+library does not restrict species to channels.
