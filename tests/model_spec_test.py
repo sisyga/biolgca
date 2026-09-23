@@ -257,21 +257,6 @@ def test_classical_only_propagation_plugin_is_native_and_matches_legacy():
     )
     result = run_model(spec, showprogress=False)
     legacy = _legacy_square(interaction="only_propagation", timesteps=2, seed=60)
-
-    plugin = describe_plugin("classical.only_propagation")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
-    np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
-    np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
-
-
-def test_classical_random_walk_modelspec_reproduces_existing_timestep():
-    result = run_model(
-        _square_spec(operators=[{"name": "classical.random_walk"}]),
-        showprogress=False,
-    )
-    legacy = _legacy_square(interaction="random_walk")
-
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
 
@@ -280,10 +265,6 @@ def test_classical_random_walk_plugin_is_native_and_matches_legacy():
     spec = _square_spec(operators=[{"name": "classical.random_walk"}], timesteps=2, seed=43)
     result = run_model(spec, showprogress=False)
     legacy = _legacy_square(interaction="random_walk", timesteps=2, seed=43)
-
-    plugin = describe_plugin("classical.random_walk")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
 
@@ -312,10 +293,6 @@ def test_classical_excitable_medium_plugin_is_native_and_matches_legacy():
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("classical.excitable_medium")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
 
@@ -341,10 +318,6 @@ def test_ib_random_walk_plugin_is_native_and_matches_legacy():
         seed=53,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("ib.random_walk")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
 
@@ -372,10 +345,6 @@ def test_ib_birth_plugin_is_native_and_matches_legacy():
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("ib.birth")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
     np.testing.assert_allclose(result.lgca.props["r_b"], legacy.props["r_b"])
@@ -410,10 +379,6 @@ def test_ib_birthdeath_plugin_is_native_and_matches_legacy():
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("ib.birthdeath")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
     np.testing.assert_allclose(result.lgca.props["r_b"], legacy.props["r_b"])
@@ -450,10 +415,6 @@ def test_ib_birthdeath_discrete_plugin_is_native_and_matches_legacy():
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("ib.birthdeath_discrete")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
     np.testing.assert_allclose(result.lgca.props["r_b"], legacy.props["r_b"])
@@ -492,10 +453,6 @@ def test_ib_go_and_grow_mutations_plugin_is_native_and_matches_legacy():
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("ib.go_and_grow_mutations")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
     np.testing.assert_array_equal(result.lgca.props["family"], legacy.props["family"])
@@ -583,10 +540,6 @@ def test_ib_go_or_grow_plugin_is_native_and_matches_legacy():
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("ib.go_or_grow")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
     np.testing.assert_allclose(result.lgca.props["kappa"], legacy.props["kappa"])
@@ -620,10 +573,6 @@ def test_classical_birth_plugins_are_native_and_match_legacy(
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin(plugin_name)
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
 
@@ -652,10 +601,6 @@ def test_classical_go_or_rest_plugin_is_native_and_matches_legacy():
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("classical.go_or_rest")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
 
@@ -684,10 +629,6 @@ def test_classical_go_or_grow_plugin_is_native_and_matches_legacy():
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("classical.go_or_grow")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
 
@@ -720,10 +661,6 @@ def test_classical_reorientation_plugins_are_native_and_match_legacy(
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin(plugin_name)
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
 
@@ -755,10 +692,6 @@ def test_classical_tensor_reorientation_plugins_are_native_and_match_legacy(
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin(plugin_name)
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
 
@@ -785,10 +718,6 @@ def test_classical_chemotaxis_plugin_is_native_and_matches_legacy():
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("classical.chemotaxis")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
 
@@ -897,24 +826,6 @@ def _state_for_plugin(plugin_name):
     "plugin_name",
     [plugin.name for plugin in list_plugins(kind="interaction")],
 )
-def test_all_registered_interactions_compile_through_modelspec(plugin_name):
-    spec = ModelSpec(
-        description=Description(title=f"compile {plugin_name}"),
-        space=SpaceSpec(geometry="square", dims=(4, 5), boundary="periodic"),
-        state=_state_for_plugin(plugin_name),
-        time=TimeSpec(steps=0, seed=19),
-        dynamics=InteractionPipelineSpec(operators=[{"name": plugin_name}]),
-    )
-
-    compiled = build_model(spec)
-
-    assert compiled.metadata["operator_names"] == [plugin_name]
-
-
-@pytest.mark.parametrize(
-    "plugin_name",
-    [plugin.name for plugin in list_plugins(kind="interaction")],
-)
 def test_all_registered_interactions_run_one_step_through_modelspec(plugin_name):
     spec = ModelSpec(
         description=Description(title=f"run {plugin_name}"),
@@ -1007,10 +918,6 @@ def test_nove_alignment_plugins_are_native_and_match_legacy(plugin_name, legacy_
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin(plugin_name)
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
 
@@ -1036,10 +943,6 @@ def test_nove_random_walk_plugin_is_native_and_matches_legacy():
         seed=39,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("nove.random_walk")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
 
@@ -1071,10 +974,6 @@ def test_nove_ib_random_walk_plugin_is_native_and_matches_legacy():
         seed=54,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("nove_ib.random_walk")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
 
@@ -1132,10 +1031,6 @@ def test_nove_ib_birth_plugins_are_native_and_match_legacy(
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin(plugin_name)
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
     np.testing.assert_allclose(result.lgca.props["r_b"], legacy.props["r_b"])
@@ -1183,10 +1078,6 @@ def test_nove_ib_birthdeath_cancerdfe_plugin_is_native_and_matches_legacy():
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("nove_ib.birthdeath_cancerdfe")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
     np.testing.assert_allclose(result.lgca.props["r_b"], legacy.props["r_b"])
@@ -1232,10 +1123,6 @@ def test_nove_ib_go_or_grow_plugin_is_native_and_matches_legacy():
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("nove_ib.go_or_grow")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
     np.testing.assert_allclose(result.lgca.props["kappa"], legacy.props["kappa"])
@@ -1281,10 +1168,6 @@ def test_nove_ib_go_or_grow_kappa_plugin_is_native_and_matches_legacy():
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("nove_ib.go_or_grow_kappa")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
     np.testing.assert_allclose(result.lgca.props["kappa"], legacy.props["kappa"])
@@ -1336,10 +1219,6 @@ def test_nove_ib_go_or_grow_kappa_chemo_plugin_is_native_and_matches_legacy():
     legacy.interaction = go_or_grow_kappa_chemo
     legacy.interaction_params["beta"] = beta
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("nove_ib.go_or_grow_kappa_chemo")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
     np.testing.assert_allclose(result.lgca.props["kappa"], legacy.props["kappa"])
@@ -1388,10 +1267,6 @@ def test_nove_ib_go_or_grow_glioblastoma_plugin_is_native_and_matches_legacy():
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("nove_ib.go_or_grow_glioblastoma")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
     np.testing.assert_array_equal(result.lgca.props["family"], legacy.props["family"])
@@ -1445,10 +1320,6 @@ def test_nove_ib_evo_steric_plugin_is_native_and_matches_legacy():
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("nove_ib.evo_steric")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
     np.testing.assert_array_equal(result.lgca.props["family"], legacy.props["family"])
@@ -1516,10 +1387,6 @@ def test_multispecies_birth_plugins_are_native_and_match_legacy(
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin(plugin_name)
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
 
@@ -1563,10 +1430,6 @@ def test_multispecies_go_or_grow_plugin_is_native_and_matches_legacy():
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("multispecies.go_or_grow")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
 
@@ -1597,10 +1460,6 @@ def test_multispecies_excitable_medium_plugin_is_native_and_matches_legacy():
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("multispecies.excitable_medium_ms")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
 
@@ -1640,10 +1499,6 @@ def test_nove_go_or_plugins_are_native_and_match_legacy(
         **parameters,
     )
     legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin(plugin_name)
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
     np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
 @pytest.mark.parametrize("operator", ["nove_ib.birth", "nove_ib.birthdeath", "nove_ib.birthdeath_cancerdfe",

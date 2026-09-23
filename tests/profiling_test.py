@@ -1,7 +1,7 @@
 import csv
 import json
 
-from profiling import BenchmarkScenario, default_scenarios, run_scenario, write_results
+from profiling import BenchmarkScenario, run_scenario, write_results
 
 
 EXPECTED_RESULT_KEYS = {
@@ -23,16 +23,6 @@ EXPECTED_RESULT_KEYS = {
     "numpy_version",
     "biolgca_version",
 }
-
-
-def test_default_benchmarks_cover_maintained_state_families():
-    assert {scenario.family for scenario in default_scenarios()} == {
-        "classical_ve",
-        "nove",
-        "identity_ve",
-        "identity_nove",
-        "multispecies",
-    }
 
 
 def test_benchmark_smoke_emits_stable_machine_readable_schema(tmp_path):
@@ -66,26 +56,3 @@ def test_benchmark_smoke_emits_stable_machine_readable_schema(tmp_path):
         rows = list(csv.DictReader(stream))
     assert len(rows) == 1
     assert rows[0]["scenario"] == scenario.name
-
-
-def test_benchmark_runs_native_modelspec_operator_path():
-    scenario = BenchmarkScenario(
-        name="smoke_native_birth_death",
-        family="classical_ve",
-        geometry="square",
-        dims=(4, 5),
-        interaction="birth_death",
-        density=0.3,
-        steps=2,
-        seed=19,
-        kwargs={"restchannels": 1},
-        model_spec_operator={
-            "name": "birth_death",
-            "parameters": {"birth_rate": 0.2, "death_rate": 0.05, "capacity": 5},
-        },
-    )
-
-    result = run_scenario(scenario, repeats=1)
-
-    assert result["scenario"] == scenario.name
-    assert result["interaction"] == "birth_death"

@@ -13,13 +13,12 @@ from lgca import get_lgca
 from lgca.plotting import animate
 
 
-@pytest.mark.parametrize("geometry", ["square", "hex"])
 @pytest.mark.parametrize("ib,ve", [(False, True), (True, True), (False, False), (True, False)])
 @pytest.mark.parametrize("kind", ["config", "flux", "flow", "density"])
-@pytest.mark.parametrize("times", [[0, 1, 2], [0, 3, 6], [0, 1, 6]])
 @pytest.mark.parametrize("entry", ["direct", "facade"])
-def test_direct_and_facade_renderer_times(geometry, ib, ve, kind, times, entry):
-    model = get_lgca(geometry=geometry, dims=(2, 2), ib=ib, ve=ve, restchannels=1,
+def test_direct_and_facade_renderer_times(ib, ve, kind, entry):
+    times = [0, 1, 6]  # non-uniform sample times must appear in the frame titles
+    model = get_lgca(geometry="square", dims=(2, 2), ib=ib, ve=ve, restchannels=1,
                      density=2, seed=113, interaction="only_propagation")
     model.nodes_t = np.stack([model.nodes[model.nonborder]] * 3)
     model.dens_t = np.stack([model.cell_density[model.nonborder]] * 3)

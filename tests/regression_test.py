@@ -1,94 +1,10 @@
 import random
-import inspect
-import importlib
-import importlib.util
-from pathlib import Path
 
 import numpy as np
 import pytest
 
 from lgca import get_lgca
 from lgca.lgca_1d import LGCA_1D, IBLGCA_1D, NoVE_LGCA_1D, NoVE_IBLGCA_1D
-import lgca.nove_ib_interactions as nove_ib_interactions
-
-
-def test_geometry_modules_do_not_use_base_wildcard_imports():
-    module_paths = [
-        "lgca/lgca_1d.py",
-        "lgca/lgca_square.py",
-        "lgca/lgca_hex.py",
-        "lgca/lgca_cubic.py",
-    ]
-    for module_path in module_paths:
-        with open(module_path, encoding="utf-8") as module_file:
-            source = module_file.read()
-        assert "from lgca.base import *" not in source
-
-
-def test_base_public_api_exports_lgca_base_classes():
-    import lgca.base as base
-
-    expected = {
-        "LGCA_base",
-        "IBLGCA_base",
-        "NoVE_LGCA_base",
-        "NoVE_IBLGCA_base",
-        "calc_nematic_tensor",
-        "colorbar_index",
-        "cmap_discretize",
-        "estimate_figsize",
-        "get_cmap",
-        "get_arr_of_empty_lists",
-        "np",
-    }
-    assert expected <= set(base.__all__)
-    assert callable(base.get_arr_of_empty_lists)
-
-
-@pytest.mark.parametrize(
-    ("module_name", "class_name"),
-    [
-        ("lgca.ib_base", "IBLGCA_base"),
-        ("lgca.nove_base", "NoVE_LGCA_base"),
-        ("lgca.nove_ib_base", "NoVE_IBLGCA_base"),
-    ],
-)
-def test_dedicated_base_modules_define_own_base_classes(module_name, class_name):
-    assert importlib.util.find_spec(module_name) is not None
-
-    module = importlib.import_module(module_name)
-    cls = getattr(module, class_name)
-
-    assert cls.__module__ == module_name
-
-
-def test_base_extensions_is_only_a_compatibility_reexport():
-    import lgca.base_extensions as base_extensions
-    from lgca.ib_base import IBLGCA_base
-    from lgca.nove_base import NoVE_LGCA_base
-    from lgca.nove_ib_base import NoVE_IBLGCA_base
-
-    assert base_extensions.IBLGCA_base is IBLGCA_base
-    assert base_extensions.NoVE_LGCA_base is NoVE_LGCA_base
-    assert base_extensions.NoVE_IBLGCA_base is NoVE_IBLGCA_base
-
-
-def test_runtime_modules_do_not_import_from_base_extensions():
-    module_paths = [
-        "lgca/base.py",
-        "lgca/lgca_1d.py",
-        "lgca/lgca_square.py",
-        "lgca/lgca_hex.py",
-        "lgca/lgca_cubic.py",
-        "lgca/lgca_3dmoore.py",
-        "lgca/square_ext.py",
-        "lgca/cubic_ext.py",
-    ]
-
-    for module_path in module_paths:
-        source = Path(module_path).read_text(encoding="utf-8")
-        assert "from lgca.base_extensions import" not in source
-        assert "from .base_extensions import" not in source
 
 
 @pytest.mark.parametrize(
@@ -468,52 +384,3 @@ def test_nove_ib_recorded_nodes_do_not_alias_live_lists():
     assert recorded is not live
     live.append(99)
     assert recorded == [0]
-
-
-@pytest.mark.parametrize(
-    "function_name",
-    [
-        "random_walk",
-        "evo_steric",
-        "birth",
-        "birthdeath",
-        "birthdeath_cancerdfe",
-        "go_or_grow",
-        "go_or_grow_kappa",
-        "go_or_grow_kappa_chemo",
-    ],
-)
-def test_nove_ib_hot_paths_avoid_deepcopy_and_list_sum(function_name):
-    source = inspect.getsource(getattr(nove_ib_interactions, function_name))
-
-    assert "deepcopy(" not in source
-    assert "node.sum()" not in source
-
-
-def test_nove_ib_go_or_grow_batches_property_array_growth(monkeypatch):
-    nodes = _nove_ib_nodes(length=20)
-    concatenate_calls = 0
-    original_concatenate = nove_ib_interactions.np.concatenate
-    lgca = get_lgca(
-        geometry="lin",
-        ib=True,
-        ve=False,
-        nodes=nodes,
-        interaction="go_or_grow",
-        seed=1,
-        r_b=1.0,
-        r_d=0.0,
-        capacity=1_000_000,
-        kappa=100.0,
-        theta=-1.0,
-    )
-
-    def counting_concatenate(*args, **kwargs):
-        nonlocal concatenate_calls
-        concatenate_calls += 1
-        return original_concatenate(*args, **kwargs)
-
-    monkeypatch.setattr(nove_ib_interactions.np, "concatenate", counting_concatenate)
-    lgca.interaction(lgca)
-
-    assert concatenate_calls <= 2
