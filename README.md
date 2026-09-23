@@ -14,16 +14,42 @@ remaining computationally accessible for custom analysis. See the
 
 ## Install and start the tutorials
 
-Clone the repository and install it into an active Python environment:
+BioLGCA uses [uv](https://docs.astral.sh/uv/) to manage Python and all
+dependencies. The committed `uv.lock` pins every package version, so
+`uv sync` reproduces the environment that the test suite runs in.
 
-```bash
-git clone https://github.com/sisyga/biolgca.git
-cd biolgca
-python -m pip install -e .
-jupyter lab
-```
+1. [Install uv](https://docs.astral.sh/uv/getting-started/installation/) once:
 
-A normal installation includes Matplotlib and JupyterLab. Open
+   ```bash
+   # macOS and Linux
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   # Windows (PowerShell)
+   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+   ```
+
+2. Clone the repository and create the environment:
+
+   ```bash
+   git clone https://github.com/sisyga/biolgca.git
+   cd biolgca
+   uv sync
+   ```
+
+   `uv sync` creates `.venv/` with the Python version from `.python-version`,
+   installs BioLGCA in editable mode and adds the test and documentation tools.
+   If your uv does not download Python automatically (some Linux distribution
+   packages), run `uv python install` first.
+
+3. Start JupyterLab:
+
+   ```bash
+   uv run jupyter lab
+   ```
+
+Run any other command inside the environment the same way, for example
+`uv run python my_simulation.py`, or activate `.venv` as usual.
+
+Open
 [`docs/source/tutorials/01_fundamentals.ipynb`](docs/source/tutorials/01_fundamentals.ipynb)
 and continue through the six maintained lessons:
 
@@ -100,8 +126,9 @@ biolgca run model.json --output runs/random-walk-001
 ```
 
 The run directory contains the resolved model, runtime metadata and configured
-observer outputs. YAML model files are available through the optional `yaml`
-extra.
+observer outputs. With uv, prefix these commands with `uv run` (for example
+`uv run biolgca examples list`) unless `.venv` is activated. YAML model files
+are available through the optional `yaml` extra.
 
 ## Supported models and analysis
 
@@ -143,19 +170,31 @@ this compatibility API. Historical teaching notebooks are retained under
 [`notebooks/legacy/`](notebooks/legacy/) but are not the maintained learner
 path.
 
-## Development and documentation
-
-Install contributor dependencies and run the project gates from the repository
-root:
+## Optional features
 
 ```bash
-python -m pip install -e ".[dev]"
-conda run -n biolgca python -m pytest -q
-conda run -n biolgca python docs/build.py
+uv sync --extra yaml     # YAML model files
+uv sync --extra plot3d   # Mayavi-based 3D plotting
+```
+
+Without uv, BioLGCA installs into any Python 3.10+ environment with
+`python -m pip install -e .` (add `".[yaml]"` for extras). This resolves the
+newest compatible package versions rather than the locked ones.
+
+## Development and documentation
+
+`uv sync` already installs the test and documentation tools. Run the project
+checks from the repository root:
+
+```bash
+uv run pytest -q
+uv run python docs/build.py
 ```
 
 The strict documentation build executes all six maintained notebooks from
 clean kernels and treats cell exceptions and Sphinx warnings as failures.
+After changing dependencies in `pyproject.toml`, run `uv lock` and commit the
+updated `uv.lock`.
 
 Issues and feature ideas are tracked on
 [GitHub](https://github.com/sisyga/biolgca/issues). User-facing changes are

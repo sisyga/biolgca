@@ -23,6 +23,12 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- The development environment is managed with uv. A committed `uv.lock` and
+  `.python-version` pin the complete environment; `uv sync` installs it and CI
+  tests against the lock file. Test, documentation and lint tools moved from
+  the `test`, `docs` and `dev` extras to PEP 735 dependency groups of the same
+  names. The redundant `requirements*.txt` files and the `plot2d`, `plot` and
+  `plotting` extras were removed; use the `plot3d` extra for Mayavi.
 - Matplotlib and JupyterLab are part of the normal installation so students can
   open the maintained notebooks and plot results without selecting extras.
   Three-dimensional Mayavi rendering remains optional.

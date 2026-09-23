@@ -36,8 +36,9 @@ The `biolgca` package is a Python library for simulating lattice-gas cellular au
 
 ## Testing
 
-- Use the dedicated Anaconda environment for this project: `conda run -n biolgca python -m pytest -q`
-- Run the test command from the project root before proposing a PR
+- The environment is managed with uv: `uv sync` creates `.venv/` from the committed `uv.lock`
+- Run the tests with `uv run pytest -q` from the project root before proposing a PR
+- After changing dependencies in `pyproject.toml`, run `uv lock` and commit `uv.lock`
 - Test files should be placed in the `tests/` directory
 - Use parameterized testing when testing similar functionality across different models
 - Tests should be deterministic (use fixed random seeds where appropriate)

@@ -30,7 +30,7 @@ class _MissingPlotLib:
 
     def __getattr__(self, _):
         raise ImportError(
-            f"Plotting requires {self._name}. Install extras with 'pip install -r plotting-requirements.txt'."
+            f"Plotting requires {self._name}. Reinstall BioLGCA with 'uv sync' or 'python -m pip install -e .'."
         )
 
 
