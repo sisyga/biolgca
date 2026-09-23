@@ -1,24 +1,36 @@
 # BioLGCA
 
 [![CI](https://github.com/sisyga/biolgca/actions/workflows/ci.yml/badge.svg)](https://github.com/sisyga/biolgca/actions/workflows/ci.yml)
+![Python 3.11–3.14](https://img.shields.io/badge/python-3.11%E2%80%933.14-blue)
+[![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-green)](LICENSE.txt)
 
-BioLGCA is a Python package for lattice-gas cellular automata in biological
-contexts. It supports reproducible simulations of cell migration, collective
-movement, population dynamics, phenotypic switching and spatial evolution.
+**Simulate how cells move, align, grow and evolve, in a few lines of Python.**
 
-LGCA represent cells in velocity and optional rest channels at each lattice
-site. This mesoscopic state records cell number and movement direction while
-remaining computationally accessible for custom analysis. See the
-[BIO-LGCA overview](https://en.wikipedia.org/wiki/BIO-LGCA) and the
-[method paper](https://doi.org/10.1371/journal.pcbi.1009066).
+<p align="center">
+  <img src="docs/images/readme/alignment_flux.gif" width="640"
+       alt="Cells with random headings align with their neighbours and form moving flocks">
+</p>
 
-## Install and start the tutorials
+BioLGCA implements biological lattice-gas cellular automata (BIO-LGCA). Each
+lattice site has one channel per direction of movement and optional rest
+channels, so the model tracks how many cells are at each site and where they
+are heading. The rules are local and stochastic, which makes simulations fast
+and the models accessible to mathematical analysis
+([Deutsch et al. 2021](https://doi.org/10.1371/journal.pcbi.1009066)).
 
-BioLGCA uses [uv](https://docs.astral.sh/uv/) to manage Python and all
-dependencies. The committed `uv.lock` pins every package version, so
-`uv sync` reproduces the environment that the test suite runs in.
+With BioLGCA you can:
 
-1. [Install uv](https://docs.astral.sh/uv/getting-started/installation/) once:
+- combine built-in mechanisms: random walk, alignment, chemotaxis, contact
+  guidance, aggregation, birth and death, go-or-grow and phenotype switching;
+- write a new interaction as a small Python class and use it like a built-in;
+- track individual cells with heritable traits to study evolution;
+- run on 1D, square, hexagonal and 3D lattices; and
+- save every model as a JSON file that reruns exactly from its seed.
+
+## Quick start
+
+1. [Install uv](https://docs.astral.sh/uv/getting-started/installation/), which
+   manages Python and all dependencies for you:
 
    ```bash
    # macOS and Linux
@@ -27,181 +39,224 @@ dependencies. The committed `uv.lock` pins every package version, so
    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
    ```
 
-2. Clone the repository and create the environment:
+2. Get BioLGCA and open JupyterLab:
 
    ```bash
    git clone https://github.com/sisyga/biolgca.git
    cd biolgca
    uv sync
-   ```
-
-   `uv sync` creates `.venv/` with the Python version from `.python-version`,
-   installs BioLGCA in editable mode and adds the test and documentation tools.
-   If your uv does not download Python automatically (some Linux distribution
-   packages), run `uv python install` first.
-
-3. Start JupyterLab:
-
-   ```bash
    uv run jupyter lab
    ```
 
-Run any other command inside the environment the same way, for example
-`uv run python my_simulation.py`, or activate `.venv` as usual.
+   If uv reports that it cannot find Python (some Linux distribution packages
+   do not download it automatically), run `uv python install` first.
 
-Open
-[`docs/source/tutorials/01_fundamentals.ipynb`](docs/source/tutorials/01_fundamentals.ipynb)
-and continue through the six maintained lessons:
+3. Paste this into a notebook cell to produce the flocks shown above:
 
-1. [LGCA fundamentals and random movement](docs/source/tutorials/01_fundamentals.ipynb)
-2. [Collective movement](docs/source/tutorials/02_collective_movement.ipynb)
-3. [Combining directional cues](docs/source/tutorials/03_combining_interactions.ipynb)
-4. [Population dynamics and phenotypic switching](docs/source/tutorials/04_population_dynamics.ipynb)
-5. [Evolutionary LGCA](docs/source/tutorials/05_evolutionary_lgca.ipynb)
-6. [Developing a reproducible student project](docs/source/tutorials/06_student_project.ipynb)
+   ```python
+   from lgca import get_lgca
 
-Every notebook constructs its `ModelSpec` and interaction pipeline in visible
-cells. The notebooks execute in CI and are intended to be copied and modified
-for student projects.
+   lgca = get_lgca(geometry="hex", dims=(50, 50), interaction="alignment",
+                   beta=3, density=0.5, seed=2)
+   lgca.timeevo(timesteps=100, record=True)
+   lgca.plot_flux()  # colour shows the direction of motion
+   ```
 
-## First reproducible simulation
+   `beta` sets how strongly cells align with their neighbours. Try `beta=0`
+   (no alignment) or `density=0.2` (sparser cells) and run again.
 
-`ModelSpec` separates lattice geometry, initial state, time, dynamics and
-analysis:
+## Build a model from mechanisms
+
+For a study you will want every assumption written down. A `ModelSpec`
+describes the lattice, initial state, time and seed, and the list of
+interactions. Here cells align with their neighbours and follow an attractant
+gradient; both cues enter one stochastic decision per site:
+
+<img src="docs/images/readme/chemotaxis_density.png" width="300" align="right"
+     alt="Cells accumulate where the attractant peaks, near x = 40">
 
 ```python
+import numpy as np
 from lgca.model import AnalysisSpec, ModelSpec, SpaceSpec, StateSpec, TimeSpec, run_model
-from lgca.pipeline import InteractionPipelineSpec
-from lgca.simulation import DensityRecorder, PopulationRecorder
+from lgca.pipeline import (InteractionPipelineSpec, ReorientationSpec,
+                           ReorientationTermSpec)
+from lgca.simulation import DensityRecorder
+
+x = np.arange(50)[:, None] * np.ones((50, 50))
+signal = np.exp(-((x - 40) / 15) ** 2)  # attractant peaks at x = 40
 
 spec = ModelSpec(
-    space=SpaceSpec(geometry="square", dims=(20, 20), boundary="periodic"),
-    state=StateSpec(density=0.15, restchannels=0),
-    time=TimeSpec(steps=30, seed=1),
-    dynamics=InteractionPipelineSpec(
-        operators=[{"name": "classical.random_walk"}],
-    ),
-    analysis=AnalysisSpec(
-        observers=[DensityRecorder(), PopulationRecorder()],
-    ),
+    space=SpaceSpec(geometry="square", dims=(50, 50), boundary="reflecting"),
+    state=StateSpec(density=0.5, fields={"signal": signal}),
+    time=TimeSpec(steps=100, seed=1),
+    dynamics=InteractionPipelineSpec(operators=[
+        ReorientationSpec(terms=[  # both cues enter one stochastic decision
+            ReorientationTermSpec(name="polar_alignment", beta=1.5),
+            ReorientationTermSpec(name="chemotaxis", beta=20, parameters={"field": "signal"}),
+        ]),
+    ]),
+    analysis=AnalysisSpec(observers=[DensityRecorder()]),  # what to record
 )
-
-result = run_model(spec, showprogress=False)
+result = run_model(spec)
 result.lgca.plot_density()
 ```
 
-To combine directional cues in one reorientation decision, place several
-terms inside one `ReorientationSpec`:
+Save the model with `save_model_spec(spec, "model.json")` from `lgca.model`.
+Anyone can then rerun it from the command line and get identical data:
+
+```bash
+uv run biolgca run model.json --output runs/chemotaxis-001
+```
+
+The run directory contains the resolved model, the BioLGCA version and the
+recorded densities in `measurements.npz`.
+
+## Growth and phenotype switching
+
+<img src="docs/images/readme/go_or_grow_density.png" width="300" align="right"
+     alt="A dense spheroid of cells grown from one site">
+
+Interactions can also create and remove cells. In the go-or-grow model, cells
+either migrate or rest and divide, and crowding changes which they do. One
+fully occupied site grows into a spheroid:
 
 ```python
-from lgca.pipeline import ReorientationSpec, ReorientationTermSpec
-
-combined = ReorientationSpec(
-    terms=[
-        ReorientationTermSpec(name="polar_alignment", beta=1.0),
-        ReorientationTermSpec(
-            name="chemotaxis",
-            beta=0.5,
-            parameters={"field": "signal"},
-        ),
-    ]
+spec = ModelSpec(
+    space=SpaceSpec(geometry="hex", dims=(60, 60)),
+    state=StateSpec(
+        restchannels=6,  # resting cells proliferate, moving cells migrate
+        initializer={"name": "region", "parameters": {"extent": 1, "density": 12}},
+    ),
+    time=TimeSpec(steps=90, seed=3),
+    dynamics=InteractionPipelineSpec(operators=[
+        {"name": "classical.go_or_grow",
+         "parameters": {"r_b": 0.2, "r_d": 0.01, "kappa": -4, "theta": 0.5}},
+    ]),
 )
+run_model(spec).lgca.plot_density()
 ```
 
-See the [interaction-composition explanation](docs/source/concepts/interactions.rst)
-and [ModelSpec guide](docs/source/how_to/model_specs_and_plugins.rst).
-`polar_alignment` favors the same heading; `nematic_alignment` favors the same
-axis, treating opposite headings equally. Choose the mechanism explicitly.
+<br clear="right">
 
-## Save and share simulations
+## Write your own interaction
 
-JSON is the canonical, versioned ModelSpec format. The installed command can
-export, validate and run models without a custom launcher:
-
-```bash
-biolgca examples list
-biolgca examples export random_walk model.json
-biolgca validate model.json
-biolgca run model.json --output runs/random-walk-001
-```
-
-The run directory contains the resolved model, runtime metadata and configured
-observer outputs. With uv, prefix these commands with `uv run` (for example
-`uv run biolgca examples list`) unless `.venv` is activated. YAML model files
-are available through the optional `yaml` extra.
-
-## Supported models and analysis
-
-BioLGCA includes:
-
-- classical and identity-based LGCA with volume exclusion;
-- classical and identity-based LGCA without volume exclusion;
-- classical multi-species LGCA with or without volume exclusion;
-- linear, square, hexagonal, cubic and three-dimensional Moore lattices; and
-- observer-based recording plus density, flux, flow, state, field, property and
-  family-population plots.
-
-The [example gallery](docs/source/example_gallery.rst) catalogs tested source
-examples after the tutorial path. Three-dimensional Mayavi plotting remains an
-optional `plot3d` dependency.
-
-## Legacy factory API
-
-Existing code can continue to use `get_lgca` for direct interactive setup:
-Its legacy `interaction="alignment"` is polar, matching the composed
-`polar_alignment` term above. The deprecated composed term `"alignment"` retains
-its historical **nematic** meaning for compatibility; avoid that alias in new models.
+A new rule is a Python class with an `apply` method that updates the lattice.
+Once registered, it has a name and takes parameters like any built-in
+interaction. This one kills cells more often on crowded sites; the loop below
+compares three death rates:
 
 ```python
-from lgca import get_lgca
+from lgca.plugins import BirthDeathOperator, ParameterSpec, PluginInfo, register_plugin
+from lgca.simulation import PopulationRecorder
 
-lgca = get_lgca(
-    geometry="hex",
-    interaction="alignment",
-    bc="reflecting",
-    seed=1,
+
+class CrowdingDeath(BirthDeathOperator):
+    """Each cell dies with probability r_d * (cells on its site) / (site capacity)."""
+
+    def apply(self, context, step):
+        lgca = context.lgca
+        nodes = lgca.nodes[lgca.nonborder]  # a copy of the interior sites
+        p_death = self.parameters["r_d"] * nodes.sum(-1, keepdims=True) / lgca.K
+        survives = lgca.rng.random(nodes.shape) >= p_death
+        lgca.nodes[lgca.nonborder] = nodes & survives
+
+
+INFO = PluginInfo(
+    name="my.crowding_death",
+    operator_kind="birth_death",
+    backend_families=("classical",),
+    parameters={"r_d": ParameterSpec(required=True, description="death probability on a full site")},
 )
-lgca.timeevo(timesteps=50, record=True, showprogress=False)
-lgca.plot_flux()
+register_plugin(INFO, lambda parameters: CrowdingDeath(INFO, parameters))
+
+for r_d in (0.0, 0.2, 0.5):
+    spec = ModelSpec(
+        space=SpaceSpec(geometry="square", dims=(40, 40)),
+        state=StateSpec(density=1, restchannels=2),
+        time=TimeSpec(steps=100, seed=1),
+        dynamics=InteractionPipelineSpec(operators=[
+            {"name": "birth_death", "parameters": {"birth_rate": 0.1}},
+            {"name": "my.crowding_death", "parameters": {"r_d": r_d}},
+            {"name": "classical.random_walk"},
+        ]),
+        analysis=AnalysisSpec(observers=[PopulationRecorder()]),
+    )
+    result = run_model(spec, showprogress=False)
+    print(f"r_d = {r_d}: {result.lgca.n_t[-1]} cells after 100 steps")
 ```
 
-The [factory reference](docs/source/reference/factory_reference.rst) documents
-this compatibility API. Historical teaching notebooks are retained under
-[`notebooks/legacy/`](notebooks/legacy/) but are not the maintained learner
-path.
+Tutorial 6 shows how to test such a rule and share it together with a model.
+The [custom interaction guide](docs/source/how_to/custom_interactions.rst)
+describes the plugin contract.
 
-## Optional features
+## Learn
+
+Six notebooks take you from the first random walk to a reproducible project.
+Every model is built in visible cells and the notebooks run in CI, so they
+always work with the current code.
+
+| Lesson | You will learn to |
+| --- | --- |
+| [1. Fundamentals](docs/source/tutorials/01_fundamentals.ipynb) | set up a lattice, run a random walk, compare boundaries and seeds |
+| [2. Collective movement](docs/source/tutorials/02_collective_movement.ipynb) | compare alignment mechanisms and measure order |
+| [3. Combining cues](docs/source/tutorials/03_combining_interactions.ipynb) | combine alignment, chemotaxis and contact guidance; sweep parameters |
+| [4. Population dynamics](docs/source/tutorials/04_population_dynamics.ipynb) | add birth, death and phenotype switching; go-or-grow |
+| [5. Evolutionary LGCA](docs/source/tutorials/05_evolutionary_lgca.ipynb) | track heritable traits across stochastic replicates |
+| [6. Student project](docs/source/tutorials/06_student_project.ipynb) | write, test and share your own interaction |
+
+The [example gallery](docs/source/example_gallery.rst) collects further
+ready-to-run models, one per question.
+
+## Model types
+
+| | Classical | Identity-based (individual cell traits) |
+| --- | --- | --- |
+| **Volume exclusion** (at most one cell per channel) | ✓, also with several species | ✓ |
+| **No volume exclusion** (many cells per channel) | ✓, also with several species | ✓ |
+
+All model types run on 1D, square and hexagonal lattices, and on cubic and 3D
+Moore lattices. 3D rendering uses Mayavi, which is optional: install it with
+`uv sync --extra plot3d`.
+
+## Other ways to install
+
+Without uv, install BioLGCA into any Python 3.11+ environment:
 
 ```bash
-uv sync --extra yaml     # YAML model files
-uv sync --extra plot3d   # Mayavi-based 3D plotting
+python -m pip install -e .            # add ".[yaml]" or ".[plot3d]" for extras
 ```
 
-Without uv, BioLGCA installs into any Python 3.11+ environment with
-`python -m pip install -e .` (add `".[yaml]"` for extras). This resolves the
-newest compatible package versions rather than the locked ones.
+This picks the newest compatible versions of the dependencies. `uv sync` instead
+installs the exact versions in `uv.lock`, which the test suite runs against.
 
-## Development and documentation
+## Contributing
 
-`uv sync` already installs the test and documentation tools. Run the project
-checks from the repository root:
+Bug reports and ideas are welcome on the
+[issue tracker](https://github.com/sisyga/biolgca/issues). `uv sync` also
+installs the development tools; run the checks from the repository root:
 
 ```bash
-uv run pytest -q
-uv run python docs/build.py
+uv run pytest -q               # test suite
+uv run python docs/build.py    # documentation, executes all tutorials
 ```
 
-The strict documentation build executes all six maintained notebooks from
-clean kernels and treats cell exceptions and Sphinx warnings as failures.
-After changing dependencies in `pyproject.toml`, run `uv lock` and commit the
-updated `uv.lock`.
+User-facing changes are recorded in [CHANGELOG.md](CHANGELOG.md).
 
-Issues and feature ideas are tracked on
-[GitHub](https://github.com/sisyga/biolgca/issues). User-facing changes are
-recorded in [CHANGELOG.md](CHANGELOG.md).
+## Citing
+
+If you use BioLGCA in published work, please cite:
+
+> Deutsch A, Nava-Sedeño JM, Syga S, Hatzikirou H (2021). BIO-LGCA: A cellular
+> automaton modelling class for analysing collective cell migration.
+> *PLoS Computational Biology* 17(6): e1009066.
+> <https://doi.org/10.1371/journal.pcbi.1009066>
+
+> Syga S, Nava-Sedeño JM, Deutsch A (2026). A novel cellular automaton approach
+> for modeling genotypic and phenotypic heterogeneity in cell systems.
+> *The European Physical Journal Special Topics*.
+> <https://doi.org/10.1140/epjs/s11734-026-02186-1>
 
 ## License
 
-BioLGCA is distributed under the BSD 3-clause license. See [LICENSE.txt](LICENSE.txt).
-
-Copyright (C) 2018-2026 Technische Universität Dresden.
+BSD 3-clause, see [LICENSE.txt](LICENSE.txt). Copyright (C) 2018–2026
+Technische Universität Dresden.

@@ -68,7 +68,7 @@ dev = [
 [project.urls]
 Homepage = "https://github.com/sisyga/biolgca"
 Issues = "https://github.com/sisyga/biolgca/issues"
-Documentation = "https://sisyga.github.io/biolgca/"
+Documentation = "https://biolgca.readthedocs.io/"
 
 [project.scripts]
 biolgca = "lgca.cli:main"

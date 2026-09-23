@@ -1,0 +1,51 @@
+cff-version: 1.2.0
+message: >-
+  If you use BioLGCA in published work, please cite the software and the
+  papers listed under references.
+title: "BioLGCA: biological lattice-gas cellular automata in Python"
+type: software
+authors:
+  - given-names: Simon
+    family-names: Syga
+    affiliation: Technische Universität Dresden
+  - given-names: Bianca
+    family-names: Güttner
+    affiliation: Technische Universität Dresden
+repository-code: "https://github.com/sisyga/biolgca"
+url: "https://biolgca.readthedocs.io/"
+license: BSD-3-Clause
+keywords:
+  - cellular automata
+  - lattice gas
+  - biological modelling
+  - collective cell migration
+references:
+  - type: article
+    title: "BIO-LGCA: A cellular automaton modelling class for analysing collective cell migration"
+    authors:
+      - given-names: Andreas
+        family-names: Deutsch
+      - given-names: Josué Manik
+        family-names: Nava-Sedeño
+      - given-names: Simon
+        family-names: Syga
+      - given-names: Haralampos
+        family-names: Hatzikirou
+    journal: PLoS Computational Biology
+    volume: 17
+    issue: 6
+    start: e1009066
+    year: 2021
+    doi: 10.1371/journal.pcbi.1009066
+  - type: article
+    title: "A novel cellular automaton approach for modeling genotypic and phenotypic heterogeneity in cell systems"
+    authors:
+      - given-names: Simon
+        family-names: Syga
+      - given-names: Josué Manik
+        family-names: Nava-Sedeño
+      - given-names: Andreas
+        family-names: Deutsch
+    journal: The European Physical Journal Special Topics
+    year: 2026
+    doi: 10.1140/epjs/s11734-026-02186-1
