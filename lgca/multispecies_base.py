@@ -23,6 +23,8 @@ _SPATIAL_NDIMS = {
 
 def _require_legacy_interaction(lgca, interaction) -> None:
     """Reject interactions without a multispecies implementation in the legacy factory path."""
+    if callable(interaction):
+        return
     name = None if interaction is None else str(interaction).replace(" ", "_")
     if name in lgca.interactions:
         return
@@ -217,6 +219,8 @@ class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
         self.update_dynamic_fields()
 
     def set_interaction(self, **kwargs):
+        if self._set_callable_interaction(kwargs):
+            return
         if kwargs.get("interaction") == "excitable_medium_ms":
             raise ValueError("excitable_medium_ms requires volume exclusion.")
         _require_legacy_interaction(self, kwargs.get("interaction"))

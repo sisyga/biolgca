@@ -9,6 +9,7 @@ volume exclusion.
 """
 
 
+import logging
 import warnings
 from abc import ABC
 from copy import copy, deepcopy
@@ -26,6 +27,8 @@ from .base import (
     _validate_positive_int,
 )
 from .plots import muller_plot
+
+logger = logging.getLogger(__name__)
 
 
 class NoVE_LGCA_base(LGCA_base, ABC):
@@ -79,6 +82,8 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         self.set_interaction(**kwargs)
 
     def set_interaction(self, **kwargs):
+        if self._set_callable_interaction(kwargs):
+            return
         from lgca.nove_interactions import dd_alignment, di_alignment, go_or_grow, go_or_rest, random_walk
         from lgca.interactions import only_propagation
         # configure interaction
@@ -97,12 +102,12 @@ class NoVE_LGCA_base(LGCA_base, ABC):
                     self.interaction_params['beta'] = kwargs['beta']
                 else:
                     self.interaction_params['beta'] = 2.
-                    print('sensitivity set to beta = ', self.interaction_params['beta'])
+                    logger.info('sensitivity set to beta = %s', self.interaction_params['beta'])
                 if 'include_center' in kwargs:
                     self.interaction_params['nb_include_center'] = kwargs['include_center']
                 else:
                     self.interaction_params['nb_include_center'] = False
-                    print('neighbourhood set to exclude the central node')
+                    logger.info('neighbourhood set to exclude the central node')
             # density-independent alignment rule
             elif interaction == 'di_alignment':
                 if self.restchannels > 0:
@@ -113,12 +118,12 @@ class NoVE_LGCA_base(LGCA_base, ABC):
                     self.interaction_params['beta'] = kwargs['beta']
                 else:
                     self.interaction_params['beta'] = 2.
-                    print('sensitivity set to beta = ', self.interaction_params['beta'])
+                    logger.info('sensitivity set to beta = %s', self.interaction_params['beta'])
                 if 'include_center' in kwargs:
                     self.interaction_params['nb_include_center'] = kwargs['include_center']
                 else:
                     self.interaction_params['nb_include_center'] = False
-                    print('neighbourhood set to exclude the central node')
+                    logger.info('neighbourhood set to exclude the central node')
             elif interaction == 'go_or_grow':
                 if self.restchannels < 1:
                     raise RuntimeError("No rest channels ({:d}) defined, interaction cannot be performed! Set number of"
@@ -128,22 +133,22 @@ class NoVE_LGCA_base(LGCA_base, ABC):
                     self.interaction_params['r_d'] = kwargs['r_d']
                 else:
                     self.interaction_params['r_d'] = 0.01
-                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+                    logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
                 if 'r_b' in kwargs:
                     self.interaction_params['r_b'] = kwargs['r_b']
                 else:
                     self.interaction_params['r_b'] = 0.2
-                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
                 if 'kappa' in kwargs:
                     self.interaction_params['kappa'] = kwargs['kappa']
                 else:
                     self.interaction_params['kappa'] = 5.
-                    print('switch rate set to kappa = ', self.interaction_params['kappa'])
+                    logger.info('switch rate set to kappa = %s', self.interaction_params['kappa'])
                 if 'theta' in kwargs:
                     self.interaction_params['theta'] = kwargs['theta']
                 else:
                     self.interaction_params['theta'] = 0.75
-                    print('switch threshold set to theta = ', self.interaction_params['theta'])
+                    logger.info('switch threshold set to theta = %s', self.interaction_params['theta'])
             elif interaction == 'go_or_rest':
                 if self.restchannels < 1:
                     raise RuntimeError(
@@ -156,12 +161,12 @@ class NoVE_LGCA_base(LGCA_base, ABC):
                     self.interaction_params['kappa'] = kwargs['kappa']
                 else:
                     self.interaction_params['kappa'] = 5.
-                    print('switch rate set to kappa = ', self.interaction_params['kappa'])
+                    logger.info('switch rate set to kappa = %s', self.interaction_params['kappa'])
                 if 'theta' in kwargs:
                     self.interaction_params['theta'] = kwargs['theta']
                 else:
                     self.interaction_params['theta'] = 0.75
-                    print('switch threshold set to theta = ', self.interaction_params['theta'])
+                    logger.info('switch threshold set to theta = %s', self.interaction_params['theta'])
 
             elif interaction == 'only_propagation':
                 self.interaction = only_propagation
@@ -175,7 +180,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
 
         # if nothing is specified, use density-dependent interaction rule
         else:
-            print('Density-dependent alignment interaction is used.')
+            logger.info('Density-dependent alignment interaction is used.')
             interaction = 'dd_alignment'
             self.interaction = dd_alignment
 
@@ -187,12 +192,12 @@ class NoVE_LGCA_base(LGCA_base, ABC):
                 self.interaction_params['beta'] = kwargs['beta']
             else:
                 self.interaction_params['beta'] = 2.
-                print('sensitivity set to beta = ', self.interaction_params['beta'])
+                logger.info('sensitivity set to beta = %s', self.interaction_params['beta'])
             if 'include_center' in kwargs:
                 self.interaction_params['nb_include_center'] = kwargs['include_center']
             else:
                 self.interaction_params['nb_include_center'] = False
-                print('neighbourhood set to exclude the central node')
+                logger.info('neighbourhood set to exclude the central node')
         self._validate_interaction_params()
         self._warn_if_nonlocal_ensemble_interaction(interaction)
 

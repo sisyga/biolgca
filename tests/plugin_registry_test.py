@@ -39,3 +39,40 @@ def test_registry_rejects_canonical_name_that_shadows_alias_atomically():
     assert [plugin.name for plugin in registry.list()] == ["canonical.one"]
     with pytest.raises(KeyError):
         registry.resolve("unused")
+
+
+def _other_module_factory(parameters=None):
+    return None
+
+
+_other_module_factory.__module__ = "some_other_package"
+
+
+def test_reregistering_from_the_same_module_replaces_the_plugin_and_its_aliases():
+    registry = PluginRegistry()
+    registry.register(
+        PluginInfo(name="mine", aliases=("old",), operator_kind="test", backend_families=("test",)), _factory
+    )
+    registry.register(
+        PluginInfo(name="mine", aliases=("new",), operator_kind="test", backend_families=("test",),
+                   description="second version"),
+        _factory,
+    )
+
+    assert registry.describe("mine").description == "second version"
+    assert registry.describe("new").name == "mine"
+    with pytest.raises(KeyError):
+        registry.resolve("old")
+
+
+def test_replacing_a_plugin_of_another_module_requires_replace():
+    registry = PluginRegistry()
+    registry.register(PluginInfo(name="builtin", operator_kind="test", backend_families=("test",)), _factory)
+    info = PluginInfo(name="builtin", operator_kind="test", backend_families=("test",), description="mine")
+
+    with pytest.raises(ValueError, match="replace=True"):
+        registry.register(info, _other_module_factory)
+    assert registry.describe("builtin").description == ""
+
+    registry.register(info, _other_module_factory, replace=True)
+    assert registry.resolve("builtin") is _other_module_factory

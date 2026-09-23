@@ -99,8 +99,10 @@ Common keyword arguments
    interactions require rest channels; some NoVE interactions require none.
 
 ``interaction``
-   Name of a built-in interaction or a callable assigned after construction.
-   Built-in options depend on the selected class family.
+   Name of a built-in interaction, or a function ``f(lgca)`` that performs the
+   interaction step. Built-in options depend on the selected class family. With
+   a function, all other keyword arguments that the factory does not use itself
+   are collected in ``lgca.interaction_params`` (see the example below).
 
 ``bc``
    Boundary condition. Geometry-specific classes implement periodic,
@@ -123,6 +125,22 @@ Examples
                    interaction="dd_alignment", seed=1)
    multispecies = get_lgca(geometry="square", n_species=2, restchannels=1,
                            interaction="excitable_medium_ms", seed=1)
+
+A user-defined interaction function receives the LGCA object and changes its
+channel state in place. Ghost nodes are overwritten by the boundary conditions
+afterwards, so the function may act on the whole ``lgca.nodes`` array:
+
+.. code-block:: python
+
+   def random_death(lgca):
+       p = lgca.interaction_params["r_d"]
+       lgca.nodes &= lgca.rng.random(lgca.nodes.shape) >= p
+
+   lgca = get_lgca(geometry="square", density=1, interaction=random_death, r_d=0.05, seed=1)
+   lgca.timeevo(timesteps=20, record=True)
+
+Keyword arguments are not checked for typos when ``interaction`` is a
+function, because the factory cannot know which parameters the function reads.
 
 Placeholders
 ------------

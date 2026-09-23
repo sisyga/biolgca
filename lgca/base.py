@@ -15,6 +15,9 @@ Supported LGCA types:
 - identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_base`)
 """
 
+import logging
+import os
+import sys
 import warnings
 from abc import ABC, abstractmethod
 from copy import copy, deepcopy
@@ -34,6 +37,19 @@ class _MissingPlotLib:
 
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
+_PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def warn_user(message, category=UserWarning):
+    """Warn and point at the first caller outside the lgca package."""
+    if sys.version_info >= (3, 12):
+        warnings.warn(message, category, skip_file_prefixes=(_PACKAGE_DIR,))
+    else:
+        warnings.warn(message, category, stacklevel=3)
+
+
 try:  # optional plotting dependencies
     import matplotlib.colors as colors
     from matplotlib import cm, pyplot as plt
@@ -558,7 +574,13 @@ class LGCA_base(ABC):
 
     @classmethod
     def _validate_kwargs(cls, kwargs):
-        """Raise on unexpected forwarded kwargs before they can be silently ignored."""
+        """Raise on unexpected forwarded kwargs before they can be silently ignored.
+
+        With a user-defined interaction function, unknown keywords are its
+        parameters and are accepted.
+        """
+        if callable(kwargs.get("interaction")):
+            return
         unknown = sorted(set(kwargs) - cls._get_valid_kwargs())
         if not unknown:
             return
@@ -671,22 +693,38 @@ class LGCA_base(ABC):
         self.init_nodes(density=0, nodes=old_nodes)
         self.update_dynamic_fields()
 
+    def _set_callable_interaction(self, kwargs):
+        """Use a user-defined function as the interaction; return whether one was given.
+
+        All keyword arguments except ``interaction`` become interaction
+        parameters, so the function can read them from ``lgca.interaction_params``.
+        """
+        interaction = kwargs.get('interaction')
+        if not callable(interaction):
+            return False
+        self.interaction = interaction
+        self.interaction_params.update({key: value for key, value in kwargs.items() if key != 'interaction'})
+        return True
+
     def set_interaction(self, **kwargs):
         """
         Set the interaction rule and respective needed parameters.
 
         Set :py:attr:`self.interaction` and possibly add entries in :py:attr:`self.interaction_params`.
-        Do not use this to specify a custom interaction. In order to do this (as of now), :py:attr:`self.interaction`
-        and :py:attr:`self.interaction_params` must be manipulated directly from an external script.
 
         Parameters
         ----------
-        kwargs['interaction'] : str, default='random_walk'
-            Name of the predefined interaction in :py:mod:`lgca.interactions`.
+        kwargs['interaction'] : str or callable, default='random_walk'
+            Name of the predefined interaction in :py:mod:`lgca.interactions`, or a
+            function ``f(lgca)`` that updates ``lgca.nodes`` in place of the
+            interaction step. A function reads its parameters from
+            ``lgca.interaction_params``, which receives all other keyword arguments.
         **kwargs
             Interaction parameters.
 
         """
+        if self._set_callable_interaction(kwargs):
+            return
         from lgca.interactions import go_or_grow, go_or_rest, birth, alignment, persistent_walk, chemotaxis, \
                 contact_guidance, nematic, aggregation, random_walk, birthdeath, excitable_medium, \
                 only_propagation
@@ -699,24 +737,24 @@ class LGCA_base(ABC):
                     self.interaction_params['r_d'] = kwargs['r_d']
                 else:
                     self.interaction_params['r_d'] = 0.01
-                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+                    logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
                 if 'r_b' in kwargs:
                     self.interaction_params['r_b'] = kwargs['r_b']
                 else:
                     self.interaction_params['r_b'] = 0.2
-                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
                 if 'kappa' in kwargs:
                     self.interaction_params['kappa'] = kwargs['kappa']
                 else:
                     self.interaction_params['kappa'] = 5.
-                    print('switch rate set to kappa = ', self.interaction_params['kappa'])
+                    logger.info('switch rate set to kappa = %s', self.interaction_params['kappa'])
                 if 'theta' in kwargs:
                     self.interaction_params['theta'] = kwargs['theta']
                 else:
                     self.interaction_params['theta'] = 0.75
-                    print('switch threshold set to theta = ', self.interaction_params['theta'])
+                    logger.info('switch threshold set to theta = %s', self.interaction_params['theta'])
                 if self.restchannels < 2:
-                    print('WARNING: not enough rest channels - system will die out!')
+                    warn_user('Not enough rest channels - system will die out.')
 
             elif interaction == 'go_or_rest':
                 self.interaction = go_or_rest
@@ -724,14 +762,14 @@ class LGCA_base(ABC):
                     self.interaction_params['kappa'] = kwargs['kappa']
                 else:
                     self.interaction_params['kappa'] = 5.
-                    print('switch rate set to kappa = ', self.interaction_params['kappa'])
+                    logger.info('switch rate set to kappa = %s', self.interaction_params['kappa'])
                 if 'theta' in kwargs:
                     self.interaction_params['theta'] = kwargs['theta']
                 else:
                     self.interaction_params['theta'] = 0.75
-                    print('switch threshold set to theta = ', self.interaction_params['theta'])
+                    logger.info('switch threshold set to theta = %s', self.interaction_params['theta'])
                 if self.restchannels < 2:
-                    print('WARNING: not enough rest channels - system will die out!!!')
+                    warn_user('Not enough rest channels - system will die out.')
 
             elif interaction == 'go_and_grow':
                 self.interaction = birth
@@ -739,7 +777,7 @@ class LGCA_base(ABC):
                     self.interaction_params['r_b'] = kwargs['r_b']
                 else:
                     self.interaction_params['r_b'] = 0.2
-                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
 
             elif interaction == 'alignment':
                 self.interaction = alignment
@@ -749,7 +787,7 @@ class LGCA_base(ABC):
                     self.interaction_params['beta'] = kwargs['beta']
                 else:
                     self.interaction_params['beta'] = 2.
-                    print('sensitivity set to beta = ', self.interaction_params['beta'])
+                    logger.info('sensitivity set to beta = %s', self.interaction_params['beta'])
 
             elif interaction == 'persistent_motion':
                 self.interaction = persistent_walk
@@ -759,7 +797,7 @@ class LGCA_base(ABC):
                     self.interaction_params['beta'] = kwargs['beta']
                 else:
                     self.interaction_params['beta'] = 2.
-                    print('sensitivity set to beta = ', self.interaction_params['beta'])
+                    logger.info('sensitivity set to beta = %s', self.interaction_params['beta'])
 
             elif interaction == 'chemotaxis':
                 self.interaction = chemotaxis
@@ -769,7 +807,7 @@ class LGCA_base(ABC):
                     self.interaction_params['beta'] = kwargs['beta']
                 else:
                     self.interaction_params['beta'] = 2.
-                    print('sensitivity set to beta = ', self.interaction_params['beta'])
+                    logger.info('sensitivity set to beta = %s', self.interaction_params['beta'])
 
                 if 'gradient' in kwargs:
                     self.interaction_params['gradient_field'] = _validate_vector_field_shape(
@@ -818,7 +856,7 @@ class LGCA_base(ABC):
                     self.interaction_params['beta'] = kwargs['beta']
                 else:
                     self.interaction_params['beta'] = 2.
-                    print('sensitivity set to beta = ', self.interaction_params['beta'])
+                    logger.info('sensitivity set to beta = %s', self.interaction_params['beta'])
 
                 if 'director' in kwargs:
                     self.interaction_params['gradient_field'] = _validate_vector_field_shape(
@@ -832,7 +870,7 @@ class LGCA_base(ABC):
                     self.interaction_params['gradient_field'][..., 0] = 1
                 self.guiding_tensor = calc_nematic_tensor(self.interaction_params['gradient_field'])
                 if self.velocitychannels < 4:
-                    print('WARNING: NEMATIC INTERACTION UNDEFINED IN 1D!')
+                    warn_user('Nematic interaction undefined in 1D.')
 
             elif interaction == 'nematic':
                 self.interaction = nematic
@@ -842,7 +880,7 @@ class LGCA_base(ABC):
                     self.interaction_params['beta'] = kwargs['beta']
                 else:
                     self.interaction_params['beta'] = 2.
-                    print('sensitivity set to beta = ', self.interaction_params['beta'])
+                    logger.info('sensitivity set to beta = %s', self.interaction_params['beta'])
 
             elif interaction == 'aggregation':
                 self.interaction = aggregation
@@ -852,7 +890,7 @@ class LGCA_base(ABC):
                     self.interaction_params['beta'] = kwargs['beta']
                 else:
                     self.interaction_params['beta'] = 2.
-                    print('sensitivity set to beta = ', self.interaction_params['beta'])
+                    logger.info('sensitivity set to beta = %s', self.interaction_params['beta'])
 
             elif interaction == 'random_walk':
                 self.interaction = random_walk
@@ -863,7 +901,7 @@ class LGCA_base(ABC):
                     self.interaction_params['r_b'] = kwargs['r_b']
                 else:
                     self.interaction_params['r_b'] = 0.2
-                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
 
             elif interaction == 'birthdeath':
                 self.interaction = birthdeath
@@ -871,13 +909,13 @@ class LGCA_base(ABC):
                     self.interaction_params['r_b'] = kwargs['r_b']
                 else:
                     self.interaction_params['r_b'] = 0.2
-                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
 
                 if 'r_d' in kwargs:
                     self.interaction_params['r_d'] = kwargs['r_d']
                 else:
                     self.interaction_params['r_d'] = 0.05
-                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+                    logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
 
             elif interaction == 'excitable_medium':
                 self.interaction = excitable_medium
@@ -886,19 +924,19 @@ class LGCA_base(ABC):
 
                 else:
                     self.interaction_params['beta'] = .05
-                    print('alignment sensitivity set to beta = ', self.interaction_params['beta'])
+                    logger.info('alignment sensitivity set to beta = %s', self.interaction_params['beta'])
 
                 if 'alpha' in kwargs:
                     self.interaction_params['alpha'] = kwargs['alpha']
                 else:
                     self.interaction_params['alpha'] = 1.
-                    print('aggregation sensitivity set to alpha = ', self.interaction_params['alpha'])
+                    logger.info('aggregation sensitivity set to alpha = %s', self.interaction_params['alpha'])
 
                 if 'N' in kwargs:
                     self.interaction_params['N'] = kwargs['N']
                 else:
                     self.interaction_params['N'] = 50
-                    print('repetition of fast reaction set to N = ', self.interaction_params['N'])
+                    logger.info('repetition of fast reaction set to N = %s', self.interaction_params['N'])
 
             elif interaction == 'excitable_medium_ms':
                 if getattr(self, "n_species", 1) != 2:
@@ -910,19 +948,19 @@ class LGCA_base(ABC):
                     self.interaction_params['beta'] = kwargs['beta']
                 else:
                     self.interaction_params['beta'] = .05
-                    print('alignment sensitivity set to beta = ', self.interaction_params['beta'])
+                    logger.info('alignment sensitivity set to beta = %s', self.interaction_params['beta'])
 
                 if 'alpha' in kwargs:
                     self.interaction_params['alpha'] = kwargs['alpha']
                 else:
                     self.interaction_params['alpha'] = 1.
-                    print('aggregation sensitivity set to alpha = ', self.interaction_params['alpha'])
+                    logger.info('aggregation sensitivity set to alpha = %s', self.interaction_params['alpha'])
 
                 if 'N' in kwargs:
                     self.interaction_params['N'] = kwargs['N']
                 else:
                     self.interaction_params['N'] = 50
-                    print('repetition of fast reaction set to N = ', self.interaction_params['N'])
+                    logger.info('repetition of fast reaction set to N = %s', self.interaction_params['N'])
 
             elif interaction == 'only_propagation':
                 self.interaction = only_propagation
@@ -935,7 +973,7 @@ class LGCA_base(ABC):
                 )
 
         else:
-            print('Random walk interaction is used.')
+            logger.info('Random walk interaction is used.')
             interaction = 'random_walk'
             self.interaction = random_walk
         self._validate_interaction_params()

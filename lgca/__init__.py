@@ -26,8 +26,12 @@ References
 """
 
 import difflib
+import logging
 import warnings
 from typing import Tuple, Any
+
+# Library loggers stay silent unless the application configures logging.
+logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 
 _VALID_KWARGS = {
@@ -71,7 +75,13 @@ _VALID_KWARGS = {
 
 
 def _validate_kwargs(kwargs):
-    """Raise on unknown factory kwargs and suggest likely typos."""
+    """Raise on unknown factory kwargs and suggest likely typos.
+
+    With a user-defined interaction function, unknown keywords are its
+    parameters and are accepted.
+    """
+    if callable(kwargs.get("interaction")):
+        return
     unknown = sorted(set(kwargs) - _VALID_KWARGS)
     if not unknown:
         return
@@ -256,22 +266,29 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, n_species
 
     >>> from lgca import get_lgca
     >>> lgca = get_lgca(interaction='random_walk')
-    Random walk interaction is used.
 
-    Used default values for interactions are printed to the terminal.
+    Default values chosen for interaction parameters are logged at INFO level.
+    To see them, enable logging:
+
+    >>> import logging
+    >>> logging.basicConfig(level=logging.INFO)
 
     Request an identity-based LGCA in a linear geometry with a birth interaction.
 
     >>> lgca = get_lgca(ib=True, geometry='1d', interaction='birth')
-    Birth rate set to r_b = 0.2
-    Standard deviation set to std = 0.01
-    Max. birth rate set to a_max = 1.0
 
     The returned LGCA object can then be used to simulate.
 
     >>> # simulate for 50 timesteps
     >>> lgca.timeevo(timesteps=50)
-    Progress: [####################] 100% Done...
+
+    Use a function of the LGCA object as the interaction and pass its parameters
+    as keyword arguments; they are stored in ``lgca.interaction_params``.
+
+    >>> def random_death(lgca):
+    ...     p = lgca.interaction_params['r_d']
+    ...     lgca.nodes &= lgca.rng.random(lgca.nodes.shape) >= p
+    >>> lgca = get_lgca(interaction=random_death, r_d=0.05)
 
     """
     _validate_kwargs(kwargs)

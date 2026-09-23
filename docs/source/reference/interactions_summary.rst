@@ -143,10 +143,10 @@ Multi-species LGCA
 Custom interactions
 -------------------
 
-Direct interaction callables remain supported on concrete LGCA objects. A
-callable receives the LGCA instance, reads parameters from
-``lgca.interaction_params`` and mutates ``lgca.nodes`` or related state before
-propagation.
+A function can serve as the interaction of a ``get_lgca`` model:
+``get_lgca(interaction=my_function, my_rate=0.1)``. It receives the LGCA
+instance, reads its parameters from ``lgca.interaction_params`` and changes
+``lgca.nodes`` before propagation. See :doc:`factory_reference` for an example.
 
 For reusable rules, prefer adding an :class:`lgca.plugins.InteractionOperator`
 subclass and registering it with :func:`lgca.plugins.register_plugin`. Plugin

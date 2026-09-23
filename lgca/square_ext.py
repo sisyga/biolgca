@@ -10,10 +10,11 @@ Includes identity-based and no-volume-exclusion simulators.
 
 from __future__ import annotations
 
+import logging
 import warnings
 
 import numpy as np
-from lgca.base import plt
+from lgca.base import warn_user, plt
 from lgca.ib_base import IBLGCA_base
 from lgca.list_utils import get_arr_of_empty_lists
 from lgca.nove_base import NoVE_LGCA_base
@@ -40,6 +41,8 @@ except ImportError:  # pragma: no cover - handled at runtime
 
 from .plot_data import resolve_animation_history, select_density, select_density_history
 from .plots import estimate_figsize, get_cmap
+
+logger = logging.getLogger(__name__)
 
 
 class IBLGCA_Square(IBLGCA_base, LGCA_Square):
@@ -165,19 +168,19 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
                     self.lx, self.ly = dims
                 elif len(dims) > 2:
                     self.lx, self.ly = dims[0], dims[1]
-                    print("Dimensions provided with too many values! " + str(dims))
+                    warn_user("Dimensions provided with too many values! " + str(dims))
                 else:
                     self.lx, self.ly = dims[0], dims[0]
-                    print("Dimensions provided as tuple " + str(dims) + ", but only one value for 2D lattice!")
+                    warn_user("Dimensions provided as tuple " + str(dims) + ", but only one value for 2D lattice!")
             elif isinstance(dims, int):
                 self.lx, self.ly = dims, dims
             else:
                 self.lx, self.ly = (50, 50)
-                print("Dimensions provided in wrong format, must be tuple of 2 elements or integer. Dimensions set to default 50x50.")
+                warn_user("Dimensions provided in wrong format, must be tuple of 2 elements or integer. Dimensions set to default 50x50.")
         # set default for dimension
         else:
             self.lx, self.ly = (50, 50)
-            print("Dimensions set to default 50x50.")
+            logger.info("Dimensions set to default 50x50.")
         self.dims = self.lx, self.ly
 
         # set number of rest channels to <= 1 because >1 cells are allowed per channel

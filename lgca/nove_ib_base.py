@@ -9,6 +9,7 @@ volume exclusion.
 """
 
 
+import logging
 import warnings
 from abc import ABC
 from copy import copy, deepcopy
@@ -20,6 +21,7 @@ from numpy import random as npr
 from tqdm.auto import tqdm
 
 from .base import (
+    warn_user,
     plt,
     LGCA_base,
     _validate_count_nodes,
@@ -34,6 +36,8 @@ from .plots import muller_plot
 from .ib_base import IBLGCA_base
 from .nove_base import NoVE_LGCA_base
 from .list_utils import get_arr_of_empty_lists, _copy_arr_of_lists
+
+logger = logging.getLogger(__name__)
 
 
 def _flatten_ids(nodes):
@@ -114,7 +118,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                         seen.add(int(label))
         if restchannels != 1:
             restchannels = 1
-            warnings.warn("There can only be one rest channel in this LGCA class. Setting to 1 to prevent issues")
+            warn_user("There can only be one rest channel in this LGCA class. Setting to 1 to prevent issues")
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes, capacity=kwargs.get("capacity"))
         self._validate_model_setup(nodes=nodes)
         if nodes is None:
@@ -166,6 +170,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.update_dynamic_fields()
 
     def set_interaction(self, **kwargs):
+        if self._set_callable_interaction(kwargs):
+            return
         from lgca.nove_ib_interactions import random_walk, birth, birthdeath, birthdeath_cancerdfe, go_or_grow, \
             evo_steric, go_or_grow_kappa, go_or_grow_glioblastoma
         from lgca.interactions import only_propagation
@@ -182,13 +188,13 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                     self.interaction_params['capacity'] = kwargs['capacity']
                 else:
                     self.interaction_params['capacity'] = 8
-                    print('capacity of channel set to ', self.interaction_params['capacity'])
+                    logger.info('capacity of channel set to %s', self.interaction_params['capacity'])
 
                 if 'r_b' in kwargs:
                     self.interaction_params['r_b'] = kwargs['r_b']
                 else:
                     self.interaction_params['r_b'] = 0.2
-                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
                 self.props.update(r_b=[self.interaction_params['r_b']] * (self.maxlabel + 1))
 
                 if 'r_d' in kwargs:
@@ -198,23 +204,23 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                 else:
                     if interaction == 'birthdeath':
                         self.interaction_params['r_d'] = 0.02
-                        print('death rate set to r_d = ', self.interaction_params['r_d'])
+                        logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
 
                 if 'std' in kwargs:
                     self.interaction_params['std'] = kwargs['std']
                 else:
                     self.interaction_params['std'] = 0.01
-                    print('standard deviation set to = ', self.interaction_params['std'])
+                    logger.info('standard deviation set to = %s', self.interaction_params['std'])
                 if 'a_max' in kwargs:
                     self.interaction_params['a_max'] = kwargs['a_max']
                 else:
                     self.interaction_params['a_max'] = 1.
-                    print('Max. birth rate set to a_max =', self.interaction_params['a_max'])
+                    logger.info('Max. birth rate set to a_max = %s', self.interaction_params['a_max'])
                 if 'gamma' in kwargs:
                     self.interaction_params['gamma'] = kwargs['gamma']
                 else:
                     self.interaction_params['gamma'] = 0.
-                    print('Rest channel weight set to gamma =', self.interaction_params['gamma'])
+                    logger.info('Rest channel weight set to gamma = %s', self.interaction_params['gamma'])
 
                 Z = self.velocitychannels + np.exp(self.interaction_params['gamma']) * self.restchannels
                 self.channel_weights = [1./Z] * self.velocitychannels + [np.exp(self.interaction_params['gamma'])/Z] * self.restchannels
@@ -225,55 +231,55 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                     self.interaction_params['capacity'] = kwargs['capacity']
                 else:
                     self.interaction_params['capacity'] = 8
-                    print('capacity of channel set to ', self.interaction_params['capacity'])
+                    logger.info('capacity of channel set to %s', self.interaction_params['capacity'])
 
                 if 'r_b' in kwargs:
                     self.interaction_params['r_b'] = kwargs['r_b']
                 else:
                     self.interaction_params['r_b'] = 0.2
-                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
                 self.props.update(r_b=[self.interaction_params['r_b']] * (self.maxlabel + 1))
 
                 if 'r_d' in kwargs:
                     self.interaction_params['r_d'] = kwargs['r_d']
                 else:
                     self.interaction_params['r_d'] = 0.02
-                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+                    logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
 
                 if 'p_d' in kwargs:
                     self.interaction_params['p_d'] = kwargs['p_d']
                 else:
                     self.interaction_params['p_d'] = 1.4e-5  # from macfarlane 2014
-                    print('probability of drivers set to = ', self.interaction_params['p_d'])
+                    logger.info('probability of drivers set to = %s', self.interaction_params['p_d'])
 
                 if 'p_p' in kwargs:
                     self.interaction_params['p_p'] = kwargs['p_p']
                 else:
                     self.interaction_params['p_p'] = 0.1  # from macfarlane 2014
-                    print('probability of passengers set to = ', self.interaction_params['p_p'])
+                    logger.info('probability of passengers set to = %s', self.interaction_params['p_p'])
 
                 if 's_d' in kwargs:
                     self.interaction_params['s_d'] = kwargs['s_d']
                 else:
                     self.interaction_params['s_d'] = .1 * self.interaction_params['r_b']  # from macfarlane 2014
-                    print('driver strength set to = ', self.interaction_params['s_d'])
+                    logger.info('driver strength set to = %s', self.interaction_params['s_d'])
 
                 if 's_p' in kwargs:
                     self.interaction_params['s_p'] = kwargs['s_p']
                 else:
                     self.interaction_params['s_p'] = .001 * self.interaction_params['r_b']  # from macfarlane 2014
-                    print('passenger strength set to = ', self.interaction_params['s_p'])
+                    logger.info('passenger strength set to = %s', self.interaction_params['s_p'])
 
                 if 'a_max' in kwargs:
                     self.interaction_params['a_max'] = kwargs['a_max']
                 else:
                     self.interaction_params['a_max'] = 1.
-                    print('Max. birth rate set to a_max =', self.interaction_params['a_max'])
+                    logger.info('Max. birth rate set to a_max = %s', self.interaction_params['a_max'])
                 if 'gamma' in kwargs:
                     self.interaction_params['gamma'] = kwargs['gamma']
                 else:
                     self.interaction_params['gamma'] = 0.
-                    print('Rest channel weight set to gamma =', self.interaction_params['gamma'])
+                    logger.info('Rest channel weight set to gamma = %s', self.interaction_params['gamma'])
 
                 Z = self.velocitychannels + np.exp(self.interaction_params['gamma']) * self.restchannels
                 self.channel_weights = [1./Z] * self.velocitychannels + [np.exp(self.interaction_params['gamma'])/Z] * self.restchannels
@@ -283,36 +289,36 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                 try:
                     assert self.restchannels > 0
                 except AssertionError:
-                    print('There must be exactly one rest channel for this interaction to work!')
+                    warn_user('This interaction requires a rest channel.')
                 if 'capacity' in kwargs:
                     self.interaction_params['capacity'] = kwargs['capacity']
                 else:
                     self.interaction_params['capacity'] = 8
-                    print('node capacity set to ', self.interaction_params['capacity'])
+                    logger.info('node capacity set to %s', self.interaction_params['capacity'])
 
                 if 'kappa_std' in kwargs:
                     self.interaction_params['kappa_std'] = kwargs['kappa_std']
                 else:
                     self.interaction_params['kappa_std'] = 0.2
-                    print('std of kappa set to', self.interaction_params['kappa_std'])
+                    logger.info('std of kappa set to %s', self.interaction_params['kappa_std'])
 
                 if 'theta_std' in kwargs:
                     self.interaction_params['theta_std'] = kwargs['theta_std']
                 else:
                     self.interaction_params['theta_std'] = 0.05
-                    print('std of theta set to', self.interaction_params['theta_std'])
+                    logger.info('std of theta set to %s', self.interaction_params['theta_std'])
 
                 if 'r_d' in kwargs:
                     self.interaction_params['r_d'] = kwargs['r_d']
                 else:
                     self.interaction_params['r_d'] = 0.01
-                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+                    logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
 
                 if 'r_b' in kwargs:
                     self.interaction_params['r_b'] = kwargs['r_b']
                 else:
                     self.interaction_params['r_b'] = 0.2
-                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
 
                 if 'kappa' in kwargs:
                     kappa = kwargs['kappa']
@@ -322,7 +328,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                         self.interaction_params['kappa'] = [kappa] * (self.maxlabel + 1)
                 else:
                     self.interaction_params['kappa'] = [5.] * (self.maxlabel + 1)
-                    print('switch rate set to kappa = ', self.interaction_params['kappa'][0])
+                    logger.info('switch rate set to kappa = %s', self.interaction_params['kappa'][0])
 
                 self.props.update(kappa=np.array(self.interaction_params['kappa']))
                 if 'theta' in kwargs:
@@ -333,7 +339,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                         self.interaction_params['theta'] = [theta] * (self.maxlabel + 1)
                 else:
                     self.interaction_params['theta'] = [0.5] * (self.maxlabel + 1)
-                    print('switch threshold set to theta = ', self.interaction_params['theta'][0])
+                    logger.info('switch threshold set to theta = %s', self.interaction_params['theta'][0])
                 self.props.update(theta=np.array(self.interaction_params['theta']))
 
             elif interaction == 'go_or_grow_kappa':
@@ -341,30 +347,30 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                 try:
                     assert self.restchannels > 0
                 except AssertionError:
-                    print('There must be exactly one rest channel for this interaction to work!')
+                    warn_user('This interaction requires a rest channel.')
                 if 'capacity' in kwargs:
                     self.interaction_params['capacity'] = kwargs['capacity']
                 else:
                     self.interaction_params['capacity'] = 8
-                    print('node capacity set to ', self.interaction_params['capacity'])
+                    logger.info('node capacity set to %s', self.interaction_params['capacity'])
 
                 if 'kappa_std' in kwargs:
                     self.interaction_params['kappa_std'] = kwargs['kappa_std']
                 else:
                     self.interaction_params['kappa_std'] = 0.2
-                    print('std of kappa set to', self.interaction_params['kappa_std'])
+                    logger.info('std of kappa set to %s', self.interaction_params['kappa_std'])
 
                 if 'r_d' in kwargs:
                     self.interaction_params['r_d'] = kwargs['r_d']
                 else:
                     self.interaction_params['r_d'] = 0.01
-                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+                    logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
 
                 if 'r_b' in kwargs:
                     self.interaction_params['r_b'] = kwargs['r_b']
                 else:
                     self.interaction_params['r_b'] = 0.2
-                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
 
                 if 'kappa' in kwargs:
                     kappa = kwargs['kappa']
@@ -374,7 +380,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                         self.interaction_params['kappa'] = [kappa] * (self.maxlabel + 1)
                 else:
                     self.interaction_params['kappa'] = [5.] * (self.maxlabel + 1)
-                    print('switch rate set to kappa = ', self.interaction_params['kappa'][0])
+                    logger.info('switch rate set to kappa = %s', self.interaction_params['kappa'][0])
 
                 self.props.update(kappa=np.array(self.interaction_params['kappa']))
                 if 'theta' in kwargs:
@@ -382,7 +388,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                     self.interaction_params['theta'] = theta
                 else:
                     self.interaction_params['theta'] = 0.5
-                    print('switch threshold set to theta = ', self.interaction_params['theta'])
+                    logger.info('switch threshold set to theta = %s', self.interaction_params['theta'])
 
             elif interaction == 'steric_evolution':
                 self.interaction = evo_steric
@@ -390,32 +396,32 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                     self.interaction_params['r_b'] = kwargs['r_b']
                 else:
                     self.interaction_params['r_b'] = 0.1
-                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
                 if 'r_m' in kwargs:
                     self.interaction_params['r_m'] = kwargs['r_m']
                 else:
                     self.interaction_params['r_m'] = 1e-3
-                    print('mutation rate set to r_m = ', self.interaction_params['r_m'])
+                    logger.info('mutation rate set to r_m = %s', self.interaction_params['r_m'])
                 if 'r_d' in kwargs:
                     self.interaction_params['r_d'] = kwargs['r_d']
                 else:
                     self.interaction_params['r_d'] = .98 * self.interaction_params['r_b']
-                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+                    logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
                 if 'alpha' in kwargs:
                     self.interaction_params['alpha'] = kwargs['alpha']
                 else:
                     self.interaction_params['alpha'] = 2.0
-                    print('steric interaction strength set to alpha = ', self.interaction_params['alpha'])
+                    logger.info('steric interaction strength set to alpha = %s', self.interaction_params['alpha'])
                 if 'gamma' in kwargs:
                     self.interaction_params['gamma'] = kwargs['gamma']
                 else:
                     self.interaction_params['gamma'] = 3.0
-                    print('rest channel weight set to gamma = ', self.interaction_params['gamma'])
+                    logger.info('rest channel weight set to gamma = %s', self.interaction_params['gamma'])
                 if 'capacity' in kwargs:
                     self.interaction_params['capacity'] = kwargs['capacity']
                 else:
                     self.interaction_params['capacity'] = 512
-                    print('deme capacity set to capacity = ', self.interaction_params['capacity'])
+                    logger.info('deme capacity set to capacity = %s', self.interaction_params['capacity'])
                 self.init_families(type='homogeneous', mutation=True)
                 self.props['family'][0] = 1  # there is no 'void' cell, so the cell w/ id = 0 also belongs to fam. 1
                 self.family_props.update(r_b=[0] + [self.interaction_params['r_b']] * self.maxfamily)
@@ -423,64 +429,62 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                     self.interaction_params['fitness_increase'] = kwargs['fitness_increase']
                 else:
                     self.interaction_params['fitness_increase'] = 1.1
-                    print('fitness increase for driver mutations set to ',
-                          self.interaction_params['fitness_increase'])
+                    logger.info('fitness increase for driver mutations set to %s', self.interaction_params['fitness_increase'])
 
             elif interaction == 'go_or_grow_glioblastoma':
                 self.interaction = go_or_grow_glioblastoma
                 try:
                     assert self.restchannels > 0
                 except AssertionError:
-                    print('There must be exactly one rest channel for this interaction to work!')
+                    warn_user('This interaction requires a rest channel.')
 
                 if 'capacity' in kwargs:
                     self.interaction_params['capacity'] = kwargs['capacity']
                 else:
                     self.interaction_params['capacity'] = 8
-                    print('node capacity set to ', self.interaction_params['capacity'])
+                    logger.info('node capacity set to %s', self.interaction_params['capacity'])
 
                 if 'kappa_std' in kwargs:
                     self.interaction_params['kappa_std'] = kwargs['kappa_std']
                 else:
                     self.interaction_params['kappa_std'] = 0.2
-                    print('std of kappa set to', self.interaction_params['kappa_std'])
+                    logger.info('std of kappa set to %s', self.interaction_params['kappa_std'])
 
                 if 'r_d' in kwargs:
                     self.interaction_params['r_d'] = kwargs['r_d']
                 else:
                     self.interaction_params['r_d'] = 0.01
-                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+                    logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
 
                 if 'r_m' in kwargs:
                     self.interaction_params['r_m'] = kwargs['r_m']
                 else:
                     self.interaction_params['r_m'] = 1e-3
-                    print('mutation rate set to r_m = ', self.interaction_params['r_m'])
+                    logger.info('mutation rate set to r_m = %s', self.interaction_params['r_m'])
 
                 if 'fitness_increase' in kwargs:
                     self.interaction_params['fitness_increase'] = kwargs['fitness_increase']
                 else:
                     self.interaction_params['fitness_increase'] = 1.1
-                    print('fitness increase for driver mutations set to ',
-                          self.interaction_params['fitness_increase'])
+                    logger.info('fitness increase for driver mutations set to %s', self.interaction_params['fitness_increase'])
 
                 if 'theta' in kwargs:
                     self.interaction_params['theta'] = kwargs['theta']
                 else:
                     self.interaction_params['theta'] = 0.5
-                    print('switch threshold set to theta = ', self.interaction_params['theta'])
+                    logger.info('switch threshold set to theta = %s', self.interaction_params['theta'])
 
                 if 'r_b' in kwargs:
                     initial_r_b = kwargs['r_b']
                 else:
                     initial_r_b = 0.2
-                    print('initial family birth rate set to r_b = ', initial_r_b)
+                    logger.info('initial family birth rate set to r_b = %s', initial_r_b)
 
                 if 'kappa' in kwargs:
                     initial_kappa = kwargs['kappa']
                 else:
                     initial_kappa = 5.0
-                    print('initial family switch rate set to kappa = ', initial_kappa)
+                    logger.info('initial family switch rate set to kappa = %s', initial_kappa)
 
                 self.init_families(type='homogeneous', mutation=True)
                 if self.props.get('family'):
@@ -495,7 +499,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                 )
 
         else:
-            print('Random walk interaction is used.')
+            logger.info('Random walk interaction is used.')
             interaction = 'random_walk'
             self.interaction = random_walk
         self._validate_interaction_params()

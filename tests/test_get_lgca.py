@@ -123,3 +123,54 @@ def test_warning_on_nonboolean_nodes():
             interaction='only_propagation',
         )
     assert set(np.unique(lgca.nodes[lgca.nonborder])) <= {0, 1}
+
+
+@pytest.mark.parametrize(
+    "family",
+    [
+        {},
+        {"ib": True},
+        {"ve": False},
+        {"ve": False, "ib": True},
+        {"n_species": 2},
+        {"n_species": 2, "ve": False},
+    ],
+    ids=["classical", "ib", "nove", "nove_ib", "multispecies", "multispecies_nove"],
+)
+def test_user_defined_interaction_function_runs_every_step_with_its_parameters(family):
+    calls = []
+
+    def my_rule(lgca):
+        calls.append(lgca.interaction_params["my_rate"])
+
+    lgca = get_lgca(geometry="lin", dims=8, density=1, seed=1, interaction=my_rule, my_rate=0.3, **family)
+    lgca.timeevo(timesteps=3, record=False, showprogress=False)
+
+    assert calls == [0.3, 0.3, 0.3]
+
+
+def test_user_defined_interaction_function_changes_the_state():
+    def remove_all_cells(lgca):
+        lgca.nodes[...] = False
+
+    lgca = get_lgca(geometry="square", dims=(5, 5), density=1, seed=1, interaction=remove_all_cells)
+    lgca.timeevo(timesteps=1, record=False, showprogress=False)
+
+    assert lgca.nodes.sum() == 0
+
+
+@pytest.mark.parametrize("family", [{}, {"ib": True}, {"ve": False}, {"ve": False, "ib": True}])
+def test_factory_and_simulation_print_nothing_but_log_chosen_defaults(family, capsys, caplog):
+    with caplog.at_level("INFO", logger="lgca"):
+        lgca = get_lgca(geometry="lin", dims=8, interaction="go_or_grow", restchannels=2, seed=1, **family)
+        lgca.timeevo(timesteps=2, record=True, showprogress=False)
+
+    assert capsys.readouterr().out == ""
+    assert any("r_b" in record.getMessage() for record in caplog.records)
+
+
+def test_too_few_rest_channels_for_go_or_grow_warn_at_the_caller():
+    with pytest.warns(UserWarning, match="die out") as record:
+        get_lgca(geometry="lin", dims=8, interaction="go_or_grow", restchannels=1, seed=1)
+
+    assert record[0].filename == __file__

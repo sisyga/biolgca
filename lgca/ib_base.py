@@ -9,6 +9,7 @@ volume exclusion.
 """
 
 
+import logging
 import warnings
 from abc import ABC
 from copy import copy, deepcopy
@@ -19,6 +20,7 @@ from numpy import random as npr
 from tqdm.auto import tqdm
 
 from .base import (
+    warn_user,
     plt,
     LGCA_base,
     _validate_density,
@@ -27,6 +29,8 @@ from .base import (
     _validate_positive_int,
 )
 from .plots import muller_plot
+
+logger = logging.getLogger(__name__)
 
 
 class IBLGCA_base(LGCA_base, ABC):
@@ -220,6 +224,8 @@ class IBLGCA_base(LGCA_base, ABC):
             Interaction parameters.
 
         """
+        if self._set_callable_interaction(kwargs):
+            return
         from lgca.ib_interactions import random_walk, birth, birthdeath, birthdeath_discrete, go_or_grow, \
             go_and_grow_mutations
         from lgca.interactions import only_propagation
@@ -231,18 +237,18 @@ class IBLGCA_base(LGCA_base, ABC):
                     self.interaction_params['r_b'] = kwargs['r_b']
                 else:
                     self.interaction_params['r_b'] = 0.2
-                    print('Birth rate set to r_b =', self.interaction_params['r_b'])
+                    logger.info('Birth rate set to r_b = %s', self.interaction_params['r_b'])
                 self.props.update(r_b=[0.] + [self.interaction_params['r_b']] * self.maxlabel)
                 if 'std' in kwargs:
                     self.interaction_params['std'] = kwargs['std']
                 else:
                     self.interaction_params['std'] = 0.01
-                    print('Standard deviation set to std =', self.interaction_params['std'])
+                    logger.info('Standard deviation set to std = %s', self.interaction_params['std'])
                 if 'a_max' in kwargs:
                     self.interaction_params['a_max'] = kwargs['a_max']
                 else:
                     self.interaction_params['a_max'] = 1.
-                    print('Max. birth rate set to a_max =', self.interaction_params['a_max'])
+                    logger.info('Max. birth rate set to a_max = %s', self.interaction_params['a_max'])
 
             elif interaction == 'birthdeath' or interaction == 'go_and_grow':
                 self.interaction = birthdeath
@@ -250,30 +256,30 @@ class IBLGCA_base(LGCA_base, ABC):
                     self.interaction_params['r_b'] = kwargs['r_b']
                 else:
                     self.interaction_params['r_b'] = 0.2
-                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
                 self.props.update(r_b=[0.] + [self.interaction_params['r_b']] * self.maxlabel)
                 if 'r_d' in kwargs:
                     self.interaction_params['r_d'] = kwargs['r_d']
                 else:
                     self.interaction_params['r_d'] = 0.02
-                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+                    logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
 
                 if 'std' in kwargs:
                     self.interaction_params['std'] = kwargs['std']
                 else:
                     self.interaction_params['std'] = 0.01
-                    print('standard deviation set to = ', self.interaction_params['std'])
+                    logger.info('standard deviation set to = %s', self.interaction_params['std'])
                 if 'a_max' in kwargs:
                     self.interaction_params['a_max'] = kwargs['a_max']
                 else:
                     self.interaction_params['a_max'] = 1.
-                    print('Max. birth rate set to a_max =', self.interaction_params['a_max'])
+                    logger.info('Max. birth rate set to a_max = %s', self.interaction_params['a_max'])
 
                 if 'track_inheritance' in kwargs:
                     self.interaction_params['track_inheritance'] = kwargs['track_inheritance']
                 else:
                     self.interaction_params['track_inheritance'] = False
-                    print('Family relationships not tracked.')
+                    logger.info('Family relationships not tracked.')
                 if self.interaction_params['track_inheritance']:
                     self.init_families(type='heterogeneous', mutation=False)
 
@@ -283,31 +289,31 @@ class IBLGCA_base(LGCA_base, ABC):
                     self.interaction_params['r_b'] = kwargs['r_b']
                 else:
                     self.interaction_params['r_b'] = 0.2
-                    print('Birth rate set to r_b = ', self.interaction_params['r_b'])
+                    logger.info('Birth rate set to r_b = %s', self.interaction_params['r_b'])
 
                 self.props.update(r_b=[0.] + [self.interaction_params['r_b']] * self.maxlabel)
                 if 'r_d' in kwargs:
                     self.interaction_params['r_d'] = kwargs['r_d']
                 else:
                     self.interaction_params['r_d'] = 0.02
-                    print('Death rate set to r_d = ', self.interaction_params['r_d'])
+                    logger.info('Death rate set to r_d = %s', self.interaction_params['r_d'])
 
                 if 'drb' in kwargs:
                     self.interaction_params['drb'] = kwargs['drb']
                 else:
                     self.interaction_params['drb'] = 0.01
-                    print('Delta r_b set to = ', self.interaction_params['drb'])
+                    logger.info('Delta r_b set to = %s', self.interaction_params['drb'])
                 if 'a_max' in kwargs:
                     self.interaction_params['a_max'] = kwargs['a_max']
                 else:
                     self.interaction_params['a_max'] = 1.
-                    print('Max. birth rate set to a_max =', self.interaction_params['a_max'])
+                    logger.info('Max. birth rate set to a_max = %s', self.interaction_params['a_max'])
 
                 if 'pmut' in kwargs:
                     self.interaction_params['pmut'] = kwargs['pmut']
                 else:
                     self.interaction_params['pmut'] = 0.1
-                    print('Mutation probability set to p_mut =', self.interaction_params['pmut'])
+                    logger.info('Mutation probability set to p_mut = %s', self.interaction_params['pmut'])
 
             elif interaction == 'go_or_grow':
                 self.interaction = go_or_grow
@@ -315,12 +321,12 @@ class IBLGCA_base(LGCA_base, ABC):
                     self.interaction_params['r_d'] = kwargs['r_d']
                 else:
                     self.interaction_params['r_d'] = 0.01
-                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+                    logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
                 if 'r_b' in kwargs:
                     self.interaction_params['r_b'] = kwargs['r_b']
                 else:
                     self.interaction_params['r_b'] = 0.2
-                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
                 if 'kappa' in kwargs:
                     kappa = kwargs['kappa']
                     try:
@@ -329,7 +335,7 @@ class IBLGCA_base(LGCA_base, ABC):
                         self.interaction_params['kappa'] = [kappa] * self.maxlabel
                 else:
                     self.interaction_params['kappa'] = [5.] * self.maxlabel
-                    print('switch rate set to kappa = ', self.interaction_params['kappa'][0])
+                    logger.info('switch rate set to kappa = %s', 5.0)
                 self.props.update(kappa=[0.] + self.interaction_params['kappa'])
                 if 'theta' in kwargs:
                     theta = kwargs['theta']
@@ -339,21 +345,21 @@ class IBLGCA_base(LGCA_base, ABC):
                         self.interaction_params['theta'] = [theta] * self.maxlabel
                 else:
                     self.interaction_params['theta'] = [0.75] * self.maxlabel
-                    print('switch threshold set to theta = ', self.interaction_params['theta'][0])
+                    logger.info('switch threshold set to theta = %s', 0.75)
                 self.props.update(theta=[0.] + self.interaction_params['theta'])
                 if 'kappa_std' in kwargs:
                     self.interaction_params['kappa_std'] = kwargs['kappa_std']
                 else:
                     self.interaction_params['kappa_std'] = 0.2
-                    print('Standard deviation for kappa mutation set to ', self.interaction_params['kappa_std'])
+                    logger.info('Standard deviation for kappa mutation set to %s', self.interaction_params['kappa_std'])
                 if 'theta_std' in kwargs:
                     self.interaction_params['theta_std'] = kwargs['theta_std']
                 else:
                     self.interaction_params['theta_std'] = 0.05
-                    print('Standard deviation for theta mutation set to ', self.interaction_params['theta_std'])
+                    logger.info('Standard deviation for theta mutation set to %s', self.interaction_params['theta_std'])
 
                 if self.restchannels < 2:
-                    print('WARNING: not enough rest channels - system will die out!!!')
+                    warn_user('Not enough rest channels - system will die out.')
 
             elif interaction == 'random_walk':
                 self.interaction = random_walk
@@ -367,24 +373,24 @@ class IBLGCA_base(LGCA_base, ABC):
                     self.interaction_params['effect'] = kwargs['effect']
                 else:
                     self.interaction_params['effect'] = 'passenger_mutation'
-                    print('fitness effect set to passenger mutation, rb=const.')
+                    logger.info('fitness effect set to passenger mutation, rb=const.')
                 if 'r_int' in kwargs:
                     self.set_r_int(kwargs['r_int'])
                 if 'r_b' in kwargs:
                     self.interaction_params['r_b'] = kwargs['r_b']
                 else:
                     self.interaction_params['r_b'] = 0.5
-                    print('birth rate set to r_b = ', self.interaction_params['r_b'])
+                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
                 if 'r_m' in kwargs:
                     self.interaction_params['r_m'] = kwargs['r_m']
                 else:
                     self.interaction_params['r_m'] = 0.001
-                    print('mutation rate set to r_m = ', self.interaction_params['r_m'])
+                    logger.info('mutation rate set to r_m = %s', self.interaction_params['r_m'])
                 if 'r_d' in kwargs:
                     self.interaction_params['r_d'] = kwargs['r_d']
                 else:
                     self.interaction_params['r_d'] = 0.02
-                    print('death rate set to r_d = ', self.interaction_params['r_d'])
+                    logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
                 self.init_families(type='homogeneous', mutation=True)
                 if self.interaction_params['effect'] == 'driver_mutation':
                     self.family_props.update(r_b=[0] + [self.interaction_params['r_b']] * self.maxfamily)
@@ -392,8 +398,7 @@ class IBLGCA_base(LGCA_base, ABC):
                         self.interaction_params['fitness_increase'] = kwargs['fitness_increase']
                     else:
                         self.interaction_params['fitness_increase'] = 1.1
-                        print('fitness increase for driver mutations set to ',
-                              self.interaction_params['fitness_increase'])
+                        logger.info('fitness increase for driver mutations set to %s', self.interaction_params['fitness_increase'])
             else:
                 raise ValueError(
                     "Unknown interaction {!r}. Implemented interactions: {}".format(
@@ -868,7 +873,7 @@ class IBLGCA_base(LGCA_base, ABC):
             else:
                 prop_values = self.family_props[prop]
                 if 'facecolour_map' in kwargs:
-                    print("If the families should be coloured according to "+str(prop) +
+                    warn_user("If the families should be coloured according to "+str(prop) +
                           ", facecolour mapping is done by the LGCA - 'facecolour_map' ignored")
                 kwargs['facecolour'] = 'property'
                 kwargs['facecolour_map'] = prop_values

@@ -66,10 +66,16 @@ from .operator_registry import PluginRegistry
 default_registry = PluginRegistry()
 
 
-def register_plugin(info: PluginInfo, factory: PluginFactory) -> None:
-    """Register a plugin in the default registry."""
+def register_plugin(info: PluginInfo, factory: PluginFactory, replace: bool = False) -> None:
+    """Register a plugin in the default registry.
 
-    default_registry.register(info, factory)
+    Registering the same name again from the same module replaces the earlier
+    entry, so a notebook cell that defines and registers a plugin can be run
+    again. Pass ``replace=True`` to replace a plugin registered by another
+    module, such as a built-in interaction.
+    """
+
+    default_registry.register(info, factory, replace=replace)
 
 
 def list_plugins(kind: str | None = None) -> list[PluginInfo]:

@@ -7,6 +7,13 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- `get_lgca(interaction=my_function, my_rate=0.1)` uses a function of the LGCA
+  object as the interaction step; the remaining keyword arguments are stored
+  in `lgca.interaction_params`. Previously this raised `AttributeError`.
+- `CITATION.cff` with the BIO-LGCA method paper (Deutsch et al. 2021) and the
+  heterogeneity paper (Syga et al. 2026).
+- The README runs as written: `tests/readme_test.py` executes its code, and
+  `docs/images/readme/make_readme_images.py` renders its figures from it.
 - Versioned, shareable `ModelSpec` simulations with canonical JSON, optional
   YAML authoring, validation, migration hooks, runtime provenance, and CLI
   commands for validation, inspection, examples, and runs.
@@ -33,6 +40,20 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- The library no longer prints. Messages about default interaction parameters
+  are logged at INFO level under the `lgca` logger (enable them with
+  `logging.basicConfig(level=logging.INFO)`), and problems such as too few rest
+  channels for go-or-grow are raised as `UserWarning` pointing at the calling
+  line.
+- Registering a plugin name again from the module that registered it replaces
+  the entry, so notebook cells that define plugins can be rerun. Replacing a
+  plugin of another module, such as a built-in, requires
+  `register_plugin(..., replace=True)`.
+- The README was rewritten around runnable examples with figures.
+- `profiling.py` moved to `benchmarks/profiling.py`. Maintainer notes (plans,
+  milestone reports, implementation ownership) moved from the user guide and
+  `benchmarks/` to `docs/development/`, which also holds the usability
+  roadmap. The project's documentation URL now points to readthedocs.
 - BioLGCA requires Python 3.11 or newer and supports Python 3.14; Python 3.10
   is no longer supported.
 - Runtime and optional dependencies declare the oldest versions the test suite
@@ -95,6 +116,8 @@ This file records notable user-facing changes. Changes remain under
 
 ### Fixed
 
+- `get_lgca(ib=True, interaction="go_or_grow")` raised `IndexError` when the
+  initial lattice contained no cells.
 - Particle-number-conserving interactions, including phenotypic switching,
   transition the complete channel state from `s` to `s'` while preserving the
   number of particles, consistent with legacy random-walk, alignment, and
