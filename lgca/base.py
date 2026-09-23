@@ -442,7 +442,7 @@ class LGCA_base(ABC):
         every geometry. Interaction sensitivities such as ``beta`` in aggregation therefore have the same meaning on
         all lattices. On 1D, square, cubic and Moore lattices it is computed with :py:func:`numpy.gradient` as
         central differences, with one-sided differences at the array edges. On the hexagonal lattice it is the
-        neighbour sum :math:`\sum_i c_i q(r + c_i)` divided by :math:`b/2`, which is exact for linear fields.
+        neighbour sum :math:`\\sum_i c_i q(r + c_i)` divided by :math:`b/2`, which is exact for linear fields.
 
         For example, the gradient at position 1 of ``np.array([1, 2, 4])`` is (4 - 1)/2 = 1.5.
 
