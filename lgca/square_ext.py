@@ -40,7 +40,7 @@ except ImportError:  # pragma: no cover - handled at runtime
     )
 
 from .plot_data import resolve_animation_history, select_density, select_density_history
-from .plots import estimate_figsize, get_cmap
+from .plots import estimate_figsize, get_cmap, make_animation
 
 logger = logging.getLogger(__name__)
 
@@ -211,14 +211,15 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
             self.apply_boundaries()
 
     def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
-                     edgecolor='None', cbar=True, cbarlabel='Particle number $n$', channels=slice(None), species=None):
+                     edgecolor='None', cbar=True, cbarlabel='Particle number $n$', channels=slice(None), species=None,
+                     ax=None):
 
         density = select_density(self, density=density, channels=channels, species=species)
 
         if figsize is None:
             figsize = estimate_figsize(density, cbar=cbar, dy=self.dy)
 
-        fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
+        fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout, ax=ax)
 
 
         cmap = get_cmap(density, ax=ax, cmap=cmap, cbarlabel=cbarlabel, cbar=cbar)
@@ -233,7 +234,7 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
         return fig, pc, cmap
 
     def animate_flux(self, nodes_t=None, figindex=None, figsize=None, interval=200, tight_layout=True,
-                     edgecolor='None', cbar=True, steps=None):
+                     edgecolor='None', cbar=True, steps=None, save_path=None, save_kwargs=None, ax=None):
         nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
 
         nodes = nodes_t.astype(float)
@@ -245,7 +246,7 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
         angle.imag = jy
         angle = np.angle(angle, deg=True) % 360.
         fig, pc, cmap = self.plot_flux(nodes=nodes[0], figindex=figindex, figsize=figsize, tight_layout=tight_layout,
-                                       edgecolor=edgecolor, cbar=cbar)
+                                       edgecolor=edgecolor, cbar=cbar, ax=ax)
         angle = cmap.to_rgba(angle[None, ...])[0]
         angle[..., -1] = np.sign(density)
 
@@ -257,12 +258,14 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
             pc.set(facecolor=angle[n, ...].reshape(-1, 4))
             return pc, title
 
-        ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
+        ani = make_animation(fig, update, interval=interval, frames=nodes_t.shape[0],
+                             save_path=save_path, save_kwargs=save_kwargs)
         return ani
 
 
     def animate_density(self, density_t=None, figindex=None, figsize=None, cmap='viridis', interval=200, vmax=None,
-                        tight_layout=True, edgecolor='None', species=None, steps=None, channels=slice(None)):
+                        tight_layout=True, edgecolor='None', species=None, steps=None, channels=slice(None),
+                        save_path=None, save_kwargs=None, ax=None):
         density_t, steps = resolve_animation_history(self, "density_t", density_t, steps, channels)
 
         density_t = select_density_history(self, density_t, species=species)
@@ -273,7 +276,7 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
             vmax_val = int(density_t.max())
 
         fig, pc, cmap = self.plot_density(density_t[0], figindex=figindex, figsize=figsize, cmap=cmap, vmax=vmax_val,
-                                          tight_layout=tight_layout, edgecolor=edgecolor)
+                                          tight_layout=tight_layout, edgecolor=edgecolor, ax=ax)
         title = pc.axes.set_title(f'Time $k =${steps[0]}')
 
         def update(n):
@@ -281,7 +284,8 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
             pc.set(facecolor=cmap.to_rgba(density_t[n, ...].ravel()))
             return pc, title
 
-        ani = animation.FuncAnimation(fig, update, interval=interval, frames=density_t.shape[0])
+        ani = make_animation(fig, update, interval=interval, frames=density_t.shape[0],
+                             save_path=save_path, save_kwargs=save_kwargs)
         return ani
 
 
@@ -349,7 +353,7 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
 
         return fig, arrows, circles, cmap
 
-    def animate_config(self, nodes_t=None, interval=100, steps=None, **kwargs):
+    def animate_config(self, nodes_t=None, interval=100, steps=None, save_path=None, save_kwargs=None, **kwargs):
         nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
 
         counts_t = self._channel_counts(nodes_t, history=True)
@@ -367,7 +371,8 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
                 circles.set(facecolor=circle_color[n])
                 return arrows, circles, title
 
-            ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
+            ani = make_animation(fig, update, interval=interval, frames=nodes_t.shape[0],
+                                 save_path=save_path, save_kwargs=save_kwargs)
             return ani
 
         else:
@@ -376,7 +381,8 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
                 arrows.set(color=arrow_color[n])
                 return arrows, title
 
-            ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
+            ani = make_animation(fig, update, interval=interval, frames=nodes_t.shape[0],
+                                 save_path=save_path, save_kwargs=save_kwargs)
             return ani
 
 

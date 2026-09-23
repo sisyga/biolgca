@@ -110,3 +110,12 @@ html_theme_options = {
     'fixed_sidebar' : True,
 }
 html_logo = '../images/biolgca_v2.png'
+
+
+def setup(app):
+    # Matplotlib docstrings inherited by lgca classes (e.g. LatticeAnimation)
+    # use Matplotlib's :rc: role for rcParams; render it as literal text.
+    from docutils import nodes
+    from docutils.parsers.rst import roles
+
+    roles.register_generic_role("rc", nodes.literal)

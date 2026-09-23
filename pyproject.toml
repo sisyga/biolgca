@@ -32,6 +32,8 @@ dependencies = [
     "tqdm>=4.64.1",
     "matplotlib>=3.7",
     "jupyterlab>=4.0",
+    # Progress bars and interactive widgets in notebooks.
+    "ipywidgets>=8.0",
 ]
 
 # Optional user-facing features: `uv sync --extra yaml` or `pip install -e ".[yaml]"`.

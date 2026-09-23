@@ -16,7 +16,7 @@ Supported LGCA types:
 - identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_Hex`)
 """
 
-from lgca.base import np, plt
+from lgca.base import np
 from lgca.list_utils import get_arr_of_empty_lists
 from lgca.lgca_square import LGCA_Square, IBLGCA_Square, NoVE_LGCA_Square, NoVE_IBLGCA_Square
 
@@ -446,15 +446,6 @@ class LGCA_Hex(LGCA_Square):
         sum[:, 1:-1:2, ...] += qty[:, 2::2, ...]
         return sum
 
-    def setup_figure(self, figindex=None, figsize=(8, 8), tight_layout=True):
-        # documented in parent class
-        # create figure from parent method
-        fig, ax = super(LGCA_Hex, self).setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
-        # correct labels for y axis scaling
-        plt.gca()
-        plt.xlabel('$x$')
-        plt.ylabel('$y$')
-        return fig, ax
 
 
 class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):

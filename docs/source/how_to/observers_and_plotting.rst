@@ -178,6 +178,41 @@ animated density paths use the same selection rule:
    plot(lgca, kind="density", species=1)  # species 1 only
    lgca.animate_density(species=1)
 
+Figures, panels and animations
+------------------------------
+
+Each 1D and 2D plot opens a new figure, so consecutive plot calls in a script
+do not draw over each other. An empty current figure is used instead, which
+keeps ``plt.figure(figsize=...)`` followed by a plot call working. To combine
+plots in one figure, pass the target axes with ``ax=``:
+
+.. code-block:: python
+
+   import matplotlib.pyplot as plt
+
+   lgca.timeevo(timesteps=25, record=True, showprogress=False)
+
+   fig, (left, right) = plt.subplots(1, 2, figsize=(10, 4), layout="constrained")
+   lgca.plot_density(ax=left)
+   lgca.plot_flux(ax=right)
+
+With constrained layout, colour bars stay inside their panel.
+
+Animations of recorded runs (``animate_density``, ``animate_flux``,
+``animate_config`` and ``animate_flow``) play in a Jupyter notebook when the
+call is the last line of a cell. ``save_path`` writes a movie file; GIF files
+need no extra software, video formats such as ``.mp4`` need ffmpeg.
+``save_kwargs`` passes options such as ``dpi`` to
+:meth:`matplotlib.animation.Animation.save`:
+
+.. code-block:: python
+
+   lgca.animate_flux(save_path="flux.gif", save_kwargs={"dpi": 80})
+
+Live animations (``live_animate_*``) simulate while they draw. They need an
+interactive Matplotlib backend, such as a desktop window or ``%matplotlib widget``
+with the ``ipympl`` package in JupyterLab.
+
 Snapshot and movie observers
 ----------------------------
 

@@ -38,6 +38,7 @@ from lgca.base import (
     plt,
 )
 from lgca.list_utils import get_arr_of_empty_lists
+from lgca.plots import colorbar_axes, lattice_axes
 
 
 class LGCA_1D(LGCA_base):
@@ -353,7 +354,7 @@ class LGCA_1D(LGCA_base):
         weights[1:, ..., 1] = qty[:-1, ...]
         return weights
 
-    def setup_figure(self, tmax, figindex=None, figsize=(8, 8), tight_layout=True):
+    def setup_figure(self, tmax, figindex=None, figsize=(8, 8), tight_layout=True, ax=None):
         """
         Create a :py:mod:`matplotlib` figure and manage basic layout.
 
@@ -370,6 +371,9 @@ class LGCA_1D(LGCA_base):
             If :py:meth:`matplotlib.figure.Figure.tight_layout` is called for padding between and around subplots.
         tmax : int or float
             Maximum simulation time to plot in order to scale the y axis.
+        ax : :py:class:`matplotlib.axes.Axes`, optional
+            Axes to draw into, e.g. one panel of :py:func:`matplotlib.pyplot.subplots`. By default, the plot
+            opens a new figure (or uses the current figure if it is still empty).
 
         Returns
         -------
@@ -384,31 +388,18 @@ class LGCA_1D(LGCA_base):
         plot_flux : Plot flux over time.
 
         """
-        # create or retrieve figure, set size and layout
-        if figindex is None:
-            fig = plt.gcf()
-            fig.set_size_inches(figsize)
-            fig.set_layout_engine("tight" if tight_layout else None)
-
-        else:
-            fig = plt.figure(num=figindex)
-            fig.set_size_inches(figsize)
-            fig.set_layout_engine("tight" if tight_layout else None)
-
-        # retrieve drawing axis and scale
-        ax = plt.gca()
+        fig, ax = lattice_axes(figindex=figindex, figsize=figsize, tight_layout=tight_layout, ax=ax)
         xmax = self.xcoords.max() + 0.5
         xmin = self.xcoords.min() - 0.5
         ymax = tmax - 0.5
         ymin = -0.5
-        plt.xlim(xmin, xmax)
-        plt.ylim(ymax, ymin)
+        ax.set_xlim(xmin, xmax)
+        ax.set_ylim(ymax, ymin)
         ax.set_aspect('equal')
 
         # label axes, set tick positions and adjust their appearance
-        plt.xlabel('Lattice node $r \\, (\\varepsilon)$')
-        plt.ylabel('Time $k'
-                   '\\, (\\tau)$')
+        ax.set_xlabel('Lattice node $r \\, (\\varepsilon)$')
+        ax.set_ylabel('Time $k \\, (\\tau)$')
         ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
         ax.spines['top'].set_visible(True)
@@ -483,8 +474,7 @@ class LGCA_1D(LGCA_base):
         # create plot
         plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=vmax, cmap=cmap)
         if cbar:
-            divider = make_axes_locatable(ax)
-            cax = divider.append_axes("right", size=colorbarwidth, pad=0.1)
+            cax = colorbar_axes(ax, size=colorbarwidth, pad=0.1)
             cbar = colorbar_index(ncolors=1 + vmax, cmap=cmap, use_gridspec=True, cax=cax)
 
             cbar.set_label('Particle number $n$')
@@ -566,8 +556,7 @@ class LGCA_1D(LGCA_base):
         ax.xaxis.tick_top()
         plt.tight_layout()
         if cbar:
-            divider = make_axes_locatable(ax)
-            cax = divider.append_axes("right", size=colorbarwidth, pad=0.1)
+            cax = colorbar_axes(ax, size=colorbarwidth, pad=0.1)
             mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
             cbar_handle = fig.colorbar(mappable, use_gridspec=True, cax=cax)
             cbar_handle.set_ticks(range(4))
@@ -640,8 +629,7 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
         mean_prop_t = self.calc_prop_mean(propname=propname, props=props, nodes=nodes_t)
 
         plot = plt.imshow(mean_prop_t, interpolation='none', aspect='equal', cmap=cmap, **kwargs)
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size=0.3, pad=0.1)
+        cax = colorbar_axes(ax, size=0.3, pad=0.1)
         cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
         cbar.set_label(r'Property ${}$'.format(propname))
         plt.sca(ax)
@@ -728,7 +716,7 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
             self.apply_boundaries()
 
     def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='hot_r', relative_max=None, cbar=True,
-                     absolute_max=None, offset_t=0, offset_x=0, cbarlabel=None, species=None, **kwargs):
+                     absolute_max=None, offset_t=0, offset_x=0, cbarlabel=None, species=None, ax=None, **kwargs):
         """
         Create a plot showing the number of particles per lattice site.
         :param density_t: particle number per lattice site (ndarray of dimension (timesteps + 1,) + self.dims)
@@ -759,7 +747,7 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
             figsize = estimate_figsize(density_t.T, cbar=True)
 
         # set up figure
-        fig, ax = self.setup_figure(density_t.shape[0], figindex=figindex, figsize=figsize)
+        fig, ax = self.setup_figure(density_t.shape[0], figindex=figindex, figsize=figsize, ax=ax)
         # set up color scaling
         if relative_max is not None:
             scale = relative_max
@@ -780,8 +768,7 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         loc = mticker.MaxNLocator(nbins='auto', steps=[1, 2, 5, 10], integer=True)
         ax.yaxis.set_major_locator(loc)
         if cbar:
-            divider = make_axes_locatable(ax)
-            cax = divider.append_axes("right", size=0.2, pad=0.1)
+            cax = colorbar_axes(ax, size=0.2, pad=0.1)
             cbar = colorbar_index(ncolors=max_part_per_cell + 1, cmap=cmap, use_gridspec=True, cax=cax)
             cbar.set_label(cbarlabel)
             plt.sca(ax)
@@ -910,8 +897,7 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
 
         plot = plt.imshow(mean_prop_t, interpolation='none', cmap=cmap, aspect='equal', **kwargs)
         if cbar:
-            divider = make_axes_locatable(ax)
-            cax = divider.append_axes("right", size=0.2, pad=0.1)
+            cax = colorbar_axes(ax, size=0.2, pad=0.1)
             cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
             if cbarlabel is None:
                 cbar.set_label(r'Property ${}$'.format(propname))

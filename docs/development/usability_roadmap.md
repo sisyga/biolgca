@@ -148,6 +148,12 @@ Independent, low-risk items, in order.
   (`_repr_html_` via `to_jshtml`).
 - Fix hex tick positions and colour-bar label clipping.
 - Add an animation to tutorials 1 and 2.
+- Status (2026-09-23): done. `lgca.plots.lattice_axes`, `colorbar_axes` and
+  `make_animation`/`LatticeAnimation` hold the shared behaviour. Tutorial 2
+  now draws its hexagonal density panels with `plot_density(ax=...)` instead
+  of `imshow`. Also fixed: 1D colour-bar ticks on bin edges. `ipywidgets` is a
+  dependency so tqdm progress bars work in notebooks. Still to check:
+  clipping of long colour-bar labels at the figure edge (D3).
 
 **0.6 Documented specs** (B1, B6)
 - NumPy docstrings for `SpaceSpec`, `StateSpec`, `TimeSpec`, `AnalysisSpec`,

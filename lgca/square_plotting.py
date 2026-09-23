@@ -38,14 +38,14 @@ from .plot_data import (
     select_scalar_field,
     validate_species,
 )
-from .plots import estimate_figsize, get_cmap
+from .plots import _nice_steps, colorbar_axes, estimate_figsize, get_cmap, lattice_axes, make_animation
 
 __all__ = ["SquarePlotMixin"]
 
 
 class SquarePlotMixin:
     """Plotting helpers for square lattice LGCAs."""
-    def setup_figure(self, figindex=None, figsize=(8, 8), tight_layout=True):
+    def setup_figure(self, figindex=None, figsize=(8, 8), tight_layout=True, ax=None):
         """
         Create a :py:mod:`matplotlib` figure and manage basic layout.
 
@@ -60,6 +60,9 @@ class SquarePlotMixin:
             Desired figure size in inches ``(x, y)``.
         tight_layout : bool, default=True
             If :py:meth:`matplotlib.figure.Figure.tight_layout` is called for padding between and around subplots.
+        ax : :py:class:`matplotlib.axes.Axes`, optional
+            Axes to draw into, e.g. one panel of :py:func:`matplotlib.pyplot.subplots`. By default, the plot
+            opens a new figure (or uses the current figure if it is still empty).
 
         Returns
         -------
@@ -77,41 +80,24 @@ class SquarePlotMixin:
         # calculate y axis scaling for polygons (squares or hexagons)
         dy = self.r_poly * np.cos(self.orientation)
 
-        # create or retrieve figure, set size and layout
-        if figindex is None:
-            fig = plt.gcf()
-            fig.set_size_inches(figsize)
-            fig.set_layout_engine("tight" if tight_layout else None)
-
-        else:
-            fig = plt.figure(num=figindex)
-            fig.set_size_inches(figsize)
-            fig.set_layout_engine("tight" if tight_layout else None)
-
-        # retrieve drawing axis and scale
-        ax = plt.gca()
+        fig, ax = lattice_axes(figindex=figindex, figsize=figsize, tight_layout=tight_layout, ax=ax)
         xmax = self.xcoords.max() + 0.5
         xmin = self.xcoords.min() - 0.5
         ymax = self.ycoords.max() + dy
         ymin = self.ycoords.min() - dy
-        plt.xlim(xmin, xmax)
-        plt.ylim(ymin, ymax)
+        ax.set_xlim(xmin, xmax)
+        ax.set_ylim(ymin, ymax)
         ax.set_aspect('equal')
 
         # label axes, set tick positions and adjust their appearance
-        plt.xlabel('$x$')
-        plt.ylabel('$y$')
+        ax.set_xlabel('$x$')
+        ax.set_ylabel('$y$')
         ax.xaxis.set_major_locator(mticker.MaxNLocator(nbins=9, steps=[1, 2, 5, 10], integer=True))
-        if self.dy >= 1:
-            minstep = self.dy
-            integer = True
-        else:
-            minstep = 1
-            integer = False
-        ax.yaxis.set_major_locator(
-            mticker.MaxNLocator(nbins=9, steps=[minstep, 2 * self.dy, 5 * self.dy, 10 * self.dy], integer=integer)
-        )
-        ax.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: int(x / self.dy)))
+        # ticks on whole rows, labelled by row index (rows are dy apart on hexagonal lattices)
+        rows = int(round((self.ycoords.max() - self.ycoords.min()) / self.dy)) + 1
+        row_step = next(step for step in _nice_steps() if rows / step <= 8)
+        ax.yaxis.set_major_locator(mticker.MultipleLocator(row_step * self.dy))
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda y, pos: int(round(y / self.dy))))
         ax.spines['top'].set_visible(True)
         ax.spines['right'].set_visible(True)
         ax.yaxis.set_ticks_position('both')
@@ -178,7 +164,7 @@ class SquarePlotMixin:
 
         return fig, arrows, circles, texts
 
-    def animate_config(self, nodes_t=None, interval=100, steps=None, **kwargs):
+    def animate_config(self, nodes_t=None, interval=100, steps=None, save_path=None, save_kwargs=None, **kwargs):
         nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
 
         fig, arrows, circles, texts = self.plot_config(nodes=nodes_t[0], **kwargs)
@@ -201,7 +187,8 @@ class SquarePlotMixin:
                     text.set(alpha=bool(i), visible=bool(i))
                 return arrows, circles, texts, title
 
-            ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
+            ani = make_animation(fig, update, interval=interval, frames=nodes_t.shape[0],
+                                 save_path=save_path, save_kwargs=save_kwargs)
             return ani
 
         else:
@@ -210,7 +197,8 @@ class SquarePlotMixin:
                 arrows.set(alpha=arrow_color[n])
                 return arrows, title
 
-            ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
+            ani = make_animation(fig, update, interval=interval, frames=nodes_t.shape[0],
+                                 save_path=save_path, save_kwargs=save_kwargs)
             return ani
 
 
@@ -290,8 +278,7 @@ class SquarePlotMixin:
                           scale=1./self.r_poly, minlength=0.)
 
         if cbar:
-            divider = make_axes_locatable(ax)
-            cax = divider.append_axes("right", size="5%", pad=0.1)
+            cax = colorbar_axes(ax, size="5%", pad=0.1)
             cmap = plt.get_cmap(cmap).with_extremes(under=(0, 0, 0, 0))
             plot.set_cmap(cmap)
             # cmap = plot.get_cmap()
@@ -317,7 +304,8 @@ class SquarePlotMixin:
         #                   pivot='mid', angles='xy', scale_units='xy', scale=1./self.r_poly)
         return fig, plot
 
-    def animate_flow(self, nodes_t=None, interval=100, cbar=False, steps=None, **kwargs):
+    def animate_flow(self, nodes_t=None, interval=100, cbar=False, steps=None, save_path=None, save_kwargs=None,
+                     **kwargs):
         nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
 
         counts_t = self._channel_counts(nodes_t, history=True).astype(float)
@@ -332,7 +320,8 @@ class SquarePlotMixin:
             plot.set_UVC(jx[n], jy[n], density[n])
             return plot, title
 
-        ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
+        ani = make_animation(fig, update, interval=interval, frames=nodes_t.shape[0],
+                             save_path=save_path, save_kwargs=save_kwargs)
         return ani
 
 
@@ -377,8 +366,7 @@ class SquarePlotMixin:
                 norm=norm,
             )
             if cbar:
-                divider = make_axes_locatable(ax)
-                cax = divider.append_axes("right", size="5%", pad=0.1)
+                cax = colorbar_axes(ax, size="5%", pad=0.1)
                 colorbar = fig.colorbar(image, cax=cax, use_gridspec=True)
                 colorbar.set_label(cbarlabel)
                 plt.sca(ax)
@@ -393,8 +381,7 @@ class SquarePlotMixin:
         pc = PatchCollection(polygons, match_original=True)
         ax.add_collection(pc)
         if cbar:
-            divider = make_axes_locatable(ax)
-            cax = divider.append_axes("right", size="5%", pad=0.1)
+            cax = colorbar_axes(ax, size="5%", pad=0.1)
             cbar = fig.colorbar(cmap, cax=cax, use_gridspec=True)
             cbar.set_label(cbarlabel)
             plt.sca(ax)
@@ -402,7 +389,7 @@ class SquarePlotMixin:
         return fig, pc, cmap
 
     def plot_density(self, density=None, channels=slice(None), species=None, figindex=None, figsize=None, tight_layout=True,
-                     cmap='viridis', vmax=None, edgecolor='None', cbar=True, cbarlabel='Particle number $n$'):
+                     cmap='viridis', vmax=None, edgecolor='None', cbar=True, cbarlabel='Particle number $n$', ax=None):
         """
         Plot particle density in the lattice. A color bar on the right side shows the color coding of density values.
         Empty nodes are white.
@@ -437,8 +424,8 @@ class SquarePlotMixin:
             Maximum density value for the color scaling. The minimum value is zero. All density values higher than
             `vmax` are drawn in the color at the end of the color bar. If None, `vmax` is set to the number of channels
             ``self.K``.
-        **kwargs
-            Arguments to be passed on to :py:meth:`setup_figure`.
+        ax : :py:class:`matplotlib.axes.Axes`, optional
+            Axes to draw into, e.g. one panel of :py:func:`matplotlib.pyplot.subplots`.
 
         Returns
         -------
@@ -463,7 +450,7 @@ class SquarePlotMixin:
             K = vmax
 
         # set up figure
-        fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
+        fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout, ax=ax)
         # set up density translation to color
         color_map = plt.get_cmap(cmap).with_extremes(under=(0, 0, 0, 0))
         if K > 1:
@@ -481,8 +468,7 @@ class SquarePlotMixin:
                 norm=norm,
             )
             if cbar:
-                divider = make_axes_locatable(ax)
-                cax = divider.append_axes("right", size="5%", pad=0.1)
+                cax = colorbar_axes(ax, size="5%", pad=0.1)
                 colorbar = fig.colorbar(image, extend='min', use_gridspec=True, cax=cax)
                 colorbar.set_label(cbarlabel)
                 colorbar.set_ticks(np.linspace(0.0, K + 1, 2 * K + 3, endpoint=True)[3::2])
@@ -500,8 +486,7 @@ class SquarePlotMixin:
         ax.add_collection(pc)
         # draw colorbar
         if cbar:
-            divider = make_axes_locatable(ax)
-            cax = divider.append_axes("right", size="5%", pad=0.1)
+            cax = colorbar_axes(ax, size="5%", pad=0.1)
             cbar = fig.colorbar(cmap, extend='min', use_gridspec=True, cax=cax)
             cbar.set_label(cbarlabel)
             cbar.set_ticks(np.linspace(0.0, K + 1, 2 * K + 3, endpoint=True)[3::2])
@@ -514,19 +499,20 @@ class SquarePlotMixin:
     def _validate_plot_species(self, species):
         return validate_species(self, species)
 
-    def plot_vectorfield(self, x, y, vfx, vfy, figindex=None, figsize=None, tight_layout=True, cmap='viridis'):
+    def plot_vectorfield(self, x, y, vfx, vfy, figindex=None, figsize=None, tight_layout=True, cmap='viridis', ax=None):
         l = np.sqrt(vfx ** 2 + vfy ** 2)
 
         if figsize is None:
             figsize = estimate_figsize(x, cbar=True)
 
-        fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
+        fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout, ax=ax)
         ax.set_aspect('equal')
         plot = plt.quiver(x, y, vfx, vfy, l, cmap=cmap, pivot='mid', angles='xy', scale_units='xy',
                           scale=1./self.r_poly, norm=colors.Normalize(vmin=0, vmax=1), minlength=0.)
         return fig, plot
 
-    def plot_flux(self, nodes=None, figindex=None, figsize=None, tight_layout=True, edgecolor='None', cbar=True):
+    def plot_flux(self, nodes=None, figindex=None, figsize=None, tight_layout=True, edgecolor='None', cbar=True,
+                  ax=None):
         if nodes is None:
             nodes = self.nodes[self.nonborder]
 
@@ -536,7 +522,7 @@ class SquarePlotMixin:
         if figsize is None:
             figsize = estimate_figsize(density, cbar=True)
 
-        fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout)
+        fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout, ax=ax)
         cmap = plt.get_cmap('gist_rainbow')
         cmap = plt.cm.ScalarMappable(cmap=cmap, norm=colors.Normalize(vmin=0, vmax=360))
 
@@ -556,8 +542,7 @@ class SquarePlotMixin:
         pc = PatchCollection(polygons, match_original=True)
         ax.add_collection(pc)
         if cbar:
-            divider = make_axes_locatable(ax)
-            cax = divider.append_axes("right", size="5%", pad=0.1)
+            cax = colorbar_axes(ax, size="5%", pad=0.1)
             cbar = fig.colorbar(cmap, use_gridspec=True, cax=cax)
             cbar.set_label('Direction of flux')
             cbar.set_ticks(np.arange(self.velocitychannels) * 360 / self.velocitychannels)
@@ -567,7 +552,8 @@ class SquarePlotMixin:
 
         return fig, pc, cmap
 
-    def animate_density(self, density_t=None, interval=100, channels=slice(None), species=None, repeat=True, steps=None, **kwargs):
+    def animate_density(self, density_t=None, interval=100, channels=slice(None), species=None, repeat=True, steps=None,
+                        save_path=None, save_kwargs=None, **kwargs):
 
         density_t, steps = resolve_animation_history(self, "density_t", density_t, steps, channels)
 
@@ -584,11 +570,12 @@ class SquarePlotMixin:
                 pc.set(facecolor=cmap.to_rgba(density_t[n, ...].ravel()))
             return pc, title
 
-        ani = animation.FuncAnimation(fig, update, interval=interval, frames=density_t.shape[0], repeat=repeat)
+        ani = make_animation(fig, update, interval=interval, frames=density_t.shape[0],
+                             save_path=save_path, save_kwargs=save_kwargs, repeat=repeat)
         return ani
 
 
-    def animate_flux(self, nodes_t=None, interval=100, steps=None, **kwargs):
+    def animate_flux(self, nodes_t=None, interval=100, steps=None, save_path=None, save_kwargs=None, **kwargs):
         nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
 
         counts_t = self._channel_counts(nodes_t, history=True).astype(float)
@@ -610,7 +597,8 @@ class SquarePlotMixin:
             pc.set(facecolor=angle[n, ...].reshape(-1, 4))
             return pc, title
 
-        ani = animation.FuncAnimation(fig, update, interval=interval, frames=nodes_t.shape[0])
+        ani = make_animation(fig, update, interval=interval, frames=nodes_t.shape[0],
+                             save_path=save_path, save_kwargs=save_kwargs)
         return ani
 
 

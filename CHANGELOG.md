@@ -7,6 +7,13 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- 1D and 2D plots accept `ax=` to draw into a given axes, e.g. one panel of
+  `plt.subplots`. In figures with constrained layout, colour bars stay inside
+  their panel.
+- Animations of recorded 2D runs accept `save_path=` and `save_kwargs=`, like
+  the 3D ones, and play in Jupyter notebooks when they are the last line of a
+  cell. GIF files are written with Pillow, so they need no ffmpeg. Tutorials 1
+  and 2 show animations.
 - `get_lgca(interaction=my_function, my_rate=0.1)` uses a function of the LGCA
   object as the interaction step; the remaining keyword arguments are stored
   in `lgca.interaction_params`. Previously this raised `AttributeError`.
@@ -40,6 +47,12 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- 1D and 2D plots open a new figure instead of drawing into the current one,
+  so consecutive plot calls in a script no longer overlay each other. An empty
+  current figure (e.g. from `plt.figure(figsize=...)`) is still used. To place
+  a plot in an existing figure, pass `ax=`.
+- `ipywidgets` is installed with BioLGCA, so progress bars render in notebooks
+  instead of warning that IProgress is missing.
 - The library no longer prints. Messages about default interaction parameters
   are logged at INFO level under the `lgca` logger (enable them with
   `logging.basicConfig(level=logging.INFO)`), and problems such as too few rest
@@ -116,6 +129,11 @@ This file records notable user-facing changes. Changes remain under
 
 ### Fixed
 
+- Hexagonal lattice plots placed y-axis ticks between rows and labelled them
+  with truncated row numbers (e.g. 49 instead of 50); ticks are now on whole
+  rows at round intervals.
+- Discrete colour bars of 1D density plots had ticks on the bin edges
+  (-0.5, 0.5, ...) instead of on the integer particle numbers.
 - `get_lgca(ib=True, interaction="go_or_grow")` raised `IndexError` when the
   initial lattice contained no cells.
 - Particle-number-conserving interactions, including phenotypic switching,

@@ -8,12 +8,15 @@ import warnings
 import numpy as np
 import random
 from itertools import cycle
+from pathlib import Path
 try:  # optional plotting dependencies
     import matplotlib.colors as mplcolors
     import matplotlib.pyplot as plt
     import matplotlib.ticker as ticker
     from matplotlib.ticker import FuncFormatter
     import matplotlib.cm as cm
+    from matplotlib.animation import FuncAnimation
+    from matplotlib.layout_engine import ConstrainedLayoutEngine
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 except ImportError:  # pragma: no cover - handled at runtime
     from lgca.base import _MissingPlotLib
@@ -21,6 +24,7 @@ except ImportError:  # pragma: no cover - handled at runtime
     mplcolors = plt = ticker = FuncFormatter = cm = make_axes_locatable = _MissingPlotLib(
         "matplotlib"
     )
+    FuncAnimation = ConstrainedLayoutEngine = object
 
 
 class IdentityColourMapper:
@@ -486,8 +490,7 @@ def muller_plot(root_ID, cum_pop_t, children_nlist, parent_list, timeline, facec
     if colourbar:
         # set up a colour bar to interpret property values that colours reflect
         # this is done for facecolour = 'property'
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size=0.12, pad=0.1)
+        cax = colorbar_axes(ax, size=0.12, pad=0.1)
         cbar = plt.colorbar(cm.ScalarMappable(norm=prop_norm, cmap=prop_cmap), cax=cax, spacing='proportional', label=legend_title)
         ret = cbar
 
@@ -534,12 +537,11 @@ def colorbar_index(ncolors: int, cmap, use_gridspec: bool=False, cax=None):
         mappable, use_gridspec=use_gridspec, cax=cax, boundaries=boundaries
     )
 
-    # configure ticks and labels using locators and formatters
-    locator = ticker.MaxNLocator(nbins="auto", integer=True)
-    formatter = FuncFormatter(lambda val, pos: int(val))
-    colorbar.ax.yaxis.set_major_locator(locator)
-    colorbar.ax.yaxis.set_major_formatter(formatter)
-    colorbar.update_ticks()
+    # integer ticks at the centres of the colour bins; set through the colorbar,
+    # which otherwise replaces an axis locator with ticks at the bin edges
+    ticks = ticker.MaxNLocator(nbins=10, integer=True).tick_values(0, ncolors - 1)
+    colorbar.set_ticks(ticks[(ticks >= 0) & (ticks <= ncolors - 1)])
+    colorbar.ax.yaxis.set_major_formatter(FuncFormatter(lambda val, pos: int(round(val))))
     return colorbar
 
 
@@ -590,6 +592,128 @@ def cmap_discretize(cmap, N: int):
         cdict[key] = [(indices[i], colors_rgba[i - 1, ki], colors_rgba[i, ki]) for i in range(N + 1)]
     # create new linear segmented colormap
     return plt.matplotlib.colors.LinearSegmentedColormap(cmap.name + "_%d" % N, cdict, 1024)
+
+
+class LatticeAnimation(FuncAnimation):
+    """Animation of recorded LGCA frames.
+
+    A :py:class:`matplotlib.animation.FuncAnimation` that plays in Jupyter
+    notebooks when it is the last expression of a cell, and that saves GIF
+    files with Pillow, so ``animation.save("movie.gif")`` works without ffmpeg.
+    Other formats, e.g. ``.mp4``, use Matplotlib's default writer (ffmpeg).
+    """
+
+    def _repr_html_(self):
+        html = self.to_jshtml()
+        # The frames are rendered now; tell Matplotlib not to warn when the object is deleted.
+        self._draw_was_started = True
+        # The player replaces the static figure the inline backend would show.
+        plt.close(self._fig)
+        return html
+
+    def save(self, filename, writer=None, *args, **kwargs):
+        if writer is None and Path(filename).suffix.lower() == ".gif":
+            writer = "pillow"
+        return super().save(filename, writer, *args, **kwargs)
+
+
+def make_animation(fig, update, frames, interval=100, save_path=None, save_kwargs=None, **kwargs):
+    """Create a :class:`LatticeAnimation` and optionally save it.
+
+    Parameters
+    ----------
+    fig : :py:class:`matplotlib.figure.Figure`
+        Figure that `update` draws into.
+    update : callable
+        Called with the frame index; updates the artists and returns them.
+    frames : int
+        Number of frames.
+    interval : float, default=100
+        Delay between frames in milliseconds; also sets the frame rate of saved movies.
+    save_path : str or pathlib.Path, optional
+        Movie file to write, e.g. ``density.gif`` or ``density.mp4``.
+    save_kwargs : dict, optional
+        Options of :py:meth:`matplotlib.animation.Animation.save`, e.g. ``{"dpi": 150}``.
+    **kwargs
+        Passed on to :py:class:`matplotlib.animation.FuncAnimation`.
+    """
+    anim = LatticeAnimation(fig, update, frames=frames, interval=interval, **kwargs)
+    if save_path is not None:
+        anim.save(save_path, **dict(save_kwargs or {}))
+    return anim
+
+
+def colorbar_axes(ax, size="5%", pad=0.1):
+    """Return axes for a colour bar right of `ax`, as tall as `ax`.
+
+    Parameters
+    ----------
+    ax : :py:class:`matplotlib.axes.Axes`
+        Axes the colour bar belongs to.
+    size : str or float, default="5%"
+        Width of the colour bar as a percentage of the axes width, or in inches.
+    pad : float, default=0.1
+        Gap between the axes and the colour bar in inches.
+
+    Notes
+    -----
+    In figures with constrained layout (``plt.subplots(layout="constrained")``)
+    the colour bar is an inset of `ax`, so the layout keeps it and its label
+    clear of neighbouring panels. Otherwise it is appended with
+    :py:func:`mpl_toolkits.axes_grid1.make_axes_locatable`.
+    """
+    fig = ax.figure
+    if isinstance(fig.get_layout_engine(), ConstrainedLayoutEngine):
+        width = ax.get_position().width * fig.get_figwidth()
+        fraction = float(size.rstrip("%")) / 100 if isinstance(size, str) else size / width
+        return ax.inset_axes([1 + pad / width, 0, fraction, 1])
+    return make_axes_locatable(ax).append_axes("right", size=size, pad=pad)
+
+
+def _nice_steps():
+    """Yield 1, 2, 5, 10, 20, 50, ... for readable tick spacings."""
+    scale = 1
+    while True:
+        for base in (1, 2, 5):
+            yield base * scale
+        scale *= 10
+
+
+def lattice_axes(figindex=None, figsize=None, tight_layout=True, ax=None):
+    """Return the figure and axes a lattice plot draws into.
+
+    Parameters
+    ----------
+    figindex : int or str, optional
+        Identifier of a figure to draw into, passed to
+        :py:func:`matplotlib.pyplot.figure`.
+    figsize : tuple of float, optional
+        Figure size in inches. Ignored when `ax` is given.
+    tight_layout : bool, default=True
+        Use Matplotlib's tight layout engine. Ignored when `ax` is given.
+    ax : :py:class:`matplotlib.axes.Axes`, optional
+        Axes to draw into, e.g. one panel of :py:func:`matplotlib.pyplot.subplots`.
+
+    Returns
+    -------
+    fig, ax
+        Without `ax` and `figindex`, a new figure, unless the current figure is
+        still empty (e.g. just created with ``plt.figure(figsize=...)``).
+        The returned axes are made the current axes.
+    """
+    if ax is None:
+        if figindex is not None:
+            fig = plt.figure(num=figindex)
+        elif plt.get_fignums() and not plt.gcf().axes:
+            fig = plt.gcf()
+        else:
+            fig = plt.figure()
+        if figsize is not None:
+            fig.set_size_inches(figsize)
+        fig.set_layout_engine("tight" if tight_layout else None)
+        ax = fig.gca()
+    plt.sca(ax)
+    return ax.figure, ax
 
 
 def estimate_figsize(array, x: float=8., cbar: bool=False, dy: float=1.):
@@ -661,8 +785,7 @@ def get_cmap(
 
     if ax is None:
         ax = plt.gca()
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size=colorbarwidth, pad=pad)
+    cax = colorbar_axes(ax, size=colorbarwidth, pad=pad)
 
     if K <= 1:
         # requires extra treatment because there is only one colour
