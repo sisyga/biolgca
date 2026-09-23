@@ -292,7 +292,6 @@ def model_spec_to_dict(spec: ModelSpec) -> dict[str, Any]:
             "dynamics": {
                 "operators": [_operator_to_dict(operator) for operator in spec.dynamics.operators],
                 "propagation": spec.dynamics.propagation,
-                "allow_custom_order": spec.dynamics.allow_custom_order,
             },
             "analysis": None if spec.analysis is None else {
                 "observers": [_observer_to_dict(observer) for observer in spec.analysis.observers],
@@ -346,7 +345,8 @@ def model_spec_from_dict(data: Mapping[str, Any]) -> ModelSpec:
         dynamics=InteractionPipelineSpec(
             operators=tuple(_operator_from_dict(operator) for operator in dynamics.get("operators", ())),
             propagation=dynamics.get("propagation", "default"),
-            allow_custom_order=dynamics.get("allow_custom_order", False),
+            # Files written before the order became free always carry the old default False.
+            allow_custom_order=dynamics.get("allow_custom_order") or None,
         ),
         analysis=None if analysis is None else AnalysisSpec(
             observers=tuple(_observer_from_dict(observer) for observer in analysis.get("observers", ())),
@@ -551,7 +551,7 @@ def _validate_serialized_model(data: Mapping[str, Any]) -> None:
             raise TypeError(f"model.dynamics.{key} must be a sequence")
     for index, operator in enumerate(dynamics.get("operators", ())):
         _validate_serialized_operator(operator, index)
-    if "allow_custom_order" in dynamics and not isinstance(
+    if dynamics.get("allow_custom_order") is not None and not isinstance(
         dynamics["allow_custom_order"], bool
     ):
         raise TypeError("model.dynamics.allow_custom_order must be a boolean")

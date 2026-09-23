@@ -660,7 +660,7 @@ def _register_native_plugins() -> None:
 
     nove_go_or_rest_info = PluginInfo(
         name="nove.go_or_rest",
-        operator_kind="phenotype_switch",
+        operator_kind="reorientation",
         backend_families=("nove",),
         legacy_source=_legacy_source("lgca.nove_interactions", "go_or_rest"),
         parameters={
@@ -673,10 +673,11 @@ def _register_native_plugins() -> None:
                 "validator": "finite scalar switching threshold",
             },
         },
-        conservation_law=_law_for_kind("phenotype_switch"),
+        conservation_law=_law_for_kind("reorientation"),
         port_status="native",
         test_status="unit_tested",
-        description="No-volume-exclusion moving/resting channel switch.",
+        description=("Cells move between velocity and rest channels with a density-dependent "
+                     "probability of resting; without volume exclusion."),
     )
 
     def nove_go_or_rest_factory(parameters: Mapping[str, Any] | None = None) -> InteractionOperator:
@@ -1547,7 +1548,7 @@ def _register_native_plugins() -> None:
 
     go_or_rest_info = PluginInfo(
         name="classical.go_or_rest",
-        operator_kind="phenotype_switch",
+        operator_kind="reorientation",
         backend_families=("classical",),
         legacy_source=_legacy_source("lgca.interactions", "go_or_rest"),
         parameters={
@@ -1560,10 +1561,11 @@ def _register_native_plugins() -> None:
                 "validator": "finite scalar switching threshold",
             },
         },
-        conservation_law=_law_for_kind("phenotype_switch"),
+        conservation_law=_law_for_kind("reorientation"),
         port_status="native",
         test_status="unit_tested",
-        description="Classical moving/resting channel switch with total-mass conservation.",
+        description=("Cells move between velocity and rest channels with a density-dependent "
+                     "probability of resting; with volume exclusion."),
     )
 
     def go_or_rest_factory(parameters: Mapping[str, Any] | None = None) -> InteractionOperator:

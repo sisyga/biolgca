@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pytest
 
@@ -10,6 +12,8 @@ from lgca.model import (
     StateSpec,
     TimeSpec,
     build_model,
+    model_spec_from_dict,
+    model_spec_to_dict,
     run_model,
 )
 from lgca.pipeline import (
@@ -599,23 +603,61 @@ def test_native_phenotype_switch_can_be_created_from_registry_name():
     assert result.lgca.nodes_t[1].sum(axis=(0, 1, 3)).tolist() == [0, 1]
 
 
-def test_operator_order_is_validated_before_simulation():
-    spec = ModelSpec(
-        description=Description(title="bad order"),
+def _two_operator_spec(operators, **state):
+    return ModelSpec(
+        description=Description(title="listed order"),
         space=SpaceSpec(geometry="square", dims=(4, 4), boundary="periodic"),
-        state=StateSpec(density=0.25, restchannels=1),
+        state=StateSpec(**({"density": 0.25, "restchannels": 1} | state)),
         time=TimeSpec(steps=1, seed=26),
-        dynamics=InteractionPipelineSpec(
-            operators=[
-                ReorientationSpec(terms=[ReorientationTermSpec(name="random_walk")]),
-                BirthDeathSpec(name="classical.birth"),
-            ],
-            propagation=False,
-        ),
+        dynamics=InteractionPipelineSpec(operators=operators, propagation=False),
     )
 
-    with pytest.raises(ValueError, match=r"dynamics\.operators\[1\].*order"):
-        build_model(spec)
+
+def test_operators_run_in_the_listed_order():
+    calls = []
+
+    class Logged(ReorientationOperator):
+        def apply(self, context, step):
+            calls.append(self.name)
+
+    def logged(name, kind):
+        return Logged(PluginInfo(name=name, operator_kind=kind, backend_families=("classical",)))
+
+    compiled = build_model(_two_operator_spec(
+        [logged("turn", "reorientation"), logged("grow", "birth_death"), logged("turn again", "reorientation")]))
+    compiled.pipeline.execute_step(compiled.context, 1)
+
+    assert calls == ["turn", "grow", "turn again"]
+
+
+def test_allow_custom_order_is_deprecated():
+    with pytest.warns(DeprecationWarning, match="allow_custom_order"):
+        InteractionPipelineSpec(allow_custom_order=True)
+
+
+def test_model_files_with_the_old_default_order_flag_load_silently():
+    data = model_spec_to_dict(_two_operator_spec([{"name": "classical.random_walk"}]))
+    assert "allow_custom_order" not in data["model"]["dynamics"]
+    data["model"]["dynamics"]["allow_custom_order"] = False
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert model_spec_from_dict(data).dynamics.allow_custom_order is None
+
+
+@pytest.mark.parametrize("switch", [
+    PhenotypeSwitchSpec(name="phenotype_switch", parameters={"rates": [[0.0]]}),
+    {"name": "species_switch", "parameters": {"rates": [[0.0]]}},
+])
+def test_phenotype_switch_needs_several_species_in_classical_models(switch):
+    with pytest.raises(ValueError, match=r"operators\[0\].*one species.*n_species"):
+        build_model(_two_operator_spec([switch]))
+
+
+def test_go_or_rest_is_a_reorientation_that_single_species_models_accept():
+    compiled = build_model(_two_operator_spec([{"name": "classical.go_or_rest"}]))
+
+    assert compiled.pipeline.operators[0].operator_kind == "reorientation"
 
 
 def test_pipeline_refreshes_density_between_birth_and_go_or_rest():

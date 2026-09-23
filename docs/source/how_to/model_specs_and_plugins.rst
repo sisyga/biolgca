@@ -8,19 +8,33 @@ inspired by Morpheus-style model declarations: dynamics are named plugins with
 metadata, validation and an explicit execution order, while propagation remains
 the deterministic lattice movement phase.
 
-Pipeline phases
----------------
+Kinds of interaction and their order
+------------------------------------
 
-One timestep is compiled as:
+Every interaction is one of three kinds, defined by what it conserves:
 
-1. particle-number changing operators, such as birth, death and division
-2. phenotype/species switching operators
-3. reorientation operators, including Boltzmann samplers over channel states
-4. deterministic propagation
+``birth_death``
+   changes the number of cells (birth, death, division).
+``phenotype_switch``
+   changes what a cell is. In classical models a phenotype is a species, and a
+   switch moves cells from one species to another, keeping the number of cells
+   at each node. A classical model with one species has nothing to switch to,
+   so a phenotype switch there is rejected. In identity-based models, a switch
+   changes a cell's own parameters.
+``reorientation``
+   rearranges the cells of a node over its channels and keeps the number of
+   cells of each species at the node. Boltzmann sampling of combined scores
+   (:class:`~lgca.pipeline.ReorientationSpec`) is the usual way to write one,
+   but any rule that keeps these numbers is a reorientation, including moving
+   cells between velocity and rest channels (``classical.go_or_rest``).
 
-The default compiler enforces this order. Pass
-``InteractionPipelineSpec(allow_custom_order=True)`` only for specialised
-experiments where the order itself is part of the model.
+A time step applies the operators in the order they are listed, then moves the
+cells (propagation). The order is part of the model: division before
+reorientation is a different model from reorientation before division. Two
+reorientation operators in a row are two independent random decisions; cues
+that should compete in one decision belong as terms of one
+``ReorientationSpec``. The run metadata records the schedule as
+``result.metadata["schedule"]``.
 
 Minimal ModelSpec
 -----------------

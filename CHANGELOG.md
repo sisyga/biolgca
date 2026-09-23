@@ -56,6 +56,14 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- Interactions run in the order they are listed in
+  `InteractionPipelineSpec.operators`; the fixed order birth/death, phenotype
+  switch, reorientation is no longer enforced. `allow_custom_order` is
+  deprecated and ignored, and model files no longer contain it.
+- A phenotype switch moves cells between species, so a classical model with
+  one species rejects it with an explanation. `classical.go_or_rest` and
+  `nove.go_or_rest`, which move cells of one species between velocity and
+  rest channels, are now reorientations.
 - The `birth_death` interaction of multispecies models processes all nodes at
   once instead of looping over them in Python, which makes it about 45x faster
   (100 steps on 50 x 50 nodes: 0.17 s instead of 7.7 s). Runs remain

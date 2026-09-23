@@ -53,13 +53,14 @@ class PhenotypeSwitchSpec:
     step (the diagonal is ignored). The number of cells at a node is
     conserved; a switch into a species whose channels at that node are full is
     rejected, and when a cell switches, the node's cells are redistributed over
-    its channels. Switching between moving and resting, as in go-or-grow, is a
-    different interaction (``classical.go_or_rest``, ``classical.go_or_grow``).
+    its channels. A phenotype switch needs several species (or an
+    identity-based model); moving cells between velocity and rest channels of
+    one species, as ``classical.go_or_rest`` does, is a reorientation.
 
     Attributes
     ----------
     name : str
-        Registered name, e.g. ``"phenotype_switch"`` or ``"classical.go_or_rest"``.
+        Registered name, e.g. ``"phenotype_switch"``.
     parameters : mapping, default={}
         Interaction parameters.
     """
@@ -155,9 +156,12 @@ class ReorientationSpec:
 class InteractionPipelineSpec:
     """The interactions of one time step, followed by propagation.
 
-    Every time step applies the operators in order and then moves the cells
-    along their velocity channels (propagation). Operators must follow the
-    order birth/death, then phenotype switching, then reorientation.
+    Every time step applies the operators in the order they are listed and
+    then moves the cells along their velocity channels (propagation). The
+    order is part of the model: birth before reorientation is a different
+    model from reorientation before birth. Two reorientation operators in a
+    row are two independent random decisions; directional cues that should
+    compete in one decision belong as terms of one :class:`ReorientationSpec`.
 
     Attributes
     ----------
@@ -174,14 +178,18 @@ class InteractionPipelineSpec:
         ``"default"`` or ``True`` moves the cells after the interactions;
         ``False``, ``None``, ``"none"`` or ``"disabled"`` keeps them in place,
         e.g. to test an interaction on its own.
-    allow_custom_order : bool, default=False
-        Allow operators in another order than birth/death, switching,
-        reorientation, for models in which the order itself is studied.
+    allow_custom_order : None
+        Deprecated and ignored: operators always run in the listed order.
     """
 
     operators: Sequence[Any] = field(default_factory=tuple)
     propagation: str | bool = "default"
-    allow_custom_order: bool = False
+    allow_custom_order: bool | None = None
+
+    def __post_init__(self):
+        if self.allow_custom_order is not None:
+            warn_user("allow_custom_order is deprecated and ignored: operators always run "
+                      "in the order they are listed", DeprecationWarning)
 
 
 @dataclass
@@ -318,8 +326,7 @@ def compile_pipeline(spec: InteractionPipelineSpec | None, context) -> CompiledP
             message = str(exc)
             separator = "" if message.startswith(".") else " "
             raise ValueError(f"dynamics.operators[{index}]{separator}{message}") from exc
-    if not spec.allow_custom_order:
-        _validate_operator_order(operators)
+    _reject_single_species_phenotype_switch(operators, context)
     growth = [operator for operator in operators if operator.operator_kind == "birth_death"]
     shared_property_operators = {"ib.birth", "ib.birthdeath", "ib.birthdeath_discrete",
                                 "ib.go_or_grow", "ib.go_and_grow_mutations"}
@@ -362,24 +369,19 @@ def _operator_name(spec) -> str:
     return str(getattr(spec, "name", "<missing>"))
 
 
-def _validate_operator_order(operators: Sequence[InteractionOperator]) -> None:
-    order = {
-        "birth_death": 0,
-        "phenotype_switch": 1,
-        "reorientation": 2,
-        "propagation": 3,
-    }
-    highest = -1
-    highest_kind = None
+def _reject_single_species_phenotype_switch(operators: Sequence[InteractionOperator], context) -> None:
+    """A classical phenotype is a species, so one species has nothing to switch to."""
+    state = context.spec.state
+    if state.identity_based or state.n_species != 1:
+        return
     for index, operator in enumerate(operators):
-        current = order.get(operator.operator_kind, highest)
-        if current < highest:
+        if operator.operator_kind == "phenotype_switch":
             raise ValueError(
-                f"dynamics.operators[{index}] invalid operator order: "
-                f"{operator.operator_kind} follows {highest_kind}"
+                f"dynamics.operators[{index}] {operator.name!r} is a phenotype switch, which "
+                "moves cells between species; this classical model has one species. Set "
+                "state.n_species to the number of phenotypes, or use an identity-based model "
+                "to change individual cell parameters."
             )
-        highest = max(highest, current)
-        highest_kind = operator.operator_kind
 
 
 def _softmax_last_axis(scores: np.ndarray) -> np.ndarray:
@@ -2118,8 +2120,8 @@ class NativeClassicalBirthOperator(BirthDeathOperator):
         return probability
 
 
-class NativeClassicalGoOrRestOperator(PhenotypeSwitchOperator):
-    """Native classical moving/resting switch matching the legacy rule."""
+class NativeClassicalGoOrRestOperator(ReorientationOperator):
+    """Moving/resting redistribution of each node's cells, matching the legacy rule."""
 
     def __init__(self, info: PluginInfo, parameters: Mapping[str, Any] | None = None):
         super().__init__(info=info, parameters=parameters)
@@ -2415,8 +2417,8 @@ class NativeNoVERandomWalkOperator(ReorientationOperator):
         lgca.nodes = newnodes
 
 
-class NativeNoVEGoOrRestOperator(PhenotypeSwitchOperator):
-    """Native no-volume-exclusion moving/resting switch."""
+class NativeNoVEGoOrRestOperator(ReorientationOperator):
+    """Moving/resting redistribution of each node's cells without volume exclusion."""
 
     def __init__(self, info: PluginInfo, parameters: Mapping[str, Any] | None = None):
         super().__init__(info=info, parameters=parameters)

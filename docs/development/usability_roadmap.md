@@ -251,6 +251,9 @@ resting cells in rest channels, guarantees it itself.
   reorientations.
 - The concepts page defines the three kinds, the species axis and the
   meaning of "phenotype" in classical and identity-based models.
+- Status (2026-09-23): done except the concepts page, which follows with 1.7.
+  The how-to on model specs explains the kinds and the order; tutorials 3
+  and 4 no longer describe a fixed order.
 
 **1.2 Go-or-grow as a two-species model**
 
