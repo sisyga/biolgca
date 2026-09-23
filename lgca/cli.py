@@ -123,6 +123,8 @@ def _run(args) -> int:
         parameters["path"] = "resources/initial_state.npz"
         portable_spec = replace(portable_spec, state=replace(portable_spec.state,
             initializer={"name": "from_npz", "parameters": parameters}))
+    # Record the seed actually used, including one drawn for an unseeded model.
+    portable_spec = replace(portable_spec, time=replace(portable_spec.time, seed=compiled.spec.time.seed))
     save_model_spec(portable_spec, output_dir / "model.resolved.json")
     result = compiled.run(showprogress=args.show_progress)
     measurements = {}

@@ -189,6 +189,9 @@ Independent, low-risk items, in order.
 - If `time.seed` is missing, draw one from `numpy.random.SeedSequence`, use it,
   and write it to the run metadata and `model.resolved.json`, so every run can
   be repeated.
+- Status (2026-09-23): done for `ModelSpec` runs and the CLI. `get_lgca(seed=None)`
+  still creates an unrecorded generator; it will inherit the behaviour when
+  `get_lgca` builds a `ModelSpec` internally (phase 2.4).
 
 ### Phase 1: A simple way to add interactions (two to three weeks)
 

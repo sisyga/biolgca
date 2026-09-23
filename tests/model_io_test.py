@@ -191,3 +191,45 @@ def test_original_get_lgca_quick_start_still_works():
     lgca.timeevo(timesteps=1, showprogress=False)
 
     assert lgca.total_population() >= 0
+
+
+def test_unseeded_run_records_a_seed_that_reproduces_it():
+    import numpy as np
+
+    from lgca.model import AnalysisSpec, ModelSpec, SpaceSpec, StateSpec, TimeSpec, run_model
+    from lgca.pipeline import InteractionPipelineSpec
+    from lgca.simulation import NodeRecorder
+
+    spec = ModelSpec(
+        space=SpaceSpec(geometry="square", dims=(8, 8)),
+        state=StateSpec(density=1),
+        time=TimeSpec(steps=5),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "classical.random_walk"}]),
+        analysis=AnalysisSpec(observers=[NodeRecorder()]),
+    )
+
+    first = run_model(spec, showprogress=False)
+    rerun = run_model(first.spec, showprogress=False)
+
+    assert first.metadata["seed_drawn"] is True
+    assert isinstance(first.spec.time.seed, int) and first.metadata["seed"] == first.spec.time.seed
+    assert rerun.metadata["seed_drawn"] is False
+    np.testing.assert_array_equal(first.lgca.nodes_t, rerun.lgca.nodes_t)
+    assert spec.time.seed is None  # the caller's spec is unchanged
+
+
+def test_cli_writes_the_seed_it_used_into_the_resolved_model(tmp_path):
+    from lgca.cli import main
+    from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, load_model_spec, save_model_spec
+    from lgca.pipeline import InteractionPipelineSpec
+
+    model = tmp_path / "model.json"
+    save_model_spec(ModelSpec(space=SpaceSpec(geometry="lin", dims=10), state=StateSpec(density=1),
+                              time=TimeSpec(steps=2),
+                              dynamics=InteractionPipelineSpec(operators=[{"name": "classical.random_walk"}])),
+                    model)
+
+    main(["run", str(model), "--output", str(tmp_path / "run")])
+
+    resolved = load_model_spec(tmp_path / "run" / "model.resolved.json")
+    assert isinstance(resolved.time.seed, int)

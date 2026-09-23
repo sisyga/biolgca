@@ -182,8 +182,10 @@ class TimeSpec:
         and then moves the cells (propagation).
     seed : int, optional
         Seed of the random number generator. The same seed and model give
-        the same trajectory. Without a seed, every run differs and cannot be
-        repeated, so set one for any result you want to keep.
+        the same trajectory. Without a seed, every run draws a new one and
+        records it in ``result.spec.time.seed`` and ``result.metadata["seed"]``
+        (and in ``model.resolved.json`` for command-line runs), so any run
+        can be repeated.
     timing_trace : int, default=0
         Number of per-operator timing records to keep in the run metadata,
         for profiling.
@@ -1003,9 +1005,17 @@ def build_model(
     resource_base: str | Path | None = None,
     trusted_paths: bool = False,
 ) -> CompiledModel:
-    """Build an LGCA instance and compile its interaction pipeline."""
+    """Build an LGCA instance and compile its interaction pipeline.
+
+    Without ``spec.time.seed``, a seed is drawn from the operating system's
+    entropy and stored in the returned model's ``spec`` and ``metadata``, so the
+    run can be repeated.
+    """
 
     spec = _normalize_and_validate_spec(spec)
+    seed_drawn = spec.time.seed is None
+    if seed_drawn:
+        spec = replace(spec, time=replace(spec.time, seed=_draw_seed()))
     lgca = _build_lgca(spec)
     if spec.state.initializer is not None:
         from .initializers import apply_initializer
@@ -1018,6 +1028,7 @@ def build_model(
         )
     _validate_field_names(lgca, spec.state.fields)
     metadata = _metadata_from_spec(spec, lgca=lgca)
+    metadata["seed_drawn"] = seed_drawn
     context = ModelContext(
         lgca=lgca,
         spec=spec,
@@ -1050,6 +1061,11 @@ def build_model(
     lgca._compiled_model = compiled
     lgca.enable_propagation = spec.dynamics.propagation not in (False, None, "none", "disabled")
     return compiled
+
+
+def _draw_seed() -> int:
+    """Draw a fresh seed for a run whose specification sets none."""
+    return int(np.random.SeedSequence().generate_state(1, np.uint32)[0])
 
 
 def run_model(

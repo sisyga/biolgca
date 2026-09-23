@@ -56,6 +56,11 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- A model run without `time.seed` draws a seed and records it in
+  `result.spec.time.seed`, `result.metadata["seed"]` (with
+  `metadata["seed_drawn"] = True`) and, for command-line runs, in
+  `model.resolved.json`. Previously the seed was not recorded and such runs
+  could not be repeated.
 - Curated examples show their effect at their own settings: alignment and
   nematic alignment run at density 0.5 with beta 3 and order visibly,
   chemotaxis uses a steeper signal with reflecting walls, go-or-grow grows
