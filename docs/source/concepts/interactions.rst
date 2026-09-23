@@ -86,6 +86,11 @@ specifications and backwards compatibility.
      - No additional input.
      - Unbiased sampler term.
 
+All gradients are derivatives in lattice units, with a lattice spacing of one,
+on every geometry. This includes the density gradient used by aggregation, so a
+sensitivity ``beta`` has the same meaning on 1D, square, hexagonal, cubic and
+Moore lattices.
+
 Prescribed chemotaxis fields are differentiated in physical lattice coordinates,
 including hexagonal row staggering and vertical spacing. Interior differences
 are centered and edge differences are one-sided; scalar fields do not implicitly

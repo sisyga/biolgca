@@ -328,8 +328,7 @@ class LGCA_1D(LGCA_base):
 
     def gradient(self, qty):
         # documented in parent class
-        return np.gradient(qty, 0.5)[..., None]
-        # None adds a new axis to the ndarray and keeps the remaining array unchanged
+        return np.gradient(qty, axis=0)[..., None]
 
     def channel_weight(self, qty):
         """

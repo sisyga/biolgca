@@ -74,9 +74,8 @@ class LGCA_3dMoore(LGCA_Cubic):
         return s
 
     def gradient(self, qty):
-        """Return the spatial gradient of ``qty``."""
-        gx, gy, gz = np.gradient(qty, 0.5)
-        return np.stack((gx, gy, gz), axis=-1)
+        """Return the spatial gradient of ``qty`` in lattice units (central differences)."""
+        return np.stack(np.gradient(qty, axis=(0, 1, 2)), axis=-1)
 
     def channel_weight(self, qty):
         """Compute neighbour weights for interaction fields."""

@@ -140,7 +140,7 @@ def test_chemotaxis_follows_the_boltzmann_weight_of_the_signal_gradient(entry):
 
 @pytest.mark.parametrize("entry", REORIENTATION_ENTRIES)
 def test_aggregation_follows_the_boltzmann_weight_of_the_density_gradient(entry):
-    beta = 0.5
+    beta = 1.0
     nodes = np.zeros((12, 6, 4), dtype=bool)
     nodes[1::3, :, 1] = True  # sampled column: one particle per node
     nodes[2::3, :, :2] = True  # its right neighbour holds two particles, its left neighbour none
@@ -149,8 +149,8 @@ def test_aggregation_follows_the_boltzmann_weight_of_the_density_gradient(entry)
                      plugin={"name": "classical.aggregation", "parameters": {"beta": beta}},
                      composed=ReorientationSpec(terms=[ReorientationTermSpec("aggregation", beta=beta)]))
 
-    # Lattice gradient: sum_i c_i n(r + c_i) = (2, 0).
-    _assert_channel_frequencies(states[:, 1::3], _boltzmann(beta * SQUARE_C @ (2 * E_X)))
+    # Density gradient: (n(x + 1) - n(x - 1)) / 2 = (2 - 0) / 2 along x.
+    _assert_channel_frequencies(states[:, 1::3], _boltzmann(beta * SQUARE_C @ E_X))
 
 
 @pytest.mark.parametrize("entry", REORIENTATION_ENTRIES)

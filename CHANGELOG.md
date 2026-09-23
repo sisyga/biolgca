@@ -35,6 +35,15 @@ This file records notable user-facing changes. Changes remain under
   reproducible from their seed, but seeded trajectories differ from those of
   earlier versions. Legacy functions and ModelSpec operators share the same
   kernels in `lgca.identity_kernels`.
+- `lgca.gradient` returns the physical gradient in lattice units on every
+  geometry, matching the composed chemotaxis term. Previously 1D, square,
+  cubic and Moore lattices returned twice and hexagonal lattices three times
+  the gradient. Aggregation, the default 2D and 3D chemotaxis fields,
+  `go_or_grow_kappa_chemo` and `calc_vorticity` inherit the new scale: at the
+  same `beta`, the effective sensitivity is half the previous value (a third
+  on hexagonal lattices). Multiply earlier `beta` values by 2 (hex: 3) to
+  reproduce previous results. The normalized 1D default chemotaxis field is
+  unchanged.
 - `DensityRecorder` stores densities as signed integers by default: `int16`
   with volume exclusion and `int32` (widened to `int64` on demand) without,
   instead of `float64`. This cuts recording memory by 4x or 2x. Pass

@@ -2,9 +2,7 @@
 
 For a linear field ``f(r) = a . r`` every lattice satisfies
 ``sum_i f(r + c_i) = b f(r)`` because the velocities sum to zero, and the
-unnormalized lattice gradient is ``k a``: central differences with step 1/2
-(``k = 2``) on 1D, square, cubic and Moore lattices, and the neighbour sum
-``sum_i c_i f(r + c_i) = 3 a`` on the hexagonal lattice.
+lattice gradient is the physical gradient ``a`` in lattice units.
 """
 
 import numpy as np
@@ -14,7 +12,6 @@ from lgca import get_lgca
 
 
 GEOMETRIES = {"lin": (9,), "square": (9, 10), "hex": (9, 10), "cubic": (7, 8, 6), "moore": (7, 8, 6)}
-GRADIENT_SCALE = {"lin": 2, "square": 2, "hex": 3, "cubic": 2, "moore": 2}
 
 
 def _empty(geometry):
@@ -54,5 +51,4 @@ def test_neighbour_sum_and_gradient_of_a_linear_field(geometry):
     gradient = lgca.gradient(field)[lgca.nonborder][interior]
 
     np.testing.assert_allclose(neighbour_sum, lgca.velocitychannels * field[lgca.nonborder][interior])
-    expected_gradient = GRADIENT_SCALE[geometry] * slope
-    np.testing.assert_allclose(gradient, np.broadcast_to(expected_gradient, gradient.shape), atol=1e-12)
+    np.testing.assert_allclose(gradient, np.broadcast_to(slope, gradient.shape), atol=1e-12)

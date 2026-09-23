@@ -496,7 +496,7 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
 
     def gradient(self, qty):
         # documented in parent class
-        return np.moveaxis(np.asarray(np.gradient(qty, 0.5)), 0, -1)
+        return np.stack(np.gradient(qty, axis=(0, 1)), axis=-1)
 
     def channel_weight(self, qty):
         """

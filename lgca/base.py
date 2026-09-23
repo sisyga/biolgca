@@ -422,12 +422,12 @@ class LGCA_base(ABC):
     @abstractmethod
     def gradient(self, qty):
         """
-        Compute the gradient of qty along all axes.
+        Compute the spatial gradient of qty in lattice units.
 
         Parameters
         ----------
         qty : :py:class:`numpy.ndarray`
-            Quantity to take the gradient of. Needs to have the same number of dimensions as :py:attr:`self.nodes`.
+            Quantity to take the gradient of. Its leading axes are the lattice axes of :py:attr:`self.nodes`.
             If ``qty.shape == self.nodes.shape[:-1]`` the result can be indexed with the LGCA coordinates (see example).
 
         Returns
@@ -439,13 +439,13 @@ class LGCA_base(ABC):
 
         Notes
         -----
-        The gradient is calculated using :py:func:`numpy.gradient()` with stepwidth h=0.5
-        (s.t. no normalization takes place).
-        It is computed as the central finite difference with equidistant support points and supports one-sided
-        differences at the boundaries.
+        The gradient is the derivative with respect to physical coordinates, with a lattice spacing of one, on
+        every geometry. Interaction sensitivities such as ``beta`` in aggregation therefore have the same meaning on
+        all lattices. On 1D, square, cubic and Moore lattices it is computed with :py:func:`numpy.gradient` as
+        central differences, with one-sided differences at the array edges. On the hexagonal lattice it is the
+        neighbour sum :math:`\sum_i c_i q(r + c_i)` divided by :math:`b/2`, which is exact for linear fields.
 
-        In most cases this yields the simple difference between the two closest array elements in the given direction.
-        For example, the gradient at position 1 of ``np.array([1, 2, 4])`` would be (4 - 1)/(2 * 0.5) = 3.
+        For example, the gradient at position 1 of ``np.array([1, 2, 4])`` is (4 - 1)/2 = 1.5.
 
         Examples
         --------
@@ -459,9 +459,9 @@ class LGCA_base(ABC):
         >>> lgca.nodes.shape  # (xdim, ydim, number of channels)
         (4, 5, 4)
         >>> my_qty = np.array([[0,0,0,0,0],
-        >>>                    [1,1,1,1,1],
-        >>>                    [2,2,2,3,2],
-        >>>                    [3,3,3,3,3]])
+        ...                    [1,1,1,1,1],
+        ...                    [2,2,2,3,2],
+        ...                    [3,3,3,3,3]])
         >>> my_qty.shape  # (xdim, ydim)
         (4, 5)
         >>> grad = lgca.gradient(my_qty)
@@ -470,12 +470,9 @@ class LGCA_base(ABC):
         >>> # address like internal LGCA fields: first dimension is x (printed vertically),
         >>> # second dimension is y (printed horizontally), this can be a bit confusing
         >>> for coord in lgca.coord_pairs:
-        >>>     if np.any(grad[coord]>2):
-        >>>         print("Gradient at index", coord, "is ", grad[coord])
-        >>>         print("Configuration at index ", coord, " is ", lgca.nodes[coord],
-        >>>               ", with cell density ", lgca.cell_density[coord])
-        Gradient at index (1, 3) is  [3. 0.]
-        Configuration at index  (1, 3)  is  [False False False  True] , with cell density  1
+        ...     if np.any(grad[coord] > 1):
+        ...         print("Gradient at index", coord, "is", grad[coord])
+        Gradient at index (1, 3) is [1.5 0. ]
 
         The first element of the gradient holds the gradient in x direction, the second element the gradient in
         y direction. Note that ``(1, 3)`` is the index corresponding to a logical non-border coordinate ``(0, 2)``
@@ -483,7 +480,7 @@ class LGCA_base(ABC):
         non-border indices will be "felt" by the particles in the LGCA if the interaction is defined accordingly,
         but border nodes can be used to specify the field's boundary conditions.
 
-        The gradient in x direction is 3 = (3 - 0)/1. In y direction it is 0 = (1 - 1)/1.
+        The gradient in x direction is 1.5 = (3 - 0)/2. In y direction it is 0 = (1 - 1)/2.
 
         """
         ...

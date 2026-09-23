@@ -271,9 +271,8 @@ class LGCA_Cubic(LGCA_base):
         return sum
 
     def gradient(self, qty):
-        # Calculate the gradient of a quantity in the lattice
-        gx, gy, gz = np.gradient(qty, 0.5)
-        return np.stack((gx, gy, gz), axis=-1)
+        # documented in parent class
+        return np.stack(np.gradient(qty, axis=(0, 1, 2)), axis=-1)
 
     def channel_weight(self, qty):
         """
