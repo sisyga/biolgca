@@ -34,3 +34,19 @@ def test_readme_code_runs_and_crowding_death_reduces_population(readme_namespace
     populations = [int(re.search(r": (\d+) cells", line).group(1)) for line in printed]
     assert len(populations) == 3
     assert populations[0] > populations[1] > populations[2]
+
+
+def test_readme_images_are_committed():
+    import shutil
+    import subprocess
+
+    root = README.parent
+    if shutil.which("git") is None or not (root / ".git").exists():
+        pytest.skip("needs a git checkout")
+    images = set(re.findall(r'src="([^"]+)"', README.read_text(encoding="utf-8")))
+    images |= set(re.findall(r"!\[[^\]]*\]\(([^)\s]+)\)", README.read_text(encoding="utf-8")))
+    local = sorted(path for path in images if not path.startswith("http"))
+    tracked = subprocess.run(["git", "ls-files", "--error-unmatch", *local], cwd=root,
+                             capture_output=True, text=True)
+
+    assert local and tracked.returncode == 0, tracked.stderr

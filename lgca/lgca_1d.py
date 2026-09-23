@@ -554,7 +554,6 @@ class LGCA_1D(LGCA_base):
         ax.xaxis.set_label_position('top')
         ax.xaxis.set_ticks_position('top')
         ax.xaxis.tick_top()
-        plt.tight_layout()
         if cbar:
             cax = colorbar_axes(ax, size=colorbarwidth, pad=0.1)
             mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
@@ -776,7 +775,6 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         plt.ylabel(r'Time step $k \, (\tau)$')
         ax.xaxis.set_label_position('top')
         ax.xaxis.tick_top()
-        plt.tight_layout()
         times = history_steps(self, len(density_t), "dens_steps", sample_steps, implicit=implicit_history)
         label_history_axis(ax, times, offset=offset_t)
         return plot

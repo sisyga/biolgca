@@ -617,6 +617,21 @@ class LatticeAnimation(FuncAnimation):
         return super().save(filename, writer, *args, **kwargs)
 
 
+def freeze_layout(fig):
+    """Keep the layout of the first draw of `fig` for all following draws.
+
+    Animations redraw the figure for every frame; recomputing the layout each
+    time is slow and lets the axes shift as the time label changes.
+    """
+    if isinstance(fig.get_layout_engine(), ConstrainedLayoutEngine):
+        def keep_first_layout(event):
+            fig.set_layout_engine("none")
+            fig.canvas.mpl_disconnect(connection)
+
+        connection = fig.canvas.mpl_connect("draw_event", keep_first_layout)
+    return fig
+
+
 def make_animation(fig, update, frames, interval=100, save_path=None, save_kwargs=None, **kwargs):
     """Create a :class:`LatticeAnimation` and optionally save it.
 
@@ -637,6 +652,7 @@ def make_animation(fig, update, frames, interval=100, save_path=None, save_kwarg
     **kwargs
         Passed on to :py:class:`matplotlib.animation.FuncAnimation`.
     """
+    freeze_layout(fig)
     anim = LatticeAnimation(fig, update, frames=frames, interval=interval, **kwargs)
     if save_path is not None:
         anim.save(save_path, **dict(save_kwargs or {}))
@@ -710,7 +726,11 @@ def lattice_axes(figindex=None, figsize=None, tight_layout=True, ax=None):
             fig = plt.figure()
         if figsize is not None:
             fig.set_size_inches(figsize)
-        fig.set_layout_engine("tight" if tight_layout else None)
+        # Constrained layout keeps colour bars (inset axes, see colorbar_axes) and labels inside the figure.
+        if tight_layout:
+            fig.set_layout_engine("constrained", compress=True)
+        else:
+            fig.set_layout_engine(None)
         ax = fig.gca()
     plt.sca(ax)
     return ax.figure, ax
@@ -718,17 +738,17 @@ def lattice_axes(figindex=None, figsize=None, tight_layout=True, ax=None):
 
 def estimate_figsize(array, x: float=8., cbar: bool=False, dy: float=1.):
     """
-    .. deprecated:: 1.0
-        :py:func:`estimate_figsize` will be removed in biolgca 1.0, it is replaced
-        by the default value for the figure size in :py:meth:`setup_figure` of the
-        respective LGCA object.
+    Estimate a figure size in which a lattice plot of `array` fills the width.
+
+    The height follows the aspect ratio of the lattice, plus room for axis
+    labels, and is limited to between 2.5 and 10 inches.
 
     Parameters
     ----------
     array : :py:class:`numpy.ndarray`
-        Array holding the data to be plotted.
+        Array holding the data to be plotted, with shape ``(lx, ly)``.
     x : float, default=8.0
-        Desired x dimension of the figure. Used to scale the y dimension.
+        Figure width in inches.
     cbar : bool, optional
         If the figure will contain a colorbar.
     dy : float, default=1.0
@@ -737,17 +757,16 @@ def estimate_figsize(array, x: float=8., cbar: bool=False, dy: float=1.):
     Returns
     -------
     figsize : tuple(float, float)
-        Optimal figure size.
+        Figure size in inches.
 
     """
     lx, ly = array.shape
-    if cbar:
-        y = min([abs(x * ly /lx - 1), 10.])
-    else:
-        y = min([x * ly / lx, 10.])
-    y *= dy
-    figsize = (x, y)
-    return figsize
+    # width of the y axis labels and ticks, plus the colour bar with its label
+    decorations_x = 1.8 if cbar else 0.9
+    # height of the x axis labels and ticks and a title
+    decorations_y = 1.2
+    y = (x - decorations_x) * ly * dy / lx + decorations_y
+    return x, min(max(y, 2.5), 10.)
 
 
 def get_cmap(

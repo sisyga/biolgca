@@ -153,8 +153,11 @@ Independent, low-risk items, in order.
   `make_animation`/`LatticeAnimation` hold the shared behaviour. Tutorial 2
   now draws its hexagonal density panels with `plot_density(ax=...)` instead
   of `imshow`. Also fixed: 1D colour-bar ticks on bin edges. `ipywidgets` is a
-  dependency so tqdm progress bars work in notebooks. Still to check:
-  clipping of long colour-bar labels at the figure edge (D3).
+  dependency so tqdm progress bars work in notebooks. D3 confirmed and fixed:
+  on wide lattices and in 1D flux plots, colour bars and labels were cut off.
+  Standalone plots now use constrained layout with inset colour bars and
+  aspect-aware default sizes; `tests/plot_figure_test.py` checks that labels
+  stay inside the figure.
 
 **0.6 Documented specs** (B1, B6)
 - NumPy docstrings for `SpaceSpec`, `StateSpec`, `TimeSpec`, `AnalysisSpec`,

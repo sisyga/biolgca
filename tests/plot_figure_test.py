@@ -127,3 +127,31 @@ def test_colorbars_in_constrained_layout_stay_inside_their_panel():
 
     left_colorbar = left.child_axes[0].get_tightbbox()
     assert left_colorbar.x1 < right.get_tightbbox().x0
+
+
+def _outside_figure(fig):
+    """Labels and visible tick labels that extend beyond the figure."""
+    fig.canvas.draw()
+    bounds = fig.bbox
+    texts = []
+    for ax in fig.axes:
+        texts += [ax.xaxis.label, ax.yaxis.label]
+        for axis in (ax.xaxis, ax.yaxis):
+            low, high = sorted(axis.get_view_interval())
+            texts += [label for tick in axis.get_major_ticks() if low <= tick.get_loc() <= high
+                      for label in (tick.label1, tick.label2) if label.get_visible()]
+    return [text.get_text() for text in texts if text.get_text() and (
+        text.get_window_extent().x0 < bounds.x0 - 1 or text.get_window_extent().x1 > bounds.x1 + 1
+        or text.get_window_extent().y0 < bounds.y0 - 1 or text.get_window_extent().y1 > bounds.y1 + 1)]
+
+
+@pytest.mark.parametrize("geometry, dims", [("square", (50, 50)), ("square", (80, 20)), ("hex", (80, 20)),
+                                            ("lin", 50), ("lin", 200)])
+@pytest.mark.parametrize("kind", ["density", "flux"])
+def test_standalone_plots_keep_labels_and_colorbars_inside_the_figure(geometry, dims, kind):
+    lgca = get_lgca(geometry=geometry, dims=dims, density=1, seed=1)
+    lgca.timeevo(timesteps=20, record=True, showprogress=False)
+
+    getattr(lgca, f"plot_{kind}")()
+
+    assert _outside_figure(plt.gcf()) == []

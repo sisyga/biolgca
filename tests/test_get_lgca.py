@@ -174,3 +174,11 @@ def test_too_few_rest_channels_for_go_or_grow_warn_at_the_caller():
         get_lgca(geometry="lin", dims=8, interaction="go_or_grow", restchannels=1, seed=1)
 
     assert record[0].filename == __file__
+
+
+@pytest.mark.parametrize("geometry", ["lin", "square", "hex", "cubic", "moore"])
+def test_default_nove_model_builds_and_runs(geometry):
+    lgca = get_lgca(geometry=geometry, ve=False, seed=1)
+    lgca.timeevo(timesteps=2, record=False, showprogress=False)
+
+    assert lgca.restchannels == 0

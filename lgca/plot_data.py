@@ -55,7 +55,9 @@ def label_history_axis(ax, steps, offset=0):
     """Label image sample rows with their actual, possibly nonuniform times."""
     indices = np.unique(np.linspace(0, len(steps) - 1, min(8, len(steps))).astype(int))
     ax.set_yticks(indices + offset, labels=[str(steps[index]) for index in indices])
-    ax.set_ylabel("Recorded time step (sample rows)")
+    # Rows of a sparse history are samples, not equally spaced times.
+    dense = len(steps) < 2 or np.all(np.diff(np.asarray(steps)) == 1)
+    ax.set_ylabel("Time step $k$" if dense else "Recorded time step $k$")
 
 
 def validate_species(lgca, species):

@@ -292,6 +292,10 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, n_species
 
     """
     _validate_kwargs(kwargs)
+    if (not ve and not ib and n_species == 1 and "interaction" not in kwargs
+            and "restchannels" not in kwargs and kwargs.get("nodes") is None):
+        # The default NoVE interaction, density-dependent alignment, needs no rest channels.
+        kwargs["restchannels"] = 0
 
     nodes = kwargs.get('nodes')
     rest_arg = kwargs.get('restchannels')

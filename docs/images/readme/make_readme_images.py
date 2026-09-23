@@ -46,8 +46,8 @@ axis.set_axis_off()
 axis.title.set_visible(False)
 for collection in axis.collections:
     collection.set_antialiased(False)  # flat colours compress far better in a GIF
-movie._fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
 movie._fig.set_layout_engine(None)
+movie._fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
 frames = OUT / "alignment_flux.mkv"
 movie.save(frames, writer=FFMpegWriter(fps=20, codec="png"), dpi=120)  # lossless intermediate
 plt.close("all")

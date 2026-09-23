@@ -40,7 +40,7 @@ except ImportError:  # pragma: no cover - handled at runtime
     )
 
 from .plot_data import resolve_animation_history, select_density, select_density_history
-from .plots import estimate_figsize, get_cmap, make_animation
+from .plots import estimate_figsize, freeze_layout, get_cmap, make_animation
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +115,7 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
                     text.set(alpha=bool(i))
                 return arrows, circles, texts, title
 
-            ani = animation.FuncAnimation(fig, update, interval=interval, cache_frame_data=False)
+            ani = animation.FuncAnimation(freeze_layout(fig), update, interval=interval, cache_frame_data=False)
             return ani
 
         else:
@@ -127,7 +127,7 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
                 arrows.set(alpha=arrow_color)
                 return arrows, title
 
-            ani = animation.FuncAnimation(fig, update, interval=interval, cache_frame_data=False)
+            ani = animation.FuncAnimation(freeze_layout(fig), update, interval=interval, cache_frame_data=False)
             return ani
 
 

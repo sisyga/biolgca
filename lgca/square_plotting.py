@@ -38,7 +38,8 @@ from .plot_data import (
     select_scalar_field,
     validate_species,
 )
-from .plots import _nice_steps, colorbar_axes, estimate_figsize, get_cmap, lattice_axes, make_animation
+from .plots import (_nice_steps, colorbar_axes, estimate_figsize, freeze_layout, get_cmap, lattice_axes,
+                    make_animation)
 
 __all__ = ["SquarePlotMixin"]
 
@@ -220,7 +221,7 @@ class SquarePlotMixin:
                     text.set(alpha=bool(i))
                 return arrows, circles, texts, title
 
-            ani = animation.FuncAnimation(fig, update, interval=interval, cache_frame_data=False)
+            ani = animation.FuncAnimation(freeze_layout(fig), update, interval=interval, cache_frame_data=False)
             return ani
 
         else:
@@ -232,7 +233,7 @@ class SquarePlotMixin:
                 arrows.set(alpha=arrow_color)
                 return arrows, title
 
-            ani = animation.FuncAnimation(fig, update, interval=interval, cache_frame_data=False)
+            ani = animation.FuncAnimation(freeze_layout(fig), update, interval=interval, cache_frame_data=False)
             return ani
 
     def live_animate_density(self, interval=100, channels=slice(None), **kwargs):
@@ -250,7 +251,7 @@ class SquarePlotMixin:
                 pc.set(facecolor=cmap.to_rgba(dens.ravel()))
             return pc, title
 
-        ani = animation.FuncAnimation(fig, update, interval=interval, cache_frame_data=False)
+        ani = animation.FuncAnimation(freeze_layout(fig), update, interval=interval, cache_frame_data=False)
         return ani
     def plot_flow(self, nodes=None, figsize=None, cmap='viridis', vmax=None, cbar=False, **kwargs):
 
@@ -337,7 +338,7 @@ class SquarePlotMixin:
             plot.set_UVC(jx, jy, counts.sum(-1))
             return plot, title
 
-        ani = animation.FuncAnimation(fig, update, interval=interval, cache_frame_data=False)
+        ani = animation.FuncAnimation(freeze_layout(fig), update, interval=interval, cache_frame_data=False)
         return ani
 
     def plot_scalarfield(self, field, cmap='cividis', cbar=True, edgecolor='none', mask=None,
@@ -626,5 +627,5 @@ class SquarePlotMixin:
             pc.set(facecolor=angle.reshape(-1, 4))
             return pc, title
 
-        ani = animation.FuncAnimation(fig, update, interval=interval, cache_frame_data=False)
+        ani = animation.FuncAnimation(freeze_layout(fig), update, interval=interval, cache_frame_data=False)
         return ani

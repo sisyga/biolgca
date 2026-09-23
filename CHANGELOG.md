@@ -56,6 +56,13 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- Standalone 1D and 2D plots use Matplotlib's constrained layout with colour
+  bars as inset axes, so axis labels, colour bars and their labels stay inside
+  the figure; animations keep the layout of their first frame. Default figure
+  heights follow the lattice's aspect ratio with room for labels (wide
+  lattices got figures about one inch tall). 1D history plots label their time
+  axis "Time step k", or "Recorded time step k" when not every step was
+  recorded.
 - A model run without `time.seed` draws a seed and records it in
   `result.spec.time.seed`, `result.metadata["seed"]` (with
   `metadata["seed_drawn"] = True`) and, for command-line runs, in
@@ -152,6 +159,13 @@ This file records notable user-facing changes. Changes remain under
 
 ### Fixed
 
+- `get_lgca(ve=False)` without further arguments failed on every geometry:
+  the default interaction (density-dependent alignment) needs zero rest
+  channels, but the default was one. Without an interaction and
+  `restchannels`, the factory now uses zero rest channels.
+- The README figures were ignored by git (`*.png`) and missing from the
+  repository; they are now committed, and a test checks that every README
+  image is tracked.
 - The registry described `phenotype_switch` as channel-preserving. It lets
   cells of a multispecies LGCA change species; the number of cells at a node is
   conserved, but a switch redistributes the node's cells over its channels.

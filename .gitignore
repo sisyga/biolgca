@@ -59,6 +59,7 @@ __pycache__/
 
 # Unless you specifically want to keep small documentation images
 !docs/images/*.png
+!docs/images/readme/*.png
 
 # Patch and temporary files
 *.patch
