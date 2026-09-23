@@ -35,7 +35,7 @@ def estimate_recording_bytes(lgca, timesteps, observers):
         if isinstance(observer, NodeRecorder):
             per_frame = spatial * channels * lgca.nodes.dtype.itemsize
         elif isinstance(observer, DensityRecorder):
-            per_frame = spatial * species * np.dtype(observer.dtype or float).itemsize
+            per_frame = spatial * species * observer.resolve_dtype(lgca).itemsize
         elif isinstance(observer, PopulationRecorder):
             per_frame = np.dtype(np.uint).itemsize
         elif isinstance(observer, ChannelDensityRecorder):
@@ -252,28 +252,52 @@ class PopulationRecorder(Observer):
 
 
 class DensityRecorder(Observer):
-    """Record node or species density in ``lgca.dens_t``."""
+    """Record node or species density in ``lgca.dens_t``.
+
+    By default densities are stored as signed integers: ``int16`` for models
+    with volume exclusion, whose nodes hold at most ``K`` particles per species,
+    and ``int32`` without volume exclusion, widened to ``int64`` if a node ever
+    exceeds that range. Pass ``dtype=float`` to record floating-point values.
+    """
 
     def __init__(self, schedule: Schedule | None = None, dtype=None):
         super().__init__(schedule=schedule)
         self.dtype = dtype
 
+    def resolve_dtype(self, lgca) -> np.dtype:
+        """Return the storage type used for ``lgca``."""
+        if self.dtype is not None:
+            return np.dtype(self.dtype)
+        if _has_unbounded_counts(lgca):
+            return np.dtype(np.int32)
+        return np.dtype(np.int16 if lgca.K <= np.iinfo(np.int16).max else np.int32)
+
     def setup(self, lgca, runner: SimulationRunner) -> None:
         value = self._density(lgca)
         length = _setup_sample_indices(self, lgca, runner, "dens_steps")
-        if self.dtype is None:
-            lgca.dens_t = np.zeros((length,) + value.shape)
-        else:
-            lgca.dens_t = np.zeros((length,) + value.shape, dtype=self.dtype)
+        dtype = self.resolve_dtype(lgca)
+        self._widen_on_overflow = self.dtype is None and _has_unbounded_counts(lgca)
+        lgca.dens_t = np.zeros((length,) + value.shape, dtype=dtype)
 
     def on_step(self, lgca, step: int) -> None:
-        lgca.dens_t[self._sample_indices[step], ...] = self._density(lgca)
+        value = self._density(lgca)
+        if (self._widen_on_overflow and value.size
+                and value.max() > np.iinfo(lgca.dens_t.dtype).max):
+            lgca.dens_t = lgca.dens_t.astype(np.int64)
+        lgca.dens_t[self._sample_indices[step], ...] = value
 
     @staticmethod
     def _density(lgca):
         if hasattr(lgca, "species_density"):
             return lgca.species_density[lgca.nonborder]
         return lgca.cell_density[lgca.nonborder]
+
+
+def _has_unbounded_counts(lgca) -> bool:
+    """Return whether nodes may hold arbitrarily many particles (no volume exclusion)."""
+    from .nove_base import NoVE_LGCA_base
+
+    return isinstance(lgca, NoVE_LGCA_base)
 
 
 class ChannelDensityRecorder(Observer):

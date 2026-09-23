@@ -35,6 +35,10 @@ This file records notable user-facing changes. Changes remain under
   reproducible from their seed, but seeded trajectories differ from those of
   earlier versions. Legacy functions and ModelSpec operators share the same
   kernels in `lgca.identity_kernels`.
+- `DensityRecorder` stores densities as signed integers by default: `int16`
+  with volume exclusion and `int32` (widened to `int64` on demand) without,
+  instead of `float64`. This cuts recording memory by 4x or 2x. Pass
+  `dtype=float` to keep floating-point output.
 - Matplotlib and JupyterLab are part of the normal installation so students can
   open the maintained notebooks and plot results without selecting extras.
   Three-dimensional Mayavi rendering remains optional.

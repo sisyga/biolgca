@@ -48,9 +48,10 @@ def test_recording_estimate_and_budget_precede_allocation():
     from types import SimpleNamespace
     from lgca.simulation import estimate_recording_bytes
 
-    fake = SimpleNamespace(dims=(128, 128, 128), nodes=np.empty((0, 0, 0, 6), dtype=bool))
-    assert estimate_recording_bytes(fake, 1000, [DensityRecorder()]) == 1001 * (128**3 * 8 + 8)
-    assert estimate_recording_bytes(fake, 1000, [DensityRecorder(Schedule(every=100))]) == 11 * (128**3 * 8 + 8)
+    fake = SimpleNamespace(dims=(128, 128, 128), K=6, nodes=np.empty((0, 0, 0, 6), dtype=bool))
+    assert estimate_recording_bytes(fake, 1000, [DensityRecorder()]) == 1001 * (128**3 * 2 + 8)
+    assert estimate_recording_bytes(fake, 1000, [DensityRecorder(dtype=float)]) == 1001 * (128**3 * 8 + 8)
+    assert estimate_recording_bytes(fake, 1000, [DensityRecorder(Schedule(every=100))]) == 11 * (128**3 * 2 + 8)
     lgca = get_lgca(geometry="lin", dims=3, density=1, seed=127, interaction="random_walk")
     before = lgca.nodes.copy()
     with pytest.raises(ValueError, match="Recording requires"):
@@ -281,3 +282,32 @@ def test_scalar_recorder_can_be_reused_without_retaining_previous_run(tmp_path):
     SimulationRunner(lgca, timesteps=1, observers=[recorder], showprogress=False).run()
 
     assert [record["step"] for record in recorder.records] == [0, 1]
+
+
+@pytest.mark.parametrize(
+    "kwargs,expected",
+    [
+        (dict(geometry="square", interaction="random_walk"), np.int16),
+        (dict(geometry="square", ib=True, interaction="random_walk"), np.int16),
+        (dict(geometry="square", ve=False, restchannels=0, interaction="dd_alignment"), np.int32),
+        (dict(geometry="square", ve=False, n_species=2, restchannels=1, interaction="birth"), np.int32),
+    ],
+)
+def test_density_recorder_stores_compact_signed_integers(kwargs, expected):
+    lgca = get_lgca(dims=4, density=1, seed=3, **kwargs)
+
+    lgca.timeevo(timesteps=3, showprogress=False)
+
+    assert lgca.dens_t.dtype == expected
+    np.testing.assert_array_equal(lgca.dens_t[-1], getattr(lgca, "species_density", lgca.cell_density)[lgca.nonborder])
+
+
+def test_density_recorder_widens_unbounded_counts_instead_of_overflowing():
+    nodes = np.zeros((3, 3), dtype=np.int64)
+    nodes[1, 2] = np.iinfo(np.int32).max + 10
+    lgca = get_lgca(geometry="lin", ve=False, nodes=nodes, interaction="only_propagation")
+
+    lgca.timeevo(timesteps=1, showprogress=False)
+
+    assert lgca.dens_t.dtype == np.int64
+    assert lgca.dens_t[0, 1] == np.iinfo(np.int32).max + 10

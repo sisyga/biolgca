@@ -518,7 +518,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         if recordN:
             observers.append(PopulationRecorder())
         if recorddens:
-            observers.append(DensityRecorder(dtype=np.uint))
+            observers.append(DensityRecorder())
         if recordchanneldens:
             observers.append(ChannelDensityRecorder())
         if recordfampop:
