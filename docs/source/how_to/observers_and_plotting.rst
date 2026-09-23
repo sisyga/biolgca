@@ -133,11 +133,12 @@ their channels before passing them. AnimationObserver captures selected density
 channels directly from each observed state.
 
 Square/hexagonal Matplotlib renderers are exercised with configuration, flux,
-flow and density data across classical, identity and NoVE backends. Cubic Mayavi
-configuration/density/flux methods use the same resolver and explicit timing
-interface; they retain their existing interactive ``show``/``None`` return
-contract. Adapter tests validate timing without requiring a display, but do not
-constitute a real Mayavi rendering test. Plot/movie observers support Matplotlib
+flow and density data across classical, identity and NoVE backends. Cubic and
+Moore Mayavi configuration/density/flux animations use the same resolver and
+label each frame with its recorded time. They open an interactive window and
+return the Mayavi ``Animator``; pass ``show=False`` inside an application that
+already runs a GUI event loop. With the ``plot3d`` extra installed, the test
+suite renders every 3D plot offscreen. Plot/movie observers support Matplotlib
 backends only. Linear models retain their space-time plot methods.
 
 On a compiled model, the operator clock continues across runs while observer

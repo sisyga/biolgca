@@ -27,8 +27,8 @@ The observer and plotting dispatch APIs are described in
 :doc:`/how_to/observers_and_plotting`. Square scalar fields use image artists and
 multi-species density selection is shared across static and animated paths.
 Remaining work includes consistent absolute/relative normalization, scalable
-colorbar tick locators, a documented slicing matrix, 3-D renderer lifecycle
-support, property/family plots and publication styling.
+colorbar tick locators, a documented slicing matrix, saving 3-D animations
+as movies, property/family plots and publication styling of 2-D plots.
 
 Custom initial conditions
 -------------------------

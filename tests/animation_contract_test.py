@@ -49,32 +49,31 @@ def test_explicit_arrays_use_only_explicit_times(kind, times):
 
 @pytest.mark.parametrize("kind", ["config", "density", "flux"])
 @pytest.mark.parametrize("entry", ["direct", "facade"])
-def test_mayavi_adapter_passes_resolved_times_without_matplotlib_internals(kind, entry, monkeypatch):
-    titles = []
+def test_mayavi_animations_label_frames_with_resolved_times(kind, entry, monkeypatch):
+    # Runs without Mayavi: the figure builders and the event loop are replaced.
+    played = {}
 
-    def animation_decorator(**kwargs):
-        def decorate(function):
-            return lambda: list(function())
-        return decorate
+    def play(fig, update, n_frames, label, interval, show):
+        played["labels"] = [label(frame) for frame in range(n_frames)]
+        for frame in range(n_frames):
+            update(frame)
+        return "animator"
 
-    fake = SimpleNamespace(animate=animation_decorator,
-                           title=lambda title, **kwargs: titles.append(title), show=lambda: None)
     module = importlib.import_module("lgca.lgca_cubic")
-    monkeypatch.setattr(module, "mlab", fake)
+    monkeypatch.setattr(module, "play", play)
     model = get_lgca(geometry="cubic", dims=(2, 2, 2), restchannels=1,
                      density=2, interaction="only_propagation")
     model.nodes_t = np.stack([model.nodes[model.nonborder]] * 3)
     model.dens_t = np.stack([model.cell_density[model.nonborder]] * 3)
     model.nodes_steps = model.dens_steps = np.array([0, 3, 20])
-    artist = SimpleNamespace(mlab_source=SimpleNamespace(set=lambda **kwargs: None))
+    updates = []
+    artist = SimpleNamespace(mlab_source=SimpleNamespace(set=lambda **kwargs: updates.append(kwargs)))
     output = (None, artist) if kind == "density" else (None, artist, artist)
-    monkeypatch.setattr(model, "plot_" + kind, lambda **kwargs: output)
-    if entry == "facade":
-        assert animate(model, kind=kind) is None
-    else:
-        assert getattr(model, "animate_" + kind)() is None
-    prefix = "Flux at Time " if kind == "flux" else "Time "
-    assert titles == [prefix + str(step) for step in (0, 0, 3, 20)]
+    monkeypatch.setattr(model, f"_{kind}_figure", lambda *args, **kwargs: output)
+    result = animate(model, kind=kind) if entry == "facade" else getattr(model, "animate_" + kind)()
+    assert result == "animator"
+    assert played["labels"] == ["t = 0", "t = 3", "t = 20"]
+    assert updates
 
 
 def test_animation_observer_captures_selected_channels():

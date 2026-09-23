@@ -146,3 +146,18 @@ def test_nove_identity_lists_living_families_with_crowded_nodes():
 
     assert families.size >= 1
     assert np.all(np.diff(families) > 0)
+
+
+@pytest.mark.parametrize("geometry", ["square", "hex"])
+def test_identity_property_map_shows_exactly_the_occupied_nodes(geometry):
+    lgca = _run("identity", geometry)
+    occupied = np.any(lgca.nodes[lgca.nonborder] > 0, axis=-1)
+
+    _, artist, _ = lgca.plot_prop_spatial()
+
+    if geometry == "square":
+        shown = ~np.ma.getmaskarray(artist.get_array()).T
+    else:
+        shown = (artist.get_facecolors()[:, 3] > 0).reshape(occupied.shape)
+    assert occupied.any() and not occupied.all()
+    np.testing.assert_array_equal(shown, occupied)

@@ -69,10 +69,9 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
         if propname is None:
             propname = list(props)[0]
 
-        lx, ly, _ = nodes.shape
-        mask = np.any(nodes, axis=-1)
+        empty = ~np.any(nodes, axis=-1)
         meanprop = self.calc_prop_mean(propname=propname, props=props, nodes=nodes)
-        fig, pc, cmap = self.plot_scalarfield(meanprop, mask=mask, **kwargs)
+        fig, pc, cmap = self.plot_scalarfield(meanprop, mask=empty, **kwargs)
         return fig, pc, cmap
 
     def plot_density(self, density=None, channels=slice(None), **kwargs):

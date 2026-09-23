@@ -48,6 +48,23 @@ This file records notable user-facing changes. Changes remain under
   with volume exclusion and `int32` (widened to `int64` on demand) without,
   instead of `float64`. This cuts recording memory by 4x or 2x. Pass
   `dtype=float` to keep floating-point output.
+- Three-dimensional plots of cubic and Moore lattices share one publication
+  style (`lgca.mayavi_style`): white background, a thin domain box with sparse
+  ticks, a fixed oblique camera with little perspective distortion,
+  anti-aliasing, correctly blended translucent isosurfaces and compact colour
+  bars whose integer bins are labelled at their centres. Node `i` is drawn at
+  the centre of the cell `[i, i + 1]`, so glyphs, isosurfaces and the domain box
+  line up. Flux arrows are centred on their node and scaled so that the
+  largest flux is 0.9 lattice units long; configuration arrows have a fixed
+  length and, when a channel can hold several particles, are coloured by its
+  population; sphere volumes are proportional to particle numbers. In-scene
+  titles were removed; animations show the recorded time in a corner label.
+  All model families on cubic and Moore lattices use one implementation.
+  Animations return the Mayavi `Animator` and accept `show=False`;
+  `plot_density` accepts `smooth=` for display-only Gaussian smoothing, and all
+  3D plots accept `size=` and `view=`.
+- The `plot3d` extra installs PySide6, which Mayavi needs to open windows and
+  run animations.
 - Matplotlib and JupyterLab are part of the normal installation so students can
   open the maintained notebooks and plot results without selecting extras.
   Three-dimensional Mayavi rendering remains optional.
@@ -82,6 +99,15 @@ This file records notable user-facing changes. Changes remain under
   density animations, stale NoVE identity-based property plots,
   `plot_prop_2dhist` without seaborn, and `list_families_alive` for crowded
   nodes.
+- 3D plotting: identity-based property maps without volume exclusion drew
+  uninitialized memory (values around 1e74) for empty nodes; they now show the
+  mean property of occupied nodes only. Isosurface levels were clamped to the
+  data range of the first animation frame. Configuration animations without
+  rest channels divided by zero, NoVE animations ignored the recorded sample
+  times, and multi-species configuration plots ignored the species axis.
+  Identity-based live 3D animations were not implemented and now run.
+- 2D identity-based property maps hid the occupied nodes: square lattices
+  showed an empty plot and hexagonal lattices showed only the empty nodes.
 
 ### Removed
 

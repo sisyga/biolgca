@@ -41,6 +41,8 @@ yaml = [
 ]
 plot3d = [
     "mayavi",
+    # Mayavi needs a Qt binding for on-screen windows and animations.
+    "PySide6",
 ]
 
 # Contributor tooling (PEP 735). `uv sync` installs the `dev` group by default.
