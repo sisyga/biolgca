@@ -170,15 +170,13 @@ def test_daughters_join_their_mothers_channel_only_without_volume_exclusion():
         LatticeState(_model()).divide_cells(0.5, channels="same")
 
 
-def test_species_share_a_full_node_in_proportion_to_their_requests():
-    lgca = _model(n_species=2, nodes=_nodes(True, 2, (80, 80), 5, 0))
-    state = LatticeState(lgca, capacity=2)
+def test_capacity_is_a_crowding_scale_and_not_a_limit():
+    state = LatticeState(_model(nodes=_nodes(True, 1, (6, 4), 5, 0)), capacity=2)
 
-    added = state.add_cells(np.array([3, 1]))
+    state.add_cells(3)
 
-    np.testing.assert_array_equal(state.density, 2)
-    assert abs(added[..., 0].mean() - 1.5) < 0.03
-    assert abs(added[..., 1].mean() - 0.5) < 0.03
+    assert state.capacity == 2
+    np.testing.assert_array_equal(state.density, 3)
 
 
 def test_cells_are_only_added_to_free_channels_of_their_species():
@@ -285,19 +283,46 @@ def test_identity_based_models_are_rejected():
         LatticeState(get_lgca(geometry="square", dims=(4, 4), ib=True, seed=1))
 
 
-def test_fields_of_a_model_spec_are_available_without_ghost_nodes():
+def _field_model(boundary):
     from lgca.model import Description, ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
 
-    signal = np.arange(24.0).reshape(6, 4)
-    compiled = build_model(ModelSpec(
+    signal = np.add.outer(np.arange(6.0), np.zeros(4))  # rises by 1 per node along x
+    return build_model(ModelSpec(
         description=Description(title="field access"),
-        space=SpaceSpec(geometry="square", dims=(6, 4)),
+        space=SpaceSpec(geometry="square", dims=(6, 4), boundary=boundary),
         state=StateSpec(density=0.5, fields={"signal": signal}),
         time=TimeSpec(steps=1, seed=1),
-    ))
-    state = LatticeState(compiled.lgca)
+    )).lgca, signal
+
+
+def test_fields_of_a_model_spec_are_available_without_ghost_nodes():
+    lgca, signal = _field_model("reflecting")
+    state = LatticeState(lgca)
 
     np.testing.assert_array_equal(state.field("signal"), signal)
-    assert state.gradient(state.field("signal")).shape == (6, 4, 2)
     with pytest.raises(KeyError, match="StateSpec.fields"):
         state.field("missing")
+
+
+def test_gradients_are_centred_and_take_boundary_values_from_ghost_nodes():
+    lgca, signal = _field_model("reflecting")
+    state = LatticeState(lgca)
+
+    # a named field uses its stored ghost nodes (edge values): half the slope at the walls
+    np.testing.assert_allclose(state.gradient("signal")[..., 0], [[0.5] * 4] + [[1.0] * 4] * 4 + [[0.5] * 4])
+    np.testing.assert_allclose(state.gradient("signal")[..., 1], 0)
+    # an array gets the ghost values of the cells, zero beyond a reflecting wall
+    np.testing.assert_allclose(state.gradient(signal)[0, :, 0], 0.5)
+    np.testing.assert_allclose(state.gradient(signal)[-1, :, 0], -2.0)
+
+
+@pytest.mark.parametrize("geometry", ["lin", "square", "hex", "cubic"])
+@pytest.mark.parametrize("bc", ["periodic", "reflecting"])
+def test_gradient_of_the_density_matches_the_model_after_its_boundary_conditions(geometry, bc):
+    lgca = _model(geometry, bc=bc, density=1.5)
+    lgca.apply_boundaries()
+    lgca.update_dynamic_fields()
+    state = LatticeState(lgca)
+
+    expected = lgca.gradient(lgca.cell_density)[lgca.nonborder]
+    np.testing.assert_allclose(state.gradient(state.density), expected)

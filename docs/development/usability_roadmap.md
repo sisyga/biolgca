@@ -304,7 +304,7 @@ state.density             # cells per node, shape dims
 state.species_density     # cells per node and species, shape dims + (n_species,)
 state.flux                # sum of cell velocities per node, shape dims + (d,)
 state.neighbor_sum(a)     # sum of a over the interaction neighbourhood
-state.gradient(f)         # physical gradient in lattice units
+state.gradient(f)         # centred gradient in lattice units; f is an array or a field name
 state.field("signal")     # named field from StateSpec.fields
 state.c, state.K, state.velocitychannels, state.restchannels, state.capacity
 state.rng, state.step, state.geometry, state.dims, state.n_species
@@ -312,7 +312,7 @@ state.rng, state.step, state.geometry, state.dims, state.n_species
 # operations; probabilities broadcast against dims or dims + (n_species,)
 state.remove_cells(p)                          # every cell dies independently with probability p
 state.divide_cells(p, channels="rest")         # every cell divides with probability p into a free channel
-state.add_cells(n, channels="rest")            # n new cells per node and species, capacity respected
+state.add_cells(n, channels="rest")            # n new cells per node and species, into free channels
 state.switch_phenotype(rates, channels=...)    # rates[a][b]: probability that a cell of species a becomes b;
                                                # switched cells go to free channels of the given set
 state.shuffle_cells("velocity", species=0)     # random walk of one species within a channel set
@@ -325,31 +325,36 @@ state.counts = new                             # expert access: replace the whol
   their channels.
 - Each operation is implemented with volume exclusion (at most one cell per
   channel and species) and without it (binomial and multinomial sampling per
-  cell), and respects the node capacity.
-- Writes are checked: capacity, non-negative integers, no NaN, and the
+  cell). The only hard limit is volume exclusion; `capacity` is the crowding
+  scale that rules use (e.g. `1 - density / capacity`), in every family.
+- Writes are checked: at most one cell per channel and species with volume
+  exclusion, non-negative integers, no NaN, and the
   conservation law of the kind (reorientation keeps cells per node and
   species; a phenotype switch keeps cells per node).
 - Only `state.rng` is available for randomness, so runs stay reproducible.
 - Status (2026-09-24): done in `lgca/lattice_state.py` (`lgca.LatticeState`),
   tested on every geometry with and without volume exclusion and with one and
   two species (`tests/lattice_state_test.py`). Decisions made on the way:
-  - `capacity` limits the cells per node only with volume exclusion (default
-    `n_species * K`). Without it, `capacity` is the crowding scale that rules
-    use (`density / capacity`) and is not enforced, as in the existing NoVE
-    rules and initial states.
-  - When several species ask for more cells than a node can take, the cells
-    that fit are a uniformly random subset of all requested cells
-    (multivariate hypergeometric), so no species is favoured.
+  - Capacity is a soft limit in every family: the crowding scale that rules
+    use, not enforced by the operations. With volume exclusion the hard limit
+    is one cell per channel and species (default capacity `n_species * K`);
+    without it there is none, as in the existing NoVE rules and initial
+    states.
   - With volume exclusion, a phenotype switch needs a channel that was free
     for the new species before the switch; competing cells are chosen at
-    random, and the rest keep their species. `channels="same"` keeps each
-    cell in its channel.
+    random, and the rest keep their species (as in legacy go-or-grow).
+    `channels="same"` keeps each cell in its channel.
   - `divide_cells(channels="same")` (daughter in the mother's channel) exists
     only without volume exclusion.
   - `neighbor_sum` wraps around periodic boundaries and sees zeros beyond
     reflecting and absorbing walls, as the model's own `nb_sum` does after
-    its boundary conditions. `gradient` uses the physical-coordinate
-    convention of the chemotaxis term (one-sided at the lattice edge).
+    its boundary conditions. `gradient` takes centred differences with the
+    model's own `gradient` method on the padded lattice: arrays get the same
+    ghost values as in `neighbor_sum`, named fields keep the ghost values the
+    model stores for them (edge values for `StateSpec.fields`).
+  - Follow-up: the native `birth_death` operator still treats `capacity` as a
+    hard limit per node; align it with the soft-limit convention when it is
+    rewritten on the operations (1.4).
   - `commit()` checks the conservation law of the kind and writes the
     interior; the pipeline integration comes with the decorator (1.4).
 
@@ -423,8 +428,8 @@ report = check_interaction(crowding_death, parameters={"r_d": 0.2})
 
 Runs the interaction on small seeded lattices of every supported geometry
 (1D, square, hex, cubic, Moore) and declared family, with one and two species,
-and checks: ghost nodes untouched after boundary application, capacity and
-dtype respected, conservation law of the kind and declared extra laws
+and checks: ghost nodes untouched after boundary application, volume
+exclusion and dtype respected, conservation law of the kind and declared extra laws
 (e.g. momentum), same seed gives same result, no NaN. With
 `expected_rates=...` it also compares measured death, birth or switch
 frequencies with the declared ones. Raises with a readable report; usable as a

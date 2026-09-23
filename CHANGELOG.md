@@ -12,7 +12,7 @@ This file records notable user-facing changes. Changes remain under
   defined meaning per cell: `remove_cells`, `divide_cells`, `add_cells`,
   `switch_phenotype` and `shuffle_cells`. Each works the same with and
   without volume exclusion (without it, cells in one channel die, divide and
-  switch one by one), respects free channels and node capacity, and draws
+  switch one by one), places cells only in free channels, and draws
   from the model's random generator. `commit()` checks the conservation law
   of the interaction's kind and writes the state back.
 - The model and pipeline specifications (`SpaceSpec`, `StateSpec`,

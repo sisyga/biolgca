@@ -34,11 +34,11 @@ class LatticeState:
     step : int, default=0
         Current time step, available as :attr:`step`.
     capacity : int, optional
-        Cells per node. With volume exclusion it limits the number of cells a
-        node holds, and defaults to ``n_species * K``, one cell per channel and
-        species. Without volume exclusion it is the crowding scale that rules
-        use, e.g. in ``density / capacity``, and is not enforced; it defaults
-        to the model's ``capacity``.
+        Cells per node at which a node counts as crowded, the scale that rules
+        use in e.g. ``density / capacity``. It is not enforced: the only hard
+        limit is volume exclusion, one cell per channel and species. Defaults
+        to ``n_species * K`` with volume exclusion and to the model's
+        ``capacity`` without it.
     kind : {None, "birth_death", "phenotype_switch", "reorientation"}
         Kind of the interaction that uses the state. :meth:`commit` checks its
         conservation law: a reorientation keeps the number of cells of each
@@ -105,7 +105,7 @@ class LatticeState:
 
         Assign a new array to replace the whole state; the assignment is
         checked (non-negative integers, one cell per channel and species with
-        volume exclusion, node capacity).
+        volume exclusion).
         """
         view = self._counts.view()
         view.flags.writeable = False
@@ -128,9 +128,6 @@ class LatticeState:
         if self._ve:
             if np.any(value > 1):
                 raise ValueError("with volume exclusion a channel holds at most one cell of each species")
-            full = value.sum(axis=(-2, -1)) > self._capacity
-            if np.any(full):
-                raise ValueError(f"{int(full.sum())} nodes hold more than capacity={self._capacity} cells")
         self._counts = value
 
     @property
@@ -162,30 +159,46 @@ class LatticeState:
         return self._lgca.nb_sum(self._pad(values))[self._lgca.nonborder]
 
     def gradient(self, values) -> np.ndarray:
-        """Gradient of a scalar field of shape ``dims`` in physical lattice units.
+        """Gradient of a scalar field in lattice units, shape ``dims + (d,)``.
 
-        Returns shape ``dims + (d,)``. Differences are centred inside the
-        lattice and one-sided at its edges; on the hexagonal lattice the row
-        offsets are taken into account.
+        ``values`` is an array of shape ``dims`` or the name of a field (see
+        :meth:`field`). Differences are centred everywhere, using ghost nodes
+        beyond the lattice edge: an array gets the ghost values of
+        :meth:`neighbor_sum` (wrapped with periodic boundaries, zero
+        otherwise), a named field keeps the ghost values the model stores for
+        it. This is the convention of the model's own ``gradient`` method.
         """
-        from .pipeline import _physical_field_gradient
-
-        values = np.asarray(values, dtype=float)
-        if values.shape != self._dims:
-            raise ValueError(f"values must have the lattice shape {self._dims}, got {values.shape}")
-        return _physical_field_gradient(self._lgca, values)
+        if isinstance(values, str):
+            padded = np.asarray(self._padded_field(values), dtype=float)
+        else:
+            values = np.asarray(values, dtype=float)
+            if values.shape != self._dims:
+                raise ValueError(f"values must have the lattice shape {self._dims}, got {values.shape}")
+            padded = self._pad(values)
+        if padded.shape != self._lgca.nodes.shape[:len(self._dims)]:
+            raise ValueError("gradient needs a scalar field with one value per node")
+        return self._lgca.gradient(padded)[self._lgca.nonborder]
 
     def field(self, name: str) -> np.ndarray:
         """A named field from ``StateSpec.fields``, shape ``dims + (...)`` (read-only)."""
-        if not hasattr(self._lgca, name):
-            raise KeyError(f"the model has no field {name!r}; declare it in StateSpec.fields")
-        values = np.asarray(getattr(self._lgca, name))
-        padded = self._lgca.nodes.shape[:len(self._dims)]
-        if values.shape[:len(self._dims)] == padded and padded != self._dims:
+        values = np.asarray(self._padded_field(name))
+        if values.shape[:len(self._dims)] != self._dims:
             values = values[self._lgca.nonborder]
         values = values.view()
         values.flags.writeable = False
         return values
+
+    def _padded_field(self, name):
+        """The field as the model stores it, with ghost nodes, or padded like cells."""
+        if not hasattr(self._lgca, name):
+            raise KeyError(f"the model has no field {name!r}; declare it in StateSpec.fields")
+        values = np.asarray(getattr(self._lgca, name))
+        padded = self._lgca.nodes.shape[:len(self._dims)]
+        if values.shape[:len(self._dims)] == padded:
+            return values
+        if values.shape[:len(self._dims)] != self._dims:
+            raise ValueError(f"field {name!r} has shape {values.shape}, which does not match the lattice")
+        return self._pad(values)
 
     @property
     def dims(self) -> tuple[int, ...]:
@@ -211,7 +224,7 @@ class LatticeState:
 
     @property
     def capacity(self) -> int:
-        """Cells per node: a limit with volume exclusion, a crowding scale without it."""
+        """Cells per node at which a node counts as crowded (not enforced)."""
         return self._capacity
 
     @property
@@ -259,8 +272,8 @@ class LatticeState:
 
         Daughters go to free channels of the set ``channels`` (see
         :meth:`add_cells`). With volume exclusion, a division fails when its
-        species has no free channel left in the set or the node is at
-        capacity; which divisions fail is random. Without volume exclusion,
+        species has no free channel left in the set; which divisions fail is
+        random. Without volume exclusion,
         ``channels="same"`` puts each daughter in its mother's channel.
 
         Returns the number of added cells per node and species.
@@ -280,10 +293,10 @@ class LatticeState:
         ``channels`` is ``"all"``, ``"rest"``, ``"velocity"``, a sequence of
         channel indices or a boolean mask of length ``K``; the new cells are
         spread uniformly over the free channels of this set. With volume
-        exclusion, a species gets at most as many cells as it has free channels
-        in the set, and a node at capacity takes no more cells; when the
-        requests of several species exceed the capacity, the cells that fit
-        are a uniformly random subset of all requested cells.
+        exclusion, a species gets at most as many cells as it has free
+        channels in the set. :attr:`capacity` is not enforced; rules that
+        should slow down near it scale their rates, e.g. with
+        ``1 - density / capacity``.
 
         Returns the number of added cells per node and species.
         """
@@ -294,7 +307,7 @@ class LatticeState:
             self._counts += added
             return wanted
         free = (self._counts == 0) & allowed
-        granted = self._within_capacity(np.minimum(wanted, free.sum(axis=-1)))
+        granted = np.minimum(wanted, free.sum(axis=-1))
         self._counts += self._choose(free, granted)
         return granted
 
@@ -454,25 +467,6 @@ class LatticeState:
         scores[~np.broadcast_to(free, scores.shape)] = np.inf
         ranks = np.argsort(np.argsort(scores, axis=-1), axis=-1)
         return (ranks < number[..., None]).astype(np.int64)
-
-    def _within_capacity(self, wanted):
-        """Grant each node's requests up to its remaining capacity.
-
-        When the requests exceed it, the granted cells are a uniformly random
-        subset of all requested cells (multivariate hypergeometric).
-        """
-        remaining = np.maximum(self._capacity - self.density, 0)
-        total = wanted.sum(axis=-1)
-        if np.all(total <= remaining):
-            return wanted
-        take = np.minimum(total, remaining)
-        left = total.copy()
-        granted = np.zeros_like(wanted)
-        for species in range(self.n_species):
-            left = left - wanted[..., species]
-            granted[..., species] = self.rng.hypergeometric(wanted[..., species], left, take)
-            take = take - granted[..., species]
-        return granted
 
     def _transition_matrix(self, rates):
         n_species = self.n_species
