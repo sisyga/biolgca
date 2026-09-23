@@ -221,20 +221,17 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         run_timeevo(self, timesteps=timesteps, observers=observers, showprogress=showprogress)
 
     def random_reset(self, density):
-        """Populate the lattice from a Poisson distribution with mean ``density`` per node."""
+        """Populate the lattice from a Poisson distribution with mean ``density`` per node.
 
+        If ``capacity`` exceeds the channel count and a rest channel exists, the rest
+        channel receives the share of the surplus capacity. Without a rest channel,
+        particles are distributed evenly over all velocity channels, so the initial
+        state carries no net flux.
+        """
         _validate_density(density)
-        normalization = max(self.capacity, self.K)
-        density = density / normalization
-        draw1 = self.rng.poisson(lam=density, size=self.nodes.shape)
-        if self.capacity > self.K:
-            draw2 = self.rng.poisson(lam=density * (self.capacity - self.K), size=self.nodes.shape[:-1])
-            draw1[..., -1] += draw2
-        self.nodes = draw1
+        self.nodes = _poisson_channel_populations(self, density, self.nodes.shape)
         self.apply_boundaries()
         self.update_dynamic_fields()
-        eff_dens = self.nodes[self.nonborder].sum() / self.cell_density[self.nonborder].size
-        print("Required density: {:.3f}, Achieved density: {:.3f}".format(density * normalization, eff_dens))
 
 
     def calc_entropy(self, base=None):
@@ -330,6 +327,22 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         # #  (computation on less elements if done here)
         no_neighbours = self.c.shape[-1]
         return alignment[self.nonborder].sum() / (no_neighbours * N)
+
+def _poisson_channel_populations(lgca, density, shape):
+    """Draw Poisson channel populations with mean ``density`` particles per node.
+
+    Rest channels are the last axis entries. When ``lgca.capacity`` exceeds the
+    channel count, the surplus is added to the rest channel only; with no rest
+    channel every channel receives the same mean.
+    """
+    if lgca.restchannels > 0 and lgca.capacity > lgca.K:
+        per_channel = density / lgca.capacity
+        populations = lgca.rng.poisson(lam=per_channel, size=shape)
+        surplus = lgca.rng.poisson(lam=per_channel * (lgca.capacity - lgca.K), size=shape[:-1])
+        populations[..., -1] += surplus
+        return populations
+    return lgca.rng.poisson(lam=density / lgca.K, size=shape)
+
 
 # create a numpy universal function (ufunc) of the python function 'list'. Can be used to create an numpy array of
 # empty lists if applied to an empty array

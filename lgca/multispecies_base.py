@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 from tqdm.auto import tqdm
 
-from .nove_base import NoVE_LGCA_base
+from .nove_base import NoVE_LGCA_base, _poisson_channel_populations
 from .base import LGCA_base, _validate_density
 
 
@@ -183,13 +183,7 @@ class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
     def random_reset(self, density):
         """Populate a total density distributed over all species."""
         _validate_density(density)
-        density = density / self.n_species
-        density = density / max(self.capacity, self.K)
-        draw1 = self.rng.poisson(lam=density, size=self.nodes.shape)
-        if self.capacity > self.K:
-            draw2 = self.rng.poisson(lam=density * (self.capacity - self.K), size=self.nodes.shape[:-1])
-            draw1[..., -1] += draw2
-        self.nodes = draw1
+        self.nodes = _poisson_channel_populations(self, density / self.n_species, self.nodes.shape)
         self.apply_boundaries()
         self.update_dynamic_fields()
 
