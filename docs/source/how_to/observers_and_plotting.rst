@@ -138,8 +138,8 @@ Moore Mayavi configuration/density/flux animations use the same resolver and
 label each frame with its recorded time. They open an interactive window and
 return the Mayavi ``Animator``; pass ``show=False`` inside an application that
 already runs a GUI event loop. With the ``plot3d`` extra installed, the test
-suite renders every 3D plot offscreen. Plot/movie observers support Matplotlib
-backends only. Linear models retain their space-time plot methods.
+suite renders every 3D plot offscreen. Linear models retain their space-time
+plot methods.
 
 On a compiled model, the operator clock continues across runs while observer
 schedules and callbacks restart at local zero. ``result.metadata['runtime']``
@@ -219,6 +219,49 @@ specification instead of a post-processing step.
 The plotting observers require the optional plotting dependencies and use the
 same backend methods as ``lgca.plot_density()``, ``lgca.animate_density()`` and
 the related geometry-specific helpers.
+
+Three-dimensional plots and movies
+----------------------------------
+
+Cubic and Moore lattices are drawn with Mayavi (``uv sync --extra plot3d``).
+The same observers work for them. Snapshots that are saved and closed, and all
+movies, are rendered offscreen, so a run does not open windows:
+
+.. code-block:: python
+
+   lgca = get_lgca(geometry="cubic", dims=20, interaction="go_or_grow", ve=False,
+                   capacity=8, restchannels=1, density=0.5, seed=6)
+
+   snapshots = PlotSnapshotObserver(
+       kind="density_cubes",
+       schedule=Schedule(steps={0, 50}),
+       output_dir=Path("outputs/snapshots"),
+   )
+   movie = AnimationObserver(
+       kind="density",
+       schedule=Schedule(every=2),
+       save_path=Path("outputs/density_3d.mp4"),
+       save_kwargs={"fps": 10},
+       smooth=1.0,
+   )
+
+   SimulationRunner(lgca, timesteps=50, observers=[snapshots, movie], showprogress=False).run()
+
+After a run with recorded history, the animation methods can also write a
+movie directly:
+
+.. code-block:: python
+
+   lgca.timeevo(timesteps=50, record=True, showprogress=False)
+   lgca.animate_density(save_path="outputs/density_3d_direct.mp4")
+   lgca.animate_flux(save_path="outputs/flux_3d.gif", size=(1000, 800))
+
+Video files such as ``.mp4`` need ffmpeg; ``.gif`` files use Pillow.
+``save_kwargs`` takes the options of Matplotlib's ``Animation.save`` (``fps``,
+``writer``, ``bitrate``, ``codec``, ...). The resolution is the figure size in
+pixels, set with ``size=(width, height)``. Without ``save_path``, an
+AnimationObserver on a 3D model returns a Mayavi ``Animator`` that plays after
+``mlab.show()``.
 
 Density/species selection is shared between static plots and animations.
 Square scalar fields use image artists, so large 2D plots do not create one

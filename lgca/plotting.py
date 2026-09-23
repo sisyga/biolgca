@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from pathlib import Path
 
 import numpy as np
@@ -21,6 +22,7 @@ __all__ = [
 
 _PLOT_METHODS = {
     "density": "plot_density",
+    "density_cubes": "plot_density_cubes",
     "config": "plot_config",
     "configuration": "plot_config",
     "flux": "plot_flux",
@@ -40,7 +42,7 @@ _ANIMATION_METHODS = {
 def plot(lgca, kind: str = "density", **kwargs):
     """Create one plot for the current state using the model's renderer."""
 
-    method = getattr(lgca, _resolve_kind(kind, _PLOT_METHODS))
+    method = _model_method(lgca, kind, _resolve_kind(kind, _PLOT_METHODS))
     return method(**kwargs)
 
 
@@ -48,14 +50,19 @@ def animate(lgca, kind: str = "density", data=None, steps=None, **kwargs):
     """Animate frames with paired simulation ``steps`` (dense if unspecified)."""
 
     method_name, data_argument = _resolve_animation(kind)
-    method = getattr(lgca, method_name)
+    method = _model_method(lgca, kind, method_name)
     channels = kwargs.pop("channels", slice(None)) if data_argument == "density_t" else slice(None)
     data, times = resolve_animation_history(lgca, data_argument, data, steps, channels)
     return method(**{data_argument: data}, steps=times, **kwargs)
 
 
 class PlotSnapshotObserver(Observer):
-    """Create static plot snapshots during a simulation run."""
+    """Create static plot snapshots during a simulation run.
+
+    Snapshots of 3D (cubic and Moore) models are rendered with Mayavi. When they
+    are closed after saving (the default with `output_dir`), they are rendered
+    offscreen without opening windows.
+    """
 
     def __init__(
         self,
@@ -78,29 +85,37 @@ class PlotSnapshotObserver(Observer):
         self.paths = []
 
     def setup(self, lgca, runner) -> None:
-        _validate_observer_backend(lgca)
+        _model_method(lgca, self.kind, _resolve_kind(self.kind, _PLOT_METHODS))
         self.results = []
         self.paths = []
         if self.output_dir is not None:
             self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def on_step(self, lgca, step: int) -> None:
-        result = plot(lgca, kind=self.kind, **self.plot_kwargs)
-        fig = _figure_from_result(result)
-        if self.retain_results:
-            self.results.append((step, result))
+        with _render_context(lgca, offscreen=self.close):
+            result = plot(lgca, kind=self.kind, **self.plot_kwargs)
+            fig = _figure_from_result(result)
+            if self.retain_results:
+                self.results.append((step, result))
 
-        if self.output_dir is not None:
-            path = self.output_dir / self.filename.format(kind=self.kind, step=step)
-            fig.savefig(path)
-            self.paths.append(path)
+            if self.output_dir is not None:
+                path = self.output_dir / self.filename.format(kind=self.kind, step=step)
+                _save_figure(fig, path)
+                self.paths.append(path)
 
-        if self.close:
-            _close_figure(fig)
+            if self.close:
+                _close_figure(fig)
 
 
 class AnimationObserver(Observer):
-    """Collect simulation frames and build an animation at the end."""
+    """Collect simulation frames and build an animation at the end.
+
+    For 2D models, :attr:`animation` is a Matplotlib animation. For 3D (cubic
+    and Moore) models, the frames are rendered with Mayavi without blocking the
+    run: with `save_path`, every frame is rendered offscreen, the movie is
+    written and :attr:`animation` is its path; otherwise :attr:`animation` is a
+    Mayavi ``Animator`` that plays after :func:`mayavi.mlab.show` is called.
+    """
 
     def __init__(
         self,
@@ -122,7 +137,7 @@ class AnimationObserver(Observer):
         self.animation = None
 
     def setup(self, lgca, runner) -> None:
-        _validate_observer_backend(lgca)
+        _model_method(lgca, self.kind, _resolve_animation(self.kind)[0])
         if self.schedule.steps is not None and not any(step <= runner.timesteps for step in self.schedule.steps):
             raise ValueError("Animation schedule selects no frames in this run; "
                              f"include a local step between 0 and {runner.timesteps}")
@@ -139,6 +154,14 @@ class AnimationObserver(Observer):
         kwargs = dict(self.animation_kwargs)
         if _resolve_animation(self.kind)[1] == "density_t":
             kwargs.pop("channels", None)  # Frame capture already selected the channels.
+        if _uses_mayavi(lgca):
+            self.frames = []
+            kwargs.setdefault("show", False)
+            if self.save_path is not None:
+                self.save_path.parent.mkdir(parents=True, exist_ok=True)
+                kwargs.update(save_path=self.save_path, save_kwargs=self.save_kwargs)
+            self.animation = animate(lgca, kind=self.kind, data=data, steps=self.frame_steps, **kwargs)
+            return
         self.animation = animate(lgca, kind=self.kind, data=data, steps=self.frame_steps,
                                  **kwargs)
         self.frames = []
@@ -181,10 +204,49 @@ def _figure_from_result(result):
         raise TypeError("Plot functions used with PlotSnapshotObserver must return a figure as their first item.") from exc
 
 
-def _close_figure(fig) -> None:
-    from matplotlib import pyplot as plt
+def _model_method(lgca, kind: str, method_name: str):
+    method = getattr(lgca, method_name, None)
+    if method is None:
+        raise ValueError(f"{type(lgca).__name__} does not provide {kind!r} plots (no method {method_name}).")
+    return method
 
-    plt.close(fig)
+
+def _uses_mayavi(lgca) -> bool:
+    return getattr(lgca, "geometry", None) in {"cubic", "moore"}
+
+
+def _render_context(lgca, offscreen: bool):
+    if not _uses_mayavi(lgca):
+        return nullcontext()
+    from .mayavi_style import offscreen as mayavi_offscreen
+
+    return mayavi_offscreen(offscreen)
+
+
+def _is_matplotlib_figure(fig) -> bool:
+    from matplotlib.figure import Figure
+
+    return isinstance(fig, Figure)
+
+
+def _save_figure(fig, path) -> None:
+    if _is_matplotlib_figure(fig):
+        fig.savefig(path)
+    else:
+        from .mayavi_style import save_figure
+
+        save_figure(fig, path)
+
+
+def _close_figure(fig) -> None:
+    if _is_matplotlib_figure(fig):
+        from matplotlib import pyplot as plt
+
+        plt.close(fig)
+    else:
+        from .mayavi_style import mlab
+
+        mlab.close(fig)
 
 
 def _capture_frame(lgca, kind: str, channels=slice(None)):
@@ -218,11 +280,3 @@ def _frames_to_array(frames):
             arr[i, ...] = frame
         return arr
     return np.asarray(frames)
-
-
-def _validate_observer_backend(lgca) -> None:
-    if getattr(lgca, "geometry", None) in {"cubic", "moore"}:
-        raise NotImplementedError(
-            "Plotting observers do not yet support the 3-D Mayavi lifecycle; "
-            "call the cubic plotting method directly."
-        )

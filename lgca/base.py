@@ -25,13 +25,12 @@ from math import comb
 class _MissingPlotLib:
     """Placeholder object for an optional plotting library."""
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, install: str = "Reinstall BioLGCA with 'uv sync' or 'python -m pip install -e .'."):
         self._name = name
+        self._install = install
 
     def __getattr__(self, _):
-        raise ImportError(
-            f"Plotting requires {self._name}. Reinstall BioLGCA with 'uv sync' or 'python -m pip install -e .'."
-        )
+        raise ImportError(f"Plotting requires {self._name}. {self._install}")
 
 
 import numpy as np

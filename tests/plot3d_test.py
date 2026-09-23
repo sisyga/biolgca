@@ -50,7 +50,7 @@ def run_frames(monkeypatch, n_frames=None):
     """Replace the GUI animation loop by calling every frame once; return the frame labels."""
     labels = []
 
-    def play(fig, update, frames, label, interval, show):
+    def play(fig, update, frames, label, interval, show, **kwargs):
         for frame in range(frames if frames is not None else n_frames):
             update(frame)
             labels.append(label(frame))
@@ -191,3 +191,65 @@ def test_identity_based_live_density_animation_steps_the_simulation(monkeypatch)
     model.live_animate_density()
 
     np.testing.assert_array_equal(figures[0][1].mlab_source.scalars, reference.cell_density[reference.nonborder])
+
+
+def open_scenes():
+    from mayavi.core.registry import registry
+
+    return sum(len(engine.scenes) for engine in registry.engines.values())
+
+
+@pytest.mark.parametrize("kind", ["density", "flux", "config"])
+def test_movie_has_one_frame_per_recorded_step_and_leaves_no_window(kind, tmp_path):
+    Image = pytest.importorskip("PIL.Image")
+    model = make_model("nove", steps=4)
+    mlab.close(all=True)
+    mlab.options.offscreen = False  # saving must not depend on the global offscreen option
+
+    path = getattr(model, "animate_" + kind)(save_path=tmp_path / f"{kind}.gif", size=(301, 241))
+
+    assert mlab.options.offscreen is False
+    assert open_scenes() == 0
+    with Image.open(path) as movie:
+        assert movie.n_frames == len(model.nodes_t)
+        assert movie.size == (300, 240)  # cropped to even dimensions for video codecs
+
+
+def test_mp4_movie_uses_ffmpeg(tmp_path):
+    from matplotlib import animation
+
+    if not animation.writers.is_available("ffmpeg"):
+        pytest.skip("ffmpeg is not installed")
+    model = make_model("classical", steps=2)
+
+    path = model.animate_density(save_path=tmp_path / "density.mp4", save_kwargs={"fps": 4})
+
+    assert path.stat().st_size > 0
+
+
+def test_movie_resolution_is_set_by_figure_size_not_dpi(tmp_path):
+    model = make_model("classical", steps=1)
+
+    with pytest.raises(ValueError, match="size="):
+        model.animate_density(save_path=tmp_path / "density.gif", save_kwargs={"dpi": 200})
+
+
+def test_plotting_observers_write_3d_snapshots_and_movies(tmp_path):
+    Image = pytest.importorskip("PIL.Image")
+    from lgca.plotting import AnimationObserver, PlotSnapshotObserver
+    from lgca.simulation import Schedule, SimulationRunner
+
+    model = make_model("ib", steps=0)
+    snapshots = PlotSnapshotObserver(kind="density_cubes", schedule=Schedule(steps={0, 3}),
+                                     output_dir=tmp_path / "snapshots")
+    movie = AnimationObserver(kind="flux", save_path=tmp_path / "movies" / "flux.gif")
+
+    SimulationRunner(model, timesteps=3, observers=[snapshots, movie], showprogress=False).run()
+
+    assert [path.name for path in snapshots.paths] == ["density_cubes_00000.png", "density_cubes_00003.png"]
+    for path in snapshots.paths:
+        with Image.open(path) as image:
+            assert np.count_nonzero(np.any(np.asarray(image.convert("RGB")) < 250, axis=-1)) > 1000
+    with Image.open(movie.animation) as frames:
+        assert frames.n_frames == 4
+    assert open_scenes() == 0

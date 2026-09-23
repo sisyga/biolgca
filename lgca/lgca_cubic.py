@@ -14,6 +14,7 @@ from lgca.mayavi_style import (
     decorate_domain,
     mlab,
     new_figure,
+    offscreen,
     play,
     style_arrows,
     style_surface,
@@ -714,7 +715,8 @@ class LGCA_Cubic(LGCA_base):
                                    **kwargs)
 
     def animate_density(self, density_t=None, contours=3, colormap="viridis", opacity=0.35, cbar=True, interval=100,
-                        steps=None, channels=slice(None), species=None, vmax=None, smooth=0.0, show=True, **kwargs):
+                        steps=None, channels=slice(None), species=None, vmax=None, smooth=0.0, show=True,
+                        save_path=None, save_kwargs=None, **kwargs):
         """
         Animate the density isosurfaces of a recorded simulation with Mayavi.
 
@@ -731,6 +733,14 @@ class LGCA_Cubic(LGCA_base):
             largest recorded density otherwise.
         show : bool, default=True
             Whether to enter the GUI event loop; see :func:`lgca.mayavi_style.play`.
+        save_path : str or pathlib.Path, optional
+            Instead of opening a window, render every frame offscreen and write a movie to this file, e.g.
+            ``density.mp4`` (needs ffmpeg) or ``density.gif``. The movie plays at ``1000 / interval`` frames per
+            second.
+        save_kwargs : dict, optional
+            Movie writer options such as ``fps``, ``writer``, ``bitrate`` or ``codec``, as for
+            :meth:`matplotlib.animation.Animation.save`; see :func:`lgca.mayavi_style.movie_writer`. Set the
+            resolution with ``size=(width, height)``.
         contours, colormap, opacity, cbar, channels, species, smooth
             As in :py:meth:`plot_density`.
         **kwargs
@@ -738,24 +748,26 @@ class LGCA_Cubic(LGCA_base):
 
         Returns
         -------
-        mayavi.tools.animator.Animator
-            The animation controller.
+        mayavi.tools.animator.Animator or pathlib.Path
+            The animation controller, or the movie file if `save_path` is given.
         """
         density_t, steps = resolve_animation_history(self, "density_t", density_t, steps, channels)
         density_t = select_density_history(self, density_t, species)
         if vmax is None:
             vmax = self._count_limit(density_t, self._density_capacity(channels))
-        fig, contour = self._density_figure(density_t[0], contours, colormap, opacity, vmax, smooth, cbar,
-                                            kwargs.pop("cbarlabel", "Particles"), kwargs.pop("size", None),
-                                            kwargs.pop("view", None), **kwargs)
+        with offscreen(save_path is not None):
+            fig, contour = self._density_figure(density_t[0], contours, colormap, opacity, vmax, smooth, cbar,
+                                                kwargs.pop("cbarlabel", "Particles"), kwargs.pop("size", None),
+                                                kwargs.pop("view", None), **kwargs)
 
-        def update(frame):
-            contour.mlab_source.set(scalars=self._smoothed(density_t[frame], smooth))
+            def update(frame):
+                contour.mlab_source.set(scalars=self._smoothed(density_t[frame], smooth))
 
-        return play(fig, update, len(density_t), lambda frame: f"t = {steps[frame]}", interval, show)
+            return play(fig, update, len(density_t), lambda frame: f"t = {steps[frame]}", interval, show,
+                        save_path=save_path, save_kwargs=save_kwargs)
 
     def animate_flux(self, nodes_t=None, scale_factor=None, color=INK, colormap="viridis", opacity=1.0, cbar=False,
-                     interval=100, steps=None, show=True, **kwargs):
+                     interval=100, steps=None, show=True, save_path=None, save_kwargs=None, **kwargs):
         """
         Animate the net particle flux of a recorded simulation with Mayavi.
 
@@ -766,7 +778,7 @@ class LGCA_Cubic(LGCA_base):
         nodes_t : :py:class:`numpy.ndarray`, optional
             Recorded lattice configurations with dimensions ``(time,) + self.dims + (self.K,)``. Default: the
             recorded node history.
-        interval, steps, show
+        interval, steps, show, save_path, save_kwargs
             As in :py:meth:`animate_density`.
         scale_factor, color, colormap, opacity, cbar
             As in :py:meth:`plot_flux`.
@@ -775,8 +787,8 @@ class LGCA_Cubic(LGCA_base):
 
         Returns
         -------
-        mayavi.tools.animator.Animator
-            The animation controller.
+        mayavi.tools.animator.Animator or pathlib.Path
+            The animation controller, or the movie file if `save_path` is given.
         """
         nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
         counts_t = self._channel_counts(nodes_t, history=True).astype(float)
@@ -785,20 +797,22 @@ class LGCA_Cubic(LGCA_base):
         if scale_factor is None:
             scale_factor = self._arrow_scale(flux_t)
         limit = self._count_limit(density_t, self._density_capacity())
-        fig, quiver, scatter = self._flux_figure(flux_t[0], density_t[0], scale_factor, limit, color, colormap,
-                                                 opacity, cbar, kwargs.pop("size", None), kwargs.pop("view", None),
-                                                 **kwargs)
+        with offscreen(save_path is not None):
+            fig, quiver, scatter = self._flux_figure(flux_t[0], density_t[0], scale_factor, limit, color, colormap,
+                                                     opacity, cbar, kwargs.pop("size", None),
+                                                     kwargs.pop("view", None), **kwargs)
 
-        def update(frame):
-            flux = flux_t[frame]
-            quiver.mlab_source.set(u=flux[..., 0], v=flux[..., 1], w=flux[..., 2],
-                                   scalars=np.linalg.norm(flux, axis=-1))
-            scatter.mlab_source.set(scalars=self._stationary_sizes(flux, density_t[frame], limit))
+            def update(frame):
+                flux = flux_t[frame]
+                quiver.mlab_source.set(u=flux[..., 0], v=flux[..., 1], w=flux[..., 2],
+                                       scalars=np.linalg.norm(flux, axis=-1))
+                scatter.mlab_source.set(scalars=self._stationary_sizes(flux, density_t[frame], limit))
 
-        return play(fig, update, len(flux_t), lambda frame: f"t = {steps[frame]}", interval, show)
+            return play(fig, update, len(flux_t), lambda frame: f"t = {steps[frame]}", interval, show,
+                        save_path=save_path, save_kwargs=save_kwargs)
 
     def animate_config(self, nodes_t=None, interval=100, steps=None, vmax=None, color=MUTED, colormap="viridis",
-                       cbar=True, show=True, **kwargs):
+                       cbar=True, show=True, save_path=None, save_kwargs=None, **kwargs):
         """
         Animate the channel configuration of a recorded simulation with Mayavi.
 
@@ -806,7 +820,7 @@ class LGCA_Cubic(LGCA_base):
         ----------
         nodes_t : :py:class:`numpy.ndarray`, optional
             Recorded lattice configurations. Default: the recorded node history.
-        interval, steps, show
+        interval, steps, show, save_path, save_kwargs
             As in :py:meth:`animate_density`.
         vmax, color, colormap, cbar
             As in :py:meth:`plot_config`; the default `vmax` covers the whole history.
@@ -815,8 +829,8 @@ class LGCA_Cubic(LGCA_base):
 
         Returns
         -------
-        mayavi.tools.animator.Animator
-            The animation controller.
+        mayavi.tools.animator.Animator or pathlib.Path
+            The animation controller, or the movie file if `save_path` is given.
         """
         nodes_t, steps = resolve_animation_history(self, "nodes_t", nodes_t, steps)
         counts_t = self._channel_counts(nodes_t, history=True).astype(float)
@@ -825,17 +839,19 @@ class LGCA_Cubic(LGCA_base):
         n_species = getattr(self, "n_species", 1)
         velocity_limit = vmax or self._count_limit(velocity_t, n_species)
         rest_limit = self._count_limit(rest_t, self.restchannels * n_species)
-        fig, quiver, scatter = self._config_figure(velocity_t[0], rest_t[0], velocity_limit, rest_limit, color,
-                                                   colormap, cbar, kwargs.pop("size", None), kwargs.pop("view", None),
-                                                   **kwargs)
+        with offscreen(save_path is not None):
+            fig, quiver, scatter = self._config_figure(velocity_t[0], rest_t[0], velocity_limit, rest_limit, color,
+                                                       colormap, cbar, kwargs.pop("size", None),
+                                                       kwargs.pop("view", None), **kwargs)
 
-        def update(frame):
-            u, v, w = self._config_vectors(velocity_t[frame])
-            quiver.mlab_source.set(u=u, v=v, w=w, scalars=velocity_t[frame])
-            if scatter is not None:
-                scatter.mlab_source.set(scalars=self._sphere_sizes(rest_t[frame], rest_limit))
+            def update(frame):
+                u, v, w = self._config_vectors(velocity_t[frame])
+                quiver.mlab_source.set(u=u, v=v, w=w, scalars=velocity_t[frame])
+                if scatter is not None:
+                    scatter.mlab_source.set(scalars=self._sphere_sizes(rest_t[frame], rest_limit))
 
-        return play(fig, update, len(counts_t), lambda frame: f"t = {steps[frame]}", interval, show)
+            return play(fig, update, len(counts_t), lambda frame: f"t = {steps[frame]}", interval, show,
+                        save_path=save_path, save_kwargs=save_kwargs)
 
     def live_animate_density(self, interval=100, channels=slice(None), species=None, contours=3, colormap="viridis",
                              opacity=0.35, vmax=None, smooth=0.0, cbar=True, show=True, **kwargs):

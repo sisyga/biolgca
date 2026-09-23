@@ -14,6 +14,16 @@ This file records notable user-facing changes. Changes remain under
   adding and inspecting reusable interactions.
 - Observer-based simulation output, plotting snapshots and movies, scheduled
   callbacks, curated runnable examples, and repeatable performance benchmarks.
+- Movies of 3D simulations: `animate_density`, `animate_flux` and
+  `animate_config` on cubic and Moore lattices accept `save_path=` (e.g.
+  `density.mp4` with ffmpeg or `density.gif` with Pillow) and `save_kwargs=`
+  with the options of Matplotlib's `Animation.save`. Frames are rendered
+  offscreen, so no window opens.
+- `PlotSnapshotObserver` and `AnimationObserver` support 3D models. Snapshots
+  are saved as images and movies are written offscreen without blocking the
+  run; the new plot kind `density_cubes` selects the voxel density plot.
+  Observers now reject a plot kind the model does not provide (e.g. `flow` on
+  a 3D lattice) before the simulation starts.
 - Six maintained, executable teaching notebooks covering LGCA fundamentals,
   collective movement, interaction composition, population dynamics,
   evolutionary LGCA, and reproducible student projects.

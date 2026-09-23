@@ -1,5 +1,6 @@
 """Public animation entry points share data, channels and time semantics."""
 
+from contextlib import nullcontext
 from types import SimpleNamespace
 import importlib
 
@@ -10,7 +11,7 @@ import numpy as np
 import pytest
 
 from lgca import get_lgca
-from lgca.plotting import animate
+from lgca.plotting import AnimationObserver, animate
 
 
 @pytest.mark.parametrize("ib,ve", [(False, True), (True, True), (False, False), (True, False)])
@@ -53,7 +54,7 @@ def test_mayavi_animations_label_frames_with_resolved_times(kind, entry, monkeyp
     # Runs without Mayavi: the figure builders and the event loop are replaced.
     played = {}
 
-    def play(fig, update, n_frames, label, interval, show):
+    def play(fig, update, n_frames, label, interval, show, **kwargs):
         played["labels"] = [label(frame) for frame in range(n_frames)]
         for frame in range(n_frames):
             update(frame)
@@ -74,6 +75,39 @@ def test_mayavi_animations_label_frames_with_resolved_times(kind, entry, monkeyp
     assert result == "animator"
     assert played["labels"] == ["t = 0", "t = 3", "t = 20"]
     assert updates
+
+
+@pytest.mark.parametrize("save_path", [None, "movie.mp4"])
+def test_3d_animation_observer_never_blocks_and_forwards_movie_options(save_path, tmp_path, monkeypatch):
+    # Runs without Mayavi: the figure builder and the event loop are replaced.
+    from lgca.simulation import Schedule, SimulationRunner
+
+    calls = []
+
+    def play(fig, update, n_frames, label, interval, show, **kwargs):
+        calls.append(dict(show=show, labels=[label(frame) for frame in range(n_frames)], **kwargs))
+        return "result"
+
+    module = importlib.import_module("lgca.lgca_cubic")
+    monkeypatch.setattr(module, "play", play)
+    monkeypatch.setattr(module, "offscreen", lambda enabled=True: nullcontext())
+    model = get_lgca(geometry="cubic", dims=(2, 2, 2), density=1, interaction="random_walk", seed=1)
+    artist = SimpleNamespace(mlab_source=SimpleNamespace(set=lambda **kwargs: None))
+    monkeypatch.setattr(model, "_density_figure", lambda *args, **kwargs: (None, artist))
+    path = None if save_path is None else tmp_path / "out" / save_path
+    observer = AnimationObserver(kind="density", schedule=Schedule(steps=[0, 2, 3]), save_path=path,
+                                 save_kwargs={"fps": 4})
+
+    SimulationRunner(model, timesteps=3, observers=[observer], showprogress=False).run()
+
+    (call,) = calls
+    assert call["show"] is False
+    assert call["labels"] == ["t = 0", "t = 2", "t = 3"]
+    assert call["save_path"] == path
+    assert call["save_kwargs"] == ({"fps": 4} if path else None)
+    assert observer.animation == "result"
+    if path is not None:
+        assert path.parent.is_dir()
 
 
 def test_animation_observer_captures_selected_channels():

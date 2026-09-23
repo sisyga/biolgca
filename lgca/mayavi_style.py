@@ -13,6 +13,9 @@ so the box spans ``[0, L]`` along each axis and glyphs sit at cell centres.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+from pathlib import Path
+
 import numpy as np
 
 from lgca.base import MaxNLocator, _MissingPlotLib
@@ -21,7 +24,9 @@ try:  # optional plotting dependency
     from mayavi import mlab
     from tvtk.api import tvtk
 except ImportError:  # pragma: no cover - handled at runtime
-    mlab = tvtk = _MissingPlotLib("mayavi")
+    mlab = tvtk = _MissingPlotLib(
+        "mayavi", "Install the 3D plotting extra with 'uv sync --extra plot3d' or "
+        "'python -m pip install -e \".[plot3d]\"'.")
 
 INK = (0.1, 0.1, 0.1)
 MUTED = (0.6, 0.6, 0.6)
@@ -190,8 +195,115 @@ def time_label(fig, text):
     return label
 
 
-def play(fig, update, n_frames=None, label=None, interval=100, show=True):
-    """Animate ``update(frame)`` in the figure window.
+@contextmanager
+def offscreen(enabled=True):
+    """Create and render figures without opening a window while the context is active.
+
+    Mayavi chooses its rendering engine per call, so keep every call that builds
+    or renders an offscreen figure inside the context. With ``enabled=False`` the
+    context does nothing, so it does not require Mayavi.
+    """
+    if not enabled:
+        yield
+        return
+    previous = mlab.options.offscreen
+    mlab.options.offscreen = previous or enabled
+    try:
+        yield
+    finally:
+        mlab.options.offscreen = previous
+
+
+def save_figure(fig, path):
+    """Save a Mayavi figure as an image; the format follows the file extension."""
+    mlab.savefig(str(path), figure=fig)
+
+
+def movie_writer(path, fps, save_kwargs=None):
+    """Return a Matplotlib movie writer for ``path``.
+
+    ``save_kwargs`` takes the options of :meth:`matplotlib.animation.Animation.save`
+    except ``dpi``: ``writer`` (name or instance), ``fps``, ``codec``,
+    ``bitrate``, ``extra_args`` and ``metadata``. GIF files default to the
+    Pillow writer, all other files to ``rcParams['animation.writer']`` (ffmpeg).
+    """
+    from matplotlib import animation, rcParams
+
+    kwargs = dict(save_kwargs or {})
+    if "dpi" in kwargs:
+        raise ValueError("3D movies are recorded at the figure size in pixels; pass size=(width, height) "
+                         "to the plotting method instead of dpi")
+    writer = kwargs.pop("writer", None)
+    fps = kwargs.pop("fps", fps)
+    if writer is None:
+        writer = "pillow" if Path(path).suffix.lower() == ".gif" else rcParams["animation.writer"]
+    if isinstance(writer, str):
+        if not animation.writers.is_available(writer):
+            raise RuntimeError(f"Movie writer {writer!r} is not available. Install ffmpeg to write video files, "
+                               "or save a .gif, which uses the Pillow writer.")
+        writer = animation.writers[writer](fps=fps, **kwargs)
+    return writer
+
+
+def save_movie(fig, update, n_frames, label, path, fps=10, save_kwargs=None):
+    """Render ``update(frame)`` for every frame and write the frames to a movie file.
+
+    Parameters
+    ----------
+    fig : mayavi.core.scene.Scene
+        Figure to record; render it offscreen (see :func:`offscreen`) to avoid
+        opening a window.
+    update : callable
+        Called with the frame index; updates the plotted data.
+    n_frames : int
+        Number of frames.
+    label : callable or None
+        Maps the frame index to the text of the time label.
+    path : str or pathlib.Path
+        Output file, e.g. ``density.mp4`` or ``density.gif``.
+    fps : float, default=10
+        Frames per second, unless ``save_kwargs`` sets ``fps``.
+    save_kwargs : dict, optional
+        Writer options; see :func:`movie_writer`.
+
+    Returns
+    -------
+    pathlib.Path
+        The movie file.
+    """
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.figure import Figure
+
+    path = Path(path)
+    writer = movie_writer(path, fps, save_kwargs)
+    text = time_label(fig, label(0)) if label is not None else None
+
+    def render(frame):
+        update(frame)
+        if text is not None:
+            text.text = label(frame)
+        fig.scene.render()
+        image = mlab.screenshot(figure=fig, mode="rgb", antialiased=False)
+        # Video codecs such as H.264 require even frame dimensions.
+        return image[: image.shape[0] // 2 * 2, : image.shape[1] // 2 * 2]
+
+    first = render(0)
+    height, width = first.shape[:2]
+    canvas = Figure(figsize=(width / 100, height / 100), dpi=100)
+    FigureCanvasAgg(canvas)
+    axes = canvas.add_axes((0, 0, 1, 1))
+    axes.set_axis_off()
+    image = axes.imshow(first, interpolation="nearest")
+    with writer.saving(canvas, str(path), dpi=100):
+        writer.grab_frame()
+        for frame in range(1, n_frames):
+            image.set_data(render(frame))
+            writer.grab_frame()
+    return path
+
+
+def play(fig, update, n_frames=None, label=None, interval=100, show=True, save_path=None, save_kwargs=None):
+    """Animate ``update(frame)`` in the figure window, or record it as a movie.
 
     Parameters
     ----------
@@ -204,16 +316,30 @@ def play(fig, update, n_frames=None, label=None, interval=100, show=True):
     label : callable, optional
         Maps the frame index to the text of the time label.
     interval : int, default=100
-        Delay between frames in milliseconds.
+        Delay between frames in milliseconds; a movie plays at ``1000 / interval``
+        frames per second unless ``save_kwargs`` sets ``fps``.
     show : bool, default=True
         Whether to enter the GUI event loop with :func:`mayavi.mlab.show`. Pass
         False inside an application that already runs an event loop.
+    save_path : str or pathlib.Path, optional
+        Record all frames to this movie file instead of animating in a window,
+        then close the figure. Requires `n_frames`.
+    save_kwargs : dict, optional
+        Writer options; see :func:`movie_writer`.
 
     Returns
     -------
-    mayavi.tools.animator.Animator
-        Animation controller; keep a reference to stop or restart it.
+    mayavi.tools.animator.Animator or pathlib.Path
+        The animation controller, or the movie file if `save_path` is given.
     """
+    if save_path is not None:
+        if n_frames is None:
+            raise ValueError("Recording a movie requires a finite number of frames")
+        try:
+            return save_movie(fig, update, n_frames, label, save_path, 1000 / interval, save_kwargs)
+        finally:
+            mlab.close(fig)
+
     text = time_label(fig, label(0)) if label is not None else None
 
     @mlab.animate(delay=interval)

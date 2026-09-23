@@ -404,12 +404,11 @@ def test_nove_multispecies_density_plot_selects_density(species):
     plt.close(fig)
 
 
-def test_plotting_observers_reject_unsupported_3d_backend_early():
-    class CubicStub:
-        geometry = "cubic"
+def test_plotting_observers_reject_plot_kinds_the_model_lacks_before_the_run():
+    lgca = get_lgca(geometry="cubic", dims=(2, 2, 2), density=1, interaction="only_propagation")
+    runner = type("Runner", (), {"timesteps": 1})()
 
-    runner = type("Runner", (), {"timesteps": 0})()
-    with pytest.raises(NotImplementedError, match="3-D"):
-        PlotSnapshotObserver().setup(CubicStub(), runner)
-    with pytest.raises(NotImplementedError, match="3-D"):
-        AnimationObserver().setup(CubicStub(), runner)
+    with pytest.raises(ValueError, match="'flow'"):
+        PlotSnapshotObserver(kind="flow").setup(lgca, runner)
+    with pytest.raises(ValueError, match="'flow'"):
+        AnimationObserver(kind="flow").setup(lgca, runner)
