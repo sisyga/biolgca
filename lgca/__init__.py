@@ -60,7 +60,6 @@ _VALID_KWARGS = {
     "r_int",
     "r_m",
     "restchannels",
-    "rho_0",
     "s_d",
     "s_p",
     "seed",

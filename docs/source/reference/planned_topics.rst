@@ -55,3 +55,14 @@ Family population and ancestry utilities are available, but a focused
 observables API for diversity indices and entropy is still planned. Remaining
 identity-based work also includes validated family-aware initialization,
 stopping conditions and additional family visualizations.
+
+Adhesion-driven invasion model
+------------------------------
+
+The former ``wetting`` interaction and its ``classical.wetting`` port were
+removed because they relied on undocumented model attributes (``ecm``,
+``spheroid``) and silently changed the interaction radius. The model of
+cell–cell adhesion, matrix confinement and jamming in breast cancer invasion
+(Ilina et al., *Nat. Cell Biol.* 2020, https://doi.org/10.1038/s41556-020-0552-6)
+is planned as an advanced tutorial that composes adhesion, pressure and
+matrix-degradation terms in a ModelSpec pipeline.

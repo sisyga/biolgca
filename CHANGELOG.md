@@ -49,6 +49,13 @@ This file records notable user-facing changes. Changes remain under
 - Stale generated autosummary pages causing strict documentation failures in
   reused working directories.
 
+### Removed
+
+- The unused `lgca.interactions.disarrange` helper.
+- The legacy `wetting` interaction and its `classical.wetting` ModelSpec
+  port. The model is planned as an advanced tutorial with a new
+  implementation; see the planned documentation topics.
+
 ### Compatibility
 
 - The `get_lgca(...)` factory and legacy `timeevo(...)` workflow remain

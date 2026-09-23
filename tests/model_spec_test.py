@@ -793,42 +793,6 @@ def test_classical_chemotaxis_plugin_is_native_and_matches_legacy():
     np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
 
 
-def test_classical_wetting_plugin_is_native_and_matches_legacy():
-    ecm = np.linspace(0.2, 1.0, 20, dtype=float).reshape(4, 5)
-    parameters = {"beta": 1.1, "alpha": 0.3, "gamma": 1.4, "rho_0": 1.0}
-    spec = ModelSpec(
-        description=Description(title="native equivalence classical.wetting"),
-        space=SpaceSpec(geometry="square", dims=(4, 5), boundary="periodic"),
-        state=StateSpec(density=0.35, restchannels=2, fields={"ecm": ecm}),
-        time=TimeSpec(steps=2, seed=47),
-        dynamics=InteractionPipelineSpec(
-            operators=[{"name": "classical.wetting", "parameters": parameters}],
-            propagation="default",
-        ),
-        analysis=AnalysisSpec(observers=[NodeRecorder(), DensityRecorder()]),
-    )
-    result = run_model(spec, showprogress=False)
-    legacy = get_lgca(
-        geometry="square",
-        dims=(4, 5),
-        density=0.35,
-        restchannels=2,
-        interaction="wetting",
-        bc="periodic",
-        seed=47,
-        **parameters,
-    )
-    legacy.ecm = np.pad(ecm, [(legacy.r_int, legacy.r_int), (legacy.r_int, legacy.r_int)], mode="edge")
-    legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-
-    plugin = describe_plugin("classical.wetting")
-    assert plugin.port_status == "native"
-    assert plugin.test_status == "unit_tested"
-    np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
-    np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
-    np.testing.assert_allclose(result.lgca.ecm, legacy.ecm)
-
-
 def test_build_model_exposes_compiled_pipeline_schedule():
     compiled = build_model(_square_spec(operators=[{"name": "classical.excitable_medium"}]))
 
@@ -910,12 +874,6 @@ def _state_for_plugin(plugin_name):
     family = plugin_name.split(".", 1)[0]
     if plugin_name == "phenotype_switch":
         return StateSpec(density=0.35, restchannels=1, n_species=2)
-    if plugin_name == "classical.wetting":
-        return StateSpec(
-            density=0.35,
-            restchannels=2,
-            fields={"ecm": np.ones((4, 5), dtype=float)},
-        )
     if family == "ib":
         return StateSpec(density=0.35, restchannels=2, identity_based=True)
     if family == "nove":

@@ -1728,41 +1728,6 @@ def _register_native_plugins() -> None:
 
         register_plugin(info, factory)
 
-    wetting_info = PluginInfo(
-        name="classical.wetting",
-        operator_kind="reorientation",
-        backend_families=("classical",),
-        legacy_source=_legacy_source("lgca.interactions", "wetting"),
-        parameters={
-            "beta": {
-                "default": 2.0,
-                "validator": "finite scalar adhesion sensitivity",
-            },
-            "alpha": {
-                "default": 2.0,
-                "validator": "finite scalar ECM degradation rate",
-            },
-            "gamma": {
-                "default": 2.0,
-                "validator": "finite scalar pressure sensitivity",
-            },
-            "rho_0": {
-                "default": "restchannels // 2",
-                "validator": "homeostatic resting density",
-            },
-        },
-        conservation_law=_law_for_kind("reorientation"),
-        port_status="native",
-        test_status="unit_tested",
-        description="Adhesive-surface wetting interaction with ECM degradation.",
-    )
-
-    def wetting_factory(parameters: Mapping[str, Any] | None = None) -> InteractionOperator:
-        from .pipeline import NativeClassicalWettingOperator
-
-        return NativeClassicalWettingOperator(wetting_info, parameters)
-
-    register_plugin(wetting_info, wetting_factory)
 
 
 def _register_example_plugins() -> None:

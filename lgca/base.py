@@ -85,7 +85,6 @@ _VALID_CONSTRUCTOR_KWARGS = {
     "r_int",
     "r_m",
     "restchannels",
-    "rho_0",
     "s_d",
     "s_p",
     "seed",
@@ -312,8 +311,6 @@ class LGCA_base(ABC):
         Flux for each possible channel configuration. Dimensions: ``(lgca.K + 1, len(lgca.c))``.
     K : int
         Number of channels per node. Equal to ``lgca.velocitychannels + lgca.restchannels``.
-    n_crit
-        Internal variable for the wetting interaction.
     n_t : :py:class:`numpy.ndarray`
         Sum of particles in the lattice for all timesteps in the previous simulation.
         Only available after a simulation performed with ``timeevo(recordN=True)``. Dimensions: ``(timesteps,)``.
@@ -695,7 +692,7 @@ class LGCA_base(ABC):
 
         """
         from lgca.interactions import go_or_grow, go_or_rest, birth, alignment, persistent_walk, chemotaxis, \
-                contact_guidance, nematic, aggregation, wetting, random_walk, birthdeath, excitable_medium, \
+                contact_guidance, nematic, aggregation, random_walk, birthdeath, excitable_medium, \
                 only_propagation
         from lgca.ms_interactions import excitable_medium_ms
         if 'interaction' in kwargs:
@@ -860,35 +857,6 @@ class LGCA_base(ABC):
                 else:
                     self.interaction_params['beta'] = 2.
                     print('sensitivity set to beta = ', self.interaction_params['beta'])
-
-            elif interaction == 'wetting':
-                self.interaction = wetting
-                self.calc_permutations()
-                self.set_r_int(2)
-
-                if 'beta' in kwargs:
-                    self.interaction_params['beta'] = kwargs['beta']
-                else:
-                    self.interaction_params['beta'] = 2.
-                    print('adhesion sensitivity set to beta = ', self.interaction_params['beta'])
-
-                if 'alpha' in kwargs:
-                    self.interaction_params['alpha'] = kwargs['alpha']
-                else:
-                    self.interaction_params['alpha'] = 2.
-                    print('substrate sensitivity set to alpha = ', self.interaction_params['alpha'])
-
-                if 'gamma' in kwargs:
-                    self.interaction_params['gamma'] = kwargs['gamma']
-                else:
-                    self.interaction_params['gamma'] = 2.
-                    print('pressure sensitivity set to gamma = ', self.interaction_params['gamma'])
-
-                if 'rho_0' in kwargs:
-                    self.interaction_params['rho_0'] = kwargs['rho_0']
-                else:
-                    self.interaction_params['rho_0'] = self.restchannels // 2
-                self.n_crit = (self.velocitychannels + 1) * self.interaction_params['rho_0']
 
             elif interaction == 'random_walk':
                 self.interaction = random_walk

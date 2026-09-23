@@ -58,7 +58,6 @@ EXPECTED_LEGACY_INTERACTIONS = {
     "classical.only_propagation",
     "classical.persistent_walk",
     "classical.random_walk",
-    "classical.wetting",
     "ib.birth",
     "ib.birthdeath",
     "ib.birthdeath_discrete",

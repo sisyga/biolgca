@@ -367,7 +367,7 @@ For a deliberate larger allocation, use
 
 The estimate is a lower bound: Python sample-index maps, object/list payloads,
 dynamically growing family histories, model state and renderer buffers cost extra.
-Dedicated vector, tensor and wetting reorientation samplers process candidate
+Dedicated vector and tensor reorientation samplers process candidate
 scores in batches with a conservative 32 MiB temporary budget. This preserves
 site order and RNG draws; it does not change the transition model.
 
