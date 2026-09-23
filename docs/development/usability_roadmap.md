@@ -195,36 +195,112 @@ Independent, low-risk items, in order.
   still creates an unrecorded generator; it will inherit the behaviour when
   `get_lgca` builds a `ModelSpec` internally (phase 2.4).
 
-### Phase 1: A simple way to add interactions (two to three weeks)
+### Phase 1: A simple way to add interactions (three to four weeks)
 
-**1.1 Lattice view for operators** (C4)
+Three conventions make interactions easy to write and hard to get wrong:
 
-A `LatticeState` object passed to user code hides ghost nodes and dtypes:
+1. **Every model has a species axis.** Channel states always have the shape
+   `dims + (n_species, K)`; a single-species model has `n_species = 1`. Code
+   written for one species then works unchanged for several.
+2. **Each pipeline phase has one meaning.**
+   - *Birth/death* changes the number of cells.
+   - *Switching* changes what a cell is: its species in multispecies models,
+     or its parameters (e.g. its birth rate) in identity-based models.
+     Single-species classical models have no switching interactions.
+   - *Reorientation* redistributes the cells of a node over its channels and
+     conserves the number of cells of each species at the node. Moving
+     between velocity and rest channels is reorientation, so the "go" part of
+     go-or-grow is a reorientation.
+3. **Interactions use operations with a defined meaning, not raw arrays.**
+   Without volume exclusion a channel holds several cells, so a rule that
+   kills whole channels has the right mean but the wrong fluctuations (for 5
+   cells per channel and a death probability of 0.5: variance 6.25 instead
+   of 1.25), and no consistency check catches it. Operations such as
+   "every cell dies with probability p" are implemented and tested once per
+   model family.
+
+**1.1 Species axis and phase names** (B2)
+- `LatticeState` (1.3) always has the species axis. Phase 2 makes it the
+  storage format (2.1); until then the view adds it for single-species models.
+- Rename the middle phase from `phenotype_switch` to `switch`, and the
+  multispecies interaction from `phenotype_switch` to `species_switch` (today
+  an alias); `PhenotypeSwitchSpec` becomes `SpeciesSwitchSpec`. The old names
+  stay as deprecated aliases for one release.
+- `phenotype_switch` is kept for identity-based models, where it will change
+  individual cell parameters (Phase 2.2).
+- `classical.go_or_rest` and `nove.go_or_rest` move from the switching phase
+  to reorientation. Afterwards no single-species classical interaction sits in
+  the switching phase; compilation rejects a switching operator in a
+  single-species classical model with a message that points to reorientation.
+- Tutorial 4 and the ModelSpec guide use the new
+  names.
+
+**1.2 Go-or-grow from birth/death and reorientation** (B4)
+- New reorientation term `rest_switch` with parameters `kappa` and `theta`:
+  it scores a candidate state by `h(rho) * n_rest(s')` with
+  `h = logit(tanh_switch(rho; kappa, theta))`, so that without full channels
+  each cell rests with probability `tanh_switch(rho)`, as in the current rule.
+- `birth_death` gains `dividing="rest"`: only resting cells divide, into free
+  rest channels.
+- Go-or-grow becomes the pipeline
+  `[birth_death(r_b, r_d, dividing="rest"), ReorientationSpec(terms=[rest_switch(kappa, theta)])]`.
+  `classical.go_or_grow` stays available as a named shortcut that expands to
+  this pipeline, so model files keep working.
+- Two differences to the current rule must be measured before switching over:
+  1. Order: the current rule switches, then kills, then divides; the pipeline
+     applies birth/death before reorientation.
+  2. With volume exclusion, a Boltzmann rest term also counts channel
+     arrangements, so it matches the current rule exactly only when rest and
+     velocity channels are not limiting.
+
+  Compare resting fraction versus density, population growth and the Allee
+  effect of the go-or-grow example (the example effect test must still pass);
+  document the result in the example.
+- Phase 1 covers classical volume exclusion (the combined sampler exists only
+  there). NoVE go-or-grow keeps its current operator until the NoVE sampler
+  (2.1); identity-based go-or-grow needs per-cell switching (2.1).
+
+**1.3 Lattice view with operations** (C4)
+
+A `LatticeState` passed to user code hides ghost nodes, dtypes and the
+differences between model families:
 
 ```python
-state.counts            # interior channel counts, int array (dims..., K)
-state.counts = new      # writes interior, applies boundaries, updates density
-state.density           # particles per node
-state.neighbor_sum(a)   # sum of a over the interaction neighbourhood
-state.gradient(f)       # physical gradient in lattice units
-state.field("signal")   # named field from StateSpec.fields
-state.c, state.K, state.velocitychannels, state.restchannels
-state.rng, state.step, state.geometry, state.dims
+# read-only views, interior nodes only, species axis always present
+state.counts              # cells per channel, shape dims + (n_species, K)
+state.density             # cells per node, shape dims
+state.species_density     # cells per node and species, shape dims + (n_species,)
+state.neighbor_sum(a)     # sum of a over the interaction neighbourhood
+state.gradient(f)         # physical gradient in lattice units
+state.field("signal")     # named field from StateSpec.fields
+state.c, state.K, state.velocitychannels, state.restchannels, state.capacity
+state.rng, state.step, state.geometry, state.dims, state.n_species
+
+# operations; probabilities broadcast against dims or dims + (n_species,)
+state.remove_cells(p)                 # every cell dies independently with probability p
+state.divide_cells(p, into="rest")    # every cell divides with probability p into a free channel
+state.add_cells(n, into="rest")       # n new cells per node and species, capacity respected
+state.switch_species(rates)           # rates[a][b]: probability that a cell of species a becomes b
+state.counts = new                    # expert access: replace the whole state (checked)
 ```
 
-Species axis for multispecies models; identity-based families get
-`state.cells` in phase 2.
+- Each operation is implemented for volume exclusion (at most one cell per
+  channel) and without it (binomial and multinomial sampling per cell), and
+  respects the node capacity.
+- Writes are checked: capacity, non-negative integers, no NaN, and the
+  conservation law of the phase (reorientation keeps cells per node and
+  species; switching keeps cells per node).
+- Only `state.rng` is available for randomness, so runs stay reproducible.
 
-**1.2 `@interaction` decorator** (C1)
+**1.4 `@interaction` decorator** (C1)
 
 ```python
 from lgca import interaction
 
-@interaction(kind="birth_death")
+@interaction(kind="birth_death", families=("classical", "multispecies"))
 def crowding_death(state, r_d=0.1):
     """Each cell dies with probability r_d * density / K."""
-    p = r_d * state.density[..., None] / state.K
-    state.counts = state.counts * (state.rng.random(state.counts.shape) >= p)
+    state.remove_cells(r_d * state.density / state.K)
 
 spec = ModelSpec(..., dynamics=InteractionPipelineSpec(
     operators=[crowding_death(r_d=0.2), {"name": "classical.random_walk"}]))
@@ -232,20 +308,22 @@ spec = ModelSpec(..., dynamics=InteractionPipelineSpec(
 
 - The decorator builds `PluginInfo` from the signature: parameters from
   keyword defaults (no default means required), description from the
-  docstring, name from `module.function` unless given.
+  docstring, name from `module.function` unless given. Defaults are applied by
+  the framework, not repeated by hand.
 - Calling the decorated function with parameters returns an operator entry
   for `operators=[...]`; the name also works in JSON.
-- `families=` defaults to all families the lattice view supports; the
-  conservation law is optional metadata.
+- `families=` is explicit. A model of another family is rejected at
+  compilation with a clear message instead of being assumed to work.
+  Identity-based families are not supported in Phase 1.
 - Drop `port_status`, `test_status` and `legacy_source` from the public
   `PluginInfo` (keep them internally until phase 2 removes the legacy code).
-- `ParameterSpec` defaults are applied by the framework; factories stop
-  duplicating them.
+- The class-based operator API stays for advanced cases (setup caches,
+  custom validation, dependencies).
 
-**1.3 Public reorientation terms** (C3)
+**1.5 Public reorientation terms** (C3)
 
-Most BIO-LGCA biases couple a field to the candidate state in one of three
-ways, which the existing terms already implement. Expose them:
+Most BIO-LGCA biases couple a field to the candidate state in a few ways,
+which the existing terms already implement. Expose them:
 
 ```python
 from lgca import reorientation_term
@@ -258,53 +336,78 @@ ReorientationTermSpec(name="drift", beta=2.0, parameters={"direction": [0, 1]})
 ```
 
 Couplings: `"flux"` (vector field · flux of the candidate), `"nematic"`
-(tensor field : nematic tensor), `"rest"` (scalar · rest occupancy), and
-`"channels"` (per-channel weights). An advanced `score(features, state)` form
-stays available. Rewrite the built-in terms on the same public API.
+(tensor field : nematic tensor), `"rest"` (scalar · rest occupancy, used by
+`rest_switch`) and `"channels"` (per-channel weights). An advanced
+`score(features, state)` form stays available. Rewrite the built-in terms on
+the same public API. Like the combined sampler, terms work for classical
+models with volume exclusion (one or several species) in Phase 1; the NoVE
+sampler follows in 2.1.
 
-**1.4 Interaction test helper** (C5)
+**1.6 Interaction test helper** (C5)
 
 ```python
 from lgca.testing import check_interaction
 
-report = check_interaction(crowding_death, parameters={"r_d": 0.2},
-                           geometries=("lin", "square", "hex"))
+report = check_interaction(crowding_death, parameters={"r_d": 0.2})
 ```
 
-Checks on small seeded lattices: ghost nodes untouched after boundary
-application, dtype and capacity respected, declared conservation holds, same
-seed gives same result, no NaN. Raises with a readable report; usable as a
-one-line pytest.
+Runs the interaction on small seeded lattices of every supported geometry
+(1D, square, hex, cubic, Moore) and declared family, and checks: ghost nodes
+untouched after boundary application, capacity and dtype respected,
+conservation law of the phase, same seed gives same result, no NaN. With
+`expected_rates=...` it also compares measured death, birth or switch
+frequencies with the declared ones. Raises with a readable report; usable as a
+one-line pytest. The built-in operations of 1.3 are tested this way across
+the full geometry-by-family matrix.
 
-**1.5 Documentation**
-- Rewrite `how_to/custom_interactions.rst` around 1.2–1.4: a growth rule, a
+**1.7 Documentation**
+- Rewrite `how_to/custom_interactions.rst` around 1.3–1.6: a growth rule, a
   movement bias, a test.
 - Tutorial 6 uses the decorator; add exercises that write a term.
+- Concepts page: the three phases and the species axis.
+
+**Supported in Phase 1**
+
+| | Birth/death | Switching | Reorientation |
+|---|---|---|---|
+| Classical, one species, VE and NoVE | decorator and operations | none by design | built-in operators; terms for VE |
+| Multispecies, VE and NoVE | decorator and operations | `species_switch`, decorator | built-in operators; terms for VE |
+| Identity-based, VE and NoVE | built-in operators only | built-in operators only | built-in operators only |
 
 Accept: a student writes, registers, tests and sweeps a new death rule or a new
-bias in under 30 lines without reading library source; re-running every
-notebook cell works.
+bias in under 30 lines without reading library source; the same rule runs
+with one or several species and with or without volume exclusion; re-running
+every notebook cell works.
 
 ### Phase 2: One mechanism for all model families (one to two months)
 
-**2.1 Common count representation** (B3, D5)
+**2.1 Common representation** (B3, D5)
 
-All families expose channel counts `(dims..., [species,] K)`. Mechanisms act
-on counts:
+All classical families store channel counts as `dims + (n_species, K)`
+(`n_species = 1` for one species), so every mechanism has one implementation.
+Model files and results keep accepting and returning single-species arrays
+without the species axis (see open decision 5). Reorientation:
 
-- reorientation for VE enumerates admissible channel states (existing
-  Boltzmann sampler);
-- reorientation for NoVE samples each cell independently over channels,
+- with volume exclusion: the existing Boltzmann sampler, which enumerates
+  admissible channel states;
+- without volume exclusion: each cell samples its channel independently,
   P(i) ∝ exp(β·score_i) (multinomial per node; cost O(K), not O(2^K));
-- identity-based families apply the count update and then reassign the existing
-  labels to channels uniformly at random (cells are exchangeable for
-  movement), keeping properties attached to labels.
+- identity-based families: when movement does not depend on cell traits, apply
+  the count update and reassign the existing labels to channels at random
+  (cells are exchangeable). Trait-dependent movement, such as identity-based
+  go-or-grow where every cell has its own `kappa` and `theta`, needs a
+  per-cell decision: each cell rests or moves with its own probability, and
+  capacity conflicts are resolved in a random order.
 
-**2.2 Cell-level operators for identity models**
+**2.2 Cell-level operations for identity models**
 
 `state.cells` exposes per-cell properties (arrays keyed by trait) with
-`divide(parents, **traits)` and `kill(cells)`, built on
-`lgca.identity_kernels`. Mutation rules become small functions.
+`divide(parents, **traits)`, `kill(cells)` and `set_trait(cells, name,
+values)`, built on `lgca.identity_kernels`. Mutation rules become small
+functions. `phenotype_switch` for identity-based models changes cell
+parameters with `set_trait`. The operations of 1.3 (`remove_cells`,
+`divide_cells`) get identity-based implementations that pick random cells and
+let daughters inherit traits.
 
 **2.3 Names without family prefixes** (B2)
 
@@ -413,3 +516,9 @@ model with a custom rule reruns from the CLI.
 4. **Preferred citation.** `CITATION.cff` currently lists the software with the
    two papers as references; decide whether one paper should be the preferred
    citation.
+5. **Array shapes at the boundary.** With the species axis stored everywhere
+   (2.1), should `StateSpec.nodes`, `lgca.nodes_t` and `measurements.npz` of
+   single-species models keep their current shape `dims + (K,)` (converted at
+   the boundary, backward compatible) or switch to `dims + (1, K)`?
+6. **Name of the middle phase.** `switch` (proposed), `switching` or
+   `species_switch` for the phase that holds species and phenotype switching.
