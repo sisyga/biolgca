@@ -21,8 +21,23 @@ _SPATIAL_NDIMS = {
 }
 
 
+def _require_legacy_interaction(lgca, interaction) -> None:
+    """Reject interactions without a multispecies implementation in the legacy factory path."""
+    name = None if interaction is None else str(interaction).replace(" ", "_")
+    if name in lgca.interactions:
+        return
+    requested = "No interaction was given" if name is None else f"Interaction {name!r} is not supported"
+    raise ValueError(
+        f"{requested} for multispecies models built with get_lgca (legacy construction). "
+        f"Supported multispecies interactions: {', '.join(lgca.interactions)}. "
+        "Build other multispecies dynamics with a ModelSpec interaction pipeline."
+    )
+
+
 class MultiSpeciesLGCA_base(LGCA_base):
     """Classical LGCA supporting multiple species."""
+
+    interactions = ["random_walk", "only_propagation", "excitable_medium_ms"]
 
     def __init__(self, *, n_species: int = 1, **kwargs: Any) -> None:
         if isinstance(n_species, bool) or int(n_species) != n_species or n_species < 1:
@@ -101,6 +116,10 @@ class MultiSpeciesLGCA_base(LGCA_base):
                 UserWarning,
             )
 
+    def set_interaction(self, **kwargs):
+        _require_legacy_interaction(self, kwargs.get("interaction", "random_walk"))
+        super().set_interaction(**kwargs)
+
     def random_reset(self, density):
         """Randomly initialize a total density distributed over all species."""
         _validate_density(density, max_density=self.n_species * self.K)
@@ -137,6 +156,8 @@ class MultiSpeciesLGCA_base(LGCA_base):
 
 class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
     """No-volume-exclusion LGCA with multiple species."""
+
+    interactions = ["birth", "birthdeath", "go_or_grow", "only_propagation"]
 
     _LOCAL_ENSEMBLE_INTERACTIONS = NoVE_LGCA_base._LOCAL_ENSEMBLE_INTERACTIONS | {
         "birth",
@@ -190,6 +211,7 @@ class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
     def set_interaction(self, **kwargs):
         if kwargs.get("interaction") == "excitable_medium_ms":
             raise ValueError("excitable_medium_ms requires volume exclusion.")
+        _require_legacy_interaction(self, kwargs.get("interaction"))
         interaction = kwargs.get("interaction", "").replace(" ", "_")
         if interaction in {"birth", "birthdeath", "go_or_grow"}:
             from lgca.ms_interactions import (

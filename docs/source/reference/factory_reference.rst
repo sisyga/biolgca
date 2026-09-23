@@ -25,6 +25,11 @@ simulator class from four main switches:
 ``n_species``
    Number of species. Values greater than one select the multi-species class
    family. Multi-species classes are currently classical, not identity-based.
+   Through ``get_lgca`` they support only ``random_walk`` (the default),
+   ``excitable_medium_ms`` and ``only_propagation`` with volume exclusion, and
+   ``birth``, ``birthdeath``, ``go_or_grow`` and ``only_propagation`` without.
+   Other multi-species dynamics are built with a ModelSpec interaction
+   pipeline; unsupported names raise ``ValueError`` at construction.
 
 Model class matrix
 ------------------
