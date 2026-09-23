@@ -424,7 +424,14 @@ def excitable_medium(lgca):
 
 
 def go_or_grow(lgca):
-    """Perform the go-or-grow switching interaction.
+    """Switch cells between moving and resting, then apply death and resting-cell birth.
+
+    Moving cells switch to free rest channels with probability
+    ``tanh_switch(rho, kappa, theta)``, where ``rho`` is the node density
+    divided by ``K``; resting cells switch to free velocity channels with the
+    complementary probability. Every cell then dies with probability ``r_d``,
+    and each resting cell divides into a free rest channel with probability
+    ``r_b``. Moving cells are finally shuffled over the velocity channels.
 
     Parameters
     ----------
@@ -433,22 +440,18 @@ def go_or_grow(lgca):
 
     Other Parameters
     ----------------
-    r_b : float # This parameter is not used in the provided snippet for go_or_grow, but kept for consistency if it
-    was intended.
-        Birth probability for resting cells.
-    r_d : float # This parameter is not used in the provided snippet for go_or_grow
-        Death probability for both states.
-    beta : float # Renamed from kappa in some contexts, this is the sensitivity for switching
-        Steepness of the switching function / sensitivity to entropy change.
-    theta : float # This parameter is not used here, tanh_switch is not directly called for entropy part
-        Threshold density for switching.
+    r_b : float
+        Division probability of a resting cell per time step.
+    r_d : float
+        Death probability of every cell per time step.
+    kappa : float
+        Steepness of the density-dependent switch.
+    theta : float
+        Relative density at which the switch probability is one half.
 
     Notes
     -----
     The ``lgca`` object is modified in place.
-    This version attempts to use the entropy-based switching logic.
-    Assumes lgca.velocitychannels and lgca.restchannels are defined.
-    Uses a placeholder `_s_binom_entropy_like` for the undefined `s_binom`.
     """
     n_m = lgca.nodes[..., :lgca.velocitychannels].sum(-1)
     n_r = lgca.nodes[..., lgca.velocitychannels:].sum(-1)

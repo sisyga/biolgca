@@ -14,7 +14,7 @@ def random_walk(lgca):
     """Perform a random walk rearrangement on the lattice.
 
     All particles of every occupied lattice site are redistributed
-    uniformly over the velocity channels.
+    uniformly over all channels, including the rest channel.
 
     Parameters
     ----------
