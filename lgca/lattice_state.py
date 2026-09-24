@@ -73,6 +73,7 @@ class LatticeState:
             raise ValueError(f"kind must be one of {_KINDS}, got {kind!r}")
         self._lgca = lgca
         self._kind = kind
+        self.fields_read: set[str] = set()  # names passed to field() or gradient(), for dependencies
         self._step = int(step)
         self._dims = tuple(int(size) for size in lgca.dims)
         interior = np.asarray(lgca.nodes[lgca.nonborder])
@@ -191,7 +192,8 @@ class LatticeState:
     def _padded_field(self, name):
         """The field as the model stores it, with ghost nodes, or padded like cells."""
         if not hasattr(self._lgca, name):
-            raise KeyError(f"the model has no field {name!r}; declare it in StateSpec.fields")
+            raise KeyError(f"state.fields.{name} does not exist; declare the field in StateSpec.fields")
+        self.fields_read.add(name)
         values = np.asarray(getattr(self._lgca, name))
         padded = self._lgca.nodes.shape[:len(self._dims)]
         if values.shape[:len(self._dims)] == padded:

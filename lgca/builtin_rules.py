@@ -25,9 +25,84 @@ from __future__ import annotations
 import numpy as np
 
 from .interactions import tanh_switch
-from .rules import interaction
+from .rules import interaction, reorientation_term
 
 __all__ = ["go_or_grow_growth", "go_or_grow_switch", "species_random_walk"]
+
+
+# Terms of the Boltzmann reorientation (ReorientationSpec). J(s') is the flux of
+# the candidate state; see lgca.rules.reorientation_term for the couplings.
+
+@reorientation_term(coupling="rest", name="random_walk", aliases="uniform")
+def random_walk(state):
+    """Score 0: all channel states are equally likely."""
+    return 0.0
+
+
+@reorientation_term(coupling="rest", name="resting_bias")
+def resting_bias(state):
+    """Number of cells in rest channels: cells prefer to rest."""
+    return 1.0
+
+
+@reorientation_term(coupling="flux", name="persistent_walk", aliases="persistent_motion")
+def persistent_walk(state):
+    """J(s) · J(s'): cells keep the direction they had at this node."""
+    return state.flux
+
+
+@reorientation_term(coupling="flux", name="polar_alignment")
+def polar_alignment(state):
+    """J_nb · J(s'), with J_nb the flux of the neighbouring nodes: cells move with their neighbours."""
+    return state.neighbor_sum(state.flux)
+
+
+@reorientation_term(coupling="channels", name="nematic_alignment", aliases=("nematic", "alignment"))
+def nematic_alignment(state):
+    """Cells share an axis with neighbouring cells; opposite directions count the same."""
+    neighbours = state.neighbor_sum(state.counts[..., :state.velocitychannels].sum(axis=-2))
+    return neighbours @ (state.c.T @ state.c) ** 2
+
+
+@reorientation_term(coupling="flux", name="aggregation")
+def aggregation(state):
+    """∇ρ · J(s'): cells move up the gradient of the cell density."""
+    return state.gradient(state.density)
+
+
+@reorientation_term(coupling="flux", name="chemotaxis")
+def chemotaxis(state, field):
+    """∇f · J(s'): cells move up the gradient of a field.
+
+    Parameters
+    ----------
+    field : str
+        Name of a scalar field in StateSpec.fields.
+    """
+    from .pipeline import _physical_field_gradient
+
+    values = state.field(field)
+    if values.shape != state.dims:
+        raise ValueError(f"state.fields.{field} must have shape {state.dims}, got {values.shape}")
+    return _physical_field_gradient(state._lgca, np.asarray(values, dtype=float))
+
+
+@reorientation_term(coupling="channels", name="contact_guidance")
+def contact_guidance(state, field="director"):
+    """Σ (d · c_i)² over occupied velocity channels: cells move along the axis of a director field.
+
+    Parameters
+    ----------
+    field : str
+        Name of a vector field in StateSpec.fields; only its direction matters.
+    """
+    director = np.asarray(state.field(field), dtype=float)
+    if director.shape != state.dims + (state.c.shape[0],):
+        raise ValueError(f"state.fields.{field} must have shape {state.dims + (state.c.shape[0],)}, "
+                         f"got {director.shape}")
+    norm = np.linalg.norm(director, axis=-1, keepdims=True)
+    director = np.divide(director, norm, out=np.zeros_like(director), where=norm > 0)
+    return (director @ state.c) ** 2
 
 _MIGRATING, _RESTING = 0, 1
 _CAPACITY_MODES = ("legacy", "reject")

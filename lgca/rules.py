@@ -32,7 +32,7 @@ from .lattice_state import LatticeState
 from .operator_base import InteractionOperator, PluginInfo
 from .plugins import _law_for_kind, register_plugin, validate_plugin_parameters
 
-__all__ = ["Interaction", "interaction"]
+__all__ = ["Interaction", "ReorientationCue", "interaction", "reorientation_term"]
 
 KINDS = ("birth_death", "phenotype_switch", "reorientation")
 FAMILIES = {"classical": "with volume exclusion", "nove": "without volume exclusion"}
@@ -208,6 +208,128 @@ class FunctionInteractionOperator(InteractionOperator):
                 raise ValueError(f"{self.rule.name} declares that it conserves momentum, but the sum of "
                                  f"the cell velocities changed at {int(changed.sum())} nodes")
         state.commit()
+
+
+def reorientation_term(
+    function: Callable | None = None,
+    *,
+    coupling: str,
+    name: str | None = None,
+    aliases: str | Iterable[str] = (),
+    register: bool = True,
+):
+    """Turn ``function(state, **parameters)`` into a term of the Boltzmann reorientation.
+
+    The function returns a field on the lattice, computed from the state
+    before the reorientation; ``coupling`` says how the field scores a
+    candidate channel state ``s'`` of a node:
+
+    ``"flux"``
+        a vector per node, shape ``dims + (d,)``; score ``g · J(s')`` with
+        ``J(s')`` the sum of the velocities of the candidate's cells. Cells
+        move along ``g``.
+    ``"nematic"``
+        a symmetric tensor per node, shape ``dims + (d, d)``; score
+        ``Σ_i n_i c_i · Q c_i`` over occupied velocity channels ``i``. Cells
+        move along the main axis of ``Q``, in either direction.
+    ``"rest"``
+        a number per node, shape ``dims``; score times the number of the
+        candidate's cells in rest channels. Positive values make cells rest.
+    ``"channels"``
+        a weight per channel, shape ``dims + (velocitychannels,)`` or
+        ``dims + (K,)``; score ``Σ_i w_i n_i``.
+
+    Arrays that broadcast to these shapes are accepted, e.g. one vector for
+    the whole lattice. The terms of a :class:`~lgca.pipeline.ReorientationSpec`
+    act in one decision, ``P(s') ∝ exp(Σ_k beta_k G_k(s'))``; like the
+    sampler, they work for classical models with volume exclusion, with one
+    or several species.
+
+    Parameters
+    ----------
+    coupling : {"flux", "nematic", "rest", "channels"}
+        How the field scores a candidate state.
+    name : str, optional
+        Name in model files. Default: the function name.
+    aliases : str or sequence of str, default=()
+        Further names.
+    register : bool, default=True
+        Make the term available by name in :class:`~lgca.pipeline.ReorientationTermSpec`.
+
+    Returns
+    -------
+    ReorientationCue
+        Call it with ``beta=`` and parameters to get a
+        :class:`~lgca.pipeline.ReorientationTermSpec`.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from lgca import reorientation_term
+    >>> @reorientation_term(coupling="flux")
+    ... def drift(state, direction=(1.0, 0.0)):
+    ...     '''Cells move in a fixed direction.'''
+    ...     return np.asarray(direction, dtype=float)
+    >>> drift(beta=2.0, direction=[0, 1])
+    ReorientationTermSpec(name='drift', beta=2.0, parameters={'direction': [0, 1]}, species=None)
+    """
+
+    def decorate(function):
+        cue = ReorientationCue(function, coupling=coupling, name=name, aliases=aliases)
+        if register:
+            from .pipeline import register_reorientation_term
+
+            register_reorientation_term(cue)
+        return cue
+
+    return decorate if function is None else decorate(function)
+
+
+class ReorientationCue:
+    """A term of the Boltzmann reorientation defined by a field and a coupling.
+
+    Created by :func:`reorientation_term`. Calling it with ``beta``,
+    optionally ``species`` and the parameters of the function returns a
+    :class:`~lgca.pipeline.ReorientationTermSpec`.
+    """
+
+    def __init__(self, function, *, coupling, name=None, aliases=()):
+        from .pipeline import _COUPLINGS
+
+        if coupling not in _COUPLINGS:
+            raise ValueError(f"coupling must be one of {', '.join(_COUPLINGS)}, got {coupling!r}")
+        self.function = function
+        self.coupling = coupling
+        self.name = name or function.__name__
+        self.aliases = (aliases,) if isinstance(aliases, str) else tuple(aliases)
+        self.module = getattr(function, "__module__", None)
+        parameters = _parameters(function)
+        reserved = {"beta", "species"} & set(parameters)
+        if reserved:
+            raise TypeError(f"{self.name}: {', '.join(sorted(reserved))} are set on the term, "
+                            "not by the function; rename the parameter")
+        self.info = PluginInfo(name=self.name, operator_kind="reorientation_term",
+                               backend_families=("classical",), aliases=self.aliases,
+                               parameters=parameters, description=_summary(function))
+        self.__doc__ = function.__doc__
+        self.__name__ = function.__name__
+
+    def __call__(self, beta: float = 1.0, species: int | None = None, **parameters):
+        from .pipeline import ReorientationTermSpec
+
+        validate_plugin_parameters(self.info, parameters)
+        return ReorientationTermSpec(name=self.name, beta=beta, parameters=dict(parameters), species=species)
+
+    def __repr__(self) -> str:
+        return f"<reorientation term {self.name!r} (coupling {self.coupling})>"
+
+    def __str__(self) -> str:
+        text = str(self.info).replace("Phase: reorientation_term. Model families: classical.",
+                                      f"Coupling: {self.coupling}. Term of ReorientationSpec.")
+        return text
+
+    def _repr_pretty_(self, printer, cycle) -> None:
+        printer.text(str(self))
 
 
 def _factory_for(rule, module):

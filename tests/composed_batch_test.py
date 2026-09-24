@@ -51,7 +51,7 @@ def test_batched_composition_matches_scalar_rng_order_and_small_batches(species,
     operator = expected.pipeline.operators[0]
     monkeypatch.setattr(operator, "_sample_batches", lambda lgca: scalar_reference(lgca, operator))
     expected.run(False)
-    for budget in (32 * 1024**2, 35 * 8 * 15):
+    for budget in (32 * 1024**2, 35 * 8 * 16):
         monkeypatch.setattr(pipeline, "_MAX_CANDIDATE_BATCH_BYTES", budget)
         actual = build_model(spec)
         actual.run(False)

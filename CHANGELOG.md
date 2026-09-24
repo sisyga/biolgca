@@ -7,6 +7,13 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- `@lgca.reorientation_term(coupling=...)` defines a new cue for
+  `ReorientationSpec` as a function that returns a field from the lattice
+  state: a vector per node (`"flux"`, cells move along it), a tensor
+  (`"nematic"`), a number (`"rest"`) or channel weights (`"channels"`).
+  Calling the term with `beta=` and its parameters gives the
+  `ReorientationTermSpec`. The built-in terms are defined the same way, with
+  unchanged results.
 - `@lgca.interaction` turns a function `rule(state, r_d=0.1)` of a
   `LatticeState` into a registered interaction: parameters, defaults and
   descriptions come from the signature and docstring, calling

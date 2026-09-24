@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 import time
 from ._warnings import warn_user
 from dataclasses import dataclass, field
@@ -100,10 +101,15 @@ class ReorientationTermSpec:
     ``"resting_bias"``
         Number of cells in rest channels: cells prefer to rest.
 
+    New terms are written with :func:`lgca.reorientation_term`; the built-in
+    terms above are defined the same way in :mod:`lgca.builtin_rules`.
+
     Attributes
     ----------
     name : str
-        One of the names above; :func:`list_reorientation_terms` lists them.
+        One of the names above or of a term defined with
+        :func:`lgca.reorientation_term`; :func:`list_reorientation_terms`
+        lists them.
     beta : float, default=1.0
         Weight (sensitivity) of the term; 0 switches it off, negative values
         reverse the preference.
@@ -405,9 +411,6 @@ def _candidate_batches(mask, candidates):
 class _ReorientationTerm:
     def __init__(self, spec: ReorientationTermSpec):
         self.name = spec.name
-        if self.name == "alignment":
-            warn_user("The composed 'alignment' alias means nematic_alignment; "
-                          "use 'nematic_alignment' or 'polar_alignment' explicitly", DeprecationWarning)
         if isinstance(spec.beta, (bool, str)) or np.asarray(spec.beta).ndim != 0 or not np.isfinite(spec.beta):
             raise ValueError("beta must be a finite numeric scalar")
         self.beta = float(spec.beta)
@@ -416,10 +419,6 @@ class _ReorientationTerm:
         if self.species is not None and (isinstance(self.species, bool)
                 or not isinstance(self.species, (int, np.integer)) or self.species < 0):
             raise ValueError("species must be a nonnegative integer index")
-        allowed = {"field"} if self.name in {"chemotaxis", "contact_guidance"} else set()
-        unknown = set(self.parameters) - allowed
-        if unknown:
-            raise ValueError(f"parameters contains unknown keys: {sorted(unknown)}")
 
     def validate(self, context) -> None:
         if self.species is not None and self.species >= context.spec.state.n_species:
@@ -440,13 +439,80 @@ class _ReorientationTerm:
         return set()
 
 
-class _UniformTerm(_ReorientationTerm):
-    pass
+_COUPLINGS = ("flux", "nematic", "rest", "channels")
 
 
-class _RestingBiasTerm(_ReorientationTerm):
+class _FieldTerm(_ReorientationTerm):
+    """A term whose score couples a field of the lattice state to the candidate state.
+
+    The field comes from ``definition.function(state, **parameters)`` with a
+    :class:`~lgca.lattice_state.LatticeState` of the state before the
+    reorientation, and is recomputed once per time step.
+    """
+
+    def __init__(self, spec: ReorientationTermSpec, definition):
+        super().__init__(spec)
+        from .plugins import validate_plugin_parameters
+
+        try:
+            validate_plugin_parameters(definition.info, self.parameters)
+        except ValueError as exc:
+            raise ValueError(f"parameters: {exc}") from exc
+        self.definition = definition
+        self.coupling = definition.coupling
+        self.field = None
+        self.step = 0
+        self.fields_read: set[str] = set()
+
+    def validate(self, context) -> None:
+        super().validate(context)
+        self.field = self._field(context.lgca)
+
+    def prepare(self, lgca, source_channels):
+        self.field = self._field(lgca)
+
+    def _field(self, lgca):
+        from .lattice_state import LatticeState
+
+        state = LatticeState(lgca, step=self.step)
+        try:
+            field = self.definition.function(state, **self.parameters)
+        except KeyError as exc:
+            raise ValueError(f"{self.name}: {exc.args[0] if exc.args else exc}") from exc
+        self.fields_read |= state.fields_read
+        field = np.asarray(field, dtype=float)
+        dims, velocity, d = state.dims, state.velocitychannels, state.c.shape[0]
+        shapes = {"flux": [dims + (d,)], "nematic": [dims + (d, d)], "rest": [dims],
+                  "channels": [dims + (velocity,), dims + (state.K,)]}[self.coupling]
+        for shape in shapes:
+            try:
+                field = np.broadcast_to(field, shape)
+                break
+            except ValueError:
+                continue
+        else:
+            raise ValueError(f"{self.name} must return an array that broadcasts to "
+                             f"{' or '.join(map(str, shapes))} for coupling {self.coupling!r}, "
+                             f"got shape {field.shape}")
+        if not np.all(np.isfinite(field)):
+            raise ValueError(f"{self.name} returned values that are not finite")
+        if self.coupling == "nematic":  # Q : (c_i c_i^T) per velocity channel
+            field = np.einsum("...ab,ai,bi->...i", field, state.c, state.c)
+        return field
+
+    def dependencies(self) -> set[str]:
+        return set(self.fields_read)
+
     def score_batch(self, features, lgca, coords):
-        return features["rest"]
+        spatial = tuple(index - lgca.r_int for index in coords)
+        field = self.field[spatial]
+        if self.coupling == "flux":
+            return field @ features["flux"].T
+        if self.coupling == "rest":
+            return field[:, None] * features["rest"][None, :]
+        if field.shape[-1] == lgca.velocitychannels:
+            return field @ features["channels"].T
+        return field @ features["occupancy"].T
 
 
 def _physical_field_gradient(lgca, field):
@@ -470,152 +536,44 @@ def _physical_field_gradient(lgca, field):
     return np.linalg.solve(jacobian, derivatives[..., None])[..., 0]
 
 
-class _ChemotaxisTerm(_ReorientationTerm):
-    def __init__(self, spec: ReorientationTermSpec):
-        super().__init__(spec)
-        self.field_name = self.parameters.get("field")
-        self.gradient = None
-
-    def validate(self, context) -> None:
-        super().validate(context)
-        if not self.field_name:
-            raise ValueError("chemotaxis requires parameter 'field'")
-        if self.field_name not in context.fields:
-            raise ValueError(f"state.fields.{self.field_name} is required by chemotaxis")
-        field = np.asarray(context.fields[self.field_name], dtype=float)
-        expected = tuple(context.lgca.dims)
-        if field.shape != expected:
-            raise ValueError(
-                f"state.fields.{self.field_name} must have shape {expected}, got {field.shape}"
-            )
-        self.gradient = _physical_field_gradient(context.lgca, field)
-
-    def prepare(self, lgca, source_channels):
-        field = np.asarray(getattr(lgca, self.field_name), dtype=float)
-        field = field[lgca.nonborder]
-        if field.shape != tuple(lgca.dims) or not np.isfinite(field).all():
-            raise ValueError(f"Field {self.field_name!r} must contain finite scalar values on the lattice")
-        self.gradient = _physical_field_gradient(lgca, field)
-
-    def score_batch(self, features, lgca, coords):
-        spatial = tuple(index - lgca.r_int for index in coords)
-        return self.gradient[spatial] @ features["flux"].T
-
-    def dependencies(self) -> set[str]:
-        return set() if not self.field_name else {self.field_name}
+# name -> term definition (see lgca.rules.reorientation_term); filled by lgca.builtin_rules
+_REORIENTATION_TERMS: dict[str, Any] = {}
+_TERM_ALIASES: dict[str, str] = {}
 
 
-class _NematicAlignmentTerm(_ReorientationTerm):
-    def prepare(self, lgca, source_channels):
-        self.neighbor_channels = lgca.nb_sum(
-            source_channels[..., : lgca.velocitychannels].astype(np.int64)
-        )
+def register_reorientation_term(definition, replace: bool = False) -> None:
+    """Register a term definition under its name and aliases.
 
-    def score_batch(self, features, lgca, coords):
-        return self.neighbor_channels[coords] @ features["nematic"].T
-
-    def dependencies(self) -> set[str]:
-        return {"boundary_nodes"}
-
-
-class _PersistentWalkTerm(_ReorientationTerm):
-    def prepare(self, lgca, source_channels):
-        self.local_flux = source_channels[..., : lgca.velocitychannels] @ lgca.c.T
-
-    def score_batch(self, features, lgca, coords):
-        return self.local_flux[coords] @ features["flux"].T
-
-
-class _PolarAlignmentTerm(_PersistentWalkTerm):
-    def prepare(self, lgca, source_channels):
-        neighbors = lgca.nb_sum(source_channels[..., :lgca.velocitychannels].astype(np.int64))
-        self.local_flux = neighbors @ lgca.c.T
-
-    def dependencies(self) -> set[str]:
-        return {"boundary_nodes"}
-
-
-class _AggregationTerm(_ReorientationTerm):
-    def prepare(self, lgca, source_channels):
-        density = source_channels.sum(axis=-1)
-        self.gradient = lgca.gradient(density)
-
-    def score_batch(self, features, lgca, coords):
-        return self.gradient[coords] @ features["flux"].T
-
-    def dependencies(self) -> set[str]:
-        return {"boundary_nodes", "cell_density"}
-
-
-class _ContactGuidanceTerm(_ReorientationTerm):
-    def __init__(self, spec: ReorientationTermSpec):
-        super().__init__(spec)
-        self.field_name = self.parameters.get("field", "director")
-        self.director = None
-
-    def validate(self, context) -> None:
-        super().validate(context)
-        if not self.field_name:
-            raise ValueError("contact_guidance requires a non-empty parameter 'field'")
-        if self.field_name not in context.fields:
-            raise ValueError(f"state.fields.{self.field_name} is required by contact_guidance")
-        field = np.asarray(context.fields[self.field_name], dtype=float)
-        expected = tuple(context.lgca.dims) + (context.lgca.c.shape[0],)
-        if field.shape != expected:
-            raise ValueError(
-                f"state.fields.{self.field_name} must have shape {expected}, got {field.shape}"
-            )
-        norm = np.linalg.norm(field, axis=-1, keepdims=True)
-        self.director = np.divide(field, norm, out=np.zeros_like(field), where=norm > 0)
-
-    def prepare(self, lgca, source_channels):
-        field = np.asarray(getattr(lgca, self.field_name), dtype=float)[lgca.nonborder]
-        expected = tuple(lgca.dims) + (lgca.c.shape[0],)
-        if field.shape != expected or not np.isfinite(field).all():
-            raise ValueError(f"Field {self.field_name!r} must contain finite vectors of shape {expected}")
-        norm = np.linalg.norm(field, axis=-1, keepdims=True)
-        self.director = np.divide(field, norm, out=np.zeros_like(field), where=norm > 0)
-
-    def score_batch(self, features, lgca, coords):
-        spatial = tuple(index - lgca.r_int for index in coords)
-        alignment = self.director[spatial] @ lgca.c
-        return alignment**2 @ features["channels"].T
-
-    def dependencies(self) -> set[str]:
-        return {self.field_name} if self.field_name else set()
-
-
-_REORIENTATION_TERMS = {
-    "aggregation": _AggregationTerm,
-    "alignment": _NematicAlignmentTerm,
-    "chemotaxis": _ChemotaxisTerm,
-    "contact_guidance": _ContactGuidanceTerm,
-    "nematic": _NematicAlignmentTerm,
-    "nematic_alignment": _NematicAlignmentTerm,
-    "persistent_motion": _PersistentWalkTerm,
-    "persistent_walk": _PersistentWalkTerm,
-    "polar_alignment": _PolarAlignmentTerm,
-    "random_walk": _UniformTerm,
-    "uniform": _UniformTerm,
-    "resting_bias": _RestingBiasTerm,
-}
+    Registering a name again from the module that registered it replaces the
+    entry (re-running a notebook cell); other modules need ``replace=True``.
+    """
+    names = (definition.name,) + tuple(definition.aliases)
+    for name in names:
+        canonical = _TERM_ALIASES.get(name, name)
+        previous = _REORIENTATION_TERMS.get(canonical)
+        if previous is not None and not replace and previous.module != definition.module:
+            raise ValueError(f"Reorientation term {name!r} is already registered by module "
+                             f"{previous.module!r}. Choose another name or pass replace=True.")
+    _REORIENTATION_TERMS[definition.name] = definition
+    for alias in definition.aliases:
+        _TERM_ALIASES[alias] = definition.name
 
 
 def list_reorientation_terms() -> tuple[str, ...]:
-    """Return the supported reorientation-term names in deterministic order."""
+    """Return the supported reorientation-term names and aliases in deterministic order."""
 
-    return tuple(sorted(_REORIENTATION_TERMS))
+    return tuple(sorted(set(_REORIENTATION_TERMS) | set(_TERM_ALIASES)))
 
 
 def _candidate_features(candidates, lgca):
     """Cache candidate-only quantities for one occupancy group."""
-    feature_bytes = len(candidates) * (2 * lgca.velocitychannels + lgca.c.shape[0] + 1) * 8
+    feature_bytes = len(candidates) * (lgca.velocitychannels + lgca.K + lgca.c.shape[0] + 1) * 8
     if feature_bytes > _MAX_CANDIDATE_BATCH_BYTES:
         raise ValueError(f"Candidate features require {feature_bytes:,} bytes; "
                          "reduce channels or use a non-enumerating interaction")
     channels = candidates[:, :lgca.velocitychannels].astype(float)
     return {"channels": channels, "flux": channels @ lgca.c.T,
-            "nematic": channels @ (lgca.c.T @ lgca.c)**2,
+            "occupancy": candidates.astype(float),
             "rest": candidates[:, lgca.velocitychannels:].sum(axis=1)}
 
 
@@ -665,6 +623,7 @@ class BoltzmannReorientationOperator(ReorientationOperator):
             if getattr(lgca, "n_species", 1) > 1:
                 source_channels = source_channels.sum(axis=-2)
             for term in self.terms:
+                term.step = step
                 term.prepare(lgca, source_channels)
             self._sample_batches(lgca)
         finally:
@@ -680,16 +639,21 @@ class BoltzmannReorientationOperator(ReorientationOperator):
     def _compile_terms(term_specs: Sequence[ReorientationTermSpec]) -> list[_ReorientationTerm]:
         terms = []
         for index, term_spec in enumerate(term_specs):
+            if term_spec.name == "alignment":
+                warn_user("The composed 'alignment' alias means nematic_alignment; "
+                          "use 'nematic_alignment' or 'polar_alignment' explicitly", DeprecationWarning)
+            definition = _REORIENTATION_TERMS.get(_TERM_ALIASES.get(term_spec.name, term_spec.name))
+            if definition is None:
+                matches = difflib.get_close_matches(term_spec.name, list_reorientation_terms(), n=1)
+                hint = f" (did you mean {matches[0]!r}?)" if matches else ""
+                raise ValueError(f".terms[{index}] unknown reorientation term {term_spec.name!r}{hint}")
             try:
-                term_cls = _REORIENTATION_TERMS[term_spec.name]
-            except KeyError as exc:
-                raise ValueError(f".terms[{index}] unknown reorientation term {term_spec.name!r}") from exc
-            try:
-                terms.append(term_cls(term_spec))
+                terms.append(_FieldTerm(term_spec, definition))
             except (TypeError, ValueError) as exc:
                 raise ValueError(f".terms[{index}] {exc}") from exc
         if not terms:
-            terms.append(_UniformTerm(ReorientationTermSpec(name="random_walk")))
+            terms.append(_FieldTerm(ReorientationTermSpec(name="random_walk"),
+                                    _REORIENTATION_TERMS["random_walk"]))
         return terms
 
     def _sample_batches(self, lgca):

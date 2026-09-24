@@ -31,7 +31,7 @@ from ._warnings import warn_user
 from typing import Tuple, Any
 
 from .lattice_state import LatticeState
-from .rules import interaction
+from .rules import interaction, reorientation_term
 from . import builtin_rules as _builtin_rules  # registers the decorated built-in interactions
 
 # Library loggers stay silent unless the application configures logging.

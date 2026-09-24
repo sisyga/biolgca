@@ -167,28 +167,23 @@ def test_native_reorientation_preserves_multispecies_mass_by_species():
     ("hex", (5, 6), 6), ("cubic", (5, 5, 5), 6),
 ])
 def test_nematic_scores_count_neighbors_and_ignore_empty_extra_species(geometry, dims, neighbors):
-    from lgca.pipeline import _NematicAlignmentTerm
-
-    lgca = get_lgca(geometry=geometry, dims=dims, density=0,
-                    interaction="only_propagation")
-    lgca.nodes[..., 0] = True
-    coord = tuple(lgca.r_int + 2 for _ in dims)
-    neighbor = (coord[0] + 1,) + coord[1:]
-    lgca.nodes[neighbor + (1,)] = True
-    candidates = np.eye(lgca.K, dtype=bool)
-    term = _NematicAlignmentTerm(ReorientationTermSpec(name="nematic_alignment"))
+    scores = []
+    for n_species in (1, 2):
+        lgca = get_lgca(geometry=geometry, dims=dims, density=0, restchannels=1, seed=1,
+                        **({"n_species": 2} if n_species == 2 else {}))
+        species = (0,) if n_species == 2 else ()
+        lgca.nodes[(Ellipsis,) + species + (0,)] = True
+        coord = tuple(lgca.r_int + 2 for _ in dims)
+        neighbor = (coord[0] + 1,) + coord[1:]
+        lgca.nodes[neighbor + species + (1,)] = True
+        term = _term("nematic_alignment")
+        term.prepare(lgca, None)
+        candidates = np.eye(lgca.K, dtype=bool)[:lgca.velocitychannels]
+        scores.append(term.score(candidates, None, lgca, coord))
     expected = neighbors * (lgca.c.T @ lgca.c[:, 0]) ** 2
     expected += (lgca.c.T @ lgca.c[:, 1]) ** 2
-    term.prepare(lgca, lgca.nodes)
-    single = term.score(candidates, lgca.nodes[coord], lgca, coord)
-    np.testing.assert_allclose(single, expected)
-    lgca._reorientation_source_nodes = np.stack(
-        [lgca.nodes, np.zeros_like(lgca.nodes)], axis=-2
-    )
-    lgca.n_species = 2
-    term.prepare(lgca, lgca._reorientation_source_nodes.sum(axis=-2))
-    multiple = term.score(candidates, lgca.nodes[coord], lgca, coord)
-    np.testing.assert_allclose(multiple, expected)
+    np.testing.assert_allclose(scores[0], expected)
+    np.testing.assert_allclose(scores[1], expected)
 
 
 @pytest.mark.parametrize("propagation", [False, True])
@@ -248,18 +243,19 @@ def test_pipeline_rejects_invalid_propagation(propagation):
         build_model(ModelSpec(dynamics=InteractionPipelineSpec(propagation=propagation)))
 
 
-def test_opposite_neighbors_distinguish_polar_and_nematic_scores():
-    from lgca.pipeline import _PolarAlignmentTerm, _NematicAlignmentTerm
+def _term(name):
+    from lgca.pipeline import _REORIENTATION_TERMS, _FieldTerm
 
+    return _FieldTerm(ReorientationTermSpec(name), _REORIENTATION_TERMS[name])
+
+
+def test_opposite_neighbors_distinguish_polar_and_nematic_scores():
     lgca = get_lgca(geometry="square", dims=(3, 3), density=0, interaction="only_propagation")
     lgca.nodes[1, 2, 0] = True  # east
     lgca.nodes[3, 2, 2] = True  # west
     candidates = np.eye(4, dtype=bool)
-    for kind, name, expected in (
-        (_PolarAlignmentTerm, "polar_alignment", [0, 0, 0, 0]),
-        (_NematicAlignmentTerm, "nematic_alignment", [2, 0, 2, 0]),
-    ):
-        term = kind(ReorientationTermSpec(name))
+    for name, expected in (("polar_alignment", [0, 0, 0, 0]), ("nematic_alignment", [2, 0, 2, 0])):
+        term = _term(name)
         term.prepare(lgca, lgca.nodes)
         np.testing.assert_allclose(term.score(candidates, lgca.nodes[2, 2], lgca, (2, 2)), expected)
 

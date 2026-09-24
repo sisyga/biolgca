@@ -25,7 +25,7 @@ def test_chemotaxis_ramps_have_analytic_physical_gradients_and_scores(geometry, 
         ))
         term = model.pipeline.operators[0].terms[0]
         expected = np.eye(ndim)[component]
-        np.testing.assert_allclose(term.gradient, np.broadcast_to(expected, dims + (ndim,)), atol=1e-14)
+        np.testing.assert_allclose(term.field, np.broadcast_to(expected, dims + (ndim,)), atol=1e-14)
         candidates = np.eye(model.lgca.K, dtype=bool)
         for spatial in np.ndindex(dims):
             coord = tuple(index + model.lgca.r_int for index in spatial)
@@ -88,11 +88,11 @@ def test_current_named_fields_steer_next_step_once_per_operator(name, writer, mo
     else:
         np.testing.assert_array_equal(np.abs(flux[..., 1]), 1)
         # A nematic director and its negative describe the same axis.
-        previous = term.director.copy()
+        previous = term.field.copy()
         field_writer.changed = False
         model.lgca.signal *= -1
         model.step()
-        np.testing.assert_array_equal(term.director, -previous)
+        np.testing.assert_array_equal(term.field, previous)
         flux = model.lgca.calc_flux(model.lgca.nodes[model.lgca.nonborder])
         np.testing.assert_array_equal(np.abs(flux[..., 1]), 1)
     assert len(calls) == (3 if name == "contact_guidance" else 2)

@@ -444,6 +444,20 @@ combined sampler, terms work for classical models with volume exclusion (one
 or several species) in Phase 1; the sampler without volume exclusion follows
 in 2.1. Rules that are not Boltzmann samplers use `@interaction(kind=
 "reorientation")` instead.
+- Status (2026-09-24): done. `lgca.reorientation_term` in `lgca/rules.py`;
+  a term is a function of a `LatticeState` (the state before the
+  reorientation) that returns a field, and the coupling turns it into a
+  score. Fields that broadcast are accepted (one vector for the whole
+  lattice). All built-in terms are now defined this way in
+  `lgca/builtin_rules.py`, and the private term classes are gone; seeded
+  runs are unchanged (the batched-sampling test compares states and random
+  number streams) and so is the run time. Terms list the fields they read
+  as inputs in the schedule. The advanced `score(features, state)` form was
+  not added: every built-in term fits one of the four couplings.
+  Open question: `chemotaxis` keeps its gradient in physical coordinates
+  (one-sided at the edge, and a different stencil from `lgca.gradient` on
+  the hexagonal lattice), while `aggregation` and `LatticeState.gradient` use
+  the model's centred gradient with ghost nodes.
 
 **1.6 Interaction test helper** (C5)
 
