@@ -194,8 +194,12 @@ This file records notable user-facing changes. Changes remain under
   and keeps counts as `int8` with volume exclusion (`state.counts` has that
   type then), cells are counted with a matrix product, identity-based cells
   are ranked with one sort of the selected cells, and `random_walk` draws
-  the state of a node from a table (0.8 ms per step on 100 x 100 hex nodes;
-  legacy `classical.random_walk` 1.0 ms). `birth_death` with a random walk
+  the state of a node from the enumerated states with as many cells (0.8 ms
+  per step on 100 x 100 hex nodes, legacy `classical.random_walk` 1.0 ms;
+  on 20 x 20 x 20 Moore nodes 1.8 ms against 4.1 ms). The states are
+  enumerated within the limits of the Boltzmann sampler's enumeration (a
+  million states, 64 MiB), per number of cells where all states together are
+  too many. `birth_death` with a random walk
   takes 1.4 ms per step where `classical.birthdeath` took 1.6 ms, and
   identity-based growth is 11 to 14 times faster than `ib.birthdeath` and
   `nove_ib.birthdeath`. Seeded runs of `random_walk` differ from before.

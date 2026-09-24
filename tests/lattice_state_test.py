@@ -413,3 +413,30 @@ def test_gradient_of_the_density_matches_the_model_after_its_boundary_conditions
 
     expected = lgca.gradient(lgca.cell_density)[lgca.nonborder]
     np.testing.assert_allclose(state.gradient(state.density), expected)
+
+
+@pytest.mark.parametrize("channels, cells", [(5, 2), (7, 3), (27, 3), (27, 13)])
+def test_random_occupancy_places_the_cells_uniformly(channels, cells):
+    # 5 and 7 channels: one table of all states; 27 channels with 3 cells: the table of that
+    # number of cells; with 13 cells too many states to enumerate: ranked random keys
+    from math import comb
+
+    from lgca.lattice_state import _enumerable, _state_table, random_occupancy
+
+    assert (_state_table(channels) is not None) == (channels < 27)
+    assert _enumerable(channels, cells) == (cells != 13)
+    rng = np.random.default_rng(0)
+    draws = 40000
+    number = np.full(draws, cells)
+    number[::7] = 1  # entries with another number of cells in the same call
+    placed = random_occupancy(rng, number, channels)
+    np.testing.assert_array_equal(placed.sum(-1), number)
+    chosen = placed[number == cells]
+    frequency = chosen.mean(0)  # every channel is occupied with probability cells / channels
+    p = cells / channels
+    np.testing.assert_allclose(frequency, p, atol=4 * np.sqrt(p * (1 - p) / len(chosen)))
+    if comb(channels, cells) <= 35:  # every state equally often
+        states, counts = np.unique(chosen, axis=0, return_counts=True)
+        assert len(states) == comb(channels, cells)
+        expected = len(chosen) / len(states)
+        assert np.all(np.abs(counts - expected) < 4 * np.sqrt(expected))

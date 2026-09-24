@@ -711,7 +711,11 @@ class LatticeState:
 
 @functools.lru_cache(maxsize=64)
 def occupations(channels, cells):
-    """All states of ``channels`` channels with ``cells`` of them occupied, one per row (read-only)."""
+    """All states of ``channels`` channels with ``cells`` of them occupied, one per row (read-only).
+
+    Cached, and shared by the uniform placement of cells (:func:`random_occupancy`) and the
+    Boltzmann sampler of channel subsets.
+    """
     rows = list(itertools.combinations(range(channels), cells))
     states = np.zeros((len(rows), channels), dtype=bool)
     states[np.repeat(np.arange(len(rows)), cells), np.asarray(rows, dtype=np.int64).ravel()] = True
@@ -719,9 +723,30 @@ def occupations(channels, cells):
     return states
 
 
-@functools.lru_cache(maxsize=16)
-def _occupation_table(channels):
-    """All states of ``channels`` channels, by number of cells: the table, first rows and sizes."""
+def _enumerable(channels, cells):
+    """Whether the states of ``cells`` cells in ``channels`` channels fit the enumeration limits.
+
+    The limits of the models' own enumeration (``LGCA_base.get_permutations``): at most a
+    million states and 64 MiB.
+    """
+    return _enumerable_rows(comb(channels, cells), channels)
+
+
+def _enumerable_rows(states, channels):
+    from .base import _MAX_LAZY_CACHE_BYTES, _MAX_PERMUTATION_CANDIDATES
+
+    return states <= _MAX_PERMUTATION_CANDIDATES and states * channels <= _MAX_LAZY_CACHE_BYTES
+
+
+@functools.lru_cache(maxsize=8)
+def _state_table(channels):
+    """All states of ``channels`` channels, by number of cells: table, first rows, sizes; or None.
+
+    None when the ``2 ** channels`` states exceed the enumeration limits (more than 20
+    channels).
+    """
+    if not _enumerable_rows(2 ** channels, channels):
+        return None
     sizes = np.array([comb(channels, cells) for cells in range(channels + 1)])
     table = np.concatenate([occupations(channels, cells) for cells in range(channels + 1)])
     return table, np.r_[0, np.cumsum(sizes)[:-1]], sizes
@@ -730,15 +755,30 @@ def _occupation_table(channels):
 def random_occupancy(rng, number, channels):
     """``number`` cells per entry in uniformly chosen channels of ``channels``, as a boolean array.
 
-    Draws each state from the table of all states (one random number per
-    entry) when it is small, else ranks random keys.
+    The states with ``n`` cells are enumerated once (and cached), and each entry draws one
+    of them with one random number: from one table of all states when they fit the
+    enumeration limits (up to 20 channels), else from the states of each number of cells.
+    Where even these are too many, e.g. about half-full nodes of the Moore lattice, entries
+    rank random keys per channel instead. All ways give every state the same probability.
     """
     number = np.asarray(number, dtype=np.int64)
-    if comb(channels, channels // 2) > 1024:
-        keys = rng.random(number.shape + (channels,))
-        return np.argsort(np.argsort(keys, axis=-1), axis=-1) < number[..., None]
-    table, first, sizes = _occupation_table(channels)
-    return table[first[number] + (rng.random(number.shape) * sizes[number]).astype(np.int64)]
+    table = _state_table(channels)
+    if table is not None:
+        states, first, sizes = table
+        return states[first[number] + (rng.random(number.shape) * sizes[number]).astype(np.int64)]
+    placed = np.zeros(number.shape + (channels,), dtype=bool)
+    for cells in np.unique(number):
+        if cells == 0:
+            continue
+        where = np.nonzero(number == cells)
+        count = len(where[0])
+        if _enumerable(channels, int(cells)):
+            states = occupations(channels, int(cells))
+            placed[where] = states[(rng.random(count) * len(states)).astype(np.int64)]
+        else:
+            keys = rng.random((count, channels))
+            placed[where] = np.argsort(np.argsort(keys, axis=-1), axis=-1) < cells
+    return placed
 
 
 def channel_mask(channels, K, velocitychannels):

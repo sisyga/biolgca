@@ -782,6 +782,16 @@ deprecated aliases for one release.
   number per channel for birth and death, ranking only selected cells,
   argsort(node + random) instead of lexsort, cheap identity conservation
   check.
+- Status (2026-09-24): uniform placement (`lattice_state.random_occupancy`)
+  draws one enumerated state per node: from one table of all states when
+  they fit the limits of `get_permutations` (10^6 states, 64 MiB: up to 20
+  channels), else from the cached states of each number of cells, else
+  (e.g. half-full Moore nodes) by ranking random keys. The earlier cutoff of
+  12 channels was not measured; the table is 5-9x faster than ranking at
+  every size tested (7-20 channels, 10^4 nodes), and the Moore random walk
+  is 2.3x faster than legacy. The `occupations` cache is shared with the
+  Boltzmann sampler of channel subsets; the full-set sampler keeps
+  `get_permutations`, whose row order its seeded results depend on.
 
 **2.4 Remove duplicates** (B4, D5)
 - Separate the random walk from `classical.birth*`.
