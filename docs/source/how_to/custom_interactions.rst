@@ -261,7 +261,9 @@ Built-in rules take the name of a trait wherever a parameter may differ
 between cells: ``go_or_rest(kappa="kappa", theta=0.6)`` gives every cell its
 own switch steepness and all cells the same threshold, and
 ``go_or_grow.growth(r_b=0.2, mutation={"kappa": 0.2})`` lets the daughters'
-``kappa`` mutate.
+``kappa`` mutate. Reorientation terms take ``trait=`` to scale a cue per
+cell, e.g. ``ReorientationTermSpec("polar_alignment", beta=1.0,
+trait="alignment")``; see :doc:`/concepts/interactions`.
 
 Testing a rule
 --------------

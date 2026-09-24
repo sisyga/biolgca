@@ -285,7 +285,7 @@ def reorientation_term(
     ...     '''Cells move in a fixed direction.'''
     ...     return np.asarray(direction, dtype=float)
     >>> drift(beta=2.0, direction=[0, 1])
-    ReorientationTermSpec(name='drift', beta=2.0, parameters={'direction': [0, 1]}, species=None)
+    ReorientationTermSpec(name='drift', beta=2.0, parameters={'direction': [0, 1]}, species=None, trait=None)
     """
 
     def decorate(function):
@@ -303,7 +303,7 @@ class ReorientationCue:
     """A term of the Boltzmann reorientation defined by a field and a coupling.
 
     Created by :func:`reorientation_term`. Calling it with ``beta``,
-    optionally ``species`` and the parameters of the function returns a
+    optionally ``species`` or ``trait`` and the parameters of the function returns a
     :class:`~lgca.pipeline.ReorientationTermSpec`.
     """
 
@@ -318,7 +318,7 @@ class ReorientationCue:
         self.aliases = (aliases,) if isinstance(aliases, str) else tuple(aliases)
         self.module = getattr(function, "__module__", None)
         parameters = _parameters(function)
-        reserved = {"beta", "species"} & set(parameters)
+        reserved = {"beta", "species", "trait"} & set(parameters)
         if reserved:
             raise TypeError(f"{self.name}: {', '.join(sorted(reserved))} are set on the term, "
                             "not by the function; rename the parameter")
@@ -328,11 +328,12 @@ class ReorientationCue:
         self.__doc__ = function.__doc__
         self.__name__ = function.__name__
 
-    def __call__(self, beta: float = 1.0, species: int | None = None, **parameters):
+    def __call__(self, beta: float = 1.0, species: int | None = None, trait: str | None = None, **parameters):
         from .pipeline import ReorientationTermSpec
 
         validate_plugin_parameters(self.info, parameters)
-        return ReorientationTermSpec(name=self.name, beta=beta, parameters=dict(parameters), species=species)
+        return ReorientationTermSpec(name=self.name, beta=beta, parameters=dict(parameters), species=species,
+                                     trait=trait)
 
     def __repr__(self) -> str:
         return f"<reorientation term {self.name!r} (coupling {self.coupling})>"

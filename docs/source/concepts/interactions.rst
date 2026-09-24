@@ -94,6 +94,18 @@ state scores the sum over its cells, and the terms add up weighted by their
 
 For a single cell at a node, the first two rules agree.
 
+A term with a ``trait`` gives every cell of an identity-based model its own
+weight, e.g. ``ReorientationTermSpec("polar_alignment", beta=1.0,
+trait="alignment")`` for an alignment strength per cell: cell ``a`` scores
+``beta * alignment_a * w_i`` in channel ``i``. Without volume exclusion
+every cell still chooses its channel on its own. With it, the cells of a
+node are no longer interchangeable, and the labelled state follows
+``P(σ) ∝ exp(Σ_a s_a w_σ(a))``. It is sampled with a Metropolis chain per
+node (all nodes at once) that starts from a random arrangement and swaps the
+contents of two channels; ``ReorientationSpec(parameters={"sweeps": 10})``
+sets its length, ``sweeps * K`` proposals per node. Placing the cells one
+after another would be faster but samples a different distribution.
+
 Supported reorientation terms
 -----------------------------
 

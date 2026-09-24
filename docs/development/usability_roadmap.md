@@ -652,6 +652,20 @@ while the same work on flat per-cell arrays takes about 1 ms.
   clashed with `StateSpec.capacity` (fixed; the parameter name of the
   go-or-grow mode is still open). Still open: the Metropolis sampler for
   trait-dependent reorientation, and stage B.
+- Status (2026-09-24): trait-dependent reorientation done.
+  `ReorientationTermSpec(trait=...)` scales a term per cell. NoVE: exact
+  per-cell draw. VE: Metropolis per node, all nodes at once, from a random
+  arrangement; proposals pick a cell uniformly and swap its channel's
+  contents with another channel (symmetric, the cell number is fixed), with
+  O(1) bookkeeping per accepted swap; `parameters={"sweeps": 10}` gives
+  `10 * K` proposals per node. Measured from a random start with a strong
+  field: 10 sweeps reach sampling noise for 4 and 6 cells on hex with one
+  rest channel; with six rest channels 20 are needed. Tests
+  (`tests/trait_reorientation_test.py`): the labelled distribution matches
+  enumeration for cells of strengths 0, 1, 2, 4 on 3600 hex nodes; equal
+  strengths reproduce the classical sampler; the NoVE draw is per cell.
+  Time per step: 51 ms (hex, 10k nodes), 36 ms (square), 106 ms (Moore, 8k
+  nodes, K = 26).
 
 **2.3 Names without family prefixes** (B2)
 

@@ -589,7 +589,7 @@ def _validate_serialized_operator(operator, index: int) -> None:
             term_path = f"{path}.terms[{term_index}]"
             term = _mapping_at(term, term_path)
             _reject_unknown_keys(
-                term, {"name", "beta", "parameters", "species"}, term_path
+                term, {"name", "beta", "parameters", "species", "trait"}, term_path
             )
             if not isinstance(term.get("name"), str):
                 raise TypeError(f"{term_path}.name must be a string")
@@ -777,6 +777,7 @@ def _reorientation_term_to_dict(term: ReorientationTermSpec) -> dict[str, Any]:
         "beta": term.beta,
         "parameters": _to_jsonable(dict(term.parameters)),
         "species": term.species,
+        "trait": term.trait,
     }
 
 
@@ -786,6 +787,7 @@ def _reorientation_term_from_dict(data: Mapping[str, Any]) -> ReorientationTermS
         beta=data.get("beta", 1.0),
         parameters=_from_jsonable(data.get("parameters", {})),
         species=data.get("species"),
+        trait=data.get("trait"),
     )
 
 

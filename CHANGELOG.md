@@ -7,6 +7,15 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- Reorientation terms scaled by a cell trait:
+  `ReorientationTermSpec("polar_alignment", beta=1.0, trait="alignment")`
+  gives every cell of an identity-based model its own strength (also
+  `term(beta=..., trait=...)` for terms written with
+  `@lgca.reorientation_term`). Without volume exclusion each cell draws its
+  channel from its own weights; with it, the labelled node states follow the
+  joint Boltzmann distribution, sampled by a Metropolis chain per node, run
+  for all nodes at once, with `ReorientationSpec(parameters={"sweeps": 10})`
+  proposals per channel (51 ms per step on a 100 x 100 hex lattice).
 - Rules for individual cells of identity-based models: `state.cells` holds
   one entry per living cell (label, node, channel) with its traits
   (`cells["kappa"]`) and the operations `kill`, `divide` (daughters inherit

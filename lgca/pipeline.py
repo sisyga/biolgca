@@ -117,12 +117,17 @@ class ReorientationTermSpec:
         ``{"field": name}`` for ``chemotaxis`` and ``contact_guidance``.
     species : int, optional
         Apply the term only to cells of this species (zero-based index).
+    trait : str, optional
+        Identity-based models: the name of a cell trait that scales the term
+        for every cell, e.g. an alignment strength per cell. A cell's score
+        in channel ``i`` is then ``beta * trait * w_i``.
     """
 
     name: str
     beta: float = 1.0
     parameters: Mapping[str, Any] = field(default_factory=dict)
     species: int | None = None
+    trait: str | None = None
 
 
 @dataclass(frozen=True)
@@ -142,6 +147,16 @@ class ReorientationSpec:
     node's cells on the occupied channels at random. Supported for every
     model family, with one or several species.
 
+    Terms with a ``trait`` give every cell of an identity-based model its own
+    weight, so the cells of a node are no longer interchangeable. Without
+    volume exclusion each cell still chooses its channel on its own, exactly.
+    With volume exclusion, the labelled state of every node is sampled with
+    a Metropolis chain that starts from a random arrangement of the node's
+    cells and proposes to swap the contents of a channel holding a cell with
+    another channel, ``sweeps * K`` times per node. Ten sweeps reach the
+    Boltzmann distribution within sampling noise on hexagonal lattices with
+    one rest channel; more channels or strong fields need more.
+
     Attributes
     ----------
     terms : sequence of ReorientationTermSpec, default=()
@@ -149,7 +164,8 @@ class ReorientationSpec:
     sampler : str, default="boltzmann"
         The sampling rule; only ``"boltzmann"`` is available.
     parameters : mapping, default={}
-        Reserved; must be empty.
+        ``{"sweeps": 10}``: length of the Metropolis chain for terms with a
+        ``trait`` in identity-based models with volume exclusion.
 
     Examples
     --------
@@ -429,10 +445,20 @@ class _ReorientationTerm:
         if self.species is not None and (isinstance(self.species, bool)
                 or not isinstance(self.species, (int, np.integer)) or self.species < 0):
             raise ValueError("species must be a nonnegative integer index")
+        self.trait = spec.trait
+        if self.trait is not None and (not isinstance(self.trait, str) or not self.trait):
+            raise ValueError("trait must be the name of a cell trait")
 
     def validate(self, context) -> None:
         if self.species is not None and self.species >= context.spec.state.n_species:
             raise ValueError(f"species index {self.species} exceeds state.n_species")
+        if self.trait is not None:
+            if not context.spec.state.identity_based:
+                raise ValueError(f"trait={self.trait!r} needs an identity-based model, whose cells "
+                                 "have traits")
+            if self.trait not in context.lgca.props:
+                raise ValueError(f"the cells have no trait {self.trait!r}; declare it with "
+                                 f"StateSpec(traits={{{self.trait!r}: ...}})")
 
     def score(self, candidates, node, lgca, coord):
         """Scores of ``candidates`` (channel states) at the padded coordinate ``coord``."""
@@ -576,12 +602,18 @@ class BoltzmannReorientationOperator(ReorientationOperator):
             operator_kind="reorientation",
             backend_families=("classical", "multispecies", "nove", "ib", "nove_ib"),
             conservation_law=ConservationLaw(True, True, False, ("channel occupancy",)),
+            parameters={"sweeps": {"default": 10, "description": (
+                "Metropolis proposals per node, in units of the channel number, for terms with a trait "
+                "in identity-based models with volume exclusion.")}},
             port_status="native",
             description="Boltzmann sampler over channel configurations.",
         )
         super().__init__(info=info, parameters=spec.parameters)
         self.sampler = spec.sampler
         self.terms = self._compile_terms(spec.terms)
+        self.sweeps = self.parameters.get("sweeps", 10)
+        if isinstance(self.sweeps, bool) or not isinstance(self.sweeps, (int, np.integer)) or self.sweeps < 1:
+            raise ValueError(".parameters.sweeps must be a positive integer")
 
     @property
     def term_names(self) -> list[str]:
@@ -610,6 +642,9 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         for term in self.terms:
             term.step = step
             term.prepare(lgca)
+        if any(term.trait is not None and term.beta != 0 for term in self.terms):
+            self._apply_traits(lgca, step, volume_exclusion=not isinstance(lgca, NoVE_IBLGCA_base))
+            return
         weights = self._channel_weights(lgca)
         if isinstance(lgca, NoVE_IBLGCA_base):
             self._apply_nove_identity(lgca, weights)
@@ -705,6 +740,86 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         labels = lgca.nodes[lgca.nonborder]
         occupied = self._sample_batches(lgca, weights, nodes=labels > 0)
         lgca.nodes[lgca.nonborder] = place_labels(labels, occupied, np.ones(lgca.K, dtype=bool), lgca.rng)
+
+    def _cell_scores(self, lgca, cells):
+        """Per-term weights of every cell's node and the cells' strengths.
+
+        Returns ``weights`` of shape ``(terms, cells, K)`` and ``strength`` of
+        shape ``(terms, cells)``: a cell's score in channel ``i`` is
+        ``Σ_k beta_k strength_k w_ki``.
+        """
+        from .cells import trait_array
+
+        terms = [term for term in self.terms if term.beta != 0]
+        weights = np.stack([term.weights.reshape(-1, lgca.K)[cells.index] for term in terms])
+        strength = np.stack([term.beta * (trait_array(lgca, term.trait).values[cells.label].astype(float)
+                                          if term.trait is not None else np.ones(len(cells)))
+                             for term in terms])
+        return weights, strength
+
+    def _apply_traits(self, lgca, step, volume_exclusion):
+        """Reorientation with a weight per cell: exact without volume exclusion, Metropolis with it."""
+        from .lattice_state import LatticeState
+
+        state = LatticeState(lgca, step=step, kind="reorientation")
+        cells = state.cells
+        weights, strength = self._cell_scores(lgca, cells)
+        if volume_exclusion:
+            cells.channel = self._metropolis(cells, weights, strength, lgca.K, lgca.rng)
+        else:  # every cell draws its channel from its own weights
+            scores = np.einsum("tc,tck->ck", strength, weights)
+            cumulative = np.cumsum(_softmax_last_axis(scores), axis=-1)
+            draws = lgca.rng.random(len(cells)) * cumulative[:, -1]
+            cells.channel = np.minimum((cumulative <= draws[:, None]).sum(axis=-1), lgca.K - 1)
+        state._cells_changed()
+        state.commit()
+
+    def _metropolis(self, cells, weights, strength, K, rng):
+        """New channels of the cells: a Metropolis chain per node, all nodes at once.
+
+        The chain starts from a random arrangement of each node's cells and
+        proposes to swap the contents of a channel holding a cell (chosen
+        uniformly among the node's cells) with another channel. The number
+        of cells is fixed, so the proposal is symmetric.
+        """
+        n = len(cells)
+        if n == 0:
+            return cells.channel
+        nodes, row = np.unique(cells.index, return_inverse=True)
+        per_row = np.bincount(row)
+        # position of each cell among the cells of its node
+        order = np.argsort(row, kind="stable")
+        starts = np.r_[0, np.cumsum(per_row)[:-1]]
+        rank = np.empty(n, dtype=np.int64)
+        rank[order] = np.arange(n) - np.repeat(starts, per_row)
+        members = np.full((len(nodes), per_row.max()), -1, dtype=np.int64)
+        members[row, rank] = np.arange(n)
+        # random start: the node's cells on the first channels of a random permutation
+        permutation = np.argsort(rng.random((len(nodes), K)), axis=-1)
+        channel = permutation[row, rank]
+        occupant = np.full((len(nodes), K), -1, dtype=np.int64)
+        occupant[row, channel] = np.arange(n)
+        # scores of the cell in a channel: Σ_t strength[t, cell] * weights[t, cell, channel]
+        node_weights = np.zeros((weights.shape[0], len(nodes), K))
+        node_weights[:, row] = weights
+        padded = np.concatenate([strength, np.zeros((strength.shape[0], 1))], axis=1)  # -1: empty
+        rows = np.arange(len(nodes))
+        for _ in range(int(self.sweeps) * K):
+            cell = members[rows, (rng.random(len(nodes)) * per_row).astype(np.int64)]
+            here = channel[cell]
+            there = (here + rng.integers(1, K, len(nodes))) % K
+            other = occupant[rows, there]
+            difference = padded[:, cell] - padded[:, other]
+            gain = (node_weights[:, rows, there] - node_weights[:, rows, here])
+            delta = (difference * gain).sum(axis=0)
+            accept = rng.random(len(nodes)) < np.exp(np.minimum(delta, 0))
+            r, c, o, h, t = rows[accept], cell[accept], other[accept], here[accept], there[accept]
+            channel[c] = t
+            moved = o >= 0
+            channel[o[moved]] = h[moved]
+            occupant[r, t] = c
+            occupant[r, h] = o
+        return channel
 
     def _apply_nove_identity(self, lgca, weights):
         """Sample cell numbers per channel, then split the node's shuffled cells over the channels."""
