@@ -35,6 +35,7 @@ from .rules import interaction, reorientation_term, stack
 from .mutations import mutation_effect
 from . import builtin_rules as _builtin_rules  # registers the decorated built-in interactions
 from . import research_models as _research_models  # registers the research models as stacks
+from . import legacy_names as _legacy_names  # registers the legacy interaction names
 
 # Library loggers stay silent unless the application configures logging.
 logging.getLogger(__name__).addHandler(logging.NullHandler())

@@ -54,7 +54,7 @@ def build_spec() -> ModelSpec:
         state=StateSpec(nodes=build_initial_nodes(), restchannels=0),
         time=TimeSpec(steps=50, seed=108),
         dynamics=InteractionPipelineSpec(
-            operators=[{"name": "classical.persistent_walk", "parameters": {"beta": 8.0}}],
+            operators=[{"name": "persistent_walk", "parameters": {"beta": 8.0}}],
         ),
         analysis=AnalysisSpec(
             observers=[NodeRecorder(), DensityRecorder(), PopulationRecorder()],

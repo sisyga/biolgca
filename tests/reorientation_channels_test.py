@@ -126,7 +126,7 @@ def test_steric_repulsion_scores_minus_the_cells_ahead():
 def test_go_or_rest_can_sense_the_neighbourhood(identity):
     # without volume exclusion every cell rests with (1 + tanh(kappa (rho - theta))) / 2, rho the mean
     # density of the node and its neighbours over the capacity
-    from lgca.interactions import tanh_switch
+    from lgca.builtin_rules import tanh_switch
 
     rng = np.random.default_rng(1)
     nodes = _nodes(False, identity, rng)
@@ -147,3 +147,44 @@ def test_go_or_rest_can_sense_the_neighbourhood(identity):
     assert abs(resting.sum() - expected) < 4 * np.sqrt(variance)
     alone = (density * tanh_switch(density / 4, 6.0, 0.6)).sum()  # with the node density alone
     assert abs(resting.sum() - alone) > 4 * np.sqrt(variance)
+
+
+def test_go_or_rest_switches_every_species_with_its_own_kappa():
+    # without volume exclusion every cell of species s rests with tanh_switch(rho, kappa_s, theta_s)
+    from lgca.builtin_rules import tanh_switch
+
+    counts = np.random.default_rng(2).poisson(0.8, DIMS + (2, 5))
+    model = build_model(ModelSpec(
+        space=SpaceSpec(geometry="square", dims=DIMS),
+        state=StateSpec(nodes=counts, restchannels=1, volume_exclusion=False, n_species=2, capacity=8),
+        time=TimeSpec(steps=1, seed=4),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "go_or_rest", "parameters": {
+            "kappa": [6.0, -6.0], "theta": [0.4, 0.6]}}], propagation=False)))
+    lgca = model.lgca
+    cells = counts.sum(-1)
+    rho = cells.sum(-1) / 8
+    model.step()
+    resting = lgca.nodes[lgca.nonborder][..., 4]
+    for species, (kappa, theta) in enumerate(((6.0, 0.4), (-6.0, 0.6))):
+        p = tanh_switch(rho, kappa, theta)
+        expected, variance = (cells[..., species] * p).sum(), (cells[..., species] * p * (1 - p)).sum()
+        assert abs(resting[..., species].sum() - expected) < 4 * np.sqrt(variance)
+    np.testing.assert_array_equal(lgca.nodes[lgca.nonborder].sum(-1), cells)  # species keep their cells
+
+
+def test_directed_motion_follows_a_given_vector_field():
+    nodes = np.zeros(DIMS + (4,), dtype=bool)
+    nodes[..., 1] = True  # one cell per node, moving north
+    field = np.zeros(DIMS + (2,))
+    field[..., 0] = 1.0  # a flow to the east
+    model = build_model(ModelSpec(
+        space=SpaceSpec(geometry="square", dims=DIMS),
+        state=StateSpec(nodes=nodes, restchannels=0, fields={"flow": field}),
+        time=TimeSpec(steps=1, seed=5),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "directed_motion", "parameters": {
+            "beta": 1.5, "field": "flow"}}], propagation=False)))
+    model.step()
+    after = model.lgca.nodes[model.lgca.nonborder].reshape(-1, 4)
+    p = np.exp(1.5 * np.array([1.0, 0.0, -1.0, 0.0]))
+    p /= p.sum()
+    np.testing.assert_allclose(after.mean(0), p, atol=4 * np.sqrt(0.25 / len(after)))

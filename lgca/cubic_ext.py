@@ -25,16 +25,6 @@ class IBLGCA_Cubic(IBLGCA_base, LGCA_Cubic):
     Identity-based LGCA simulator class for a 3D cubic lattice.
     """
 
-    interactions = [
-        "go_or_grow",
-        "go_and_grow",
-        "random_walk",
-        "birth",
-        "birthdeath",
-        "birthdeath_discrete",
-        "only_propagation",
-        "go_and_grow_mutations",
-    ]
 
     def init_nodes(self, density=0.1, nodes=None, **kwargs):
         """
@@ -95,7 +85,6 @@ class NoVE_LGCA_Cubic(LGCA_Cubic, NoVE_LGCA_base):
     3D cubic version of an LGCA without volume exclusion.
     """
 
-    interactions = ["dd_alignment", "di_alignment", "go_or_grow", "go_or_rest"]
 
     def set_dims(self, dims=None, nodes=None, restchannels=None, capacity=None):
         """

@@ -73,7 +73,7 @@ def test_one_step_with_a_kappa_per_cell_matches_the_legacy_rule(ve):
     # without death, the legacy order (death first) and the classical order agree
     nodes, kappa = _initial(ve)
     legacy = _model(nodes, kappa, [{
-        "name": "ib.go_or_grow" if ve else "nove_ib.go_or_grow",
+        "name": "legacy.ib.go_or_grow" if ve else "legacy.nove_ib.go_or_grow",
         "parameters": {"r_b": 0.3, "r_d": 0.0, "kappa": kappa.tolist(), "theta": 0.5,
                        "kappa_std": 0.0, "theta_std": 0.0}}])
     new = _model(nodes, kappa, _pipeline(0.3, 0.0), traits={"kappa": kappa})
@@ -101,7 +101,7 @@ def _cells(lgca):
 def test_every_cell_rests_with_its_own_probability(ve):
     # where no channel is full, a cell rests after the switch with probability
     # (1 + tanh(kappa (rho - theta))) / 2 for its own kappa, whether it rested before or not
-    from lgca.interactions import tanh_switch
+    from lgca.builtin_rules import tanh_switch
 
     nodes, kappa = _initial(ve)
     model = _model(nodes, kappa, [_pipeline(0.0, 0.0)[0]], traits={"kappa": kappa})
@@ -195,7 +195,8 @@ def test_new_families_are_recorded_and_plotted(ve):
     lgca.muller_plot()
 
 
-def test_decorated_growth_combines_with_a_legacy_identity_growth_rule():
+@pytest.mark.filterwarnings("ignore:The interaction name:FutureWarning")
+def test_decorated_growth_combines_with_a_legacy_identity_growth_name():
     model = build_model(ModelSpec(
         space=SpaceSpec(geometry="square", dims=(20, 20)),
         state=StateSpec(density=1, restchannels=2, identity_based=True),

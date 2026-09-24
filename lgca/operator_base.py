@@ -7,17 +7,15 @@ operators do not need to import the built-in plugin catalogue.
 
 from __future__ import annotations
 
-import importlib
 import textwrap
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Mapping
-
+from typing import Any
 
 __all__ = [
     "BirthDeathOperator",
     "ConservationLaw",
     "InteractionOperator",
-    "LegacyInteractionOperator",
     "ParameterSpec",
     "PhenotypeSwitchOperator",
     "PluginInfo",
@@ -40,7 +38,7 @@ class ParameterSpec:
     description: str = ""
 
     @classmethod
-    def from_metadata(cls, metadata: Any) -> "ParameterSpec":
+    def from_metadata(cls, metadata: Any) -> ParameterSpec:
         if isinstance(metadata, cls):
             return metadata
         if isinstance(metadata, Mapping):
@@ -144,6 +142,7 @@ class PluginInfo:
     test_status: str = "unverified"
     mutates_families: bool = False
     description: str = ""
+    deprecated: str = ""  # the warning of a deprecated name, e.g. a legacy name with a family prefix
 
     @property
     def parameter_specs(self) -> dict[str, ParameterSpec]:
@@ -249,54 +248,3 @@ class ReorientationOperator(InteractionOperator):
 
 class ReorientationTerm(InteractionOperator):
     """Marker base for terms combined by a reorientation sampler."""
-
-
-class LegacyInteractionOperator(InteractionOperator):
-    """Adapter that runs a legacy ``set_interaction`` interaction as a plugin."""
-
-    def __init__(
-        self,
-        info: PluginInfo,
-        legacy_interaction: str,
-        parameters: Mapping[str, Any] | None = None,
-        function_module: str | None = None,
-        function_name: str | None = None,
-    ):
-        super().__init__(info=info, parameters=parameters)
-        self.legacy_interaction = legacy_interaction
-        self.function_module = function_module
-        self.function_name = function_name
-        self._interaction = None
-        self._interaction_params: dict[str, Any] = {}
-
-    def setup(self, context) -> None:
-        lgca = context.lgca
-        previous_interaction = getattr(lgca, "interaction", None)
-        previous_params = dict(getattr(lgca, "interaction_params", {}))
-        lgca.interaction_params = {}
-        lgca.set_interaction(interaction=self.legacy_interaction, **self.parameters)
-        if self.function_module is not None and self.function_name is not None:
-            module = importlib.import_module(self.function_module)
-            self._interaction = getattr(module, self.function_name)
-        else:
-            self._interaction = lgca.interaction
-        self._interaction_params = dict(lgca.interaction_params)
-        self._interaction_params.update(self.parameters)
-        if previous_interaction is not None:
-            lgca.interaction = previous_interaction
-        lgca.interaction_params = previous_params
-
-    def apply(self, context, step: int) -> None:
-        if self._interaction is None:
-            self.setup(context)
-        lgca = context.lgca
-        previous_interaction = getattr(lgca, "interaction", None)
-        previous_params = dict(getattr(lgca, "interaction_params", {}))
-        lgca.interaction = self._interaction
-        lgca.interaction_params = dict(self._interaction_params)
-        try:
-            self._interaction(lgca)
-        finally:
-            if previous_interaction is not None:
-                lgca.interaction = previous_interaction
-            lgca.interaction_params = previous_params

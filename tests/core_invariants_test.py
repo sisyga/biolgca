@@ -56,7 +56,7 @@ def test_identity_initialization_rejects_invalid_labels(nodes):
 
 
 def test_shared_identity_birth_kernel_preserves_ids_and_indexes_new_properties():
-    from lgca.identity_kernels import apply_identity_birth
+    from tests.legacy.identity_kernels import apply_identity_birth
 
     lgca = get_lgca(geometry="lin", ib=True, nodes=np.array([[1, 0], [2, 3], [0, 0]]),
                     interaction="only_propagation", seed=125)
@@ -168,7 +168,7 @@ def test_dense_recorders_have_one_row_per_simulation_step(family, tmp_path):
 
 
 def test_truncated_normal_sampler_respects_bounds_and_moments():
-    from lgca.identity_kernels import sample_truncated_normal
+    from tests.legacy.identity_kernels import sample_truncated_normal
 
     rng = np.random.default_rng(3)
     means = np.repeat([0.0, 0.5, 1.5], 20000)
@@ -188,7 +188,7 @@ def test_truncated_normal_sampler_respects_bounds_and_moments():
 def test_daughter_properties_copy_untouched_traits_from_parents():
     from types import SimpleNamespace
 
-    from lgca.identity_kernels import append_daughter_properties
+    from tests.legacy.identity_kernels import append_daughter_properties
 
     lgca = SimpleNamespace(maxlabel=5, props={
         "r_b": [0.0, 0.1, 0.2, 0.3],

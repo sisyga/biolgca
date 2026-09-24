@@ -78,7 +78,7 @@ def test_a_pipeline_of_rules_never_builds_lists(monkeypatch):
 
 def test_rules_and_legacy_code_can_take_turns():
     model = _model("square", (10, 10), "periodic", [
-        {"name": "nove_ib.random_walk"},  # legacy: reads and writes lists
+        {"name": "legacy.nove_ib.random_walk"},  # legacy: reads and writes lists
         {"name": "go_or_rest", "parameters": {"kappa": "kappa", "theta": 0.5}},
         {"name": "random_walk"},
     ])

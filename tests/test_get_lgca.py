@@ -191,7 +191,7 @@ def test_deprecation_warnings_point_at_the_callers_line():
     spec = ModelSpec(space=SpaceSpec(geometry="lin", dims=5),
                      state=StateSpec(density=1, volume_exclusion=False, parameters={"capacity": 4}),
                      time=TimeSpec(steps=1, seed=1),
-                     dynamics=InteractionPipelineSpec(operators=[{"name": "nove.random_walk"}]))
+                     dynamics=InteractionPipelineSpec(operators=[{"name": "random_walk"}]))
 
     with pytest.warns(DeprecationWarning, match="state.capacity") as record:
         run_model(spec, showprogress=False)

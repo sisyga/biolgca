@@ -99,6 +99,8 @@ class LatticeState:
         self._ve = not isinstance(lgca, NoVE_IBLGCA_base) if self._identity else lgca.nodes.dtype == bool
         # with volume exclusion counts are 0 or 1: small integers keep the temporaries of rules small
         self._dtype = np.int8 if self._ve else np.int64
+        if not self._ve:
+            _check_representable(interior)
         self._counts = interior.astype(self._dtype)
         n_species, channels = self._counts.shape[-2:]
         self._capacity_set = capacity is not None or not self._ve
@@ -779,6 +781,20 @@ def random_occupancy(rng, number, channels):
             keys = rng.random((count, channels))
             placed[where] = np.argsort(np.argsort(keys, axis=-1), axis=-1) < cells
     return placed
+
+
+def _check_representable(counts):
+    """Refuse cell numbers whose sum over a node does not fit the signed int64 of the rules."""
+    counts = np.asarray(counts)
+    if counts.size == 0 or counts.dtype.kind != "u" or int(counts.max()) < _INT64_LIMIT // counts.shape[-1]:
+        return
+    totals = counts.reshape(-1, counts.shape[-2] * counts.shape[-1]).astype(object).sum(axis=-1)
+    if max(totals) >= _INT64_LIMIT:
+        raise ValueError(f"a node holds {max(totals)} cells, but the samplers count the cells of a node "
+                         f"as signed int64 (below {_INT64_LIMIT})")
+
+
+_INT64_LIMIT = 2 ** 63
 
 
 def channel_mask(channels, K, velocitychannels):

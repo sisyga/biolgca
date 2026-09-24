@@ -56,7 +56,7 @@ def build_spec() -> ModelSpec:
         state=StateSpec(nodes=build_initial_nodes(), restchannels=20),
         time=TimeSpec(steps=100, seed=113),
         dynamics=InteractionPipelineSpec(
-            operators=[{"name": "classical.excitable_medium", "parameters": {"N": 20}}],
+            operators=[{"name": "excitable_medium", "parameters": {"N": 20}}],
         ),
         analysis=AnalysisSpec(
             observers=[NodeRecorder(), DensityRecorder(), PopulationRecorder()],

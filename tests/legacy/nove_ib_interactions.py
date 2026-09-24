@@ -10,7 +10,7 @@ Interaction functions and helper functions for identity-based LGCA without volum
 from itertools import chain
 
 import numpy as np
-from lgca.interactions import tanh_switch
+from .interactions import tanh_switch
 
 
 def _cells_from_node(node):

@@ -49,18 +49,6 @@ class LGCA_Cubic(LGCA_base):
 
     # Set class attributes
     geometry = 'cubic'
-    interactions = [
-        "go_and_grow",
-        "go_or_grow",
-        "alignment",
-        "aggregation",
-        "random_walk",
-        "excitable_medium",
-        "nematic",
-        "persistent_motion",
-        "chemotaxis",
-        "only_propagation",
-    ]
     velocitychannels = 6  # +x, -x, +y, -y, +z, -z
 
     # Build velocity channel vectors

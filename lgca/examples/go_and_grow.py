@@ -54,7 +54,10 @@ def build_spec() -> ModelSpec:
         state=StateSpec(nodes=build_initial_nodes(), restchannels=6),
         time=TimeSpec(steps=100, seed=110),
         dynamics=InteractionPipelineSpec(
-            operators=[{"name": "classical.birth", "parameters": {"r_b": 0.2}}],
+            operators=[
+                {"name": "birth_death", "parameters": {"birth_rate": 0.2}},
+                {"name": "random_walk"},
+            ],
         ),
         analysis=AnalysisSpec(
             observers=[NodeRecorder(), DensityRecorder(), PopulationRecorder()],

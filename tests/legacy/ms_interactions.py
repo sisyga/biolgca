@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.special import ndtr
 
-from lgca.interactions import tanh_switch
+from .interactions import tanh_switch
 
 
 def _validate_species_vector(lgca, name, value):

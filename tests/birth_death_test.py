@@ -75,7 +75,7 @@ def test_classical_births_match_the_legacy_rule_in_the_mean():
     # legacy: every empty channel is filled with probability r_b * n / K, so the variance differs
     nodes = np.random.default_rng(0).random(DIMS + (5,)) < 0.4
     new = _births(nodes, {"name": "birth_death", "parameters": {"birth_rate": 0.4, "death_rate": 0.2}})
-    legacy = _births(nodes, {"name": "classical.birthdeath", "parameters": {"r_b": 0.4, "r_d": 0.2}}, seed=2)
+    legacy = _births(nodes, {"name": "legacy.classical.birthdeath", "parameters": {"r_b": 0.4, "r_d": 0.2}}, seed=2)
     _assert_same_distribution(new, legacy, spread=False)
 
 
@@ -83,7 +83,7 @@ def test_identity_births_match_the_legacy_rule():
     labels = _labels(np.random.default_rng(0).random(DIMS + (5,)) < 0.4)
     new = _births(labels, {"name": "birth_death", "parameters": {"birth_rate": "r_b", "death_rate": 0.2}},
                   identity=True, traits={"r_b": 0.4})
-    legacy = _births(labels, {"name": "ib.birthdeath", "parameters": {"r_b": 0.4, "r_d": 0.2, "std": 1e-9,
+    legacy = _births(labels, {"name": "legacy.ib.birthdeath", "parameters": {"r_b": 0.4, "r_d": 0.2, "std": 1e-9,
                                                                       "a_max": 1.0}}, identity=True, seed=2)
     _assert_same_distribution(new, legacy)
 
@@ -93,7 +93,7 @@ def test_identity_births_without_volume_exclusion_match_the_legacy_rule():
     options = {"ve": False, "identity": True, "capacity": 10}
     new = _births(lists, {"name": "birth_death", "parameters": {"birth_rate": "r_b", "death_rate": 0.2}},
                   traits={"r_b": 0.4}, **options)
-    legacy = _births(lists, {"name": "nove_ib.birthdeath", "parameters": {"r_b": 0.4, "r_d": 0.2, "std": 1e-9,
+    legacy = _births(lists, {"name": "legacy.nove_ib.birthdeath", "parameters": {"r_b": 0.4, "r_d": 0.2, "std": 1e-9,
                                                                          "a_max": 1.0}}, seed=2, **options)
     _assert_same_distribution(new, legacy)
 
@@ -104,7 +104,7 @@ def test_species_births_with_mutations_match_the_legacy_rule():
     options = {"ve": False, "capacity": 8, "n_species": 2}
     new = _births(nodes, {"name": "birth_death", "parameters": {"birth_rate": [0.3, 0.6], "death_rate": 0.2,
                                                                 "mutation_matrix": matrix}}, **options)
-    legacy = _births(nodes, {"name": "multispecies.birthdeath", "parameters": {"r_b": [0.3, 0.6], "r_d": 0.2,
+    legacy = _births(nodes, {"name": "legacy.multispecies.birthdeath", "parameters": {"r_b": [0.3, 0.6], "r_d": 0.2,
                                                                               "mutation_matrix": matrix}},
                      seed=2, **options)
     _assert_same_distribution(new, legacy)
@@ -295,3 +295,47 @@ def test_invalid_parameters_are_explained(parameters, identity, message):
                    identity=identity, n_species=n_species, traits={"r_b": 0.2} if identity else None)
     with pytest.raises(ValueError, match=message):
         model.step()
+
+
+def _rest_counts(model):
+    lgca = model.lgca
+    counts = lgca._channel_counts(lgca.nodes[lgca.nonborder]).astype(int)
+    return counts[..., :lgca.velocitychannels], counts[..., lgca.velocitychannels:]
+
+
+@pytest.mark.parametrize("ve, identity", [(True, False), (False, False), (True, True), (False, True)])
+def test_a_channel_set_limits_who_dies_and_divides_and_where_daughters_go(ve, identity):
+    # go-or-grow: only resting cells divide, into rest channels; the logistic factor counts the cells of
+    # the set with volume exclusion (4 rest channels) and all cells of the node without (one rest channel)
+    rng = np.random.default_rng(5)
+    rest = 4 if ve else 1
+    if ve:
+        occupied = rng.random(DIMS + (4 + rest,)) < 0.4
+        nodes = _labels(occupied) if identity else occupied
+    else:
+        counts = rng.poisson(0.6, DIMS + (4 + rest,))
+        nodes = _lists(counts) if identity else counts
+    model = _model(nodes, {"name": "birth_death", "parameters": {
+        "birth_rate": 0.5, "death_rate": 0.1, "channels": "rest"}}, ve=ve, identity=identity, rest=rest,
+        capacity=None if ve else 12, seed=3)
+    moving, resting = _rest_counts(model)
+    model.step()
+    moving_after, resting_after = _rest_counts(model)
+    np.testing.assert_array_equal(moving_after, moving)  # moving cells neither die nor divide
+    n_rest = resting.sum(-1)
+    change = resting_after.sum(-1) - n_rest
+    crowding = 1 - n_rest / rest if ve else 1 - (moving.sum(-1) + n_rest) / 12
+    expected = 0.5 * n_rest * np.clip(crowding, 0, 1) - 0.1 * n_rest
+    error = np.sqrt(np.maximum(change.var(), 1e-12) / change.size)
+    assert abs(change.mean() - expected.mean()) < 4 * error
+
+
+def test_a_channel_set_without_volume_exclusion_changes_nothing_else():
+    counts = np.random.default_rng(6).poisson(1.0, DIMS + (5,))
+    model = _model(counts, {"name": "birth_death", "parameters": {"birth_rate": 0.3, "channels": [0, 1]}},
+                   ve=False, capacity=20)
+    before = model.lgca.nodes[model.lgca.nonborder].copy()
+    model.step()
+    after = model.lgca.nodes[model.lgca.nonborder]
+    np.testing.assert_array_equal(after[..., 2:], before[..., 2:])
+    assert np.all(after[..., :2] >= before[..., :2]) and after[..., :2].sum() > before[..., :2].sum()

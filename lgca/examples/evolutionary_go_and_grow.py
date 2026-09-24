@@ -51,14 +51,16 @@ def build_spec() -> ModelSpec:
             tags=("example", "evolution", "birth-death"),
         ),
         space=SpaceSpec(geometry="lin", dims=(100,), boundary="reflecting"),
-        state=StateSpec(nodes=build_initial_nodes(), restchannels=2, identity_based=True),
+        state=StateSpec(nodes=build_initial_nodes(), restchannels=2, identity_based=True,
+                        traits={"r_b": 0.2}),
         time=TimeSpec(steps=200, seed=114),
         dynamics=InteractionPipelineSpec(
             operators=[
-                {
-                    "name": "ib.birthdeath",
-                    "parameters": {"r_b": 0.2, "r_d": 0.01, "std": 0.05},
-                }
+                # every cell has its own birth rate; daughters inherit it with a normal change
+                {"name": "birth_death", "parameters": {
+                    "birth_rate": "r_b", "death_rate": 0.01, "mutation": {"r_b": {
+                        "distribution": "normal", "scale": 0.05, "bounds": [0, 1], "at_bounds": "redraw"}}}},
+                {"name": "random_walk"},
             ],
         ),
         analysis=AnalysisSpec(

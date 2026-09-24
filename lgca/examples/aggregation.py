@@ -44,7 +44,7 @@ def build_spec() -> ModelSpec:
         state=StateSpec(density=0.3, restchannels=3),
         time=TimeSpec(steps=100, seed=106),
         dynamics=InteractionPipelineSpec(
-            operators=[{"name": "classical.aggregation", "parameters": {"beta": 2.0}}],
+            operators=[{"name": "aggregation", "parameters": {"beta": 2.0}}],
         ),
         analysis=AnalysisSpec(
             observers=[NodeRecorder(), DensityRecorder(), PopulationRecorder()],

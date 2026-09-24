@@ -19,7 +19,7 @@ from lgca.model import (
 from lgca.pipeline import (
     BirthDeathSpec,
     InteractionPipelineSpec,
-    NativePhenotypeSwitchOperator,
+    SpeciesSwitchOperator,
     PhenotypeSwitchSpec,
     ReorientationSpec,
     ReorientationTermSpec,
@@ -457,7 +457,7 @@ def test_phenotype_switch_preserves_every_two_species_two_channel_ve_state(mask,
     state = np.array([(mask >> bit) & 1 for bit in range(4)], dtype=bool).reshape(2, 2)
 
     for seed in range(4):
-        result = NativePhenotypeSwitchOperator._sample_state(
+        result = SpeciesSwitchOperator._sample_state(
             state, rates, np.random.default_rng(seed)
         )
 
@@ -472,7 +472,7 @@ def test_saturated_phenotype_switch_preserves_forbidden_species_under_relabeling
     rates = np.array([[0., 1., 0.], [0., 0., 0.], [0., 0., 0.]])
     order = np.asarray(order)
     for seed in range(32):
-        result = NativePhenotypeSwitchOperator._sample_state(
+        result = SpeciesSwitchOperator._sample_state(
             state[order], rates[np.ix_(order, order)], np.random.default_rng(seed)
         )
         # The sole permitted destination is full: every attempted switch stays.
@@ -486,7 +486,7 @@ def test_phenotype_switch_zero_rates_leave_complete_state_unchanged():
         np.array([[True, False], [False, True]]),
         np.array([[2, 0], [1, 3]], dtype=np.int64),
     ):
-        result = NativePhenotypeSwitchOperator._sample_state(
+        result = SpeciesSwitchOperator._sample_state(
             state, np.zeros((2, 2)), np.random.default_rng(7)
         )
 
@@ -497,7 +497,7 @@ def test_phenotype_switch_forced_transition_changes_species_without_losing_parti
     state = np.array([[True, False], [False, False]])
     rates = np.array([[0.0, 1.0], [0.0, 0.0]])
 
-    result = NativePhenotypeSwitchOperator._sample_state(
+    result = SpeciesSwitchOperator._sample_state(
         state, rates, np.random.default_rng(9)
     )
 
@@ -508,7 +508,7 @@ def test_phenotype_switch_nove_samples_one_complete_conserved_state():
     state = np.array([[3, 1], [2, 4]], dtype=np.int64)
     rates = np.array([[0.0, 1.0], [1.0, 0.0]])
 
-    result = NativePhenotypeSwitchOperator._sample_state(
+    result = SpeciesSwitchOperator._sample_state(
         state, rates, np.random.default_rng(11)
     )
 
@@ -524,7 +524,7 @@ def test_phenotype_switch_one_particle_frequency_matches_rate_matrix():
     rng = np.random.default_rng(1234)
 
     switched = sum(
-        NativePhenotypeSwitchOperator._sample_state(state, rates, rng)[1].sum()
+        SpeciesSwitchOperator._sample_state(state, rates, rng)[1].sum()
         for _ in range(5000)
     )
 
@@ -590,7 +590,7 @@ def test_allow_custom_order_is_deprecated():
 
 
 def test_model_files_with_the_old_default_order_flag_load_silently():
-    data = model_spec_to_dict(_two_operator_spec([{"name": "classical.random_walk"}]))
+    data = model_spec_to_dict(_two_operator_spec([{"name": "random_walk"}]))
     assert "allow_custom_order" not in data["model"]["dynamics"]
     data["model"]["dynamics"]["allow_custom_order"] = False
 
@@ -609,7 +609,7 @@ def test_phenotype_switch_needs_several_species_in_classical_models(switch):
 
 
 def test_go_or_rest_is_a_reorientation_that_single_species_models_accept():
-    compiled = build_model(_two_operator_spec([{"name": "classical.go_or_rest"}]))
+    compiled = build_model(_two_operator_spec([{"name": "go_or_rest"}]))
 
     assert compiled.pipeline.operators[0].operator_kind == "reorientation"
 
@@ -624,9 +624,9 @@ def test_pipeline_refreshes_density_between_birth_and_go_or_rest():
         time=TimeSpec(steps=1, seed=0),
         dynamics=InteractionPipelineSpec(
             operators=[
-                {"name": "classical.birth", "parameters": {"r_b": 1.0}},
+                {"name": "birth_death", "parameters": {"birth_rate": 1.0}},
                 {
-                    "name": "classical.go_or_rest",
+                    "name": "go_or_rest",
                     "parameters": {"kappa": 50.0, "theta": 0.3},
                 },
             ],
@@ -649,7 +649,8 @@ def test_pipeline_refreshes_density_between_birth_and_go_or_rest():
         explicitly_refreshed.lgca.nonborder
     ].reshape(-1)
     np.testing.assert_array_equal(actual, reference)
-    assert actual.astype(int).tolist() == [0, 1, 0, 0, 1]
+    # the switch sees the daughter: at density 2 / 5 > theta a cell rests; at 1 / 5 it would move
+    assert actual.sum() == 2 and actual[4]
 
 
 def test_pipeline_refreshes_species_density_after_phenotype_switch():
@@ -857,7 +858,7 @@ def test_native_moore_nematic_uses_safe_lazy_tensor_permutations():
         state=StateSpec(nodes=nodes),
         time=TimeSpec(steps=1, seed=3),
         dynamics=InteractionPipelineSpec(
-            operators=[{"name": "classical.nematic", "parameters": {"beta": 1.0}}],
+            operators=[{"name": "nematic_alignment", "parameters": {"beta": 1.0}}],
             propagation=False,
         ),
         analysis=AnalysisSpec(observers=[NodeRecorder()]),
@@ -875,11 +876,11 @@ def test_native_contact_guidance_supports_safe_lazy_square_configuration():
     spec = ModelSpec(
         description=Description(title="lazy square contact guidance"),
         space=SpaceSpec(geometry="square", boundary="periodic"),
-        state=StateSpec(nodes=nodes, restchannels=12),
+        state=StateSpec(nodes=nodes, restchannels=12, fields={"director": np.ones((2, 2, 2))}),
         time=TimeSpec(steps=1, seed=4),
         dynamics=InteractionPipelineSpec(
             operators=[
-                {"name": "classical.contact_guidance", "parameters": {"beta": 1.0}}
+                {"name": "contact_guidance", "parameters": {"beta": 1.0}}
             ],
             propagation=False,
         ),

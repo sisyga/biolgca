@@ -52,14 +52,16 @@ def build_spec() -> ModelSpec:
             tags=("example", "evolution", "go-or-grow"),
         ),
         space=SpaceSpec(geometry="lin", dims=(25,), boundary="reflecting"),
-        state=StateSpec(nodes=build_initial_nodes(), restchannels=2, identity_based=True),
+        state=StateSpec(nodes=build_initial_nodes(), restchannels=2, identity_based=True,
+                        traits={"kappa": 0.0, "theta": 0.75}),
         time=TimeSpec(steps=100, seed=115),
         dynamics=InteractionPipelineSpec(
             operators=[
-                {
-                    "name": "ib.go_or_grow",
-                    "parameters": {"r_b": 0.2, "r_d": 0.01, "kappa": 0.0},
-                }
+                # every cell switches with its own kappa and theta; daughters inherit them with a change
+                {"name": "go_or_rest", "parameters": {"kappa": "kappa", "theta": "theta"}},
+                {"name": "go_or_grow.growth", "parameters": {
+                    "r_b": 0.2, "r_d": 0.01, "mutation": {"kappa": 0.2, "theta": 0.05}}},
+                {"name": "random_walk", "parameters": {"channels": "velocity"}},
             ],
         ),
         analysis=AnalysisSpec(

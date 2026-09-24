@@ -696,276 +696,35 @@ class LGCA_base(ABC):
 
     def set_interaction(self, **kwargs):
         """
-        Set the interaction rule and respective needed parameters.
+        Set the interaction rule and its parameters.
 
-        Set :py:attr:`self.interaction` and possibly add entries in :py:attr:`self.interaction_params`.
+        A name selects the interaction of earlier biolgca versions for this
+        model family, which now runs as a stack of the rules without family
+        prefix (see :mod:`lgca.legacy_names`); its parameters come from
+        ``kwargs``, and :py:attr:`self.interaction_params` holds them with their
+        defaults. The model then runs a compiled pipeline, as a model built
+        from a :class:`~lgca.model.ModelSpec` does.
 
         Parameters
         ----------
-        kwargs['interaction'] : str or callable, default='random_walk'
-            Name of the predefined interaction in :py:mod:`lgca.interactions`, or a
-            function ``f(lgca)`` that updates ``lgca.nodes`` in place of the
-            interaction step. A function reads its parameters from
-            ``lgca.interaction_params``, which receives all other keyword arguments.
+        kwargs['interaction'] : str or callable, optional
+            Name of the interaction, by default ``'random_walk'`` (``'dd_alignment'``
+            without volume exclusion). Or a function ``f(lgca)`` that updates
+            ``lgca.nodes`` in place of the interaction step; it reads its
+            parameters from ``lgca.interaction_params``, which receives all
+            other keyword arguments.
         **kwargs
             Interaction parameters.
 
         """
+        from .legacy_names import compile_legacy_interaction
+
+        self.__dict__.pop("_compiled_model", None)
         if self._set_callable_interaction(kwargs):
             return
-        from lgca.interactions import go_or_grow, go_or_rest, birth, alignment, persistent_walk, chemotaxis, \
-                contact_guidance, nematic, aggregation, random_walk, birthdeath, excitable_medium, \
-                only_propagation
-        from lgca.ms_interactions import excitable_medium_ms
-        if 'interaction' in kwargs:
-            interaction = kwargs['interaction'].replace(" ", "_")
-            if interaction == 'go_or_grow':
-                self.interaction = go_or_grow
-                if 'r_d' in kwargs:
-                    self.interaction_params['r_d'] = kwargs['r_d']
-                else:
-                    self.interaction_params['r_d'] = 0.01
-                    logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
-                if 'r_b' in kwargs:
-                    self.interaction_params['r_b'] = kwargs['r_b']
-                else:
-                    self.interaction_params['r_b'] = 0.2
-                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
-                if 'kappa' in kwargs:
-                    self.interaction_params['kappa'] = kwargs['kappa']
-                else:
-                    self.interaction_params['kappa'] = 5.
-                    logger.info('switch rate set to kappa = %s', self.interaction_params['kappa'])
-                if 'theta' in kwargs:
-                    self.interaction_params['theta'] = kwargs['theta']
-                else:
-                    self.interaction_params['theta'] = 0.75
-                    logger.info('switch threshold set to theta = %s', self.interaction_params['theta'])
-                if self.restchannels < 2:
-                    warn_user('Not enough rest channels - system will die out.')
-
-            elif interaction == 'go_or_rest':
-                self.interaction = go_or_rest
-                if 'kappa' in kwargs:
-                    self.interaction_params['kappa'] = kwargs['kappa']
-                else:
-                    self.interaction_params['kappa'] = 5.
-                    logger.info('switch rate set to kappa = %s', self.interaction_params['kappa'])
-                if 'theta' in kwargs:
-                    self.interaction_params['theta'] = kwargs['theta']
-                else:
-                    self.interaction_params['theta'] = 0.75
-                    logger.info('switch threshold set to theta = %s', self.interaction_params['theta'])
-                if self.restchannels < 2:
-                    warn_user('Not enough rest channels - system will die out.')
-
-            elif interaction == 'go_and_grow':
-                self.interaction = birth
-                if 'r_b' in kwargs:
-                    self.interaction_params['r_b'] = kwargs['r_b']
-                else:
-                    self.interaction_params['r_b'] = 0.2
-                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
-
-            elif interaction == 'alignment':
-                self.interaction = alignment
-                self.calc_permutations()
-
-                if 'beta' in kwargs:
-                    self.interaction_params['beta'] = kwargs['beta']
-                else:
-                    self.interaction_params['beta'] = 2.
-                    logger.info('sensitivity set to beta = %s', self.interaction_params['beta'])
-
-            elif interaction == 'persistent_motion':
-                self.interaction = persistent_walk
-                self.calc_permutations()
-
-                if 'beta' in kwargs:
-                    self.interaction_params['beta'] = kwargs['beta']
-                else:
-                    self.interaction_params['beta'] = 2.
-                    logger.info('sensitivity set to beta = %s', self.interaction_params['beta'])
-
-            elif interaction == 'chemotaxis':
-                self.interaction = chemotaxis
-                self.calc_permutations()
-
-                if 'beta' in kwargs:
-                    self.interaction_params['beta'] = kwargs['beta']
-                else:
-                    self.interaction_params['beta'] = 2.
-                    logger.info('sensitivity set to beta = %s', self.interaction_params['beta'])
-
-                if 'gradient' in kwargs:
-                    self.interaction_params['gradient_field'] = _validate_vector_field_shape(
-                        kwargs['gradient'],
-                        self.nodes.shape[:-1] + (self.c.shape[0],),
-                        "gradient",
-                    )
-                else:
-                    if len(self.dims) == 2:
-                        x_source = self.xcoords.mean()
-                        y_source = self.ycoords.mean()
-                        rx = self.xcoords - x_source
-                        ry = self.ycoords - y_source
-                        r = np.sqrt(rx ** 2 + ry ** 2)
-                        self.concentration = np.exp(-2 * r / self.ly)
-                        self.interaction_params['gradient_field'] = self.gradient(np.pad(self.concentration, 1,
-                                                                                         'reflect'))
-                    elif len(self.dims) == 1:
-                        source = self.l / 2
-                        r = abs(self.xcoords - source)
-                        self.concentration = np.exp(-2 * r / self.l)
-                        self.interaction_params['gradient_field'] = self.gradient(np.pad(self.concentration, 1,
-                                                                                         'reflect'))
-                        self.interaction_params['gradient_field'] /= self.interaction_params['gradient_field'].max()
-
-                    elif len(self.dims) == 3:
-                        x_source = self.xcoords.mean()
-                        y_source = self.ycoords.mean()
-                        z_source = self.zcoords.mean()
-                        rx = self.xcoords - x_source
-                        ry = self.ycoords - y_source
-                        rz = self.zcoords - z_source
-                        r = np.sqrt(rx ** 2 + ry ** 2 + rz ** 2)
-                        self.concentration = np.exp(-2 * r / self.ly)
-                        self.interaction_params['gradient_field'] = self.gradient(np.pad(self.concentration, 1,
-                                                                                         'reflect'))
-
-
-            elif interaction == 'contact_guidance':
-                if len(self.dims) != 2:
-                    raise ValueError("contact_guidance is not supported for this geometry.")
-                self.interaction = contact_guidance
-                self.calc_permutations()
-
-                if 'beta' in kwargs:
-                    self.interaction_params['beta'] = kwargs['beta']
-                else:
-                    self.interaction_params['beta'] = 2.
-                    logger.info('sensitivity set to beta = %s', self.interaction_params['beta'])
-
-                if 'director' in kwargs:
-                    self.interaction_params['gradient_field'] = _validate_vector_field_shape(
-                        kwargs['director'],
-                        self.nodes.shape[:-1] + (2,),
-                        "director",
-                    )
-                else:
-                    self.interaction_params['gradient_field'] = np.zeros((self.lx + 2 * self.r_int,
-                                                                          self.ly + 2 * self.r_int, 2))
-                    self.interaction_params['gradient_field'][..., 0] = 1
-                self.guiding_tensor = calc_nematic_tensor(self.interaction_params['gradient_field'])
-                if self.velocitychannels < 4:
-                    warn_user('Nematic interaction undefined in 1D.')
-
-            elif interaction == 'nematic':
-                self.interaction = nematic
-                self.calc_permutations()
-
-                if 'beta' in kwargs:
-                    self.interaction_params['beta'] = kwargs['beta']
-                else:
-                    self.interaction_params['beta'] = 2.
-                    logger.info('sensitivity set to beta = %s', self.interaction_params['beta'])
-
-            elif interaction == 'aggregation':
-                self.interaction = aggregation
-                self.calc_permutations()
-
-                if 'beta' in kwargs:
-                    self.interaction_params['beta'] = kwargs['beta']
-                else:
-                    self.interaction_params['beta'] = 2.
-                    logger.info('sensitivity set to beta = %s', self.interaction_params['beta'])
-
-            elif interaction == 'random_walk':
-                self.interaction = random_walk
-
-            elif interaction == 'birth':
-                self.interaction = birth
-                if 'r_b' in kwargs:
-                    self.interaction_params['r_b'] = kwargs['r_b']
-                else:
-                    self.interaction_params['r_b'] = 0.2
-                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
-
-            elif interaction == 'birthdeath':
-                self.interaction = birthdeath
-                if 'r_b' in kwargs:
-                    self.interaction_params['r_b'] = kwargs['r_b']
-                else:
-                    self.interaction_params['r_b'] = 0.2
-                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
-
-                if 'r_d' in kwargs:
-                    self.interaction_params['r_d'] = kwargs['r_d']
-                else:
-                    self.interaction_params['r_d'] = 0.05
-                    logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
-
-            elif interaction == 'excitable_medium':
-                self.interaction = excitable_medium
-                if 'beta' in kwargs:
-                    self.interaction_params['beta'] = kwargs['beta']
-
-                else:
-                    self.interaction_params['beta'] = .05
-                    logger.info('alignment sensitivity set to beta = %s', self.interaction_params['beta'])
-
-                if 'alpha' in kwargs:
-                    self.interaction_params['alpha'] = kwargs['alpha']
-                else:
-                    self.interaction_params['alpha'] = 1.
-                    logger.info('aggregation sensitivity set to alpha = %s', self.interaction_params['alpha'])
-
-                if 'N' in kwargs:
-                    self.interaction_params['N'] = kwargs['N']
-                else:
-                    self.interaction_params['N'] = 50
-                    logger.info('repetition of fast reaction set to N = %s', self.interaction_params['N'])
-
-            elif interaction == 'excitable_medium_ms':
-                if getattr(self, "n_species", 1) != 2:
-                    raise ValueError("excitable_medium_ms requires a multi-species LGCA with exactly two species.")
-                if self.restchannels < 1:
-                    raise ValueError("excitable_medium_ms requires at least one rest channel.")
-                self.interaction = excitable_medium_ms
-                if 'beta' in kwargs:
-                    self.interaction_params['beta'] = kwargs['beta']
-                else:
-                    self.interaction_params['beta'] = .05
-                    logger.info('alignment sensitivity set to beta = %s', self.interaction_params['beta'])
-
-                if 'alpha' in kwargs:
-                    self.interaction_params['alpha'] = kwargs['alpha']
-                else:
-                    self.interaction_params['alpha'] = 1.
-                    logger.info('aggregation sensitivity set to alpha = %s', self.interaction_params['alpha'])
-
-                if 'N' in kwargs:
-                    self.interaction_params['N'] = kwargs['N']
-                else:
-                    self.interaction_params['N'] = 50
-                    logger.info('repetition of fast reaction set to N = %s', self.interaction_params['N'])
-
-            elif interaction == 'only_propagation':
-                self.interaction = only_propagation
-
-            else:
-                raise ValueError(
-                    "Unknown interaction {!r}. Implemented interactions: {}".format(
-                        kwargs["interaction"], self.interactions
-                    )
-                )
-
-        else:
-            logger.info('Random walk interaction is used.')
-            interaction = 'random_walk'
-            self.interaction = random_walk
-        self._validate_interaction_params()
-        self._warn_if_nonlocal_ensemble_interaction(interaction)
+        interaction = kwargs.get("interaction")
+        compile_legacy_interaction(self, interaction, kwargs)
+        self._warn_if_nonlocal_ensemble_interaction(self.interaction.__name__)
 
     def set_bc(self, bc):
         """
@@ -1036,8 +795,15 @@ class LGCA_base(ABC):
         """
         return np.asarray(nodes)
 
+    @property
+    def interactions(self) -> list[str]:
+        """The names of the interactions ``get_lgca`` accepts for this LGCA type."""
+        from .legacy_names import legacy_family, legacy_names
+
+        return legacy_names(legacy_family(self), len(self.dims))
+
     def print_interactions(self):
-        """Print the list of pre-implemented interactions for this LGCA type."""
+        """Print the names of the interactions ``get_lgca`` accepts for this LGCA type."""
         print(self.interactions)
 
     def print_nodes(self):

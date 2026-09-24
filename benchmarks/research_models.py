@@ -1,5 +1,8 @@
 """Time the rules that replace legacy interactions against the legacy interactions.
 
+The legacy interaction functions are kept in ``tests/legacy`` and run under the names
+``legacy.<family>.<name>``.
+
 Every pair runs the same seeded model for some steps, propagation included, and reports the
 median time per step over repeats, after warm-up steps (the first steps of a model are slower:
 growth has not settled and the memory allocator adapts). The legacy growth rules also move the
@@ -14,12 +17,16 @@ Timings are diagnostics for one machine, not portable performance gates.
 import argparse
 import json
 import multiprocessing
+import sys
 import warnings
+from pathlib import Path
 from statistics import median
 from time import perf_counter
 
 import numpy as np
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # the repository root, for tests.legacy
+import tests.legacy  # noqa: E402,F401  (registers "legacy.<family>.<name>")
 from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
 from lgca.pipeline import InteractionPipelineSpec
 
@@ -29,37 +36,37 @@ DIMS = (100, 100)
 _IB = {"restchannels": 1, "identity_based": True, "density": 0.3}
 _NOVE_IB = {"restchannels": 1, "identity_based": True, "volume_exclusion": False, "capacity": 8, "density": 2.0}
 PAIRS = {
-    "birth_death (classical)": ("classical.birthdeath", ("birth_death", "random_walk"),
+    "birth_death (classical)": ("legacy.classical.birthdeath", ("birth_death", "random_walk"),
                                 ({"r_b": 0.2, "r_d": 0.05}, {"birth_rate": 0.2, "death_rate": 0.05}),
                                 {"restchannels": 1, "density": 0.3}),
-    "birth_death (species)": ("multispecies.birthdeath", ("birth_death", "random_walk"),
+    "birth_death (species)": ("legacy.multispecies.birthdeath", ("birth_death", "random_walk"),
                               ({"r_b": [0.2, 0.1], "r_d": 0.05}, {"birth_rate": [0.2, 0.1], "death_rate": 0.05}),
                               {"restchannels": 1, "n_species": 2, "volume_exclusion": False, "capacity": 8,
                                "density": 2.0}),
-    "birth_death (ib)": ("ib.birthdeath", ("birth_death", "random_walk"),
+    "birth_death (ib)": ("legacy.ib.birthdeath", ("birth_death", "random_walk"),
                          ({"r_b": 0.2, "r_d": 0.05, "std": 0.01, "a_max": 1.0},
                           {"birth_rate": "r_b", "death_rate": 0.05, "mutation": {"r_b": {
                               "distribution": "normal", "scale": 0.01, "bounds": [0, 1], "at_bounds": "redraw"}}}),
                          {**_IB, "traits": {"r_b": 0.2}}),
-    "birth_death (nove_ib)": ("nove_ib.birthdeath", ("birth_death", "random_walk"),
+    "birth_death (nove_ib)": ("legacy.nove_ib.birthdeath", ("birth_death", "random_walk"),
                               ({"r_b": 0.2, "r_d": 0.05, "std": 0.01, "a_max": 1.0},
                                {"birth_rate": "r_b", "death_rate": 0.05, "mutation": {"r_b": {
                                    "distribution": "normal", "scale": 0.01, "bounds": [0, 1],
                                    "at_bounds": "redraw"}}}),
                               {**_NOVE_IB, "traits": {"r_b": 0.2}}),
-    "birthdeath_cancerdfe": ("nove_ib.birthdeath_cancerdfe", "birthdeath_cancerdfe",
+    "birthdeath_cancerdfe": ("legacy.nove_ib.birthdeath_cancerdfe", "birthdeath_cancerdfe",
                              {"r_b": 0.3, "p_d": 0.05, "p_p": 0.2}, _NOVE_IB),
-    "go_or_grow_kappa": ("nove_ib.go_or_grow_kappa", "go_or_grow_kappa", {}, _NOVE_IB),
-    "go_or_grow_kappa_chemo": ("nove_ib.go_or_grow_kappa_chemo", "go_or_grow_kappa_chemo", {}, _NOVE_IB),
-    "go_or_grow_glioblastoma": ("nove_ib.go_or_grow_glioblastoma", "go_or_grow_glioblastoma", {"r_m": 0.05},
+    "go_or_grow_kappa": ("legacy.nove_ib.go_or_grow_kappa", "go_or_grow_kappa", {}, _NOVE_IB),
+    "go_or_grow_kappa_chemo": ("legacy.nove_ib.go_or_grow_kappa_chemo", "go_or_grow_kappa_chemo", {}, _NOVE_IB),
+    "go_or_grow_glioblastoma": ("legacy.nove_ib.go_or_grow_glioblastoma", "go_or_grow_glioblastoma", {"r_m": 0.05},
                                 _NOVE_IB),
-    "evo_steric": ("nove_ib.evo_steric", "evo_steric", {"r_m": 0.05}, {**_NOVE_IB, "capacity": 50}),
-    "go_and_grow_mutations": ("ib.go_and_grow_mutations", "go_and_grow_mutations",
+    "evo_steric": ("legacy.nove_ib.evo_steric", "evo_steric", {"r_m": 0.05}, {**_NOVE_IB, "capacity": 50}),
+    "go_and_grow_mutations": ("legacy.ib.go_and_grow_mutations", "go_and_grow_mutations",
                               {"r_m": 0.05, "effect": "driver_mutation"}, _IB),
-    "birthdeath_discrete": ("ib.birthdeath_discrete", "birthdeath_discrete", {}, _IB),
-    "excitable_medium": ("classical.excitable_medium", "excitable_medium", {"N": 10},
+    "birthdeath_discrete": ("legacy.ib.birthdeath_discrete", "birthdeath_discrete", {}, _IB),
+    "excitable_medium": ("legacy.classical.excitable_medium", "excitable_medium", {"N": 10},
                          {"restchannels": 4, "density": 0.3, "geometry": "square"}),
-    "excitable_medium (species)": ("multispecies.excitable_medium_ms", "excitable_medium", {"N": 10},
+    "excitable_medium (species)": ("legacy.multispecies.excitable_medium_ms", "excitable_medium", {"N": 10},
                                    {"restchannels": 4, "n_species": 2, "geometry": "square"}),
 }
 

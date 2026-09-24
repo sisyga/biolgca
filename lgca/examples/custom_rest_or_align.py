@@ -43,7 +43,7 @@ def rest_or_align(lgca) -> None:
     _apply_rest_or_align(lgca, beta=beta, alpha=alpha)
 
 
-class NativeRestOrAlignOperator(ReorientationOperator):
+class RestOrAlignOperator(ReorientationOperator):
     """Portable operator for the custom rest-or-align example."""
 
     def __init__(self, info: PluginInfo, parameters=None):

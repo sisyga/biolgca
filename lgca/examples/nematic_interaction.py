@@ -45,9 +45,9 @@ def build_spec() -> ModelSpec:
         ),
         space=SpaceSpec(geometry="hex", dims=(50, 50), boundary="periodic"),
         state=StateSpec(density=0.5, restchannels=0),
-        time=TimeSpec(steps=100, seed=107),
+        time=TimeSpec(steps=100, seed=103),
         dynamics=InteractionPipelineSpec(
-            operators=[{"name": "classical.nematic", "parameters": {"beta": 3.0}}],
+            operators=[{"name": "nematic_alignment", "parameters": {"beta": 3.0}}],
         ),
         analysis=AnalysisSpec(
             observers=[NodeRecorder(), DensityRecorder(), PopulationRecorder()],

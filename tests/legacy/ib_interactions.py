@@ -9,7 +9,7 @@ Interaction functions and helper functions for identity-based LGCA with volume e
 import numpy as np
 from .identity_kernels import inherit_missing_properties, sample_truncated_normal
 
-from lgca.interactions import tanh_switch
+from .interactions import tanh_switch
 
 
 def random_walk(lgca):

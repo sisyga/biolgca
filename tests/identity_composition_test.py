@@ -10,6 +10,7 @@ from lgca.pipeline import InteractionPipelineSpec
 @pytest.mark.parametrize("growth", ["ib.birth", "ib.birthdeath", "ib.birthdeath_discrete",
                                     "ib.go_and_grow_mutations"])
 @pytest.mark.parametrize("reverse", [False, True])
+@pytest.mark.filterwarnings("ignore:The interaction name:FutureWarning")
 def test_identity_growth_compositions_keep_all_living_property_rows(growth, reverse):
     parameters = {"r_b": 1.0}
     if growth != "ib.birth":
@@ -42,15 +43,22 @@ def test_identity_growth_compositions_keep_all_living_property_rows(growth, reve
     assert compiled.lgca.maxlabel > 1
 
 
-def test_unsupported_identity_growth_lifecycles_fail_at_compilation():
-    with pytest.raises(ValueError, match="shared daughter-property lifecycle"):
-        build_model(ModelSpec(
-            space=SpaceSpec(geometry="lin", dims=2),
-            state=StateSpec(identity_based=True, volume_exclusion=False),
-            dynamics=InteractionPipelineSpec(operators=[
-                {"name": "nove_ib.birth"}, {"name": "nove_ib.go_or_grow"},
-            ]),
-        ))
+def test_identity_growth_rules_without_volume_exclusion_combine():
+    model = build_model(ModelSpec(
+        space=SpaceSpec(geometry="lin", dims=4),
+        state=StateSpec(identity_based=True, volume_exclusion=False, density=2, restchannels=1, capacity=8,
+                        traits={"r_b": 0.5, "kappa": 2.0}),
+        time=TimeSpec(seed=3),
+        dynamics=InteractionPipelineSpec(operators=[
+            {"name": "birth_death", "parameters": {"birth_rate": "r_b", "mutation": {"r_b": 0.01}}},
+            {"name": "go_or_rest", "parameters": {"kappa": "kappa"}},
+            {"name": "go_or_grow.growth", "parameters": {"r_b": 0.3, "mutation": {"kappa": 0.1}}},
+        ]),
+    ))
+    for _ in range(5):
+        model.step()
+    for values in model.lgca.props.values():
+        assert len(values) == int(model.lgca.maxlabel) + 1
 
 
 @pytest.mark.parametrize("interaction", ["birth", "birthdeath", "birthdeath_discrete",
@@ -67,4 +75,4 @@ def test_legacy_growth_inherits_additional_cell_property(interaction):
         model.timestep()
         assert len(model.props["marker"]) == int(model.maxlabel) + 1
     assert model.maxlabel > 1
-    assert model.props["marker"][1:] == [17] * int(model.maxlabel)
+    np.testing.assert_array_equal(np.asarray(model.props["marker"])[1:], 17)

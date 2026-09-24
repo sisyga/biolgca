@@ -121,7 +121,7 @@ TRAITS = {"go_or_grow_kappa": ("kappa",), "go_or_grow_glioblastoma": ("r_b", "ka
 def test_models_without_volume_exclusion_match_the_legacy_rules(name):
     nodes = _initial(False, 0.8)
     new = _step(name, NOVE[name], nodes, False, 1)
-    legacy = _step(f"nove_ib.{name}", NOVE[name], nodes, False, 2)
+    legacy = _step(f"legacy.nove_ib.{name}", NOVE[name], nodes, False, 2)
     _assert_same_nodes(new, legacy)
     for trait in TRAITS[name]:
         _assert_same_mean(_trait(new, trait, new["daughters"]), _trait(legacy, trait, legacy["daughters"]))
@@ -137,7 +137,7 @@ def test_chemotaxis_of_moving_cells_matches_the_legacy_rule():
     nodes = _initial(False, 0.8)
     parameters = {"r_b": 0.0, "r_d": 0.0, "kappa": 0.0, "beta": 8.0}
     scores = []
-    for name, seed in (("go_or_grow_kappa_chemo", 1), ("nove_ib.go_or_grow_kappa_chemo", 2)):
+    for name, seed in (("go_or_grow_kappa_chemo", 1), ("legacy.nove_ib.go_or_grow_kappa_chemo", 2)):
         model = _model(name, parameters, nodes, False, seed)
         lgca = model.lgca
         gradient = LatticeState(lgca).gradient(lgca.cell_density[lgca.nonborder])
@@ -160,13 +160,13 @@ VE = {
 def test_models_with_volume_exclusion_match_the_legacy_rules(name):
     nodes = _initial(True, 0.45)
     new = _step(name, VE[name], nodes, True, 1)
-    legacy = _step(f"ib.{name}", VE[name], nodes, True, 2)
+    legacy = _step(f"legacy.ib.{name}", VE[name], nodes, True, 2)
     _assert_same_nodes(new, legacy)
     _assert_same_mean(_trait(new, "r_b", new["daughters"]), _trait(legacy, "r_b", legacy["daughters"]))
 
 
-@pytest.mark.parametrize("n_species, legacy", [(1, "classical.excitable_medium"),
-                                               (2, "multispecies.excitable_medium_ms")])
+@pytest.mark.parametrize("n_species, legacy", [(1, "legacy.classical.excitable_medium"),
+                                               (2, "legacy.multispecies.excitable_medium_ms")])
 def test_the_excitable_medium_matches_the_legacy_rule(n_species, legacy):
     rng = np.random.default_rng(0)
     nodes = rng.random((150, 150) + ((2,) if n_species == 2 else ()) + (8,)) < 0.3

@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from lgca import get_lgca
-from lgca.nove_ib_interactions import tanh_switch
+from lgca.builtin_rules import tanh_switch
 
 
 N_NODES = 400
@@ -153,9 +153,10 @@ def _single_resting_cell_glioblastoma_lgca(**kw):
 def test_glioblastoma_initializes_one_family_per_founder_cell():
     lgca = _single_resting_cell_glioblastoma_lgca(r_b=0.3, kappa=4.0)
 
-    assert lgca.props["family"][0] == 1
-    assert lgca.family_props["r_b"][1] == pytest.approx(0.3)
-    assert lgca.family_props["kappa"][1] == pytest.approx(4.0)
+    founder = int(lgca.maxlabel)  # the only cell
+    assert lgca.props["family"][founder] == 1
+    assert lgca.props["r_b"][founder] == pytest.approx(0.3)
+    assert lgca.props["kappa"][founder] == pytest.approx(4.0)
 
 
 def test_glioblastoma_mutation_creates_a_fitter_family_with_inherited_traits():
@@ -164,13 +165,13 @@ def test_glioblastoma_mutation_creates_a_fitter_family_with_inherited_traits():
     lgca.interaction(lgca)
     lgca.update_dynamic_fields()
 
+    daughter = int(lgca.maxlabel)
     assert lgca.cell_density[lgca.nonborder].sum() == 2
-    assert lgca.maxlabel == 1
     assert lgca.maxfamily == 2
-    assert lgca.props["family"][1] == 2
+    assert lgca.props["family"][daughter] == 2
     assert lgca.family_props["ancestor"][2] == 1
-    assert lgca.family_props["r_b"][2] == pytest.approx(1.5)
-    assert lgca.family_props["kappa"][2] == pytest.approx(2.0)
+    assert lgca.props["r_b"][daughter] == pytest.approx(1.5)
+    assert lgca.props["kappa"][daughter] == pytest.approx(2.0)
 
 
 def test_glioblastoma_family_populations_are_recorded_as_families_appear():

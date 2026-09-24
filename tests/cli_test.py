@@ -82,7 +82,7 @@ def test_moved_cli_archive_replays_companion_resource_without_touching_first_run
     spec = ModelSpec(space=SpaceSpec(geometry="lin", dims=3),
         state=StateSpec(initializer={"name": "from_npz", "parameters": {"path": "input.npz"}}),
         time=TimeSpec(steps=2, seed=115),
-        dynamics=InteractionPipelineSpec(operators=[{"name": "classical.random_walk"}]),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "random_walk"}]),
         analysis=AnalysisSpec(observers=[CSVSnapshotObserver(output_dir="snapshots")]))
     model = save_model_spec(spec, tmp_path / "model.json")
     first = tmp_path / "first"
@@ -105,7 +105,7 @@ def _main(argv):
     return importlib.import_module("lgca.cli").main(argv)
 
 
-def _write_tiny_model(path, *, operator="classical.random_walk", observer=None):
+def _write_tiny_model(path, *, operator="random_walk", observer=None):
     spec = ModelSpec(
         space=SpaceSpec(geometry="square", dims=(3, 4), boundary="periodic"),
         state=StateSpec(density=1.0, restchannels=1),

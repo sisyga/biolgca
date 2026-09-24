@@ -48,8 +48,6 @@ class IBLGCA_Square(IBLGCA_base, LGCA_Square):
     """
     Identity-based LGCA simulator class.
     """
-    interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath', 'birthdeath_discrete',
-                    'only_propagation', 'go_and_grow_mutations']
 
     def init_nodes(self, density=0.1, nodes=None, **kwargs):
         self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
@@ -134,7 +132,6 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
     """
     2D square version of an LGCA without volume exclusion.
     """
-    interactions = ['dd_alignment', 'di_alignment', 'go_or_grow', 'go_or_rest']
 
     def set_dims(self, dims=None, nodes=None, restchannels=None, capacity=None):
         """

@@ -452,8 +452,6 @@ class IBLGCA_Hex(IBLGCA_Square, LGCA_Hex):
     """
     Identity-based LGCA simulator class.
     """
-    interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath', 'birthdeath_discrete',
-                    'only_propagation']
 
 
 class NoVE_LGCA_Hex(NoVE_LGCA_Square, LGCA_Hex):

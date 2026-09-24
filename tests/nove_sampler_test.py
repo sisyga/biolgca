@@ -1,7 +1,5 @@
 """Count-state and sequential-operator NoVE regressions."""
 
-from copy import deepcopy
-
 import numpy as np
 import pytest
 
@@ -10,9 +8,9 @@ from lgca.pipeline import InteractionPipelineSpec
 from lgca.operator_base import InteractionOperator, PluginInfo
 
 
-@pytest.mark.parametrize("operator", ["nove.dd_alignment", "nove.di_alignment"])
+@pytest.mark.parametrize("normalize", [False, True])
 @pytest.mark.parametrize("propagation", [False, True])
-def test_sequential_reverse_then_align_refreshes_periodic_edges(operator, propagation):
+def test_sequential_reverse_then_align_refreshes_periodic_edges(normalize, propagation):
     class Reverse(InteractionOperator):
         def __init__(self):
             super().__init__(PluginInfo("reverse", "reorientation", ("nove",)))
@@ -26,14 +24,15 @@ def test_sequential_reverse_then_align_refreshes_periodic_edges(operator, propag
         state=StateSpec(volume_exclusion=False, nodes=np.array([[10, 0]] * 4)),
         time=TimeSpec(steps=1, seed=1),
         dynamics=InteractionPipelineSpec(operators=[Reverse(), {
-            "name": operator, "parameters": {"beta": 100},
+            "name": "polar_alignment", "parameters": {"beta": 100, "normalize": normalize},
         }], propagation=propagation),
     ))
     model.run(False)
     np.testing.assert_array_equal(model.lgca.nodes[model.lgca.nonborder], [[0, 10]] * 4)
 
 
-@pytest.mark.parametrize("operator", ["nove.random_walk", "nove.dd_alignment", "nove.di_alignment"])
+@pytest.mark.parametrize("operator", [{"name": "random_walk"}, {"name": "polar_alignment"},
+                                      {"name": "polar_alignment", "parameters": {"normalize": True}}])
 @pytest.mark.parametrize("source", ["explicit", "npz", "density"])
 def test_native_nove_samplers_accept_all_count_sources(operator, source, tmp_path):
     state = dict(volume_exclusion=False, restchannels=0)
@@ -47,24 +46,21 @@ def test_native_nove_samplers_accept_all_count_sources(operator, source, tmp_pat
     model = build_model(ModelSpec(
         space=SpaceSpec(geometry="lin", dims=3), state=StateSpec(**state),
         time=TimeSpec(steps=3, seed=130),
-        dynamics=InteractionPipelineSpec(operators=[{"name": operator}], propagation=False),
+        dynamics=InteractionPipelineSpec(operators=[operator], propagation=False),
     ), resource_base=tmp_path)
     before = model.lgca.nodes[model.lgca.nonborder].sum(-1)
     model.run(False)
     np.testing.assert_array_equal(model.lgca.nodes[model.lgca.nonborder].sum(-1), before)
 
 
-@pytest.mark.parametrize("operator", ["nove.random_walk", "nove.dd_alignment", "nove.di_alignment"])
+@pytest.mark.parametrize("operator", [{"name": "random_walk"}, {"name": "polar_alignment"},
+                                      {"name": "polar_alignment", "parameters": {"normalize": True}}])
 @pytest.mark.parametrize("counts", [[2**63, 0], [2**63 - 1, 1], [2**64 - 1, 1]])
-def test_nove_sampler_rejects_unrepresentable_totals_without_rng_draw(operator, counts):
-    model = build_model(ModelSpec(
+def test_nove_sampler_rejects_unrepresentable_totals(operator, counts):
+    spec = ModelSpec(
         space=SpaceSpec(geometry="lin", dims=1),
         state=StateSpec(volume_exclusion=False, nodes=np.array([counts], dtype=np.uint64)),
-        dynamics=InteractionPipelineSpec(operators=[{"name": operator}], propagation=False),
-    ))
-    before = model.lgca.nodes.copy()
-    rng = deepcopy(model.lgca.rng.bit_generator.state)
+        dynamics=InteractionPipelineSpec(operators=[operator], propagation=False),
+    )
     with pytest.raises(ValueError, match="sampler.*signed int64"):
-        model.step()
-    np.testing.assert_array_equal(model.lgca.nodes, before)
-    assert model.lgca.rng.bit_generator.state == rng
+        build_model(spec)

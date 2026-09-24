@@ -251,7 +251,7 @@ class ModelSpec:
     ...     space=SpaceSpec(geometry="square", dims=(20, 20)),
     ...     state=StateSpec(density=0.5),
     ...     time=TimeSpec(steps=50, seed=1),
-    ...     dynamics=InteractionPipelineSpec(operators=[{"name": "classical.random_walk"}]),
+    ...     dynamics=InteractionPipelineSpec(operators=[{"name": "random_walk"}]),
     ... )
     >>> result = run_model(spec, showprogress=False)
     """

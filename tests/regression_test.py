@@ -160,7 +160,7 @@ def test_nove_ib_moore_propagates_all_velocity_channels():
     assert lgca.nodes[center + (channel,)] == []
 
 
-def test_contact_guidance_director_initializes_guiding_tensor():
+def test_contact_guidance_takes_a_director_with_ghost_nodes():
     director = np.zeros((5, 5, 2))
     director[..., 0] = 1
     lgca = get_lgca(
@@ -171,7 +171,7 @@ def test_contact_guidance_director_initializes_guiding_tensor():
         director=director,
     )
 
-    assert hasattr(lgca, "guiding_tensor")
+    np.testing.assert_array_equal(lgca.director, director)
     lgca.timestep()
 
 

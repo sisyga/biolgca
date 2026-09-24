@@ -401,24 +401,21 @@ class FamilyPopulationRecorder(Observer):
 
     @staticmethod
     def _is_mutating_family_interaction(lgca, runner) -> bool:
+        """Whether new families can appear: an operator, or one stacked in it, founds families.
+
+        A function passed as the interaction may do anything, so it counts as founding them.
+        """
         compiled = getattr(runner, "context", None)
         pipeline = getattr(compiled, "pipeline", None)
-        if pipeline is not None:
-            return any(operator.info.mutates_families for operator in pipeline.operators)
-        mutating_interactions = []
-        try:
-            from lgca.ib_interactions import go_and_grow_mutations
-
-            mutating_interactions.append(go_and_grow_mutations)
-        except ImportError:
-            pass
-        try:
-            from lgca.nove_ib_interactions import evo_steric, go_or_grow_glioblastoma
-
-            mutating_interactions.extend([evo_steric, go_or_grow_glioblastoma])
-        except ImportError:
-            pass
-        return lgca.interaction in mutating_interactions
+        if pipeline is None:
+            return True
+        operators = list(pipeline.operators)
+        while operators:
+            operator = operators.pop()
+            if operator.info.mutates_families:
+                return True
+            operators.extend(getattr(operator, "operators", ()))
+        return False
 
 
 def run_timeevo(lgca, timesteps: int, observers, showprogress: bool) -> None:

@@ -21,25 +21,9 @@ _SPATIAL_NDIMS = {
 }
 
 
-def _require_legacy_interaction(lgca, interaction) -> None:
-    """Reject interactions without a multispecies implementation in the legacy factory path."""
-    if callable(interaction):
-        return
-    name = None if interaction is None else str(interaction).replace(" ", "_")
-    if name in lgca.interactions:
-        return
-    requested = "No interaction was given" if name is None else f"Interaction {name!r} is not supported"
-    raise ValueError(
-        f"{requested} for multispecies models built with get_lgca (legacy construction). "
-        f"Supported multispecies interactions: {', '.join(lgca.interactions)}. "
-        "Build other multispecies dynamics with a ModelSpec interaction pipeline."
-    )
-
-
 class MultiSpeciesLGCA_base(LGCA_base):
     """Classical LGCA supporting multiple species."""
 
-    interactions = ["random_walk", "only_propagation", "excitable_medium_ms"]
 
     def __init__(self, *, n_species: int = 1, **kwargs: Any) -> None:
         if isinstance(n_species, bool) or int(n_species) != n_species or n_species < 1:
@@ -115,10 +99,6 @@ class MultiSpeciesLGCA_base(LGCA_base):
         if nodes.shape != expected:
             warn_user(f"Provided nodes have shape {nodes.shape}, expected {expected}.")
 
-    def set_interaction(self, **kwargs):
-        _require_legacy_interaction(self, kwargs.get("interaction", "random_walk"))
-        super().set_interaction(**kwargs)
-
     def _channel_counts(self, nodes, history=False):
         """Return channel populations summed over species; summed arrays pass through."""
         nodes = np.asarray(nodes)
@@ -163,7 +143,6 @@ class MultiSpeciesLGCA_base(LGCA_base):
 class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
     """No-volume-exclusion LGCA with multiple species."""
 
-    interactions = ["birth", "birthdeath", "go_or_grow", "only_propagation"]
 
     _LOCAL_ENSEMBLE_INTERACTIONS = NoVE_LGCA_base._LOCAL_ENSEMBLE_INTERACTIONS | {
         "birth",
@@ -211,72 +190,6 @@ class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
         self.nodes = _poisson_channel_populations(self, density / self.n_species, self.nodes.shape)
         self.apply_boundaries()
         self.update_dynamic_fields()
-
-    def set_interaction(self, **kwargs):
-        if self._set_callable_interaction(kwargs):
-            return
-        if kwargs.get("interaction") == "excitable_medium_ms":
-            raise ValueError("excitable_medium_ms requires volume exclusion.")
-        _require_legacy_interaction(self, kwargs.get("interaction"))
-        interaction = kwargs.get("interaction", "").replace(" ", "_")
-        if interaction in {"birth", "birthdeath", "go_or_grow"}:
-            from lgca.ms_interactions import (
-                _resolve_mutation_matrix,
-                _validate_mutation_matrix,
-                _validate_species_vector,
-                birth,
-                birthdeath,
-                go_or_grow,
-            )
-
-            self.interaction_params["capacity"] = self.capacity
-            if "mutation_matrix" in kwargs:
-                self.interaction_params["mutation_matrix"] = _validate_mutation_matrix(
-                    self, kwargs["mutation_matrix"]
-                )
-
-            if interaction in {"birth", "birthdeath"}:
-                self.interaction = birthdeath if interaction == "birthdeath" else birth
-                r_b = kwargs.get("r_b", 0.2)
-                self.interaction_params["r_b"] = _validate_species_vector(self, "r_b", r_b)
-                if "std" in kwargs:
-                    self.interaction_params["std"] = kwargs["std"]
-                self.interaction_params["mutation_matrix"] = _validate_mutation_matrix(
-                    self, _resolve_mutation_matrix(self, trait_name="r_b", std_name="std")
-                )
-                if interaction == "birthdeath":
-                    self.interaction_params["r_d"] = kwargs.get("r_d", 0.02)
-                elif "r_d" in kwargs:
-                    warn_user("Death rate defined but not used in birth interaction.")
-
-                gamma = kwargs.get("gamma", 0.0)
-                self.interaction_params["gamma"] = gamma
-                z = self.velocitychannels + np.exp(gamma) * self.restchannels
-                self.channel_weights = np.array(
-                    [1.0 / z] * self.velocitychannels
-                    + [np.exp(gamma) / z] * self.restchannels
-                )
-
-            else:
-                if self.restchannels != 1:
-                    raise ValueError("go_or_grow requires exactly one rest channel.")
-                self.interaction = go_or_grow
-                self.interaction_params["r_d"] = kwargs.get("r_d", 0.01)
-                self.interaction_params["r_b"] = kwargs.get("r_b", 0.2)
-                self.interaction_params["kappa"] = _validate_species_vector(
-                    self, "kappa", kwargs.get("kappa", 5.0)
-                )
-                self.interaction_params["theta"] = kwargs.get("theta", 0.5)
-                if "kappa_std" in kwargs:
-                    self.interaction_params["kappa_std"] = kwargs["kappa_std"]
-                self.interaction_params["mutation_matrix"] = _validate_mutation_matrix(
-                    self, _resolve_mutation_matrix(self, trait_name="kappa", std_name="kappa_std")
-                )
-
-            self._validate_interaction_params()
-            self._warn_if_nonlocal_ensemble_interaction(interaction)
-            return
-        super().set_interaction(**kwargs)
 
     def update_dynamic_fields(self) -> None:
         self.channel_pop = self.nodes

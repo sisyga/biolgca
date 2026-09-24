@@ -47,7 +47,7 @@ def build_spec() -> ModelSpec:
         state=StateSpec(density=0.5, restchannels=0),
         time=TimeSpec(steps=100, seed=102),
         dynamics=InteractionPipelineSpec(
-            operators=[{"name": "classical.alignment", "parameters": {"beta": 3.0}}],
+            operators=[{"name": "polar_alignment", "parameters": {"beta": 3.0}}],
         ),
         analysis=AnalysisSpec(
             observers=[NodeRecorder(), DensityRecorder(), PopulationRecorder()],

@@ -73,7 +73,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     of every cell), which rules on the lattice state, the boundary conditions
     and propagation update without building lists. ``nodes`` builds the
     object array from the table when it is read; whichever of the two was
-    written last is the state.
+    written last is the state, and both are while neither was written.
     """
 
     def __init_subclass__(cls, **kwargs):
@@ -85,8 +85,9 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     def nodes(self):
         """Lists of cell labels per channel, shape ``padded dims + (K,)``."""
         store = self.__dict__.get("_store")
-        if store is not None:
-            self.__dict__["_nodes_array"] = self._nodes_from_store(*store)
+        if store is not None:  # the caller may change the lists in place, so they become the state
+            if self.__dict__.get("_nodes_array") is None:
+                self.__dict__["_nodes_array"] = self._nodes_from_store(*store)
             self.__dict__["_store"] = None
         try:
             return self.__dict__["_nodes_array"]
@@ -165,8 +166,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
             labels = np.fromiter((label for slot in used for label in flat[slot]), dtype=np.int64,
                                  count=int(lengths.sum()))
             store = (labels, np.repeat(used, lengths[used]))
-            self.__dict__["_store"] = store
-            self.__dict__["_nodes_array"] = None
+            self.__dict__["_store"] = store  # the lists stay valid until either is written
         return store
 
     def _set_cell_table(self, labels, slots):
@@ -187,6 +187,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         slots = self._slot_table()[which][slots]
         kept = slots >= 0
         self.__dict__["_store"] = (labels[kept], slots[kept])
+        self.__dict__["_nodes_array"] = None
 
     def _store_counts(self, slots):
         """Cells per padded channel, with periodic ghost nodes copying the interior."""
@@ -209,17 +210,6 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         for ghost in np.flatnonzero(maps["source"] >= 0).tolist():
             flat[ghost] = list(flat[maps["source"][ghost]])
         return flat.reshape(maps["shape"])
-    interactions = [
-        'go_or_grow',
-        'go_or_grow_kappa',
-        'go_or_grow_glioblastoma',
-        'birth',
-        'birthdeath',
-        'birthdeath_cancerdfe',
-        'random_walk',
-        'randomwalk',
-        'steric_evolution',
-    ]
     _LOCAL_ENSEMBLE_INTERACTIONS = {
         "birth",
         "birthdeath",
@@ -328,342 +318,6 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.nodes[self.nonborder] = tempnodes
         self.maxlabel = numbers.sum()
         self.update_dynamic_fields()
-
-    def set_interaction(self, **kwargs):
-        if self._set_callable_interaction(kwargs):
-            return
-        from lgca.nove_ib_interactions import random_walk, birth, birthdeath, birthdeath_cancerdfe, go_or_grow, \
-            evo_steric, go_or_grow_kappa, go_or_grow_glioblastoma
-        from lgca.interactions import only_propagation
-        if 'interaction' in kwargs:
-            interaction = kwargs['interaction'].replace(" ", "_")
-            if interaction in ('random_walk', 'diffusion'):
-                self.interaction = random_walk
-            elif interaction == 'only_propagation':
-                self.interaction = only_propagation
-
-            elif interaction in ('birth', 'birthdeath'):
-                self.interaction = birthdeath if interaction == 'birthdeath' else birth
-                if 'capacity' in kwargs:
-                    self.interaction_params['capacity'] = kwargs['capacity']
-                else:
-                    self.interaction_params['capacity'] = 8
-                    logger.info('capacity of channel set to %s', self.interaction_params['capacity'])
-
-                if 'r_b' in kwargs:
-                    self.interaction_params['r_b'] = kwargs['r_b']
-                else:
-                    self.interaction_params['r_b'] = 0.2
-                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
-                self.props.update(r_b=[self.interaction_params['r_b']] * (self.maxlabel + 1))
-
-                if 'r_d' in kwargs:
-                    self.interaction_params['r_d'] = kwargs['r_d']
-                    if interaction == 'birth':
-                        warn_user("Death rate defined but not used in birth interaction.")
-                else:
-                    if interaction == 'birthdeath':
-                        self.interaction_params['r_d'] = 0.02
-                        logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
-
-                if 'std' in kwargs:
-                    self.interaction_params['std'] = kwargs['std']
-                else:
-                    self.interaction_params['std'] = 0.01
-                    logger.info('standard deviation set to = %s', self.interaction_params['std'])
-                if 'a_max' in kwargs:
-                    self.interaction_params['a_max'] = kwargs['a_max']
-                else:
-                    self.interaction_params['a_max'] = 1.
-                    logger.info('Max. birth rate set to a_max = %s', self.interaction_params['a_max'])
-                if 'gamma' in kwargs:
-                    self.interaction_params['gamma'] = kwargs['gamma']
-                else:
-                    self.interaction_params['gamma'] = 0.
-                    logger.info('Rest channel weight set to gamma = %s', self.interaction_params['gamma'])
-
-                Z = self.velocitychannels + np.exp(self.interaction_params['gamma']) * self.restchannels
-                self.channel_weights = [1./Z] * self.velocitychannels + [np.exp(self.interaction_params['gamma'])/Z] * self.restchannels
-
-            elif interaction == 'birthdeath_cancerdfe':
-                self.interaction = birthdeath_cancerdfe
-                if 'capacity' in kwargs:
-                    self.interaction_params['capacity'] = kwargs['capacity']
-                else:
-                    self.interaction_params['capacity'] = 8
-                    logger.info('capacity of channel set to %s', self.interaction_params['capacity'])
-
-                if 'r_b' in kwargs:
-                    self.interaction_params['r_b'] = kwargs['r_b']
-                else:
-                    self.interaction_params['r_b'] = 0.2
-                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
-                self.props.update(r_b=[self.interaction_params['r_b']] * (self.maxlabel + 1))
-
-                if 'r_d' in kwargs:
-                    self.interaction_params['r_d'] = kwargs['r_d']
-                else:
-                    self.interaction_params['r_d'] = 0.02
-                    logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
-
-                if 'p_d' in kwargs:
-                    self.interaction_params['p_d'] = kwargs['p_d']
-                else:
-                    self.interaction_params['p_d'] = 1.4e-5  # from macfarlane 2014
-                    logger.info('probability of drivers set to = %s', self.interaction_params['p_d'])
-
-                if 'p_p' in kwargs:
-                    self.interaction_params['p_p'] = kwargs['p_p']
-                else:
-                    self.interaction_params['p_p'] = 0.1  # from macfarlane 2014
-                    logger.info('probability of passengers set to = %s', self.interaction_params['p_p'])
-
-                if 's_d' in kwargs:
-                    self.interaction_params['s_d'] = kwargs['s_d']
-                else:
-                    self.interaction_params['s_d'] = .1 * self.interaction_params['r_b']  # from macfarlane 2014
-                    logger.info('driver strength set to = %s', self.interaction_params['s_d'])
-
-                if 's_p' in kwargs:
-                    self.interaction_params['s_p'] = kwargs['s_p']
-                else:
-                    self.interaction_params['s_p'] = .001 * self.interaction_params['r_b']  # from macfarlane 2014
-                    logger.info('passenger strength set to = %s', self.interaction_params['s_p'])
-
-                if 'a_max' in kwargs:
-                    self.interaction_params['a_max'] = kwargs['a_max']
-                else:
-                    self.interaction_params['a_max'] = 1.
-                    logger.info('Max. birth rate set to a_max = %s', self.interaction_params['a_max'])
-                if 'gamma' in kwargs:
-                    self.interaction_params['gamma'] = kwargs['gamma']
-                else:
-                    self.interaction_params['gamma'] = 0.
-                    logger.info('Rest channel weight set to gamma = %s', self.interaction_params['gamma'])
-
-                Z = self.velocitychannels + np.exp(self.interaction_params['gamma']) * self.restchannels
-                self.channel_weights = [1./Z] * self.velocitychannels + [np.exp(self.interaction_params['gamma'])/Z] * self.restchannels
-
-            elif interaction == 'go_or_grow':
-                self.interaction = go_or_grow
-                try:
-                    assert self.restchannels > 0
-                except AssertionError:
-                    warn_user('This interaction requires a rest channel.')
-                if 'capacity' in kwargs:
-                    self.interaction_params['capacity'] = kwargs['capacity']
-                else:
-                    self.interaction_params['capacity'] = 8
-                    logger.info('node capacity set to %s', self.interaction_params['capacity'])
-
-                if 'kappa_std' in kwargs:
-                    self.interaction_params['kappa_std'] = kwargs['kappa_std']
-                else:
-                    self.interaction_params['kappa_std'] = 0.2
-                    logger.info('std of kappa set to %s', self.interaction_params['kappa_std'])
-
-                if 'theta_std' in kwargs:
-                    self.interaction_params['theta_std'] = kwargs['theta_std']
-                else:
-                    self.interaction_params['theta_std'] = 0.05
-                    logger.info('std of theta set to %s', self.interaction_params['theta_std'])
-
-                if 'r_d' in kwargs:
-                    self.interaction_params['r_d'] = kwargs['r_d']
-                else:
-                    self.interaction_params['r_d'] = 0.01
-                    logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
-
-                if 'r_b' in kwargs:
-                    self.interaction_params['r_b'] = kwargs['r_b']
-                else:
-                    self.interaction_params['r_b'] = 0.2
-                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
-
-                if 'kappa' in kwargs:
-                    kappa = kwargs['kappa']
-                    if hasattr(kappa, '__iter__'):
-                        self.interaction_params['kappa'] = list(kappa)
-                    else:
-                        self.interaction_params['kappa'] = [kappa] * (self.maxlabel + 1)
-                else:
-                    self.interaction_params['kappa'] = [5.] * (self.maxlabel + 1)
-                    logger.info('switch rate set to kappa = %s', self.interaction_params['kappa'][0])
-
-                self.props.update(kappa=np.array(self.interaction_params['kappa']))
-                if 'theta' in kwargs:
-                    theta = kwargs['theta']
-                    if hasattr(theta, '__iter__'):
-                        self.interaction_params['theta'] = list(theta)
-                    else:
-                        self.interaction_params['theta'] = [theta] * (self.maxlabel + 1)
-                else:
-                    self.interaction_params['theta'] = [0.5] * (self.maxlabel + 1)
-                    logger.info('switch threshold set to theta = %s', self.interaction_params['theta'][0])
-                self.props.update(theta=np.array(self.interaction_params['theta']))
-
-            elif interaction == 'go_or_grow_kappa':
-                self.interaction = go_or_grow_kappa
-                try:
-                    assert self.restchannels > 0
-                except AssertionError:
-                    warn_user('This interaction requires a rest channel.')
-                if 'capacity' in kwargs:
-                    self.interaction_params['capacity'] = kwargs['capacity']
-                else:
-                    self.interaction_params['capacity'] = 8
-                    logger.info('node capacity set to %s', self.interaction_params['capacity'])
-
-                if 'kappa_std' in kwargs:
-                    self.interaction_params['kappa_std'] = kwargs['kappa_std']
-                else:
-                    self.interaction_params['kappa_std'] = 0.2
-                    logger.info('std of kappa set to %s', self.interaction_params['kappa_std'])
-
-                if 'r_d' in kwargs:
-                    self.interaction_params['r_d'] = kwargs['r_d']
-                else:
-                    self.interaction_params['r_d'] = 0.01
-                    logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
-
-                if 'r_b' in kwargs:
-                    self.interaction_params['r_b'] = kwargs['r_b']
-                else:
-                    self.interaction_params['r_b'] = 0.2
-                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
-
-                if 'kappa' in kwargs:
-                    kappa = kwargs['kappa']
-                    if hasattr(kappa, '__iter__'):
-                        self.interaction_params['kappa'] = list(kappa)
-                    else:
-                        self.interaction_params['kappa'] = [kappa] * (self.maxlabel + 1)
-                else:
-                    self.interaction_params['kappa'] = [5.] * (self.maxlabel + 1)
-                    logger.info('switch rate set to kappa = %s', self.interaction_params['kappa'][0])
-
-                self.props.update(kappa=np.array(self.interaction_params['kappa']))
-                if 'theta' in kwargs:
-                    theta = kwargs['theta']
-                    self.interaction_params['theta'] = theta
-                else:
-                    self.interaction_params['theta'] = 0.5
-                    logger.info('switch threshold set to theta = %s', self.interaction_params['theta'])
-
-            elif interaction == 'steric_evolution':
-                self.interaction = evo_steric
-                if 'r_b' in kwargs:
-                    self.interaction_params['r_b'] = kwargs['r_b']
-                else:
-                    self.interaction_params['r_b'] = 0.1
-                    logger.info('birth rate set to r_b = %s', self.interaction_params['r_b'])
-                if 'r_m' in kwargs:
-                    self.interaction_params['r_m'] = kwargs['r_m']
-                else:
-                    self.interaction_params['r_m'] = 1e-3
-                    logger.info('mutation rate set to r_m = %s', self.interaction_params['r_m'])
-                if 'r_d' in kwargs:
-                    self.interaction_params['r_d'] = kwargs['r_d']
-                else:
-                    self.interaction_params['r_d'] = .98 * self.interaction_params['r_b']
-                    logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
-                if 'alpha' in kwargs:
-                    self.interaction_params['alpha'] = kwargs['alpha']
-                else:
-                    self.interaction_params['alpha'] = 2.0
-                    logger.info('steric interaction strength set to alpha = %s', self.interaction_params['alpha'])
-                if 'gamma' in kwargs:
-                    self.interaction_params['gamma'] = kwargs['gamma']
-                else:
-                    self.interaction_params['gamma'] = 3.0
-                    logger.info('rest channel weight set to gamma = %s', self.interaction_params['gamma'])
-                if 'capacity' in kwargs:
-                    self.interaction_params['capacity'] = kwargs['capacity']
-                else:
-                    self.interaction_params['capacity'] = 512
-                    logger.info('deme capacity set to capacity = %s', self.interaction_params['capacity'])
-                self.init_families(type='homogeneous', mutation=True)
-                self.props['family'][0] = 1  # there is no 'void' cell, so the cell w/ id = 0 also belongs to fam. 1
-                self.family_props.update(r_b=[0] + [self.interaction_params['r_b']] * self.maxfamily)
-                if 'fitness_increase' in kwargs:
-                    self.interaction_params['fitness_increase'] = kwargs['fitness_increase']
-                else:
-                    self.interaction_params['fitness_increase'] = 1.1
-                    logger.info('fitness increase for driver mutations set to %s', self.interaction_params['fitness_increase'])
-
-            elif interaction == 'go_or_grow_glioblastoma':
-                self.interaction = go_or_grow_glioblastoma
-                try:
-                    assert self.restchannels > 0
-                except AssertionError:
-                    warn_user('This interaction requires a rest channel.')
-
-                if 'capacity' in kwargs:
-                    self.interaction_params['capacity'] = kwargs['capacity']
-                else:
-                    self.interaction_params['capacity'] = 8
-                    logger.info('node capacity set to %s', self.interaction_params['capacity'])
-
-                if 'kappa_std' in kwargs:
-                    self.interaction_params['kappa_std'] = kwargs['kappa_std']
-                else:
-                    self.interaction_params['kappa_std'] = 0.2
-                    logger.info('std of kappa set to %s', self.interaction_params['kappa_std'])
-
-                if 'r_d' in kwargs:
-                    self.interaction_params['r_d'] = kwargs['r_d']
-                else:
-                    self.interaction_params['r_d'] = 0.01
-                    logger.info('death rate set to r_d = %s', self.interaction_params['r_d'])
-
-                if 'r_m' in kwargs:
-                    self.interaction_params['r_m'] = kwargs['r_m']
-                else:
-                    self.interaction_params['r_m'] = 1e-3
-                    logger.info('mutation rate set to r_m = %s', self.interaction_params['r_m'])
-
-                if 'fitness_increase' in kwargs:
-                    self.interaction_params['fitness_increase'] = kwargs['fitness_increase']
-                else:
-                    self.interaction_params['fitness_increase'] = 1.1
-                    logger.info('fitness increase for driver mutations set to %s', self.interaction_params['fitness_increase'])
-
-                if 'theta' in kwargs:
-                    self.interaction_params['theta'] = kwargs['theta']
-                else:
-                    self.interaction_params['theta'] = 0.5
-                    logger.info('switch threshold set to theta = %s', self.interaction_params['theta'])
-
-                if 'r_b' in kwargs:
-                    initial_r_b = kwargs['r_b']
-                else:
-                    initial_r_b = 0.2
-                    logger.info('initial family birth rate set to r_b = %s', initial_r_b)
-
-                if 'kappa' in kwargs:
-                    initial_kappa = kwargs['kappa']
-                else:
-                    initial_kappa = 5.0
-                    logger.info('initial family switch rate set to kappa = %s', initial_kappa)
-
-                self.init_families(type='homogeneous', mutation=True)
-                if self.props.get('family'):
-                    self.props['family'][0] = 1
-                self.family_props.update(r_b=[0.0] + [initial_r_b] * self.maxfamily)
-                self.family_props.update(kappa=[0.0] + [initial_kappa] * self.maxfamily)
-            else:
-                raise ValueError(
-                    "Unknown interaction {!r}. Implemented interactions: {}".format(
-                        kwargs["interaction"], self.interactions
-                    )
-                )
-
-        else:
-            logger.info('Random walk interaction is used.')
-            interaction = 'random_walk'
-            self.interaction = random_walk
-        self._validate_interaction_params()
-        self._warn_if_nonlocal_ensemble_interaction(interaction)
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, recordchanneldens=False,
                 showprogress=True, recordfampop=False):

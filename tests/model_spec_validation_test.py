@@ -138,7 +138,7 @@ def test_unknown_plugin_parameter_is_rejected_with_suggestion():
         space=SpaceSpec(geometry="square", dims=(3, 3)),
         state=StateSpec(density=0.2),
         dynamics=InteractionPipelineSpec(
-            operators=[{"name": "classical.birth", "parameters": {"birth_raet": 0.2}}],
+            operators=[{"name": "birth_death", "parameters": {"birth_raet": 0.2}}],
             propagation=False,
         ),
     )
@@ -146,6 +146,7 @@ def test_unknown_plugin_parameter_is_rejected_with_suggestion():
         build_model(spec)
 
 
+@pytest.mark.filterwarnings("ignore:The interaction name:FutureWarning")
 def test_non_finite_plugin_probability_is_rejected():
     spec = ModelSpec(
         description=Description(title="non-finite"),
@@ -193,11 +194,13 @@ def _capacity_spec(operator_capacity):
     )
 
 
+@pytest.mark.filterwarnings("ignore:The interaction name:FutureWarning")
 def test_conflicting_operator_capacity_is_rejected():
     with pytest.raises(ValueError, match=r"capacity.*model.state.capacity"):
         build_model(_capacity_spec(7))
 
 
+@pytest.mark.filterwarnings("ignore:The interaction name:FutureWarning")
 def test_equal_operator_capacity_is_temporarily_accepted_with_warning():
     with pytest.warns(DeprecationWarning, match="model.state.capacity"):
         compiled = build_model(_capacity_spec(8))

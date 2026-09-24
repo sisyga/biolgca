@@ -35,12 +35,21 @@ import functools
 
 import numpy as np
 
-from .interactions import tanh_switch
-from .lattice_state import random_occupancy
+from .base import channel_sum
+from .lattice_state import channel_mask, random_occupancy
 from .mutations import apply_mutations, parse_mutation
 from .rules import interaction, register_single_cue, reorientation_term
 
-__all__ = ["birth_death", "go_or_grow_growth", "go_or_grow_switch", "go_or_rest", "random_walk"]
+__all__ = ["birth_death", "go_or_grow_growth", "go_or_grow_switch", "go_or_rest", "random_walk", "tanh_switch"]
+
+
+def tanh_switch(rho, kappa=5.0, theta=0.8):
+    """Probability to rest at relative density ``rho``: ``(1 + tanh(kappa (rho - theta))) / 2``.
+
+    ``theta`` is the relative density at which half of the cells rest, and
+    ``kappa`` the steepness of the switch; with ``kappa < 0`` crowded cells move.
+    """
+    return 0.5 * (1 + np.tanh(kappa * (rho - theta)))
 
 
 # Terms of the Boltzmann reorientation (ReorientationSpec). J(s') is the flux of
@@ -130,6 +139,23 @@ def chemotaxis(state, field):
     return state.gradient(field)
 
 
+@reorientation_term(coupling="flux", name="directed_motion")
+def directed_motion(state, field):
+    """g · J(s'): cells move along a given vector field g, e.g. a flow or an external gradient.
+
+    Parameters
+    ----------
+    field : str
+        Name of a vector field in StateSpec.fields, shape ``dims + (d,)``; its
+        length sets the strength of the bias together with ``beta``.
+    """
+    values = np.asarray(state.field(field), dtype=float)
+    if values.shape != state.dims + (state.c.shape[0],):
+        raise ValueError(f"state.fields.{field} must have shape {state.dims + (state.c.shape[0],)}, "
+                         f"got {values.shape}")
+    return values
+
+
 @reorientation_term(coupling="channels", name="contact_guidance")
 def contact_guidance(state, field="director"):
     """Cells move along the axis of a director field.
@@ -155,13 +181,13 @@ def contact_guidance(state, field="director"):
 # Every built-in cue also works alone as an operator: {"name": "chemotaxis", "parameters": {"beta": 2,
 # "field": "signal"}} is a ReorientationSpec with this one term.
 for _cue, _aliases in ((polar_alignment, ()), (nematic_alignment, ("nematic",)),
-                       (persistent_walk, ("persistent_motion",)), (aggregation, ()), (chemotaxis, ()),
+                       (persistent_walk, ("persistent_motion",)), (aggregation, ()), (chemotaxis, ()), (directed_motion, ()),
                        (contact_guidance, ()), (resting_bias, ()), (steric_repulsion, ())):
     register_single_cue(_cue, aliases=_aliases)
 
 @interaction(kind="birth_death", families=("classical", "nove", "ib", "nove_ib"), name="birth_death")
 def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_matrix=None, mutation=None,
-                new_family=False):
+                new_family=False, channels="all"):
     """Cells die and divide at the same time; crowded nodes have less room for daughters.
 
     In a time step, every cell dies with probability ``death_rate`` and,
@@ -185,6 +211,12 @@ def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_m
     ``capacity = K`` under volume exclusion. For death before division,
     list two operators: one with only ``death_rate``, then one with only
     ``birth_rate``.
+
+    With ``channels``, only the cells in a set of channels die and divide,
+    and their daughters go to that set: e.g. ``channels="rest"`` for the
+    go-or-grow rule that only resting cells divide. Under volume exclusion
+    the daughters then need empty channels of the set, ``K`` above becomes
+    the size of the set, and ``n_s`` the cells in it.
 
     Parameters
     ----------
@@ -211,6 +243,9 @@ def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_m
         Identity-based models: daughters that mutate found a new family, for
         lineage analyses such as Muller plots; without ``mutation``, every
         daughter founds one.
+    channels : str or list of int
+        The channels whose cells die and divide, and where daughters go:
+        ``"all"``, ``"velocity"``, ``"rest"`` or channel indices.
 
     Examples
     --------
@@ -226,7 +261,7 @@ def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_m
         if mutation_matrix is not None and not np.array_equal(np.asarray(mutation_matrix), [[1]]):
             raise ValueError("mutation_matrix needs a classical model with several species; identity-based "
                              "models have one species and change traits with mutation=")
-        _birth_death_cells(state, birth_rate, death_rate, crowding, mutation, new_family)
+        _birth_death_cells(state, birth_rate, death_rate, crowding, mutation, new_family, channels)
         return
     if mutation or new_family:
         raise ValueError("mutation and new_family change cell traits and families, which only "
@@ -235,52 +270,69 @@ def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_m
     death = _per_species(death_rate, "death_rate", n_species)
     birth = _per_species(birth_rate, "birth_rate", n_species)
     matrix = _mutation_matrix(mutation_matrix, n_species)
+    in_set = channel_mask(channels, state.K, state.velocitychannels)
+    every = in_set.all()
     # deaths and divisions are decided on the state at the start of the step
-    channels = state.counts
+    nodes = state.counts
     counts = state.species_density
     density = counts[..., 0] if n_species == 1 else counts.sum(axis=-1)
+    if not every:  # only the cells in the set take part
+        nodes = nodes * in_set
+        counts = channel_sum(nodes)
     if crowding and state.has_capacity:
         birth = birth * np.clip(1 - density / state.capacity, 0, 1)[..., None]
     if state.volume_exclusion:  # a cell per channel: one random number decides both, independently
         # booleans and float32 keep the temporaries small, which is what makes this fast
-        occupied = channels.astype(bool)
+        occupied = nodes.astype(bool)
         b = np.asarray(birth[..., None], dtype=np.float32)
         d = np.asarray(death[:, None], dtype=np.float32)
-        draw = rng.random(channels.shape, dtype=np.float32)
+        draw = rng.random(nodes.shape, dtype=np.float32)
         dying = occupied & ((draw < b * d) | ((draw >= b) & (draw < b + d * (1 - b))))
         births = (occupied & (draw < b)).view(np.uint8) @ np.ones(state.K, dtype=np.int64)
     else:
-        deaths = _by_species(rng, channels, death, axis=-2)
+        deaths = _by_species(rng, nodes, death, axis=-2)
         births = _by_species(rng, counts, birth, axis=-1) if birth.ndim == 1 else rng.binomial(counts, birth)
     if matrix is not None:
         births = rng.multinomial(births, matrix).sum(axis=-2)
     if crowding and state.volume_exclusion:  # daughters go to distinct random channels; the empty ones hold them
-        targets = random_occupancy(rng, np.minimum(births, state.K), state.K)
+        size = int(in_set.sum())
+        targets = random_occupancy(rng, np.minimum(births, size), size)
+        if not every:
+            placed = np.zeros(occupied.shape, dtype=bool)
+            placed[..., in_set] = targets
+            targets, occupied = placed, state.counts.astype(bool)
         state.counts = (occupied & ~dying) | (targets & ~occupied)
         return
     if state.volume_exclusion:
         deaths = dying.astype(np.int64)
     if not crowding:
         births = _at_most(rng, births, np.maximum(state.capacity - density, 0))
-    state.add_cells(births)  # into channels that were free at the start of the step
+    state.add_cells(births, channels=in_set)  # into channels that were free at the start of the step
     state.counts = state.counts - deaths
 
 
-def _birth_death_cells(state, birth_rate, death_rate, crowding, mutation, new_family):
+def _birth_death_cells(state, birth_rate, death_rate, crowding, mutation, new_family, channels):
     """birth_death for identity-based models: death and division per cell, decided at once."""
     cells, rng = state.cells, state.rng
+    in_set = channel_mask(channels, state.K, state.velocitychannels)
     dying = rng.random(len(cells)) < _per_cell(cells, death_rate, "death_rate")
     birth = _per_cell(cells, birth_rate, "birth_rate")
     density = state.density
     if crowding and state.has_capacity:
         birth = birth * np.clip(1 - density / state.capacity, 0, 1)[cells.node]
     dividing = rng.random(len(cells)) < birth
+    if not in_set.all():  # only the cells in the set take part
+        taking_part = in_set[cells.channel]
+        dying &= taking_part
+        dividing &= taking_part
     if crowding and state.volume_exclusion:
+        occupied = density if in_set.all() else (
+            np.bincount(cells.index[in_set[cells.channel]], minlength=density.size).reshape(density.shape))
         attempts = np.bincount(cells.index[dividing], minlength=density.size).reshape(density.shape)
-        dividing = cells.pick(dividing, _into_empty(rng, attempts, density, state.K))
+        dividing = cells.pick(dividing, _into_empty(rng, attempts, occupied, int(in_set.sum())))
     elif not crowding:
         dividing = cells.pick(dividing, np.maximum(state.capacity - density, 0))
-    daughters = _divide_and_mutate(state, dividing, "all", mutation, new_family)
+    daughters = _divide_and_mutate(state, dividing, in_set, mutation, new_family)
     cells.kill(np.concatenate([dying, np.zeros(len(daughters), dtype=bool)]))
 
 
@@ -330,13 +382,13 @@ def _thinned(rng, number, p):
     return np.bincount(rows[rng.random(len(rows)) < p], minlength=flat.size).reshape(number.shape)
 
 
-def _per_species(value, name, n_species):
+def _per_species(value, name, n_species, probability=True):
     rates = np.asarray(_number(value, name), dtype=float)
     if rates.ndim == 0:
         rates = np.full(n_species, float(rates))
     if rates.shape != (n_species,):
         raise ValueError(f"{name} must be one number or one per species ({n_species}), got {value!r}")
-    if np.any((rates < 0) | (rates > 1)):
+    if probability and np.any((rates < 0) | (rates > 1)):
         raise ValueError(f"{name} must be probabilities, got {value!r}")
     return rates
 
@@ -399,20 +451,23 @@ def random_walk(state, channels="all", species=None):
     state.shuffle_cells(channels, species=species)
 
 
-@interaction(kind="reorientation", families=("classical", "nove", "ib", "nove_ib"), n_species=1,
-             name="go_or_rest")
+@interaction(kind="reorientation", families=("classical", "nove", "ib", "nove_ib"), name="go_or_rest")
 def go_or_rest(state, kappa=5.0, theta=0.75, when_full="legacy", density="node"):
     """Moving cells start resting on crowded nodes, resting cells start moving on sparse ones.
 
+    A moving cell starts resting with probability ``tanh_switch(rho, kappa,
+    theta)``, a resting cell starts moving with the complementary
+    probability; ``rho`` is the relative density of all cells at the node.
+
     Parameters
     ----------
-    kappa : float or str
+    kappa : float, sequence or str
         Steepness of the switch. With kappa > 0 crowded cells rest, with
-        kappa < 0 they move. In identity-based models, the name of a cell
-        trait gives every cell its own value.
-    theta : float or str
-        Relative density at which half of the cells rest, or the name of a
-        cell trait. The relative density is the number of cells at the node
+        kappa < 0 they move. One number, one per species, or in
+        identity-based models the name of a cell trait (a value per cell).
+    theta : float, sequence or str
+        Relative density at which half of the cells rest, given like
+        ``kappa``. The relative density is the number of cells at the node
         over its capacity: the number of channels K with volume exclusion,
         ``StateSpec.capacity`` (the crowding scale) without.
     when_full : {"legacy", "reject"}
@@ -430,9 +485,11 @@ def go_or_rest(state, kappa=5.0, theta=0.75, when_full="legacy", density="node")
     if state.identity_based:
         _go_or_rest_cells(state, kappa, theta, when_full, density)
         return
-    rest = tanh_switch(_relative_density(state, density), _number(kappa, "kappa"), _number(theta, "theta"))
+    kappa = _per_species(kappa, "kappa", state.n_species, probability=False)
+    theta = _per_species(theta, "theta", state.n_species, probability=False)
+    rest = tanh_switch(_relative_density(state, density)[..., None], kappa, theta)  # per species
     velocity, rng = state.velocitychannels, state.rng
-    cells = state.counts[..., 0, :]
+    cells = state.counts
     moving, resting = cells[..., :velocity], cells[..., velocity:]
     if state.volume_exclusion:
         n_m, n_r = moving.sum(-1), resting.sum(-1)
@@ -450,7 +507,7 @@ def go_or_rest(state, kappa=5.0, theta=0.75, when_full="legacy", density="node")
         leaving_resting = rng.binomial(resting, (1 - rest)[..., None])
         new_moving = moving - leaving_moving + _spread(rng, leaving_resting.sum(-1), velocity)
         new_resting = resting - leaving_resting + _spread(rng, leaving_moving.sum(-1), state.restchannels)
-    state.counts = np.concatenate((new_moving, new_resting), axis=-1)[..., None, :]
+    state.counts = np.concatenate((new_moving, new_resting), axis=-1)
 
 
 @interaction(kind="phenotype_switch", families=("classical", "nove"), n_species=2, name="go_or_grow.switch")

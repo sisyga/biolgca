@@ -45,7 +45,7 @@ def build_spec() -> ModelSpec:
         state=StateSpec(density=0.1, restchannels=0),
         time=TimeSpec(steps=100, seed=101),
         dynamics=InteractionPipelineSpec(
-            operators=[{"name": "classical.random_walk"}],
+            operators=[{"name": "random_walk"}],
         ),
         analysis=AnalysisSpec(
             observers=[DensityRecorder(), PopulationRecorder()],

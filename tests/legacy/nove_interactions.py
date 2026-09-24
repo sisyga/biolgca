@@ -9,7 +9,7 @@ Interaction functions and helper functions for LGCA without volume exclusion.
 import numpy as np
 from scipy.special import softmax
 from lgca.base import _sampling_totals
-from lgca.interactions import tanh_switch
+from .interactions import tanh_switch
 
 def random_walk(lgca):
     """Perform a random walk rearrangement on the lattice.

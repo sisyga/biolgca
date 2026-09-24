@@ -279,7 +279,7 @@ def test_check_interaction_detects_a_wrong_rate():
 
 
 def test_check_interaction_accepts_registered_names():
-    assert check_interaction("classical.birth", parameters={"r_b": 0.2}).passed
+    assert check_interaction("birth_death", parameters={"birth_rate": 0.2}).passed
 
 
 def test_check_interaction_catches_ghost_nodes_that_leak_into_the_lattice():

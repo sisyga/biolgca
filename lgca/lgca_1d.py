@@ -62,8 +62,6 @@ class LGCA_1D(LGCA_base):
     """
     # set class attributes
     geometry = 'lin'
-    interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation',
-                    'random_walk', 'persistent_motion', 'birthdeath', 'only_propagation']
     velocitychannels = 2
     c = np.array([1., -1.])[None, ...] #directions of velocity channels; shape: (1,2)
 
@@ -588,7 +586,6 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
     lgca.base.IBLGCA_base : Base class for IBLGCA with volume exclusion with geometry-independent methods and attributes.
 
     """
-    interactions = ['go_or_grow', 'go_and_grow', 'random_walk', 'birth', 'birthdeath', 'birthdeath_discrete', 'only_propagation', 'go_and_grow_mutations']
 
     def init_nodes(self, density, nodes=None, **kwargs):
         self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.uint)
@@ -642,7 +639,6 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
     """
     1D version of an LGCA without volume exclusion.
     """
-    interactions = ['dd_alignment', 'di_alignment', 'go_or_grow', 'go_or_rest']
 
     def set_dims(self, dims=None, nodes=None, restchannels=None, capacity=None):
         """

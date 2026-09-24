@@ -72,9 +72,6 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
     """
     # set class attributes
     geometry = 'square'
-    interactions = ['go_and_grow', 'go_or_grow', 'alignment', 'aggregation',
-                    'random_walk', 'excitable_medium', 'nematic', 'persistent_motion', 'chemotaxis', 'contact_guidance',
-                    'only_propagation']
     velocitychannels = 4
     # build velocity channel vectors
     cix = np.array([1, 0, -1, 0], dtype=float)

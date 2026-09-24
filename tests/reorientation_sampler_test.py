@@ -40,14 +40,14 @@ def _run(model, steps):
 @pytest.mark.parametrize("restchannels", [0, 1])
 @pytest.mark.parametrize("geometry,dims", GEOMETRIES)
 def test_without_terms_it_is_the_nove_random_walk(geometry, dims, restchannels):
-    legacy = _model(geometry, dims, [{"name": "nove.random_walk"}], restchannels=restchannels)
+    legacy = _model(geometry, dims, [{"name": "legacy.nove.random_walk"}], restchannels=restchannels)
     composed = _model(geometry, dims, [ReorientationSpec()], restchannels=restchannels)
     np.testing.assert_array_equal(_run(composed, 10), _run(legacy, 10))
 
 
 @pytest.mark.parametrize("geometry,dims", [g for g in GEOMETRIES if g[0] != "hex"])
 def test_polar_alignment_is_the_nove_density_dependent_alignment(geometry, dims):
-    legacy = _model(geometry, dims, [{"name": "nove.dd_alignment", "parameters": {"beta": 0.7}}])
+    legacy = _model(geometry, dims, [{"name": "legacy.nove.dd_alignment", "parameters": {"beta": 0.7}}])
     composed = _model(geometry, dims, [ReorientationSpec(terms=[ReorientationTermSpec("polar_alignment",
                                                                                        beta=0.7)])])
     np.testing.assert_array_equal(_run(composed, 10), _run(legacy, 10))
@@ -161,7 +161,7 @@ def test_identity_models_place_their_cells_at_random(ve):
         assert abs(np.mean(odd & even) - resting ** 2) < 5 * np.sqrt(resting ** 2 / n)
 
 
-@pytest.mark.parametrize("ve,growth", [(True, "ib.birthdeath"), (False, "nove_ib.birthdeath")])
+@pytest.mark.parametrize("ve,growth", [(True, "legacy.ib.birthdeath"), (False, "legacy.nove_ib.birthdeath")])
 def test_identity_growth_and_reorientation_run_together(ve, growth):
     model = _model("square", (10, 10), [{"name": growth}, ReorientationSpec(terms=TERMS)],
                    density=0.5 if ve else 2, restchannels=1, ve=ve, ib=True, seed=11)

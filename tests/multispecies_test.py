@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from lgca import get_lgca
-from lgca.ms_interactions import _sample_offspring_by_species
+from tests.legacy.ms_interactions import _sample_offspring_by_species
 
 
 GEOMS = {
@@ -380,6 +380,13 @@ def test_multispecies_nove_birth_growth_uses_total_density_for_capacity_limit():
     assert lgca.nodes[lgca.nonborder].sum() == 10
 
 
+def _stacked_mutation_matrix(lgca):
+    """The mutation matrix of the growth rule that get_lgca stacked for a legacy interaction."""
+    stacked = lgca._compiled_model.pipeline.operators[0].operators
+    return next(np.asarray(operator.parameters["mutation_matrix"]) for operator in stacked
+                if operator.parameters.get("mutation_matrix") is not None)
+
+
 def test_multispecies_nove_birth_derives_mutation_matrix_from_birth_rate_bins():
     lgca = get_lgca(
         geometry="lin",
@@ -392,7 +399,7 @@ def test_multispecies_nove_birth_derives_mutation_matrix_from_birth_rate_bins():
         std=0.01,
     )
 
-    mutation_matrix = lgca.interaction_params["mutation_matrix"]
+    mutation_matrix = _stacked_mutation_matrix(lgca)
 
     assert mutation_matrix.shape == (3, 3)
     assert mutation_matrix.sum(axis=1) == pytest.approx(np.ones(3))
@@ -460,7 +467,7 @@ def test_multispecies_nove_go_or_grow_derives_mutation_matrix_from_kappa_bins():
         kappa_std=0.01,
     )
 
-    mutation_matrix = lgca.interaction_params["mutation_matrix"]
+    mutation_matrix = _stacked_mutation_matrix(lgca)
 
     assert mutation_matrix.shape == (3, 3)
     assert mutation_matrix.sum(axis=1) == pytest.approx(np.ones(3))
@@ -549,14 +556,23 @@ def test_multispecies_nove_go_or_grow_runs_on_multidimensional_lattices(geom, di
     assert rest_counts[1] == 40
 
 
+@pytest.mark.parametrize("ve,interaction", [(True, "go_or_grow_kappa"), (False, "evo_steric")])
+def test_factory_rejects_interactions_without_multispecies_implementation(ve, interaction):
+    with pytest.raises(ValueError, match="Unknown interaction"):
+        get_lgca(geometry="square", dims=4, ve=ve, n_species=2, restchannels=1, seed=1, interaction=interaction)
+
+
 @pytest.mark.parametrize(
     "ve,interaction",
     [(True, "birth"), (True, "alignment"), (False, "random_walk"), (False, "dd_alignment"), (False, None)],
 )
-def test_factory_rejects_interactions_without_multispecies_implementation(ve, interaction):
+def test_the_rules_without_prefix_serve_several_species(ve, interaction):
+    # the legacy multispecies classes had only a few interactions; the rules work for any number of species
     kwargs = {} if interaction is None else {"interaction": interaction}
-    with pytest.raises(ValueError, match="not supported|No interaction was given"):
-        get_lgca(geometry="square", dims=4, ve=ve, n_species=2, restchannels=1, seed=1, **kwargs)
+    lgca = get_lgca(geometry="square", dims=4, ve=ve, n_species=2, restchannels=1, seed=1, **kwargs)
+    before = lgca.cell_density[lgca.nonborder].sum()
+    lgca.timestep()
+    assert interaction in (None, "birth") or lgca.cell_density[lgca.nonborder].sum() == before
 
 
 @pytest.mark.parametrize(

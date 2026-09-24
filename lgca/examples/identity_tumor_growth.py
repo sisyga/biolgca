@@ -50,22 +50,18 @@ def build_spec() -> ModelSpec:
             volume_exclusion=False,
             identity_based=True,
             capacity=8,
+            traits={"kappa": -5.0, "theta": 0.5},
             # a 3 x 3 block of fully occupied nodes in the centre
             initializer={"name": "region", "parameters": {"extent": 3, "density": 8}},
         ),
         time=TimeSpec(steps=100, seed=105),
         dynamics=InteractionPipelineSpec(
             operators=[
-                {
-                    "name": "nove_ib.go_or_grow",
-                    "parameters": {
-                        "r_b": 0.2,
-                        "r_d": 0.01,
-                        "kappa": -5.0,
-                        "theta": 0.5,
-                        "kappa_std": 0.2,
-                    },
-                }
+                # every cell switches with its own kappa and theta; daughters inherit them with a change
+                {"name": "go_or_rest", "parameters": {"kappa": "kappa", "theta": "theta"}},
+                {"name": "go_or_grow.growth", "parameters": {
+                    "r_b": 0.2, "r_d": 0.01, "mutation": {"kappa": 0.2, "theta": 0.05}}},
+                {"name": "random_walk", "parameters": {"channels": "velocity"}},
             ],
         ),
         analysis=AnalysisSpec(

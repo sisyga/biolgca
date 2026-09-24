@@ -16,7 +16,7 @@ def test_compiled_family_growth_recording_and_continuation(entry):
         space=SpaceSpec(geometry="lin", dims=1),
         state=StateSpec(identity_based=True, nodes=np.array([[1, 0, 0, 0]], dtype=np.uint64)),
         time=TimeSpec(steps=4, seed=42),
-        dynamics=InteractionPipelineSpec(operators=[{"name": "ib.go_and_grow_mutations",
+        dynamics=InteractionPipelineSpec(operators=[{"name": "go_and_grow_mutations",
             "parameters": {"r_b": 1., "r_d": 0., "r_m": 1.}}], propagation=False),
         analysis=AnalysisSpec(observers=[FamilyPopulationRecorder(), NodeRecorder()]),
     )
@@ -44,7 +44,9 @@ def test_compiled_family_growth_recording_and_continuation(entry):
     assert model.lgca.maxfamily > 1
     assert model.lgca.enable_propagation is False
     np.testing.assert_array_equal(model.lgca.nodes, uninterrupted.lgca.nodes)
-    assert model.lgca.props == uninterrupted.lgca.props
+    assert model.lgca.props.keys() == uninterrupted.lgca.props.keys()
+    for name, values in model.lgca.props.items():
+        np.testing.assert_array_equal(np.asarray(values), np.asarray(uninterrupted.lgca.props[name]))
     assert model.lgca.rng.bit_generator.state == uninterrupted.lgca.rng.bit_generator.state
 
 
@@ -55,7 +57,7 @@ def test_sparse_continuation_metadata_reconstructs_serialized_sample_times(tmp_p
     model = build_model(ModelSpec(
         space=SpaceSpec(geometry="lin", dims=3),
         time=TimeSpec(steps=4, seed=146, timing_trace=10),
-        dynamics=InteractionPipelineSpec(operators=[{"name": "classical.random_walk"}]),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "random_walk"}]),
         analysis=AnalysisSpec(observers=[NodeRecorder(Schedule(steps=[0, 1, 4]))]),
     ))
     first = model.run(False)

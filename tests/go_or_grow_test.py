@@ -71,7 +71,7 @@ def _pipeline(n_species, when_full="legacy"):
 @pytest.mark.parametrize("ve", [True, False])
 def test_one_step_matches_the_legacy_rule_at_every_density(ve, n_species):
     nodes = _legacy_nodes(ve, seed=4)
-    legacy = _step(nodes, [{"name": "classical.go_or_grow" if ve else "nove.go_or_grow",
+    legacy = _step(nodes, [{"name": "legacy.classical.go_or_grow" if ve else "legacy.nove.go_or_grow",
                             "parameters": PARAMETERS}])
     if n_species == 1:
         two = _step(nodes, _pipeline(1))
@@ -90,7 +90,7 @@ def test_one_step_matches_the_legacy_rule_at_every_density(ve, n_species):
 
 def test_the_reject_mode_is_a_different_model():
     nodes = _legacy_nodes(True, seed=4)
-    legacy = _migrating_and_resting(_step(nodes, [{"name": "classical.go_or_grow", "parameters": PARAMETERS}]))
+    legacy = _migrating_and_resting(_step(nodes, [{"name": "legacy.classical.go_or_grow", "parameters": PARAMETERS}]))
     reject = _migrating_and_resting(_step(nodes, _pipeline(1, when_full="reject")))
     crowded = nodes.sum(-1) >= 7
 

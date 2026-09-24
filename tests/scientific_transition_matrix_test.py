@@ -5,7 +5,7 @@ from itertools import permutations
 import numpy as np
 import pytest
 
-from lgca.pipeline import NativePhenotypeSwitchOperator
+from lgca.pipeline import SpeciesSwitchOperator
 
 
 def test_phenotype_switch_metadata_matches_mass_and_momentum_observables():
@@ -41,7 +41,7 @@ def test_all_small_states_respect_directed_transition_support(order):
         state = np.array([(mask >> bit) & 1 for bit in range(6)], dtype=bool).reshape(3, 2)
         before = state.sum(axis=1)
         for seed in range(4):
-            result = NativePhenotypeSwitchOperator._sample_state(
+            result = SpeciesSwitchOperator._sample_state(
                 state[order], rates[np.ix_(order, order)], np.random.default_rng(seed)
             )
             counts = result.sum(axis=1)[np.argsort(order)]

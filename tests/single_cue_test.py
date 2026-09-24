@@ -38,17 +38,18 @@ def _director():
 
 
 CASES = {
-    "alignment": ({"name": "classical.alignment", "parameters": {"beta": 1.5}},
+    "alignment": ({"name": "legacy.classical.alignment", "parameters": {"beta": 1.5}},
                   {"name": "polar_alignment", "parameters": {"beta": 1.5}}, {}),
-    "persistent_walk": ({"name": "classical.persistent_walk", "parameters": {"beta": 1.5}},
+    "persistent_walk": ({"name": "legacy.classical.persistent_walk", "parameters": {"beta": 1.5}},
                         {"name": "persistent_walk", "parameters": {"beta": 1.5}}, {}),
-    "aggregation": ({"name": "classical.aggregation", "parameters": {"beta": 1.5}},
+    "aggregation": ({"name": "legacy.classical.aggregation", "parameters": {"beta": 1.5}},
                     {"name": "aggregation", "parameters": {"beta": 1.5}}, {}),
     "chemotaxis": (None, {"name": "chemotaxis", "parameters": {"beta": 20.0, "field": "signal"}},
                    {"signal": _signal()}),
-    "nematic": ({"name": "classical.nematic", "parameters": {"beta": 1.5}},
+    "nematic": ({"name": "legacy.classical.nematic", "parameters": {"beta": 1.5}},
                 {"name": "nematic_alignment", "parameters": {"beta": 1.5}}, {}),
-    "contact_guidance": ({"name": "classical.contact_guidance", "parameters": {"beta": 2.0}},
+    "contact_guidance": ({"name": "legacy.classical.contact_guidance", "parameters": {
+                             "beta": 2.0, "director": np.pad(_director(), [(1, 1), (1, 1), (0, 0)], mode="edge")}},
                          {"name": "contact_guidance", "parameters": {"beta": 2.0, "field": "director"}},
                          {"director": _director()}),
 }
@@ -70,7 +71,7 @@ def test_a_single_cue_reproduces_the_legacy_classical_operator(case):
     weights = term.weights
     if legacy_entry is None:  # chemotaxis: the legacy operator takes the gradient itself
         gradient = np.pad(term.field, [(1, 1), (1, 1), (0, 0)], mode="edge")
-        legacy_entry = {"name": "classical.chemotaxis", "parameters": {"beta": 20.0, "gradient": gradient}}
+        legacy_entry = {"name": "legacy.classical.chemotaxis", "parameters": {"beta": 20.0, "gradient": gradient}}
     legacy = _model(nodes, legacy_entry, fields=fields, seed=4)
     new.step()
     legacy.step()
@@ -84,10 +85,10 @@ def test_a_single_cue_reproduces_the_legacy_classical_operator(case):
 
 
 @pytest.mark.parametrize("parameters, legacy", [
-    ({}, ("nove.dd_alignment", {})),
-    ({"include_center": True}, ("nove.dd_alignment", {"include_center": True})),
-    ({"normalize": True}, ("nove.di_alignment", {})),
-    ({"normalize": True, "include_center": True}, ("nove.di_alignment", {"include_center": True})),
+    ({}, ("legacy.nove.dd_alignment", {})),
+    ({"include_center": True}, ("legacy.nove.dd_alignment", {"include_center": True})),
+    ({"normalize": True}, ("legacy.nove.di_alignment", {})),
+    ({"normalize": True, "include_center": True}, ("legacy.nove.di_alignment", {"include_center": True})),
 ])
 def test_polar_alignment_is_the_nove_alignment_seed_for_seed(parameters, legacy):
     nodes = np.random.default_rng(2).poisson(1.5, DIMS + (4,))

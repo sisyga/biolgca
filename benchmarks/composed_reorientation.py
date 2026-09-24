@@ -1,29 +1,39 @@
 """Repeatable diagnostic for the recommended composed reorientation route.
 
-Run from the repository with PYTHONPATH set to its root. Timings are diagnostics,
-not portable performance gates. Each repeat constructs a fresh seeded model.
+Compares the legacy aggregation function (``tests/legacy``, route "legacy") with the
+aggregation cue alone and combined with nematic alignment. Run from the repository root,
+``uv run python benchmarks/composed_reorientation.py OUTPUT``. Timings are diagnostics, not
+portable performance gates. Each repeat constructs a fresh seeded model.
 """
 
 import argparse
 import cProfile
 import io
 import json
-from pathlib import Path
 import pstats
+import sys
+from pathlib import Path
 from statistics import median
 from time import perf_counter
 
 import numpy as np
 
 from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
-from lgca.pipeline import InteractionPipelineSpec, ReorientationSpec, ReorientationTermSpec
+from lgca.pipeline import (
+    InteractionPipelineSpec,
+    ReorientationSpec,
+    ReorientationTermSpec,
+)
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # the repository root, for tests.legacy
+import tests.legacy
 
 
 def make_model(size, occupancy, route, steps):
     nodes = np.zeros((size, size, 4), dtype=bool)
     nodes[..., :occupancy] = True
-    if route == "dedicated":
-        operator = {"name": "classical.aggregation", "parameters": {"beta": 2.0}}
+    if route == "legacy":
+        operator = {"name": "legacy.classical.aggregation", "parameters": {"beta": 2.0}}
     else:
         terms = [ReorientationTermSpec("aggregation", beta=2.0)]
         if route == "combined":
@@ -45,7 +55,7 @@ def main():
     results = []
     for size in (64, 128):
         for occupancy in (1, 2):
-            for route in ("dedicated", "composed", "combined"):
+            for route in ("legacy", "composed", "combined"):
                 elapsed = []
                 for _ in range(args.repeats):
                     model = make_model(size, occupancy, route, args.steps)

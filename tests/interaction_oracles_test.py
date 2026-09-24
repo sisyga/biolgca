@@ -4,14 +4,17 @@ Each test prepares a lattice on which many nodes see the same neighbourhood,
 applies one interaction step without propagation, and compares the measured
 channel frequencies with probabilities computed here from the rule's
 definition. Every implementation of a rule is checked against the same oracle:
-the ``get_lgca`` interaction, the registered ModelSpec plugin and, where one
+the legacy interaction function, its translation to rules (the prefixed name) and, where one
 exists, the composed reorientation term.
 """
 
 import numpy as np
 import pytest
 
-from lgca import get_lgca
+from tests.legacy import legacy_lgca
+
+# the prefixed names are the translations of the legacy names, which warn as deprecated
+pytestmark = pytest.mark.filterwarnings("ignore:The interaction name:FutureWarning")
 from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
 from lgca.pipeline import InteractionPipelineSpec, ReorientationSpec, ReorientationTermSpec
 
@@ -26,7 +29,7 @@ def _boltzmann(scores):
 
 
 def _legacy_states(geometry, nodes, interaction, repeats, ve=True, **params):
-    lgca = get_lgca(geometry=geometry, nodes=nodes, ve=ve, interaction=interaction, seed=0, **params)
+    lgca = legacy_lgca(geometry=geometry, nodes=nodes, ve=ve, interaction=interaction, seed=0, **params)
     start = lgca.nodes.copy()
     states = []
     for _ in range(repeats):
@@ -59,7 +62,7 @@ def _model_spec_states(geometry, nodes, operator, repeats, ve=True, velocitychan
 
 def _states(entry, geometry, nodes, repeats, *, legacy, plugin, composed=None, ve=True, velocitychannels=4,
             fields=None, capacity=None):
-    if entry == "get_lgca":
+    if entry == "legacy":
         interaction, params = legacy
         return _legacy_states(geometry, nodes, interaction, repeats, ve=ve, **params)
     operator = plugin if entry == "plugin" else composed
@@ -82,7 +85,7 @@ def _uniform_right_movers(dims=(10, 10), restchannels=0):
     return nodes
 
 
-REORIENTATION_ENTRIES = ["get_lgca", "plugin", "composed"]
+REORIENTATION_ENTRIES = ["legacy", "plugin", "composed"]
 
 
 @pytest.mark.parametrize("entry", REORIENTATION_ENTRIES)
@@ -163,7 +166,7 @@ def test_random_walk_places_a_particle_uniformly_in_all_channels(entry):
     _assert_channel_frequencies(states, np.full(5, 1 / 5))
 
 
-@pytest.mark.parametrize("entry", ["get_lgca", "plugin"])
+@pytest.mark.parametrize("entry", ["legacy", "plugin"])
 def test_birth_fills_empty_channels_in_proportion_to_local_density(entry):
     r_b = 0.5
     nodes = np.zeros((10, 10, 5), dtype=bool)
@@ -179,7 +182,7 @@ def test_birth_fills_empty_channels_in_proportion_to_local_density(entry):
     assert abs(births.sum() - trials * p) < 4 * np.sqrt(trials * p * (1 - p))
 
 
-@pytest.mark.parametrize("entry", ["get_lgca", "plugin"])
+@pytest.mark.parametrize("entry", ["legacy", "plugin"])
 @pytest.mark.parametrize("theta,r_d,expected_moving,expected_resting", [
     (0.0, 0.0, 0, 2),  # density above threshold: both cells switch to rest
     (1.0, 0.0, 2, 0),  # density below threshold: both cells keep moving
@@ -198,7 +201,7 @@ def test_go_or_grow_switches_by_density_threshold_and_removes_dead_cells(entry, 
     assert np.all(states[..., 4:].sum(axis=-1) == expected_resting)
 
 
-@pytest.mark.parametrize("entry", ["get_lgca", "plugin"])
+@pytest.mark.parametrize("entry", ["legacy", "plugin"])
 def test_nove_density_dependent_alignment_follows_the_neighbour_flux(entry):
     beta = 0.1
     nodes = np.zeros((10, 10, 4), dtype=np.uint)
@@ -211,7 +214,7 @@ def test_nove_density_dependent_alignment_follows_the_neighbour_flux(entry):
     _assert_channel_frequencies(states, _boltzmann(beta * SQUARE_C @ (12 * E_X)), particles_per_node=3)
 
 
-@pytest.mark.parametrize("entry", ["get_lgca", "plugin"])
+@pytest.mark.parametrize("entry", ["legacy", "plugin"])
 def test_nove_random_walk_spreads_particles_over_all_channels(entry):
     nodes = np.zeros((10, 10, 5), dtype=np.uint)
     nodes[..., 0] = 5
@@ -221,7 +224,7 @@ def test_nove_random_walk_spreads_particles_over_all_channels(entry):
     _assert_channel_frequencies(states, np.full(5, 1 / 5), particles_per_node=5)
 
 
-@pytest.mark.parametrize("entry", ["get_lgca", "plugin"])
+@pytest.mark.parametrize("entry", ["legacy", "plugin"])
 @pytest.mark.parametrize("cells,capacity", [(8, 8), (4, 8)])
 def test_nove_go_or_grow_birth_is_logistic_in_node_density(entry, cells, capacity):
     r_b = 0.6

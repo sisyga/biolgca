@@ -115,7 +115,7 @@ def test_runtime_metadata_and_csv_observers_capture_outputs(tmp_path):
         space=SpaceSpec(geometry="square", dims=(4, 4), boundary="periodic"),
         state=StateSpec(density=0.25, restchannels=1),
         time=TimeSpec(steps=1, seed=11),
-        dynamics=InteractionPipelineSpec(operators=[{"name": "classical.random_walk"}]),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "random_walk"}]),
         analysis=AnalysisSpec(observers=[snapshot, series]),
     )
 
@@ -125,7 +125,7 @@ def test_runtime_metadata_and_csv_observers_capture_outputs(tmp_path):
     assert result.metadata["model_spec_schema_version"] == MODEL_SPEC_SCHEMA_VERSION
     assert result.metadata["biolgca_version"]
     assert runtime["elapsed_seconds"] >= 0.0
-    assert any(entry["name"] == "classical.random_walk" for entry in runtime["operator_timings"])
+    assert any(entry["name"] == "random_walk" for entry in runtime["operator_timings"])
     assert all(path in result.metadata["output_paths"] for path in [str(series.output_path), *map(str, snapshot.paths)])
 
     with series.output_path.open(newline="") as handle:
@@ -201,7 +201,7 @@ def test_unseeded_run_records_a_seed_that_reproduces_it():
         space=SpaceSpec(geometry="square", dims=(8, 8)),
         state=StateSpec(density=1),
         time=TimeSpec(steps=5),
-        dynamics=InteractionPipelineSpec(operators=[{"name": "classical.random_walk"}]),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "random_walk"}]),
         analysis=AnalysisSpec(observers=[NodeRecorder()]),
     )
 
@@ -223,7 +223,7 @@ def test_cli_writes_the_seed_it_used_into_the_resolved_model(tmp_path):
     model = tmp_path / "model.json"
     save_model_spec(ModelSpec(space=SpaceSpec(geometry="lin", dims=10), state=StateSpec(density=1),
                               time=TimeSpec(steps=2),
-                              dynamics=InteractionPipelineSpec(operators=[{"name": "classical.random_walk"}])),
+                              dynamics=InteractionPipelineSpec(operators=[{"name": "random_walk"}])),
                     model)
 
     main(["run", str(model), "--output", str(tmp_path / "run")])
