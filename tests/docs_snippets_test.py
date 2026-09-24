@@ -29,13 +29,13 @@ def clean_registries():
     _TERM_ALIASES.clear(), _TERM_ALIASES.update(term_aliases)
 
 
-@pytest.mark.parametrize("page", ["how_to/custom_interactions.rst"])
-def test_page_code_runs(page, clean_registries):
+@pytest.mark.parametrize("page, blocks", [("how_to/custom_interactions.rst", 5), ("how_to/research_models.rst", 3)])
+def test_page_code_runs(page, blocks, clean_registries):
     matplotlib.use("Agg")
     namespace = {"print": lambda *args, **kwargs: None}
-    blocks = _python_blocks(DOCS / page)
-    assert len(blocks) >= 5
-    for block in blocks:
+    code = _python_blocks(DOCS / page)
+    assert len(code) >= blocks
+    for block in code:
         exec(compile(block, str(DOCS / page), "exec"), namespace)  # noqa: S102
 
-    assert namespace["result"].lgca.nodes.sum() > 0
+    assert namespace["result"].lgca.cell_density.sum() > 0

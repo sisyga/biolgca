@@ -196,9 +196,9 @@ def _daughter_values(model, name, first):
 
 
 @pytest.mark.parametrize("ve", [True, False])
-def test_traits_mutate_within_bounds(ve):
-    model = _identity_model(ve, {"birth_rate": 1.0, "mutation": {"r": {"std": 0.1, "bounds": [0.0, 0.5]}}},
-                            {"r": 0.45})
+def test_a_redrawn_normal_change_is_a_truncated_normal(ve):
+    effect = {"distribution": "normal", "scale": 0.1, "bounds": [0.0, 0.5], "at_bounds": "redraw"}
+    model = _identity_model(ve, {"birth_rate": 1.0, "mutation": {"r": effect}}, {"r": 0.45})
     first = model.lgca.maxlabel + 1
     model.step()
     values = _daughter_values(model, "r", first)
@@ -207,25 +207,52 @@ def test_traits_mutate_within_bounds(ve):
 
     law = truncnorm((0 - 0.45) / 0.1, (0.5 - 0.45) / 0.1, loc=0.45, scale=0.1)
     assert abs(values.mean() - law.mean()) < 4 * law.std() / np.sqrt(len(values))
+    assert abs(values.std() - law.std()) < 0.05 * law.std()
 
 
 @pytest.mark.parametrize("ve", [True, False])
-def test_traits_mutate_in_steps(ve):
-    model = _identity_model(ve, {"birth_rate": 1.0, "mutation": {"r": {"step": 0.1, "probability": 0.3,
-                                                                       "bounds": [None, 0.5]}}},
-                            {"r": 0.45})
+def test_kinds_of_mutation_apply_independently_in_order(ve):
+    # passengers subtract an exponential effect, then drivers add 0.02; values stay <= 0.5
+    mutation = [
+        {"probability": 0.3, "traits": {"r": {"distribution": "exponential", "scale": 0.01,
+                                              "operation": "subtract", "bounds": [None, 0.5]}}},
+        {"probability": 0.2, "traits": {"r": {"value": 0.02, "bounds": [None, 0.5]}}},
+    ]
+    model = _identity_model(ve, {"birth_rate": 1.0, "mutation": mutation}, {"r": 0.49})
     first = model.lgca.maxlabel + 1
     model.step()
-    values = _daughter_values(model, "r", first)
-    changed = np.round(values - 0.45, 6)
-    assert set(np.unique(changed)) <= {-0.1, 0.0, 0.05}  # a step up is clipped to 0.5
-    for step, p in ((-0.1, 0.15), (0.05, 0.15)):
-        assert abs((changed == step).mean() - p) < 4 * np.sqrt(p * (1 - p) / len(values))
+    change = np.round(_daughter_values(model, "r", first) - 0.49, 12)
+    n = len(change)
+    assert change.max() <= 0.01
+    # at 0.5: a driver alone, or after a passenger effect below 0.01 (probability 1 - 1/e)
+    at_bound = 0.2 * (0.7 + 0.3 * (1 - np.exp(-1)))
+    below = 0.3 * (0.8 + 0.2 * np.exp(-1))  # a passenger, and no driver that brings the value back
+    for observed, p in (((change == 0.01).mean(), at_bound), ((change == 0).mean(), 0.7 * 0.8),
+                        ((change < 0).mean() + ((change > 0) & (change < 0.01)).mean(), below)):
+        assert abs(observed - p) < 4 * np.sqrt(p * (1 - p) / n)
+
+
+def test_a_fixed_effect_can_multiply_and_a_registered_function_can_draw_it():
+    from lgca import mutation_effect
+
+    @mutation_effect
+    def two_values(rng, size, low=0.5, high=2.0):
+        return np.where(rng.random(size) < 0.5, low, high)
+
+    model = _identity_model(False, {"birth_rate": 1.0, "mutation": {
+        "r": {"function": "two_values", "operation": "multiply"}, "s": {"value": 3.0, "operation": "multiply"}}},
+        {"r": 0.4, "s": 2.0})
+    first = model.lgca.maxlabel + 1
+    model.step()
+    r, s = _daughter_values(model, "r", first), _daughter_values(model, "s", first)
+    assert set(np.round(r, 9)) == {0.2, 0.8} and abs((r < 0.5).mean() - 0.5) < 0.03
+    np.testing.assert_allclose(s, 6.0)
 
 
 @pytest.mark.parametrize("ve", [True, False])
-def test_daughters_found_families_with_a_probability(ve):
-    model = _identity_model(ve, {"birth_rate": 1.0, "new_family": 0.2}, {})
+def test_mutated_daughters_found_families(ve):
+    model = _identity_model(ve, {"birth_rate": 1.0, "new_family": True,
+                                 "mutation": {"probability": 0.2, "traits": {}}}, {})
     lgca = model.lgca
     lgca.init_families(type="homogeneous", mutation=True)
     first, families = lgca.maxlabel + 1, lgca.maxfamily
@@ -234,14 +261,16 @@ def test_daughters_found_families_with_a_probability(ve):
     founded = family > families
     assert abs(founded.mean() - 0.2) < 4 * np.sqrt(0.16 / len(family))
     assert len(np.unique(family[founded])) == founded.sum() == lgca.maxfamily - families
-    assert set(family[~founded]) == {0} or set(family[~founded]) == {1}  # the mother's family
+    ancestors = np.asarray(lgca.family_props["ancestor"])[family[founded]]
+    mothers = set(np.unique(family[~founded]))
+    assert len(mothers) == 1 and set(ancestors) == mothers  # descend from the mother's family
 
 
 def test_the_rule_passes_the_interaction_checks():
     check_interaction(birth_death, {"birth_rate": 0.3, "death_rate": 0.1})
     check_interaction(birth_death, {"birth_rate": 0.3, "crowding": False})
-    check_interaction(birth_death, {"birth_rate": "r_b", "death_rate": 0.1, "mutation": {"r_b": 0.01}},
-                      families=("ib", "nove_ib"), traits={"r_b": 0.3})
+    check_interaction(birth_death, {"birth_rate": "r_b", "death_rate": 0.1, "mutation": {"r_b": 0.01},
+                                    "new_family": True}, families=("ib", "nove_ib"), traits={"r_b": 0.3})
 
 
 @pytest.mark.parametrize("parameters, identity, message", [
@@ -250,8 +279,11 @@ def test_the_rule_passes_the_interaction_checks():
     ({"birth_rate": [0.1, 0.2, 0.3]}, False, "one per species"),
     ({"mutation_matrix": [[0.5, 0.4], [0, 1]]}, False, "sum to 1"),
     ({"mutation_matrix": [[0, 1], [1, 0]]}, True, "classical model with several species"),
-    ({"mutation": {"r_b": {"std": 0.1, "step": 0.1}}}, True, "must be a standard deviation"),
-    ({"new_family": 1.5}, True, "True, False or a probability"),
+    ({"mutation": {"r_b": {"distribution": "normal", "value": 0.1}}}, True, "exactly one of"),
+    ({"mutation": {"r_b": {"distribution": "bit_generator"}}}, True, "must name a distribution"),
+    ({"mutation": {"r_b": {"function": "nowhere"}}}, True, "is not registered"),
+    ({"mutation": {"probability": 2, "traits": {}}}, True, "must be a probability"),
+    ({"mutation": {"r_b": {"value": 1, "operation": "divide"}}}, True, "must be one of"),
 ])
 def test_invalid_parameters_are_explained(parameters, identity, message):
     counts = np.ones((4, 4, 5), dtype=int)

@@ -78,15 +78,15 @@ class LGCA_3dMoore(LGCA_Cubic):
         return np.stack(np.gradient(qty, axis=(0, 1, 2)), axis=-1)
 
     def channel_weight(self, qty):
-        """Compute neighbour weights for interaction fields."""
+        """Values of ``qty`` at the neighbour each velocity channel points to."""
         w = np.zeros(qty.shape + (self.velocitychannels,))
         for k, (dx, dy, dz) in enumerate(self._vels):
-            src_x = slice(max(-dx, 0), qty.shape[0] - max(dx, 0))
-            dst_x = slice(max(dx, 0), qty.shape[0] - max(-dx, 0))
-            src_y = slice(max(-dy, 0), qty.shape[1] - max(dy, 0))
-            dst_y = slice(max(dy, 0), qty.shape[1] - max(-dy, 0))
-            src_z = slice(max(-dz, 0), qty.shape[2] - max(dz, 0))
-            dst_z = slice(max(dz, 0), qty.shape[2] - max(-dz, 0))
+            dst_x = slice(max(-dx, 0), qty.shape[0] - max(dx, 0))
+            src_x = slice(max(dx, 0), qty.shape[0] - max(-dx, 0))
+            dst_y = slice(max(-dy, 0), qty.shape[1] - max(dy, 0))
+            src_y = slice(max(dy, 0), qty.shape[1] - max(-dy, 0))
+            dst_z = slice(max(-dz, 0), qty.shape[2] - max(dz, 0))
+            src_z = slice(max(dz, 0), qty.shape[2] - max(-dz, 0))
             w[dst_x, dst_y, dst_z, k] = qty[src_x, src_y, src_z]
         return w
 

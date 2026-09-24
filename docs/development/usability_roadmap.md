@@ -748,6 +748,40 @@ deprecated aliases for one release.
   `multispecies.birthdeath` in distribution). All legacy research rules get
   ported as stacks of generic rules under their legacy names, which needs
   custom mutation-effect distributions.
+- Status (2026-09-24): research models ported. `lgca.stack` makes one
+  operator from a list of operators (StackOperator builds them when the model
+  is built, with the model's LatticeState). `lgca.research_models` registers
+  `go_or_grow_kappa`, `go_or_grow_kappa_chemo`, `go_or_grow_glioblastoma`,
+  `evo_steric`, `birthdeath_cancerdfe`, `go_and_grow_mutations`,
+  `birthdeath_discrete` (stacks, identity-based families) and
+  `excitable_medium` (a rule, classical). Mutations are events
+  (`lgca.mutations`): probability, per-trait effects from any NumPy
+  distribution, fixed values or registered functions (`@mutation_effect`),
+  add/subtract/multiply, bounds clipped or redrawn, lists of kinds;
+  `new_family=True` means mutated daughters found families (decided with the
+  user; the per-daughter probability is gone). Generic additions:
+  `channels` for reorientations, `steric_repulsion`, `neighbor_values`,
+  `go_or_rest(density="neighbourhood")`, `Cells.found_families`.
+  Parity in distribution away from the edges (`tests/research_models_test.py`;
+  in a pipeline the legacy operators see empty ghost nodes). Differences:
+  family traits become cell traits; density cues see the density after
+  growth; legacy `go_or_grow_kappa_chemo` normalized the neighbourhood sum by
+  v instead of v + 1 (kappa = 0 in its test); `birthdeath_discrete` clips at
+  a_max; Moore `channel_weight` pointed backwards (fixed).
+  Speed (`benchmarks/research_models.py`, 50 warm-up steps, every
+  measurement in a fresh process): research stacks 3.6-17x faster,
+  identity-based growth 11-14x, the excitable medium 2x, classical growth
+  with a random walk 1.1x (after `int8` counts with volume exclusion: int64
+  temporaries of 560 kB made glibc map fresh pages every step). Multispecies
+  growth without volume exclusion is 0.8x or 1.3x depending on whether glibc
+  trims the heap (bimodal across identical seeded runs; with
+  MALLOC_TRIM_THRESHOLD_ raised it is steadily 1.3x). int32 counts there
+  made it worse (mixed-type conversions). Optimizations on the way: interior
+  as slice views, channel sums as matrix products, table-drawn occupancy
+  states, distinct-target births as one random subset per node, one random
+  number per channel for birth and death, ranking only selected cells,
+  argsort(node + random) instead of lexsort, cheap identity conservation
+  check.
 
 **2.4 Remove duplicates** (B4, D5)
 - Separate the random walk from `classical.birth*`.

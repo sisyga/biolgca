@@ -7,16 +7,41 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- The research models of earlier versions as stacks of the generic rules, in
+  `lgca.research_models` and under the legacy names without family prefix:
+  `go_or_grow_kappa`, `go_or_grow_kappa_chemo`, `go_or_grow_glioblastoma`,
+  `evo_steric`, `birthdeath_cancerdfe`, `go_and_grow_mutations`,
+  `birthdeath_discrete` and `excitable_medium`. They work in identity-based
+  models with and without volume exclusion, match the legacy interactions in
+  distribution (`tests/research_models_test.py`) and run 4 to 17 times
+  faster (`benchmarks/research_models.py`; the excitable medium 2 times). The how-to page "Research models from generic rules" shows how
+  they are built.
+- `lgca.stack`: a decorator that turns a function returning a list of
+  operators into one operator with its own parameters, e.g. a published
+  model. Parameters named in `traits=` give the initial cell traits.
+- Mutations as events (`lgca.mutations`): `"mutation": {"probability": p,
+  "traits": {"r_b": effect, ...}}`, or a list of such kinds of mutation.
+  An effect is a draw from any NumPy distribution (`{"distribution":
+  "exponential", "scale": 0.01}`), a fixed value, or a function of your own
+  registered with `lgca.mutation_effect`; it adds, subtracts or multiplies,
+  within optional bounds (clipped or redrawn). With `new_family=True`,
+  mutated daughters found new families (`Cells.found_families`).
 - `birth_death` works in every model family and takes rates per cell in
-  identity-based models (`"birth_rate": "r_b"` names a trait), trait
-  mutations (`"mutation": {"r_b": {"std": 0.01, "bounds": [0, 0.5]}}` or
-  discrete steps `{"step": 0.01, "probability": 0.1}`), `new_family` as a
-  probability, and a `mutation_matrix` for the species of daughters in
+  identity-based models (`"birth_rate": "r_b"` names a trait), `mutation`
+  and `new_family`, and a `mutation_matrix` for the species of daughters in
   classical models with several species. It matches the legacy
   `classical.birthdeath` (in the mean), `ib.birthdeath`,
   `nove_ib.birthdeath` and `multispecies.birthdeath` in distribution
-  (`tests/birth_death_test.py`).
-  `go_or_grow.growth` takes the same `mutation` and `new_family` options.
+  (`tests/birth_death_test.py`). `go_or_grow.growth` takes the same
+  `mutation` and `new_family` options.
+- Reorientations restricted to a channel set: `ReorientationSpec(parameters=
+  {"channels": "velocity"})`, also for the single-cue operators, moves only
+  the cells in these channels and only among them, in every family.
+- `steric_repulsion`, a term by which cells avoid crowded neighbours, and
+  `LatticeState.neighbor_values` (a field at the neighbour each channel
+  points to). `go_or_rest` and `go_or_grow.switch` take
+  `density="neighbourhood"`: the switch senses the mean density of the node
+  and its neighbours.
 - Names without family prefixes for movement: `random_walk` (cells move to
   random channels, optionally within a channel set or for some species) and
   every built-in cue as an operator of its own (`polar_alignment`,
@@ -165,6 +190,18 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- Faster rules: the lattice state reads and writes the interior as a view
+  and keeps counts as `int8` with volume exclusion (`state.counts` has that
+  type then), cells are counted with a matrix product, identity-based cells
+  are ranked with one sort of the selected cells, and `random_walk` draws
+  the state of a node from a table (0.8 ms per step on 100 x 100 hex nodes;
+  legacy `classical.random_walk` 1.0 ms). `birth_death` with a random walk
+  takes 1.4 ms per step where `classical.birthdeath` took 1.6 ms, and
+  identity-based growth is 11 to 14 times faster than `ib.birthdeath` and
+  `nove_ib.birthdeath`. Seeded runs of `random_walk` differ from before.
+- The Moore lattice's `channel_weight` gave every channel the value of the
+  neighbour behind it instead of the one ahead; legacy models on the Moore
+  lattice that used it (`nove_ib.evo_steric`) change.
 - `nematic_alignment` and `contact_guidance` score a channel with traceless
   tensors, c cᵀ - |c|² I / d: resting scores 0, moving along the axis above
   and across it below it. Before, resting tied with moving across the axis,

@@ -216,6 +216,21 @@ class Cells:
         labels = self.label[self._mask(which)]
         trait[labels] = values
 
+    def found_families(self, which) -> None:
+        """The selected cells found new families, each descending from the cell's current family.
+
+        For lineage analyses such as ``lgca.muller_plot``: e.g. daughters
+        that acquired a mutation. Starts family tracking if the model has none.
+        """
+        selected = self._mask(which)
+        if not selected.any():
+            return
+        lgca = self._lgca
+        if "family" not in lgca.props:
+            lgca.init_families(type="homogeneous", mutation=True)
+        families = _found_families(lgca, np.asarray(self["family"][selected], dtype=np.int64))
+        self.set_trait(selected, "family", families)
+
     def move(self, which, channels: Any) -> np.ndarray:
         """Move the selected cells to channels of the set ``channels`` at their node.
 
@@ -284,17 +299,19 @@ class Cells:
         mask[which.astype(np.int64)] = True
         return mask
 
-    def _rank(self, selected, key=None) -> np.ndarray:
-        """Rank of each selected cell among the selected cells of its node, in random order."""
-        if key is None:
-            key = self._state.rng.random(len(self))
-        key = np.where(selected, key, np.inf)
-        order = np.lexsort((key, self.index))
-        index = self.index[order]
-        starts = np.flatnonzero(np.r_[True, index[1:] != index[:-1]])
-        group_start = np.repeat(starts, np.diff(np.r_[starts, len(index)]))
-        rank = np.empty(len(self), dtype=np.int64)
-        rank[order] = np.arange(len(self)) - group_start
+    def _rank(self, selected) -> np.ndarray:
+        """Rank of each selected cell among the selected cells of its node, in random order.
+
+        Cells that are not selected get a rank larger than any.
+        """
+        rank = np.full(len(self), np.iinfo(np.int64).max, dtype=np.int64)
+        chosen = np.flatnonzero(selected)
+        if len(chosen):
+            # by node, random within a node
+            order = chosen[np.argsort(self.index[chosen] + self._state.rng.random(len(chosen)))]
+            index = self.index[order]
+            starts = np.flatnonzero(np.r_[True, index[1:] != index[:-1]])
+            rank[order] = np.arange(len(order)) - np.repeat(starts, np.diff(np.r_[starts, len(order)]))
         return rank
 
     def _place(self, selected, allowed):
@@ -309,19 +326,21 @@ class Cells:
         if not self._state.volume_exclusion:
             return selected, options[rng.integers(0, len(options), int(selected.sum()))]
         K = self._state.K
-        n_nodes = int(np.prod(self._state.dims))
-        occupied = np.zeros(n_nodes * K, dtype=bool)
-        occupied[self.index * K + self.channel] = True
-        free = ~occupied.reshape(n_nodes, K) & allowed
-        # free channels of every node in random order, and the selected cells in random order
-        slot_node, slot_channel = np.nonzero(free)
-        slot_order = np.lexsort((rng.random(len(slot_node)), slot_node))
-        slot_node, slot_channel = slot_node[slot_order], slot_channel[slot_order]
+        # only the nodes with selected cells: their free channels in random order
+        if not selected.any():
+            return selected, np.zeros(0, dtype=np.int64)
+        nodes = np.unique(self.index[selected])
+        row = np.minimum(np.searchsorted(nodes, self.index), len(nodes) - 1)
+        here = nodes[row] == self.index
+        occupied = np.zeros((len(nodes), K), dtype=bool)
+        occupied[row[here], self.channel[here]] = True
+        free = ~occupied & allowed
+        keys = np.where(free, rng.random(free.shape), np.inf)
+        channels = np.argsort(keys, axis=1)
         rank = self._rank(selected)
-        winners = selected & (rank < free.sum(axis=1)[self.index])
+        winners = selected & (rank < free.sum(axis=1)[row])
         # the k-th winner of a node takes the node's k-th free channel
-        slot_start = np.searchsorted(slot_node, self.index[winners])
-        return winners, slot_channel[slot_start + rank[winners]]
+        return winners, channels[row[winners], rank[winners]]
 
 
 def _inherit(lgca, mothers, daughters, founders):

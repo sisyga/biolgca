@@ -10,6 +10,8 @@ Core modules for the declarative simulation API:
 - :mod:`lgca.cells`
 - :mod:`lgca.rules`
 - :mod:`lgca.builtin_rules`
+- :mod:`lgca.mutations`
+- :mod:`lgca.research_models`
 - :mod:`lgca.testing`
 - :mod:`lgca.simulation`
 - :mod:`lgca.plotting`

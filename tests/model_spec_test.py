@@ -795,6 +795,8 @@ def test_invalid_time_spec_reports_modelspec_path():
 
 def _state_for_plugin(plugin_name):
     family = plugin_name.split(".", 1)[0]
+    if "." not in plugin_name and set(describe_plugin(plugin_name).backend_families) <= {"ib", "nove_ib"}:
+        family = "nove_ib"  # e.g. the research models, stacks of rules for identity-based models
     if plugin_name == "phenotype_switch":
         return StateSpec(density=0.35, restchannels=1, n_species=2)
     if family == "go_or_grow":  # migrating cells in velocity channels, resting cells in rest channels

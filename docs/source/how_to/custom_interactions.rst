@@ -94,11 +94,16 @@ rule therefore works for one and for several species.
    * - ``state.neighbor_sum(a)``, ``state.gradient(a)``
      - Sum over the neighbours and centred gradient of ``a``; the boundary
        conditions supply the values beyond the edge.
+   * - ``state.neighbor_values(a)``
+     - ``a`` at the neighbour each velocity channel points to, shape
+       ``dims + (velocitychannels,)``.
    * - ``state.field(name)``
      - A field from ``StateSpec.fields``.
-   * - ``state.capacity``
-     - Cells per node at which a node counts as crowded. It is not enforced;
-       the only hard limit is volume exclusion.
+   * - ``state.capacity``, ``state.has_capacity``
+     - Cells per node at which a node counts as crowded, and whether the
+       model sets it (``StateSpec.capacity``; always without volume
+       exclusion). It is not enforced; the only hard limit is volume
+       exclusion.
    * - ``state.rng``, ``state.step``
      - The model's random generator and the time step. Use only
        ``state.rng`` for random numbers, so runs are reproducible.
@@ -247,7 +252,8 @@ operations act on all cells at once:
 density at each cell's node, and ``cells["resistance"]`` gives a trait per
 cell. The operations are ``kill``, ``divide`` (daughters inherit all traits;
 ``new_family=True`` starts a family per daughter for lineage plots such as
-``lgca.muller_plot()``), ``set_trait``, ``move`` (to other channels of the
+``lgca.muller_plot()``), ``found_families`` (selected cells, e.g. mutated
+daughters, found new families), ``set_trait``, ``move`` (to other channels of the
 node) and ``pick`` (at most a given number of cells per node, e.g. as many as
 there are free channels). With volume exclusion a cell only enters a free
 channel; when more cells compete for the free channels of a node, the

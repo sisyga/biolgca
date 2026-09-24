@@ -9,7 +9,7 @@ import numpy as np
 from tqdm.auto import tqdm
 
 from .nove_base import NoVE_LGCA_base, _poisson_channel_populations
-from .base import LGCA_base, _validate_density
+from .base import LGCA_base, _validate_density, channel_sum
 
 
 _SPATIAL_NDIMS = {
@@ -134,8 +134,8 @@ class MultiSpeciesLGCA_base(LGCA_base):
         self.update_dynamic_fields()
 
     def update_dynamic_fields(self) -> None:
-        self.species_density = self.nodes.sum(-1)
-        self.cell_density = self.species_density.sum(-1)
+        self.species_density = channel_sum(self.nodes)
+        self.cell_density = channel_sum(self.species_density)
 
     def timeevo(
         self,
@@ -280,8 +280,8 @@ class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
 
     def update_dynamic_fields(self) -> None:
         self.channel_pop = self.nodes
-        self.species_density = self.channel_pop.sum(-1)
-        self.cell_density = self.species_density.sum(-1)
+        self.species_density = channel_sum(self.channel_pop)
+        self.cell_density = channel_sum(self.species_density)
 
     def timeevo(
         self,

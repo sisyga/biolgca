@@ -83,12 +83,13 @@ on the cells per node.
 
 In identity-based models the rates can differ between cells: the name of a
 trait, e.g. ``"birth_rate": "r_b"``, gives every cell its own value.
-Daughters inherit all traits of their mother; ``mutation`` changes some of
-them, e.g. ``{"r_b": {"std": 0.01, "bounds": [0, 0.5]}}`` (a normal change
-kept within bounds) or ``{"r_b": {"step": 0.01, "probability": 0.1}}``, and
-``new_family`` lets daughters found new families for lineage plots. In
-classical models with several species, a ``mutation_matrix`` gives the
-species of the daughters.
+Daughters inherit all traits of their mother. A mutation is an event: a
+daughter mutates with some probability, and then its traits change by random
+effects drawn from any distribution; with ``new_family=True`` every mutated
+daughter founds a new family, for lineage plots. See
+:doc:`/how_to/research_models` for the options and for published models
+built this way. In classical models with several species, a
+``mutation_matrix`` gives the species of the daughters.
 
 Combining directional cues
 --------------------------

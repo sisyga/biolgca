@@ -49,9 +49,12 @@ tests the installed wheel and CLI, and builds the docs.
 - Writing rules: `lattice_state.py` (`LatticeState`, the interior of a
   model with a species axis and per-cell operations), `cells.py` (the cell
   table and trait buffers of identity-based models, `state.cells`), `rules.py`
-  (the `@interaction` and `@reorientation_term` decorators), `builtin_rules.py`
-  (built-in rules and reorientation terms written with them, including
-  go-or-grow), `testing.py` (`check_interaction`).
+  (the `@interaction`, `@reorientation_term` and `@stack` decorators),
+  `builtin_rules.py` (built-in rules and reorientation terms written with
+  them, including go-or-grow and `birth_death`), `mutations.py` (mutation
+  events and effect distributions of growth rules), `research_models.py`
+  (published models as stacks of the rules, under the legacy names),
+  `testing.py` (`check_interaction`).
 - Model classes: `base.py`, `nove_base.py`, `ib_base.py`, `nove_ib_base.py`,
   `multispecies_base.py`; geometries in `lgca_1d.py`, `lgca_square.py`,
   `lgca_hex.py`, `lgca_cubic.py`, `lgca_3dmoore.py` and `ms_*.py`.

@@ -14,7 +14,10 @@ it (any number of cells per channel). The changes reach the model when
 
 from __future__ import annotations
 
+import functools
+import itertools
 from collections.abc import Sequence
+from math import comb
 from typing import Any
 
 import numpy as np
@@ -77,6 +80,8 @@ class LatticeState:
         self.fields_read: set[str] = set()  # names passed to field() or gradient(), for dependencies
         self._step = int(step)
         self._dims = tuple(int(size) for size in lgca.dims)
+        # lgca.nonborder as slices: the interior as a view, without copying through index arrays
+        self._interior = tuple(slice(lgca.r_int, lgca.r_int + size) for size in self._dims)
         self._identity = isinstance(lgca, IBLGCA_base)
         self._cells = None
         self._ghost_cells = None
@@ -84,15 +89,17 @@ class LatticeState:
         if table is not None:  # the model holds a cell table: no lists to read
             interior = self._cells_from_table(lgca, *table)
         else:
-            interior = np.asarray(lgca.nodes[lgca.nonborder])
+            interior = np.asarray(lgca.nodes[self._interior])
             if self._identity:  # labelled cells: a table with one entry per cell
                 self._cells = _cells_from_nodes(self, interior)
                 interior = lgca._channel_counts(interior)
         self._has_species_axis = interior.ndim == len(self._dims) + 2
         if not self._has_species_axis:
             interior = interior[..., None, :]
-        self._counts = interior.astype(np.int64)
         self._ve = not isinstance(lgca, NoVE_IBLGCA_base) if self._identity else lgca.nodes.dtype == bool
+        # with volume exclusion counts are 0 or 1: small integers keep the temporaries of rules small
+        self._dtype = np.int8 if self._ve else np.int64
+        self._counts = interior.astype(self._dtype)
         n_species, channels = self._counts.shape[-2:]
         self._capacity_set = capacity is not None or not self._ve
         if capacity is None:
@@ -100,12 +107,10 @@ class LatticeState:
         if isinstance(capacity, bool) or int(capacity) != capacity or capacity < 1:
             raise ValueError(f"capacity must be a positive integer, got {capacity!r}")
         self._capacity = int(capacity)
-        self._initial = {"birth_death": None,
-                         "phenotype_switch": self.density,
-                         "reorientation": self.species_density,
-                         None: None}[kind]
+        self._initial = (self.density if kind == "phenotype_switch"
+                         else self.species_density if kind == "reorientation" else None)
         self._initial_cells = (None if self._cells is None or kind not in ("reorientation", "phenotype_switch")
-                               else _cells_per_node(self._cells))
+                               else (self._cells.index.copy(), self._cells.label.copy()))
 
     def __repr__(self) -> str:
         exclusion = "with" if self._ve else "without"
@@ -118,9 +123,11 @@ class LatticeState:
     def counts(self) -> np.ndarray:
         """Cells per channel, shape ``dims + (n_species, K)`` (read-only).
 
-        Assign a new array to replace the whole state; the assignment is
-        checked (non-negative integers, one cell per channel and species with
-        volume exclusion).
+        Integers: ``int8`` with volume exclusion (0 or 1), else ``int64``;
+        sums and products with other arrays give the wider type. Assign a new
+        array to replace the whole state; the assignment is checked
+        (non-negative integers, one cell per channel and species with volume
+        exclusion).
         """
         view = self._counts.view()
         view.flags.writeable = False
@@ -138,25 +145,29 @@ class LatticeState:
         if value.shape != self._counts.shape:
             raise ValueError(f"counts must have shape {self._counts.shape}, got {value.shape}")
         if value.dtype == bool:
-            value = value.astype(np.int64)
-        if not np.issubdtype(value.dtype, np.number) or not np.all(np.isfinite(value)):
-            raise ValueError("counts must be finite numbers")
-        if np.any(value < 0) or np.any(value != np.round(value)):
+            self._counts = value.astype(self._dtype)
+            return
+        if not np.issubdtype(value.dtype, np.integer):
+            if not np.issubdtype(value.dtype, np.number) or not np.all(np.isfinite(value)):
+                raise ValueError("counts must be finite numbers")
+            if np.any(value != np.round(value)):
+                raise ValueError("counts must be non-negative integers")
+        if np.any(value < 0):
             raise ValueError("counts must be non-negative integers")
-        value = value.astype(np.int64)
         if self._ve and np.any(value > 1):
             raise ValueError("with volume exclusion a channel holds at most one cell of each species")
-        self._counts = value
+        self._counts = value.astype(self._dtype, copy=False)
 
     @property
     def density(self) -> np.ndarray:
         """Cells per node, shape ``dims``."""
-        return self._counts.sum(axis=(-2, -1))
+        species = self.species_density
+        return species[..., 0].copy() if species.shape[-1] == 1 else species.sum(axis=-1)
 
     @property
     def species_density(self) -> np.ndarray:
         """Cells per node and species, shape ``dims + (n_species,)``."""
-        return self._counts.sum(axis=-1)
+        return self._counts @ np.ones(self._counts.shape[-1], dtype=np.int64)  # faster than sum(-1)
 
     @property
     def flux(self) -> np.ndarray:
@@ -186,7 +197,19 @@ class LatticeState:
         values = np.asarray(values)
         if values.shape[:len(self._dims)] != self._dims:
             raise ValueError(f"values must start with the lattice shape {self._dims}, got {values.shape}")
-        return self._lgca.nb_sum(self._pad(values))[self._lgca.nonborder]
+        return self._lgca.nb_sum(self._pad(values))[self._interior]
+
+    def neighbor_values(self, values) -> np.ndarray:
+        """``values`` at the neighbour each velocity channel points to, shape ``dims + (velocitychannels,)``.
+
+        ``values`` has shape ``dims``. Beyond the lattice edge they wrap
+        around with periodic boundaries and are zero otherwise, as in
+        :meth:`neighbor_sum`, which is their sum over the channels.
+        """
+        values = np.asarray(values, dtype=float)
+        if values.shape != self._dims:
+            raise ValueError(f"values must have the lattice shape {self._dims}, got {values.shape}")
+        return self._lgca.channel_weight(self._pad(values))[self._interior]
 
     def gradient(self, values) -> np.ndarray:
         """Gradient of a scalar field in lattice units, shape ``dims + (d,)``.
@@ -205,15 +228,15 @@ class LatticeState:
             if values.shape != self._dims:
                 raise ValueError(f"values must have the lattice shape {self._dims}, got {values.shape}")
             padded = self._pad(values)
-        if padded.shape != self._lgca.nodes.shape[:len(self._dims)]:
+        if padded.shape != np.shape(self._lgca.cell_density)[:len(self._dims)]:
             raise ValueError("gradient needs a scalar field with one value per node")
-        return self._lgca.gradient(padded)[self._lgca.nonborder]
+        return self._lgca.gradient(padded)[self._interior]
 
     def field(self, name: str) -> np.ndarray:
         """A named field from ``StateSpec.fields``, shape ``dims + (...)`` (read-only)."""
         values = np.asarray(self._padded_field(name))
         if values.shape[:len(self._dims)] != self._dims:
-            values = values[self._lgca.nonborder]
+            values = values[self._interior]
         values = values.view()
         values.flags.writeable = False
         return values
@@ -224,7 +247,7 @@ class LatticeState:
             raise KeyError(f"state.fields.{name} does not exist; declare the field in StateSpec.fields")
         self.fields_read.add(name)
         values = np.asarray(getattr(self._lgca, name))
-        padded = self._lgca.nodes.shape[:len(self._dims)]
+        padded = np.shape(self._lgca.cell_density)[:len(self._dims)]
         if values.shape[:len(self._dims)] == padded:
             return values
         if values.shape[:len(self._dims)] != self._dims:
@@ -315,7 +338,11 @@ class LatticeState:
             removed = self._per_node(cells.index[dying])
             cells.kill(dying)
             return removed
-        removed = self.rng.binomial(self._counts, self._probability(p, "p"))
+        p = self._probability(p, "p")
+        if self._ve:  # a channel holds at most one cell: one random number each
+            removed = self._counts * (self.rng.random(self._counts.shape) < p)
+        else:
+            removed = self.rng.binomial(self._counts, p)
         self._counts -= removed
         return removed.sum(axis=-1)
 
@@ -418,10 +445,14 @@ class LatticeState:
         selected = np.zeros(self.n_species, dtype=bool)
         selected[slice(None) if species is None else np.atleast_1d(species)] = True
         mask = selected[:, None] & allowed
-        number = np.where(mask, self._counts, 0).sum(axis=-1)
-        cleared = np.where(mask, 0, self._counts)
-        if self._ve:
-            cleared += self._choose(np.broadcast_to(mask, cleared.shape), number)
+        number = (self._counts * mask) @ np.ones(self.K, dtype=np.int64)
+        cleared = self._counts * ~mask
+        if self._ve:  # every node draws a state of the set's channels
+            for moving in np.flatnonzero(mask.any(axis=-1)):
+                where = np.flatnonzero(mask[moving])
+                if where[-1] - where[0] + 1 == len(where):  # contiguous: a slice is faster
+                    where = slice(where[0], where[-1] + 1)
+                cleared[..., moving, where] = random_occupancy(self.rng, number[..., moving], mask[moving].sum())
         else:
             cleared += self._spread(number, allowed)
         if self._identity:  # one species: place the cells of the set on the new cell numbers
@@ -446,8 +477,7 @@ class LatticeState:
             first = tuple(int(index) for index in np.argwhere(changed)[0])
             raise ValueError(f"a {self._kind} must keep {what} at every node; it changed at "
                              f"{int(changed.sum())} nodes, first at {first}")
-        if self._initial_cells is not None and not all(
-                np.array_equal(a, b) for a, b in zip(self._initial_cells, _cells_per_node(self._cells))):
+        if self._initial_cells is not None and not _same_cells(self._initial_cells, self._cells):
             raise ValueError(f"a {self._kind} must keep the cells of every node; cells were removed "
                              "or added")
         lgca = self._lgca
@@ -457,11 +487,11 @@ class LatticeState:
             lgca._set_cell_table(np.concatenate([cells.label, ghost_labels]),
                                  np.concatenate([slots, ghost_slots]))
         elif self._identity:
-            lgca.nodes[lgca.nonborder] = _nodes_from_cells(self._cells, self._counts[..., 0, :],
+            lgca.nodes[self._interior] = _nodes_from_cells(self._cells, self._counts[..., 0, :],
                                                            lgca.nodes.dtype)
         else:
             interior = self._counts if self._has_species_axis else self._counts[..., 0, :]
-            lgca.nodes[lgca.nonborder] = interior.astype(lgca.nodes.dtype)
+            lgca.nodes[self._interior] = interior
         lgca.update_dynamic_fields()
 
     # --------------------------------------------------------------- helpers
@@ -507,7 +537,7 @@ class LatticeState:
         # slots of the set in node order, one per new cell, and the set's cells in node order
         slots = np.repeat(np.arange(counts.size), (counts * channels).ravel())
         moving = np.flatnonzero(inside)
-        order = np.lexsort((self.rng.random(len(moving)), cells.index[moving]))
+        order = np.argsort(cells.index[moving] + self.rng.random(len(moving)))  # by node, random within
         channel = cells.channel.copy()
         channel[moving[order]] = slots % K
         cells.channel = channel
@@ -566,29 +596,7 @@ class LatticeState:
         raise ValueError(f"{name} has shape {value.shape}; expected one of {', '.join(expected)}")
 
     def _channel_mask(self, channels):
-        velocity = self.velocitychannels
-        if isinstance(channels, str):
-            masks = {"all": np.ones(self.K, dtype=bool),
-                     "rest": np.arange(self.K) >= velocity,
-                     "velocity": np.arange(self.K) < velocity}
-            if channels not in masks:
-                raise ValueError(f"channels must be 'all', 'rest', 'velocity', a sequence of channel "
-                                 f"indices or a boolean mask, got {channels!r}")
-            mask = masks[channels]
-        else:
-            channels = np.asarray(channels)
-            if channels.dtype == bool:
-                if channels.shape != (self.K,):
-                    raise ValueError(f"a channel mask must have length K={self.K}")
-                mask = channels
-            else:
-                if channels.ndim != 1 or np.any((channels < 0) | (channels >= self.K)):
-                    raise ValueError(f"channel indices must lie between 0 and {self.K - 1}")
-                mask = np.zeros(self.K, dtype=bool)
-                mask[channels] = True
-        if not mask.any():
-            raise ValueError(f"the channel set {channels!r} is empty in this model")
-        return mask
+        return channel_mask(channels, self.K, self.velocitychannels)
 
     def _channel_sets(self, channels):
         """Allowed channels per species, shape ``(n_species, K)``."""
@@ -602,17 +610,34 @@ class LatticeState:
 
     def _spread(self, number, allowed):
         """Distribute ``number`` cells per node and species uniformly over allowed channels."""
-        weights = allowed / allowed.sum(axis=-1, keepdims=True)
-        return self.rng.multinomial(number, weights)
+        number = np.asarray(number, dtype=np.int64)
+        if number.sum() > 20 * number.size:  # many cells: one multinomial draw per node and species
+            weights = allowed / allowed.sum(axis=-1, keepdims=True)
+            return self.rng.multinomial(number, weights)
+        # every cell picks a channel of its species' set, and the picks are counted
+        spread = np.zeros(number.shape + (self.K,), dtype=np.int64)
+        for species in range(number.shape[-1]):
+            options = np.flatnonzero(allowed[species])
+            cells = number[..., species].ravel()
+            rows = np.repeat(np.arange(cells.size), cells)
+            picks = options[self.rng.integers(0, len(options), len(rows))]
+            spread[..., species, :] = np.bincount(rows * self.K + picks,
+                                                  minlength=cells.size * self.K).reshape(spread.shape[:-2] + (self.K,))
+        return spread
 
     def _choose(self, free, number):
         """Occupy ``number`` uniformly chosen channels among the ``free`` ones (volume exclusion)."""
-        if not np.any(number):
-            return np.zeros(self._counts.shape, dtype=np.int64)
-        scores = self.rng.random(self._counts.shape)
-        scores[~np.broadcast_to(free, scores.shape)] = np.inf
-        ranks = np.argsort(np.argsort(scores, axis=-1), axis=-1)
-        return (ranks < number[..., None]).astype(np.int64)
+        chosen = np.zeros(self._counts.shape, dtype=np.int64)
+        number = np.broadcast_to(number, self._counts.shape[:-1])
+        rows = np.nonzero(number)  # only the nodes and species that gain cells
+        if not len(rows[0]):
+            return chosen
+        free = np.broadcast_to(free, self._counts.shape)[rows]
+        scores = np.where(free, self.rng.random(free.shape), np.inf)
+        # the number-th smallest score of each row is the threshold
+        threshold = np.take_along_axis(np.sort(scores, axis=-1), (number[rows] - 1)[:, None], axis=-1)
+        chosen[rows] = free & (scores <= threshold)
+        return chosen
 
     def _transition_matrix(self, rates):
         n_species = self.n_species
@@ -684,6 +709,64 @@ class LatticeState:
         return (ranks < number[..., None]).astype(np.int64)
 
 
+@functools.lru_cache(maxsize=64)
+def occupations(channels, cells):
+    """All states of ``channels`` channels with ``cells`` of them occupied, one per row (read-only)."""
+    rows = list(itertools.combinations(range(channels), cells))
+    states = np.zeros((len(rows), channels), dtype=bool)
+    states[np.repeat(np.arange(len(rows)), cells), np.asarray(rows, dtype=np.int64).ravel()] = True
+    states.flags.writeable = False
+    return states
+
+
+@functools.lru_cache(maxsize=16)
+def _occupation_table(channels):
+    """All states of ``channels`` channels, by number of cells: the table, first rows and sizes."""
+    sizes = np.array([comb(channels, cells) for cells in range(channels + 1)])
+    table = np.concatenate([occupations(channels, cells) for cells in range(channels + 1)])
+    return table, np.r_[0, np.cumsum(sizes)[:-1]], sizes
+
+
+def random_occupancy(rng, number, channels):
+    """``number`` cells per entry in uniformly chosen channels of ``channels``, as a boolean array.
+
+    Draws each state from the table of all states (one random number per
+    entry) when it is small, else ranks random keys.
+    """
+    number = np.asarray(number, dtype=np.int64)
+    if comb(channels, channels // 2) > 1024:
+        keys = rng.random(number.shape + (channels,))
+        return np.argsort(np.argsort(keys, axis=-1), axis=-1) < number[..., None]
+    table, first, sizes = _occupation_table(channels)
+    return table[first[number] + (rng.random(number.shape) * sizes[number]).astype(np.int64)]
+
+
+def channel_mask(channels, K, velocitychannels):
+    """Boolean mask of length ``K`` for ``"all"``, ``"rest"``, ``"velocity"``, channel indices or a mask."""
+    if isinstance(channels, str):
+        masks = {"all": np.ones(K, dtype=bool),
+                 "rest": np.arange(K) >= velocitychannels,
+                 "velocity": np.arange(K) < velocitychannels}
+        if channels not in masks:
+            raise ValueError(f"channels must be 'all', 'rest', 'velocity', a sequence of channel "
+                             f"indices or a boolean mask, got {channels!r}")
+        mask = masks[channels]
+    else:
+        channels = np.asarray(channels)
+        if channels.dtype == bool:
+            if channels.shape != (K,):
+                raise ValueError(f"a channel mask must have length K={K}")
+            mask = channels
+        else:
+            if channels.ndim != 1 or np.any((channels < 0) | (channels >= K)):
+                raise ValueError(f"channel indices must lie between 0 and {K - 1}")
+            mask = np.zeros(K, dtype=bool)
+            mask[channels] = True
+    if not mask.any():
+        raise ValueError(f"the channel set {channels!r} is empty in this model")
+    return mask
+
+
 def _cells_from_nodes(state, interior):
     """The table of cells from interior labels: an array (0 empty) or lists of labels per channel."""
     from .cells import Cells
@@ -722,6 +805,17 @@ def _cells_per_node(cells):
     """Node indices and labels, sorted, to compare which cells sit at which node."""
     order = np.lexsort((cells.label, cells.index))
     return cells.index[order], cells.label[order]
+
+
+def _same_cells(initial, cells):
+    """Whether every node holds the cells it held initially (``initial``: node indices and labels)."""
+    index, label = initial
+    if np.array_equal(index, cells.index) and np.array_equal(label, cells.label):
+        return True  # the usual case: only channels changed
+    if len(index) != len(cells.index):
+        return False
+    order = np.lexsort((label, index))
+    return all(np.array_equal(a, b) for a, b in zip((index[order], label[order]), _cells_per_node(cells)))
 
 
 def place_labels(labels, counts, channels, rng):

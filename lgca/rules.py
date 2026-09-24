@@ -33,7 +33,8 @@ from .lattice_state import LatticeState
 from .operator_base import InteractionOperator, PluginInfo
 from .plugins import _law_for_kind, register_plugin, validate_plugin_parameters
 
-__all__ = ["Interaction", "ReorientationCue", "interaction", "register_single_cue", "reorientation_term"]
+__all__ = ["Interaction", "ReorientationCue", "Stack", "interaction", "register_single_cue", "reorientation_term",
+           "stack"]
 
 KINDS = ("birth_death", "phenotype_switch", "reorientation")
 FAMILIES = {"classical": "with volume exclusion", "nove": "without volume exclusion",
@@ -230,6 +231,145 @@ class FunctionInteractionOperator(InteractionOperator):
         state.commit()
 
 
+def stack(
+    function: Callable | None = None,
+    *,
+    kind: str,
+    families: str | Iterable[str],
+    traits: str | Iterable[str] = (),
+    name: str | None = None,
+    register: bool = True,
+):
+    """Turn ``function(state, **parameters)``, which returns a list of operators, into one operator.
+
+    A stack is a model step made of other rules, applied in the listed order,
+    under one name with its own parameters: e.g. a published model that
+    combines a phenotype switch, growth with mutations and movement. The
+    function receives the model's :class:`~lgca.lattice_state.LatticeState`
+    once, when the model is built (to read e.g. ``state.capacity``), and
+    returns operator entries as in ``InteractionPipelineSpec(operators=[...])``.
+
+    Parameters
+    ----------
+    kind : {"birth_death", "phenotype_switch", "reorientation"}
+        The most general kind among the stacked rules.
+    families : str or sequence of str
+        Model families the stack is written for (see :func:`interaction`).
+    traits : str or sequence of str
+        Parameters that also give the initial value of the cell trait of the
+        same name, in identity-based models whose state does not set it
+        (``StateSpec.traits``).
+    name : str, optional
+        Name in model files. Default: as for :func:`interaction`.
+    register : bool, default=True
+        Register the stack so that model files can refer to it by name.
+
+    Examples
+    --------
+    >>> from lgca import stack
+    >>> @stack(kind="birth_death", families=("ib", "nove_ib"), traits="r_b", name="growing_walkers")
+    ... def growing_walkers(state, r_b=0.2, r_d=0.05):
+    ...     '''Cells with their own birth rate grow logistically and walk at random.'''
+    ...     return [{"name": "birth_death", "parameters": {"birth_rate": "r_b", "death_rate": r_d}},
+    ...             {"name": "random_walk"}]
+    >>> growing_walkers(r_d=0.1)
+    {'name': 'growing_walkers', 'parameters': {'r_d': 0.1}}
+    """
+
+    def decorate(function):
+        rule = Stack(function, kind=kind, families=families, traits=traits, name=name)
+        if register:
+            register_plugin(rule.info, rule._factory)
+        return rule
+
+    return decorate if function is None else decorate(function)
+
+
+class Stack(Interaction):
+    """A model step made of other rules; created by :func:`stack`."""
+
+    def __init__(self, function, *, kind, families, traits=(), name=None):
+        super().__init__(function, kind=kind, families=families, name=name)
+        self.traits = _names("traits", traits, tuple(self.parameters), allow_empty=True)
+
+        def factory(parameters=None):
+            return StackOperator(self, parameters)
+
+        factory.__module__ = self.__module__
+        self._factory = factory
+
+    def __call__(self, *args, **parameters):
+        if args:
+            raise TypeError(f"{self.name}() takes parameters by keyword; it returns an operator entry")
+        return super().__call__(**parameters)
+
+    def __repr__(self) -> str:
+        return f"<stack {self.name!r} ({self.kind}; {', '.join(self.families)})>"
+
+    def defaults(self) -> dict[str, Any]:
+        return {key: entry["default"] for key, entry in self.parameters.items() if "default" in entry}
+
+    def operators(self, state, **parameters) -> list:
+        """The stacked operator entries for a model's state and these parameters."""
+        return list(self.function(state, **{**self.defaults(), **parameters}))
+
+
+class StackOperator(InteractionOperator):
+    """Pipeline operator that applies the operators of a :class:`Stack` in order."""
+
+    def __init__(self, rule: Stack, parameters=None):
+        super().__init__(info=rule.info, parameters=parameters)
+        self.rule = rule
+        self.operators: list[InteractionOperator] = []
+
+    def validate(self, context) -> None:
+        from .model import _attach_traits
+        from .pipeline import _compile_operator
+
+        state = context.spec.state
+        family = ("ib" if state.volume_exclusion else "nove_ib") if state.identity_based else (
+            "classical" if state.volume_exclusion else "nove")
+        if family not in self.rule.families:
+            raise ValueError(f"{self.rule.name} is written for {_family_list(self.rule.families)}, but this "
+                             f"model is {FAMILIES[family]}")
+        lgca = context.lgca
+        values = {**self.rule.defaults(), **self.parameters}
+        if state.identity_based:  # parameters give the initial traits that the state does not set
+            _attach_traits(lgca, {name: values[name] for name in self.rule.traits if name not in lgca.props})
+        entries = self.rule.operators(LatticeState(lgca, capacity=state.capacity), **self.parameters)
+        self.operators = []
+        for index, entry in enumerate(entries):
+            try:
+                operator = _compile_operator(entry)
+                operator.validate_parameter_contracts(context)
+                operator.validate(context)
+            except (KeyError, ValueError) as exc:
+                raise ValueError(f"{self.rule.name}: operators[{index}] {exc}") from exc
+            self.operators.append(operator)
+
+    def setup(self, context) -> None:
+        for operator in self.operators:
+            operator.setup(context)
+
+    def apply(self, context, step: int) -> None:
+        lgca = context.lgca
+        for operator in self.operators:
+            if "boundary_nodes" in operator.dependencies():
+                lgca.apply_boundaries()
+                lgca.update_dynamic_fields()
+            operator.apply(context, step)
+            if "nodes" in operator.outputs():
+                lgca.update_dynamic_fields()
+
+    def dependencies(self) -> set[str]:
+        return set().union(*(operator.dependencies() for operator in self.operators))
+
+    @property
+    def stacked_names(self) -> list[str]:
+        """Names of the stacked operators, in order."""
+        return [operator.name for operator in self.operators]
+
+
 def reorientation_term(
     function: Callable | None = None,
     *,
@@ -369,6 +509,9 @@ def register_single_cue(cue: ReorientationCue, aliases: str | Iterable[str] = ()
         "sweeps": {"default": 10, "description": (
             "Metropolis proposals per node, in units of the channel number, for a trait with volume "
             "exclusion.")},
+        "channels": {"default": "all", "description": (
+            "The channels that take part: 'all', 'velocity', 'rest' or channel indices. Only cells in "
+            "these channels move, and only among them.")},
         **cue.info.parameters,
     }
     info = PluginInfo(name=cue.name, operator_kind="reorientation",
@@ -387,7 +530,7 @@ def register_single_cue(cue: ReorientationCue, aliases: str | Iterable[str] = ()
 
         values = dict(parameters or {})
         beta, trait = values.pop("beta", 1.0), values.pop("trait", None)
-        sampler = {"sweeps": values.pop("sweeps")} if "sweeps" in values else {}
+        sampler = {key: values.pop(key) for key in ("sweeps", "channels") if key in values}
         term = ReorientationTermSpec(cue.name, beta=beta, parameters=values, trait=trait)
         operator = BoltzmannReorientationOperator(ReorientationSpec(terms=[term], parameters=sampler))
         operator.info = replace(operator.info, name=cue.name, description=info.description)

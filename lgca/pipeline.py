@@ -11,6 +11,7 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 
 from .base import _sampling_totals
+from .lattice_state import channel_mask, occupations
 from .identity_kernels import inherit_missing_properties
 from .plugins import (
     BirthDeathOperator,
@@ -360,11 +361,11 @@ def compile_pipeline(spec: InteractionPipelineSpec | None, context) -> CompiledP
     shared_property_operators = {"ib.birth", "ib.birthdeath", "ib.birthdeath_discrete",
                                 "ib.go_or_grow", "ib.go_and_grow_mutations"}
     if context.spec.state.identity_based and len(growth) > 1:
-        from .rules import FunctionInteractionOperator
+        from .rules import FunctionInteractionOperator, StackOperator
 
         # decorated rules give every daughter a complete row of traits (lgca.cells.Cells.divide)
         if any(operator.name not in shared_property_operators
-               and not isinstance(operator, FunctionInteractionOperator) for operator in growth):
+               and not isinstance(operator, (FunctionInteractionOperator, StackOperator)) for operator in growth):
             raise ValueError(
                 "Identity growth composition requires a shared daughter-property lifecycle; "
                 "currently supported for ib.birth, ib.birthdeath, ib.birthdeath_discrete, "
@@ -608,7 +609,10 @@ class BoltzmannReorientationOperator(ReorientationOperator):
             conservation_law=ConservationLaw(True, True, False, ("channel occupancy",)),
             parameters={"sweeps": {"default": 10, "description": (
                 "Metropolis proposals per node, in units of the channel number, for terms with a trait "
-                "in identity-based models with volume exclusion.")}},
+                "in identity-based models with volume exclusion.")},
+                        "channels": {"default": "all", "description": (
+                "The channels that take part: 'all', 'velocity', 'rest' or channel indices. Only cells "
+                "in these channels move, and only among them.")}},
             port_status="native",
             description="Boltzmann sampler over channel configurations.",
         )
@@ -618,6 +622,7 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         self.sweeps = self.parameters.get("sweeps", 10)
         if isinstance(self.sweeps, bool) or not isinstance(self.sweeps, (int, np.integer)) or self.sweeps < 1:
             raise ValueError(".parameters.sweeps must be a positive integer")
+        self.channels = self.parameters.get("channels", "all")
 
     @property
     def term_names(self) -> list[str]:
@@ -646,24 +651,34 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         for term in self.terms:
             term.step = step
             term.prepare(lgca)
+        mask = channel_mask(self.channels, lgca.K, lgca.velocitychannels)
+        mask = None if mask.all() else mask
         if any(term.trait is not None and term.beta != 0 for term in self.terms):
-            self._apply_traits(lgca, step, volume_exclusion=not isinstance(lgca, NoVE_IBLGCA_base))
+            self._apply_traits(lgca, step, not isinstance(lgca, NoVE_IBLGCA_base), mask)
             return
         weights = self._channel_weights(lgca)
         if isinstance(lgca, NoVE_IBLGCA_base):
-            self._apply_nove_identity(lgca, weights)
+            self._apply_nove_identity(lgca, weights, mask)
         elif isinstance(lgca, IBLGCA_base):
-            self._apply_identity(lgca, weights)
+            self._apply_identity(lgca, weights, mask)
         elif lgca.nodes.dtype == bool:
             lgca._reorientation_source_nodes = lgca.nodes.copy()
             try:
-                self._sample_batches(lgca, weights)
+                if mask is None:
+                    self._sample_batches(lgca, weights)
+                else:
+                    self._sample_batches(lgca, weights, mask=mask)
             finally:
                 del lgca._reorientation_source_nodes
         else:
             interior = lgca.nodes[lgca.nonborder]
             counts = interior if interior.ndim == weights.ndim else interior[..., None, :]
-            sampled = self._sample_independent(lgca, counts.sum(axis=-1), weights)
+            if mask is None:
+                sampled = self._sample_independent(lgca, counts.sum(axis=-1), weights)
+            else:
+                sampled = counts.copy()
+                sampled[..., mask] = self._sample_independent(lgca, counts[..., mask].sum(axis=-1),
+                                                              weights[..., mask])
             lgca.nodes[lgca.nonborder] = sampled.reshape(interior.shape).astype(lgca.nodes.dtype)
 
     def dependencies(self) -> set[str]:
@@ -711,10 +726,22 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         """Every cell picks channel ``i`` with ``P(i) ∝ exp(w_i)``: a multinomial per node and species."""
         return lgca.rng.multinomial(np.asarray(number, dtype=np.int64), _softmax_last_axis(weights))
 
-    def _sample_batches(self, lgca, weights, nodes=None):
-        """Sample new channel states with volume exclusion and write them to the interior."""
+    def _sample_batches(self, lgca, weights, nodes=None, mask=None):
+        """Sample new channel states with volume exclusion and write them to the interior.
+
+        With a channel ``mask``, only the cells in these channels move, among them.
+        """
         if nodes is None:
             nodes = lgca._reorientation_source_nodes[lgca.nonborder]
+        if mask is not None:
+            sampled = nodes.copy()
+            sampled[..., mask] = self._sample_states(lgca, weights[..., mask], nodes[..., mask], subset=True)
+            lgca.nodes[lgca.nonborder] = sampled
+            return sampled
+        return self._sample_states(lgca, weights, nodes)
+
+    def _sample_states(self, lgca, weights, nodes, subset=False):
+        """New channel states of ``nodes`` (all their channels, or a subset of the model's)."""
         counts = nodes.sum(axis=-1)
         sampled = np.zeros_like(nodes)
         # Preserve the former spatial-then-species categorical draw order,
@@ -724,7 +751,7 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         ndim = len(lgca.dims)
         multispecies = counts.ndim > ndim
         for count in np.unique(counts[counts > 0]):
-            candidates = lgca.get_permutations(int(count))
+            candidates = occupations(nodes.shape[-1], int(count)) if subset else lgca.get_permutations(int(count))
             matrix = _candidate_matrix(candidates)
             for indices in _candidate_batches(counts == count, len(candidates)):
                 species = indices[-1] if multispecies else np.zeros(len(indices[0]), dtype=int)
@@ -734,16 +761,18 @@ class BoltzmannReorientationOperator(ReorientationOperator):
                 cumulative /= cumulative[:, -1:]
                 choices = (cumulative <= draws[indices][:, None]).sum(axis=-1)
                 sampled[indices] = candidates[choices]
-        lgca.nodes[lgca.nonborder] = sampled
+        if not subset:
+            lgca.nodes[lgca.nonborder] = sampled
         return sampled
 
-    def _apply_identity(self, lgca, weights):
+    def _apply_identity(self, lgca, weights, mask=None):
         """Sample the occupied channels, then place the node's labelled cells on them at random."""
         from .lattice_state import place_labels
 
         labels = lgca.nodes[lgca.nonborder]
-        occupied = self._sample_batches(lgca, weights, nodes=labels > 0)
-        lgca.nodes[lgca.nonborder] = place_labels(labels, occupied, np.ones(lgca.K, dtype=bool), lgca.rng)
+        occupied = self._sample_batches(lgca, weights, nodes=labels > 0, mask=mask)
+        channels = np.ones(lgca.K, dtype=bool) if mask is None else mask
+        lgca.nodes[lgca.nonborder] = place_labels(labels, occupied, channels, lgca.rng)
 
     def _cell_scores(self, lgca, cells):
         """Per-term weights of every cell's node and the cells' strengths.
@@ -761,24 +790,33 @@ class BoltzmannReorientationOperator(ReorientationOperator):
                              for term in terms])
         return weights, strength
 
-    def _apply_traits(self, lgca, step, volume_exclusion):
-        """Reorientation with a weight per cell: exact without volume exclusion, Metropolis with it."""
+    def _apply_traits(self, lgca, step, volume_exclusion, mask=None):
+        """Reorientation with a weight per cell: exact without volume exclusion, Metropolis with it.
+
+        With a channel ``mask``, only the cells in these channels move, among them.
+        """
         from .lattice_state import LatticeState
 
         state = LatticeState(lgca, step=step, kind="reorientation")
         cells = state.cells
+        channels = np.arange(lgca.K) if mask is None else np.flatnonzero(mask)
+        moving = np.ones(len(cells), dtype=bool) if mask is None else mask[cells.channel]
         weights, strength = self._cell_scores(lgca, cells)
+        weights, strength = weights[:, moving][..., channels], strength[:, moving]
         if volume_exclusion:
-            cells.channel = self._metropolis(cells, weights, strength, lgca.K, lgca.rng)
+            new = self._metropolis(cells.index[moving], weights, strength, len(channels), lgca.rng)
         else:  # every cell draws its channel from its own weights
             scores = np.einsum("tc,tck->ck", strength, weights)
             cumulative = np.cumsum(_softmax_last_axis(scores), axis=-1)
-            draws = lgca.rng.random(len(cells)) * cumulative[:, -1]
-            cells.channel = np.minimum((cumulative <= draws[:, None]).sum(axis=-1), lgca.K - 1)
+            draws = lgca.rng.random(len(scores)) * cumulative[:, -1]
+            new = np.minimum((cumulative <= draws[:, None]).sum(axis=-1), len(channels) - 1)
+        channel = cells.channel.copy()
+        channel[moving] = channels[new]
+        cells.channel = channel
         state._cells_changed()
         state.commit()
 
-    def _metropolis(self, cells, weights, strength, K, rng):
+    def _metropolis(self, index, weights, strength, K, rng):
         """New channels of the cells: a Metropolis chain per node, all nodes at once.
 
         The chain starts from a random arrangement of each node's cells and
@@ -786,10 +824,10 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         uniformly among the node's cells) with another channel. The number
         of cells is fixed, so the proposal is symmetric.
         """
-        n = len(cells)
+        n = len(index)
         if n == 0:
-            return cells.channel
-        nodes, row = np.unique(cells.index, return_inverse=True)
+            return np.zeros(0, dtype=np.int64)
+        nodes, row = np.unique(index, return_inverse=True)
         per_row = np.bincount(row)
         # position of each cell among the cells of its node
         order = np.argsort(row, kind="stable")
@@ -825,14 +863,20 @@ class BoltzmannReorientationOperator(ReorientationOperator):
             occupant[r, h] = o
         return channel
 
-    def _apply_nove_identity(self, lgca, weights):
+    def _apply_nove_identity(self, lgca, weights, mask=None):
         """Sample cell numbers per channel, then place the node's cells on them in random order."""
         from .lattice_state import LatticeState
 
         state = LatticeState(lgca, kind="reorientation")
         before = state.counts[..., 0, :]
-        after = self._sample_independent(lgca, before.sum(axis=-1)[..., None], weights)[..., 0, :]
-        state._place_cells(after, np.ones(lgca.K, dtype=bool))
+        if mask is None:
+            after = self._sample_independent(lgca, before.sum(axis=-1)[..., None], weights)[..., 0, :]
+            mask = np.ones(lgca.K, dtype=bool)
+        else:
+            after = before.copy()
+            after[..., mask] = self._sample_independent(lgca, before[..., mask].sum(axis=-1),
+                                                        weights[..., 0, :][..., mask])
+        state._place_cells(after, mask)
         state._counts = after[..., None, :]
         state.commit()
 
