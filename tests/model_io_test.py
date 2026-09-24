@@ -24,7 +24,7 @@ from lgca.model import (
     save_model_spec,
 )
 from lgca.pipeline import InteractionPipelineSpec, ReorientationSpec, ReorientationTermSpec
-from lgca.plugins import ParameterSpec, PluginInfo, describe_plugin, validate_plugin_parameters
+from lgca.plugins import ParameterSpec, PluginInfo, validate_plugin_parameters
 from lgca.simulation import CSVSnapshotObserver, DensityRecorder, ScalarTimeSeriesRecorder
 
 
@@ -95,9 +95,6 @@ def test_parameter_contracts_validate_required_allowed_and_builtin_probability()
     with pytest.raises(ValueError, match="mode.*fast, slow"):
         validate_plugin_parameters(info, {"mode": "medium"})
 
-    birth_rate = describe_plugin("birth_death").parameter_specs["birth_rate"]
-    assert birth_rate.type_label == "probability"
-
     spec = _chemotaxis_spec()
     bad_operator = {"name": "birth_death", "parameters": {"birth_rate": -0.1}}
     bad_spec = ModelSpec(
@@ -106,7 +103,7 @@ def test_parameter_contracts_validate_required_allowed_and_builtin_probability()
         time=spec.time,
         dynamics=InteractionPipelineSpec(operators=[bad_operator], propagation=False),
     )
-    with pytest.raises(ValueError, match="birth_rate.*probability"):
+    with pytest.raises(ValueError, match="birth_rate must be probabilities"):
         run_model(bad_spec, showprogress=False)
 
 

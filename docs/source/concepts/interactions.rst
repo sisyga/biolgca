@@ -55,6 +55,36 @@ sequence ``go_or_rest`` (cells move between velocity and rest channels),
 ``random_walk`` over the velocity channels. The run metadata
 records the schedule as ``result.metadata["schedule"]``.
 
+Growth
+------
+
+``birth_death`` is the growth rule of every model family. In a time step,
+every cell dies with probability ``death_rate``; then every surviving cell
+divides with probability ``birth_rate * (1 - n / capacity)``, with ``n`` the
+cells at its node. This is logistic growth, the same law with and without
+volume exclusion:
+
+- with volume exclusion and one species, ``capacity`` is the number of
+  channels ``K`` and the factor comes from exclusion itself: the daughter
+  goes to a random channel of the node, and survives only if that channel is
+  empty;
+- with several species, ``n`` counts all species and ``capacity`` is
+  ``StateSpec.capacity`` (by default ``n_species * K`` with volume
+  exclusion), so the species compete for space;
+- without volume exclusion, ``capacity`` is ``StateSpec.capacity``.
+
+``crowding=False`` removes the factor: cells divide with ``birth_rate``, and
+``StateSpec.capacity`` becomes a hard limit on the cells per node.
+
+In identity-based models the rates can differ between cells: the name of a
+trait, e.g. ``"birth_rate": "r_b"``, gives every cell its own value.
+Daughters inherit all traits of their mother; ``mutation`` changes some of
+them, e.g. ``{"r_b": {"std": 0.01, "bounds": [0, 0.5]}}`` (a normal change
+kept within bounds) or ``{"r_b": {"step": 0.01, "probability": 0.1}}``, and
+``new_family`` lets daughters found new families for lineage plots. In
+classical models with several species, a ``mutation_matrix`` gives the
+species of the daughters.
+
 Combining directional cues
 --------------------------
 
@@ -149,7 +179,9 @@ coupling that turns it into a score; new terms are written the same way with
      - flux
      - neighbouring cells
    * - ``nematic_alignment`` (``nematic``, ``alignment``)
-     - Rewards sharing an axis with neighbouring cells.
+     - Rewards sharing an axis with neighbouring cells:
+       ``Σ_k n_k [(c_k · c_i)² - |c_k|² |c_i|² / d]`` for a cell in channel
+       ``i`` (see below).
      - channels
      - neighbouring cells
    * - ``aggregation``
@@ -161,7 +193,8 @@ coupling that turns it into a score; new terms are written the same way with
      - flux
      - ``parameters={"field": name}``
    * - ``contact_guidance``
-     - ``Σ (d · c_i)²`` over occupied channels: along a director field.
+     - ``(n · c_i)² - |c_i|² / d`` for a cell in channel ``i``, with the unit
+       director ``n``: along a director field.
      - channels
      - a vector field, default ``director``
 
@@ -211,6 +244,14 @@ fluxes. Opposite headings cancel. ``nematic_alignment`` instead sums squared
 velocity dot products, weighted by numeric neighboring channel counts; opposite
 headings reinforce the same axis. Both can be combined with the other cues.
 The registered ``classical.alignment`` operator is polar.
+
+The axis cues compare traceless tensors ``c cᵀ - |c|² I / d`` (``d`` the
+spatial dimension): a cell moving along the axis scores above a resting cell,
+which scores 0, and a cell moving across it below. Averaged over all
+directions, moving scores like resting, so the cue orients cells without
+making them rest or move more. In 2D these are the tensors of the legacy
+``classical.nematic`` and ``classical.contact_guidance``; in 1D there is only
+one axis and the cues have no effect.
 
 For compatibility, existing composed ``alignment`` declarations retain nematic
 semantics and emit a deprecation warning. Replace that alias with

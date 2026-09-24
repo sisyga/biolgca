@@ -36,7 +36,7 @@ import numpy as np
 from .interactions import tanh_switch
 from .rules import interaction, register_single_cue, reorientation_term
 
-__all__ = ["go_or_grow_growth", "go_or_grow_switch", "go_or_rest", "random_walk"]
+__all__ = ["birth_death", "go_or_grow_growth", "go_or_grow_switch", "go_or_rest", "random_walk"]
 
 
 # Terms of the Boltzmann reorientation (ReorientationSpec). J(s') is the flux of
@@ -84,9 +84,17 @@ def polar_alignment(state, include_center=False, normalize=False):
 
 @reorientation_term(coupling="channels", name="nematic_alignment", aliases=("nematic", "alignment"))
 def nematic_alignment(state):
-    """Cells share an axis with neighbouring cells; opposite directions count the same."""
+    """Cells share an axis with neighbouring cells; opposite directions count the same.
+
+    A cell in channel i gains Σ_k n_k [(c_k · c_i)² - |c_k|² |c_i|² / d] from the n_k
+    neighbouring cells in channel k (d the spatial dimension): the product of the
+    traceless tensors c cᵀ - |c|² I / d of the two directions. Moving along the
+    neighbours' axis scores above resting (0), moving across it below.
+    """
     neighbours = state.neighbor_sum(state.counts[..., :state.velocitychannels].sum(axis=-2))
-    return neighbours @ (state.c.T @ state.c) ** 2
+    c = state.c
+    lengths = (c ** 2).sum(0)
+    return neighbours @ ((c.T @ c) ** 2 - np.multiply.outer(lengths, lengths) / c.shape[0])
 
 
 @reorientation_term(coupling="flux", name="aggregation")
@@ -114,7 +122,11 @@ def chemotaxis(state, field):
 
 @reorientation_term(coupling="channels", name="contact_guidance")
 def contact_guidance(state, field="director"):
-    """Σ (d · c_i)² over occupied velocity channels: cells move along the axis of a director field.
+    """Cells move along the axis of a director field.
+
+    A cell in channel i scores (n · c_i)² - |c_i|² / d, with n the unit director and d
+    the spatial dimension: above resting (0) along the axis, below it across. Where
+    the director is zero, all channels score 0.
 
     Parameters
     ----------
@@ -127,7 +139,8 @@ def contact_guidance(state, field="director"):
                          f"got {director.shape}")
     norm = np.linalg.norm(director, axis=-1, keepdims=True)
     director = np.divide(director, norm, out=np.zeros_like(director), where=norm > 0)
-    return (director @ state.c) ** 2
+    c = state.c
+    return (director @ c) ** 2 - (director ** 2).sum(-1)[..., None] * (c ** 2).sum(0) / c.shape[0]
 
 # Every built-in cue also works alone as an operator: {"name": "chemotaxis", "parameters": {"beta": 2,
 # "field": "signal"}} is a ReorientationSpec with this one term.
@@ -135,6 +148,200 @@ for _cue, _aliases in ((polar_alignment, ()), (nematic_alignment, ("nematic",)),
                        (persistent_walk, ("persistent_motion",)), (aggregation, ()), (chemotaxis, ()),
                        (contact_guidance, ()), (resting_bias, ())):
     register_single_cue(_cue, aliases=_aliases)
+
+@interaction(kind="birth_death", families=("classical", "nove", "ib", "nove_ib"), name="birth_death")
+def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_matrix=None, mutation=None,
+                new_family=False):
+    """Cells die, then the survivors divide; crowded nodes have less room for daughters.
+
+    Every cell dies with probability ``death_rate``. Every surviving cell then
+    divides with probability ``birth_rate * (1 - n / capacity)``, where ``n``
+    is the number of cells at its node: logistic growth.
+
+    - With volume exclusion and one species, ``capacity`` is the number of
+      channels ``K``, and the factor comes from exclusion: the daughter goes
+      to a random channel of the node (dividing cells pick different
+      channels) and survives only if that channel is empty.
+    - With volume exclusion and several species, ``n`` counts all species
+      and ``capacity`` is ``StateSpec.capacity`` (default ``n_species * K``),
+      so species compete for space; a daughter takes a free channel of its
+      species and fails if there is none.
+    - Without volume exclusion, ``capacity`` is ``StateSpec.capacity``.
+
+    Parameters
+    ----------
+    birth_rate : float, sequence or str
+        Probability per time step that a cell tries to divide: one number,
+        one per species, or in identity-based models the name of a cell trait
+        (a value per cell).
+    death_rate : float, sequence or str
+        Probability per time step that a cell dies, given like ``birth_rate``.
+    crowding : bool
+        False: every daughter that fits survives, and ``state.capacity`` is a
+        hard limit on the cells per node: daughters take free channels (with
+        volume exclusion), and divisions beyond the free channels or the
+        capacity fail, chosen at random.
+    mutation_matrix : array_like or None
+        Classical models with several species: entry ``[a][b]`` is the
+        probability that a daughter of species ``a`` belongs to species ``b``
+        (rows sum to 1). Default: daughters have their mother's species.
+    mutation : dict or None
+        Identity-based models: how the daughters' traits change, by trait
+        name. A number is the standard deviation of a normal change,
+        ``{"std": s, "bounds": [low, high]}`` a normal change truncated to
+        the bounds, ``{"step": d, "probability": p}`` a change by ``+d`` or
+        ``-d`` with probability ``p`` (clipped to ``"bounds"`` if given).
+    new_family : bool or float
+        Identity-based models: every daughter founds a new family (True), or
+        each one with this probability, for lineage analyses such as Muller
+        plots.
+
+    Examples
+    --------
+    Logistic growth, ``{"name": "birth_death", "parameters": {"birth_rate":
+    0.2, "death_rate": 0.02}}``; in an identity-based model with a mutating
+    birth rate per cell, ``{"birth_rate": "r_b", "death_rate": 0.02,
+    "mutation": {"r_b": {"std": 0.01, "bounds": [0, 0.5]}}}``.
+    """
+    if not isinstance(crowding, (bool, np.bool_)):
+        raise TypeError(f"crowding must be True or False, got {crowding!r}")
+    if state.identity_based:
+        if mutation_matrix is not None and not np.array_equal(np.asarray(mutation_matrix), [[1]]):
+            raise ValueError("mutation_matrix needs a classical model with several species; identity-based "
+                             "models have one species and change traits with mutation=")
+        _birth_death_cells(state, birth_rate, death_rate, crowding, mutation or {}, new_family)
+        return
+    if mutation or new_family:
+        raise ValueError("mutation and new_family change cell traits and families, which only "
+                         "identity-based models have")
+    n_species, rng = state.n_species, state.rng
+    death = _per_species(death_rate, "death_rate", n_species)
+    birth = _per_species(birth_rate, "birth_rate", n_species)
+    matrix = _mutation_matrix(mutation_matrix, n_species)
+    state.remove_cells(death)
+    counts = state.counts.sum(axis=-1)
+    by_exclusion = crowding and state.volume_exclusion and n_species == 1
+    if crowding and not by_exclusion:
+        birth = birth * np.clip(1 - state.density / state.capacity, 0, 1)[..., None]
+    births = rng.binomial(counts, birth)
+    if matrix is not None:
+        births = rng.multinomial(births, matrix).sum(axis=-2)
+    if by_exclusion:  # daughters pick distinct random channels; the empty ones hold them
+        births = _into_empty(rng, births, counts, state.K)
+    elif not crowding:
+        births = _at_most(rng, births, np.maximum(state.capacity - state.density, 0))
+    state.add_cells(births)
+
+
+def _birth_death_cells(state, birth_rate, death_rate, crowding, mutation, new_family):
+    """birth_death for identity-based models: death and division per cell."""
+    cells, rng = state.cells, state.rng
+    cells.kill(rng.random(len(cells)) < _per_cell(cells, death_rate, "death_rate"))
+    birth = _per_cell(cells, birth_rate, "birth_rate")
+    density = state.density
+    if crowding and not state.volume_exclusion:
+        birth = birth * np.clip(1 - density / state.capacity, 0, 1)[cells.node]
+    dividing = rng.random(len(cells)) < birth
+    if crowding and state.volume_exclusion:
+        attempts = np.bincount(cells.index[dividing], minlength=density.size).reshape(density.shape)
+        dividing = cells.pick(dividing, _into_empty(rng, attempts, density, state.K))
+    elif not crowding:
+        dividing = cells.pick(dividing, np.maximum(state.capacity - density, 0))
+    founders = _founders(rng, cells, dividing, new_family)
+    daughters = cells.divide(dividing, new_family=founders)
+    _mutate(state, daughters, mutation)
+
+
+def _into_empty(rng, attempts, occupied, channels):
+    """How many of ``attempts`` daughters, sent to distinct random channels of ``channels``, find them empty."""
+    attempts = np.minimum(attempts, channels)
+    return rng.hypergeometric(channels - occupied, occupied, attempts)
+
+
+def _per_species(value, name, n_species):
+    rates = np.asarray(_number(value, name), dtype=float)
+    if rates.ndim == 0:
+        rates = np.full(n_species, float(rates))
+    if rates.shape != (n_species,):
+        raise ValueError(f"{name} must be one number or one per species ({n_species}), got {value!r}")
+    if np.any((rates < 0) | (rates > 1)):
+        raise ValueError(f"{name} must be probabilities, got {value!r}")
+    return rates
+
+
+def _mutation_matrix(value, n_species):
+    if value is None:
+        return None
+    matrix = np.asarray(value, dtype=float)
+    if matrix.shape != (n_species, n_species):
+        raise ValueError(f"mutation_matrix must have shape ({n_species}, {n_species}), got {matrix.shape}")
+    if np.any(matrix < 0) or not np.allclose(matrix.sum(axis=1), 1):
+        raise ValueError("mutation_matrix rows must be probabilities that sum to 1")
+    return None if np.array_equal(matrix, np.eye(n_species)) else matrix / matrix.sum(axis=1, keepdims=True)
+
+
+def _at_most(rng, births, room):
+    """Keep at most ``room`` of the births at each node, chosen uniformly among all species' births."""
+    total = births.sum(axis=-1)
+    kept = np.empty_like(births)
+    left, wanted = np.minimum(total, room), total
+    for species in range(births.shape[-1]):
+        kept[..., species] = rng.hypergeometric(births[..., species], wanted - births[..., species], left)
+        left, wanted = left - kept[..., species], wanted - births[..., species]
+    return kept
+
+
+def _founders(rng, cells, dividing, new_family):
+    """Mask of the dividing cells whose daughters found a family: all, none, or each with a probability."""
+    if isinstance(new_family, (bool, np.bool_)):
+        return bool(new_family)
+    probability = float(new_family)
+    if not 0 <= probability <= 1:
+        raise ValueError(f"new_family must be True, False or a probability, got {new_family!r}")
+    return dividing & (rng.random(len(cells)) < probability)
+
+
+def _mutate(state, daughters, mutation):
+    """Change the daughters' traits as ``mutation`` says (see birth_death)."""
+    cells, rng = state.cells, state.rng
+    for name, spec in mutation.items():
+        if not isinstance(spec, dict):
+            spec = {"std": spec}
+        unknown = set(spec) - {"std", "bounds", "step", "probability"}
+        if unknown or ("std" in spec) == ("step" in spec):
+            raise ValueError(f"mutation[{name!r}] must be a standard deviation, {{'std': s, 'bounds': "
+                             f"[low, high]}} or {{'step': d, 'probability': p}}, got {spec!r}")
+        low, high = spec.get("bounds") or (-np.inf, np.inf)
+        low, high = -np.inf if low is None else float(low), np.inf if high is None else float(high)
+        if not low <= high:
+            raise ValueError(f"mutation[{name!r}]['bounds'] must be [low, high] with low <= high")
+        values = np.asarray(cells[name][daughters], dtype=float)
+        if "std" in spec:
+            std = float(spec["std"])
+            if not np.isfinite(std) or std < 0:
+                raise ValueError(f"mutation[{name!r}] needs a non-negative standard deviation")
+            values = _truncated_normal(rng, values, std, low, high)
+        else:
+            step, probability = float(spec["step"]), float(spec.get("probability", 1.0))
+            if not 0 <= probability <= 1:
+                raise ValueError(f"mutation[{name!r}]['probability'] must be a probability")
+            mutates = rng.random(len(values)) < probability
+            signs = np.where(rng.random(len(values)) < 0.5, -1.0, 1.0)
+            values = np.clip(values + mutates * signs * step, low, high)
+        cells.set_trait(daughters, name, values)
+
+
+def _truncated_normal(rng, mean, std, low, high):
+    """Normal values around ``mean`` with standard deviation ``std``, truncated to [low, high]."""
+    if std == 0 or len(mean) == 0:
+        return np.clip(mean, low, high)
+    if np.isinf(low) and np.isinf(high):
+        return mean + rng.normal(0.0, std, len(mean))
+    from scipy.stats import truncnorm
+
+    return truncnorm.rvs((low - mean) / std, (high - mean) / std, loc=mean, scale=std, size=len(mean),
+                         random_state=rng)
+
 
 _MIGRATING, _RESTING = 0, 1
 _WHEN_FULL = ("legacy", "reject")
@@ -282,11 +489,13 @@ def go_or_grow_growth(state, r_b=0.2, r_d=0.01, r_d_resting=None, when_full="leg
         many resting cells as there are free rest channels. "reject": every
         resting cell tries to divide, and divisions into full channels fail.
     mutation : dict or None
-        Identity-based models: traits of the daughters that mutate, with the
-        standard deviation of a normal change, e.g. ``{"kappa": 0.2}``.
-    new_family : bool
-        Identity-based models: every daughter founds a new family, for
-        lineage analyses such as Muller plots.
+        Identity-based models: traits of the daughters that mutate, e.g.
+        ``{"kappa": 0.2}`` for a normal change with standard deviation 0.2;
+        see :func:`birth_death` for bounded and discrete changes.
+    new_family : bool or float
+        Identity-based models: every daughter founds a new family (True), or
+        each one with this probability, for lineage analyses such as Muller
+        plots.
     """
     _check_mode(when_full)
     if state.identity_based:
@@ -365,12 +574,9 @@ def _growth_cells(state, r_b, r_d, r_d_resting, when_full, mutation, new_family)
     else:
         rate = np.clip(birth * (1 - crowding[cells.node]), 0, 1)
         dividing = resting & (rng.random(len(cells)) < rate)
-    daughters = cells.divide(dividing, channels="rest", new_family=new_family)
-    for name, std in mutation.items():
-        if not np.isfinite(std) or std < 0:
-            raise ValueError(f"mutation[{name!r}] must be a non-negative standard deviation")
-        values = cells[name][daughters]
-        cells.set_trait(daughters, name, values + rng.normal(0.0, std, len(daughters)))
+    founders = _founders(rng, cells, dividing, new_family)
+    daughters = cells.divide(dividing, channels="rest", new_family=founders)
+    _mutate(state, daughters, mutation)
 
 
 def _per_cell(cells, value, name):

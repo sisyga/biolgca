@@ -284,45 +284,6 @@ def _register_legacy(
 
 
 def _register_native_plugins() -> None:
-    birth_death_info = PluginInfo(
-        name="birth_death",
-        aliases=("birthdeath_native",),
-        operator_kind="birth_death",
-        backend_families=("classical", "multispecies"),
-        parameters={
-            "birth_rate": {
-                "default": 0.0,
-                "type_label": "probability",
-                "validator": "probability scalar or per-species vector",
-            },
-            "death_rate": {
-                "default": 0.0,
-                "type_label": "probability",
-                "validator": "probability scalar or per-species vector",
-            },
-            "capacity": {
-                "default": "K with one species, none with several",
-                "type_label": "positive integer",
-                "validator": "positive integer",
-            },
-        },
-        conservation_law=_law_for_kind("birth_death"),
-        port_status="native",
-        test_status="unit_tested",
-        description=(
-            "Cells die with probability death_rate, then divide with probability birth_rate into a "
-            "free channel of their species. With one species, capacity limits the cells per node; "
-            "with several, divisions slow down as a node fills: birth_rate * (1 - cells / capacity)."
-        ),
-    )
-
-    def birth_death_factory(parameters: Mapping[str, Any] | None = None) -> InteractionOperator:
-        from .pipeline import NativeBirthDeathOperator
-
-        return NativeBirthDeathOperator(parameters)
-
-    register_plugin(birth_death_info, birth_death_factory)
-
     only_propagation_info = PluginInfo(
         name="classical.only_propagation",
         aliases=("only_propagation", "propagation.default"),
@@ -1822,10 +1783,6 @@ _PARAMETER_MEANINGS = {
              "that a cell of species a becomes species b. Off-diagonal row sums must be <= 1.",
 }
 _PLUGIN_PARAMETER_MEANINGS = {
-    ("birth_death", "capacity"): "Cells per node. With one species a hard limit: no division fills a "
-                                 "node beyond it. With several species a soft limit: a cell divides "
-                                 "with probability birth_rate * (1 - cells on its node / capacity); "
-                                 "without it, only free channels limit divisions.",
     ("classical.birth", "r_b"): "Birth probability: a free channel of a node is filled with "
                                 "probability r_b * n / K, where n is the number of cells at the "
                                 "node and K the number of channels.",

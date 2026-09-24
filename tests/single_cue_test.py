@@ -5,10 +5,8 @@ compared in distribution: the mean and spread of each node's score after one ste
 number of cells at the node. The NoVE alignment rules draw the same numbers and are compared
 seed for seed (on hex the neighbour sums round differently, so hex is left out).
 
-The legacy nematic and contact-guidance tensors are c cᵀ - I/2, so with rest channels a
-resting cell scores like a cell moving at 45° to the axis, while the terms score resting
-like moving perpendicular to it. Without rest channels the two agree, which is what the
-comparison checks.
+The nematic and contact-guidance terms use traceless tensors; in 2D these are the legacy
+tensors c cᵀ - I/2, so the comparison includes a rest channel.
 """
 
 import numpy as np
@@ -65,21 +63,20 @@ def _scores(model, weights):
 @pytest.mark.parametrize("case", list(CASES))
 def test_a_single_cue_reproduces_the_legacy_classical_operator(case):
     legacy_entry, new_entry, fields = CASES[case]
-    rest = 0 if case in ("nematic", "contact_guidance") else 1
-    nodes = np.random.default_rng(7).random(DIMS + (4 + rest,)) < 0.5
-    new = _model(nodes, new_entry, fields=fields, rest=rest)
+    nodes = np.random.default_rng(7).random(DIMS + (5,)) < 0.5
+    new = _model(nodes, new_entry, fields=fields)
     term = new.pipeline.operators[0].terms[0]
     term.prepare(new.lgca)
     weights = term.weights
     if legacy_entry is None:  # chemotaxis: the legacy operator takes the gradient itself
         gradient = np.pad(term.field, [(1, 1), (1, 1), (0, 0)], mode="edge")
         legacy_entry = {"name": "classical.chemotaxis", "parameters": {"beta": 20.0, "gradient": gradient}}
-    legacy = _model(nodes, legacy_entry, fields=fields, seed=4, rest=rest)
+    legacy = _model(nodes, legacy_entry, fields=fields, seed=4)
     new.step()
     legacy.step()
     a, b = _scores(new, weights), _scores(legacy, weights)
     density = nodes.sum(-1)
-    for level in range(1, 4 + rest):  # empty and full nodes cannot change
+    for level in range(1, 5):  # empty and full nodes cannot change
         at = density == level
         for x, y in ((a[at], b[at]), (a[at] ** 2, b[at] ** 2)):
             error = np.sqrt((x.var() + y.var()) / at.sum())
@@ -117,3 +114,23 @@ def test_single_cues_run_in_every_family(name, ve, identity):
     cells = model.lgca.cell_density[model.lgca.nonborder].copy()
     model.step()
     np.testing.assert_array_equal(model.lgca.cell_density[model.lgca.nonborder], cells)
+
+
+@pytest.mark.parametrize("geometry, dims", [("lin", (8,)), ("square", (6, 6)), ("hex", (6, 6)),
+                                            ("cubic", (4, 4, 4)), ("moore", (4, 4, 4))])
+@pytest.mark.parametrize("name", ["nematic_alignment", "contact_guidance"])
+def test_axis_cues_score_resting_like_the_average_direction(geometry, dims, name):
+    # traceless tensors: the velocity channels' scores sum to zero, the rest channel scores zero
+    rng = np.random.default_rng(0)
+    probe = build_model(ModelSpec(space=SpaceSpec(geometry=geometry, dims=dims),
+                                  state=StateSpec(density=0.3, restchannels=1)))
+    d, K = probe.lgca.c.shape[0], probe.lgca.K
+    nodes = rng.random(dims + (K,)) < 0.3
+    fields = {"director": rng.normal(size=dims + (d,))}
+    model = _model(nodes, {"name": name, "parameters": {"beta": 1.0}}, geometry=geometry, fields=fields)
+    term = model.pipeline.operators[0].terms[0]
+    term.prepare(model.lgca)
+    weights = term.weights
+    np.testing.assert_allclose(weights[..., -1], 0.0, atol=1e-12)
+    np.testing.assert_allclose(weights[..., :-1].sum(-1), 0.0, atol=1e-9)
+    assert np.abs(weights).max() > 0.1 or geometry == "lin"

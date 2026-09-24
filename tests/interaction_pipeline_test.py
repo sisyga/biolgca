@@ -25,7 +25,6 @@ from lgca.pipeline import (
     ReorientationTermSpec,
 )
 from lgca.plugins import PluginInfo, ReorientationOperator
-from lgca.pipeline import NativeBirthDeathOperator
 from lgca.simulation import NodeRecorder
 from lgca.simulation import DensityRecorder, PopulationRecorder
 
@@ -59,13 +58,13 @@ def test_native_birth_death_changes_total_mass_within_capacity():
     spec = ModelSpec(
         description=Description(title="native birth death"),
         space=SpaceSpec(geometry="square", boundary="periodic"),
-        state=StateSpec(nodes=nodes, restchannels=1),
+        state=StateSpec(nodes=nodes, restchannels=1, capacity=2),
         time=TimeSpec(steps=1, seed=30),
         dynamics=InteractionPipelineSpec(
             operators=[
                 BirthDeathSpec(
                     name="birth_death",
-                    parameters={"birth_rate": 1.0, "death_rate": 0.0, "capacity": 2},
+                    parameters={"birth_rate": 1.0, "death_rate": 0.0, "crowding": False},
                 )
             ],
             propagation=False,
@@ -79,27 +78,6 @@ def test_native_birth_death_changes_total_mass_within_capacity():
     assert result.lgca.nodes_t[0].sum() == 1
     assert result.lgca.nodes_t[1].sum() == 2
     assert result.lgca.nodes_t[1].sum(axis=-1).max() <= 2
-
-
-def test_single_species_birth_death_lattice_kernel_preserves_local_capacity():
-    nodes = np.zeros((2, 3, 5), dtype=bool)
-    nodes[..., 0] = True
-    operator = NativeBirthDeathOperator(
-        {"birth_rate": 1.0, "death_rate": 0.0, "capacity": 3}
-    )
-
-    result = operator._apply_single_species_lattice(
-        nodes,
-        birth_rate=1.0,
-        death_rate=0.0,
-        rng=np.random.default_rng(37),
-        capacity=3,
-    )
-
-    assert result.shape == nodes.shape
-    assert result.dtype == nodes.dtype
-    np.testing.assert_array_equal(result.sum(axis=-1), np.full((2, 3), 2))
-    assert result.sum(axis=-1).max() <= 3
 
 
 def test_native_birth_death_supports_species_specific_rates():
@@ -118,6 +96,7 @@ def test_native_birth_death_supports_species_specific_rates():
                     parameters={
                         "birth_rate": [1.0, 0.0],
                         "death_rate": [0.0, 1.0],
+                        "crowding": False,
                     },
                 )
             ],
@@ -178,8 +157,12 @@ def test_nematic_scores_count_neighbors_and_ignore_empty_extra_species(geometry,
         term.prepare(lgca)
         candidates = np.eye(lgca.K, dtype=bool)[:lgca.velocitychannels]
         scores.append(term.score(candidates, None, lgca, coord))
-    expected = neighbors * (lgca.c.T @ lgca.c[:, 0]) ** 2
-    expected += (lgca.c.T @ lgca.c[:, 1]) ** 2
+    c, d = lgca.c, lgca.c.shape[0]
+
+    def traceless(k):  # (c_k · c_i)² - |c_k|² |c_i|² / d
+        return (c.T @ c[:, k]) ** 2 - (c ** 2).sum(0) * (c[:, k] ** 2).sum() / d
+
+    expected = neighbors * traceless(0) + traceless(1)
     np.testing.assert_allclose(scores[0], expected)
     np.testing.assert_allclose(scores[1], expected)
 
@@ -252,7 +235,7 @@ def test_opposite_neighbors_distinguish_polar_and_nematic_scores():
     lgca.nodes[1, 2, 0] = True  # east
     lgca.nodes[3, 2, 2] = True  # west
     candidates = np.eye(4, dtype=bool)
-    for name, expected in (("polar_alignment", [0, 0, 0, 0]), ("nematic_alignment", [2, 0, 2, 0])):
+    for name, expected in (("polar_alignment", [0, 0, 0, 0]), ("nematic_alignment", [1, -1, 1, -1])):
         term = _term(name)
         term.prepare(lgca)
         np.testing.assert_allclose(term.score(candidates, lgca.nodes[2, 2], lgca, (2, 2)), expected)
@@ -945,10 +928,10 @@ def test_lazy_permutation_cache_evicts_by_bytes(monkeypatch):
     assert list(cache) == [1]
 
 
-def _turnover_step(nodes, **parameters):
+def _turnover_step(nodes, capacity=None, **parameters):
     spec = ModelSpec(
         space=SpaceSpec(geometry="lin", dims=nodes.shape[0]),
-        state=StateSpec(nodes=nodes, n_species=2, restchannels=nodes.shape[-1] - 2),
+        state=StateSpec(nodes=nodes, n_species=2, restchannels=nodes.shape[-1] - 2, capacity=capacity),
         time=TimeSpec(steps=1, seed=3),
         dynamics=InteractionPipelineSpec(operators=[{"name": "birth_death", "parameters": parameters}],
                                          propagation=False),
@@ -963,9 +946,12 @@ def test_multispecies_turnover_matches_its_rates():
     survivors = _turnover_step(full, death_rate=[0.2, 0.5]).mean(axis=(0, 2))
     np.testing.assert_allclose(survivors, [0.8, 0.5], atol=0.01)
 
+    # one cell of each species per node; the node holds 2 x 4 cells, so crowding is 1 - 2 / 8
     one_cell = np.zeros((20000, 2, 4), dtype=bool)
     one_cell[..., 0] = True
     births = _turnover_step(one_cell, birth_rate=[0.1, 0.4]).sum(axis=-1).mean(axis=0) - 1
+    np.testing.assert_allclose(births, [0.075, 0.3], atol=0.01)
+    births = _turnover_step(one_cell, birth_rate=[0.1, 0.4], crowding=False).sum(axis=-1).mean(axis=0) - 1
     np.testing.assert_allclose(births, [0.1, 0.4], atol=0.01)
 
 
@@ -973,7 +959,7 @@ def test_multispecies_capacity_slows_divisions_instead_of_capping_them():
     # two cells per node of capacity 4: each divides with probability 0.8 * (1 - 2 / 4)
     nodes = np.zeros((20000, 2, 4), dtype=bool)
     nodes[..., 0] = True
-    after = _turnover_step(nodes, birth_rate=0.8, capacity=4).sum(axis=-1)
+    after = _turnover_step(nodes, capacity=4, birth_rate=0.8).sum(axis=-1)
 
     np.testing.assert_allclose(after.mean(axis=0) - 1, [0.4, 0.4], atol=0.01)
     assert (after.sum(axis=-1) == 4).any()  # nodes may reach capacity

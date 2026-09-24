@@ -7,6 +7,15 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- `birth_death` works in every model family and takes rates per cell in
+  identity-based models (`"birth_rate": "r_b"` names a trait), trait
+  mutations (`"mutation": {"r_b": {"std": 0.01, "bounds": [0, 0.5]}}` or
+  discrete steps `{"step": 0.01, "probability": 0.1}`), `new_family` as a
+  probability, and a `mutation_matrix` for the species of daughters in
+  classical models with several species. It matches the legacy
+  `classical.birth`, `ib.birthdeath`, `nove_ib.birth` and
+  `multispecies.birth` in distribution (`tests/birth_death_test.py`).
+  `go_or_grow.growth` takes the same `mutation` and `new_family` options.
 - Names without family prefixes for movement: `random_walk` (cells move to
   random channels, optionally within a channel set or for some species) and
   every built-in cue as an operator of its own (`polar_alignment`,
@@ -155,6 +164,12 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- `nematic_alignment` and `contact_guidance` score a channel with traceless
+  tensors, c cᵀ - |c|² I / d: resting scores 0, moving along the axis above
+  and across it below it. Before, resting tied with moving across the axis,
+  so cells rested less than in the legacy `classical.nematic`, which the
+  terms now match in 2D. Seeded results of models with rest channels change.
+
 - `channel_random_walk` is now called `random_walk`; the name `random_walk`
   used to be an alias of `classical.random_walk`, which it replaces in every
   family (same distribution, different random numbers).
@@ -168,11 +183,18 @@ This file records notable user-facing changes. Changes remain under
   named field repeat its edge values. Inside the lattice nothing changes for
   linear signals; at the edge, and on the hexagonal lattice for curved
   signals, seeded runs differ from before.
-- With several species, `capacity` of `birth_death` is a soft limit: cells
-  divide with probability `birth_rate * (1 - cells on the node / capacity)`,
-  and without a capacity only free channels limit divisions. With one
-  species it remains a hard limit. Seeded multispecies runs differ from
-  before.
+- `birth_death` is one rule for every model family (classical and
+  identity-based, with and without volume exclusion). By default growth is
+  logistic: after the deaths, a cell divides with probability
+  `birth_rate * (1 - n / capacity)`. With volume exclusion and one species
+  the factor comes from exclusion, as in the legacy `classical.birth` and
+  `ib.birthdeath`: a daughter goes to a random channel and survives if it is
+  empty. With several species, `n` counts all of them and the capacity is
+  `StateSpec.capacity`, by default `n_species * K`, so species compete for
+  space. `crowding=False` gives the former behaviour: cells divide
+  with `birth_rate`, and `StateSpec.capacity` is a hard limit. The operator
+  no longer takes `capacity`; set `StateSpec.capacity`. The alias
+  `birthdeath_native` is gone. Seeded runs differ from before.
 - The README go-or-grow example uses the go-or-grow rules.
 - The custom interaction guide, the concepts page on interactions,
   tutorials 4 and 6 and the README use the decorators: rules are written as

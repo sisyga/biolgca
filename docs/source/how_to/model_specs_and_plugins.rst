@@ -309,12 +309,13 @@ drop the duplicate shared endpoint. A result's metadata remains a snapshot after
 subsequent runs. Direct runners publish ``lgca.recording_start_step`` and
 ``lgca.recording_end_step`` for the same purpose.
 
-``state.capacity`` supplies the carrying capacity for NoVE models and the shared
-birth limit for native VE ``birth_death``. An operator capacity that conflicts
-with it is rejected. VE channel occupancy remains limited by ``K`` per species.
-Metadata records ``channel_capacity`` separately from per-operator
-``growth_capacities``; with one native birth/death operator, ``capacity`` reports
-its active configured limit.
+``state.capacity`` supplies the crowding scale of the rules: the carrying
+capacity of models without volume exclusion, and of ``birth_death`` with
+several species (by default ``n_species * K`` with volume exclusion). An
+operator capacity that conflicts with it is rejected. VE channel occupancy
+remains limited by ``K`` per species. Metadata records ``channel_capacity``
+separately from per-operator ``growth_capacities``; with one ``birth_death``
+operator, ``capacity`` reports the capacity it uses.
 
 Recording and temporary-memory budgets
 --------------------------------------

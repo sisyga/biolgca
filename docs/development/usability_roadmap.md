@@ -708,10 +708,38 @@ deprecated aliases for one release.
   `classical.alignment`, `persistent_walk`, `aggregation`, `chemotaxis`
   (given the same gradient), `nematic` and `contact_guidance` in
   distribution (score mean and spread per density level); the NoVE
-  alignments match seed for seed. Open: with rest channels, legacy `nematic`
-  and `contact_guidance` use the tensor c cᵀ - I/2, which makes moving
-  perpendicular to the axis worse than resting; the terms score resting like
-  moving perpendicular. Growth (birth/death, go-or-grow variants) is next.
+  alignments match seed for seed. Growth (birth/death, go-or-grow variants)
+  is next.
+- Status (2026-09-24): `nematic_alignment` and `contact_guidance` score with
+  traceless tensors c cᵀ - |c|² I / d. They equal the legacy tensors c cᵀ - I/2
+  in 2D, so the parity test now includes a rest channel; in 3D the legacy
+  tensor is not traceless (a perpendicular cell scored -1/4 against resting),
+  and on Moore the velocities have unequal lengths. Averaged over directions,
+  moving now scores like resting on every geometry (tested).
+- Status (2026-09-24): `birth_death` is one decorated rule for all four
+  families (the class-based native operator is deleted). Death first, then
+  division with `birth_rate * (1 - n / capacity)`. With volume exclusion
+  and one species the factor comes from the legacy mechanism (a daughter
+  picks a random channel, distinct per node, and survives if it is empty;
+  sampled as a hypergeometric count), which gives exactly r_b n (K - n) / K.
+  A first version that scaled the rate and then also needed a free channel
+  counted crowding twice (0.284 instead of 0.32 births at n = 4 of K = 5);
+  `test_volume_exclusion_gives_logistic_births` catches it. Several species
+  keep the Phase 1 competition through total density / `StateSpec.capacity`
+  (default n_species * K). `crowding=False` is the former single-species
+  behaviour (hard capacity; several species share the room by a
+  hypergeometric draw). Rates can be trait names; `mutation` takes a
+  standard deviation, `{"std", "bounds"}` (truncated normal) or `{"step",
+  "probability"}`; `new_family` takes a probability; `mutation_matrix` sets
+  the daughters' species. Parity in distribution with `classical.birth`
+  (mean only: legacy fills each empty channel with r_b n / K),
+  `ib.birthdeath` (legacy `ib.birth` draws target channels with replacement,
+  so colliding daughters are lost), `nove_ib.birth` and `multispecies.birth`
+  with a mutation matrix. Legacy rules that let dying cells divide in the
+  same step differ by O(r_b r_d). Open: which research rules to port
+  (`nove_ib.birthdeath_cancerdfe`, `go_or_grow_kappa(_chemo)`,
+  `go_or_grow_glioblastoma`, `evo_steric`, `ib.go_and_grow_mutations`, the
+  excitable media, `classical.go_and_grow`).
 
 **2.4 Remove duplicates** (B4, D5)
 - Separate the random walk from `classical.birth*`.

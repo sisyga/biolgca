@@ -146,8 +146,10 @@ def check_interaction(
     models = list(dict.fromkeys(declared))
     if families is not None or n_species is not None:
         families = dict.fromkeys(family for family, _ in declared) if families is None else families
+        explicit = n_species is not None
         n_species = dict.fromkeys(count for _, count in declared) if n_species is None else n_species
-        models = [(family, count) for family in families for count in n_species]
+        models = [(family, count) for family in families for count in n_species
+                  if explicit or family not in _IDENTITY or count == 1]
     entry = {"name": info.name, "parameters": dict(parameters or {})}
 
     report = InteractionReport(info.name)

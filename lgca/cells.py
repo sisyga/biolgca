@@ -231,7 +231,7 @@ class Cells:
         self._state._cells_changed()
         return winners
 
-    def divide(self, which, channels: Any = "all", new_family: bool = False) -> np.ndarray:
+    def divide(self, which, channels: Any = "all", new_family=False) -> np.ndarray:
         """The selected cells divide; each daughter inherits all traits of its mother.
 
         Daughters go to channels of the set ``channels`` at the mother's node:
@@ -240,7 +240,8 @@ class Cells:
         random). Without volume exclusion, ``channels="same"`` puts the daughter
         in its mother's channel. With ``new_family=True`` every daughter founds
         a new family (see ``lgca.muller_plot``); otherwise it belongs to its
-        mother's family.
+        mother's family. A mask of cells as ``new_family`` selects the mothers
+        whose daughters found one.
 
         Returns the positions of the daughters in the cell arrays, e.g. to
         mutate their traits with :meth:`set_trait`.
@@ -257,7 +258,11 @@ class Cells:
         lgca = self._lgca
         first = int(lgca.maxlabel) + 1
         labels = np.arange(first, first + len(mothers), dtype=np.int64)
-        _inherit(lgca, self.label[mothers], labels, new_family)
+        if isinstance(new_family, (bool, np.bool_)):
+            founders = np.full(len(mothers), bool(new_family))
+        else:
+            founders = self._mask(new_family)[mothers]
+        _inherit(lgca, self.label[mothers], labels, founders)
         lgca.maxlabel = first + len(mothers) - 1
         start = len(self)
         self.label = np.concatenate([self.label, labels])
@@ -319,11 +324,14 @@ class Cells:
         return winners, slot_channel[slot_start + rank[winners]]
 
 
-def _inherit(lgca, mothers, daughters, new_family):
-    """Append the daughters' trait rows (copies of their mothers') and their families."""
+def _inherit(lgca, mothers, daughters, founders):
+    """Append the daughters' trait rows (copies of their mothers') and their families.
+
+    ``founders`` marks the daughters that found a new family.
+    """
     if len(daughters) == 0:
         return
-    if new_family and "family" not in lgca.props:
+    if founders.any() and "family" not in lgca.props:
         lgca.init_families(type="homogeneous", mutation=True)
     for name in list(lgca.props):
         trait = trait_array(lgca, name)
@@ -331,8 +339,9 @@ def _inherit(lgca, mothers, daughters, new_family):
             raise ValueError(f"trait {name!r} has {len(trait)} values, but the next label is "
                              f"{daughters[0]}; every trait needs one value per label")
         values = trait.values[mothers]
-        if name == "family" and new_family:
-            values = _found_families(lgca, values)
+        if name == "family" and founders.any():
+            values = values.copy()
+            values[founders] = _found_families(lgca, values[founders])
         trait.extend(values)
 
 
