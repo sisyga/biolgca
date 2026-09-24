@@ -291,8 +291,10 @@ class LatticeState:
         """Add ``n`` cells per node and species to free channels.
 
         ``channels`` is ``"all"``, ``"rest"``, ``"velocity"``, a sequence of
-        channel indices or a boolean mask of length ``K``; the new cells are
-        spread uniformly over the free channels of this set. With volume
+        channel indices or a boolean mask of length ``K``, or a mapping from
+        species to one of these, e.g. ``{0: "velocity", 1: "rest"}`` (species
+        left out use all channels); the new cells are spread uniformly over
+        the free channels of this set. With volume
         exclusion, a species gets at most as many cells as it has free
         channels in the set. :attr:`capacity` is not enforced; rules that
         should slow down near it scale their rates, e.g. with
@@ -301,7 +303,7 @@ class LatticeState:
         Returns the number of added cells per node and species.
         """
         wanted = self._number(n, "n")
-        allowed = self._channel_mask(channels)
+        allowed = self._channel_sets(channels)
         if not self._ve:
             added = self._spread(wanted, allowed)
             self._counts += added
@@ -331,7 +333,7 @@ class LatticeState:
         """
         transition = self._transition_matrix(rates)
         same = isinstance(channels, str) and channels == "same"
-        allowed = None if same else self._channel_mask(channels)
+        allowed = None if same else self._channel_sets(channels)
         if self._ve:
             return self._switch_ve(transition, allowed)
         return self._switch_nove(transition, allowed)
@@ -345,10 +347,10 @@ class LatticeState:
         ``shuffle_cells()``, and moving cells that keep resting cells in place
         use ``shuffle_cells("velocity")``.
         """
-        allowed = self._channel_mask(channels)
+        allowed = self._channel_sets(channels)
         selected = np.zeros(self.n_species, dtype=bool)
         selected[slice(None) if species is None else np.atleast_1d(species)] = True
-        mask = selected[:, None] & allowed[None, :]
+        mask = selected[:, None] & allowed
         number = np.where(mask, self._counts, 0).sum(axis=-1)
         cleared = np.where(mask, 0, self._counts)
         if self._ve:
@@ -396,8 +398,14 @@ class LatticeState:
 
     def _probability(self, p, name):
         values = self._broadcastable(p, name, per_channel=True).astype(float, copy=False)
-        if not np.all(np.isfinite(values)) or np.any((values < 0) | (values > 1)):
-            raise ValueError(f"{name} must contain probabilities between 0 and 1")
+        if not np.all(np.isfinite(values)):
+            raise ValueError(f"{name} must contain probabilities between 0 and 1, not NaN or infinity")
+        if np.any((values < 0) | (values > 1)):
+            hint = ("; without volume exclusion a node can hold more than its capacity, so a rate "
+                    "proportional to density / capacity may need np.minimum(..., 1)"
+                    if not self._ve and values.max() > 1 else "")
+            raise ValueError(f"{name} must contain probabilities between 0 and 1, got values from "
+                             f"{values.min():.3g} to {values.max():.3g}{hint}")
         return values
 
     def _number(self, n, name):
@@ -454,9 +462,19 @@ class LatticeState:
             raise ValueError(f"the channel set {channels!r} is empty in this model")
         return mask
 
+    def _channel_sets(self, channels):
+        """Allowed channels per species, shape ``(n_species, K)``."""
+        if isinstance(channels, dict):
+            unknown = [species for species in channels if not 0 <= int(species) < self.n_species]
+            if unknown:
+                raise ValueError(f"channels names species {unknown}, but the model has {self.n_species}")
+            return np.stack([self._channel_mask(channels.get(species, "all"))
+                             for species in range(self.n_species)])
+        return np.broadcast_to(self._channel_mask(channels), (self.n_species, self.K))
+
     def _spread(self, number, allowed):
         """Distribute ``number`` cells per node and species uniformly over allowed channels."""
-        weights = allowed / allowed.sum()
+        weights = allowed / allowed.sum(axis=-1, keepdims=True)
         return self.rng.multinomial(number, weights)
 
     def _choose(self, free, number):
@@ -519,7 +537,7 @@ class LatticeState:
                 accepted = candidates & winner & free_before[..., species, None, :]
                 added[..., species, :] = accepted.any(axis=-2)
             else:
-                slots = free_before[..., species, :] & allowed
+                slots = free_before[..., species, :] & allowed[species]
                 flat = scores.reshape(self._dims + (-1,))
                 ranks = np.argsort(np.argsort(flat, axis=-1), axis=-1).reshape(counts.shape)
                 accepted = candidates & (ranks < slots.sum(axis=-1)[..., None, None])

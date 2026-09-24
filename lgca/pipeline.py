@@ -224,12 +224,9 @@ class CompiledPipeline:
             if law:
                 suffix += f"; {law}"
             suffix += f"; backend={','.join(operator.info.backend_families)}"
-            if operator.info.legacy_source:
-                suffix += f"; source={operator.info.legacy_source}"
             deps = ",".join(sorted(operator.dependencies())) or "-"
             outputs = ",".join(sorted(operator.outputs())) or "-"
             suffix += f"; inputs={deps}; outputs={outputs}"
-            suffix += f"; status={operator.info.port_status}"
             suffix += ")"
             parts.append(f"{operator.name}{suffix}")
         if self.propagation not in (False, None, "none", "disabled"):

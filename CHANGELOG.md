@@ -7,6 +7,29 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- `@lgca.interaction` turns a function `rule(state, r_d=0.1)` of a
+  `LatticeState` into a registered interaction: parameters, defaults and
+  descriptions come from the signature and docstring, calling
+  `rule(r_d=0.2)` gives the entry for `InteractionPipelineSpec(operators=[...])`,
+  and the name works in model files. The rule declares its kind, the families
+  it supports (`"classical"`, `"nove"`) and optionally geometries, a number of
+  species and momentum conservation; models it was not written for are
+  rejected when they are built, and the conservation laws are checked after
+  every call.
+- `lgca.testing.check_interaction(rule, parameters)` runs an interaction on
+  small seeded models of every supported geometry and family, with one and two
+  species and periodic and reflecting boundaries, and reports broken
+  conservation laws, invalid states, ghost-node changes that reach the
+  lattice and unseeded randomness. `expected_growth=` compares the measured
+  growth per step with the expected one.
+- Go-or-grow as a two-species model: `go_or_grow.switch` (migrating and
+  resting cells switch species depending on density), `go_or_grow.growth`
+  (death, and division of resting cells into rest channels, with separate
+  death rates if wanted) and `species_random_walk`. With
+  `capacity="legacy"` (default) they reproduce `classical.go_or_grow` and
+  `nove.go_or_grow` in distribution; the go-or-grow example uses them.
+- `LatticeState` operations accept channel sets per species, e.g.
+  `channels={0: "velocity", 1: "rest"}`.
 - `lgca.LatticeState`: the interior of a classical model with a species axis
   (`dims + (n_species, K)`, also for one species) and operations with a
   defined meaning per cell: `remove_cells`, `divide_cells`, `add_cells`,

@@ -124,7 +124,12 @@ class ConservationLaw:
 
 @dataclass(frozen=True)
 class PluginInfo:
-    """Public metadata for a registered plugin."""
+    """Public metadata for a registered plugin.
+
+    ``legacy_source``, ``port_status`` and ``test_status`` are internal
+    bookkeeping of the port from the legacy interaction functions and will be
+    removed with them; new plugins leave them out.
+    """
 
     name: str
     operator_kind: str

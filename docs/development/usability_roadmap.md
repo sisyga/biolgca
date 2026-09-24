@@ -291,6 +291,22 @@ from its current state.
 - Phase 1 covers classical models with and without volume exclusion.
   Identity-based go-or-grow, where every cell has its own `kappa` and
   `theta`, follows with per-cell operations in Phase 2.
+- Status (2026-09-24): done in `lgca/builtin_rules.py` as `go_or_grow.switch`,
+  `go_or_grow.growth` and `species_random_walk` (a random walk restricted to
+  some species and channels, which the built-in random walks did not offer
+  for several species). Both go-or-grow rules need `n_species=2`, accept
+  `capacity="legacy"` or `"reject"`, and refuse states with migrating cells
+  outside velocity channels or resting cells outside rest channels. Without
+  volume exclusion both modes are the legacy rule (every cell switches and
+  divides on its own); births are scaled by `1 - density / capacity` as
+  before. Validation: one step on 3600 nodes over the whole density range
+  matches the legacy rule per density level (`tests/go_or_grow_test.py`,
+  which also detects `capacity="reject"` as a different model), and 300
+  seeded runs of a small colony, a large colony and an invasion agree in
+  population and resting fraction within one standard error at t = 10, 30
+  and 60. The go-or-grow example uses the two-species model and still shows
+  the Allee effect (12 cells shrink to 5; with kappa = -4 they grow to 1933).
+  Tutorial 4 follows with 1.7.
 
 **1.3 Lattice view with operations** (C4)
 
@@ -392,6 +408,17 @@ spec = ModelSpec(..., dynamics=InteractionPipelineSpec(
   `PluginInfo` (keep them internally until phase 2 removes the legacy code).
 - The class-based operator API stays for advanced cases (setup caches,
   custom validation, dependencies).
+- Status (2026-09-24): done in `lgca/rules.py` (`from lgca import
+  interaction`). Additions: `n_species=` for rules that need a number of
+  species (checked when the model is built); calling a rule with a
+  `LatticeState` applies it directly; parameter descriptions come from a
+  numpydoc `Parameters` section. Declared momentum conservation is checked
+  after every call, like the conservation law of the kind. The schedule no
+  longer shows `port_status` and `legacy_source`; the fields stay in
+  `PluginInfo` with defaults and are documented as internal. Tutorial 6 and
+  the how-to still pass them and are rewritten with 1.7. Open: the native
+  `birth_death` operator keeps its hard capacity per node until it is
+  rewritten on the operations.
 
 **1.5 Public reorientation terms** (C3)
 
@@ -436,6 +463,16 @@ frequencies with the declared ones. Raises with a readable report; usable as a
 one-line pytest. The operations of 1.3 are tested this way across the full
 geometry-by-family matrix; HPP serves as the test case for a deterministic
 reorientation.
+- Status (2026-09-24): done in `lgca/testing.py`. It checks every declared
+  geometry and family with one and two species (two and three for a
+  phenotype switch, or the rule's `n_species`) and periodic and reflecting
+  boundaries, also for registered built-in names. Changes to ghost nodes
+  count as errors only when they reach the lattice through the boundary
+  conditions (the legacy `classical.birth` writes ghost nodes that periodic
+  boundaries overwrite). Instead of `expected_rates`, `expected_growth`
+  compares the relative change of cells per species in one step on a large
+  lattice; switch rates are not measured yet. `prepare=` arranges the random
+  initial states for rules that expect a layout (go-or-grow).
 
 **1.7 Documentation**
 - Rewrite `how_to/custom_interactions.rst` around 1.3–1.6: a growth rule, a

@@ -31,6 +31,8 @@ from ._warnings import warn_user
 from typing import Tuple, Any
 
 from .lattice_state import LatticeState
+from .rules import interaction
+from . import builtin_rules as _builtin_rules  # registers the decorated built-in interactions
 
 # Library loggers stay silent unless the application configures logging.
 logging.getLogger(__name__).addHandler(logging.NullHandler())

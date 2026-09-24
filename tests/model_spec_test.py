@@ -731,8 +731,6 @@ def test_build_model_exposes_compiled_pipeline_schedule():
     schedule = compiled.pipeline.describe_schedule()
     assert "classical.excitable_medium" in schedule
     assert "birth_death" in schedule
-    assert "lgca.interactions.excitable_medium" in schedule
-    assert "status=native" in schedule
     assert "Propagation" in schedule
 
 
@@ -803,6 +801,10 @@ def _state_for_plugin(plugin_name):
     family = plugin_name.split(".", 1)[0]
     if plugin_name == "phenotype_switch":
         return StateSpec(density=0.35, restchannels=1, n_species=2)
+    if family == "go_or_grow":  # migrating cells in velocity channels, resting cells in rest channels
+        nodes = np.zeros((4, 5, 2, 5), dtype=bool)
+        nodes[::2, :, 0, :4] = nodes[1::2, :, 1, 4] = True
+        return StateSpec(nodes=nodes, restchannels=1, n_species=2)
     if family == "ib":
         return StateSpec(density=0.35, restchannels=2, identity_based=True)
     if family == "nove":

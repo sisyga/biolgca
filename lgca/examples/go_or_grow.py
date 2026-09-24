@@ -1,9 +1,14 @@
 """Go-or-grow example: an emerging Allee effect.
 
-Cells either migrate (velocity channels) or rest and divide (rest channels),
-and switch between the two depending on how crowded their node is: a moving
-cell starts resting with probability ``(1 + tanh(kappa * (rho - theta))) / 2``,
-where ``rho`` is the fraction of occupied channels.
+Cells either migrate (species 0, in velocity channels) or rest and divide
+(species 1, in rest channels), and switch between the two depending on how
+crowded their node is: a migrating cell starts resting with probability
+``(1 + tanh(kappa * (rho - theta))) / 2``, where ``rho`` is the fraction of
+occupied channels. One time step is a phenotype switch
+(``go_or_grow.switch``), death and division (``go_or_grow.growth``) and a
+random walk of the migrating cells over the velocity channels, followed by
+propagation. This reproduces the original single-species go-or-grow rule
+(``classical.go_or_grow``) in distribution.
 
 With the default ``kappa=4, theta=0.75``, cells in sparse regions keep
 migrating and rarely divide. A colony that starts from one fully occupied node
@@ -54,10 +59,11 @@ INFO = ExampleInfo(
 
 
 def build_initial_nodes() -> np.ndarray:
-    """Seed one fully occupied node in the centre."""
+    """Seed one fully occupied node in the centre: 6 migrating and 6 resting cells."""
 
-    nodes = np.zeros((50, 50, 12), dtype=bool)
-    nodes[25, 25, :] = True
+    nodes = np.zeros((50, 50, 2, 12), dtype=bool)
+    nodes[25, 25, 0, :6] = True  # migrating cells in the velocity channels
+    nodes[25, 25, 1, 6:] = True  # resting cells in the rest channels
     return nodes
 
 
@@ -78,14 +84,13 @@ def build_spec(kappa: float = 4.0) -> ModelSpec:
             tags=("example", "go-or-grow", "phenotype-switching"),
         ),
         space=SpaceSpec(geometry="hex", dims=(50, 50), boundary="periodic"),
-        state=StateSpec(nodes=build_initial_nodes(), restchannels=6),
+        state=StateSpec(nodes=build_initial_nodes(), restchannels=6, n_species=2),
         time=TimeSpec(steps=100, seed=111),
         dynamics=InteractionPipelineSpec(
             operators=[
-                {
-                    "name": "classical.go_or_grow",
-                    "parameters": {"r_b": 0.2, "r_d": 0.01, "kappa": kappa, "theta": 0.75},
-                }
+                {"name": "go_or_grow.switch", "parameters": {"kappa": kappa, "theta": 0.75}},
+                {"name": "go_or_grow.growth", "parameters": {"r_b": 0.2, "r_d": 0.01}},
+                {"name": "species_random_walk", "parameters": {"species": 0, "channels": "velocity"}},
             ],
         ),
         analysis=AnalysisSpec(
