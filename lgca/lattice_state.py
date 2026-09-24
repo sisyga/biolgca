@@ -14,6 +14,7 @@ it (any number of cells per channel). The changes reach the model when
 
 from __future__ import annotations
 
+import copy
 import functools
 import itertools
 from collections.abc import Sequence
@@ -176,6 +177,21 @@ class LatticeState:
         """Sum of the velocities of the cells at each node, shape ``dims + (d,)``."""
         velocities = self._counts[..., :self.velocitychannels].sum(axis=-2)
         return velocities @ np.asarray(self.c, dtype=float).T
+
+    def sensing(self, species) -> LatticeState:
+        """The state with only the cells of ``species`` (an index or a list of indices), to read.
+
+        For cues that sense some species only, e.g. cells that align with
+        their own species: ``counts``, ``density``, ``flux`` and the other
+        views of the returned state count only these cells. It cannot be
+        committed.
+        """
+        chosen = _species_indices(species, self.n_species)
+        view = copy.copy(self)
+        view._counts = self._counts[..., chosen, :]
+        view._cells = None
+        view._sensing_only = True
+        return view
 
     @property
     def cells(self):
@@ -467,6 +483,8 @@ class LatticeState:
         Raises ``ValueError`` if the state breaks the conservation law of its
         kind. Ghost nodes are left to the model's boundary conditions.
         """
+        if getattr(self, "_sensing_only", False):
+            raise TypeError("a state from sensing() shows some species only and cannot be committed")
         if self._kind == "reorientation":
             changed = np.any(self.species_density != self._initial, axis=-1)
             what = "the number of cells of each species"
@@ -781,6 +799,17 @@ def random_occupancy(rng, number, channels):
             keys = rng.random((count, channels))
             placed[where] = np.argsort(np.argsort(keys, axis=-1), axis=-1) < cells
     return placed
+
+
+def _species_indices(species, n_species):
+    """Species as a sorted array of distinct indices, checked against ``n_species``."""
+    chosen = np.atleast_1d(np.asarray(species))
+    if chosen.ndim != 1 or len(chosen) == 0 or chosen.dtype == bool or not np.issubdtype(chosen.dtype, np.integer):
+        raise ValueError(f"species must be a species index or a list of them, got {species!r}")
+    if np.any((chosen < 0) | (chosen >= n_species)):
+        raise ValueError(f"species {species!r} does not exist; the model has {n_species} "
+                         f"(indices 0 to {n_species - 1})")
+    return np.unique(chosen)
 
 
 def _check_representable(counts):

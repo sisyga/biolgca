@@ -43,6 +43,30 @@ The library does not restrict where a species may sit. A model in which
 some cells must stay in rest channels, like the two-species form of
 go-or-grow, uses interactions that keep them there.
 
+Every part of the dynamics can be given to some species only. The parameter
+``species`` (an index or a list) of ``birth_death``, ``go_or_rest``,
+``random_walk``, the directional cues and ``ReorientationSpec(parameters=
+{"species": ...})`` chooses the species whose cells take part; the other
+cells are left as they are, but still count, e.g. for crowding.
+``phenotype_switch`` has a rate for every pair of species. Cues computed from
+the cells (alignment, aggregation, steric repulsion, persistence) sense all
+cells by default; ``sensed_species`` chooses whose cells they read. Species 0
+following a signal and species 1 aligning with its own kind:
+
+.. code-block:: python
+
+   operators = [
+       {"name": "chemotaxis", "parameters": {"beta": 1.0, "field": "signal", "species": 0}},
+       {"name": "polar_alignment", "parameters": {"beta": 2.0, "species": 1, "sensed_species": 1}},
+   ]
+
+A single cue is a ``ReorientationSpec`` with that one term, so the same
+model is ``ReorientationSpec(terms=[ReorientationTermSpec("chemotaxis", beta=1.0,
+species=0, parameters={"field": "signal"}), ReorientationTermSpec("polar_alignment",
+beta=2.0, species=1, sensed_species=1)])``. The two forms agree when each cue
+senses only the species it moves; a cue that senses other species sees them
+after the operators before it (see `Order`_).
+
 Order
 -----
 
@@ -99,6 +123,28 @@ daughter founds a new family, for lineage plots. See
 :doc:`/how_to/research_models` for the options and for published models
 built this way. In classical models with several species, a
 ``mutation_matrix`` gives the species of the daughters.
+
+Switching traits
+----------------
+
+Cells of identity-based models can change their traits at any time, not only
+when they divide: ``trait_switch`` applies events written as mutations to all
+living cells. Every step each cell has an event with its probability, which
+changes its traits by the effects; the operation ``"set"`` switches a trait
+to a value. A cell that starts to align with probability 0.02 per step, for a
+cue scaled by the trait (``ReorientationTermSpec(..., trait="alignment")``):
+
+.. code-block:: python
+
+   {"name": "trait_switch", "parameters": {"switch": {
+       "probability": 0.02, "traits": {"alignment": {"value": 2.0, "operation": "set"}}}}}
+
+A change of random size, e.g. ``{"alignment": {"distribution": "normal",
+"scale": 0.1, "bounds": [0, None]}}``, makes the strength drift. Two states
+that switch with their own rates, ``k_on`` from 0 to 2 and ``k_off`` back,
+are one event with probability ``k_on + k_off`` that sets a state drawn with
+``{"distribution": "choice", "a": [0, 2], "p": [k_off / (k_on + k_off),
+k_on / (k_on + k_off)]}``, whatever the old state was.
 
 Combining directional cues
 --------------------------

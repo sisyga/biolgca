@@ -28,7 +28,10 @@ cells between species (see :doc:`/concepts/interactions`). A
 
 The rules work in every model family (classical or identity-based, with or
 without volume exclusion, one or several species) unless stated otherwise;
-a rule that does not support a model says so when the model is built.
+a rule that does not support a model says so when the model is built. With
+several species, ``species`` chooses the species a rule acts on and
+``sensed_species`` the species a cue senses (see
+:doc:`/concepts/interactions`, "Species").
 
 The rules
 ---------
@@ -70,6 +73,9 @@ The rules
        are species.
    * - ``phenotype_switch``
      - Switch species at given rates (several species).
+   * - ``trait_switch``
+     - Change their traits by events, as daughters do by mutations
+       (identity-based models).
    * - ``excitable_medium``
      - Barkley kinetics of resting inhibitors and moving activators
        (classical models).

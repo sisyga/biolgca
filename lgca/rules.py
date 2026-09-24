@@ -502,7 +502,9 @@ def register_single_cue(cue: ReorientationCue, aliases: str | Iterable[str] = ()
 
     ``{"name": cue.name, "parameters": {"beta": ..., **term_parameters}}`` then
     stands for a :class:`~lgca.pipeline.ReorientationSpec` with this one term,
-    in every model family. ``trait`` and ``sweeps`` work as in the spec.
+    in every model family. ``species`` and ``channels`` choose the cells that
+    move (the others keep their channels), ``sensed_species`` the cells the
+    cue senses; ``trait`` and ``sweeps`` work as in the spec.
     """
     parameters = {
         "beta": {"default": 1.0, "description": "Sensitivity to the cue; negative values reverse it."},
@@ -514,6 +516,12 @@ def register_single_cue(cue: ReorientationCue, aliases: str | Iterable[str] = ()
         "channels": {"default": "all", "description": (
             "The channels that take part: 'all', 'velocity', 'rest' or channel indices. Only cells in "
             "these channels move, and only among them.")},
+        "species": {"default": None, "description": (
+            "The species whose cells move, an index or a list; the others keep their channels. "
+            "Default: all.")},
+        "sensed_species": {"default": None, "description": (
+            "The species whose cells the cue senses, for cues computed from the cells (e.g. align with "
+            "species 1 only). Default: all.")},
         **cue.info.parameters,
     }
     info = PluginInfo(name=cue.name, operator_kind="reorientation",
@@ -532,8 +540,9 @@ def register_single_cue(cue: ReorientationCue, aliases: str | Iterable[str] = ()
 
         values = dict(parameters or {})
         beta, trait = values.pop("beta", 1.0), values.pop("trait", None)
-        sampler = {key: values.pop(key) for key in ("sweeps", "channels") if key in values}
-        term = ReorientationTermSpec(cue.name, beta=beta, parameters=values, trait=trait)
+        sensed = values.pop("sensed_species", None)
+        sampler = {key: values.pop(key) for key in ("sweeps", "channels", "species") if key in values}
+        term = ReorientationTermSpec(cue.name, beta=beta, parameters=values, trait=trait, sensed_species=sensed)
         operator = BoltzmannReorientationOperator(ReorientationSpec(terms=[term], parameters=sampler))
         operator.info = replace(operator.info, name=cue.name, description=info.description)
         return operator

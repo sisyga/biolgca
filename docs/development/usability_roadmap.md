@@ -840,6 +840,17 @@ has no parity tests.
   functions (`benchmarks/research_models.py`): research models 3.6-18x,
   identity-based growth 11-16x, classical growth 1.1x, multispecies growth
   0.8-1.4x depending on the allocator (unchanged).
+- Decided and done (2026-09-24, user): with several species every part of
+  the dynamics can act on chosen species (`species` on growth, go-or-rest,
+  reorientations and single cues; a single cue is a `ReorientationSpec` with
+  one term, and its other species now keep their channels), and cues take
+  `sensed_species` (whose cells they read; default all), via
+  `LatticeState.sensing`. The open switching gap is closed by reusing
+  mutations: `trait_switch` applies mutation events to all living cells
+  (identity-based, with and without volume exclusion), with a new operation
+  `"set"`; two states with their own rates are one event with a `choice`
+  draw. Rates that depend on the surroundings or on the current value are
+  not covered yet.
 
 ### Phase 3: Studying a model (two to three weeks)
 

@@ -32,8 +32,9 @@ An effect is one of
     ``function(rng, size, **parameters)``; in Python the function itself may
     be passed instead of the dict.
 
-and may add ``"operation"`` (``"add"``, the default, ``"subtract"`` or
-``"multiply"``: how the effect changes the trait) and ``"bounds"``
+and may add ``"operation"`` (``"add"``, the default, ``"subtract"``,
+``"multiply"`` or ``"set"``, which replaces the trait by the effect: how the
+effect changes the trait) and ``"bounds"``
 (``[low, high]``, either may be ``None``) with ``"at_bounds"``: ``"clip"``
 (default) sets values beyond a bound to it, ``"redraw"`` draws the effect
 again, which truncates the distribution (a normal change then follows a
@@ -58,7 +59,7 @@ _DISTRIBUTIONS = frozenset({
     "standard_cauchy", "standard_exponential", "standard_gamma", "standard_normal", "standard_t",
     "triangular", "uniform", "vonmises", "wald", "weibull", "zipf",
 })
-_OPERATIONS = ("add", "subtract", "multiply")
+_OPERATIONS = ("add", "subtract", "multiply", "set")
 _REDRAWS = 100
 
 
@@ -111,6 +112,8 @@ class _Effect:
             return values + effects
         if self.operation == "subtract":
             return values - effects
+        if self.operation == "set":
+            return np.broadcast_to(effects, np.shape(values)).copy()
         return values * effects
 
 
@@ -120,21 +123,24 @@ class _Mutation:
     traits: dict[str, _Effect]
 
 
-def parse_mutation(mutation) -> list[_Mutation]:
-    """The kinds of mutation in a ``mutation`` parameter (see the module docstring)."""
+def parse_mutation(mutation, name: str = "mutation") -> list[_Mutation]:
+    """The kinds of mutation in a ``mutation`` parameter (see the module docstring).
+
+    ``name`` is the parameter's name in error messages, e.g. ``"switch"``.
+    """
     if mutation is None:
         return []
     blocks = [mutation] if isinstance(mutation, Mapping) else list(mutation)
     parsed = []
     for index, block in enumerate(blocks):
-        where = "mutation" if isinstance(mutation, Mapping) else f"mutation[{index}]"
+        where = name if isinstance(mutation, Mapping) else f"{name}[{index}]"
         if not isinstance(block, Mapping):
             raise TypeError(f"{where} must be a dict with 'traits' (and 'probability'), got {block!r}")
         if "traits" not in block:  # a dict of traits: one kind of mutation, always
             block = {"traits": block}
         unknown = set(block) - {"probability", "traits"}
         if unknown:
-            raise ValueError(f"{where} has unknown keys {sorted(unknown)}; a kind of mutation has "
+            raise ValueError(f"{where} has unknown keys {sorted(unknown)}; an event has "
                              f"'probability' and 'traits'")
         probability = float(block.get("probability", 1.0))
         if not 0 <= probability <= 1:
@@ -148,7 +154,10 @@ def parse_mutation(mutation) -> list[_Mutation]:
 
 
 def apply_mutations(state, daughters, mutations) -> np.ndarray:
-    """Mutate the daughters (positions in ``state.cells``); returns the mask of daughters that mutated."""
+    """Mutate the daughters (positions in ``state.cells``); returns the mask of daughters that mutated.
+
+    Also changes the traits of any other cells, e.g. all living cells for a switch of traits.
+    """
     cells, rng = state.cells, state.rng
     mutated = np.zeros(len(daughters), dtype=bool)
     for mutation in mutations:
@@ -156,6 +165,9 @@ def apply_mutations(state, daughters, mutations) -> np.ndarray:
         mutated |= events
         which = daughters[events]
         for name, effect in mutation.traits.items():
+            if name not in state._lgca.props:
+                raise ValueError(f"the cells have no trait {name!r}; declare it with "
+                                 f"StateSpec(traits={{{name!r}: ...}})")
             values = np.asarray(cells[name][which], dtype=float)
             cells.set_trait(which, name, effect.apply(rng, values))
     return mutated

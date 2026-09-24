@@ -138,7 +138,7 @@ An effect is
 - a function of your own, for any other distribution of effects (below).
 
 ``"operation"`` says how the effect changes the trait: ``"add"`` (default),
-``"subtract"`` or ``"multiply"``. ``"bounds": [low, high]`` keeps the trait
+``"subtract"``, ``"multiply"`` or ``"set"`` (the effect becomes the trait). ``"bounds": [low, high]`` keeps the trait
 within limits, either of which may be ``None``: by default values beyond a
 bound are set to it (``"at_bounds": "clip"``); ``"redraw"`` draws the effect
 again, which truncates the distribution. A number instead of an effect is

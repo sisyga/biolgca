@@ -118,6 +118,10 @@ class ReorientationTermSpec:
         ``{"field": name}`` for ``chemotaxis`` and ``contact_guidance``.
     species : int, optional
         Apply the term only to cells of this species (zero-based index).
+    sensed_species : int or list of int, optional
+        The species whose cells the term senses, for terms computed from the
+        cells, e.g. ``polar_alignment`` with ``sensed_species=1``: align with
+        the cells of species 1 only. Default: all cells.
     trait : str, optional
         Identity-based models: the name of a cell trait that scales the term
         for every cell, e.g. an alignment strength per cell. A cell's score
@@ -129,6 +133,7 @@ class ReorientationTermSpec:
     parameters: Mapping[str, Any] = field(default_factory=dict)
     species: int | None = None
     trait: str | None = None
+    sensed_species: int | Sequence[int] | None = None
 
 
 @dataclass(frozen=True)
@@ -166,6 +171,9 @@ class ReorientationSpec:
     sampler : str, default="boltzmann"
         The sampling rule; only ``"boltzmann"`` is available.
     parameters : mapping, default={}
+        ``{"species": [0]}``: only the cells of these species move; the
+        others keep their channels. ``{"channels": "velocity"}``: only the
+        cells in these channels move, and only among them.
         ``{"sweeps": 10}``: length of the Metropolis chain for terms with a
         ``trait`` in identity-based models with volume exclusion.
 
@@ -425,10 +433,15 @@ class _ReorientationTerm:
         self.trait = spec.trait
         if self.trait is not None and (not isinstance(self.trait, str) or not self.trait):
             raise ValueError("trait must be the name of a cell trait")
+        self.sensed_species = spec.sensed_species
 
     def validate(self, context) -> None:
+        from .lattice_state import _species_indices
+
         if self.species is not None and self.species >= context.spec.state.n_species:
             raise ValueError(f"species index {self.species} exceeds state.n_species")
+        if self.sensed_species is not None:
+            _species_indices(self.sensed_species, context.spec.state.n_species)
         if self.trait is not None:
             if not context.spec.state.identity_based:
                 raise ValueError(f"trait={self.trait!r} needs an identity-based model, whose cells "
@@ -485,6 +498,8 @@ class _FieldTerm(_ReorientationTerm):
         from .lattice_state import LatticeState
 
         state = LatticeState(lgca, step=self.step)
+        if self.sensed_species is not None:
+            state = state.sensing(self.sensed_species)
         try:
             field = self.definition.function(state, **self.parameters)
         except KeyError as exc:
@@ -584,7 +599,10 @@ class BoltzmannReorientationOperator(ReorientationOperator):
                 "in identity-based models with volume exclusion.")},
                         "channels": {"default": "all", "description": (
                 "The channels that take part: 'all', 'velocity', 'rest' or channel indices. Only cells "
-                "in these channels move, and only among them.")}},
+                "in these channels move, and only among them.")},
+                        "species": {"default": None, "description": (
+                "The species whose cells move, an index or a list; the others keep their channels. "
+                "Default: all.")}},
             port_status="native",
             description="Boltzmann sampler over channel configurations.",
         )
@@ -595,14 +613,22 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         if isinstance(self.sweeps, bool) or not isinstance(self.sweeps, (int, np.integer)) or self.sweeps < 1:
             raise ValueError(".parameters.sweeps must be a positive integer")
         self.channels = self.parameters.get("channels", "all")
+        self.species = self.parameters.get("species")
 
     @property
     def term_names(self) -> list[str]:
         return [term.name for term in self.terms]
 
     def validate(self, context) -> None:
+        from .lattice_state import _species_indices
+
         if self.sampler != "boltzmann":
             raise ValueError(f"unsupported reorientation sampler {self.sampler!r}")
+        if self.species is not None:
+            try:
+                _species_indices(self.species, context.spec.state.n_species)
+            except ValueError as exc:
+                raise ValueError(f".parameters.{exc}") from exc
         for index, term in enumerate(self.terms):
             try:
                 term.validate(context)
@@ -625,6 +651,8 @@ class BoltzmannReorientationOperator(ReorientationOperator):
             term.prepare(lgca)
         mask = channel_mask(self.channels, lgca.K, lgca.velocitychannels)
         mask = None if mask.all() else mask
+        # only these species move; with one species (identity-based models) that is all cells
+        still = self._still_species(getattr(lgca, "n_species", 1))
         if any(term.trait is not None and term.beta != 0 for term in self.terms):
             self._apply_traits(lgca, step, not isinstance(lgca, NoVE_IBLGCA_base), mask)
             return
@@ -636,22 +664,46 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         elif lgca.nodes.dtype == bool:
             lgca._reorientation_source_nodes = lgca.nodes.copy()
             try:
-                if mask is None:
+                if still is None and mask is None:
                     self._sample_batches(lgca, weights)
                 else:
-                    self._sample_batches(lgca, weights, mask=mask)
+                    source = lgca._reorientation_source_nodes[lgca.nonborder]
+                    nodes = source
+                    if still is not None:  # species that stay have no cells to move: no draws for them
+                        nodes = source.copy()
+                        nodes[..., still, :] = False
+                    self._sample_batches(lgca, weights, nodes=nodes, mask=mask)
+                    if still is not None:
+                        interior = lgca.nodes[lgca.nonborder]
+                        interior[..., still, :] = source[..., still, :]
+                        lgca.nodes[lgca.nonborder] = interior
             finally:
                 del lgca._reorientation_source_nodes
         else:
             interior = lgca.nodes[lgca.nonborder]
             counts = interior if interior.ndim == weights.ndim else interior[..., None, :]
+            moving = counts
+            if still is not None:
+                moving = counts.copy()
+                moving[..., still, :] = 0
             if mask is None:
-                sampled = self._sample_independent(lgca, counts.sum(axis=-1), weights)
+                sampled = self._sample_independent(lgca, moving.sum(axis=-1), weights)
             else:
-                sampled = counts.copy()
-                sampled[..., mask] = self._sample_independent(lgca, counts[..., mask].sum(axis=-1),
+                sampled = moving.copy()
+                sampled[..., mask] = self._sample_independent(lgca, moving[..., mask].sum(axis=-1),
                                                               weights[..., mask])
+            if still is not None:
+                sampled[..., still, :] = counts[..., still, :]
             lgca.nodes[lgca.nonborder] = sampled.reshape(interior.shape).astype(lgca.nodes.dtype)
+
+    def _still_species(self, n_species):
+        """The species whose cells keep their channels, or None if all move."""
+        if self.species is None:
+            return None
+        from .lattice_state import _species_indices
+
+        still = np.setdiff1d(np.arange(n_species), _species_indices(self.species, n_species))
+        return still if len(still) else None
 
     def dependencies(self) -> set[str]:
         deps = set()

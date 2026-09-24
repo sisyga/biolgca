@@ -36,11 +36,12 @@ import functools
 import numpy as np
 
 from .base import channel_sum
-from .lattice_state import channel_mask, random_occupancy
+from .lattice_state import _species_indices, channel_mask, random_occupancy
 from .mutations import apply_mutations, parse_mutation
 from .rules import interaction, register_single_cue, reorientation_term
 
-__all__ = ["birth_death", "go_or_grow_growth", "go_or_grow_switch", "go_or_rest", "random_walk", "tanh_switch"]
+__all__ = ["birth_death", "go_or_grow_growth", "go_or_grow_switch", "go_or_rest", "random_walk", "tanh_switch",
+           "trait_switch"]
 
 
 def tanh_switch(rho, kappa=5.0, theta=0.8):
@@ -187,7 +188,7 @@ for _cue, _aliases in ((polar_alignment, ()), (nematic_alignment, ("nematic",)),
 
 @interaction(kind="birth_death", families=("classical", "nove", "ib", "nove_ib"), name="birth_death")
 def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_matrix=None, mutation=None,
-                new_family=False, channels="all"):
+                new_family=False, channels="all", species=None):
     """Cells die and divide at the same time; crowded nodes have less room for daughters.
 
     In a time step, every cell dies with probability ``death_rate`` and,
@@ -246,6 +247,10 @@ def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_m
     channels : str or list of int
         The channels whose cells die and divide, and where daughters go:
         ``"all"``, ``"velocity"``, ``"rest"`` or channel indices.
+    species : int, list of int or None
+        Classical models with several species: the species whose cells die
+        and divide; the others are left as they are (but count for crowding).
+        Default: all.
 
     Examples
     --------
@@ -258,6 +263,8 @@ def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_m
     if not isinstance(crowding, (bool, np.bool_)):
         raise TypeError(f"crowding must be True or False, got {crowding!r}")
     if state.identity_based:
+        if species is not None:
+            _species_indices(species, 1)
         if mutation_matrix is not None and not np.array_equal(np.asarray(mutation_matrix), [[1]]):
             raise ValueError("mutation_matrix needs a classical model with several species; identity-based "
                              "models have one species and change traits with mutation=")
@@ -269,6 +276,10 @@ def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_m
     n_species, rng = state.n_species, state.rng
     death = _per_species(death_rate, "death_rate", n_species)
     birth = _per_species(birth_rate, "birth_rate", n_species)
+    if species is not None:  # the other species neither die nor divide
+        still = np.setdiff1d(np.arange(n_species), _species_indices(species, n_species))
+        death, birth = death.copy(), birth.copy()  # not the caller's arrays
+        death[still] = birth[still] = 0.0
     matrix = _mutation_matrix(mutation_matrix, n_species)
     in_set = channel_mask(channels, state.K, state.velocitychannels)
     every = in_set.all()
@@ -429,6 +440,37 @@ def _divide_and_mutate(state, dividing, channels, mutation, new_family):
     return daughters
 
 
+@interaction(kind="phenotype_switch", families=("ib", "nove_ib"), name="trait_switch")
+def trait_switch(state, switch, new_family=False):
+    """Cells change their traits by events, as daughters do by mutations, at any time.
+
+    Every time step each cell has an event with its probability, and the
+    event changes the cell's traits by its effects. The events and effects are
+    written as mutations (:mod:`lgca.mutations`), with the operation ``"set"``
+    to switch a trait to a value, e.g. a cell that starts to align::
+
+        {"name": "trait_switch", "parameters": {"switch": {
+            "probability": 0.02, "traits": {"alignment": {"value": 2.0, "operation": "set"}}}}}
+
+    Parameters
+    ----------
+    switch : dict or list
+        The events: ``{"probability": p, "traits": {name: effect, ...}}``,
+        or a list of them, applied in order.
+    new_family : bool
+        Cells that switch found a new family.
+    """
+    events = parse_mutation(switch, name="switch")
+    if not events:
+        raise ValueError("trait_switch needs a switch, e.g. {'probability': 0.01, 'traits': {'alignment': 0.1}}")
+    if not isinstance(new_family, (bool, np.bool_)):
+        raise TypeError(f"new_family must be True or False, got {new_family!r}")
+    cells = state.cells
+    switched = apply_mutations(state, np.arange(len(cells)), events)
+    if new_family:
+        cells.found_families(switched)
+
+
 _MIGRATING, _RESTING = 0, 1
 _WHEN_FULL = ("legacy", "reject")
 
@@ -452,7 +494,7 @@ def random_walk(state, channels="all", species=None):
 
 
 @interaction(kind="reorientation", families=("classical", "nove", "ib", "nove_ib"), name="go_or_rest")
-def go_or_rest(state, kappa=5.0, theta=0.75, when_full="legacy", density="node"):
+def go_or_rest(state, kappa=5.0, theta=0.75, when_full="legacy", density="node", species=None):
     """Moving cells start resting on crowded nodes, resting cells start moving on sparse ones.
 
     A moving cell starts resting with probability ``tanh_switch(rho, kappa,
@@ -478,10 +520,16 @@ def go_or_rest(state, kappa=5.0, theta=0.75, when_full="legacy", density="node")
     density : {"node", "neighbourhood"}
         The cells that set the relative density: those at the node, or the
         mean over the node and its neighbours.
+    species : int, list of int or None
+        Classical models with several species: the species whose cells switch;
+        the others keep their channels (but count for the density). Default:
+        all.
     """
     _check_mode(when_full)
     if state.restchannels < 1:
         raise ValueError("go_or_rest needs at least one rest channel for resting cells")
+    still = None if species is None else np.setdiff1d(np.arange(state.n_species),
+                                                      _species_indices(species, state.n_species))
     if state.identity_based:
         _go_or_rest_cells(state, kappa, theta, when_full, density)
         return
@@ -507,7 +555,10 @@ def go_or_rest(state, kappa=5.0, theta=0.75, when_full="legacy", density="node")
         leaving_resting = rng.binomial(resting, (1 - rest)[..., None])
         new_moving = moving - leaving_moving + _spread(rng, leaving_resting.sum(-1), velocity)
         new_resting = resting - leaving_resting + _spread(rng, leaving_moving.sum(-1), state.restchannels)
-    state.counts = np.concatenate((new_moving, new_resting), axis=-1)
+    new = np.concatenate((new_moving, new_resting), axis=-1)
+    if still is not None and len(still):
+        new[..., still, :] = cells[..., still, :]
+    state.counts = new
 
 
 @interaction(kind="phenotype_switch", families=("classical", "nove"), n_species=2, name="go_or_grow.switch")

@@ -188,3 +188,54 @@ def test_directed_motion_follows_a_given_vector_field():
     p = np.exp(1.5 * np.array([1.0, 0.0, -1.0, 0.0]))
     p /= p.sum()
     np.testing.assert_allclose(after.mean(0), p, atol=4 * np.sqrt(0.25 / len(after)))
+
+
+def _two_species(ve, operators, seed=3):
+    rng = np.random.default_rng(seed)
+    nodes = rng.random(DIMS + (2, 5)) < 0.3 if ve else rng.poisson(0.5, DIMS + (2, 5))
+    return build_model(ModelSpec(
+        space=SpaceSpec(geometry="square", dims=DIMS),
+        state=StateSpec(nodes=nodes, restchannels=1, n_species=2, volume_exclusion=ve, capacity=None if ve else 8,
+                        fields={"signal": np.add.outer(np.arange(DIMS[0]), np.zeros(DIMS[1])) / 10}),
+        time=TimeSpec(steps=1, seed=seed),
+        dynamics=InteractionPipelineSpec(operators=operators, propagation=False)))
+
+
+@pytest.mark.parametrize("ve", [True, False])
+@pytest.mark.parametrize("operator", [
+    {"name": "chemotaxis", "parameters": {"beta": 2.0, "field": "signal", "species": 0}},
+    {"name": "random_walk", "parameters": {"species": 0}},
+    ReorientationSpec(terms=[ReorientationTermSpec("polar_alignment", beta=2.0)], parameters={"species": [0]}),
+    {"name": "go_or_rest", "parameters": {"kappa": 5.0, "theta": 0.2, "species": 0}},
+    {"name": "birth_death", "parameters": {"birth_rate": 0.5, "death_rate": 0.2, "species": 0}},
+], ids=["chemotaxis", "random_walk", "spec", "go_or_rest", "birth_death"])
+def test_rules_for_one_species_leave_the_other_species_as_they_are(ve, operator):
+    model = _two_species(ve, [operator])
+    before = model.lgca.nodes[model.lgca.nonborder].copy()
+    model.step()
+    after = model.lgca.nodes[model.lgca.nonborder]
+    np.testing.assert_array_equal(after[..., 1, :], before[..., 1, :])
+    assert np.any(after[..., 0, :] != before[..., 0, :])
+
+
+@pytest.mark.parametrize("ve", [True, False])
+def test_a_cue_senses_the_chosen_species(ve):
+    # polar alignment of species 0 with the cells of species 1: the neighbours' flux of species 1 only
+    model = _two_species(ve, [{"name": "polar_alignment", "parameters": {"species": 0, "sensed_species": 1}}])
+    lgca = model.lgca
+    term = model.pipeline.operators[0].terms[0]
+    term.prepare(lgca)
+    state = LatticeState(lgca)
+    flux = state.counts[..., 1, :4] @ lgca.c.T
+    np.testing.assert_allclose(term.weights[..., :4], state.neighbor_sum(flux) @ lgca.c)
+    all_species = _two_species(ve, [{"name": "polar_alignment"}]).pipeline.operators[0].terms[0]
+    all_species.prepare(lgca)
+    assert not np.allclose(all_species.weights, term.weights)
+
+
+def test_species_that_do_not_exist_are_refused():
+    for operator in ({"name": "polar_alignment", "parameters": {"species": 2}},
+                     {"name": "polar_alignment", "parameters": {"sensed_species": [0, 2]}},
+                     {"name": "birth_death", "parameters": {"birth_rate": 0.1, "species": 2}}):
+        with pytest.raises(ValueError, match="species"):
+            _two_species(True, [operator]).step()

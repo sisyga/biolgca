@@ -12,6 +12,17 @@ This file records notable user-facing changes. Changes remain under
   growth by resting cells; with volume exclusion the logistic factor counts
   the cells of the set.
 - `go_or_rest` for several species, with `kappa` and `theta` per species.
+- Every part of the dynamics can act on some species only: `species` for
+  `birth_death`, `go_or_rest`, the single-cue operators and
+  `ReorientationSpec(parameters={"species": ...})` (the other species keep
+  their cells and channels), and `sensed_species` for the cues computed from
+  the cells (whose cells they sense), e.g. species 1 aligning with its own
+  kind while species 0 follows a signal. `LatticeState.sensing(species)`
+  gives rules the state of some species only.
+- `trait_switch`: cells of identity-based models change their traits at any
+  time by events written as mutations (probability, effects, bounds), e.g.
+  switching on an alignment strength; the new effect operation `"set"`
+  replaces a trait by a value.
 - `directed_motion`, a cue by which cells move along a given vector field
   (`{"name": "directed_motion", "parameters": {"beta": 2, "field": "flow"}}`).
 - The research models of earlier versions as stacks of the generic rules, in

@@ -432,6 +432,8 @@ def _state_for_plugin(plugin_name):
         family = "nove_ib"  # e.g. the research models, stacks of rules for identity-based models
     if plugin_name == "phenotype_switch":
         return StateSpec(density=0.35, restchannels=1, n_species=2)
+    if plugin_name == "trait_switch":
+        return StateSpec(density=0.35, restchannels=1, identity_based=True, traits={"alignment": 1.0})
     if family == "go_or_grow":  # migrating cells in velocity channels, resting cells in rest channels
         nodes = np.zeros((4, 5, 2, 5), dtype=bool)
         nodes[::2, :, 0, :4] = nodes[1::2, :, 1, 4] = True
@@ -458,7 +460,8 @@ def _state_for_plugin(plugin_name):
     return StateSpec(density=0.35, restchannels=2)
 
 
-_PARAMETERS_FOR_PLUGIN = {"chemotaxis": {"field": "signal"}, "directed_motion": {"field": "director"}}
+_PARAMETERS_FOR_PLUGIN = {"chemotaxis": {"field": "signal"}, "directed_motion": {"field": "director"},
+                          "trait_switch": {"switch": {"alignment": 0.1}}}
 
 
 @pytest.mark.parametrize(
