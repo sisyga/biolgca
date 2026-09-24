@@ -350,3 +350,81 @@ def _found_families(lgca, parent_families):
         descendants[parent].append(family)
     descendants.extend([] for _ in families)
     return families
+
+
+def slot_maps(lgca):
+    """Where cells go under the boundary conditions and propagation, as lookup tables.
+
+    Slots number the channels of the padded lattice (ghost nodes included),
+    ``node * K + channel``. The maps are derived from the classical model
+    without volume exclusion of the same geometry: slot IDs pass through its
+    ``apply_boundaries()`` and ``propagation()``, interior and ghost slots in
+    separate passes; IDs that meet in one slot pass again in random halves,
+    until every ID is found or known to leave the lattice. So the
+    tables follow the geometry's own transport code, hexagonal offsets and
+    reflection included.
+
+    Returns a dict with ``boundary`` and ``propagation`` (the new slot of a
+    cell in every slot, -1 if it leaves the lattice; ``propagation`` includes
+    the boundary conditions applied before it), ``source`` (for periodic
+    boundaries the interior slot a ghost slot copies, else -1), and
+    ``interior`` (the interior slot ``node * K + channel`` of every padded
+    slot, -1 for ghosts) with its inverse ``padded``.
+    """
+    import warnings
+
+    from . import get_lgca
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        clone = get_lgca(geometry=lgca.geometry, dims=lgca.dims, restchannels=lgca.restchannels, bc=lgca.bc,
+                         ve=False, density=0, interaction="only_propagation", r_int=lgca.r_int)
+    shape = clone.nodes.shape
+    n = int(np.prod(shape))
+    spatial = np.zeros(shape[:-1], dtype=bool)
+    spatial[lgca.nonborder] = True
+    interior = np.broadcast_to(spatial[..., None], shape).ravel()
+
+    def run(ids, *, propagate):
+        clone.nodes = ids.reshape(shape).copy()
+        clone.apply_boundaries()
+        if propagate:
+            clone.propagation()
+        return clone.nodes.ravel()
+
+    def lookup(propagate):
+        destination = np.full(n, -1, dtype=np.int64)
+        split = np.random.default_rng(0)  # splits colliding IDs; not the model's random numbers
+        for sources in (interior, ~interior):
+            unresolved, halves = sources.copy(), np.zeros(n, dtype=np.int64)
+            while unresolved.any():
+                for half in (0, 1):
+                    chosen = unresolved & (halves == half)
+                    if not chosen.any():
+                        continue
+                    count = run(chosen.astype(np.int64), propagate=propagate)
+                    out = run(np.where(chosen, np.arange(1, n + 1), 0), propagate=propagate)
+                    alone = np.flatnonzero(count == 1)  # slots that received one ID: it can be read
+                    found = out[alone] - 1
+                    # prefer interior occurrences: periodic ghost nodes hold copies of interior cells
+                    order = np.argsort(~interior[alone], kind="stable")
+                    alone, found = alone[order], found[order]
+                    first = np.unique(found, return_index=True)[1]
+                    destination[found[first]] = alone[first]
+                    unresolved[found] = False
+                    if count.max() <= 1:  # no two IDs met: the IDs not found left the lattice
+                        unresolved[chosen] = False
+                halves = split.integers(0, 2, n)  # IDs that met go on in random halves
+        return destination
+
+    boundary, propagation = lookup(False), lookup(True)
+    if lgca.bc == "periodic":  # ghost slots copy interior slots
+        source = run(np.where(interior, np.arange(1, n + 1), 0), propagate=False) - 1
+        source[interior] = -1
+    else:
+        source = np.full(n, -1, dtype=np.int64)
+    padded = np.flatnonzero(interior)
+    index = np.full(n, -1, dtype=np.int64)
+    index[padded] = np.arange(len(padded))
+    return {"boundary": boundary, "propagation": propagation, "source": source,
+            "interior": index, "padded": padded, "shape": shape}

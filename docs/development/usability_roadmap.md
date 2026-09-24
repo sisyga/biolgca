@@ -666,6 +666,22 @@ while the same work on flat per-cell arrays takes about 1 ms.
   strengths reproduce the classical sampler; the NoVE draw is per cell.
   Time per step: 51 ms (hex, 10k nodes), 36 ms (square), 106 ms (Moore, 8k
   nodes, K = 26).
+- Status (2026-09-24): stage B done. `NoVE_IBLGCA_base` holds either the
+  lists (`nodes`) or a table of labels and padded slots, whichever was
+  written last; reading `nodes` builds the lists, `_cell_table()` builds the
+  table. `LatticeState` reads and writes the table (cells in flight in ghost
+  slots are kept aside), `update_dynamic_fields` counts from it, and
+  `apply_boundaries` and `propagation` (the geometry methods are wrapped in
+  `__init_subclass__` and `set_bc`) use lookup tables from
+  `lgca.cells.slot_maps`, built once per model (0.4 s for Moore with
+  reflecting walls, otherwise below 0.05 s). Periodic, reflecting and
+  absorbing boundaries; inflow keeps the lists. The table moves cells exactly
+  like the list code on 5 geometries x 3 boundaries
+  (`tests/cell_store_test.py`), and a pipeline of rules builds no lists.
+  Speed (100 x 100 square, per step, NoVE): go-or-grow rules 13 ms (legacy
+  125 ms), `ReorientationSpec` 10 ms. `NodeRecorder` still builds the lists
+  every recorded step (52 ms per step); recording the table is left for
+  later.
 
 **2.3 Names without family prefixes** (B2)
 

@@ -7,6 +7,13 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- Identity-based models without volume exclusion hold their cells in a table
+  between rules: boundary conditions and propagation move it with lookup
+  tables derived from the geometry's own transport code, and `lgca.nodes`
+  builds the lists of labels only when it is read. A go-or-grow step on a
+  100 x 100 lattice takes 13 ms (legacy `nove_ib.go_or_grow` 125 ms); code
+  that reads or edits `lgca.nodes` keeps working. Recording `nodes` every
+  step (`NodeRecorder`) still builds the lists.
 - Reorientation terms scaled by a cell trait:
   `ReorientationTermSpec("polar_alignment", beta=1.0, trait="alignment")`
   gives every cell of an identity-based model its own strength (also

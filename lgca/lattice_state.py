@@ -77,11 +77,16 @@ class LatticeState:
         self._step = int(step)
         self._dims = tuple(int(size) for size in lgca.dims)
         self._identity = isinstance(lgca, IBLGCA_base)
-        interior = np.asarray(lgca.nodes[lgca.nonborder])
         self._cells = None
-        if self._identity:  # labelled cells: a table with one entry per cell
-            self._cells = _cells_from_nodes(self, interior)
-            interior = lgca._channel_counts(interior)
+        self._ghost_cells = None
+        table = lgca._cell_table() if isinstance(lgca, NoVE_IBLGCA_base) else None
+        if table is not None:  # the model holds a cell table: no lists to read
+            interior = self._cells_from_table(lgca, *table)
+        else:
+            interior = np.asarray(lgca.nodes[lgca.nonborder])
+            if self._identity:  # labelled cells: a table with one entry per cell
+                self._cells = _cells_from_nodes(self, interior)
+                interior = lgca._channel_counts(interior)
         self._has_species_axis = interior.ndim == len(self._dims) + 2
         if not self._has_species_axis:
             interior = interior[..., None, :]
@@ -434,7 +439,12 @@ class LatticeState:
             raise ValueError(f"a {self._kind} must keep the cells of every node; cells were removed "
                              "or added")
         lgca = self._lgca
-        if self._identity:
+        if self._ghost_cells is not None:
+            cells, (ghost_labels, ghost_slots) = self._cells, self._ghost_cells
+            slots = lgca._slot_table()["padded"][cells.index * self.K + cells.channel]
+            lgca._set_cell_table(np.concatenate([cells.label, ghost_labels]),
+                                 np.concatenate([slots, ghost_slots]))
+        elif self._identity:
             lgca.nodes[lgca.nonborder] = _nodes_from_cells(self._cells, self._counts[..., 0, :],
                                                            lgca.nodes.dtype)
         else:
@@ -443,6 +453,18 @@ class LatticeState:
         lgca.update_dynamic_fields()
 
     # --------------------------------------------------------------- helpers
+
+    def _cells_from_table(self, lgca, labels, slots):
+        """Cells from the model's table (labels, padded slots); returns the counts per channel."""
+        from .cells import Cells
+
+        K = int(lgca.K)
+        inner = lgca._slot_table()["interior"][slots]
+        inside = inner >= 0
+        self._ghost_cells = (labels[~inside], slots[~inside])  # in flight beyond a wall
+        self._cells = Cells(self, labels[inside], inner[inside] // K, inner[inside] % K)
+        counts = np.bincount(inner[inside], minlength=int(np.prod(self._dims)) * K)
+        return counts.reshape(self._dims + (K,))
 
     def _require_classical(self, operation, reason):
         if self._identity:

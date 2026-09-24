@@ -822,13 +822,15 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         return channel
 
     def _apply_nove_identity(self, lgca, weights):
-        """Sample cell numbers per channel, then split the node's shuffled cells over the channels."""
-        from .lattice_state import place_labels
+        """Sample cell numbers per channel, then place the node's cells on them in random order."""
+        from .lattice_state import LatticeState
 
-        interior = lgca.nodes[lgca.nonborder]
-        before = lgca._channel_counts(interior).astype(np.int64)
+        state = LatticeState(lgca, kind="reorientation")
+        before = state.counts[..., 0, :]
         after = self._sample_independent(lgca, before.sum(axis=-1)[..., None], weights)[..., 0, :]
-        lgca.nodes[lgca.nonborder] = place_labels(interior, after, np.ones(lgca.K, dtype=bool), lgca.rng)
+        state._place_cells(after, np.ones(lgca.K, dtype=bool))
+        state._counts = after[..., None, :]
+        state.commit()
 
 
 from .classical_operators import NativeClassicalRandomWalkOperator

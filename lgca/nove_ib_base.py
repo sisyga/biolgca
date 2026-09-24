@@ -39,6 +39,23 @@ from .list_utils import get_arr_of_empty_lists, _copy_arr_of_lists
 logger = logging.getLogger(__name__)
 
 
+_STORE_BOUNDARIES = ("periodic", "reflecting", "absorbing")
+
+
+def _store_aware(list_method):
+    """Wrap a geometry's list propagation: with a current cell table, use the lookup table instead."""
+
+    def propagation(self, *args, **kwargs):
+        if self.__dict__.get("_store") is not None:
+            return self._store_move("propagation")
+        return list_method(self, *args, **kwargs)
+
+    propagation.__doc__ = list_method.__doc__
+    propagation.__name__ = list_method.__name__
+    propagation.__wrapped__ = list_method
+    return propagation
+
+
 def _flatten_ids(nodes):
     """Return all particle IDs stored in an object array of label lists."""
     return np.fromiter(chain.from_iterable(np.asarray(nodes, dtype=object).flat), dtype=np.intp)
@@ -51,7 +68,111 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     Explicit object-array channels contain lists of unique non-negative integer
     particle IDs. ID zero denotes a particle in this backend. Uniqueness applies
     to physical sites before boundary copies are added.
+
+    Internally, the cells can also be held as a table (label and padded slot
+    of every cell), which rules on the lattice state, the boundary conditions
+    and propagation update without building lists. ``nodes`` builds the
+    object array from the table when it is read; whichever of the two was
+    written last is the state.
     """
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if "propagation" in cls.__dict__:
+            cls.propagation = _store_aware(cls.__dict__["propagation"])
+
+    @property
+    def nodes(self):
+        """Lists of cell labels per channel, shape ``padded dims + (K,)``."""
+        store = self.__dict__.get("_store")
+        if store is not None:
+            self.__dict__["_nodes_array"] = self._nodes_from_store(*store)
+            self.__dict__["_store"] = None
+        try:
+            return self.__dict__["_nodes_array"]
+        except KeyError:
+            raise AttributeError("nodes") from None
+
+    @nodes.setter
+    def nodes(self, value):
+        self.__dict__["_nodes_array"] = value
+        self.__dict__["_store"] = None
+
+    def set_bc(self, bc):
+        super().set_bc(bc)
+        self.__dict__["_slot_maps"] = None
+        self._list_boundaries = self.apply_boundaries
+        self.apply_boundaries = self._apply_boundaries
+
+    def _apply_boundaries(self):
+        if self.__dict__.get("_store") is not None:
+            self._store_move("boundary")
+        else:
+            self._list_boundaries()
+
+    def _cell_table(self):
+        """Labels and padded slots of all cells, or None if the boundary has no lookup table.
+
+        Builds the table from ``nodes`` if they are the current state; ghost
+        nodes count only where they hold cells in flight (not with periodic
+        boundaries, where they copy interior nodes).
+        """
+        if self.bc not in _STORE_BOUNDARIES:
+            return None
+        store = self.__dict__.get("_store")
+        if store is None:
+            flat = self.__dict__["_nodes_array"].reshape(-1)
+            lengths = np.fromiter(map(len, flat), dtype=np.int64, count=flat.size)
+            if self.bc == "periodic":
+                lengths[self._slot_table()["interior"] < 0] = 0
+            used = np.flatnonzero(lengths)
+            labels = np.fromiter((label for slot in used for label in flat[slot]), dtype=np.int64,
+                                 count=int(lengths.sum()))
+            store = (labels, np.repeat(used, lengths[used]))
+            self.__dict__["_store"] = store
+            self.__dict__["_nodes_array"] = None
+        return store
+
+    def _set_cell_table(self, labels, slots):
+        """Make the table of labels and padded slots the state of the model."""
+        self.__dict__["_store"] = (np.asarray(labels, dtype=np.int64), np.asarray(slots, dtype=np.int64))
+        self.__dict__["_nodes_array"] = None
+
+    def _slot_table(self):
+        maps = self.__dict__.get("_slot_maps")
+        if maps is None:
+            from .cells import slot_maps
+
+            maps = self.__dict__["_slot_maps"] = slot_maps(self)
+        return maps
+
+    def _store_move(self, which):
+        labels, slots = self.__dict__["_store"]
+        slots = self._slot_table()[which][slots]
+        kept = slots >= 0
+        self.__dict__["_store"] = (labels[kept], slots[kept])
+
+    def _store_counts(self, slots):
+        """Cells per padded channel, with periodic ghost nodes copying the interior."""
+        maps = self._slot_table()
+        counts = np.bincount(slots, minlength=int(np.prod(maps["shape"])))
+        ghosts = maps["source"] >= 0
+        counts[ghosts] = counts[maps["source"][ghosts]]
+        return counts.reshape(maps["shape"])
+
+    def _nodes_from_store(self, labels, slots):
+        maps = self._slot_table()
+        size = int(np.prod(maps["shape"]))
+        ends = np.cumsum(np.bincount(slots, minlength=size)).tolist()
+        ordered = labels[np.argsort(slots, kind="stable")].tolist()
+        flat = np.empty(size, dtype=object)
+        start = 0
+        for slot, end in enumerate(ends):
+            flat[slot] = ordered[start:end]
+            start = end
+        for ghost in np.flatnonzero(maps["source"] >= 0).tolist():
+            flat[ghost] = list(flat[maps["source"][ghost]])
+        return flat.reshape(maps["shape"])
     interactions = [
         'go_or_grow',
         'go_or_grow_kappa',
@@ -131,7 +252,11 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
 
 
     def update_dynamic_fields(self):
-        self.channel_pop = self.length_checker(self.nodes)  # population of a channel
+        store = self.__dict__.get("_store")
+        if store is not None:
+            self.channel_pop = self._store_counts(store[1]).astype(np.uint)
+        else:
+            self.channel_pop = self.length_checker(self.nodes)  # population of a channel
         self.cell_density = self.channel_pop.sum(-1)  # population of a node
 
     def _channel_counts(self, nodes, history=False):

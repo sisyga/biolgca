@@ -38,6 +38,16 @@ kernels. `Cells.divide` appends a complete row for every trait (and a family,
 optionally a new one). New rules should use the table; the per-node loops of
 the legacy identity kernels remain until phase 2.4.
 
+Without volume exclusion the model itself can hold the table
+(`NoVE_IBLGCA_base._cell_table()`, labels and padded slots `node * K +
+channel`, ghost nodes included for cells in flight beyond reflecting walls).
+The `nodes` property builds the object array of label lists only when it is
+read and then makes the lists the state again; writing `nodes` does the
+same. `update_dynamic_fields`, `apply_boundaries` and `propagation` act on the
+table when it is the state. The lookup tables (`lgca.cells.slot_maps`) come
+from passing slot IDs through the classical NoVE model's own boundary and
+propagation code, so a new geometry needs no table code of its own.
+
 ## Numerical implementation ownership
 
 `lgca.identity_kernels.inherit_missing_properties` owns completion of a
