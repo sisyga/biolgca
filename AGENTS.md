@@ -47,7 +47,8 @@ tests the installed wheel and CLI, and builds the docs.
   classes), `operator_registry.py`, `plugins.py` (registration, parameter
   validation and descriptions, built-in plugin catalogue).
 - Writing rules: `lattice_state.py` (`LatticeState`, the interior of a
-  classical model with a species axis and per-cell operations), `rules.py`
+  model with a species axis and per-cell operations), `cells.py` (the cell
+  table and trait buffers of identity-based models, `state.cells`), `rules.py`
   (the `@interaction` and `@reorientation_term` decorators), `builtin_rules.py`
   (built-in rules and reorientation terms written with them, including
   go-or-grow), `testing.py` (`check_interaction`).

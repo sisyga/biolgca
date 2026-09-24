@@ -7,6 +7,22 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- Rules for individual cells of identity-based models: `state.cells` holds
+  one entry per living cell (label, node, channel) with its traits
+  (`cells["kappa"]`) and the operations `kill`, `divide` (daughters inherit
+  all traits; `new_family=True` starts a family per daughter), `set_trait`,
+  `move` and `pick`, which act on all cells at once instead of looping over
+  nodes. `remove_cells`, `divide_cells` and `shuffle_cells` work in
+  identity-based models too. `StateSpec(traits={"kappa": 4.0})` gives the
+  initial cells their traits, one value for all or one per cell.
+  `check_interaction(..., traits=...)` checks rules that read traits.
+- `go_or_rest` and `go_or_grow.growth` run in identity-based models, and
+  their parameters take a trait name for values per cell, e.g.
+  `go_or_rest(kappa="kappa", theta=0.6)`; `go_or_grow.growth(mutation=
+  {"kappa": 0.2}, new_family=True)` mutates daughters and tracks lineages.
+  One step matches `ib.go_or_grow` and `nove_ib.go_or_grow` in distribution;
+  a step on a 100 x 100 lattice takes 23 ms with volume exclusion (legacy
+  243 ms) and 89 ms without (legacy 226 ms).
 - `ReorientationSpec` works in every model family. Without volume exclusion,
   every cell chooses its channel independently with `P(i) ∝ exp(Σ beta w_i)`
   (a multinomial draw per node and species), where `w_i` is the score of one
@@ -243,6 +259,15 @@ This file records notable user-facing changes. Changes remain under
   example now live in clearly labelled archive directories.
 
 ### Fixed
+
+- In identity-based models without volume exclusion, labels start at 0, and
+  `init_families` put cell 0 into family 0, the root of the family tree, so
+  it and its descendants counted as an extra family. Cell 0 now belongs to
+  family 1 like the other initial cells (homogeneous), or founds family 1
+  (heterogeneous). Family counts and Muller plots of such runs change.
+- A rule parameter named `capacity` whose value is a string (the mode of
+  `go_or_rest` and `go_or_grow.growth`) no longer conflicts with
+  `StateSpec(capacity=...)`.
 
 - `get_lgca(ve=False)` without further arguments failed on every geometry:
   the default interaction (density-dependent alignment) needs zero rest

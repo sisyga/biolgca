@@ -180,9 +180,17 @@ class FunctionInteractionOperator(InteractionOperator):
     """Pipeline operator that runs a decorated rule on a :class:`LatticeState`."""
 
     def __init__(self, rule: Interaction, parameters=None):
-        super().__init__(info=rule.info, parameters=parameters)
+        info = rule.info
+        if (parameters or {}).get("new_family") is True:  # daughters found families: track them
+            info = replace(info, mutates_families=True)
+        super().__init__(info=info, parameters=parameters)
         self.rule = rule
         self._capacity = None
+
+    def setup(self, context) -> None:
+        lgca = context.lgca
+        if self.info.mutates_families and "family" not in lgca.props:
+            lgca.init_families(type="homogeneous", mutation=True)
 
     def validate(self, context) -> None:
         state = context.spec.state

@@ -340,7 +340,11 @@ def compile_pipeline(spec: InteractionPipelineSpec | None, context) -> CompiledP
     shared_property_operators = {"ib.birth", "ib.birthdeath", "ib.birthdeath_discrete",
                                 "ib.go_or_grow", "ib.go_and_grow_mutations"}
     if context.spec.state.identity_based and len(growth) > 1:
-        if any(operator.name not in shared_property_operators for operator in growth):
+        from .rules import FunctionInteractionOperator
+
+        # decorated rules give every daughter a complete row of traits (lgca.cells.Cells.divide)
+        if any(operator.name not in shared_property_operators
+               and not isinstance(operator, FunctionInteractionOperator) for operator in growth):
             raise ValueError(
                 "Identity growth composition requires a shared daughter-property lifecycle; "
                 "currently supported for ib.birth, ib.birthdeath, ib.birthdeath_discrete, "

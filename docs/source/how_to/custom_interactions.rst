@@ -68,10 +68,9 @@ model file the same entry reads ``{"name": "logistic_growth", "parameters":
 ``"classical"`` with volume exclusion (at most one cell per channel and
 species) and ``"nove"`` without. Models of other families are rejected when
 they are built. ``geometries=`` restricts the lattices in the same way.
-Identity-based models, whose cells carry labels, are the families ``"ib"``
-(with volume exclusion) and ``"nove_ib"`` (without). A rule can read their
-state, but so far only ``shuffle_cells`` changes it: it moves the cells with
-their labels, and cells outside the shuffled channels keep label and channel.
+Identity-based models, whose cells carry labels and traits, are the families
+``"ib"`` (with volume exclusion) and ``"nove_ib"`` (without); see
+`Rules for individual cells`_.
 
 What a rule sees and does
 -------------------------
@@ -212,6 +211,58 @@ meet head-on leave at right angles, which keeps their momentum:
 every node is kept; it is checked after every step, like the conservation
 law of the kind.
 
+Rules for individual cells
+--------------------------
+
+In identity-based models every cell has a label and traits, such as its own
+birth rate or drug resistance. ``StateSpec(traits=...)`` gives the initial
+cells their traits, one value for all or one per cell, and daughters inherit
+the traits of their mother. ``state.cells`` holds one entry per cell, and its
+operations act on all cells at once:
+
+.. code-block:: python
+
+   @interaction(kind="birth_death", families=("ib", "nove_ib"))
+   def selection(state, r_d=0.2, r_b=0.2, std=0.05):
+       """Cells die with probability r_d * (1 - resistance) and divide; daughters mutate."""
+       cells = state.cells
+       dying = state.rng.random(len(cells)) < r_d * (1 - cells["resistance"])
+       cells.kill(dying)
+       crowding = state.density[cells.node] / state.capacity
+       dividing = state.rng.random(len(cells)) < r_b * (1 - crowding)
+       daughters = cells.divide(dividing, channels="all")
+       resistance = cells["resistance"][daughters] + state.rng.normal(0, std, len(daughters))
+       cells.set_trait(daughters, "resistance", np.clip(resistance, 0, 1))
+
+   spec = ModelSpec(
+       space=SpaceSpec(geometry="hex", dims=(20, 20)),
+       state=StateSpec(density=2, restchannels=1, volume_exclusion=False, capacity=8,
+                       identity_based=True, traits={"resistance": 0.1}),
+       time=TimeSpec(steps=50, seed=1),
+       dynamics=InteractionPipelineSpec(operators=[selection(), {"name": "channel_random_walk"}]),
+   )
+   lgca = run_model(spec, showprogress=False).lgca
+
+``cells.node`` indexes lattice arrays, so ``state.density[cells.node]`` is the
+density at each cell's node, and ``cells["resistance"]`` gives a trait per
+cell. The operations are ``kill``, ``divide`` (daughters inherit all traits;
+``new_family=True`` starts a family per daughter for lineage plots such as
+``lgca.muller_plot()``), ``set_trait``, ``move`` (to other channels of the
+node) and ``pick`` (at most a given number of cells per node, e.g. as many as
+there are free channels). With volume exclusion a cell only enters a free
+channel; when more cells compete for the free channels of a node, the
+successful ones are chosen at random. The operations on cell numbers work as
+well: ``remove_cells``, ``divide_cells`` and ``shuffle_cells`` pick random
+cells and keep their labels. ``add_cells`` and ``switch_phenotype`` do not
+exist for identity-based models, and ``state.counts`` can be read but not
+assigned, because a number of cells does not say which cell went where.
+
+Built-in rules take the name of a trait wherever a parameter may differ
+between cells: ``go_or_rest(kappa="kappa", theta=0.6)`` gives every cell its
+own switch steepness and all cells the same threshold, and
+``go_or_grow.growth(r_b=0.2, mutation={"kappa": 0.2})`` lets the daughters'
+``kappa`` mutate.
+
 Testing a rule
 --------------
 
@@ -221,6 +272,7 @@ Testing a rule
    print(report)
    check_interaction(crowding_switch)
    check_interaction(hpp_collision)
+   check_interaction(selection, traits={"resistance": 0.1})
 
 :func:`~lgca.testing.check_interaction` runs the rule for a few steps on
 small seeded models of every declared geometry and family, with one and two
@@ -228,7 +280,8 @@ species and with periodic and reflecting boundaries. It checks that states
 stay valid, that the conservation laws hold, that changes to ghost nodes do
 not leak into the lattice and that the same seed gives the same result.
 ``expected_growth`` compares the measured change of the number of cells per
-step with the expected one. It raises with a readable report, so one line
+step with the expected one, and ``traits`` gives the cells of
+identity-based models their initial traits. It raises with a readable report, so one line
 makes a test::
 
    def test_logistic_growth():

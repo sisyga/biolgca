@@ -23,6 +23,21 @@ terms (`@reorientation_term`, a field plus a coupling, evaluated by
 built-in reorientation terms this way. `lgca.testing.check_interaction` runs
 a rule on every declared geometry and family.
 
+## Cells of identity-based models
+
+`lgca.cells.Cells` is the table of living cells (label, flat node index,
+channel) that `LatticeState.cells` builds for identity-based models; its
+operations (`kill`, `divide`, `move`, `pick`, `set_trait`) are array
+operations, and competition for free channels with volume exclusion is
+resolved by ranking the cells of each node in random order (one `lexsort` of
+all cells). `LatticeState` recounts the cells per channel after every change
+and writes the labels back on `commit()`. Traits are `lgca.cells.TraitArray`
+buffers in `lgca.props`, one row per label, converted from lists on first use
+by the new code; they keep list-like `append` and `extend` for the legacy
+kernels. `Cells.divide` appends a complete row for every trait (and a family,
+optionally a new one). New rules should use the table; the per-node loops of
+the legacy identity kernels remain until phase 2.4.
+
 ## Numerical implementation ownership
 
 `lgca.identity_kernels.inherit_missing_properties` owns completion of a

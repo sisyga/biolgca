@@ -300,8 +300,8 @@ def test_identity_based_counts_can_be_read_but_not_assigned(ve):
     np.testing.assert_allclose(state.flux, lgca.calc_flux(lgca.nodes)[lgca.nonborder])
     with pytest.raises(TypeError, match="can be read but not assigned"):
         state.counts = state.counts
-    with pytest.raises(TypeError, match="identity-based"):
-        state.remove_cells(0.5)
+    with pytest.raises(TypeError, match="new cells need traits"):
+        state.add_cells(1)
 
 
 @pytest.mark.parametrize("ve", [True, False])

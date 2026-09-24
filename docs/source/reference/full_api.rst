@@ -7,6 +7,7 @@ Core modules for the declarative simulation API:
 - :mod:`lgca.pipeline`
 - :mod:`lgca.plugins`
 - :mod:`lgca.lattice_state`
+- :mod:`lgca.cells`
 - :mod:`lgca.rules`
 - :mod:`lgca.builtin_rules`
 - :mod:`lgca.testing`

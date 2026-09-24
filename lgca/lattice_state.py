@@ -78,9 +78,9 @@ class LatticeState:
         self._dims = tuple(int(size) for size in lgca.dims)
         self._identity = isinstance(lgca, IBLGCA_base)
         interior = np.asarray(lgca.nodes[lgca.nonborder])
-        self._labels = None
-        if self._identity:  # cell labels: keep a copy, count the cells per channel
-            self._labels = _copy_labels(interior)
+        self._cells = None
+        if self._identity:  # labelled cells: a table with one entry per cell
+            self._cells = _cells_from_nodes(self, interior)
             interior = lgca._channel_counts(interior)
         self._has_species_axis = interior.ndim == len(self._dims) + 2
         if not self._has_species_axis:
@@ -97,6 +97,8 @@ class LatticeState:
                          "phenotype_switch": self.density,
                          "reorientation": self.species_density,
                          None: None}[kind]
+        self._initial_cells = (None if self._cells is None or kind not in ("reorientation", "phenotype_switch")
+                               else _cells_per_node(self._cells))
 
     def __repr__(self) -> str:
         exclusion = "with" if self._ve else "without"
@@ -154,6 +156,18 @@ class LatticeState:
         """Sum of the velocities of the cells at each node, shape ``dims + (d,)``."""
         velocities = self._counts[..., :self.velocitychannels].sum(axis=-2)
         return velocities @ np.asarray(self.c, dtype=float).T
+
+    @property
+    def cells(self):
+        """The cells of an identity-based model, one entry per cell (:class:`~lgca.cells.Cells`).
+
+        Gives each cell's label, node, channel and traits, and operations on
+        individual cells (``kill``, ``divide``, ``move``, ``set_trait``).
+        """
+        if self._cells is None:
+            raise TypeError("state.cells exists in identity-based models; in classical models, cells "
+                            "have no labels, so rules use state.counts and the operations")
+        return self._cells
 
     def neighbor_sum(self, values) -> np.ndarray:
         """Sum of ``values`` over each node's neighbours, excluding the node.
@@ -242,6 +256,11 @@ class LatticeState:
         return self._ve
 
     @property
+    def identity_based(self) -> bool:
+        """Whether cells carry labels and traits (see :attr:`cells`)."""
+        return self._identity
+
+    @property
     def c(self) -> np.ndarray:
         """Velocity vectors of the velocity channels, shape ``(d, velocitychannels)``."""
         return np.asarray(self._lgca.c)
@@ -273,7 +292,12 @@ class LatticeState:
 
         Returns the number of removed cells per node and species.
         """
-        self._require_classical("remove_cells")
+        if self._identity:
+            cells = self._cells
+            dying = self.rng.random(len(cells)) < self._per_cell(self._probability(p, "p"))
+            removed = self._per_node(cells.index[dying])
+            cells.kill(dying)
+            return removed
         removed = self.rng.binomial(self._counts, self._probability(p, "p"))
         self._counts -= removed
         return removed.sum(axis=-1)
@@ -287,9 +311,16 @@ class LatticeState:
         random. Without volume exclusion,
         ``channels="same"`` puts each daughter in its mother's channel.
 
+        In identity-based models the daughters inherit their mother's traits
+        (see :meth:`lgca.cells.Cells.divide`).
+
         Returns the number of added cells per node and species.
         """
-        self._require_classical("divide_cells")
+        if self._identity:
+            cells = self._cells
+            dividing = self.rng.random(len(cells)) < self._per_cell(self._probability(p, "p"))
+            daughters = cells.divide(dividing, channels=channels)
+            return self._per_node(cells.index[daughters])
         daughters = self.rng.binomial(self._counts, self._probability(p, "p"))
         if isinstance(channels, str) and channels == "same":
             if self._ve:
@@ -314,7 +345,8 @@ class LatticeState:
 
         Returns the number of added cells per node and species.
         """
-        self._require_classical("add_cells")
+        self._require_classical("add_cells", "new cells need traits; let cells divide instead "
+                                "(divide_cells or state.cells.divide)")
         wanted = self._number(n, "n")
         allowed = self._channel_sets(channels)
         if not self._ve:
@@ -344,7 +376,8 @@ class LatticeState:
         Returns the number of switches per node, shape
         ``dims + (n_species, n_species)``, from species ``a`` (row) to ``b``.
         """
-        self._require_classical("switch_phenotype")
+        self._require_classical("switch_phenotype", "they have one species; change the traits of "
+                                "cells with state.cells.set_trait")
         transition = self._transition_matrix(rates)
         same = isinstance(channels, str) and channels == "same"
         allowed = None if same else self._channel_sets(channels)
@@ -374,9 +407,9 @@ class LatticeState:
             cleared += self._choose(np.broadcast_to(mask, cleared.shape), number)
         else:
             cleared += self._spread(number, allowed)
+        if self._identity:  # one species: place the cells of the set on the new cell numbers
+            self._place_cells(cleared[..., 0, :], mask[0])
         self._counts = cleared
-        if self._identity:  # one species
-            self._labels = place_labels(self._labels, cleared[..., 0, :], mask[0], self.rng)
 
     def commit(self) -> None:
         """Check the state and write it into the model's interior nodes.
@@ -396,9 +429,14 @@ class LatticeState:
             first = tuple(int(index) for index in np.argwhere(changed)[0])
             raise ValueError(f"a {self._kind} must keep {what} at every node; it changed at "
                              f"{int(changed.sum())} nodes, first at {first}")
+        if self._initial_cells is not None and not all(
+                np.array_equal(a, b) for a, b in zip(self._initial_cells, _cells_per_node(self._cells))):
+            raise ValueError(f"a {self._kind} must keep the cells of every node; cells were removed "
+                             "or added")
         lgca = self._lgca
         if self._identity:
-            lgca.nodes[lgca.nonborder] = _copy_labels(self._labels)
+            lgca.nodes[lgca.nonborder] = _nodes_from_cells(self._cells, self._counts[..., 0, :],
+                                                           lgca.nodes.dtype)
         else:
             interior = self._counts if self._has_species_axis else self._counts[..., 0, :]
             lgca.nodes[lgca.nonborder] = interior.astype(lgca.nodes.dtype)
@@ -406,11 +444,39 @@ class LatticeState:
 
     # --------------------------------------------------------------- helpers
 
-    def _require_classical(self, operation):
+    def _require_classical(self, operation, reason):
         if self._identity:
-            raise TypeError(f"{operation} is not available for identity-based models yet; of the "
-                            "operations, they support shuffle_cells. Their state can be read, "
-                            "e.g. by reorientation terms.")
+            raise TypeError(f"{operation} is not available in identity-based models: {reason}")
+
+    def _cells_changed(self):
+        """Recount the cells per channel after an operation on the cell table."""
+        cells = self._cells
+        n_slots = int(np.prod(self._dims)) * self.K
+        counts = np.bincount(cells.index * self.K + cells.channel, minlength=n_slots)
+        self._counts = counts.reshape(self._dims + (1, self.K))
+
+    def _per_cell(self, values):
+        """Values that broadcast against ``dims + (1, K)``, looked up for every cell."""
+        values = np.broadcast_to(values, self._dims + (1, self.K)).reshape(-1, self.K)
+        return values[self._cells.index, self._cells.channel]
+
+    def _per_node(self, index):
+        """Number of cells per node and species (one species) from node indices."""
+        counts = np.bincount(index, minlength=int(np.prod(self._dims)))
+        return counts.reshape(self._dims + (1,))
+
+    def _place_cells(self, counts, channels):
+        """Put the cells in the channel set on the new cell numbers ``counts``, in random order."""
+        cells = self._cells
+        inside = channels[cells.channel]
+        K = self.K
+        # slots of the set in node order, one per new cell, and the set's cells in node order
+        slots = np.repeat(np.arange(counts.size), (counts * channels).ravel())
+        moving = np.flatnonzero(inside)
+        order = np.lexsort((self.rng.random(len(moving)), cells.index[moving]))
+        channel = cells.channel.copy()
+        channel[moving[order]] = slots % K
+        cells.channel = channel
 
     def _pad(self, values):
         """Embed interior values in the padded lattice according to the boundary."""
@@ -584,15 +650,44 @@ class LatticeState:
         return (ranks < number[..., None]).astype(np.int64)
 
 
-def _copy_labels(labels):
-    """Copy an array of labels; for lists of labels (no volume exclusion) copy the lists too."""
-    labels = np.asarray(labels)
-    if labels.dtype != object:
-        return labels.copy()
-    copied = np.empty(labels.shape, dtype=object)
-    for index, channel in np.ndenumerate(labels):
-        copied[index] = list(channel)
-    return copied
+def _cells_from_nodes(state, interior):
+    """The table of cells from interior labels: an array (0 empty) or lists of labels per channel."""
+    from .cells import Cells
+
+    K = interior.shape[-1]
+    flat = interior.reshape(-1)
+    if interior.dtype != object:
+        slot = np.flatnonzero(flat)
+        return Cells(state, flat[slot], slot // K, slot % K)
+    lengths = np.fromiter(map(len, flat), dtype=np.int64, count=flat.size)
+    labels = np.fromiter((label for channel in flat for label in channel), dtype=np.int64,
+                         count=int(lengths.sum()))
+    slot = np.repeat(np.arange(flat.size), lengths)
+    return Cells(state, labels, slot // K, slot % K)
+
+
+def _nodes_from_cells(cells, counts, dtype):
+    """Interior labels from the table: an array (0 empty) or lists of labels per channel."""
+    K = counts.shape[-1]
+    slot = cells.index * K + cells.channel
+    if dtype != object:
+        flat = np.zeros(counts.size, dtype=dtype)
+        flat[slot] = cells.label
+        return flat.reshape(counts.shape)
+    labels = cells.label[np.argsort(slot, kind="stable")].tolist()
+    ends = np.cumsum(counts.ravel()).tolist()
+    flat = np.empty(counts.size, dtype=object)
+    start = 0
+    for index, end in enumerate(ends):
+        flat[index] = labels[start:end]
+        start = end
+    return flat.reshape(counts.shape)
+
+
+def _cells_per_node(cells):
+    """Node indices and labels, sorted, to compare which cells sit at which node."""
+    order = np.lexsort((cells.label, cells.index))
+    return cells.index[order], cells.label[order]
 
 
 def place_labels(labels, counts, channels, rng):

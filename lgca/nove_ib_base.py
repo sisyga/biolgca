@@ -528,6 +528,27 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
             observers.append(FamilyPopulationRecorder())
         run_timeevo(self, timesteps=timesteps, observers=observers, showprogress=showprogress)
 
+    def init_families(self, type='homogeneous', mutation=True):
+        """Initialize family tracking; see :meth:`IBLGCA_base.init_families`.
+
+        Labels start at 0 in this model, so every label, including 0, is a
+        cell: family 0 stays the root of the tree, and cell ``i`` of a
+        heterogeneous population founds family ``i + 1``.
+        """
+        cells = int(self.maxlabel) + 1
+        if type == 'homogeneous':
+            self.props.update(family=[1] * cells)
+            if mutation:
+                self.family_props = {'ancestor': [0, 0], 'descendants': [[1], []]}
+                self.maxfamily = 1
+        elif type == 'heterogeneous':
+            families = list(range(1, cells + 1))
+            self.props.update(family=families)
+            if mutation:
+                self.family_props = {'ancestor': [0] * (cells + 1),
+                                     'descendants': [families] + [[] for _ in range(cells)]}
+                self.maxfamily = cells
+
     def calc_max_label(self):
         cells = _flatten_ids(self.nodes)
         self.maxlabel = int(cells.max()) if cells.size else 0

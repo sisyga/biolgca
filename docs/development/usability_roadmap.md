@@ -573,6 +573,86 @@ parameters with `set_trait`. The operations of 1.3 (`remove_cells`,
 `divide_cells`) get identity-based implementations that pick random cells and
 let daughters inherit traits.
 
+Design (agreed 2026-09-24, after profiling). The legacy identity kernels loop
+over nodes and channels in Python: on a 100 x 100 square lattice a step takes
+90 to 240 ms (e.g. `nove_ib.birthdeath` 150 ms, `ib.go_or_grow` 243 ms),
+while the same work on flat per-cell arrays takes about 1 ms.
+
+- **Cell table.** One entry per living cell: label, node, channel. `state.cells`
+  exposes it; `cells.node` indexes lattice fields (`state.density[cells.node]`)
+  and `cells["kappa"]` gives a trait per cell. Operations (`kill`, `divide`,
+  `set_trait`, moving cells between channel sets) and `remove_cells`,
+  `divide_cells`, `shuffle_cells` are array operations on the table. With
+  volume exclusion, cells that compete for free channels are ranked in random
+  order within their node by one sort of all cells (the legacy rule: a random
+  subset of the cells that fit tries), without a loop over nodes.
+- **Traits.** `lgca.props` holds each trait as a NumPy buffer with spare
+  capacity (doubling when full), indexed by label, with list-like `append`,
+  `extend` and indexing. Lists cost 10 ms per step to read for 30k living
+  cells after 930k births (every vectorized read converts the whole list);
+  the buffer costs 0.04 ms to read and 0.01 ms to append. Labels are never
+  reused; rows of dead cells stay for lineages.
+- **Families.** Daughters inherit the parent's family; `new_family=True`
+  starts a new one (lineage tracking is optional because it costs time).
+  Muller plots and the family functions must keep working.
+- **Initial traits.** `StateSpec(traits={"kappa": 4.0, "theta": 0.6})`: one
+  value for all initial cells or an iterable with one value per initial cell.
+- **Rules with per-cell parameters.** A rule parameter takes a number (the
+  same for all cells) or the name of a trait (per cell), chosen per
+  parameter, e.g. `go_or_rest(kappa="kappa", theta=0.6)`. Identity-based
+  go-or-grow uses the classical order (switch, growth, walk); the legacy
+  order of `ib.go_or_grow` (death first) stays in the legacy rule only.
+- **Stage B, NoVE storage.** Without volume exclusion, converting the table
+  back to lists costs 40 ms (reading them 4 ms). The NoVE identity model
+  stores the table and builds `lgca.nodes` only when it is read. Propagation
+  uses a slot lookup table obtained by passing slot IDs through the classical
+  NoVE `apply_boundaries()` and `propagation()` (interior and ghost sources
+  separately, split further until no two IDs meet); the prototype matched the
+  list propagation on 5 geometries x 3 boundaries. Recorders store the table;
+  a test checks that a pipeline of new rules never builds `lgca.nodes`.
+- **Trait-dependent reorientation** (e.g. an alignment strength per cell):
+  with volume exclusion the labelled node state has the joint weight
+  `P(σ) ∝ exp(Σ_a β_a w_σ(a))`. Assigning cells one after another in random
+  order gives a different distribution (two identical cells, weights 1, 1, 3:
+  0.100 instead of 1/7 for the pair of velocity channels), so it is not used.
+  Decided: a Metropolis sampler that proposes swapping the contents of two
+  channels on all nodes at once (prototype: 11 ms per 20 proposals per node
+  for 10k hex nodes; about 40 proposals per node reach the exact
+  distribution for 4 cells on hex). It starts from a random arrangement, so
+  stopping early weakens the cue instead of adding persistence; the number
+  of proposals is a parameter that scales with the number of channels. It is
+  used only when a term depends on cell traits; trait-independent movement
+  keeps the exact classical sampler with random labels. Tests compare it with
+  full enumeration on small nodes and with the classical sampler for equal
+  traits. Exact alternatives were rejected: enumeration (up to 5040 states on
+  hex, 466 ms per step) and dynamic programming over channel subsets (2^K
+  states, 117 ms on hex, 4096 subsets with 6 rest channels, impossible on
+  Moore). Weights do not depend on the new positions of other cells at the
+  same node (terms stay linear in the occupation); within-node interactions
+  would need an energy of the whole node state and are not planned now.
+  Without volume exclusion each cell samples its own channel, exactly.
+
+- Status (2026-09-24): stage A done. `lgca/cells.py` holds `TraitArray` and
+  `Cells`; `LatticeState` builds the cell table for identity-based models
+  (VE from the label array, NoVE from the lists) and writes it back on
+  commit, checking that reorientations and phenotype switches keep every
+  node's cells. `StateSpec.traits`, `check_interaction(traits=...)`, and
+  `go_or_rest`, `go_or_grow.growth`, `channel_random_walk` in the families
+  `ib` and `nove_ib` (parameters take a number or a trait name). Decorated
+  growth rules may be combined with the legacy identity growth operators.
+  Validation (`tests/identity_go_or_grow_test.py`): one step with a kappa per
+  cell matches `ib.go_or_grow` and `nove_ib.go_or_grow` per density level
+  (r_d = 0, where the orders agree); on nodes without full channels every
+  cell rests with its own probability; mutated daughters have the right
+  spread; new families are recorded and plotted. Speed (100 x 100 square,
+  per step): 23 ms with VE (legacy 243 ms), 89 ms without (legacy 226 ms),
+  where converting the table to lists and counting list lengths dominate;
+  stage B removes this. Found on the way: `init_families` put NoVE cell 0
+  into the root family 0 (fixed), and a string-valued `capacity` parameter
+  clashed with `StateSpec.capacity` (fixed; the parameter name of the
+  go-or-grow mode is still open). Still open: the Metropolis sampler for
+  trait-dependent reorientation, and stage B.
+
 **2.3 Names without family prefixes** (B2)
 
 `random_walk`, `alignment`, `chemotaxis`, `birth_death`, `go_or_grow`, ...

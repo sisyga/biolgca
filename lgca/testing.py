@@ -68,6 +68,7 @@ def check_interaction(
     seed: int = 0,
     expected_growth=None,
     prepare=None,
+    traits: Mapping[str, Any] | None = None,
     raise_on_failure: bool = True,
 ) -> InteractionReport:
     """Run an interaction on small models and check what every interaction must do.
@@ -111,6 +112,9 @@ def check_interaction(
         in rest channels. It receives a
         :class:`~lgca.lattice_state.LatticeState` and assigns
         ``state.counts``.
+    traits : mapping, optional
+        Initial cell traits of identity-based models, as in
+        ``StateSpec(traits=...)``, for rules that read traits.
     raise_on_failure : bool, default=True
         Raise :class:`InteractionCheckError` if a check fails.
 
@@ -151,11 +155,11 @@ def check_interaction(
         for family, species in models:
             for boundary in _BOUNDARIES:
                 case = f"{geometry}, {family}, {species} species, {boundary}"
-                setup = _Setup(geometry, family, species, boundary, density, seed)
+                setup = _Setup(geometry, family, species, boundary, density, seed, traits=traits)
                 report.rows.append((case, _check_case(entry, setup, kind, momentum, prepare)))
     if expected_growth is not None:
         report.growth = _check_growth(entry, geometries[0], models, density, seed, expected_growth,
-                                      prepare)
+                                      prepare, traits)
     if raise_on_failure and not report.passed:
         raise InteractionCheckError(str(report))
     return report
@@ -170,6 +174,7 @@ class _Setup:
     density: float | None
     seed: int
     large: bool = False
+    traits: Any = None
 
     def spec(self, entry):
         from .model import Description, ModelSpec, SpaceSpec, StateSpec, TimeSpec
@@ -182,7 +187,8 @@ class _Setup:
             description=Description(title=f"check {entry['name']}"),
             space=SpaceSpec(geometry=self.geometry, dims=dims, boundary=self.boundary),
             state=StateSpec(density=density, restchannels=1, volume_exclusion=self.family in ("classical", "ib"),
-                            identity_based=self.family in _IDENTITY, n_species=self.n_species),
+                            identity_based=self.family in _IDENTITY, n_species=self.n_species,
+                            traits=dict(self.traits or {}) if self.family in _IDENTITY else {}),
             time=TimeSpec(steps=_STEPS, seed=self.seed),
             dynamics=InteractionPipelineSpec(operators=[entry], propagation=False),
         )
@@ -329,10 +335,10 @@ def _cells_per_species(lgca, n_species):
     return interior.reshape(-1, n_species, lgca.K).sum(axis=(0, 2))
 
 
-def _check_growth(entry, geometry, models, density, seed, expected, prepare) -> list[str]:
+def _check_growth(entry, geometry, models, density, seed, expected, prepare, traits=None) -> list[str]:
     problems = []
     for family, species in models:
-        setup = _Setup(geometry, family, species, "periodic", density, seed, large=True)
+        setup = _Setup(geometry, family, species, "periodic", density, seed, large=True, traits=traits)
         compiled = _build(entry, setup, prepare)
         lgca = compiled.lgca
         lgca.apply_boundaries()

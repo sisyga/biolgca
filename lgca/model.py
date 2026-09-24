@@ -157,6 +157,13 @@ class StateSpec:
         ``dims`` for ``chemotaxis`` or a director field of shape
         ``dims + (d,)`` for ``contact_guidance``. Each field becomes an
         attribute of the LGCA object.
+    traits : mapping, default={}
+        Initial traits of the cells of an identity-based model, e.g.
+        ``{"kappa": 4.0, "theta": 0.6}``. A value is either one number for all
+        initial cells or a sequence with one number per initial cell, in the
+        order of their labels (cells are labelled along the lattice, node by
+        node and channel by channel). Daughters inherit the traits of their
+        mother; rules read them with ``state.cells["kappa"]``.
     """
 
     density: float | None = None
@@ -169,6 +176,7 @@ class StateSpec:
     initializer: Mapping[str, Any] | None = None
     parameters: Mapping[str, Any] = field(default_factory=dict)
     fields: Mapping[str, Any] = field(default_factory=dict)
+    traits: Mapping[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -283,6 +291,7 @@ def model_spec_to_dict(spec: ModelSpec) -> dict[str, Any]:
                 "initializer": _to_jsonable(spec.state.initializer),
                 "parameters": _to_jsonable(dict(spec.state.parameters)),
                 "fields": _to_jsonable(dict(spec.state.fields)),
+                "traits": _to_jsonable(dict(spec.state.traits)),
             },
             "time": {
                 "steps": spec.time.steps,
@@ -336,6 +345,7 @@ def model_spec_from_dict(data: Mapping[str, Any]) -> ModelSpec:
             initializer=_from_jsonable(state.get("initializer")),
             parameters=_from_jsonable(state.get("parameters", {})),
             fields=_from_jsonable(state.get("fields", {})),
+            traits=_from_jsonable(state.get("traits", {})),
         ),
         time=TimeSpec(
             steps=time_spec.get("steps", 100),
@@ -497,7 +507,7 @@ def _validate_serialized_model(data: Mapping[str, Any]) -> None:
         state,
         {
             "density", "nodes", "restchannels", "volume_exclusion", "identity_based",
-            "n_species", "capacity", "initializer", "parameters", "fields",
+            "n_species", "capacity", "initializer", "parameters", "fields", "traits",
         },
         "model.state",
     )
@@ -519,7 +529,7 @@ def _validate_serialized_model(data: Mapping[str, Any]) -> None:
     for key in ("volume_exclusion", "identity_based"):
         if key in state and not isinstance(state[key], bool):
             raise TypeError(f"model.state.{key} must be a boolean")
-    for key in ("parameters", "fields"):
+    for key in ("parameters", "fields", "traits"):
         if key in state and not isinstance(state[key], Mapping):
             raise TypeError(f"model.state.{key} must be a mapping")
     initializer = state.get("initializer")
@@ -1036,8 +1046,13 @@ def build_model(
         metadata=metadata,
     )
     _attach_fields(lgca, context.fields)
+    traits = _attach_traits(lgca, spec.state.traits)
     pipeline = compile_pipeline(spec.dynamics, context)
     _attach_fields(lgca, context.fields)
+    for name, values in traits.items():
+        if lgca.props.get(name) is not values:
+            warn_user(f"an interaction set the cell trait {name!r} when the model was built, so the "
+                      f"values from state.traits are not used; set it in one place only")
     metadata["operator_names"] = pipeline.operator_names
     metadata["reorientation_term_names"] = pipeline.reorientation_term_names
     metadata["observer_names"] = _observer_names(spec.analysis)
@@ -1123,6 +1138,14 @@ def _validate_spec(spec: ModelSpec) -> None:
         raise ValueError("model.state.parameters must be a mapping")
     if not isinstance(spec.state.fields, Mapping):
         raise ValueError("model.state.fields must be a mapping")
+    if not isinstance(spec.state.traits, Mapping):
+        raise ValueError("model.state.traits must be a mapping")
+    if spec.state.traits and not spec.state.identity_based:
+        raise ValueError("model.state.traits needs an identity-based model (state.identity_based=True); "
+                         "classical cells have no individual traits")
+    for name in spec.state.traits:
+        if not isinstance(name, str) or not name:
+            raise ValueError("model.state.traits keys must be non-empty strings")
 
 
 _GEOMETRY_ALIASES = {
@@ -1284,6 +1307,41 @@ def _metadata_from_spec(spec: ModelSpec, lgca=None) -> dict[str, Any]:
             "timing_trace": [],
         },
     }
+
+
+def _attach_traits(lgca, traits: Mapping[str, Any]) -> dict[str, Any]:
+    """Give the initial cells their traits, one value per label (``lgca.props``)."""
+    from .cells import TraitArray
+
+    if not traits:
+        return {}
+    interior = lgca.nodes[lgca.nonborder]
+    if interior.dtype == object:
+        labels = np.fromiter((label for channel in interior.flat for label in channel), dtype=np.int64)
+    else:
+        labels = interior[interior > 0].astype(np.int64)
+    labels = np.sort(labels)
+    rows = int(lgca.maxlabel) + 1
+    attached = {}
+    for name, value in traits.items():
+        values = np.asarray(value)
+        if values.dtype == object or not np.issubdtype(values.dtype, np.number) and values.dtype != bool:
+            raise ValueError(f"model.state.traits.{name} must contain numbers")
+        if values.ndim == 0:
+            column = np.full(rows, values)
+        elif values.ndim == 1:
+            if len(values) != len(labels):
+                raise ValueError(f"model.state.traits.{name} has {len(values)} values, but there are "
+                                 f"{len(labels)} initial cells; give one value per cell or one for all")
+            # rows of labels without a cell (e.g. label 0 with volume exclusion) are never read
+            column = np.full(rows, values[0] if len(values) else 0, dtype=values.dtype)
+            column[labels] = values
+        else:
+            raise ValueError(f"model.state.traits.{name} must be a number or a sequence of numbers")
+        if not np.all(np.isfinite(column.astype(float))):
+            raise ValueError(f"model.state.traits.{name} must contain finite numbers")
+        lgca.props[name] = attached[name] = TraitArray(column)
+    return attached
 
 
 def _attach_fields(lgca, fields: Mapping[str, Any]) -> None:

@@ -99,6 +99,10 @@
         "fields": {
           "type": "object",
           "additionalProperties": {"$ref": "#/$defs/jsonValue"}
+        },
+        "traits": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/jsonValue"}
         }
       }
     },

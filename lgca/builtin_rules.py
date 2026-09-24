@@ -135,17 +135,20 @@ def channel_random_walk(state, channels="all", species=None):
     state.shuffle_cells(channels, species=species)
 
 
-@interaction(kind="reorientation", families=("classical", "nove"), n_species=1, name="go_or_rest")
+@interaction(kind="reorientation", families=("classical", "nove", "ib", "nove_ib"), n_species=1,
+             name="go_or_rest")
 def go_or_rest(state, kappa=5.0, theta=0.75, capacity="legacy"):
     """Moving cells start resting on crowded nodes, resting cells start moving on sparse ones.
 
     Parameters
     ----------
-    kappa : float
+    kappa : float or str
         Steepness of the switch. With kappa > 0 crowded cells rest, with
-        kappa < 0 they move.
-    theta : float
-        Density (cells per node over capacity) at which half of the cells rest.
+        kappa < 0 they move. In identity-based models, the name of a cell
+        trait gives every cell its own value.
+    theta : float or str
+        Density (cells per node over capacity) at which half of the cells
+        rest, or the name of a cell trait.
     capacity : {"legacy", "reject"}
         With volume exclusion, what happens when a switching cell finds no free
         channel. "legacy" reproduces the original rule: the number of switching
@@ -155,7 +158,10 @@ def go_or_rest(state, kappa=5.0, theta=0.75, capacity="legacy"):
     _check_mode(capacity)
     if state.restchannels < 1:
         raise ValueError("go_or_rest needs at least one rest channel for resting cells")
-    rest = tanh_switch(state.density / _node_capacity(state), kappa, theta)
+    if state.identity_based:
+        _go_or_rest_cells(state, kappa, theta, capacity)
+        return
+    rest = tanh_switch(state.density / _node_capacity(state), _number(kappa, "kappa"), _number(theta, "theta"))
     velocity, rng = state.velocitychannels, state.rng
     cells = state.counts[..., 0, :]
     moving, resting = cells[..., :velocity], cells[..., velocity:]
@@ -225,8 +231,9 @@ def go_or_grow_switch(state, kappa=5.0, theta=0.75, capacity="legacy"):
     state.switch_phenotype(rates, channels={_MIGRATING: "velocity", _RESTING: "rest"})
 
 
-@interaction(kind="birth_death", families=("classical", "nove"), name="go_or_grow.growth")
-def go_or_grow_growth(state, r_b=0.2, r_d=0.01, r_d_resting=None, capacity="legacy"):
+@interaction(kind="birth_death", families=("classical", "nove", "ib", "nove_ib"), name="go_or_grow.growth")
+def go_or_grow_growth(state, r_b=0.2, r_d=0.01, r_d_resting=None, capacity="legacy", mutation=None,
+                      new_family=False):
     """Cells die, and resting cells divide into free rest channels.
 
     Resting cells are the cells in rest channels, or species 1 in the
@@ -234,21 +241,33 @@ def go_or_grow_growth(state, r_b=0.2, r_d=0.01, r_d_resting=None, capacity="lega
 
     Parameters
     ----------
-    r_b : float
+    r_b : float or str
         Division probability of a resting cell. Without volume exclusion it is
-        scaled by 1 - density / capacity.
-    r_d : float
+        scaled by 1 - density / capacity. In identity-based models, the name
+        of a cell trait gives every cell its own value.
+    r_d : float or str
         Death probability of a moving cell, and of a resting cell unless
-        r_d_resting is given.
-    r_d_resting : float or None
+        r_d_resting is given; or the name of a cell trait.
+    r_d_resting : float, str or None
         Death probability of a resting cell. Default: r_d.
     capacity : {"legacy", "reject"}
         With volume exclusion, how divisions meet full rest channels. "legacy"
         reproduces the original rule: the number of divisions is drawn from as
         many resting cells as there are free rest channels. "reject": every
         resting cell tries to divide, and divisions into full channels fail.
+    mutation : dict or None
+        Identity-based models: traits of the daughters that mutate, with the
+        standard deviation of a normal change, e.g. ``{"kappa": 0.2}``.
+    new_family : bool
+        Identity-based models: every daughter founds a new family, for
+        lineage analyses such as Muller plots.
     """
     _check_mode(capacity)
+    if state.identity_based:
+        _growth_cells(state, r_b, r_d, r_d_resting, capacity, mutation or {}, new_family)
+        return
+    r_b, r_d = _number(r_b, "r_b"), _number(r_d, "r_d")
+    r_d_resting = None if r_d_resting is None else _number(r_d_resting, "r_d_resting")
     if state.n_species == 1:
         if state.restchannels < 1:
             raise ValueError("go-or-grow needs at least one rest channel for resting cells")
@@ -274,6 +293,72 @@ def go_or_grow_growth(state, r_b=0.2, r_d=0.01, r_d_resting=None, capacity="lega
     division = np.where(resting, np.asarray(rate, dtype=float)[..., None, None], 0.0)
     state.divide_cells(np.broadcast_to(division, state.dims + resting.shape),
                        channels={resting_species: "rest"})
+
+
+def _go_or_rest_cells(state, kappa, theta, capacity):
+    """go_or_rest for identity-based models: every cell switches with its own probability."""
+    cells, rng = state.cells, state.rng
+    rho = state.density[cells.node] / _node_capacity(state)
+    rest = tanh_switch(rho, _per_cell(cells, kappa, "kappa"), _per_cell(cells, theta, "theta"))
+    resting = cells.in_channels("rest")
+    to_rest = ~resting & (rng.random(len(cells)) < rest)
+    to_move = resting & (rng.random(len(cells)) < 1 - rest)
+    if state.volume_exclusion:
+        # only as many cells as there were free channels before the switch
+        n_r = state.counts[..., 0, state.velocitychannels:].sum(-1)
+        n_m = state.counts[..., 0, :state.velocitychannels].sum(-1)
+        free_rest, free_velocity = state.restchannels - n_r, state.velocitychannels - n_m
+        if capacity == "legacy":  # the cells that fit try to switch
+            to_rest = cells.pick(~resting, free_rest) & to_rest
+            to_move = cells.pick(resting, free_velocity) & to_move
+        else:  # every cell tries; the successful ones are chosen at random
+            to_rest = cells.pick(to_rest, free_rest)
+            to_move = cells.pick(to_move, free_velocity)
+    cells.move(to_rest, "rest")
+    cells.move(to_move, "velocity")
+
+
+def _growth_cells(state, r_b, r_d, r_d_resting, capacity, mutation, new_family):
+    """go_or_grow.growth for identity-based models: death and division per cell."""
+    cells, rng = state.cells, state.rng
+    crowding = state.density / _node_capacity(state)
+    resting = cells.in_channels("rest")
+    death = _per_cell(cells, r_d, "r_d")
+    if r_d_resting is not None:
+        death = np.where(resting, _per_cell(cells, r_d_resting, "r_d_resting"), death)
+    alive = rng.random(len(cells)) >= death
+    cells.kill(~alive)
+    resting = resting[alive]
+    birth = _per_cell(cells, r_b, "r_b")
+    if state.volume_exclusion:
+        free_rest = state.restchannels - state.counts[..., 0, state.velocitychannels:].sum(-1)
+        if capacity == "legacy":  # as many resting cells as there are free rest channels try
+            dividing = cells.pick(resting, free_rest) & (rng.random(len(cells)) < birth)
+        else:
+            dividing = resting & (rng.random(len(cells)) < birth)
+    else:
+        rate = np.clip(birth * (1 - crowding[cells.node]), 0, 1)
+        dividing = resting & (rng.random(len(cells)) < rate)
+    daughters = cells.divide(dividing, channels="rest", new_family=new_family)
+    for name, std in mutation.items():
+        if not np.isfinite(std) or std < 0:
+            raise ValueError(f"mutation[{name!r}] must be a non-negative standard deviation")
+        values = cells[name][daughters]
+        cells.set_trait(daughters, name, values + rng.normal(0.0, std, len(daughters)))
+
+
+def _per_cell(cells, value, name):
+    """A parameter per cell: the named trait, or one number for all cells."""
+    if isinstance(value, str):
+        return cells[value]
+    return np.full(len(cells), _number(value, name))
+
+
+def _number(value, name):
+    if isinstance(value, str):
+        # a model mismatch rather than a wrong type: the same value is valid in identity-based models
+        raise ValueError(f"{name}={value!r} names a cell trait, which only identity-based models have")  # noqa: TRY004
+    return value
 
 
 def go_or_grow_layout(state):
