@@ -13,6 +13,10 @@ its traits change by random effects. Growth rules such as ``birth_death`` and
     }
 
 With ``new_family=True`` every daughter that mutates founds a new family.
+The probability may respond to cues of the cell's surroundings, e.g. the
+local density (see :mod:`lgca.switching`), and ``"when": {"alignment": 0}``
+(or a range, ``[low, high]``) limits an event to the cells whose trait has
+that value. ``trait_switch`` applies the same events to living cells.
 A list of such blocks gives independent kinds of mutation, each with its own
 probability, applied in the listed order (e.g. driver and passenger
 mutations). A dict of traits without ``"traits"`` is short for one block with
@@ -48,6 +52,8 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+
+from .switching import Probability, parse_probability
 
 __all__ = ["mutation_effect"]
 
@@ -119,8 +125,9 @@ class _Effect:
 
 @dataclass(frozen=True)
 class _Mutation:
-    probability: float
+    probability: Probability
     traits: dict[str, _Effect]
+    when: dict[str, tuple[float, float]]  # trait -> the range of values of the cells it applies to
 
 
 def parse_mutation(mutation, name: str = "mutation") -> list[_Mutation]:
@@ -138,19 +145,35 @@ def parse_mutation(mutation, name: str = "mutation") -> list[_Mutation]:
             raise TypeError(f"{where} must be a dict with 'traits' (and 'probability'), got {block!r}")
         if "traits" not in block:  # a dict of traits: one kind of mutation, always
             block = {"traits": block}
-        unknown = set(block) - {"probability", "traits"}
+        unknown = set(block) - {"probability", "traits", "when"}
         if unknown:
             raise ValueError(f"{where} has unknown keys {sorted(unknown)}; an event has "
-                             f"'probability' and 'traits'")
-        probability = float(block.get("probability", 1.0))
-        if not 0 <= probability <= 1:
-            raise ValueError(f"{where}['probability'] must be a probability, got {probability}")
+                             f"'probability', 'traits' and 'when'")
+        probability = parse_probability(block.get("probability", 1.0), f"{where}['probability']")
         traits = block["traits"] or {}
         if not isinstance(traits, Mapping):
             raise TypeError(f"{where}['traits'] must map trait names to effects, got {traits!r}")
         parsed.append(_Mutation(probability, {name: _effect(effect, f"{where}[{name!r}]")
-                                              for name, effect in traits.items()}))
+                                              for name, effect in traits.items()},
+                                _when(block.get("when") or {}, f"{where}['when']")))
     return parsed
+
+
+def _when(conditions, where):
+    """Trait -> (low, high): a value means that value, a list [low, high] a range (None: open)."""
+    if not isinstance(conditions, Mapping):
+        raise TypeError(f"{where} must map trait names to values or ranges, e.g. {{'alignment': 0}}")
+    ranges = {}
+    for name, condition in conditions.items():
+        if isinstance(condition, (list, tuple)):
+            if len(condition) != 2:
+                raise ValueError(f"{where}[{name!r}] must be a value or a range [low, high]")
+            low, high = (-np.inf if condition[0] is None else float(condition[0]),
+                         np.inf if condition[1] is None else float(condition[1]))
+        else:
+            low = high = float(condition)
+        ranges[name] = (low, high)
+    return ranges
 
 
 def apply_mutations(state, daughters, mutations) -> np.ndarray:
@@ -161,16 +184,23 @@ def apply_mutations(state, daughters, mutations) -> np.ndarray:
     cells, rng = state.cells, state.rng
     mutated = np.zeros(len(daughters), dtype=bool)
     for mutation in mutations:
-        events = rng.random(len(daughters)) < mutation.probability
+        events = rng.random(len(daughters)) < mutation.probability.cells(state, daughters)
+        for name, (low, high) in mutation.when.items():
+            _require_trait(state, name)
+            values = np.asarray(cells[name][daughters], dtype=float)
+            events &= (values >= low) & (values <= high)
         mutated |= events
         which = daughters[events]
         for name, effect in mutation.traits.items():
-            if name not in state._lgca.props:
-                raise ValueError(f"the cells have no trait {name!r}; declare it with "
-                                 f"StateSpec(traits={{{name!r}: ...}})")
+            _require_trait(state, name)
             values = np.asarray(cells[name][which], dtype=float)
             cells.set_trait(which, name, effect.apply(rng, values))
     return mutated
+
+
+def _require_trait(state, name):
+    if name not in state._lgca.props:
+        raise ValueError(f"the cells have no trait {name!r}; declare it with StateSpec(traits={{{name!r}: ...}})")
 
 
 def _effect(spec, where) -> _Effect:

@@ -851,6 +851,20 @@ has no parity tests.
   `"set"`; two states with their own rates are one event with a `choice`
   draw. Rates that depend on the surroundings or on the current value are
   not covered yet.
+- Status (2026-09-24): switching responds to the surroundings
+  (`lgca.switching`, user request). A probability is a number or
+  `{"max", "cues"}` = `max (1 + tanh(Σ kappa_k (c_k - theta_k))) / 2`, the
+  go-or-grow switch generalised to several cues (density, field, gradient,
+  flux, cell traits; `sensed_species`; `@switch_cue`), in the rates of
+  `phenotype_switch` and in the events of `trait_switch` and mutations, which
+  also take `"when"` (the event applies to cells with some trait values, so
+  any rate matrix between discrete states). `phenotype_switch` became a rule
+  on `LatticeState.switch_phenotype` (the class-based operator looped over
+  nodes: 463 -> 16 ms per step with volume exclusion, 164 -> 9 without, 100 x
+  100 hex); switched cells take a free channel of their new species instead
+  of all cells of the node being redistributed. Tests:
+  `tests/switching_test.py` (probabilities by density and field level against
+  the formula, per-cell sensitivities, when-conditions, custom cues).
 
 ### Phase 3: Studying a model (two to three weeks)
 

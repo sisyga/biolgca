@@ -216,36 +216,6 @@ def _law_for_kind(kind: str) -> ConservationLaw:
     return ConservationLaw(None, None, None)
 
 
-def _register_native_plugins() -> None:
-    phenotype_switch_info = PluginInfo(
-        name="phenotype_switch",
-        aliases=("species_switch",),
-        operator_kind="phenotype_switch",
-        backend_families=("multispecies",),
-        parameters={
-            "rates": {
-                "default": [[0.0, 0.0], [0.0, 0.0]],
-                "validator": "square transition matrix with off-diagonal row sums <= 1",
-            },
-        },
-        conservation_law=_law_for_kind("phenotype_switch"),
-        port_status="native",
-        test_status="unit_tested",
-        description="Cells of a multispecies LGCA switch species at given rates; the number of cells "
-                    "at each node is conserved and a node's cells are redistributed over its channels "
-                    "when one of them switches.",
-    )
-
-    def phenotype_switch_factory(parameters: Mapping[str, Any] | None = None) -> InteractionOperator:
-        from .pipeline import SpeciesSwitchOperator
-
-        merged_parameters = {"rates": [[0.0, 0.0], [0.0, 0.0]]}
-        merged_parameters.update(dict(parameters or {}))
-        return SpeciesSwitchOperator(merged_parameters)
-
-    register_plugin(phenotype_switch_info, phenotype_switch_factory)
-
-
 def _register_example_plugins() -> None:
     custom_rest_or_align_info = PluginInfo(
         name="custom.rest_or_align",
@@ -345,6 +315,5 @@ def _describe_builtin_plugins() -> None:
     for name, (info, factory) in list(default_registry._plugins.items()):
         default_registry._plugins[name] = (_with_parameter_meanings(info), factory)
 
-_register_native_plugins()
 _register_example_plugins()
 _describe_builtin_plugins()

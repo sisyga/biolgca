@@ -39,9 +39,10 @@ from .base import channel_sum
 from .lattice_state import _species_indices, channel_mask, random_occupancy
 from .mutations import apply_mutations, parse_mutation
 from .rules import interaction, register_single_cue, reorientation_term
+from .switching import parse_probability
 
-__all__ = ["birth_death", "go_or_grow_growth", "go_or_grow_switch", "go_or_rest", "random_walk", "tanh_switch",
-           "trait_switch"]
+__all__ = ["birth_death", "go_or_grow_growth", "go_or_grow_switch", "go_or_rest", "phenotype_switch",
+           "random_walk", "tanh_switch", "trait_switch"]
 
 
 def tanh_switch(rho, kappa=5.0, theta=0.8):
@@ -440,6 +441,58 @@ def _divide_and_mutate(state, dividing, channels, mutation, new_family):
     return daughters
 
 
+@interaction(kind="phenotype_switch", families=("classical", "nove"), name="phenotype_switch",
+             aliases="species_switch")
+def phenotype_switch(state, rates, channels="all"):
+    """Cells switch species: a cell of species a becomes species b with probability rates[a][b] per step.
+
+    The rates are numbers or probabilities that respond to cues of the
+    surroundings, e.g. cells that turn migratory in crowded nodes
+    (:mod:`lgca.switching`)::
+
+        "rates": [[0, {"max": 0.2, "cues": [{"name": "density", "kappa": 5, "theta": 0.5}]}],
+                  [0.05, 0]]
+
+    The number of cells at every node stays the same. With volume exclusion a
+    cell switches only if its new species has a free channel at the node;
+    when fewer channels are free than cells switch, the ones that succeed
+    are chosen at random.
+
+    Parameters
+    ----------
+    rates : list of lists
+        ``n_species x n_species`` switching probabilities per time step, each
+        a number or a response to cues; the diagonal is ignored, and the
+        (maximal) probabilities of each row must sum to at most 1.
+    channels : str or list of int
+        Where switched cells go: a random free channel of their new species in
+        this set (``"all"``, ``"velocity"``, ``"rest"`` or indices), or
+        ``"same"``: they keep their channel (with volume exclusion only if it is
+        free for the new species).
+    """
+    n_species = state.n_species
+    if n_species < 2:
+        raise ValueError("phenotype_switch moves cells between species and needs n_species >= 2")
+    rows = rates.tolist() if isinstance(rates, np.ndarray) else rates
+    if not isinstance(rows, (list, tuple)) or len(rows) != n_species or any(
+            not isinstance(row, (list, tuple)) or len(row) != n_species for row in rows):
+        raise ValueError(f"rates must be a {n_species} x {n_species} matrix, got {rates!r}")
+    table = [[parse_probability(entry, f"rates[{a}][{b}]") for b, entry in enumerate(row)]
+             for a, row in enumerate(rows)]
+    leaving = [sum(entry.max for b, entry in enumerate(row) if b != a) for a, row in enumerate(table)]
+    if max(leaving) > 1 + 1e-12:
+        raise ValueError("the switching probabilities of each species must sum to at most 1")
+    if all(entry.constant for row in table for entry in row):
+        matrix = np.array([[entry.max for entry in row] for row in table])
+    else:
+        matrix = np.zeros(state.dims + (n_species, n_species))
+        for a, row in enumerate(table):
+            for b, entry in enumerate(row):
+                if a != b:
+                    matrix[..., a, b] = entry.nodes(state)
+    state.switch_phenotype(matrix, channels=channels)
+
+
 @interaction(kind="phenotype_switch", families=("ib", "nove_ib"), name="trait_switch")
 def trait_switch(state, switch, new_family=False):
     """Cells change their traits by events, as daughters do by mutations, at any time.
@@ -451,6 +504,18 @@ def trait_switch(state, switch, new_family=False):
 
         {"name": "trait_switch", "parameters": {"switch": {
             "probability": 0.02, "traits": {"alignment": {"value": 2.0, "operation": "set"}}}}}
+
+    The probability may respond to cues of the cell's surroundings (see
+    :mod:`lgca.switching`), and ``"when"`` limits an event to cells with some
+    values of a trait, e.g. cells that align more in crowded nodes and stop
+    at a constant rate::
+
+        "switch": [
+            {"when": {"alignment": 0}, "traits": {"alignment": {"value": 2.0, "operation": "set"}},
+             "probability": {"max": 0.1, "cues": [{"name": "density", "kappa": 6, "theta": 0.5}]}},
+            {"when": {"alignment": 2}, "probability": 0.02,
+             "traits": {"alignment": {"value": 0.0, "operation": "set"}}},
+        ]
 
     Parameters
     ----------

@@ -53,6 +53,7 @@ def interaction(
     conserves: str | Iterable[str] = (),
     n_species: int | None = None,
     name: str | None = None,
+    aliases: str | Iterable[str] = (),
     register: bool = True,
 ):
     """Turn ``function(state, **parameters)`` into a registered interaction.
@@ -85,6 +86,8 @@ def interaction(
     name : str, optional
         Name in model files. Default: the function name, prefixed with its
         module unless it is defined in a notebook or script.
+    aliases : str or sequence of str, default=()
+        Further names in model files.
     register : bool, default=True
         Register the rule so that model files can refer to it by name.
         Registering again from the same module (re-running a notebook cell)
@@ -108,7 +111,7 @@ def interaction(
 
     def decorate(function):
         rule = Interaction(function, kind=kind, families=families, geometries=geometries,
-                           conserves=conserves, n_species=n_species, name=name)
+                           conserves=conserves, n_species=n_species, name=name, aliases=aliases)
         if register:
             register_plugin(rule.info, rule._factory)
         return rule
@@ -125,7 +128,7 @@ class Interaction:
     """
 
     def __init__(self, function, *, kind, families, geometries=None, conserves=(), n_species=None,
-                 name=None):
+                 name=None, aliases=()):
         if kind not in KINDS:
             raise ValueError(f"kind must be one of {', '.join(KINDS)}, got {kind!r}")
         self.function = function
@@ -150,6 +153,7 @@ class Interaction:
             name=self.name,
             operator_kind=kind,
             backend_families=self.families + (("multispecies",) if several else ()),
+            aliases=(aliases,) if isinstance(aliases, str) else tuple(aliases),
             parameters=self.parameters,
             conservation_law=law,
             port_status="native",

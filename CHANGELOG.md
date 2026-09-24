@@ -22,7 +22,15 @@ This file records notable user-facing changes. Changes remain under
 - `trait_switch`: cells of identity-based models change their traits at any
   time by events written as mutations (probability, effects, bounds), e.g.
   switching on an alignment strength; the new effect operation `"set"`
-  replaces a trait by a value.
+  replaces a trait by a value, and `"when"` limits an event to cells with
+  some values of a trait (so two or more states switch at their own rates).
+- Switching probabilities that respond to the surroundings (`lgca.switching`):
+  the rates of `phenotype_switch` and the probabilities of `trait_switch`
+  events and mutations can be `{"max": p, "cues": [...]}`, i.e.
+  `p (1 + tanh(Σ kappa (cue - theta))) / 2` as in go-or-grow, with the cues
+  `density`, `field`, `gradient` and `flux` (for chosen species), traits as
+  cues or as per-cell sensitivities, and cues of your own
+  (`lgca.switch_cue`).
 - `directed_motion`, a cue by which cells move along a given vector field
   (`{"name": "directed_motion", "parameters": {"beta": 2, "field": "flow"}}`).
 - The research models of earlier versions as stacks of the generic rules, in
@@ -233,6 +241,11 @@ This file records notable user-facing changes. Changes remain under
   to the `ib.*` growth operators is gone.
 - Models refuse node counts whose sum over a node does not fit a signed
   64-bit integer when they are built.
+- `phenotype_switch` is a rule on the lattice state, 18 to 28 times faster
+  (100 x 100 hex nodes: 16 ms per step with volume exclusion, 9 ms without,
+  instead of 463 and 164 ms). Switched cells go to a free channel of their
+  new species and the other cells stay in their channels; before, a switch
+  at a node redistributed all its cells over the channels.
 
 - Faster rules: the lattice state reads and writes the interior as a view
   and keeps counts as `int8` with volume exclusion (`state.counts` has that

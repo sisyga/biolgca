@@ -124,6 +124,39 @@ daughter founds a new family, for lineage plots. See
 built this way. In classical models with several species, a
 ``mutation_matrix`` gives the species of the daughters.
 
+Switching that responds to the surroundings
+-------------------------------------------
+
+The probabilities of switches (the rates of ``phenotype_switch``, the events
+of ``trait_switch`` and of mutations) are numbers or responses to cues of the
+cell's surroundings, in the form of the go-or-grow switch:
+
+.. code-block:: python
+
+   {"max": 0.2, "cues": [
+       {"name": "density", "kappa": 5.0, "theta": 0.5},
+       {"name": "field", "field": "signal", "kappa": -2.0, "theta": 1.0},
+   ]}
+
+is ``p = max * (1 + tanh(Σ_k kappa_k (c_k - theta_k))) / 2``, with ``c_k``
+the value of cue ``k`` at the cell's node: half the maximal probability where
+the weighted cues balance their thresholds, more where cues with positive
+``kappa`` are large. The cues are the relative ``density`` (of the node or its
+neighbourhood), the value and the ``gradient`` of a ``field``, and the
+``flux`` of the cells, each for all species or the ``sensed_species``; in
+identity-based models ``kappa`` and ``theta`` may name traits (every cell with
+its own sensitivity) and ``{"name": "trait", "trait": "age"}`` is a cue per
+cell. :func:`lgca.switch_cue` registers cues of your own, functions of the
+lattice state with a value per node. Migrating cells (species 0) that turn
+resting (species 1) in crowded nodes and return at a constant rate:
+
+.. code-block:: python
+
+   {"name": "phenotype_switch", "parameters": {"rates": [
+       [0, {"max": 0.3, "cues": [{"name": "density", "kappa": 6.0, "theta": 0.5}]}],
+       [0.05, 0],
+   ]}}
+
 Switching traits
 ----------------
 
@@ -142,9 +175,20 @@ cue scaled by the trait (``ReorientationTermSpec(..., trait="alignment")``):
 A change of random size, e.g. ``{"alignment": {"distribution": "normal",
 "scale": 0.1, "bounds": [0, None]}}``, makes the strength drift. Two states
 that switch with their own rates, ``k_on`` from 0 to 2 and ``k_off`` back,
-are one event with probability ``k_on + k_off`` that sets a state drawn with
-``{"distribution": "choice", "a": [0, 2], "p": [k_off / (k_on + k_off),
-k_on / (k_on + k_off)]}``, whatever the old state was.
+are two events, each for the cells in one state (``"when"``), and a rate may
+respond to cues, e.g. cells that start to align in crowded nodes:
+
+.. code-block:: python
+
+   {"name": "trait_switch", "parameters": {"switch": [
+       {"when": {"alignment": 0}, "traits": {"alignment": {"value": 2.0, "operation": "set"}},
+        "probability": {"max": 0.1, "cues": [{"name": "density", "kappa": 6.0, "theta": 0.5}]}},
+       {"when": {"alignment": 2}, "probability": 0.02,
+        "traits": {"alignment": {"value": 0.0, "operation": "set"}}},
+   ]}}
+
+``"when"`` takes a value or a range ``[low, high]`` of a trait (either may be
+``None``).
 
 Combining directional cues
 --------------------------
@@ -290,12 +334,12 @@ Phenotype switching with volume exclusion
 -----------------------------------------
 
 With volume exclusion, a cell that switches species needs a channel that is
-free for its new species. The built-in ``phenotype_switch`` samples the
-complete new state of each node at once, so switches cannot collide.
-``LatticeState.switch_phenotype`` lets every cell try to switch on its own:
-a switch into an occupied channel fails, and when several cells compete for
-the same free channel, one of them wins at random. The population-dynamics
-tutorial demonstrates both.
+free for its new species. ``phenotype_switch`` (and
+``LatticeState.switch_phenotype``, on which it is built) lets every cell try
+to switch on its own: a switched cell goes to a random free channel of its
+new species at the node (``channels="same"``: it keeps its channel if that is
+free), a switch without a free channel fails, and when more cells switch
+than channels are free, the successful ones are chosen at random.
 
 Polar versus nematic composition
 --------------------------------

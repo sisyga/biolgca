@@ -52,8 +52,10 @@ tests the installed wheel and CLI, and builds the docs.
   table and trait buffers of identity-based models, `state.cells`), `rules.py`
   (the `@interaction`, `@reorientation_term` and `@stack` decorators),
   `builtin_rules.py` (built-in rules and reorientation terms written with
-  them, including go-or-grow and `birth_death`), `mutations.py` (mutation
-  events and effect distributions of growth rules), `research_models.py`
+  them, including go-or-grow, `birth_death` and the switches),
+  `mutations.py` (events that change cell traits: mutations of daughters and
+  `trait_switch`), `switching.py` (switching probabilities that respond to
+  cues such as the density), `research_models.py`
   (published models as stacks of the rules, under the legacy names),
   `legacy_names.py` (the `get_lgca` interaction names, and the deprecated
   prefixed names of model files, as stacks of rules), `testing.py`

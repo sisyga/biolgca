@@ -5,27 +5,28 @@ from itertools import permutations
 import numpy as np
 import pytest
 
-from lgca.pipeline import SpeciesSwitchOperator
+from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
+from lgca.pipeline import InteractionPipelineSpec
 
 
 def test_phenotype_switch_metadata_matches_mass_and_momentum_observables():
-    from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
-    from lgca.pipeline import InteractionPipelineSpec, PhenotypeSwitchSpec
+    from lgca.pipeline import PhenotypeSwitchSpec
 
+    nodes = np.zeros((50, 2, 2), dtype=bool)
+    nodes[:, 0, 0] = True  # one cell of species 0 moving right at every node
     model = build_model(ModelSpec(
-        space=SpaceSpec(geometry="lin", dims=1),
-        state=StateSpec(nodes=np.array([[[True, False], [False, False]]]), n_species=2),
+        space=SpaceSpec(geometry="lin", dims=50),
+        state=StateSpec(nodes=nodes, n_species=2, restchannels=0),
         time=TimeSpec(steps=1, seed=42),
         dynamics=InteractionPipelineSpec(operators=[PhenotypeSwitchSpec("phenotype_switch", {
             "rates": [[0, 1], [0, 0]],
         })], propagation=False),
     ))
-    before = model.lgca.nodes[model.lgca.nonborder].copy()
     model.run(False)
     after = model.lgca.nodes[model.lgca.nonborder]
-    assert before.sum() == after.sum() == 1
-    assert (before[..., 0].sum() - before[..., 1].sum()) == 1
-    assert (int(after[..., 0].sum()) - int(after[..., 1].sum())) == -1
+    assert after.sum() == 50 and after[:, 1].sum() == 50  # every cell switched species, none was lost
+    moved = after[:, 1, 1].sum()  # switched cells go to a random free channel: the momentum changes
+    assert 0 < moved < 50
     law = model.pipeline.operators[0].conservation_law
     assert law.conserves_total_particles is True
     assert law.conserves_momentum is False
@@ -37,18 +38,20 @@ def test_all_small_states_respect_directed_transition_support(order):
     """Only 0 -> 1 is allowed; species 2 is isolated, including saturation."""
     order = np.asarray(order)
     rates = np.array([[0., 1., 0.], [0., 0., 0.], [0., 0., 0.]])
-    for mask in range(64):
-        state = np.array([(mask >> bit) & 1 for bit in range(6)], dtype=bool).reshape(3, 2)
-        before = state.sum(axis=1)
-        for seed in range(4):
-            result = SpeciesSwitchOperator._sample_state(
-                state[order], rates[np.ix_(order, order)], np.random.default_rng(seed)
-            )
-            counts = result.sum(axis=1)[np.argsort(order)]
-            assert result.dtype == bool
-            assert result.shape == state.shape
-            assert counts.sum() == before.sum()
-            assert np.all(counts <= 2)
-            assert counts[2] == before[2]
-            assert counts[0] <= before[0]
-            assert counts[1] >= before[1]
+    states = np.array([[(mask >> bit) & 1 for bit in range(6)] for mask in range(64)], dtype=bool).reshape(64, 3, 2)
+    before = states.sum(axis=2)
+    for seed in range(4):
+        model = build_model(ModelSpec(
+            space=SpaceSpec(geometry="lin", dims=64),
+            state=StateSpec(nodes=states[:, order], restchannels=0, n_species=3),
+            time=TimeSpec(steps=1, seed=seed),
+            dynamics=InteractionPipelineSpec(operators=[{"name": "phenotype_switch", "parameters": {
+                "rates": rates[np.ix_(order, order)].tolist()}}], propagation=False)))
+        model.step()
+        result = model.lgca.nodes[model.lgca.nonborder]
+        counts = result.sum(axis=2)[:, np.argsort(order)]
+        assert result.dtype == bool
+        np.testing.assert_array_equal(counts.sum(axis=1), before.sum(axis=1))
+        assert np.all(counts <= 2)
+        np.testing.assert_array_equal(counts[:, 2], before[:, 2])
+        assert np.all(counts[:, 0] <= before[:, 0]) and np.all(counts[:, 1] >= before[:, 1])

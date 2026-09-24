@@ -72,10 +72,11 @@ The rules
      - The two-species form of ``go_or_rest``: migrating and resting cells
        are species.
    * - ``phenotype_switch``
-     - Switch species at given rates (several species).
+     - Switch species at given rates, which may respond to cues such as the
+       density or a field (several species).
    * - ``trait_switch``
-     - Change their traits by events, as daughters do by mutations
-       (identity-based models).
+     - Change their traits by events, as daughters do by mutations, at rates
+       that may respond to cues (identity-based models).
    * - ``excitable_medium``
      - Barkley kinetics of resting inhibitors and moving activators
        (classical models).

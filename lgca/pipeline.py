@@ -15,7 +15,6 @@ from .lattice_state import channel_mask, occupations
 from .plugins import (
     ConservationLaw,
     InteractionOperator,
-    PhenotypeSwitchOperator,
     PluginInfo,
     ReorientationOperator,
     create_plugin,
@@ -49,12 +48,13 @@ class PhenotypeSwitchSpec:
     ``PhenotypeSwitchSpec(name="phenotype_switch", parameters={"rates": R})``
     lets cells of a multispecies LGCA change their species: each cell of
     species ``a`` becomes species ``b`` with probability ``R[a][b]`` per time
-    step (the diagonal is ignored). The number of cells at a node is
-    conserved; a switch into a species whose channels at that node are full is
-    rejected, and when a cell switches, the node's cells are redistributed over
-    its channels. A phenotype switch needs several species (or an
-    identity-based model); moving cells between velocity and rest channels of
-    one species, as ``classical.go_or_rest`` does, is a reorientation.
+    step (the diagonal is ignored); the rates may respond to cues of the
+    surroundings (:mod:`lgca.switching`). The number of cells at a node is
+    conserved; a switch into a species without a free channel at the node
+    fails, and switched cells go to free channels of their new species. A
+    phenotype switch needs several species (identity-based models change
+    traits with ``trait_switch``); moving cells between velocity and rest
+    channels of one species, as ``go_or_rest`` does, is a reorientation.
 
     Attributes
     ----------
@@ -362,8 +362,6 @@ def _compile_operator(spec) -> InteractionOperator:
         return spec
     if isinstance(spec, ReorientationSpec):
         return BoltzmannReorientationOperator(spec)
-    if isinstance(spec, PhenotypeSwitchSpec) and spec.name == "phenotype_switch":
-        return SpeciesSwitchOperator(spec.parameters)
     if isinstance(spec, (BirthDeathSpec, PhenotypeSwitchSpec)):
         return create_plugin(spec.name, spec.parameters)
     if isinstance(spec, Mapping):
@@ -903,122 +901,3 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         state._place_cells(after, mask)
         state._counts = after[..., None, :]
         state.commit()
-
-
-class SpeciesSwitchOperator(PhenotypeSwitchOperator):
-    """Sample an atomic, particle-conserving multispecies state transition.
-
-    At each lattice site, ``s`` is the complete ``(n_species, K)`` channel
-    state and the interaction constructs one equally shaped and typed ``s'``.
-    It guarantees ``N(s') == N(s)`` and, for Boolean states, at most one
-    particle per species/channel slot. If at least one phenotype changes, all
-    channel positions are resampled; if none changes, the state is unchanged.
-    Each particle retains its source capacity until processed in random order.
-    A sampled switch into a full species is rejected and the particle stays
-    in its source species, even when its configured stay probability is zero.
-    Collisions therefore cannot merge particles or create forbidden switches.
-    """
-
-    def __init__(self, parameters: Mapping[str, Any] | None = None):
-        info = PluginInfo(
-            name="phenotype_switch",
-            aliases=("species_switch",),
-            operator_kind="phenotype_switch",
-            backend_families=("multispecies",),
-            parameters={
-                "rates": {
-                    "required": True,
-                    "type_label": "array",
-                    "description": "Off-diagonal phenotype transition probabilities.",
-                }
-            },
-            conservation_law=ConservationLaw(True, False, False, ("species identity", "channel occupancy")),
-            port_status="native",
-            description="Atomic phenotype transition with collision-safe channel resampling.",
-        )
-        super().__init__(info=info, parameters=parameters)
-        self.rates = None
-
-    def validate(self, context) -> None:
-        n_species = context.spec.state.n_species
-        if n_species < 2:
-            raise ValueError("phenotype switch requires state.n_species >= 2")
-        if context.spec.state.identity_based:
-            raise ValueError("phenotype switch does not yet support identity-based states")
-        if "rates" not in self.parameters:
-            raise ValueError("missing required parameter 'rates'")
-        rates = np.asarray(self.parameters["rates"], dtype=float)
-        if rates.shape != (n_species, n_species):
-            raise ValueError("rates must have shape (n_species, n_species)")
-        if not np.all(np.isfinite(rates)) or np.any(rates < 0):
-            raise ValueError("rates must contain finite non-negative values")
-        off_diag = rates.copy()
-        np.fill_diagonal(off_diag, 0.0)
-        if np.any(off_diag.sum(axis=1) > 1.0):
-            raise ValueError("row sums of phenotype switch rates must be <= 1")
-        self.rates = off_diag
-
-    def apply(self, context, step: int) -> None:
-        lgca = context.lgca
-        rates = self.rates
-        if rates is None:
-            self.validate(context)
-            rates = self.rates
-        for spatial in np.ndindex(lgca.dims):
-            coord = tuple(index + lgca.r_int for index in spatial)
-            state = lgca.nodes[coord + (slice(None), slice(None))]
-            lgca.nodes[coord + (slice(None), slice(None))] = self._sample_state(
-                state, rates, lgca.rng
-            )
-
-    @staticmethod
-    def _sample_state(state, rates, rng):
-        """Construct one admissible complete state without sequential writes."""
-        state = np.asarray(state)
-        n_species, n_channels = state.shape
-        probabilities = np.asarray(rates, dtype=float).copy()
-        np.fill_diagonal(
-            probabilities, 1.0 - probabilities.sum(axis=1)
-        )
-
-        if state.dtype == bool:
-            sources = np.repeat(np.arange(n_species), state.sum(axis=1))
-            if sources.size == 0:
-                return state.copy()
-            rng.shuffle(sources)
-            counts = state.sum(axis=1).astype(int)
-            targets = np.empty(sources.size, dtype=int)
-            changed = False
-            for index, source in enumerate(sources):
-                target = int(rng.choice(n_species, p=probabilities[source]))
-                if target != source and counts[target] >= n_channels:
-                    target = int(source)
-                targets[index] = target
-                counts[source] -= 1
-                counts[target] += 1
-                changed |= target != source
-
-            if not changed:
-                return state.copy()
-
-            result = np.zeros_like(state)
-            for target, count in enumerate(np.bincount(targets, minlength=n_species)):
-                if count:
-                    channels = rng.choice(n_channels, size=count, replace=False)
-                    result[target, channels] = True
-            return result
-
-        source_counts = state.sum(axis=1).astype(int)
-        flows = np.zeros((n_species, n_species), dtype=int)
-        for source, count in enumerate(source_counts):
-            if count:
-                flows[source] = rng.multinomial(count, probabilities[source])
-        if not (flows - np.diag(np.diag(flows))).any():
-            return state.copy()
-
-        result = np.zeros_like(state)
-        channel_probabilities = np.full(n_channels, 1.0 / n_channels)
-        for target, count in enumerate(flows.sum(axis=0)):
-            if count:
-                result[target] = rng.multinomial(count, channel_probabilities)
-        return result

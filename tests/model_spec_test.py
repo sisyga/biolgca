@@ -461,7 +461,8 @@ def _state_for_plugin(plugin_name):
 
 
 _PARAMETERS_FOR_PLUGIN = {"chemotaxis": {"field": "signal"}, "directed_motion": {"field": "director"},
-                          "trait_switch": {"switch": {"alignment": 0.1}}}
+                          "trait_switch": {"switch": {"alignment": 0.1}},
+                          "phenotype_switch": {"rates": [[0, 0.1], [0.2, 0]]}}
 
 
 @pytest.mark.parametrize(

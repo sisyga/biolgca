@@ -33,6 +33,7 @@ from typing import Tuple, Any
 from .lattice_state import LatticeState
 from .rules import interaction, reorientation_term, stack
 from .mutations import mutation_effect
+from .switching import switch_cue
 from . import builtin_rules as _builtin_rules  # registers the decorated built-in interactions
 from . import research_models as _research_models  # registers the research models as stacks
 from . import legacy_names as _legacy_names  # registers the legacy interaction names
