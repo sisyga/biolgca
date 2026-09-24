@@ -12,9 +12,12 @@ from lgca.operator_base import InteractionOperator, PluginInfo
 @pytest.mark.parametrize("geometry,dims", [("lin", (4,)), ("square", (4, 4)),
                                          ("hex", (4, 4)), ("cubic", (4, 4, 4))])
 def test_chemotaxis_ramps_have_analytic_physical_gradients_and_scores(geometry, dims):
+    # Inside the lattice the centred gradient of a linear ramp is exact on every
+    # geometry; at the edge the field's ghost values (its edge values) halve it.
     reference = get_lgca(geometry=geometry, dims=dims, density=0, interaction="only_propagation")
     ndim = len(dims)
     coordinates = [getattr(reference, name) for name in ("xcoords", "ycoords", "zcoords")[:ndim]]
+    inside = tuple(slice(1, -1) for _ in dims)
     for component, coordinate in enumerate(coordinates):
         model = build_model(ModelSpec(
             space=SpaceSpec(geometry=geometry, dims=dims),
@@ -25,12 +28,13 @@ def test_chemotaxis_ramps_have_analytic_physical_gradients_and_scores(geometry, 
         ))
         term = model.pipeline.operators[0].terms[0]
         expected = np.eye(ndim)[component]
-        np.testing.assert_allclose(term.field, np.broadcast_to(expected, dims + (ndim,)), atol=1e-14)
+        np.testing.assert_allclose(term.field[inside], np.broadcast_to(expected, term.field[inside].shape),
+                                   atol=1e-12)
         candidates = np.eye(model.lgca.K, dtype=bool)
-        for spatial in np.ndindex(dims):
-            coord = tuple(index + model.lgca.r_int for index in spatial)
+        for spatial in np.ndindex(tuple(size - 2 for size in dims)):
+            coord = tuple(index + 1 + model.lgca.r_int for index in spatial)
             scores = term.score(candidates, None, model.lgca, coord)
-            np.testing.assert_allclose(scores, model.lgca.c[component], atol=1e-14)
+            np.testing.assert_allclose(scores, model.lgca.c[component], atol=1e-12)
 
 
 @pytest.mark.parametrize("name", ["chemotaxis", "contact_guidance"])

@@ -94,6 +94,17 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- The `chemotaxis` term uses the same gradient as `aggregation` and
+  `LatticeState.gradient`: centred differences with ghost nodes, which for a
+  named field repeat its edge values. Inside the lattice nothing changes for
+  linear signals; at the edge, and on the hexagonal lattice for curved
+  signals, seeded runs differ from before.
+- With several species, `capacity` of `birth_death` is a soft limit: cells
+  divide with probability `birth_rate * (1 - cells on the node / capacity)`,
+  and without a capacity only free channels limit divisions. With one
+  species it remains a hard limit. Seeded multispecies runs differ from
+  before.
+- The README go-or-grow example uses the two-species model.
 - The custom interaction guide, the concepts page on interactions,
   tutorials 4 and 6 and the README use the decorators: rules are written as
   functions of the lattice state and tested with `check_interaction`.

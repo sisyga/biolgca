@@ -368,9 +368,10 @@ state.counts = new                             # expert access: replace the whol
     model's own `gradient` method on the padded lattice: arrays get the same
     ghost values as in `neighbor_sum`, named fields keep the ghost values the
     model stores for them (edge values for `StateSpec.fields`).
-  - Follow-up: the native `birth_death` operator still treats `capacity` as a
-    hard limit per node; align it with the soft-limit convention when it is
-    rewritten on the operations (1.4).
+  - Done (2026-09-24): with several species `birth_death` runs on the
+    operations and `capacity` is a soft limit (divisions with probability
+    `birth_rate * (1 - density / capacity)`, no capacity by default); with
+    one species it stays a hard limit by design.
   - `commit()` checks the conservation law of the kind and writes the
     interior; the pipeline integration comes with the decorator (1.4).
 
@@ -415,10 +416,7 @@ spec = ModelSpec(..., dynamics=InteractionPipelineSpec(
   numpydoc `Parameters` section. Declared momentum conservation is checked
   after every call, like the conservation law of the kind. The schedule no
   longer shows `port_status` and `legacy_source`; the fields stay in
-  `PluginInfo` with defaults and are documented as internal. Tutorial 6 and
-  the how-to still pass them and are rewritten with 1.7. Open: the native
-  `birth_death` operator keeps its hard capacity per node until it is
-  rewritten on the operations.
+  `PluginInfo` with defaults and are documented as internal.
 
 **1.5 Public reorientation terms** (C3)
 
@@ -454,10 +452,11 @@ in 2.1. Rules that are not Boltzmann samplers use `@interaction(kind=
   number streams) and so is the run time. Terms list the fields they read
   as inputs in the schedule. The advanced `score(features, state)` form was
   not added: every built-in term fits one of the four couplings.
-  Open question: `chemotaxis` keeps its gradient in physical coordinates
-  (one-sided at the edge, and a different stencil from `lgca.gradient` on
-  the hexagonal lattice), while `aggregation` and `LatticeState.gradient` use
-  the model's centred gradient with ghost nodes.
+  Decided (2026-09-24): `chemotaxis` uses `state.gradient(field)` like
+  `aggregation`: centred differences with ghost nodes, which for a named
+  field repeat its edge values unless set otherwise. Linear ramps keep their
+  exact gradient inside the lattice on every geometry; across the edge the
+  slope is halved. Seeded chemotaxis runs differ from before.
 
 **1.6 Interaction test helper** (C5)
 
@@ -502,9 +501,8 @@ reorientation.
   and -4, migrating and resting cells plotted separately); tutorial 6 writes
   its rule with the decorator and runs `check_interaction`; tutorials 3 and
   6 have exercises that write a term. The README section "Write your own
-  interaction" uses the decorator. The README go-or-grow block still uses
-  `classical.go_or_grow` with a region initializer, which cannot yet place
-  two species in their channels.
+  interaction" uses the decorator, and its go-or-grow block the two-species
+  model, with the initial colony given as `nodes`.
 
 **Supported in Phase 1**
 

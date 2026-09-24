@@ -118,7 +118,6 @@ def test_native_birth_death_supports_species_specific_rates():
                     parameters={
                         "birth_rate": [1.0, 0.0],
                         "death_rate": [0.0, 1.0],
-                        "capacity": 4,
                     },
                 )
             ],
@@ -131,7 +130,6 @@ def test_native_birth_death_supports_species_specific_rates():
     species_counts = result.lgca.nodes_t[1].sum(axis=(0, 1, 3))
 
     assert species_counts.tolist() == [2, 0]
-    assert result.lgca.nodes_t[1].sum(axis=(2, 3)).max() <= 4
 
 
 def test_native_reorientation_preserves_multispecies_mass_by_species():
@@ -498,29 +496,6 @@ def test_saturated_phenotype_switch_preserves_forbidden_species_under_relabeling
         np.testing.assert_array_equal(result, state[order])
         assert result.dtype == bool
         assert result.sum() == 3
-
-
-@pytest.mark.parametrize("order", [(0, 1, 2), (2, 0, 1), (1, 2, 0)])
-def test_shared_birth_capacity_has_exchangeable_competition(order):
-    from lgca.pipeline import NativeBirthDeathOperator
-
-    operator = NativeBirthDeathOperator()
-    operator.birth_rate = np.array([1., 1., 0.])[list(order)]
-    operator.death_rate = np.zeros(3)
-    operator.capacity = 3
-    node = np.array([[True, False], [True, False], [False, False]])[list(order)]
-    lattice = np.broadcast_to(node, (2000,) + node.shape).copy()
-
-    result = operator._apply_multispecies_lattice(lattice, np.random.default_rng(108))
-
-    assert result.dtype == bool
-    assert (result.sum(axis=(-2, -1)) == 3).all()
-    counts = result.sum(axis=-1)[:, np.argsort(order)]
-    assert (counts[:, 2] == 0).all()
-    winners = (counts == 2).sum(axis=0)
-    # Each identical species wins with probability 1/2 (six standard errors).
-    assert winners[0] / 2000 == pytest.approx(.5, abs=6 * np.sqrt(.25 / 2000))
-    assert winners[1] == 2000 - winners[0]
 
 
 def test_phenotype_switch_zero_rates_leave_complete_state_unchanged():
@@ -970,20 +945,35 @@ def test_lazy_permutation_cache_evicts_by_bytes(monkeypatch):
     assert list(cache) == [1]
 
 
+def _turnover_step(nodes, **parameters):
+    spec = ModelSpec(
+        space=SpaceSpec(geometry="lin", dims=nodes.shape[0]),
+        state=StateSpec(nodes=nodes, n_species=2, restchannels=nodes.shape[-1] - 2),
+        time=TimeSpec(steps=1, seed=3),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "birth_death", "parameters": parameters}],
+                                         propagation=False),
+    )
+    compiled = build_model(spec)
+    compiled.step()
+    return compiled.lgca.nodes[compiled.lgca.nonborder]
+
+
 def test_multispecies_turnover_matches_its_rates():
-    from lgca.pipeline import NativeBirthDeathOperator
-
-    rng = np.random.default_rng(3)
-    operator = NativeBirthDeathOperator()
-    operator.capacity = 100  # never limiting
-
-    operator.death_rate, operator.birth_rate = np.array([0.2, 0.5]), np.zeros(2)
     full = np.ones((4000, 2, 4), dtype=bool)
-    survivors = operator._apply_multispecies_lattice(full, rng).mean(axis=(0, 2))
+    survivors = _turnover_step(full, death_rate=[0.2, 0.5]).mean(axis=(0, 2))
     np.testing.assert_allclose(survivors, [0.8, 0.5], atol=0.01)
 
-    operator.death_rate, operator.birth_rate = np.zeros(2), np.array([0.1, 0.4])
     one_cell = np.zeros((20000, 2, 4), dtype=bool)
     one_cell[..., 0] = True
-    births = operator._apply_multispecies_lattice(one_cell, rng).sum(axis=-1).mean(axis=0) - 1
+    births = _turnover_step(one_cell, birth_rate=[0.1, 0.4]).sum(axis=-1).mean(axis=0) - 1
     np.testing.assert_allclose(births, [0.1, 0.4], atol=0.01)
+
+
+def test_multispecies_capacity_slows_divisions_instead_of_capping_them():
+    # two cells per node of capacity 4: each divides with probability 0.8 * (1 - 2 / 4)
+    nodes = np.zeros((20000, 2, 4), dtype=bool)
+    nodes[..., 0] = True
+    after = _turnover_step(nodes, birth_rate=0.8, capacity=4).sum(axis=-1)
+
+    np.testing.assert_allclose(after.mean(axis=0) - 1, [0.4, 0.4], atol=0.01)
+    assert (after.sum(axis=-1) == 4).any()  # nodes may reach capacity

@@ -515,27 +515,6 @@ class _FieldTerm(_ReorientationTerm):
         return field @ features["occupancy"].T
 
 
-def _physical_field_gradient(lgca, field):
-    """Differentiate a prescribed field in physical lattice coordinates.
-
-    Centered interior and one-sided edge differences do not wrap the prescribed
-    field across particle boundaries. Singleton axes have zero derivative.
-    The coordinate Jacobian removes the hexagonal row staggering and spacing.
-    """
-    ndim = len(lgca.dims)
-    coordinates = [getattr(lgca, name) for name in ("xcoords", "ycoords", "zcoords")[:ndim]]
-    derivatives = np.zeros(field.shape + (ndim,))
-    jacobian = np.zeros(field.shape + (ndim, ndim))
-    for axis, size in enumerate(lgca.dims):
-        if size == 1:
-            jacobian[..., axis, axis] = 1
-            continue
-        derivatives[..., axis] = np.gradient(field, axis=axis)
-        for component, coordinate in enumerate(coordinates):
-            jacobian[..., axis, component] = np.gradient(coordinate, axis=axis)
-    return np.linalg.solve(jacobian, derivatives[..., None])[..., 0]
-
-
 # name -> term definition (see lgca.rules.reorientation_term); filled by lgca.builtin_rules
 _REORIENTATION_TERMS: dict[str, Any] = {}
 _TERM_ALIASES: dict[str, str] = {}
@@ -2758,11 +2737,20 @@ class NativeMultispeciesExcitableMediumOperator(BirthDeathOperator):
         lgca.nodes = newnodes
 
 
+_BIRTH_DEATH_DESCRIPTION = (
+    "Cells die with probability death_rate, then divide with probability birth_rate into a free "
+    "channel of their species. With one species, capacity limits the cells per node; with several, "
+    "divisions slow down as a node fills: birth_rate * (1 - cells / capacity).")
+
+
 class NativeBirthDeathOperator(BirthDeathOperator):
     """Native volume-exclusion birth/death operator.
 
-    Deaths precede births. Species compete for shared birth capacity in a fresh
-    uniformly random order at each site, without a species-index priority.
+    Deaths precede births. With one species, ``capacity`` is a hard limit on
+    the cells per node. With several species it is a soft limit, the crowding
+    scale of the other rules: a cell divides with probability
+    ``birth_rate * (1 - density / capacity)``, and without a capacity with
+    ``birth_rate``. Daughters take free channels of their species.
     """
 
     def __init__(self, parameters: Mapping[str, Any] | None = None):
@@ -2783,14 +2771,14 @@ class NativeBirthDeathOperator(BirthDeathOperator):
                     "validator": "probability scalar or per-species vector",
                 },
                 "capacity": {
-                    "default": "n_species * K",
+                    "default": "K with one species, none with several",
                     "type_label": "positive integer",
                     "validator": "positive integer",
                 },
             },
             conservation_law=ConservationLaw(False, False, False, ("particle number",)),
             port_status="native",
-            description="Local birth/death process with volume-exclusion capacity.",
+            description=_BIRTH_DEATH_DESCRIPTION,
         )
         super().__init__(info=info, parameters=parameters)
         self.birth_rate = None
@@ -2806,10 +2794,11 @@ class NativeBirthDeathOperator(BirthDeathOperator):
         self.birth_rate = self._rates("birth_rate", n_species)
         self.death_rate = self._rates("death_rate", n_species)
         canonical = context.spec.state.capacity
-        capacity = self.parameters.get("capacity", canonical if canonical is not None else n_species * context.lgca.K)
-        if int(capacity) != capacity or capacity < 1:
+        default = context.lgca.K if n_species == 1 else None
+        capacity = self.parameters.get("capacity", canonical if canonical is not None else default)
+        if capacity is not None and (int(capacity) != capacity or capacity < 1):
             raise ValueError("capacity must be a positive integer")
-        self.capacity = int(capacity)
+        self.capacity = None if capacity is None else int(capacity)
 
     def apply(self, context, step: int) -> None:
         lgca = context.lgca
@@ -2823,8 +2812,16 @@ class NativeBirthDeathOperator(BirthDeathOperator):
                 self.capacity,
             )
             return
-        interior = lgca.nodes[lgca.nonborder]
-        lgca.nodes[lgca.nonborder] = self._apply_multispecies_lattice(interior, lgca.rng)
+        from .lattice_state import LatticeState
+
+        state = LatticeState(lgca, step=step)
+        state.remove_cells(self.death_rate)
+        division = np.broadcast_to(self.birth_rate, state.dims + (state.n_species,))
+        if self.capacity is not None:
+            crowding = np.clip(1 - state.density / self.capacity, 0, 1)
+            division = division * crowding[..., None]
+        state.divide_cells(division)
+        state.commit()
 
     def _rates(self, name: str, n_species: int) -> np.ndarray:
         value = self.parameters.get(name, 0.0)
@@ -2836,39 +2833,6 @@ class NativeBirthDeathOperator(BirthDeathOperator):
         if np.any((rates < 0.0) | (rates > 1.0)):
             raise ValueError(f"{name} entries must be probabilities")
         return rates
-
-    def _apply_multispecies_lattice(self, nodes, rng):
-        """Apply turnover to all sites at once; nodes have shape ``dims + (n_species, K)``.
-
-        At every site, cells die independently, then each species draws its
-        births from a binomial distribution in its cell number. Species claim
-        the site's remaining capacity in a random order, and births occupy
-        uniformly chosen free channels of their species.
-        """
-        n_species = nodes.shape[-2]
-        after_death = nodes.copy()
-        if np.any(self.death_rate > 0.0):
-            after_death &= rng.random(nodes.shape) >= self.death_rate[:, None]
-        counts = after_death.sum(axis=-1)
-        if not np.any(self.birth_rate > 0.0):
-            return after_death
-
-        wanted = np.minimum(rng.binomial(counts, self.birth_rate), nodes.shape[-1] - counts)
-        remaining = np.maximum(self.capacity - counts.sum(axis=-1), 0)
-        births = np.zeros_like(wanted)
-        order = np.argsort(rng.random(counts.shape), axis=-1)
-        for position in range(n_species):
-            species = order[..., position:position + 1]
-            granted = np.minimum(np.take_along_axis(wanted, species, axis=-1)[..., 0], remaining)
-            np.put_along_axis(births, species, granted[..., None], axis=-1)
-            remaining -= granted
-        if not np.any(births):
-            return after_death
-
-        scores = rng.random(nodes.shape)
-        scores[after_death] = np.inf
-        ranks = np.argsort(np.argsort(scores, axis=-1), axis=-1)
-        return after_death | (ranks < births[..., None])
 
     @staticmethod
     def _apply_single_species_lattice(nodes, birth_rate, death_rate, rng, capacity):

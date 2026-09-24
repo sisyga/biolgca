@@ -117,28 +117,33 @@ recorded densities in `measurements.npz`.
      alt="A dense spheroid of cells grown from one site">
 
 Interactions can also create and remove cells. In the go-or-grow model, cells
-either migrate or rest and divide, and crowding changes which they do. One
-fully occupied site grows into a spheroid:
+either migrate or rest and divide, and crowding changes which they do.
+Migrating cells (species 0) live in the velocity channels and resting cells
+(species 1) in the rest channels. One fully occupied node grows into a
+spheroid:
 
 ```python
+nodes = np.zeros((60, 60, 2, 12), dtype=bool)  # nodes, species, channels
+nodes[30, 30, 0, :6] = True  # 6 migrating cells in the velocity channels
+nodes[30, 30, 1, 6:] = True  # 6 resting cells in the rest channels
+
 spec = ModelSpec(
     space=SpaceSpec(geometry="hex", dims=(60, 60)),
-    state=StateSpec(
-        restchannels=6,  # resting cells proliferate, moving cells migrate
-        initializer={"name": "region", "parameters": {"extent": 1, "density": 12}},
-    ),
+    state=StateSpec(nodes=nodes, restchannels=6, n_species=2),
     time=TimeSpec(steps=90, seed=3),
     dynamics=InteractionPipelineSpec(operators=[
-        {"name": "classical.go_or_grow",
-         "parameters": {"r_b": 0.2, "r_d": 0.01, "kappa": -4, "theta": 0.5}},
+        {"name": "go_or_grow.switch", "parameters": {"kappa": -4, "theta": 0.5}},
+        {"name": "go_or_grow.growth", "parameters": {"r_b": 0.2, "r_d": 0.01}},
+        {"name": "species_random_walk", "parameters": {"species": 0, "channels": "velocity"}},
     ]),
 )
 run_model(spec).lgca.plot_density()
 ```
 
-With `kappa=4`, crowded cells rest instead, and the same small colony shrinks:
-growth then needs a minimum population, an Allee effect that emerges from the
-switching rule.
+Each step, cells switch between migrating and resting, die or divide, and the
+migrating cells pick new directions. With `kappa=4`, crowded cells rest
+instead, and the same small colony shrinks: growth then needs a minimum
+population, an Allee effect that emerges from the switching rule.
 
 <br clear="right">
 

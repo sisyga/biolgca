@@ -77,14 +77,14 @@ def chemotaxis(state, field):
     Parameters
     ----------
     field : str
-        Name of a scalar field in StateSpec.fields.
+        Name of a scalar field in StateSpec.fields. Its gradient is centred
+        everywhere; beyond the lattice edge the field keeps the ghost values
+        the model stores for it (the edge values unless changed).
     """
-    from .pipeline import _physical_field_gradient
-
     values = state.field(field)
     if values.shape != state.dims:
         raise ValueError(f"state.fields.{field} must have shape {state.dims}, got {values.shape}")
-    return _physical_field_gradient(state._lgca, np.asarray(values, dtype=float))
+    return state.gradient(field)
 
 
 @reorientation_term(coupling="channels", name="contact_guidance")

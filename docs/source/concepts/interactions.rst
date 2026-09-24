@@ -125,11 +125,15 @@ on every geometry. This includes the density gradient used by aggregation, so a
 sensitivity ``beta`` has the same meaning on 1D, square, hexagonal, cubic and
 Moore lattices.
 
-Prescribed chemotaxis fields are differentiated in physical lattice coordinates,
-including hexagonal row staggering and vertical spacing. Interior differences
-are centered and edge differences are one-sided; scalar fields do not implicitly
-wrap with the particle boundary condition. A singleton axis has zero derivative.
-Thus a physical linear ramp has the same gradient at boundary and interior sites.
+Gradients are centred differences over the neighbouring nodes, taken with the
+model's own ``gradient`` method; on the hexagonal lattice this accounts for
+the row offsets, so a linear ramp in physical coordinates has its exact
+gradient. At the edge of the lattice, the ghost nodes supply the values
+beyond it. For the cell density these follow the boundary condition: wrapped
+with periodic boundaries, zero beyond reflecting or absorbing walls. A named
+field such as the chemotaxis signal keeps the ghost values stored with it,
+which repeat its edge values unless you set them, so a linear ramp has half
+its slope across the edge.
 
 Named chemotaxis and contact-guidance fields are read from their current padded
 ``lgca.<field_name>`` arrays once before each reorientation operator. Update their

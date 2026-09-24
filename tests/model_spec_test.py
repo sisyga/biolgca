@@ -95,7 +95,8 @@ def test_ve_growth_capacity_configuration_and_metadata(n_species, canonical):
         time=TimeSpec(steps=1, seed=122),
         dynamics=InteractionPipelineSpec(operators=[{"name": "birth_death", "parameters": parameters}], propagation=False))
     result = run_model(model_spec_from_json(model_spec_to_json(spec)), showprogress=False)
-    assert result.lgca.total_population() == capacity
+    if n_species == 1:  # a hard limit; with several species capacity only slows divisions
+        assert result.lgca.total_population() == capacity
     assert result.metadata["capacity"] == capacity
     assert result.metadata["channel_capacity"] == 2
     assert result.metadata["growth_capacities"][0]["capacity"] == capacity
