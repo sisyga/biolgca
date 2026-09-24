@@ -194,8 +194,10 @@ small or the legacy code had a flaw:
 - traits that the legacy code stored per family (``family_props["r_b"]``,
   ``["kappa"]``) are cell traits. They only change when a mutated daughter
   founds a family, so every cell of a family has its family's value;
-- ``aggregation`` and ``steric_repulsion`` see the density after the growth
-  of the step, the legacy code the density at its start;
+- ``aggregation`` and ``steric_repulsion`` come after growth, so they see
+  the density after the births and deaths of the step; the legacy code used
+  the density at its start. Both conventions are valid (see
+  :doc:`/concepts/interactions`, "Order"), and the difference is small;
 - ``go_or_grow_kappa_chemo`` averages the density over the node and its
   neighbours, as ``go_or_grow_kappa`` does; the legacy code divided their sum
   by the number of neighbours, one node fewer;

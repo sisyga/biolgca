@@ -55,6 +55,15 @@ sequence ``go_or_rest`` (cells move between velocity and rest channels),
 ``random_walk`` over the velocity channels. The run metadata
 records the schedule as ``result.metadata["schedule"]``.
 
+Each operator sees the state that the previous one left. A cue computed
+from the cells, such as ``aggregation`` or ``steric_repulsion``, therefore
+sees the density after the births and deaths of the step when it is listed
+after growth, and the density at the start of the step when it is listed
+before. Both are valid models; the order says which one is meant. Some
+legacy interactions computed such a cue at the start of the step but applied
+it after growth, also to the daughters; with separate operators the cue
+follows the order instead.
+
 Growth
 ------
 

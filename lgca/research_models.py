@@ -20,8 +20,9 @@ Differences from the legacy code, all small:
   mutated daughter founds a family, so every cell of a family has its
   family's value, and the dynamics are the same;
 - cues computed from the cell density (``aggregation``, ``steric_repulsion``)
-  see the density after the growth of the step, where the legacy code used
-  the density at its start;
+  follow growth, so they see the density after the births and deaths of the
+  step, where the legacy code used the density at its start; both
+  conventions are valid, and the order of the operators says which is meant;
 - ``go_or_grow_kappa_chemo`` averages the neighbourhood density over the node
   and its neighbours, as ``go_or_grow_kappa`` does; the legacy code divided
   the sum over ``velocitychannels + 1`` nodes by ``velocitychannels``.
