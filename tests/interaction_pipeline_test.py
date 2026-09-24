@@ -946,7 +946,7 @@ def test_multispecies_turnover_matches_its_rates():
     survivors = _turnover_step(full, death_rate=[0.2, 0.5]).mean(axis=(0, 2))
     np.testing.assert_allclose(survivors, [0.8, 0.5], atol=0.01)
 
-    # one cell of each species per node; the node holds 2 x 4 cells, so crowding is 1 - 2 / 8
+    # one cell of each species per node; within its species a random channel is free with 3 / 4
     one_cell = np.zeros((20000, 2, 4), dtype=bool)
     one_cell[..., 0] = True
     births = _turnover_step(one_cell, birth_rate=[0.1, 0.4]).sum(axis=-1).mean(axis=0) - 1
@@ -956,10 +956,11 @@ def test_multispecies_turnover_matches_its_rates():
 
 
 def test_multispecies_capacity_slows_divisions_instead_of_capping_them():
-    # two cells per node of capacity 4: each divides with probability 0.8 * (1 - 2 / 4)
+    # one cell of each species per node of capacity 4: the capacity scales divisions by 1 - 2 / 4,
+    # in addition to volume exclusion within the species (a random channel is free with 3 / 4)
     nodes = np.zeros((20000, 2, 4), dtype=bool)
     nodes[..., 0] = True
     after = _turnover_step(nodes, capacity=4, birth_rate=0.8).sum(axis=-1)
 
-    np.testing.assert_allclose(after.mean(axis=0) - 1, [0.4, 0.4], atol=0.01)
+    np.testing.assert_allclose(after.mean(axis=0) - 1, [0.3, 0.3], atol=0.01)
     assert (after.sum(axis=-1) == 4).any()  # nodes may reach capacity

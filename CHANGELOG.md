@@ -13,8 +13,9 @@ This file records notable user-facing changes. Changes remain under
   discrete steps `{"step": 0.01, "probability": 0.1}`), `new_family` as a
   probability, and a `mutation_matrix` for the species of daughters in
   classical models with several species. It matches the legacy
-  `classical.birth`, `ib.birthdeath`, `nove_ib.birth` and
-  `multispecies.birth` in distribution (`tests/birth_death_test.py`).
+  `classical.birthdeath` (in the mean), `ib.birthdeath`,
+  `nove_ib.birthdeath` and `multispecies.birthdeath` in distribution
+  (`tests/birth_death_test.py`).
   `go_or_grow.growth` takes the same `mutation` and `new_family` options.
 - Names without family prefixes for movement: `random_walk` (cells move to
   random channels, optionally within a channel set or for some species) and
@@ -184,17 +185,19 @@ This file records notable user-facing changes. Changes remain under
   linear signals; at the edge, and on the hexagonal lattice for curved
   signals, seeded runs differ from before.
 - `birth_death` is one rule for every model family (classical and
-  identity-based, with and without volume exclusion). By default growth is
-  logistic: after the deaths, a cell divides with probability
-  `birth_rate * (1 - n / capacity)`. With volume exclusion and one species
-  the factor comes from exclusion, as in the legacy `classical.birth` and
-  `ib.birthdeath`: a daughter goes to a random channel and survives if it is
-  empty. With several species, `n` counts all of them and the capacity is
-  `StateSpec.capacity`, by default `n_species * K`, so species compete for
-  space. `crowding=False` gives the former behaviour: cells divide
-  with `birth_rate`, and `StateSpec.capacity` is a hard limit. The operator
-  no longer takes `capacity`; set `StateSpec.capacity`. The alias
-  `birthdeath_native` is gone. Seeded runs differ from before.
+  identity-based, with and without volume exclusion). Birth and death are
+  decided at the same time, on the state at the start of the step, as in
+  the legacy `birthdeath` rules; before, cells died first. Growth is
+  logistic: with volume exclusion a daughter goes to a random channel of its
+  species and survives if it was empty, as in the legacy `classical.birth`
+  and `ib.birthdeath`; a capacity (`StateSpec.capacity`, always set without
+  volume exclusion) scales divisions by `1 - n / capacity`. With volume
+  exclusion the capacity is optional, a soft limit in addition to the
+  channels: species with volume exclusion now compete for space only if the
+  model sets one. `crowding=False` gives the former single-species
+  behaviour: cells divide with `birth_rate`, and the capacity is a hard
+  limit. The operator no longer takes `capacity`; set `StateSpec.capacity`.
+  The alias `birthdeath_native` is gone. Seeded runs differ from before.
 - The README go-or-grow example uses the go-or-grow rules.
 - The custom interaction guide, the concepts page on interactions,
   tutorials 4 and 6 and the README use the decorators: rules are written as

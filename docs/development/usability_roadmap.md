@@ -724,7 +724,7 @@ deprecated aliases for one release.
   sampled as a hypergeometric count), which gives exactly r_b n (K - n) / K.
   A first version that scaled the rate and then also needed a free channel
   counted crowding twice (0.284 instead of 0.32 births at n = 4 of K = 5);
-  `test_volume_exclusion_gives_logistic_births` catches it. Several species
+  `test_volume_exclusion_gives_logistic_growth` catches it. Several species
   keep the Phase 1 competition through total density / `StateSpec.capacity`
   (default n_species * K). `crowding=False` is the former single-species
   behaviour (hard capacity; several species share the room by a
@@ -736,10 +736,18 @@ deprecated aliases for one release.
   `ib.birthdeath` (legacy `ib.birth` draws target channels with replacement,
   so colliding daughters are lost), `nove_ib.birth` and `multispecies.birth`
   with a mutation matrix. Legacy rules that let dying cells divide in the
-  same step differ by O(r_b r_d). Open: which research rules to port
-  (`nove_ib.birthdeath_cancerdfe`, `go_or_grow_kappa(_chemo)`,
-  `go_or_grow_glioblastoma`, `evo_steric`, `ib.go_and_grow_mutations`, the
-  excitable media, `classical.go_and_grow`).
+  same step differ by O(r_b r_d).
+- Status (2026-09-24, user decisions): birth and death are simultaneous
+  (decided on the state at the start of the step, as in the legacy
+  `birthdeath` rules), because the expected change is then exactly
+  r_b n (1 - n / capacity) - r_d n; death first is two stacked operators.
+  With volume exclusion and several species, exclusion acts only within a
+  species (classical LGCA); `StateSpec.capacity`, if set, adds a soft limit
+  on all cells (`LatticeState.has_capacity`). Parity now includes deaths
+  (`classical.birthdeath` in the mean; `ib.birthdeath`, `nove_ib.birthdeath`,
+  `multispecies.birthdeath` in distribution). All legacy research rules get
+  ported as stacks of generic rules under their legacy names, which needs
+  custom mutation-effect distributions.
 
 **2.4 Remove duplicates** (B4, D5)
 - Separate the random walk from `classical.birth*`.

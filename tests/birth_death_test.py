@@ -1,8 +1,8 @@
 """birth_death: one growth rule for every model family, validated against the legacy rules.
 
-Cells die, then the survivors try to divide; with volume exclusion a daughter goes to a random
-channel (distinct for the dividing cells of a node) and survives if it is empty, without it
-the division probability is scaled by 1 - n / capacity. The legacy rules are compared in
+Cells die and divide at the same time; with volume exclusion a daughter goes to a random channel
+(distinct for the dividing cells of a node) and survives if it was empty, without it the division
+probability is scaled by 1 - n / capacity. The legacy rules are compared in
 distribution after one step: the mean (and where the legacy rule draws the same distribution,
 the spread) of the births per node, per number of cells at the node.
 """
@@ -74,16 +74,16 @@ def _assert_same_distribution(new, legacy, spread=True):
 def test_classical_births_match_the_legacy_rule_in_the_mean():
     # legacy: every empty channel is filled with probability r_b * n / K, so the variance differs
     nodes = np.random.default_rng(0).random(DIMS + (5,)) < 0.4
-    _assert_same_distribution(_births(nodes, {"name": "birth_death", "parameters": {"birth_rate": 0.4}}),
-                              _births(nodes, {"name": "classical.birth", "parameters": {"r_b": 0.4}}, seed=2),
-                              spread=False)
+    new = _births(nodes, {"name": "birth_death", "parameters": {"birth_rate": 0.4, "death_rate": 0.2}})
+    legacy = _births(nodes, {"name": "classical.birthdeath", "parameters": {"r_b": 0.4, "r_d": 0.2}}, seed=2)
+    _assert_same_distribution(new, legacy, spread=False)
 
 
 def test_identity_births_match_the_legacy_rule():
     labels = _labels(np.random.default_rng(0).random(DIMS + (5,)) < 0.4)
-    new = _births(labels, {"name": "birth_death", "parameters": {"birth_rate": "r_b"}}, identity=True,
-                  traits={"r_b": 0.4})
-    legacy = _births(labels, {"name": "ib.birthdeath", "parameters": {"r_b": 0.4, "r_d": 0.0, "std": 1e-9,
+    new = _births(labels, {"name": "birth_death", "parameters": {"birth_rate": "r_b", "death_rate": 0.2}},
+                  identity=True, traits={"r_b": 0.4})
+    legacy = _births(labels, {"name": "ib.birthdeath", "parameters": {"r_b": 0.4, "r_d": 0.2, "std": 1e-9,
                                                                       "a_max": 1.0}}, identity=True, seed=2)
     _assert_same_distribution(new, legacy)
 
@@ -91,10 +91,10 @@ def test_identity_births_match_the_legacy_rule():
 def test_identity_births_without_volume_exclusion_match_the_legacy_rule():
     lists = _lists(np.random.default_rng(0).poisson(0.8, DIMS + (5,)))
     options = {"ve": False, "identity": True, "capacity": 10}
-    new = _births(lists, {"name": "birth_death", "parameters": {"birth_rate": "r_b"}}, traits={"r_b": 0.4},
-                  **options)
-    legacy = _births(lists, {"name": "nove_ib.birth", "parameters": {"r_b": 0.4, "std": 1e-9, "a_max": 1.0}},
-                     seed=2, **options)
+    new = _births(lists, {"name": "birth_death", "parameters": {"birth_rate": "r_b", "death_rate": 0.2}},
+                  traits={"r_b": 0.4}, **options)
+    legacy = _births(lists, {"name": "nove_ib.birthdeath", "parameters": {"r_b": 0.4, "r_d": 0.2, "std": 1e-9,
+                                                                         "a_max": 1.0}}, seed=2, **options)
     _assert_same_distribution(new, legacy)
 
 
@@ -102,26 +102,26 @@ def test_species_births_with_mutations_match_the_legacy_rule():
     nodes = np.random.default_rng(0).poisson(0.4, DIMS + (2, 5))
     matrix = [[0.9, 0.1], [0.2, 0.8]]
     options = {"ve": False, "capacity": 8, "n_species": 2}
-    new = _births(nodes, {"name": "birth_death", "parameters": {"birth_rate": [0.3, 0.6],
+    new = _births(nodes, {"name": "birth_death", "parameters": {"birth_rate": [0.3, 0.6], "death_rate": 0.2,
                                                                 "mutation_matrix": matrix}}, **options)
-    legacy = _births(nodes, {"name": "multispecies.birth", "parameters": {"r_b": [0.3, 0.6],
-                                                                         "mutation_matrix": matrix}},
+    legacy = _births(nodes, {"name": "multispecies.birthdeath", "parameters": {"r_b": [0.3, 0.6], "r_d": 0.2,
+                                                                              "mutation_matrix": matrix}},
                      seed=2, **options)
     _assert_same_distribution(new, legacy)
 
 
 @pytest.mark.parametrize("identity", [False, True])
-def test_volume_exclusion_gives_logistic_births(identity):
-    # a node with n of K cells gains r_b n (K - n) / K daughters on average, also when nearly full
+def test_volume_exclusion_gives_logistic_growth(identity):
+    # a node with n of K cells changes by r_b n (K - n) / K - r_d n on average, also when nearly full
     occupied = np.random.default_rng(4).random((200, 200, 5)) < 0.7
     nodes = _labels(occupied) if identity else occupied
-    parameters = {"birth_rate": "r_b" if identity else 0.4}
+    parameters = {"birth_rate": "r_b" if identity else 0.4, "death_rate": 0.1}
     density, births = _births(nodes, {"name": "birth_death", "parameters": parameters}, identity=identity,
                               traits={"r_b": 0.4} if identity else None)
     for n in range(1, 5):
         at = density == n
         error = births[at].std() / np.sqrt(at.sum())
-        assert abs(births[at].mean() - 0.4 * n * (5 - n) / 5) < 4 * error, n
+        assert abs(births[at].mean() - (0.4 * n * (5 - n) / 5 - 0.1 * n)) < 4 * error, n
 
 
 FAMILIES = [("classical", True, False), ("nove", False, False), ("ib", True, True), ("nove_ib", False, True)]
@@ -132,7 +132,7 @@ GEOMETRIES = [("lin", (4000,)), ("square", (60, 60)), ("hex", (60, 60)), ("cubic
 @pytest.mark.parametrize("family, ve, identity", FAMILIES)
 @pytest.mark.parametrize("geometry, dims", GEOMETRIES)
 def test_rates_in_every_family_and_geometry(family, ve, identity, geometry, dims):
-    # one cell per node: it dies with r_d; a survivor divides with r_b (1 - 1 / capacity)
+    # one cell per node: it dies with r_d and, independently, divides with r_b (1 - 1 / capacity)
     K = build_model(ModelSpec(space=SpaceSpec(geometry=geometry, dims=dims),
                               state=StateSpec(density=0, restchannels=1))).lgca.K
     occupied = np.zeros(dims + (K,), dtype=bool)
@@ -149,8 +149,8 @@ def test_rates_in_every_family_and_geometry(family, ve, identity, geometry, dims
                    traits={"r_b": r_b, "r_d": r_d} if identity else None)
     model.step()
     after = model.lgca.cell_density[model.lgca.nonborder].astype(int).ravel()
-    survived = (1 - r_d) * np.array([1 - r_b * (1 - 1 / capacity), r_b * (1 - 1 / capacity)])
-    expected = np.array([r_d, *survived])
+    q = r_b * (1 - 1 / capacity)
+    expected = np.array([r_d * (1 - q), (1 - r_d) * (1 - q) + r_d * q, (1 - r_d) * q])
     observed = np.bincount(after, minlength=3) / after.size
     np.testing.assert_allclose(observed, expected, atol=4 * np.sqrt(0.25 / after.size))
 

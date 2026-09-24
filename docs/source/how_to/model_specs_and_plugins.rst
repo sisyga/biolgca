@@ -310,8 +310,8 @@ subsequent runs. Direct runners publish ``lgca.recording_start_step`` and
 ``lgca.recording_end_step`` for the same purpose.
 
 ``state.capacity`` supplies the crowding scale of the rules: the carrying
-capacity of models without volume exclusion, and of ``birth_death`` with
-several species (by default ``n_species * K`` with volume exclusion). An
+capacity of models without volume exclusion and, with volume exclusion, an
+optional soft limit on all cells of a node in addition to the channels. An
 operator capacity that conflicts with it is rejected. VE channel occupancy
 remains limited by ``K`` per species. Metadata records ``channel_capacity``
 separately from per-operator ``growth_capacities``; with one ``birth_death``

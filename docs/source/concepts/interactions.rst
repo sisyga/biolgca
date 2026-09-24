@@ -59,22 +59,27 @@ Growth
 ------
 
 ``birth_death`` is the growth rule of every model family. In a time step,
-every cell dies with probability ``death_rate``; then every surviving cell
-divides with probability ``birth_rate * (1 - n / capacity)``, with ``n`` the
-cells at its node. This is logistic growth, the same law with and without
-volume exclusion:
+every cell dies with probability ``death_rate`` and, independently, tries to
+divide with probability ``birth_rate``. Both are decided on the state at the
+start of the step: a dying cell may still divide, and a daughter does not die
+in the step it is born. The daughter needs room:
 
-- with volume exclusion and one species, ``capacity`` is the number of
-  channels ``K`` and the factor comes from exclusion itself: the daughter
-  goes to a random channel of the node, and survives only if that channel is
-  empty;
-- with several species, ``n`` counts all species and ``capacity`` is
-  ``StateSpec.capacity`` (by default ``n_species * K`` with volume
-  exclusion), so the species compete for space;
-- without volume exclusion, ``capacity`` is ``StateSpec.capacity``.
+- with volume exclusion, it goes to a random channel of its species at the
+  node and survives only if that channel was empty, which happens with
+  probability ``1 - n_s / K`` for ``n_s`` cells of its species;
+- a capacity, ``StateSpec.capacity``, scales the division probability by
+  ``1 - n / capacity``, with ``n`` all cells at the node. Models without
+  volume exclusion always have one. With volume exclusion it is optional, a
+  soft limit in addition to the channels, e.g. to make species compete for
+  space.
 
-``crowding=False`` removes the factor: cells divide with ``birth_rate``, and
-``StateSpec.capacity`` becomes a hard limit on the cells per node.
+For one species the expected change of a node is
+``birth_rate * n * (1 - n / capacity) - death_rate * n`` (``capacity = K``
+with volume exclusion): logistic growth. For death before division, list two
+operators, one with only ``death_rate`` and then one with only
+``birth_rate``. ``crowding=False`` removes the crowding factors: cells divide
+with ``birth_rate`` into free channels, and the capacity becomes a hard limit
+on the cells per node.
 
 In identity-based models the rates can differ between cells: the name of a
 trait, e.g. ``"birth_rate": "r_b"``, gives every cell its own value.

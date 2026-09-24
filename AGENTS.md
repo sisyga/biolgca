@@ -89,8 +89,9 @@ Elsewhere:
 - **Capacity** is a crowding scale used in rates such as
   `1 - density / capacity`; it comes from `StateSpec.capacity`, not from
   operator parameters. The hard limit is volume exclusion (one cell per
-  channel and species); `birth_death` with `crowding=False` also treats
-  capacity as a hard limit.
+  channel and species). With volume exclusion a capacity is optional
+  (`state.has_capacity`), a soft limit in addition to the channels;
+  `birth_death` with `crowding=False` treats it as a hard limit.
 - **Messages:** warn with `lgca._warnings.warn_user` (points at the user's
   code); report progress with the `logging` logger `"lgca"`, never `print`.
 - **Reproducibility:** tests use fixed seeds. Statistical tests compare with

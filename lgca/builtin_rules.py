@@ -152,21 +152,29 @@ for _cue, _aliases in ((polar_alignment, ()), (nematic_alignment, ("nematic",)),
 @interaction(kind="birth_death", families=("classical", "nove", "ib", "nove_ib"), name="birth_death")
 def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_matrix=None, mutation=None,
                 new_family=False):
-    """Cells die, then the survivors divide; crowded nodes have less room for daughters.
+    """Cells die and divide at the same time; crowded nodes have less room for daughters.
 
-    Every cell dies with probability ``death_rate``. Every surviving cell then
-    divides with probability ``birth_rate * (1 - n / capacity)``, where ``n``
-    is the number of cells at its node: logistic growth.
+    In a time step, every cell dies with probability ``death_rate`` and,
+    independently, tries to divide with probability ``birth_rate``; both are
+    decided on the state at the start of the step, so a dying cell may still
+    divide, and daughters do not die in the step they are born. The daughter
+    needs room:
 
-    - With volume exclusion and one species, ``capacity`` is the number of
-      channels ``K``, and the factor comes from exclusion: the daughter goes
-      to a random channel of the node (dividing cells pick different
-      channels) and survives only if that channel is empty.
-    - With volume exclusion and several species, ``n`` counts all species
-      and ``capacity`` is ``StateSpec.capacity`` (default ``n_species * K``),
-      so species compete for space; a daughter takes a free channel of its
-      species and fails if there is none.
-    - Without volume exclusion, ``capacity`` is ``StateSpec.capacity``.
+    - with volume exclusion, it goes to a random channel of its species at
+      the node (dividing cells pick different channels) and survives only
+      if that channel was empty, which happens with probability
+      ``1 - n_s / K`` for ``n_s`` cells of its species;
+    - a capacity (``StateSpec.capacity``; always set without volume
+      exclusion) scales the division probability by ``1 - n / capacity``,
+      with ``n`` all cells at the node. With volume exclusion it is an
+      optional soft limit in addition to the channels, e.g. to make species
+      compete for space.
+
+    The expected change of a node with one species is
+    ``birth_rate * n * (1 - n / capacity) - death_rate * n``, with
+    ``capacity = K`` under volume exclusion. For death before division,
+    list two operators: one with only ``death_rate``, then one with only
+    ``birth_rate``.
 
     Parameters
     ----------
@@ -177,10 +185,9 @@ def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_m
     death_rate : float, sequence or str
         Probability per time step that a cell dies, given like ``birth_rate``.
     crowding : bool
-        False: every daughter that fits survives, and ``state.capacity`` is a
-        hard limit on the cells per node: daughters take free channels (with
-        volume exclusion), and divisions beyond the free channels or the
-        capacity fail, chosen at random.
+        False: cells divide with ``birth_rate`` regardless of crowding;
+        daughters take free channels, and ``state.capacity`` is a hard limit
+        on the cells per node. Divisions beyond either fail, chosen at random.
     mutation_matrix : array_like or None
         Classical models with several species: entry ``[a][b]`` is the
         probability that a daughter of species ``a`` belongs to species ``b``
@@ -218,28 +225,29 @@ def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_m
     death = _per_species(death_rate, "death_rate", n_species)
     birth = _per_species(birth_rate, "birth_rate", n_species)
     matrix = _mutation_matrix(mutation_matrix, n_species)
-    state.remove_cells(death)
-    counts = state.counts.sum(axis=-1)
-    by_exclusion = crowding and state.volume_exclusion and n_species == 1
-    if crowding and not by_exclusion:
-        birth = birth * np.clip(1 - state.density / state.capacity, 0, 1)[..., None]
+    channels = state.counts
+    deaths = rng.binomial(channels, death[:, None])  # decided on the state at the start of the step
+    counts, density = channels.sum(axis=-1), state.density
+    if crowding and state.has_capacity:
+        birth = birth * np.clip(1 - density / state.capacity, 0, 1)[..., None]
     births = rng.binomial(counts, birth)
     if matrix is not None:
         births = rng.multinomial(births, matrix).sum(axis=-2)
-    if by_exclusion:  # daughters pick distinct random channels; the empty ones hold them
+    if crowding and state.volume_exclusion:  # daughters pick distinct random channels; the empty ones hold them
         births = _into_empty(rng, births, counts, state.K)
     elif not crowding:
-        births = _at_most(rng, births, np.maximum(state.capacity - state.density, 0))
-    state.add_cells(births)
+        births = _at_most(rng, births, np.maximum(state.capacity - density, 0))
+    state.add_cells(births)  # into channels that were free at the start of the step
+    state.counts = state.counts - deaths
 
 
 def _birth_death_cells(state, birth_rate, death_rate, crowding, mutation, new_family):
-    """birth_death for identity-based models: death and division per cell."""
+    """birth_death for identity-based models: death and division per cell, decided at once."""
     cells, rng = state.cells, state.rng
-    cells.kill(rng.random(len(cells)) < _per_cell(cells, death_rate, "death_rate"))
+    dying = rng.random(len(cells)) < _per_cell(cells, death_rate, "death_rate")
     birth = _per_cell(cells, birth_rate, "birth_rate")
     density = state.density
-    if crowding and not state.volume_exclusion:
+    if crowding and state.has_capacity:
         birth = birth * np.clip(1 - density / state.capacity, 0, 1)[cells.node]
     dividing = rng.random(len(cells)) < birth
     if crowding and state.volume_exclusion:
@@ -250,6 +258,7 @@ def _birth_death_cells(state, birth_rate, death_rate, crowding, mutation, new_fa
     founders = _founders(rng, cells, dividing, new_family)
     daughters = cells.divide(dividing, new_family=founders)
     _mutate(state, daughters, mutation)
+    cells.kill(np.concatenate([dying, np.zeros(len(daughters), dtype=bool)]))
 
 
 def _into_empty(rng, attempts, occupied, channels):

@@ -186,6 +186,7 @@ class FunctionInteractionOperator(InteractionOperator):
         super().__init__(info=info, parameters=parameters)
         self.rule = rule
         self.capacity = None  # state.capacity of the rule: StateSpec.capacity or the LatticeState default
+        self._capacity = None  # StateSpec.capacity, None if the model sets none
 
     def setup(self, context) -> None:
         lgca = context.lgca
@@ -209,6 +210,7 @@ class FunctionInteractionOperator(InteractionOperator):
             raise ValueError(f"{rule.name} is written for the geometries {', '.join(rule.geometries)}, "
                              f"not {geometry!r}")
         lgca = context.lgca
+        self._capacity = state.capacity  # None: the LatticeState default
         if state.capacity is not None:
             self.capacity = state.capacity
         elif state.volume_exclusion:
@@ -217,7 +219,7 @@ class FunctionInteractionOperator(InteractionOperator):
             self.capacity = getattr(lgca, "capacity", lgca.K)
 
     def apply(self, context, step: int) -> None:
-        state = LatticeState(context.lgca, step=step, capacity=self.capacity, kind=self.operator_kind)
+        state = LatticeState(context.lgca, step=step, capacity=self._capacity, kind=self.operator_kind)
         before = state.flux if "momentum" in self.rule.conserves else None
         self.rule.function(state, **self.parameters)
         if before is not None:

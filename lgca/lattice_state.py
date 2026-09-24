@@ -40,7 +40,8 @@ class LatticeState:
         use in e.g. ``density / capacity``. It is not enforced: the only hard
         limit is volume exclusion, one cell per channel and species. Defaults
         to ``n_species * K`` with volume exclusion and to the model's
-        ``capacity`` without it.
+        ``capacity`` without it; :attr:`has_capacity` tells whether the model
+        sets one.
     kind : {None, "birth_death", "phenotype_switch", "reorientation"}
         Kind of the interaction that uses the state. :meth:`commit` checks its
         conservation law: a reorientation keeps the number of cells of each
@@ -93,6 +94,7 @@ class LatticeState:
         self._counts = interior.astype(np.int64)
         self._ve = not isinstance(lgca, NoVE_IBLGCA_base) if self._identity else lgca.nodes.dtype == bool
         n_species, channels = self._counts.shape[-2:]
+        self._capacity_set = capacity is not None or not self._ve
         if capacity is None:
             capacity = n_species * channels if self._ve else getattr(lgca, "capacity", channels)
         if isinstance(capacity, bool) or int(capacity) != capacity or capacity < 1:
@@ -255,6 +257,16 @@ class LatticeState:
     def capacity(self) -> int:
         """Cells per node at which a node counts as crowded (not enforced)."""
         return self._capacity
+
+    @property
+    def has_capacity(self) -> bool:
+        """Whether the model sets a capacity (``StateSpec.capacity``).
+
+        Models without volume exclusion always have one. With volume
+        exclusion it is optional: a soft limit on all cells of a node, in
+        addition to the channels, e.g. for competition between species.
+        """
+        return self._capacity_set
 
     @property
     def volume_exclusion(self) -> bool:
