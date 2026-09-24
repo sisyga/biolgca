@@ -278,9 +278,89 @@ def test_invalid_probabilities_are_explained(p, message):
         LatticeState(_model(n_species=2)).remove_cells(p)
 
 
-def test_identity_based_models_are_rejected():
+def _identity_model(ve, nodes, seed=1):
+    from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
+    from lgca.pipeline import InteractionPipelineSpec
+
+    dims = nodes.shape[:-1]
+    return build_model(ModelSpec(
+        space=SpaceSpec(geometry="lin" if len(dims) == 1 else "square", dims=dims),
+        state=StateSpec(nodes=nodes, restchannels=1, volume_exclusion=ve, identity_based=True),
+        time=TimeSpec(steps=1, seed=seed), dynamics=InteractionPipelineSpec(operators=[]))).lgca
+
+
+@pytest.mark.parametrize("ve", [True, False])
+def test_identity_based_counts_can_be_read_but_not_assigned(ve):
+    lgca = get_lgca(geometry="square", dims=(4, 4), ib=True, ve=ve, density=2 if not ve else 0.5,
+                    restchannels=1, seed=1)
+    state = LatticeState(lgca)
+    counts = lgca._channel_counts(lgca.nodes[lgca.nonborder])
+    np.testing.assert_array_equal(state.counts[..., 0, :], counts)
+    assert state.volume_exclusion == ve
+    np.testing.assert_allclose(state.flux, lgca.calc_flux(lgca.nodes)[lgca.nonborder])
+    with pytest.raises(TypeError, match="can be read but not assigned"):
+        state.counts = state.counts
     with pytest.raises(TypeError, match="identity-based"):
-        LatticeState(get_lgca(geometry="square", dims=(4, 4), ib=True, seed=1))
+        state.remove_cells(0.5)
+
+
+@pytest.mark.parametrize("ve", [True, False])
+@pytest.mark.parametrize("geometry", list(DIMS))
+def test_identity_shuffle_moves_labels_and_keeps_other_channels(geometry, ve):
+    classical = _model(geometry, ve, 1, density=0.4 if ve else 2, seed=4)
+    counts = classical.nodes[classical.nonborder]
+    if ve:
+        labels = counts.astype(np.uint64)
+        labels[counts] = np.arange(1, counts.sum() + 1)
+    else:
+        labels = counts.astype(np.int64)
+    lgca = get_lgca(geometry=geometry, dims=classical.dims, nodes=labels, ib=True, ve=ve,
+                    restchannels=classical.restchannels, seed=9)
+    classical.rng = np.random.default_rng(9)
+    before = lgca.nodes[lgca.nonborder].copy()
+    state = LatticeState(lgca, kind="reorientation")
+    state.shuffle_cells("velocity")
+    state.commit()
+    expected = LatticeState(classical, kind="reorientation")
+    expected.shuffle_cells("velocity")  # the same random numbers for the cell numbers
+    after = lgca.nodes[lgca.nonborder]
+    np.testing.assert_array_equal(state.counts, expected.counts)
+    velocity = lgca.velocitychannels
+    rest_before, rest_after = before[..., velocity:], after[..., velocity:]
+    assert rest_before.tolist() == rest_after.tolist()  # resting cells keep label and channel
+    for old, new in zip(before.reshape(-1, lgca.K), after.reshape(-1, lgca.K)):
+        if ve:
+            assert sorted(old[old > 0]) == sorted(new[new > 0])
+        else:
+            assert sorted(x for c in old for x in c) == sorted(x for c in new for x in c)
+
+
+@pytest.mark.parametrize("ve", [True, False])
+def test_identity_shuffle_places_labels_at_random(ve):
+    # every node: cells 2k+1 and 2k+2 in velocity channel 0, cell 3k in the rest channel (lin)
+    n = 10000
+    if ve:
+        nodes = np.zeros((n, 3), dtype=np.uint64)
+        nodes[:, 0], nodes[:, 1] = np.arange(1, 2 * n, 2), np.arange(2, 2 * n + 1, 2)
+    else:
+        nodes = np.empty((n, 3), dtype=object)
+        for index in range(n):
+            nodes[index] = [[2 * index + 1, 2 * index + 2], [], []]
+    lgca = _identity_model(ve, nodes)
+    state = LatticeState(lgca, kind="reorientation")
+    state.shuffle_cells("velocity")
+    state.commit()
+    first = lgca.nodes[lgca.nonborder][:, 0]
+    in_first = np.zeros(2 * n + 1, dtype=bool)
+    in_first[[label for channel in first for label in np.atleast_1d(channel) if label]] = True
+    odd, even = in_first[1::2], in_first[2::2]
+    tolerance = 5 * np.sqrt(0.25 / n)
+    # with volume exclusion the cell numbers cannot change here; only the labels move
+    assert abs(odd.mean() - 0.5) < tolerance and abs(even.mean() - 0.5) < tolerance
+    if ve:
+        assert np.all(odd != even)
+    else:  # independent cells
+        assert abs(np.mean(odd & even) - 0.25) < 5 * np.sqrt(0.25 * 0.75 / n)
 
 
 def _field_model(boundary):

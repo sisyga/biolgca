@@ -7,6 +7,22 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- `ReorientationSpec` works in every model family. Without volume exclusion,
+  every cell chooses its channel independently with `P(i) ∝ exp(Σ beta w_i)`
+  (a multinomial draw per node and species), where `w_i` is the score of one
+  cell in channel `i`; without terms this is `nove.random_walk`, and
+  `polar_alignment` is `nove.dd_alignment`. Identity-based models, with and
+  without volume exclusion, update their cell numbers the same way as the
+  classical models and then place each node's cells on the occupied channels
+  at random. Terms written with `@lgca.reorientation_term` work unchanged in
+  all of them. With volume exclusion, seeded results are unchanged.
+- Rules written with `@lgca.interaction` can declare the identity-based
+  families `"ib"` and `"nove_ib"`. `LatticeState` reads their cell numbers
+  (labels > 0, or the length of each channel's list), and `shuffle_cells`
+  moves the labelled cells within a channel set, so cells outside it keep
+  label and channel; the other operations and assigning `state.counts` are
+  refused for now. `channel_random_walk` supports these families, and
+  `check_interaction` checks them, including that every node keeps its cells.
 - `@lgca.reorientation_term(coupling=...)` defines a new cue for
   `ReorientationSpec` as a function that returns a field from the lattice
   state: a vector per node (`"flux"`, cells move along it), a tensor

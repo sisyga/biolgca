@@ -70,6 +70,30 @@ transitions; the second does not simply add a bias to the first. Use sequential
 pipeline operators for different biological phases, not for combining energy
 terms that should compete in one decision.
 
+How the cues are sampled
+------------------------
+
+Each term gives every channel ``i`` of a node a score ``w_i``, the score of
+one cell in that channel: ``g · c_i`` for a vector field ``g`` such as a
+gradient, the field value for a rest channel with ``resting_bias``. A channel
+state scores the sum over its cells, and the terms add up weighted by their
+``beta``. How the cells use these scores depends on the model:
+
+- **With volume exclusion** the cells of each species at a node choose a new
+  channel state ``s'`` together, among the states with as many cells:
+  ``P(s') ∝ exp(Σ_k beta_k G_k(s'))``. Cells exclude each other, so they
+  cannot all take the best channel.
+- **Without volume exclusion** every cell chooses its channel on its own,
+  ``P(i) ∝ exp(Σ_k beta_k w_ki)``, and any number of cells can share a
+  channel. For the random walk and ``polar_alignment`` this is the rule of
+  ``nove.random_walk`` and ``nove.dd_alignment``.
+- **Identity-based models** first update their cell numbers in the same way
+  and then place the node's cells on the occupied channels at random. The
+  cues do not depend on the properties of individual cells, so it does not
+  matter which cell takes which channel.
+
+For a single cell at a node, the first two rules agree.
+
 Supported reorientation terms
 -----------------------------
 

@@ -4,10 +4,14 @@ import numpy as np
 import pytest
 
 from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
-from lgca.pipeline import InteractionPipelineSpec, ReorientationSpec, ReorientationTermSpec
+from lgca.pipeline import (
+    InteractionPipelineSpec,
+    ReorientationSpec,
+    ReorientationTermSpec,
+)
 
 
-def scalar_reference(lgca, operator):
+def scalar_reference(lgca, operator, weights=None):
     source = lgca._reorientation_source_nodes
     for spatial in np.ndindex(lgca.dims):
         coord = tuple(index + lgca.r_int for index in spatial)
@@ -33,7 +37,7 @@ def scalar_reference(lgca, operator):
 @pytest.mark.parametrize("species", [1, 2])
 @pytest.mark.parametrize("geometry", ["square", "hex"])
 def test_batched_composition_matches_scalar_rng_order_and_small_batches(species, geometry, monkeypatch):
-    import lgca.pipeline as pipeline
+    from lgca import pipeline
 
     channels = 5 if geometry == "square" else 7
     shape = (4, 4, channels) if species == 1 else (4, 4, species, channels)
@@ -49,7 +53,7 @@ def test_batched_composition_matches_scalar_rng_order_and_small_batches(species,
         dynamics=InteractionPipelineSpec(operators=[ReorientationSpec(terms=terms)]))
     expected = build_model(spec)
     operator = expected.pipeline.operators[0]
-    monkeypatch.setattr(operator, "_sample_batches", lambda lgca: scalar_reference(lgca, operator))
+    monkeypatch.setattr(operator, "_sample_batches", lambda lgca, weights: scalar_reference(lgca, operator))
     expected.run(False)
     for budget in (32 * 1024**2, 35 * 8 * 16):
         monkeypatch.setattr(pipeline, "_MAX_CANDIDATE_BATCH_BYTES", budget)
@@ -73,43 +77,40 @@ def test_rest_bias_has_hand_derived_categorical_distribution():
     assert np.all(np.abs(observed - expected) < 6 * np.sqrt(expected * (1 - expected) / len(nodes)))
 
 
-def test_composed_scores_are_bounded_and_candidate_features_reused(monkeypatch):
-    import lgca.pipeline as pipeline
+def test_composed_scores_are_bounded_and_candidates_converted_once(monkeypatch):
+    from lgca import pipeline
 
     model = build_model(ModelSpec(space=SpaceSpec(geometry="square", dims=(8, 8)),
         state=StateSpec(nodes=np.tile([True, True, False, False], (8, 8, 1))),
         dynamics=InteractionPipelineSpec(operators=[ReorientationSpec(terms=[
             ReorientationTermSpec("aggregation"), ReorientationTermSpec("polar_alignment")])], propagation=False)))
     monkeypatch.setattr(pipeline, "_MAX_CANDIDATE_BATCH_BYTES", 6 * 8 * 6 * 2)
-    feature_calls = []
-    original_features = pipeline._candidate_features
+    matrix_calls, batches = [], []
+    original_matrix, original_batches = pipeline._candidate_matrix, pipeline._candidate_batches
 
     def counted(*args):
-        feature_calls.append(1)
-        return original_features(*args)
+        matrix_calls.append(1)
+        return original_matrix(*args)
 
-    monkeypatch.setattr(pipeline, "_candidate_features", counted)
-    batches = []
-    term = model.pipeline.operators[0].terms[0]
-    original_score = term.score_batch
+    def checked(*args):
+        for indices in original_batches(*args):
+            batches.append(len(indices[0]))
+            assert len(indices[0]) <= 2
+            yield indices
 
-    def checked(features, lgca, coords):
-        batches.append(len(coords[0]))
-        assert len(coords[0]) <= 2
-        return original_score(features, lgca, coords)
-
-    monkeypatch.setattr(term, "score_batch", checked)
+    monkeypatch.setattr(pipeline, "_candidate_matrix", counted)
+    monkeypatch.setattr(pipeline, "_candidate_batches", checked)
     model.step()
-    assert len(feature_calls) == 1
+    assert len(matrix_calls) == 1
     assert sum(batches) == 64
 
 
-def test_candidate_feature_budget_rejects_before_allocation(monkeypatch):
-    import lgca.pipeline as pipeline
+def test_candidate_budget_rejects_before_allocation(monkeypatch):
+    from lgca import pipeline
 
     model = build_model(ModelSpec(space=SpaceSpec(geometry="square", dims=(2, 2)),
         state=StateSpec(density=0), dynamics=InteractionPipelineSpec(operators=[])))
     candidates = model.lgca.get_permutations(2)
     monkeypatch.setattr(pipeline, "_MAX_CANDIDATE_BATCH_BYTES", 1)
-    with pytest.raises(ValueError, match="Candidate features require.*reduce channels"):
-        pipeline._candidate_features(candidates, model.lgca)
+    with pytest.raises(ValueError, match="Candidate states require.*reduce channels"):
+        pipeline._candidate_matrix(candidates)

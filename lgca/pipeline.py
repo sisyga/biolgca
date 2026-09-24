@@ -133,8 +133,14 @@ class ReorientationSpec:
     with the same number of cells, with probability
     ``P(s') ∝ exp(Σ_k beta_k · G_k(s'))``, where ``G_k`` are the scores of the
     terms. All terms thus act in one decision instead of one after another.
-    The number of cells is conserved. Supported for classical models with
-    volume exclusion, including several species.
+    The number of cells of each species is conserved.
+
+    This is the rule with volume exclusion. Without it, every cell chooses
+    its channel ``i`` independently with ``P(i) ∝ exp(Σ_k beta_k · w_ki)``,
+    where ``w_ki`` is the score of one cell in channel ``i``. Identity-based
+    models update their cell numbers in the same way and then place the
+    node's cells on the occupied channels at random. Supported for every
+    model family, with one or several species.
 
     Attributes
     ----------
@@ -425,15 +431,12 @@ class _ReorientationTerm:
             raise ValueError(f"species index {self.species} exceeds state.n_species")
 
     def score(self, candidates, node, lgca, coord):
-        coords = tuple(np.asarray([index]) for index in coord)
-        return np.broadcast_to(self.score_batch(_candidate_features(candidates, lgca), lgca, coords),
-                               (1, len(candidates)))[0]
+        """Scores of ``candidates`` (channel states) at the padded coordinate ``coord``."""
+        spatial = tuple(index - lgca.r_int for index in coord)
+        return np.asarray(candidates, dtype=float) @ self.weights[spatial]
 
-    def score_batch(self, features, lgca, coords):
-        return 0.0
-
-    def prepare(self, lgca, source_channels):
-        """Prepare spatial fields once from the frozen operator input."""
+    def prepare(self, lgca):
+        """Compute the channel weights once per step from the state before the reorientation."""
 
     def dependencies(self) -> set[str]:
         return set()
@@ -447,7 +450,9 @@ class _FieldTerm(_ReorientationTerm):
 
     The field comes from ``definition.function(state, **parameters)`` with a
     :class:`~lgca.lattice_state.LatticeState` of the state before the
-    reorientation, and is recomputed once per time step.
+    reorientation, and is recomputed once per time step. Every coupling scores
+    a channel state linearly, ``G(s) = Σ_i s_i w_i``; :attr:`weights` holds the
+    weights ``w_i``, shape ``dims + (K,)``.
     """
 
     def __init__(self, spec: ReorientationTermSpec, definition):
@@ -461,17 +466,15 @@ class _FieldTerm(_ReorientationTerm):
         self.definition = definition
         self.coupling = definition.coupling
         self.field = None
+        self.weights = None
         self.step = 0
         self.fields_read: set[str] = set()
 
     def validate(self, context) -> None:
         super().validate(context)
-        self.field = self._field(context.lgca)
+        self.prepare(context.lgca)
 
-    def prepare(self, lgca, source_channels):
-        self.field = self._field(lgca)
-
-    def _field(self, lgca):
+    def prepare(self, lgca):
         from .lattice_state import LatticeState
 
         state = LatticeState(lgca, step=self.step)
@@ -496,23 +499,20 @@ class _FieldTerm(_ReorientationTerm):
                              f"got shape {field.shape}")
         if not np.all(np.isfinite(field)):
             raise ValueError(f"{self.name} returned values that are not finite")
-        if self.coupling == "nematic":  # Q : (c_i c_i^T) per velocity channel
-            field = np.einsum("...ab,ai,bi->...i", field, state.c, state.c)
-        return field
+        self.field = field
+        weights = np.zeros(dims + (state.K,))
+        if self.coupling == "flux":  # g · c_i
+            weights[..., :velocity] = field @ state.c
+        elif self.coupling == "nematic":  # c_i · Q c_i
+            weights[..., :velocity] = np.einsum("...ab,ai,bi->...i", field, state.c, state.c)
+        elif self.coupling == "rest":
+            weights[..., velocity:] = field[..., None]
+        else:
+            weights[..., :field.shape[-1]] = field
+        self.weights = weights
 
     def dependencies(self) -> set[str]:
         return set(self.fields_read)
-
-    def score_batch(self, features, lgca, coords):
-        spatial = tuple(index - lgca.r_int for index in coords)
-        field = self.field[spatial]
-        if self.coupling == "flux":
-            return field @ features["flux"].T
-        if self.coupling == "rest":
-            return field[:, None] * features["rest"][None, :]
-        if field.shape[-1] == lgca.velocitychannels:
-            return field @ features["channels"].T
-        return field @ features["occupancy"].T
 
 
 # name -> term definition (see lgca.rules.reorientation_term); filled by lgca.builtin_rules
@@ -544,26 +544,33 @@ def list_reorientation_terms() -> tuple[str, ...]:
     return tuple(sorted(set(_REORIENTATION_TERMS) | set(_TERM_ALIASES)))
 
 
-def _candidate_features(candidates, lgca):
-    """Cache candidate-only quantities for one occupancy group."""
-    feature_bytes = len(candidates) * (lgca.velocitychannels + lgca.K + lgca.c.shape[0] + 1) * 8
-    if feature_bytes > _MAX_CANDIDATE_BATCH_BYTES:
-        raise ValueError(f"Candidate features require {feature_bytes:,} bytes; "
-                         "reduce channels or use a non-enumerating interaction")
-    channels = candidates[:, :lgca.velocitychannels].astype(float)
-    return {"channels": channels, "flux": channels @ lgca.c.T,
-            "occupancy": candidates.astype(float),
-            "rest": candidates[:, lgca.velocitychannels:].sum(axis=1)}
+def _candidate_matrix(candidates):
+    """Candidate channel states as floats, for one matrix product with the channel weights."""
+    matrix_bytes = candidates.size * np.dtype(float).itemsize
+    if matrix_bytes > _MAX_CANDIDATE_BATCH_BYTES:
+        raise ValueError(f"Candidate states require {matrix_bytes:,} bytes; "
+                         "reduce channels or use a model without volume exclusion")
+    return candidates.astype(float)
 
 
 class BoltzmannReorientationOperator(ReorientationOperator):
-    """Native mass-preserving reorientation sampler."""
+    """Reorientation that combines the scores of several terms in one decision.
+
+    Every term gives a weight ``w_i`` per channel, and the weights of all terms
+    add up, ``w_i = Σ_k beta_k w_ik``. With volume exclusion, a node's cells
+    of each species move to the channel state ``s'`` with
+    ``P(s') ∝ exp(Σ_i s'_i w_i)``, among the states with as many cells.
+    Without volume exclusion, every cell moves to channel ``i`` independently
+    with ``P(i) ∝ exp(w_i)``, a multinomial draw per node and species. In
+    identity-based models, the cell numbers are updated this way and the
+    node's cells are then assigned to the occupied channels at random.
+    """
 
     def __init__(self, spec: ReorientationSpec):
         info = PluginInfo(
             name="reorientation.boltzmann",
             operator_kind="reorientation",
-            backend_families=("classical", "multispecies"),
+            backend_families=("classical", "multispecies", "nove", "ib", "nove_ib"),
             conservation_law=ConservationLaw(True, True, False, ("channel occupancy",)),
             port_status="native",
             description="Boltzmann sampler over channel configurations.",
@@ -579,10 +586,6 @@ class BoltzmannReorientationOperator(ReorientationOperator):
     def validate(self, context) -> None:
         if self.sampler != "boltzmann":
             raise ValueError(f"unsupported reorientation sampler {self.sampler!r}")
-        if context.spec.state.identity_based:
-            raise ValueError("native reorientation does not yet support identity-based states")
-        if not context.spec.state.volume_exclusion:
-            raise ValueError("native reorientation currently requires volume exclusion")
         for index, term in enumerate(self.terms):
             try:
                 term.validate(context)
@@ -591,22 +594,34 @@ class BoltzmannReorientationOperator(ReorientationOperator):
 
     def setup(self, context) -> None:
         lgca = context.lgca
-        if not hasattr(lgca, "permutations") and not hasattr(lgca, "_permutation_cache"):
+        if (context.spec.state.volume_exclusion and not hasattr(lgca, "permutations")
+                and not hasattr(lgca, "_permutation_cache")):
             lgca.calc_permutations()
 
     def apply(self, context, step: int) -> None:
+        from .ib_base import IBLGCA_base
+        from .nove_ib_base import NoVE_IBLGCA_base
+
         lgca = context.lgca
-        lgca._reorientation_source_nodes = lgca.nodes.copy()
-        try:
-            source_channels = lgca._reorientation_source_nodes
-            if getattr(lgca, "n_species", 1) > 1:
-                source_channels = source_channels.sum(axis=-2)
-            for term in self.terms:
-                term.step = step
-                term.prepare(lgca, source_channels)
-            self._sample_batches(lgca)
-        finally:
-            del lgca._reorientation_source_nodes
+        for term in self.terms:
+            term.step = step
+            term.prepare(lgca)
+        weights = self._channel_weights(lgca)
+        if isinstance(lgca, NoVE_IBLGCA_base):
+            self._apply_nove_identity(lgca, weights)
+        elif isinstance(lgca, IBLGCA_base):
+            self._apply_identity(lgca, weights)
+        elif lgca.nodes.dtype == bool:
+            lgca._reorientation_source_nodes = lgca.nodes.copy()
+            try:
+                self._sample_batches(lgca, weights)
+            finally:
+                del lgca._reorientation_source_nodes
+        else:
+            interior = lgca.nodes[lgca.nonborder]
+            counts = interior if interior.ndim == weights.ndim else interior[..., None, :]
+            sampled = self._sample_independent(lgca, counts.sum(axis=-1), weights)
+            lgca.nodes[lgca.nonborder] = sampled.reshape(interior.shape).astype(lgca.nodes.dtype)
 
     def dependencies(self) -> set[str]:
         deps = set()
@@ -635,8 +650,28 @@ class BoltzmannReorientationOperator(ReorientationOperator):
                                     _REORIENTATION_TERMS["random_walk"]))
         return terms
 
-    def _sample_batches(self, lgca):
-        nodes = lgca._reorientation_source_nodes[lgca.nonborder]
+    def _channel_weights(self, lgca):
+        """Summed channel weights of all terms, shape ``dims + (n_species, K)``."""
+        n_species = getattr(lgca, "n_species", 1)
+        weights = np.zeros(tuple(lgca.dims) + (n_species, lgca.K))
+        for term in self.terms:
+            if term.beta == 0:
+                continue
+            if term.species is None:
+                weights += term.beta * term.weights[..., None, :]
+            else:
+                weights[..., term.species, :] += term.beta * term.weights
+        return weights
+
+    @staticmethod
+    def _sample_independent(lgca, number, weights):
+        """Every cell picks channel ``i`` with ``P(i) ∝ exp(w_i)``: a multinomial per node and species."""
+        return lgca.rng.multinomial(np.asarray(number, dtype=np.int64), _softmax_last_axis(weights))
+
+    def _sample_batches(self, lgca, weights, nodes=None):
+        """Sample new channel states with volume exclusion and write them to the interior."""
+        if nodes is None:
+            nodes = lgca._reorientation_source_nodes[lgca.nonborder]
         counts = nodes.sum(axis=-1)
         sampled = np.zeros_like(nodes)
         # Preserve the former spatial-then-species categorical draw order,
@@ -644,27 +679,37 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         draws = np.zeros(counts.shape)
         draws[counts > 0] = lgca.rng.random(np.count_nonzero(counts))
         ndim = len(lgca.dims)
-        multispecies = getattr(lgca, "n_species", 1) > 1
+        multispecies = counts.ndim > ndim
         for count in np.unique(counts[counts > 0]):
             candidates = lgca.get_permutations(int(count))
-            features = _candidate_features(candidates, lgca)
+            matrix = _candidate_matrix(candidates)
             for indices in _candidate_batches(counts == count, len(candidates)):
-                coords = tuple(axis + lgca.r_int for axis in indices[:ndim])
-                scores = np.zeros((len(indices[0]), len(candidates)))
                 species = indices[-1] if multispecies else np.zeros(len(indices[0]), dtype=int)
-                for term in self.terms:
-                    if term.beta == 0:
-                        continue
-                    contribution = term.beta * term.score_batch(features, lgca, coords)
-                    if term.species is not None:
-                        contribution = contribution * (species == term.species)[:, None]
-                    scores += contribution
+                scores = weights[indices[:ndim] + (species,)] @ matrix.T
                 probabilities = _softmax_last_axis(scores)
                 cumulative = np.cumsum(probabilities, axis=-1)
                 cumulative /= cumulative[:, -1:]
                 choices = (cumulative <= draws[indices][:, None]).sum(axis=-1)
                 sampled[indices] = candidates[choices]
         lgca.nodes[lgca.nonborder] = sampled
+        return sampled
+
+    def _apply_identity(self, lgca, weights):
+        """Sample the occupied channels, then place the node's labelled cells on them at random."""
+        from .lattice_state import place_labels
+
+        labels = lgca.nodes[lgca.nonborder]
+        occupied = self._sample_batches(lgca, weights, nodes=labels > 0)
+        lgca.nodes[lgca.nonborder] = place_labels(labels, occupied, np.ones(lgca.K, dtype=bool), lgca.rng)
+
+    def _apply_nove_identity(self, lgca, weights):
+        """Sample cell numbers per channel, then split the node's shuffled cells over the channels."""
+        from .lattice_state import place_labels
+
+        interior = lgca.nodes[lgca.nonborder]
+        before = lgca._channel_counts(interior).astype(np.int64)
+        after = self._sample_independent(lgca, before.sum(axis=-1)[..., None], weights)[..., 0, :]
+        lgca.nodes[lgca.nonborder] = place_labels(interior, after, np.ones(lgca.K, dtype=bool), lgca.rng)
 
 
 from .classical_operators import NativeClassicalRandomWalkOperator

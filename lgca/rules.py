@@ -36,9 +36,11 @@ from .plugins import _law_for_kind, register_plugin, validate_plugin_parameters
 __all__ = ["Interaction", "ReorientationCue", "interaction", "reorientation_term"]
 
 KINDS = ("birth_death", "phenotype_switch", "reorientation")
-FAMILIES = {"classical": "with volume exclusion", "nove": "without volume exclusion"}
+FAMILIES = {"classical": "with volume exclusion", "nove": "without volume exclusion",
+            "ib": "identity-based with volume exclusion", "nove_ib": "identity-based without volume exclusion"}
 GEOMETRIES = ("lin", "square", "hex", "cubic", "moore")
 CONSERVED = ("momentum",)
+_TERM_FAMILIES = ("classical", "nove", "ib", "nove_ib")
 
 
 def interaction(
@@ -62,9 +64,13 @@ def interaction(
         every node; both are checked after every call.
     families : str or sequence of str
         Model families the rule is written for: ``"classical"`` (with volume
-        exclusion, at most one cell per channel and species) and/or ``"nove"``
-        (without volume exclusion). Rules work for any number of species. A
-        model of another family is rejected when the model is built.
+        exclusion, at most one cell per channel and species), ``"nove"``
+        (without volume exclusion), and the identity-based families ``"ib"``
+        and ``"nove_ib"``, whose cells carry labels. Classical rules work for
+        any number of species. A model of another family is rejected when the
+        model is built. In identity-based models, rules can read the state and
+        use the operations that keep track of labels (so far
+        :meth:`~lgca.lattice_state.LatticeState.shuffle_cells`).
     geometries : str or sequence of str, optional
         Lattices the rule is written for, from ``"lin"``, ``"square"``,
         ``"hex"``, ``"cubic"`` and ``"moore"``. Default: all.
@@ -123,8 +129,7 @@ class Interaction:
             raise ValueError(f"kind must be one of {', '.join(KINDS)}, got {kind!r}")
         self.function = function
         self.kind = kind
-        self.families = _names("families", families, tuple(FAMILIES), hint=(
-            "identity-based models are not supported by decorated rules yet"))
+        self.families = _names("families", families, tuple(FAMILIES))
         self.geometries = GEOMETRIES if geometries is None else _names("geometries", geometries, GEOMETRIES)
         self.conserves = _names("conserves", conserves, CONSERVED, allow_empty=True)
         if n_species is not None and (isinstance(n_species, bool) or int(n_species) != n_species
@@ -182,10 +187,8 @@ class FunctionInteractionOperator(InteractionOperator):
     def validate(self, context) -> None:
         state = context.spec.state
         rule = self.rule
-        if state.identity_based:
-            raise ValueError(f"{rule.name} is a decorated rule for classical models; "
-                             "identity-based models are not supported yet")
-        family = "classical" if state.volume_exclusion else "nove"
+        family = ("ib" if state.volume_exclusion else "nove_ib") if state.identity_based else (
+            "classical" if state.volume_exclusion else "nove")
         if family not in rule.families:
             raise ValueError(
                 f"{rule.name} is written for {_family_list(rule.families)}, but this model is "
@@ -242,9 +245,11 @@ def reorientation_term(
 
     Arrays that broadcast to these shapes are accepted, e.g. one vector for
     the whole lattice. The terms of a :class:`~lgca.pipeline.ReorientationSpec`
-    act in one decision, ``P(s') ∝ exp(Σ_k beta_k G_k(s'))``; like the
-    sampler, they work for classical models with volume exclusion, with one
-    or several species.
+    act in one decision, ``P(s') ∝ exp(Σ_k beta_k G_k(s'))``. Every coupling
+    scores a channel state as the sum of the scores of its cells, so terms
+    also work without volume exclusion, where each cell chooses its channel on
+    its own, and in identity-based models; see
+    :class:`~lgca.pipeline.ReorientationSpec`.
 
     Parameters
     ----------
@@ -310,7 +315,7 @@ class ReorientationCue:
             raise TypeError(f"{self.name}: {', '.join(sorted(reserved))} are set on the term, "
                             "not by the function; rename the parameter")
         self.info = PluginInfo(name=self.name, operator_kind="reorientation_term",
-                               backend_families=("classical",), aliases=self.aliases,
+                               backend_families=_TERM_FAMILIES, aliases=self.aliases,
                                parameters=parameters, description=_summary(function))
         self.__doc__ = function.__doc__
         self.__name__ = function.__name__
@@ -325,7 +330,7 @@ class ReorientationCue:
         return f"<reorientation term {self.name!r} (coupling {self.coupling})>"
 
     def __str__(self) -> str:
-        text = str(self.info).replace("Phase: reorientation_term. Model families: classical.",
+        text = str(self.info).replace(f"Phase: reorientation_term. Model families: {', '.join(_TERM_FAMILIES)}.",
                                       f"Coupling: {self.coupling}. Term of ReorientationSpec.")
         return text
 

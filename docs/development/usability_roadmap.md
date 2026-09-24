@@ -537,6 +537,31 @@ without the species axis. Reorientation:
   go-or-grow where every cell has its own `kappa` and `theta`, needs a
   per-cell decision: each cell rests or moves with its own probability, and
   capacity conflicts are resolved in a random order.
+- Status (2026-09-24): the sampler part is done. `ReorientationSpec` runs in
+  every family: every term gives a weight per channel (all four couplings are
+  linear in the channel occupation), so one set of term fields serves both
+  samplers. Without volume exclusion each cell draws its channel from the
+  softmax of the summed weights (one multinomial per node and species); it
+  reproduces `nove.random_walk` and `nove.dd_alignment` seed for seed on 1D,
+  square, cubic and Moore lattices, and on hex in distribution only, since
+  the neighbour sums of `LatticeState` round differently in the last bit.
+  Identity-based models (VE and NoVE) run the classical sampler on their
+  cell numbers, with the same random numbers, and then place the node's labels
+  on the occupied channels in random order; `LatticeState` reads their cell
+  numbers but refuses to change them until 2.2. With volume exclusion the
+  per-channel weights give bit-identical seeded runs and are not slower
+  (`benchmarks/composed_reorientation.py`; differences were within the noise). Tests:
+  `tests/reorientation_sampler_test.py`.
+  Decided and done (2026-09-24): decorated rules may declare the families
+  `"ib"` and `"nove_ib"`. `LatticeState` keeps the labels; `shuffle_cells`
+  draws the cell numbers as in the classical model (same random numbers) and
+  places the labelled cells of the shuffled channel set on them in random
+  order, so cells outside the set keep label and channel (e.g. resting cells
+  under `channel_random_walk(channels="velocity")`). Assigning `state.counts`
+  is refused for identity-based models (reading works), because an array of
+  cell numbers does not say which cell went where; the other operations
+  follow in 2.2. Still open for 2.1: trait-dependent movement such as
+  identity-based go-or-grow.
 
 **2.2 Cell-level operations for identity models**
 

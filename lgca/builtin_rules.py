@@ -117,9 +117,12 @@ _MIGRATING, _RESTING = 0, 1
 _CAPACITY_MODES = ("legacy", "reject")
 
 
-@interaction(kind="reorientation", families=("classical", "nove"), name="channel_random_walk")
+@interaction(kind="reorientation", families=("classical", "nove", "ib", "nove_ib"), name="channel_random_walk")
 def channel_random_walk(state, channels="all", species=None):
     """Cells move to uniformly random channels of their node, within a set of channels.
+
+    In identity-based models the cells keep their labels; cells outside the
+    set keep their channels.
 
     Parameters
     ----------

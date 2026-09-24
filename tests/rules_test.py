@@ -139,9 +139,25 @@ def test_models_of_undeclared_families_and_geometries_are_rejected():
         build_model(_spec([rule()], geometry="hex"))
 
 
-def test_identity_based_families_cannot_be_declared_yet():
-    with pytest.raises(ValueError, match="identity-based"):
-        interaction(kind="birth_death", families="ib")(lambda state: None)
+@pytest.mark.parametrize("ve", [True, False])
+def test_rules_run_in_identity_based_models_they_declare(ve):
+    @interaction(kind="reorientation", families=("ib", "nove_ib"), name="velocity_walk")
+    def velocity_walk(state):
+        """Moving cells pick new directions; resting cells stay."""
+        state.shuffle_cells("velocity")
+
+    spec = ModelSpec(space=SpaceSpec(geometry="square", dims=(6, 6)),
+                     state=StateSpec(density=0.5 if ve else 2, restchannels=1, volume_exclusion=ve,
+                                     identity_based=True),
+                     time=TimeSpec(steps=5, seed=2),
+                     dynamics=InteractionPipelineSpec(operators=[velocity_walk()]))
+    lgca = run_model(spec, showprogress=False).lgca
+    assert lgca.cell_density[lgca.nonborder].sum() > 0
+    classical = _crowding_death()
+    family = "identity-based with" if ve else "identity-based without"
+    with pytest.raises(ValueError, match=f"this model is {family} volume exclusion"):
+        build_model(ModelSpec(space=spec.space, state=spec.state, time=spec.time,
+                              dynamics=InteractionPipelineSpec(operators=[classical()])))
 
 
 def test_a_phenotype_switch_rule_needs_several_species():

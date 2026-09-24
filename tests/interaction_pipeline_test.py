@@ -175,7 +175,7 @@ def test_nematic_scores_count_neighbors_and_ignore_empty_extra_species(geometry,
         neighbor = (coord[0] + 1,) + coord[1:]
         lgca.nodes[neighbor + species + (1,)] = True
         term = _term("nematic_alignment")
-        term.prepare(lgca, None)
+        term.prepare(lgca)
         candidates = np.eye(lgca.K, dtype=bool)[:lgca.velocitychannels]
         scores.append(term.score(candidates, None, lgca, coord))
     expected = neighbors * (lgca.c.T @ lgca.c[:, 0]) ** 2
@@ -254,7 +254,7 @@ def test_opposite_neighbors_distinguish_polar_and_nematic_scores():
     candidates = np.eye(4, dtype=bool)
     for name, expected in (("polar_alignment", [0, 0, 0, 0]), ("nematic_alignment", [2, 0, 2, 0])):
         term = _term(name)
-        term.prepare(lgca, lgca.nodes)
+        term.prepare(lgca)
         np.testing.assert_allclose(term.score(candidates, lgca.nodes[2, 2], lgca, (2, 2)), expected)
 
 

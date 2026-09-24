@@ -24,6 +24,7 @@ _DIMS = {"lin": (16,), "square": (8, 6), "hex": (8, 6), "cubic": (4, 4, 3), "moo
 _LARGE_DIMS = {"lin": (4000,), "square": (60, 60), "hex": (60, 60), "cubic": (16, 16, 16), "moore": (12, 12, 12)}
 _VELOCITIES = {"lin": 2, "square": 4, "hex": 6, "cubic": 6, "moore": 26}
 _BOUNDARIES = ("periodic", "reflecting")
+_IDENTITY = ("ib", "nove_ib")
 _STEPS = 3
 
 
@@ -93,7 +94,8 @@ def check_interaction(
         Parameters of the rule.
     geometries, families, n_species : sequence, optional
         Restrict the models checked. Defaults: what the rule declares, and one
-        and two species (two and three for a phenotype switch).
+        and two species (two and three for a phenotype switch; identity-based
+        models have one).
     density : float, optional
         Mean number of cells per node of the random initial states. Default:
         40% of the channels of all species.
@@ -124,13 +126,15 @@ def check_interaction(
         declared_geometries = rule.geometries
         species_counts = ((rule.n_species,) if rule.n_species is not None
                           else (2, 3) if rule.kind == "phenotype_switch" else (1, 2))
-        declared = [(family, count) for family in rule.families for count in species_counts]
+        # identity-based models have one species
+        declared = [(family, count) for family in rule.families for count in species_counts
+                    if family not in _IDENTITY or count == 1]
     else:
         # built-in plugins name their families: "multispecies" means classical with several species
         info = describe_plugin(str(rule))
         declared_geometries = tuple(_DIMS)
         backends = {"classical": [("classical", 1)], "nove": [("nove", 1)],
-                    "multispecies": [("classical", 2)]}
+                    "multispecies": [("classical", 2)], "ib": [("ib", 1)], "nove_ib": [("nove_ib", 1)]}
         declared = [case for backend in info.backend_families for case in backends.get(backend, [])]
     kind = info.operator_kind
     momentum = info.conservation_law.conserves_momentum is True
@@ -177,8 +181,8 @@ class _Setup:
         return ModelSpec(
             description=Description(title=f"check {entry['name']}"),
             space=SpaceSpec(geometry=self.geometry, dims=dims, boundary=self.boundary),
-            state=StateSpec(density=density, restchannels=1, volume_exclusion=self.family == "classical",
-                            n_species=self.n_species),
+            state=StateSpec(density=density, restchannels=1, volume_exclusion=self.family in ("classical", "ib"),
+                            identity_based=self.family in _IDENTITY, n_species=self.n_species),
             time=TimeSpec(steps=_STEPS, seed=self.seed),
             dynamics=InteractionPipelineSpec(operators=[entry], propagation=False),
         )
@@ -264,9 +268,12 @@ def _compare(lgca, before, kind, momentum) -> list[str]:
     if nodes.dtype != before.dtype:
         return [f"the state changed type from {before.dtype} to {nodes.dtype}"]
     problems = []
-    if nodes.dtype != bool and np.any(nodes < 0):
-        problems.append("a channel holds a negative number of cells")
     old, new = before[lgca.nonborder], nodes[lgca.nonborder]
+    if _is_identity(lgca):
+        problems += _label_problems(old, new, kind)
+        old, new = lgca._channel_counts(old), lgca._channel_counts(new)
+    elif nodes.dtype != bool and np.any(nodes < 0):
+        problems.append("a channel holds a negative number of cells")
     if new.ndim == len(lgca.dims) + 1:
         old, new = old[..., None, :], new[..., None, :]
     old, new = old.astype(np.int64), new.astype(np.int64)
@@ -289,8 +296,36 @@ def _compare(lgca, before, kind, momentum) -> list[str]:
     return problems
 
 
+def _is_identity(lgca):
+    from .ib_base import IBLGCA_base
+
+    return isinstance(lgca, IBLGCA_base)
+
+
+def _labels_per_node(nodes):
+    """Sorted labels of every node of an interior array of labels or label lists."""
+    flat = nodes.reshape(-1, nodes.shape[-1])
+    if flat.dtype == object:
+        return [sorted(label for channel in node for label in channel) for node in flat]
+    return [sorted(node[node > 0].tolist()) for node in flat]
+
+
+def _label_problems(old, new, kind) -> list[str]:
+    """Labels must stay unique; a reorientation or phenotype switch keeps each node's cells."""
+    before, after = _labels_per_node(old), _labels_per_node(new)
+    labels = [label for node in after for label in node]
+    problems = [] if len(labels) == len(set(labels)) else ["two cells carry the same label"]
+    if kind in ("reorientation", "phenotype_switch") and before != after:
+        moved = sum(a != b for a, b in zip(before, after))
+        problems.append(f"a {kind} must keep the cells (labels) of every node; they changed at {moved} nodes")
+    return problems
+
+
 def _cells_per_species(lgca, n_species):
-    interior = np.asarray(lgca.nodes[lgca.nonborder], dtype=np.int64)
+    interior = lgca.nodes[lgca.nonborder]
+    if _is_identity(lgca):
+        interior = lgca._channel_counts(interior)
+    interior = np.asarray(interior, dtype=np.int64)
     return interior.reshape(-1, n_species, lgca.K).sum(axis=(0, 2))
 
 

@@ -68,6 +68,10 @@ model file the same entry reads ``{"name": "logistic_growth", "parameters":
 ``"classical"`` with volume exclusion (at most one cell per channel and
 species) and ``"nove"`` without. Models of other families are rejected when
 they are built. ``geometries=`` restricts the lattices in the same way.
+Identity-based models, whose cells carry labels, are the families ``"ib"``
+(with volume exclusion) and ``"nove_ib"`` (without). A rule can read their
+state, but so far only ``shuffle_cells`` changes it: it moves the cells with
+their labels, and cells outside the shuffled channels keep label and channel.
 
 What a rule sees and does
 -------------------------

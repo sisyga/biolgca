@@ -91,14 +91,22 @@ Dedicated vector and tensor reorientation samplers process candidate
 scores in batches with a conservative 32 MiB temporary budget. This preserves
 site order and RNG draws; it does not change the transition model.
 
-Composed Boltzmann reorientation also batches sites by occupancy and caches
-candidate flux, velocity and full channel occupancy and rest occupancy once
-per group. Score batches
-and cached candidate features each have a 32 MiB budget; these are temporary
-array limits, not a total process-memory limit. Candidate enumeration has its
-own size guard. The sampler retains one categorical uniform draw per nonempty
-site/species in spatial order, including fully occupied sites. Scalar-reference
-regressions preserve seeded trajectories for the tested mixed terms and species.
+Composed Boltzmann reorientation turns every term into one weight per channel
+(`_FieldTerm.weights`; all couplings are linear in the channel occupation) and
+adds them up once per step. With volume exclusion it batches sites by
+occupancy, converts the candidate states of each occupancy once, and scores a
+batch with one matrix product; the candidate matrix and the score batches each
+have a 32 MiB budget, which are temporary array limits, not a total
+process-memory limit. The sampler retains one categorical uniform draw per
+nonempty site/species in spatial order, including fully occupied sites.
+Without volume exclusion it draws one multinomial per node and species from the
+softmax of the weights, which reproduces `nove.random_walk` and
+`nove.dd_alignment` bit for bit (on hex only in distribution, since the
+neighbour sums round differently). Identity-based models reuse both samplers
+for their cell numbers and then place the node's labels on the occupied
+channels in random order (one extra uniform draw per channel or cell).
+Scalar-reference regressions preserve seeded trajectories for the tested mixed
+terms and species.
 Floating-point matrix evaluation can differ in its final bits across numerical
 libraries, so cross-platform bitwise trajectories are not promised. Boltzmann
 transition weights are unchanged. See `benchmarks/composed_reorientation.py`
