@@ -239,7 +239,7 @@ operations act on all cells at once:
        state=StateSpec(density=2, restchannels=1, volume_exclusion=False, capacity=8,
                        identity_based=True, traits={"resistance": 0.1}),
        time=TimeSpec(steps=50, seed=1),
-       dynamics=InteractionPipelineSpec(operators=[selection(), {"name": "channel_random_walk"}]),
+       dynamics=InteractionPipelineSpec(operators=[selection(), {"name": "random_walk"}]),
    )
    lgca = run_model(spec, showprogress=False).lgca
 

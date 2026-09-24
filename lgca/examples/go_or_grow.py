@@ -6,7 +6,7 @@ a moving cell starts resting with probability
 ``(1 + tanh(kappa * (rho - theta))) / 2``, where ``rho`` is the fraction of
 occupied channels. One time step is the switch (``go_or_rest``), death and
 division of resting cells (``go_or_grow.growth``) and a random walk of the
-moving cells over the velocity channels (``channel_random_walk``), followed
+moving cells over the velocity channels (``random_walk``), followed
 by propagation. This reproduces the original rule (``classical.go_or_grow``)
 in distribution.
 
@@ -89,7 +89,7 @@ def build_spec(kappa: float = 4.0) -> ModelSpec:
             operators=[
                 {"name": "go_or_rest", "parameters": {"kappa": kappa, "theta": 0.75}},
                 {"name": "go_or_grow.growth", "parameters": {"r_b": 0.2, "r_d": 0.01}},
-                {"name": "channel_random_walk", "parameters": {"channels": "velocity"}},
+                {"name": "random_walk", "parameters": {"channels": "velocity"}},
             ],
         ),
         analysis=AnalysisSpec(

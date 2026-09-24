@@ -64,7 +64,7 @@ def _pipeline(n_species, when_full="legacy"):
     return [{"name": "go_or_rest" if n_species == 1 else "go_or_grow.switch",
              "parameters": switch | {"when_full": when_full}},
             {"name": "go_or_grow.growth", "parameters": growth | {"when_full": when_full}},
-            {"name": "channel_random_walk", "parameters": walk}]
+            {"name": "random_walk", "parameters": walk}]
 
 
 @pytest.mark.parametrize("n_species", [1, 2])

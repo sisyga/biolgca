@@ -40,7 +40,7 @@ def _model(nodes, kappa, operators, traits=None, seed=1):
 def _pipeline(r_b, r_d, when_full="legacy"):
     return [{"name": "go_or_rest", "parameters": {"kappa": "kappa", "theta": 0.5, "when_full": when_full}},
             {"name": "go_or_grow.growth", "parameters": {"r_b": r_b, "r_d": r_d, "when_full": when_full}},
-            {"name": "channel_random_walk", "parameters": {"channels": "velocity"}}]
+            {"name": "random_walk", "parameters": {"channels": "velocity"}}]
 
 
 def _summary(lgca):
@@ -153,7 +153,7 @@ def test_daughters_inherit_and_mutate_traits_and_can_found_families(ve):
     ("go_or_rest", {"kappa": 4.0, "theta": "theta", "when_full": "reject"}),
     ("go_or_grow.growth", {"r_b": "r_b", "r_d": 0.05, "mutation": {"r_b": 0.01}}),
     ("go_or_grow.growth", {"r_b": 0.3, "r_d": "r_d", "when_full": "reject", "new_family": True}),
-    ("channel_random_walk", {"channels": "velocity"}),
+    ("random_walk", {"channels": "velocity"}),
 ])
 def test_rules_pass_the_interaction_check_on_identity_models(rule, parameters):
     check_interaction(rule, parameters, families=("ib", "nove_ib"), n_species=(1,),
@@ -180,7 +180,7 @@ def test_new_families_are_recorded_and_plotted(ve):
         {"name": "go_or_rest", "parameters": {"kappa": "kappa", "theta": 0.5}},
         {"name": "go_or_grow.growth", "parameters": {"r_b": 0.2, "r_d": 0.02, "mutation": {"kappa": 0.3},
                                                      "new_family": True}},
-        {"name": "channel_random_walk", "parameters": {"channels": "velocity"}},
+        {"name": "random_walk", "parameters": {"channels": "velocity"}},
     ]
     result = run_model(ModelSpec(
         space=SpaceSpec(geometry="hex", dims=(10, 10)),
@@ -203,7 +203,7 @@ def test_decorated_growth_combines_with_a_legacy_identity_growth_rule():
         dynamics=InteractionPipelineSpec(operators=[
             {"name": "ib.birthdeath"},
             {"name": "go_or_grow.growth", "parameters": {"r_b": 0.1, "r_d": 0.01}},
-            {"name": "channel_random_walk"}])))
+            {"name": "random_walk"}])))
     for _ in range(10):
         model.step()
     lgca = model.lgca

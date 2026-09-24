@@ -7,6 +7,15 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- Names without family prefixes for movement: `random_walk` (cells move to
+  random channels, optionally within a channel set or for some species) and
+  every built-in cue as an operator of its own (`polar_alignment`,
+  `nematic_alignment`/`nematic`, `persistent_walk`/`persistent_motion`,
+  `aggregation`, `chemotaxis`, `contact_guidance`, `resting_bias`), e.g.
+  `{"name": "chemotaxis", "parameters": {"beta": 2.0, "field": "signal"}}`.
+  They work in every model family. `polar_alignment` takes `include_center`
+  and `normalize` (density-independent alignment); with them it is
+  `nove.dd_alignment` and `nove.di_alignment` seed for seed.
 - Identity-based models without volume exclusion hold their cells in a table
   between rules: boundary conditions and propagation move it with lookup
   tables derived from the geometry's own transport code, and `lgca.nodes`
@@ -145,6 +154,10 @@ This file records notable user-facing changes. Changes remain under
   persistence, the CLI, and installed-package smoke tests.
 
 ### Changed
+
+- `channel_random_walk` is now called `random_walk`; the name `random_walk`
+  used to be an alias of `classical.random_walk`, which it replaces in every
+  family (same distribution, different random numbers).
 
 - The option of `go_or_rest`, `go_or_grow.switch` and `go_or_grow.growth`
   for full channels is now called `when_full` ("legacy" or "reject"; it was

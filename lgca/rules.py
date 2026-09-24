@@ -33,7 +33,7 @@ from .lattice_state import LatticeState
 from .operator_base import InteractionOperator, PluginInfo
 from .plugins import _law_for_kind, register_plugin, validate_plugin_parameters
 
-__all__ = ["Interaction", "ReorientationCue", "interaction", "reorientation_term"]
+__all__ = ["Interaction", "ReorientationCue", "interaction", "register_single_cue", "reorientation_term"]
 
 KINDS = ("birth_death", "phenotype_switch", "reorientation")
 FAMILIES = {"classical": "with volume exclusion", "nove": "without volume exclusion",
@@ -345,6 +345,48 @@ class ReorientationCue:
 
     def _repr_pretty_(self, printer, cycle) -> None:
         printer.text(str(self))
+
+
+def register_single_cue(cue: ReorientationCue, aliases: str | Iterable[str] = ()) -> None:
+    """Register a reorientation term as an operator of its own.
+
+    ``{"name": cue.name, "parameters": {"beta": ..., **term_parameters}}`` then
+    stands for a :class:`~lgca.pipeline.ReorientationSpec` with this one term,
+    in every model family. ``trait`` and ``sweeps`` work as in the spec.
+    """
+    parameters = {
+        "beta": {"default": 1.0, "description": "Sensitivity to the cue; negative values reverse it."},
+        "trait": {"default": None, "description": (
+            "Identity-based models: a cell trait that scales beta for every cell.")},
+        "sweeps": {"default": 10, "description": (
+            "Metropolis proposals per node, in units of the channel number, for a trait with volume "
+            "exclusion.")},
+        **cue.info.parameters,
+    }
+    info = PluginInfo(name=cue.name, operator_kind="reorientation",
+                      backend_families=("classical", "multispecies", "nove", "ib", "nove_ib"),
+                      aliases=(aliases,) if isinstance(aliases, str) else tuple(aliases),
+                      parameters=parameters, conservation_law=_law_for_kind("reorientation"),
+                      port_status="native", description=f"{cue.info.description} (one cue; see "
+                                                         "ReorientationSpec to combine cues)")
+
+    def factory(parameters=None):
+        from .pipeline import (
+            BoltzmannReorientationOperator,
+            ReorientationSpec,
+            ReorientationTermSpec,
+        )
+
+        values = dict(parameters or {})
+        beta, trait = values.pop("beta", 1.0), values.pop("trait", None)
+        sampler = {"sweeps": values.pop("sweeps")} if "sweeps" in values else {}
+        term = ReorientationTermSpec(cue.name, beta=beta, parameters=values, trait=trait)
+        operator = BoltzmannReorientationOperator(ReorientationSpec(terms=[term], parameters=sampler))
+        operator.info = replace(operator.info, name=cue.name, description=info.description)
+        return operator
+
+    factory.__module__ = cue.module
+    register_plugin(info, factory)
 
 
 def _factory_for(rule, module):

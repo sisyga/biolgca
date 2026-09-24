@@ -52,7 +52,7 @@ part of the model: division before reorientation is a different model from
 reorientation before division, and the classical go-or-grow model is the
 sequence ``go_or_rest`` (cells move between velocity and rest channels),
 ``go_or_grow.growth`` (death, division of resting cells) and
-``channel_random_walk`` over the velocity channels. The run metadata
+``random_walk`` over the velocity channels. The run metadata
 records the schedule as ``result.metadata["schedule"]``.
 
 Combining directional cues
@@ -63,6 +63,12 @@ as multiple :class:`lgca.pipeline.ReorientationTermSpec` objects inside one
 :class:`lgca.pipeline.ReorientationSpec`. Their weighted scores are added, and
 the sampler performs **one sampled reorientation transition** of the complete
 channel state.
+
+A single cue does not need the spec: every term in the table below is also
+an operator of its own, e.g. ``{"name": "chemotaxis", "parameters": {"beta":
+2.0, "field": "signal"}}``, which stands for a ``ReorientationSpec`` with this
+one term and works in every model family. ``random_walk`` moves cells to
+uniformly random channels (``channels`` and ``species`` restrict it).
 
 This is different from a **sequential pipeline** containing two full
 reorientation operators. Sequential operators perform two stochastic state
@@ -137,7 +143,9 @@ coupling that turns it into a score; new terms are written the same way with
      - flux
      - the node's cells
    * - ``polar_alignment``
-     - ``J_nb · J(s')`` with the flux ``J_nb`` of the neighbours.
+     - ``J_nb · J(s')`` with the flux ``J_nb`` of the neighbours
+       (``include_center`` adds the node's own flux, ``normalize`` divides by
+       the number of cells: density-independent alignment).
      - flux
      - neighbouring cells
    * - ``nematic_alignment`` (``nematic``, ``alignment``)

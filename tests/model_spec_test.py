@@ -822,7 +822,13 @@ def _state_for_plugin(plugin_name):
         if plugin_name.endswith("excitable_medium_ms"):
             return StateSpec(density=0.35, restchannels=1, n_species=2)
         return StateSpec(density=0.35, restchannels=1, volume_exclusion=False, n_species=2)
+    if plugin_name in ("chemotaxis", "contact_guidance"):  # cues that read a named field
+        return StateSpec(density=0.35, restchannels=2, fields={
+            "signal": np.arange(20.0).reshape(4, 5), "director": np.ones((4, 5, 2))})
     return StateSpec(density=0.35, restchannels=2)
+
+
+_PARAMETERS_FOR_PLUGIN = {"chemotaxis": {"field": "signal"}}
 
 
 @pytest.mark.parametrize(
@@ -835,7 +841,8 @@ def test_all_registered_interactions_run_one_step_through_modelspec(plugin_name)
         space=SpaceSpec(geometry="square", dims=(4, 5), boundary="periodic"),
         state=_state_for_plugin(plugin_name),
         time=TimeSpec(steps=1, seed=21),
-        dynamics=InteractionPipelineSpec(operators=[{"name": plugin_name}]),
+        dynamics=InteractionPipelineSpec(operators=[
+            {"name": plugin_name, "parameters": _PARAMETERS_FOR_PLUGIN.get(plugin_name, {})}]),
     )
 
     result = run_model(spec, showprogress=False)

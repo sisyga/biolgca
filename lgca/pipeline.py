@@ -85,7 +85,8 @@ class ReorientationTermSpec:
         ``J(s) · J(s')``: cells keep the direction they had at this node.
     ``"polar_alignment"``
         ``J_nb · J(s')``, with ``J_nb`` the flux of the neighbouring nodes:
-        cells move in the direction of their neighbours.
+        cells move in the direction of their neighbours. Parameters
+        ``include_center`` and ``normalize`` (divide by the number of cells).
     ``"nematic_alignment"`` (alias ``"nematic"``)
         Rewards sharing an axis with neighbouring cells; opposite directions
         count the same.
@@ -102,7 +103,9 @@ class ReorientationTermSpec:
         Number of cells in rest channels: cells prefer to rest.
 
     New terms are written with :func:`lgca.reorientation_term`; the built-in
-    terms above are defined the same way in :mod:`lgca.builtin_rules`.
+    terms above are defined the same way in :mod:`lgca.builtin_rules`, and
+    each of them is also an operator of its own (one cue), e.g.
+    ``{"name": "chemotaxis", "parameters": {"beta": 2.0, "field": "signal"}}``.
 
     Attributes
     ----------

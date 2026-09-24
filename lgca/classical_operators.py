@@ -9,7 +9,6 @@ from .operator_base import ConservationLaw, PluginInfo, ReorientationOperator
 
 CLASSICAL_RANDOM_WALK_INFO = PluginInfo(
     name="classical.random_walk",
-    aliases=("random_walk",),
     operator_kind="reorientation",
     backend_families=("classical",),
     legacy_source="lgca.interactions.random_walk",

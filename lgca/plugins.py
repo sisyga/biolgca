@@ -1631,7 +1631,7 @@ def _register_native_plugins() -> None:
             "classical.persistent_walk",
             "persistent_walk",
             "persistent_walk",
-            ("persistent_motion",),
+            (),
             "Local-flux persistent motion for volume-exclusion classical LGCA.",
         ),
         (

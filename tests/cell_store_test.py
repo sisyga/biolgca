@@ -80,7 +80,7 @@ def test_rules_and_legacy_code_can_take_turns():
     model = _model("square", (10, 10), "periodic", [
         {"name": "nove_ib.random_walk"},  # legacy: reads and writes lists
         {"name": "go_or_rest", "parameters": {"kappa": "kappa", "theta": 0.5}},
-        {"name": "channel_random_walk"},
+        {"name": "random_walk"},
     ])
     lgca = model.lgca
     before = sorted(label for channel in lgca.nodes[lgca.nonborder].flat for label in channel)
@@ -119,7 +119,7 @@ def test_the_node_recorder_stores_cell_tables(bc, monkeypatch):
         time=TimeSpec(steps=6, seed=2),
         dynamics=InteractionPipelineSpec(operators=[
             {"name": "go_or_rest", "parameters": {"kappa": "kappa", "theta": 0.5}},
-            {"name": "channel_random_walk"}]),
+            {"name": "random_walk"}]),
         analysis=AnalysisSpec(observers=[NodeRecorder()]))
     lgca = run_model(spec, showprogress=False).lgca
     assert len(lgca.cells_t) == 7 and built in ([], [1])  # at most once, to estimate the recording size

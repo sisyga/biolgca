@@ -699,6 +699,20 @@ resolve to the implementation for the family chosen by `StateSpec`; an
 unsupported combination raises a clear error. Old prefixed names remain as
 deprecated aliases for one release.
 
+- Status (2026-09-24): movement done. `random_walk` (the former
+  `channel_random_walk`) and every built-in cue registered as an operator of
+  its own (`lgca.rules.register_single_cue`: a ReorientationSpec with one
+  term) work in every family, so no per-family dispatch is needed: one
+  implementation per name. `polar_alignment` got `include_center` and
+  `normalize`. Parity (`tests/single_cue_test.py`): one step matches
+  `classical.alignment`, `persistent_walk`, `aggregation`, `chemotaxis`
+  (given the same gradient), `nematic` and `contact_guidance` in
+  distribution (score mean and spread per density level); the NoVE
+  alignments match seed for seed. Open: with rest channels, legacy `nematic`
+  and `contact_guidance` use the tensor c cᵀ - I/2, which makes moving
+  perpendicular to the axis worse than resting; the terms score resting like
+  moving perpendicular. Growth (birth/death, go-or-grow variants) is next.
+
 **2.4 Remove duplicates** (B4, D5)
 - Separate the random walk from `classical.birth*`.
 - After parity tests pass on the new implementations, delete the legacy

@@ -131,7 +131,7 @@ spec = ModelSpec(
     dynamics=InteractionPipelineSpec(operators=[
         {"name": "go_or_rest", "parameters": {"kappa": -4, "theta": 0.5}},
         {"name": "go_or_grow.growth", "parameters": {"r_b": 0.2, "r_d": 0.01}},
-        {"name": "channel_random_walk", "parameters": {"channels": "velocity"}},
+        {"name": "random_walk", "parameters": {"channels": "velocity"}},
     ]),
 )
 run_model(spec).lgca.plot_density()

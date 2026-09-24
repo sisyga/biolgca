@@ -11,7 +11,7 @@ One time step of the classical go-or-grow model is the pipeline ::
     operators=[
         {"name": "go_or_rest", "parameters": {"kappa": 4.0, "theta": 0.75}},
         {"name": "go_or_grow.growth", "parameters": {"r_b": 0.2, "r_d": 0.01}},
-        {"name": "channel_random_walk", "parameters": {"channels": "velocity"}},
+        {"name": "random_walk", "parameters": {"channels": "velocity"}},
     ]
 
 in this order, followed by propagation: cells switch between moving and
@@ -34,16 +34,16 @@ from __future__ import annotations
 import numpy as np
 
 from .interactions import tanh_switch
-from .rules import interaction, reorientation_term
+from .rules import interaction, register_single_cue, reorientation_term
 
-__all__ = ["channel_random_walk", "go_or_grow_growth", "go_or_grow_switch", "go_or_rest"]
+__all__ = ["go_or_grow_growth", "go_or_grow_switch", "go_or_rest", "random_walk"]
 
 
 # Terms of the Boltzmann reorientation (ReorientationSpec). J(s') is the flux of
 # the candidate state; see lgca.rules.reorientation_term for the couplings.
 
 @reorientation_term(coupling="rest", name="random_walk", aliases="uniform")
-def random_walk(state):
+def uniform(state):
     """Score 0: all channel states are equally likely."""
     return 0.0
 
@@ -61,9 +61,25 @@ def persistent_walk(state):
 
 
 @reorientation_term(coupling="flux", name="polar_alignment")
-def polar_alignment(state):
-    """J_nb · J(s'), with J_nb the flux of the neighbouring nodes: cells move with their neighbours."""
-    return state.neighbor_sum(state.flux)
+def polar_alignment(state, include_center=False, normalize=False):
+    """J_nb · J(s'), with J_nb the flux of the neighbouring nodes: cells move with their neighbours.
+
+    Parameters
+    ----------
+    include_center : bool
+        Add the flux of the node's own cells to J_nb.
+    normalize : bool
+        Divide J_nb by the number of cells it sums over (at least one), so the
+        cue measures the mean direction rather than the number of neighbours
+        (density-independent alignment).
+    """
+    flux = state.neighbor_sum(state.flux)
+    cells = state.neighbor_sum(state.density)
+    if include_center:
+        flux, cells = flux + state.flux, cells + state.density
+    if normalize:
+        flux = flux / np.maximum(cells, 1)[..., None]
+    return flux
 
 
 @reorientation_term(coupling="channels", name="nematic_alignment", aliases=("nematic", "alignment"))
@@ -113,12 +129,19 @@ def contact_guidance(state, field="director"):
     director = np.divide(director, norm, out=np.zeros_like(director), where=norm > 0)
     return (director @ state.c) ** 2
 
+# Every built-in cue also works alone as an operator: {"name": "chemotaxis", "parameters": {"beta": 2,
+# "field": "signal"}} is a ReorientationSpec with this one term.
+for _cue, _aliases in ((polar_alignment, ()), (nematic_alignment, ("nematic",)),
+                       (persistent_walk, ("persistent_motion",)), (aggregation, ()), (chemotaxis, ()),
+                       (contact_guidance, ()), (resting_bias, ())):
+    register_single_cue(_cue, aliases=_aliases)
+
 _MIGRATING, _RESTING = 0, 1
 _WHEN_FULL = ("legacy", "reject")
 
 
-@interaction(kind="reorientation", families=("classical", "nove", "ib", "nove_ib"), name="channel_random_walk")
-def channel_random_walk(state, channels="all", species=None):
+@interaction(kind="reorientation", families=("classical", "nove", "ib", "nove_ib"), name="random_walk")
+def random_walk(state, channels="all", species=None):
     """Cells move to uniformly random channels of their node, within a set of channels.
 
     In identity-based models the cells keep their labels; cells outside the
