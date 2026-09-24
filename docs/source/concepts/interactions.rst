@@ -258,15 +258,15 @@ Polar versus nematic composition
 fluxes. Opposite headings cancel. ``nematic_alignment`` instead sums squared
 velocity dot products, weighted by numeric neighboring channel counts; opposite
 headings reinforce the same axis. Both can be combined with the other cues.
-The registered ``classical.alignment`` operator is polar.
+The ``alignment`` interaction of ``get_lgca`` is polar.
 
 The axis cues compare traceless tensors ``c cᵀ - |c|² I / d`` (``d`` the
 spatial dimension): a cell moving along the axis scores above a resting cell,
 which scores 0, and a cell moving across it below. Averaged over all
 directions, moving scores like resting, so the cue orients cells without
-making them rest or move more. In 2D these are the tensors of the legacy
-``classical.nematic`` and ``classical.contact_guidance``; in 1D there is only
-one axis and the cues have no effect.
+making them rest or move more. In 2D these are the tensors of the
+``nematic`` and ``contact_guidance`` interactions of earlier versions; in 1D
+there is only one axis and the cues have no effect.
 
 For compatibility, existing composed ``alignment`` declarations retain nematic
 semantics and emit a deprecation warning. Replace that alias with

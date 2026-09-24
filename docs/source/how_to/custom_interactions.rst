@@ -51,7 +51,7 @@ A growth rule
        time=TimeSpec(steps=50, seed=1),
        dynamics=InteractionPipelineSpec(operators=[
            logistic_growth(r_b=0.3),
-           {"name": "classical.random_walk"},
+           {"name": "random_walk"},
        ]),
    )
    result = run_model(spec, showprogress=False)

@@ -58,7 +58,7 @@ initial state, time horizon, interaction pipeline and recorded data explicit:
        state=StateSpec(density=0.15, restchannels=0),
        time=TimeSpec(steps=30, seed=1),
        dynamics=InteractionPipelineSpec(
-           operators=[{"name": "classical.random_walk"}],
+           operators=[{"name": "random_walk"}],
        ),
        analysis=AnalysisSpec(
            observers=[DensityRecorder(), PopulationRecorder()],

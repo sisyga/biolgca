@@ -144,10 +144,12 @@ class Interaction:
         law = _law_for_kind(kind)
         if "momentum" in self.conserves:
             law = replace(law, conserves_momentum=True)
+        # in the plugin catalogue, "multispecies" marks classical rules that work with several species
+        several = (self.n_species is None or self.n_species > 1) and bool({"classical", "nove"} & set(self.families))
         self.info = PluginInfo(
             name=self.name,
             operator_kind=kind,
-            backend_families=self.families,
+            backend_families=self.families + (("multispecies",) if several else ()),
             parameters=self.parameters,
             conservation_law=law,
             port_status="native",

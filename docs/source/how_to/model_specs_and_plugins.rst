@@ -26,7 +26,7 @@ Every interaction is one of three kinds, defined by what it conserves:
    cells of each species at the node. Boltzmann sampling of combined scores
    (:class:`~lgca.pipeline.ReorientationSpec`) is the usual way to write one,
    but any rule that keeps these numbers is a reorientation, including moving
-   cells between velocity and rest channels (``classical.go_or_rest``).
+   cells between velocity and rest channels (``go_or_rest``).
 
 A time step applies the operators in the order they are listed, then moves the
 cells (propagation). The order is part of the model: division before
@@ -59,7 +59,7 @@ Minimal ModelSpec
        state=StateSpec(density=0.2, restchannels=0),
        time=TimeSpec(steps=100, seed=1),
        dynamics=InteractionPipelineSpec(
-           operators=[{"name": "classical.random_walk"}],
+           operators=[{"name": "random_walk"}],
        ),
        analysis=AnalysisSpec(observers=[NodeRecorder(), DensityRecorder()]),
    )
@@ -191,9 +191,11 @@ chemotaxis.
 Identity-based family dynamics
 ------------------------------
 
-Identity-based models can use native plugins for family and mutation dynamics.
-For example, the glioblastoma go-or-grow interaction tracks family-level
-proliferation rates and switching sensitivities:
+Identity-based models give every cell its own traits, which daughters
+inherit and mutations change; mutated daughters can found families for
+lineage analyses. For example, in the glioblastoma model driver mutations found
+clones with a higher birth rate and a new switch steepness
+(see :doc:`research_models`):
 
 .. code-block:: python
 
@@ -214,7 +216,7 @@ proliferation rates and switching sensitivities:
        dynamics=InteractionPipelineSpec(
            operators=[
                {
-                   "name": "nove_ib.go_or_grow_glioblastoma",
+                   "name": "go_or_grow_glioblastoma",
                    "parameters": {
                        "r_b": 0.2,
                        "r_d": 0.01,
@@ -230,13 +232,11 @@ proliferation rates and switching sensitivities:
    )
 
    result = run_model(spec, showprogress=False)
-   family_rates = result.lgca.family_props["r_b"]
+   birth_rates = result.lgca.props["r_b"]  # one value per cell label
+   families = result.lgca.props["family"]
 
-Several identity growth operators can be combined only when they share the
-daughter-property bookkeeping: ``ib.birth``, ``ib.birthdeath``,
-``ib.birthdeath_discrete``, ``ib.go_or_grow`` and ``ib.go_and_grow_mutations``.
-Other combinations are rejected when the model is built; use one growth
-operator for the other identity-based backends.
+Growth rules of identity-based models combine freely: every daughter inherits
+all traits of its mother, whichever rule made it.
 
 Plugin registry
 ---------------
@@ -252,7 +252,7 @@ registered interaction.
    for plugin in list_plugins(kind="interaction"):
        print(plugin.name, plugin.operator_kind, plugin.description)
 
-   info = describe_plugin("nove_ib.go_or_grow_kappa_chemo")
+   info = describe_plugin("go_or_grow_kappa_chemo")
    print(info.parameters)
 
    rows = interaction_coverage_table()

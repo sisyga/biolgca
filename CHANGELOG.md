@@ -7,15 +7,22 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- `birth_death(channels=...)`: only the cells in a set of channels die and
+  divide, and their daughters go to that set, e.g. `channels="rest"` for
+  growth by resting cells; with volume exclusion the logistic factor counts
+  the cells of the set.
+- `go_or_rest` for several species, with `kappa` and `theta` per species.
+- `directed_motion`, a cue by which cells move along a given vector field
+  (`{"name": "directed_motion", "parameters": {"beta": 2, "field": "flow"}}`).
 - The research models of earlier versions as stacks of the generic rules, in
   `lgca.research_models` and under the legacy names without family prefix:
   `go_or_grow_kappa`, `go_or_grow_kappa_chemo`, `go_or_grow_glioblastoma`,
   `evo_steric`, `birthdeath_cancerdfe`, `go_and_grow_mutations`,
   `birthdeath_discrete` and `excitable_medium`. They work in identity-based
   models with and without volume exclusion, match the legacy interactions in
-  distribution (`tests/research_models_test.py`) and run 4 to 17 times
-  faster (`benchmarks/research_models.py`; the excitable medium 2 times). The how-to page "Research models from generic rules" shows how
-  they are built.
+  distribution (`tests/research_models_test.py`) and run 4 to 18 times
+  faster (`benchmarks/research_models.py`; the excitable medium 2 times). The
+  how-to page "Research models from generic rules" shows how they are built.
 - `lgca.stack`: a decorator that turns a function returning a list of
   operators into one operator with its own parameters, e.g. a published
   model. Parameters named in `traits=` give the initial cell traits.
@@ -189,6 +196,32 @@ This file records notable user-facing changes. Changes remain under
   persistence, the CLI, and installed-package smoke tests.
 
 ### Changed
+
+- The interaction names of `get_lgca` run stacks of the rules without family
+  prefix (`lgca.legacy_names`): `get_lgca(interaction="alignment", beta=2)`
+  runs `polar_alignment`, `interaction="go_or_grow"` runs `go_or_rest`,
+  `go_or_grow.growth` and `random_walk`, and so on for every name and family,
+  with the legacy parameters and defaults. The dynamics agree with the legacy
+  functions in distribution (`tests/legacy_names_test.py`), but seeded runs
+  give other numbers than before, and details differ where the rules differ:
+  growth is logistic with birth and death decided at once, identity-based
+  go-or-grow switches before cells die, and the default concentration of
+  `chemotaxis` takes its gradient with the model's ghost nodes. The research
+  models run 4 to 18 times faster, identity-based growth 11 to 16 times.
+  `lgca.interaction`, `lgca.interaction_params`, `lgca.interactions` and
+  functions passed as the interaction keep working.
+- Multi-species models built with `get_lgca` accept every interaction name
+  whose rules work with several species (e.g. `alignment`, `birthdeath` with
+  volume exclusion), not only the few the legacy classes had.
+- The prefixed names of model files (`"classical.alignment"`,
+  `"nove_ib.go_or_grow"`, ...) are deprecated aliases of these stacks: they
+  warn (`FutureWarning`) and name the rules to use instead, and
+  `list_plugins()` lists them only with `deprecated=True`. The examples,
+  tutorials and documentation use the rules without prefix.
+- Identity-based growth rules combine freely in a pipeline; the restriction
+  to the `ib.*` growth operators is gone.
+- Models refuse node counts whose sum over a node does not fit a signed
+  64-bit integer when they are built.
 
 - Faster rules: the lattice state reads and writes the interior as a view
   and keeps counts as `int8` with volume exclusion (`state.counts` has that
@@ -419,6 +452,15 @@ This file records notable user-facing changes. Changes remain under
 
 ### Removed
 
+- The legacy interaction modules `lgca.interactions`,
+  `lgca.nove_interactions`, `lgca.ib_interactions`,
+  `lgca.nove_ib_interactions`, `lgca.ms_interactions` and
+  `lgca.identity_kernels`, the class-based `Native*` operators that ported
+  them to model files, `lgca.classical_operators`, `LegacyInteractionOperator`
+  and `lgca.plugins.resolve_operator_capacity`. `tanh_switch` is in
+  `lgca.builtin_rules`, `mutation_matrix_from_trait_bins` in
+  `lgca.legacy_names`. The legacy functions are kept, unchanged, in
+  `tests/legacy` of the repository as a reference for tests.
 - The unused `lgca.interactions.disarrange` helper.
 - The legacy `wetting` interaction and its `classical.wetting` ModelSpec
   port. The model is planned as an advanced tutorial with a new
@@ -427,6 +469,8 @@ This file records notable user-facing changes. Changes remain under
 ### Compatibility
 
 - The `get_lgca(...)` factory and legacy `timeevo(...)` workflow remain
-  supported for interactive use.
+  supported for interactive use; their interactions now run the rules (see
+  "Changed"). Published results of earlier versions are reproduced with the
+  archived versions of BioLGCA they cite.
 - This development branch still reports package version `0.1.0`; a release
   version will be chosen as a separate release decision.

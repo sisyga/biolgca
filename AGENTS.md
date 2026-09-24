@@ -14,9 +14,10 @@ Two APIs coexist:
 - **`ModelSpec` (current):** a model is a declarative spec (space, state,
   time, interaction pipeline, observers) that can be saved as JSON/YAML and
   run from Python or the `biolgca` CLI. New features go here.
-- **`get_lgca` (legacy):** builds an LGCA object with one interaction
-  function. It stays supported but gets no new interactions; phase 2 of the
-  roadmap plans to retire the legacy interaction modules.
+- **`get_lgca` (legacy front door):** builds an LGCA object from an
+  interaction name of earlier versions. `legacy_names.py` translates every
+  name into a stack of rules and compiles it into a pipeline, so both APIs
+  run the same code. It gets no new names; new rules go to `ModelSpec`.
 
 ## Environment and commands
 
@@ -54,20 +55,22 @@ tests the installed wheel and CLI, and builds the docs.
   them, including go-or-grow and `birth_death`), `mutations.py` (mutation
   events and effect distributions of growth rules), `research_models.py`
   (published models as stacks of the rules, under the legacy names),
-  `testing.py` (`check_interaction`).
+  `legacy_names.py` (the `get_lgca` interaction names, and the deprecated
+  prefixed names of model files, as stacks of rules), `testing.py`
+  (`check_interaction`).
 - Model classes: `base.py`, `nove_base.py`, `ib_base.py`, `nove_ib_base.py`,
   `multispecies_base.py`; geometries in `lgca_1d.py`, `lgca_square.py`,
   `lgca_hex.py`, `lgca_cubic.py`, `lgca_3dmoore.py` and `ms_*.py`.
-- Legacy interaction functions for `get_lgca`: `interactions.py`,
-  `nove_interactions.py`, `ib_interactions.py`, `nove_ib_interactions.py`,
-  `ms_interactions.py`. Do not add new rules here.
 - Plotting: `plots.py`, `plot_data.py`, `square_plotting.py`, `plotting.py`,
   `mayavi_style.py` (optional 3D).
 - `examples/`: curated runnable models (`lgca.examples.run_example`).
 
 Elsewhere:
 
-- `tests/`: pytest files named `*_test.py`.
+- `tests/`: pytest files named `*_test.py`. `tests/legacy/` keeps the
+  interaction functions of earlier versions, frozen, as a reference for
+  comparison tests (`legacy_lgca(...)`, or `legacy.<family>.<name>` in a
+  pipeline); the package never imports it.
 - `docs/source/`: Sphinx user docs; the tutorials in `docs/source/tutorials/`
   run during every docs build. `docs/development/`: maintainer notes, not
   built: `usability_roadmap.md` (the current plan), `architecture.md`.

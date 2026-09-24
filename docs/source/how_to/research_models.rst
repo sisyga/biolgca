@@ -7,8 +7,10 @@ few steps: a phenotype switch, growth with mutations, movement. These models
 are now written as *stacks* of the generic rules, in the module
 :mod:`lgca.research_models`, under the names of the legacy interactions
 without the family prefix. They work in identity-based models with and
-without volume exclusion, run 4 to 17 times faster than the legacy code
+without volume exclusion, run 4 to 18 times faster than the legacy code
 (`Speed`_), and show how to build a published model from the rules.
+``get_lgca(interaction="go_or_grow_glioblastoma", ...)`` runs them as well, as
+do model files with the prefixed names (see :ref:`interaction_chapter`).
 
 Using a research model
 ----------------------
@@ -213,7 +215,8 @@ Speed
 -----
 
 ``benchmarks/research_models.py`` times every model against the legacy
-interaction, 20 steps on a 100 x 100 lattice after 50 steps of warm-up:
+interaction function (kept in ``tests/legacy``), 20 steps on a 100 x 100
+lattice after 50 steps of warm-up, each measurement in a fresh process:
 
 .. code-block:: text
 
@@ -228,42 +231,42 @@ interaction, 20 steps on a 100 x 100 lattice after 50 steps of warm-up:
      - rules
      - speed-up
    * - ``go_or_grow_kappa``
-     - 150
-     - 8.7
-     - 17x
+     - 168
+     - 9.3
+     - 18x
    * - ``go_or_grow_glioblastoma``
-     - 143
-     - 8.3
+     - 155
+     - 9.0
      - 17x
-   * - ``birthdeath_discrete``
-     - 164
-     - 12
-     - 13x
    * - ``evo_steric``
-     - 91
-     - 6.9
+     - 101
+     - 7.5
+     - 13x
+   * - ``birthdeath_discrete``
+     - 171
+     - 13
      - 13x
    * - ``birthdeath_cancerdfe``
-     - 167
-     - 17
-     - 10x
+     - 194
+     - 18
+     - 11x
    * - ``go_or_grow_kappa_chemo``
-     - 55
-     - 7.9
+     - 60
+     - 8.2
      - 7x
    * - ``go_and_grow_mutations``
-     - 43
-     - 12
+     - 47
+     - 13
      - 3.6x
    * - ``excitable_medium`` (one, two species)
      - 3.4, 4.9
-     - 1.6, 2.5
-     - 2.1x, 1.9x
+     - 1.6, 2.8
+     - 2.1x, 1.8x
    * - ``birth_death`` + ``random_walk`` (identity-based, with and without
        volume exclusion) against ``ib.birthdeath``, ``nove_ib.birthdeath``
-     - 113, 137
-     - 10, 9.5
-     - 11x, 14x
+     - 116, 164
+     - 11, 11
+     - 11x, 16x
    * - ``birth_death`` + ``random_walk`` (classical) against
        ``classical.birthdeath``
      - 1.6
@@ -271,9 +274,9 @@ interaction, 20 steps on a 100 x 100 lattice after 50 steps of warm-up:
      - 1.1x
    * - ``birth_death`` + ``random_walk`` (two species, without volume
        exclusion) against ``multispecies.birthdeath``
-     - 6.1
+     - 6.4
      - 4.5 to 7.9
-     - 0.8x to 1.3x
+     - 0.8x to 1.4x
 
 The legacy growth rules also moved the cells, so they are compared with
 ``birth_death`` followed by ``random_walk``. The last row depends on the

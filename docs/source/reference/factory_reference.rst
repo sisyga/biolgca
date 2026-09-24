@@ -25,11 +25,10 @@ simulator class from four main switches:
 ``n_species``
    Number of species. Values greater than one select the multi-species class
    family. Multi-species classes are currently classical, not identity-based.
-   Through ``get_lgca`` they support only ``random_walk`` (the default),
-   ``excitable_medium_ms`` and ``only_propagation`` with volume exclusion, and
-   ``birth``, ``birthdeath``, ``go_or_grow`` and ``only_propagation`` without.
-   Other multi-species dynamics are built with a ModelSpec interaction
-   pipeline; unsupported names raise ``ValueError`` at construction.
+   They accept every interaction name whose rules work with several species,
+   e.g. ``random_walk`` (the default), ``alignment``, ``birthdeath`` or
+   ``excitable_medium_ms``; unknown names raise ``ValueError`` at
+   construction.
 
 Model class matrix
 ------------------
@@ -100,7 +99,8 @@ Common keyword arguments
 
 ``interaction``
    Name of a built-in interaction, or a function ``f(lgca)`` that performs the
-   interaction step. Built-in options depend on the selected class family. With
+   interaction step. The names and their defaults depend on the selected class
+   family; each runs a stack of rules (see :ref:`interaction_chapter`). With
    a function, all other keyword arguments that the factory does not use itself
    are collected in ``lgca.interaction_params`` (see the example below).
 

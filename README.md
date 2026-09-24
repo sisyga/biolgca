@@ -172,7 +172,7 @@ for r_d in (0.0, 0.2, 0.5):
         dynamics=InteractionPipelineSpec(operators=[
             {"name": "birth_death", "parameters": {"birth_rate": 0.1}},
             crowding_death(r_d=r_d),
-            {"name": "classical.random_walk"},
+            {"name": "random_walk"},
         ]),
         analysis=AnalysisSpec(observers=[PopulationRecorder()]),
     )

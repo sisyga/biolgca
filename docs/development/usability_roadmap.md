@@ -803,6 +803,44 @@ Accept: the coverage matrix (mechanism × family) is full for movement terms,
 birth/death and switching; `pipeline.py` shrinks substantially; the test suite
 has no parity tests.
 
+- Decided (2026-09-24, user): prefixed names stay as aliases that warn
+  (removed in the next release); the legacy interaction functions are not
+  deleted but frozen in `tests/legacy`, so the comparison tests keep a
+  reference (this replaces "the test suite has no parity tests"); functions
+  passed to `get_lgca(interaction=...)` keep running on the model object;
+  legacy details that the rules do differently (e.g. `classical.birth`,
+  classical go-or-grow's birth cap) follow the rules and are documented.
+- Status (2026-09-24): done. `lgca/legacy_names.py` translates every
+  `get_lgca` name of every family into a stack of rules with the legacy
+  parameters and defaults (growth with a random walk, so `birth*` no longer
+  moves cells itself); the prefixed model-file names are registered as
+  deprecated aliases (`PluginInfo.deprecated`: `FutureWarning`, hidden from
+  `list_plugins`). `LGCA_base.set_interaction` is one method for all
+  families: it derives a `ModelSpec` from the model object and compiles the
+  stack, so `get_lgca` and model files run the same code; `lgca.interaction`,
+  `interaction_params` and `interactions` keep working. Multi-species models
+  now accept every name whose rules take several species. Generic additions
+  for the translations: `birth_death(channels=...)`, `go_or_rest` with a
+  kappa and theta per species (multispecies go-or-grow), `directed_motion`
+  (a given gradient for legacy chemotaxis). Deleted from the package: the
+  five legacy interaction modules and `identity_kernels` (moved to
+  `tests/legacy` with their `set_interaction` code, registered there as
+  `legacy.<family>.<name>`), all `Native*` duplicates, the legacy plugin
+  registrations and `classical_operators`: `pipeline.py` 2951 -> 972 lines,
+  `plugins.py` 1822 -> 350, 5900 lines removed in all. Comparison tests use
+  the frozen functions (several had compared with the `Native*` ports, and a
+  few had silently compared a translation with itself);
+  `tests/legacy_names_test.py` compares every name of every family with its
+  legacy function after one step (changes of cells, resting cells and flux
+  per node, 100 x 100 nodes; a 15 % change of a rate shows at 3-5 sigma).
+  Coverage: movement and growth rules work in every family, species switching
+  in classical models with several species. Open: identity-based models have
+  no generic rule that switches a discrete cell trait at given rates (the
+  counterpart of `phenotype_switch`). Speed against the frozen legacy
+  functions (`benchmarks/research_models.py`): research models 3.6-18x,
+  identity-based growth 11-16x, classical growth 1.1x, multispecies growth
+  0.8-1.4x depending on the allocator (unchanged).
+
 ### Phase 3: Studying a model (two to three weeks)
 
 **3.1 Varying specs** (B7)

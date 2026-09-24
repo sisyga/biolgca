@@ -26,7 +26,7 @@ from time import perf_counter
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # the repository root, for tests.legacy
-import tests.legacy  # noqa: E402,F401  (registers "legacy.<family>.<name>")
+import tests.legacy  # noqa: F401  (registers "legacy.<family>.<name>")
 from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
 from lgca.pipeline import InteractionPipelineSpec
 
