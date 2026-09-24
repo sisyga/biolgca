@@ -29,12 +29,14 @@ This file records notable user-facing changes. Changes remain under
   conservation laws, invalid states, ghost-node changes that reach the
   lattice and unseeded randomness. `expected_growth=` compares the measured
   growth per step with the expected one.
-- Go-or-grow as a two-species model: `go_or_grow.switch` (migrating and
-  resting cells switch species depending on density), `go_or_grow.growth`
-  (death, and division of resting cells into rest channels, with separate
-  death rates if wanted) and `species_random_walk`. With
-  `capacity="legacy"` (default) they reproduce `classical.go_or_grow` and
-  `nove.go_or_grow` in distribution; the go-or-grow example uses them.
+- Go-or-grow from separate rules: `go_or_rest` (cells move between velocity
+  and rest channels depending on density), `go_or_grow.growth` (death, and
+  division of resting cells into rest channels, with separate death rates if
+  wanted) and `channel_random_walk` (a random walk within a set of channels
+  and species). With `capacity="legacy"` (default) they reproduce
+  `classical.go_or_grow` and `nove.go_or_grow` in distribution; the example,
+  tutorial 4 and the README use them. In the two-species form, migrating and
+  resting cells are species and `go_or_grow.switch` is the switch.
 - `LatticeState` operations accept channel sets per species, e.g.
   `channels={0: "velocity", 1: "rest"}`.
 - `lgca.LatticeState`: the interior of a classical model with a species axis
@@ -104,11 +106,11 @@ This file records notable user-facing changes. Changes remain under
   and without a capacity only free channels limit divisions. With one
   species it remains a hard limit. Seeded multispecies runs differ from
   before.
-- The README go-or-grow example uses the two-species model.
+- The README go-or-grow example uses the go-or-grow rules.
 - The custom interaction guide, the concepts page on interactions,
   tutorials 4 and 6 and the README use the decorators: rules are written as
   functions of the lattice state and tested with `check_interaction`.
-  Tutorial 4 builds go-or-grow from migrating and resting cells.
+  Tutorial 4 builds go-or-grow from `go_or_rest`, growth and a random walk.
 - Interactions run in the order they are listed in
   `InteractionPipelineSpec.operators`; the fixed order birth/death, phenotype
   switch, reorientation is no longer enforced. `allow_custom_order` is

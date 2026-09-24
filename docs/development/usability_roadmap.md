@@ -255,7 +255,7 @@ resting cells in rest channels, guarantees it itself.
   The how-to on model specs explains the kinds and the order; tutorials 3
   and 4 no longer describe a fixed order.
 
-**1.2 Go-or-grow as a two-species model**
+**1.2 Go-or-grow from separate rules** (planned as a two-species model; see status)
 
 Migrating cells (species 0, in velocity channels) and resting cells (species
 1, in rest channels) are separate species. The model is the pipeline
@@ -291,22 +291,21 @@ from its current state.
 - Phase 1 covers classical models with and without volume exclusion.
   Identity-based go-or-grow, where every cell has its own `kappa` and
   `theta`, follows with per-cell operations in Phase 2.
-- Status (2026-09-24): done in `lgca/builtin_rules.py` as `go_or_grow.switch`,
-  `go_or_grow.growth` and `species_random_walk` (a random walk restricted to
-  some species and channels, which the built-in random walks did not offer
-  for several species). Both go-or-grow rules need `n_species=2`, accept
-  `capacity="legacy"` or `"reject"`, and refuse states with migrating cells
-  outside velocity channels or resting cells outside rest channels. Without
-  volume exclusion both modes are the legacy rule (every cell switches and
-  divides on its own); births are scaled by `1 - density / capacity` as
-  before. Validation: one step on 3600 nodes over the whole density range
-  matches the legacy rule per density level (`tests/go_or_grow_test.py`,
-  which also detects `capacity="reject"` as a different model), and 300
-  seeded runs of a small colony, a large colony and an invasion agree in
-  population and resting fraction within one standard error at t = 10, 30
-  and 60. The go-or-grow example uses the two-species model and still shows
-  the Allee effect (12 cells shrink to 5; with kappa = -4 they grow to 1933).
-  Tutorial 4 follows with 1.7.
+- Status (2026-09-24): done in `lgca/builtin_rules.py`. Decided afterwards:
+  the default formulation is single-species, which is easier to explain:
+  `go_or_rest` (a reorientation between velocity and rest channels),
+  `go_or_grow.growth` (resting cells are the cells in rest channels) and
+  `channel_random_walk` over the velocity channels. The two-species form
+  (`go_or_grow.switch`, the same growth rule, the walk restricted to species
+  0) stays available. Both accept `capacity="legacy"` or `"reject"`; without
+  volume exclusion both modes are the legacy rule. Validation: one step on
+  3600 nodes over the whole density range matches the legacy rule per
+  density level for both forms, with and without volume exclusion
+  (`tests/go_or_grow_test.py`, which also detects `"reject"` as a different
+  model), and 300 seeded runs of the two-species form agreed with the legacy
+  rule within one standard error at t = 10, 30 and 60. The example, tutorial
+  4 and the README use the single-species form; the example still shows the
+  Allee effect (12 cells shrink to 2; with kappa = -4 they grow to 1827).
 
 **1.3 Lattice view with operations** (C4)
 
@@ -497,12 +496,12 @@ reorientation.
   switch, a movement bias (term), HPP and `check_interaction`; its code runs
   in `tests/docs_snippets_test.py`. The concepts page on interactions
   explains the three kinds, species and order, and lists the terms with
-  their couplings. Tutorial 4 ends with go-or-grow as two species (kappa = 4
-  and -4, migrating and resting cells plotted separately); tutorial 6 writes
+  their couplings. Tutorial 4 ends with go-or-grow built from `go_or_rest`
+  (kappa = 4 and -4, moving and resting cells plotted separately); tutorial 6 writes
   its rule with the decorator and runs `check_interaction`; tutorials 3 and
   6 have exercises that write a term. The README section "Write your own
-  interaction" uses the decorator, and its go-or-grow block the two-species
-  model, with the initial colony given as `nodes`.
+  interaction" uses the decorator, and its go-or-grow block the go-or-grow
+  rules.
 
 **Supported in Phase 1**
 

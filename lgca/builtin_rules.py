@@ -3,21 +3,30 @@
 They work with and without volume exclusion and for any number of species
 unless stated otherwise, and serve as worked examples of the decorator.
 
-Go-or-grow as a two-species model
----------------------------------
-Migrating cells are species 0 and live in velocity channels; resting cells are
-species 1 and live in rest channels. One time step of the classical
-go-or-grow model is the pipeline ::
+Go-or-grow
+----------
+Cells in velocity channels migrate, cells in rest channels rest and divide.
+One time step of the classical go-or-grow model is the pipeline ::
 
     operators=[
-        {"name": "go_or_grow.switch", "parameters": {"kappa": 4.0, "theta": 0.75}},
+        {"name": "go_or_rest", "parameters": {"kappa": 4.0, "theta": 0.75}},
         {"name": "go_or_grow.growth", "parameters": {"r_b": 0.2, "r_d": 0.01}},
-        {"name": "species_random_walk", "parameters": {"species": 0, "channels": "velocity"}},
+        {"name": "channel_random_walk", "parameters": {"channels": "velocity"}},
     ]
 
-in this order, followed by propagation. The rules keep each species in its
-channels, so the initial state must place migrating cells in velocity
-channels and resting cells in rest channels.
+in this order, followed by propagation: cells switch between moving and
+resting (a reorientation between velocity and rest channels), die, and
+resting cells divide into rest channels; then the moving cells pick new
+directions. This reproduces ``classical.go_or_grow`` and ``nove.go_or_grow``
+in distribution.
+
+In the two-species variant, migrating cells are species 0 (in velocity
+channels) and resting cells species 1 (in rest channels), and the switch is
+a phenotype switch, ``go_or_grow.switch``; ``go_or_grow.growth`` and the
+random walk (with ``"species": 0``) work unchanged. It gives both phenotypes
+their own counts in recordings. The rules keep each species in its channels,
+so the initial state must place migrating cells in velocity channels and
+resting cells in rest channels.
 """
 
 from __future__ import annotations
@@ -27,7 +36,7 @@ import numpy as np
 from .interactions import tanh_switch
 from .rules import interaction, reorientation_term
 
-__all__ = ["go_or_grow_growth", "go_or_grow_switch", "species_random_walk"]
+__all__ = ["channel_random_walk", "go_or_grow_growth", "go_or_grow_switch", "go_or_rest"]
 
 
 # Terms of the Boltzmann reorientation (ReorientationSpec). J(s') is the flux of
@@ -108,24 +117,70 @@ _MIGRATING, _RESTING = 0, 1
 _CAPACITY_MODES = ("legacy", "reject")
 
 
-@interaction(kind="reorientation", families=("classical", "nove"), name="species_random_walk")
-def species_random_walk(state, species=None, channels="all"):
-    """Cells move to uniformly random channels of their node.
+@interaction(kind="reorientation", families=("classical", "nove"), name="channel_random_walk")
+def channel_random_walk(state, channels="all", species=None):
+    """Cells move to uniformly random channels of their node, within a set of channels.
 
     Parameters
     ----------
-    species : int, list of int or None
-        Species that move; the others stay in their channels. Default: all.
     channels : str or list of int
         Channels the moving cells are spread over: ``"all"``, ``"velocity"``,
         ``"rest"`` or channel indices. Cells in other channels stay put.
+    species : int, list of int or None
+        Species that move; the others stay in their channels. Default: all.
     """
     state.shuffle_cells(channels, species=species)
+
+
+@interaction(kind="reorientation", families=("classical", "nove"), n_species=1, name="go_or_rest")
+def go_or_rest(state, kappa=5.0, theta=0.75, capacity="legacy"):
+    """Moving cells start resting on crowded nodes, resting cells start moving on sparse ones.
+
+    Parameters
+    ----------
+    kappa : float
+        Steepness of the switch. With kappa > 0 crowded cells rest, with
+        kappa < 0 they move.
+    theta : float
+        Density (cells per node over capacity) at which half of the cells rest.
+    capacity : {"legacy", "reject"}
+        With volume exclusion, what happens when a switching cell finds no free
+        channel. "legacy" reproduces the original rule: the number of switching
+        cells is drawn from the cells that fit into free channels. "reject":
+        every cell tries to switch, and switches into full channels fail.
+    """
+    _check_mode(capacity)
+    if state.restchannels < 1:
+        raise ValueError("go_or_rest needs at least one rest channel for resting cells")
+    rest = tanh_switch(state.density / _node_capacity(state), kappa, theta)
+    velocity, rng = state.velocitychannels, state.rng
+    cells = state.counts[..., 0, :]
+    moving, resting = cells[..., :velocity], cells[..., velocity:]
+    if state.volume_exclusion:
+        n_m, n_r = moving.sum(-1), resting.sum(-1)
+        free_rest, free_velocity = state.restchannels - n_r, velocity - n_m
+        if capacity == "legacy":
+            to_rest = rng.binomial(np.minimum(n_m, free_rest), rest)
+            to_move = rng.binomial(np.minimum(n_r, free_velocity), 1 - rest)
+        else:
+            to_rest = np.minimum(rng.binomial(n_m, rest), free_rest)
+            to_move = np.minimum(rng.binomial(n_r, 1 - rest), free_velocity)
+        new_moving = moving - _pick(rng, moving == 1, to_rest) + _pick(rng, moving == 0, to_move)
+        new_resting = resting - _pick(rng, resting == 1, to_move) + _pick(rng, resting == 0, to_rest)
+    else:
+        leaving_moving = rng.binomial(moving, rest[..., None])
+        leaving_resting = rng.binomial(resting, (1 - rest)[..., None])
+        new_moving = moving - leaving_moving + _spread(rng, leaving_resting.sum(-1), velocity)
+        new_resting = resting - leaving_resting + _spread(rng, leaving_moving.sum(-1), state.restchannels)
+    state.counts = np.concatenate((new_moving, new_resting), axis=-1)[..., None, :]
 
 
 @interaction(kind="phenotype_switch", families=("classical", "nove"), n_species=2, name="go_or_grow.switch")
 def go_or_grow_switch(state, kappa=5.0, theta=0.75, capacity="legacy"):
     """Migrating cells start resting in crowded nodes, resting cells start migrating in sparse ones.
+
+    The two-species form of go_or_rest: migrating cells are species 0 (in
+    velocity channels), resting cells species 1 (in rest channels).
 
     Parameters
     ----------
@@ -141,8 +196,7 @@ def go_or_grow_switch(state, kappa=5.0, theta=0.75, capacity="legacy"):
         every cell tries to switch, and switches into full channels fail.
     """
     _check_layout(state)
-    if capacity not in _CAPACITY_MODES:
-        raise ValueError(f"capacity must be one of {_CAPACITY_MODES}, got {capacity!r}")
+    _check_mode(capacity)
     rest = tanh_switch(state.density / _node_capacity(state), kappa, theta)
     if state.volume_exclusion and capacity == "legacy":
         counts = state.counts.copy()
@@ -168,9 +222,12 @@ def go_or_grow_switch(state, kappa=5.0, theta=0.75, capacity="legacy"):
     state.switch_phenotype(rates, channels={_MIGRATING: "velocity", _RESTING: "rest"})
 
 
-@interaction(kind="birth_death", families=("classical", "nove"), n_species=2, name="go_or_grow.growth")
+@interaction(kind="birth_death", families=("classical", "nove"), name="go_or_grow.growth")
 def go_or_grow_growth(state, r_b=0.2, r_d=0.01, r_d_resting=None, capacity="legacy"):
     """Cells die, and resting cells divide into free rest channels.
+
+    Resting cells are the cells in rest channels, or species 1 in the
+    two-species form of go-or-grow.
 
     Parameters
     ----------
@@ -178,7 +235,7 @@ def go_or_grow_growth(state, r_b=0.2, r_d=0.01, r_d_resting=None, capacity="lega
         Division probability of a resting cell. Without volume exclusion it is
         scaled by 1 - density / capacity.
     r_d : float
-        Death probability of a migrating cell, and of a resting cell unless
+        Death probability of a moving cell, and of a resting cell unless
         r_d_resting is given.
     r_d_resting : float or None
         Death probability of a resting cell. Default: r_d.
@@ -188,28 +245,43 @@ def go_or_grow_growth(state, r_b=0.2, r_d=0.01, r_d_resting=None, capacity="lega
         many resting cells as there are free rest channels. "reject": every
         resting cell tries to divide, and divisions into full channels fail.
     """
-    _check_layout(state)
-    if capacity not in _CAPACITY_MODES:
-        raise ValueError(f"capacity must be one of {_CAPACITY_MODES}, got {capacity!r}")
+    _check_mode(capacity)
+    if state.n_species == 1:
+        if state.restchannels < 1:
+            raise ValueError("go-or-grow needs at least one rest channel for resting cells")
+        resting = np.arange(state.K) >= state.velocitychannels
+        resting_species = 0
+    elif state.n_species == 2:
+        _check_layout(state)
+        resting = np.array([np.zeros(state.K, dtype=bool), np.ones(state.K, dtype=bool)])
+        resting_species = _RESTING
+    else:
+        raise ValueError(f"go_or_grow.growth works with one or two species, not {state.n_species}")
+    resting = np.broadcast_to(resting, (state.n_species, state.K))
     crowding = state.density / _node_capacity(state)
-    state.remove_cells([r_d, r_d if r_d_resting is None else r_d_resting])
+    death = np.where(resting, r_d if r_d_resting is None else r_d_resting, r_d)
+    state.remove_cells(np.broadcast_to(death, state.dims + death.shape))
     if state.volume_exclusion and capacity == "legacy":
-        n_r = state.species_density[..., _RESTING]
-        births = np.zeros(state.dims + (2,), dtype=np.int64)
-        births[..., _RESTING] = state.rng.binomial(np.minimum(n_r, state.restchannels - n_r), r_b)
-        state.add_cells(births, channels={_RESTING: "rest"})
+        n_r = (state.counts * resting).sum(axis=(-2, -1))
+        births = np.zeros(state.dims + (state.n_species,), dtype=np.int64)
+        births[..., resting_species] = state.rng.binomial(np.minimum(n_r, state.restchannels - n_r), r_b)
+        state.add_cells(births, channels={resting_species: "rest"})
         return
-    division = np.zeros(state.dims + (2,))
-    division[..., _RESTING] = r_b if state.volume_exclusion else np.clip(r_b * (1 - crowding), 0, 1)
-    state.divide_cells(division, channels={_RESTING: "rest"})
+    rate = r_b if state.volume_exclusion else np.clip(r_b * (1 - crowding), 0, 1)
+    division = np.where(resting, np.asarray(rate, dtype=float)[..., None, None], 0.0)
+    state.divide_cells(np.broadcast_to(division, state.dims + resting.shape),
+                       channels={resting_species: "rest"})
 
 
 def go_or_grow_layout(state):
     """Move migrating cells to velocity channels and resting cells to rest channels.
 
-    For random initial states, e.g. in :func:`lgca.testing.check_interaction`:
-    cells in the wrong channels are dropped.
+    For random initial states of the two-species form, e.g. in
+    :func:`lgca.testing.check_interaction`: cells in the wrong channels are
+    dropped. States with one species are left as they are.
     """
+    if state.n_species == 1:
+        return
     counts = state.counts.copy()
     velocity = state.velocitychannels
     counts[..., _MIGRATING, velocity:] = 0
@@ -220,6 +292,16 @@ def go_or_grow_layout(state):
 def _node_capacity(state):
     """Cells a node can hold: its channels with volume exclusion, the model capacity without."""
     return state.K if state.volume_exclusion else state.capacity
+
+
+def _check_mode(capacity):
+    if capacity not in _CAPACITY_MODES:
+        raise ValueError(f"capacity must be one of {_CAPACITY_MODES}, got {capacity!r}")
+
+
+def _spread(rng, number, channels):
+    """Spread ``number`` cells per node uniformly over ``channels`` channels."""
+    return rng.multinomial(number, np.full(channels, 1 / channels))
 
 
 def _check_layout(state):

@@ -142,9 +142,12 @@ from one species to another and needs a model with several species:
        state.switch_phenotype(rates)
 
 Each cell keeps its channel (``channels="same"``); a switch into a channel
-that the new species already occupies fails. The built-in go-or-grow model
-uses this to switch between migrating cells (species 0, in velocity channels)
-and resting cells (species 1, in rest channels); see tutorial 4.
+that the new species already occupies fails. The two-species form of the
+built-in go-or-grow model uses this to switch between migrating cells
+(species 0, in velocity channels) and resting cells (species 1, in rest
+channels); see :mod:`lgca.builtin_rules`. With one species, moving and
+resting are channel types, and the switch is a reorientation between them
+(``go_or_rest``).
 
 A movement bias
 ---------------

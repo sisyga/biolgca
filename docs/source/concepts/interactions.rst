@@ -32,8 +32,7 @@ against it after every step; see :doc:`/how_to/custom_interactions`.
 Species
 -------
 
-Classical models can have several species, e.g. two cell types, or migrating
-and resting cells of go-or-grow. With volume exclusion, each channel holds at
+Classical models can have several species, e.g. two cell types. With volume exclusion, each channel holds at
 most one cell of each species. Rules see the channel states as an array of
 shape ``dims + (n_species, K)``, also when there is only one species, so the
 same rule works for one and for several species. Arrays of single-species
@@ -41,8 +40,8 @@ models keep their shape ``dims + (K,)`` outside the rules, in ``lgca.nodes``,
 recordings and model files.
 
 The library does not restrict where a species may sit. A model in which
-resting cells stay in rest channels, like go-or-grow, uses interactions that
-keep them there.
+some cells must stay in rest channels, like the two-species form of
+go-or-grow, uses interactions that keep them there.
 
 Order
 -----
@@ -51,7 +50,9 @@ The pipeline applies the interactions in the order of
 ``InteractionPipelineSpec.operators``, followed by propagation. The order is
 part of the model: division before reorientation is a different model from
 reorientation before division, and the classical go-or-grow model is the
-sequence switch, growth, random walk of the migrating cells. The run metadata
+sequence ``go_or_rest`` (cells move between velocity and rest channels),
+``go_or_grow.growth`` (death, division of resting cells) and
+``channel_random_walk`` over the velocity channels. The run metadata
 records the schedule as ``result.metadata["schedule"]``.
 
 Combining directional cues
