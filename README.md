@@ -144,34 +144,23 @@ switching rule.
 
 ## Write your own interaction
 
-A new rule is a Python class with an `apply` method that updates the lattice.
-Once registered, it has a name and takes parameters like any built-in
-interaction. This one kills cells more often on crowded sites; the loop below
-compares three death rates:
+A new rule is a Python function of the lattice state. The state offers
+operations with a fixed meaning per cell, such as "every cell dies with
+probability p", which work with and without volume exclusion and for any
+number of species. The decorator registers the rule under its name, with its
+parameters taken from the signature. This rule kills cells more often on
+crowded nodes; the loop compares three death rates:
 
 ```python
-from lgca.plugins import BirthDeathOperator, ParameterSpec, PluginInfo, register_plugin
+from lgca import interaction
 from lgca.simulation import PopulationRecorder
 
 
-class CrowdingDeath(BirthDeathOperator):
-    """Each cell dies with probability r_d * (cells on its site) / (site capacity)."""
+@interaction(kind="birth_death", families=("classical", "nove"))
+def crowding_death(state, r_d=0.1):
+    """Each cell dies with probability r_d * (cells on its node) / (node capacity)."""
+    state.remove_cells(r_d * state.density / state.capacity)
 
-    def apply(self, context, step):
-        lgca = context.lgca
-        nodes = lgca.nodes[lgca.nonborder]  # a copy of the interior sites
-        p_death = self.parameters["r_d"] * nodes.sum(-1, keepdims=True) / lgca.K
-        survives = lgca.rng.random(nodes.shape) >= p_death
-        lgca.nodes[lgca.nonborder] = nodes & survives
-
-
-INFO = PluginInfo(
-    name="my.crowding_death",
-    operator_kind="birth_death",
-    backend_families=("classical",),
-    parameters={"r_d": ParameterSpec(required=True, description="death probability on a full site")},
-)
-register_plugin(INFO, lambda parameters: CrowdingDeath(INFO, parameters))
 
 for r_d in (0.0, 0.2, 0.5):
     spec = ModelSpec(
@@ -180,7 +169,7 @@ for r_d in (0.0, 0.2, 0.5):
         time=TimeSpec(steps=100, seed=1),
         dynamics=InteractionPipelineSpec(operators=[
             {"name": "birth_death", "parameters": {"birth_rate": 0.1}},
-            {"name": "my.crowding_death", "parameters": {"r_d": r_d}},
+            crowding_death(r_d=r_d),
             {"name": "classical.random_walk"},
         ]),
         analysis=AnalysisSpec(observers=[PopulationRecorder()]),
@@ -189,9 +178,13 @@ for r_d in (0.0, 0.2, 0.5):
     print(f"r_d = {r_d}: {result.lgca.n_t[-1]} cells after 100 steps")
 ```
 
-Tutorial 6 shows how to test such a rule and share it together with a model.
-The [custom interaction guide](docs/source/how_to/custom_interactions.rst)
-describes the plugin contract.
+`lgca.testing.check_interaction(crowding_death)` runs a rule on every lattice
+and model family it claims to support and reports what goes wrong, from lost
+cells to unseeded random numbers. Movement biases are written the same way
+with `@reorientation_term`. The
+[custom interaction guide](docs/source/how_to/custom_interactions.rst) shows
+growth rules, movement biases and a deterministic collision rule, and tutorial
+6 how to test a rule and share it together with a model.
 
 ## Learn
 

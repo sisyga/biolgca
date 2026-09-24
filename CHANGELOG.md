@@ -94,6 +94,10 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- The custom interaction guide, the concepts page on interactions,
+  tutorials 4 and 6 and the README use the decorators: rules are written as
+  functions of the lattice state and tested with `check_interaction`.
+  Tutorial 4 builds go-or-grow from migrating and resting cells.
 - Interactions run in the order they are listed in
   `InteractionPipelineSpec.operators`; the fixed order birth/death, phenotype
   switch, reorientation is no longer enforced. `allow_custom_order` is

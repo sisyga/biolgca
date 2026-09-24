@@ -494,6 +494,17 @@ reorientation.
 - Tutorial 4 builds go-or-grow as a two-species model; tutorial 6 uses the
   decorator; add exercises that write a term.
 - Concepts page: the three kinds of interaction, the species axis, free order.
+- Status (2026-09-24): done. The how-to shows a growth rule, a phenotype
+  switch, a movement bias (term), HPP and `check_interaction`; its code runs
+  in `tests/docs_snippets_test.py`. The concepts page on interactions
+  explains the three kinds, species and order, and lists the terms with
+  their couplings. Tutorial 4 ends with go-or-grow as two species (kappa = 4
+  and -4, migrating and resting cells plotted separately); tutorial 6 writes
+  its rule with the decorator and runs `check_interaction`; tutorials 3 and
+  6 have exercises that write a term. The README section "Write your own
+  interaction" uses the decorator. The README go-or-grow block still uses
+  `classical.go_or_grow` with a region initializer, which cannot yet place
+  two species in their channels.
 
 **Supported in Phase 1**
 

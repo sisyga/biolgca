@@ -148,12 +148,11 @@ A function can serve as the interaction of a ``get_lgca`` model:
 instance, reads its parameters from ``lgca.interaction_params`` and changes
 ``lgca.nodes`` before propagation. See :doc:`factory_reference` for an example.
 
-For reusable rules, prefer adding an :class:`lgca.plugins.InteractionOperator`
-subclass and registering it with :func:`lgca.plugins.register_plugin`. Plugin
-operators can validate the model context, advertise dependencies and outputs,
-declare conservation laws, and participate in :class:`lgca.model.ModelSpec`
-pipeline compilation. Follow :doc:`/how_to/custom_interactions` for the complete
-extension recipe. :mod:`lgca.classical_operators` demonstrates a focused
-metadata/factory/operator slice; the remaining native families in
-:mod:`lgca.pipeline` provide examples of birth/death, phenotype-switch and
-composed reorientation rules.
+For reusable rules, write a function of the lattice state and decorate it
+with :func:`lgca.interaction`, or with :func:`lgca.reorientation_term` for a
+cue of the Boltzmann reorientation. The rule gets a name for model files,
+works with and without volume exclusion and for any number of species, and is
+checked against the conservation law of its kind;
+:func:`lgca.testing.check_interaction` tests it on every lattice and family it
+supports. :doc:`/how_to/custom_interactions` shows examples, and
+:mod:`lgca.builtin_rules` contains the built-in rules written this way.

@@ -1,15 +1,58 @@
-Interaction composition
-=======================
+Interactions
+============
 
-An LGCA time step contains conceptually different processes. In the standard
-pipeline they run in the following order:
+One time step of an LGCA applies the interactions of the model, in the order
+they are listed, and then moves the cells along their velocity channels
+(propagation). This page explains the three kinds of interaction, how models
+with one and several species are treated, and how directional cues combine.
 
-``birth/death -> phenotype switching -> reorientation -> propagation``
+Three kinds of interaction
+--------------------------
 
-Birth and death may change total particle number. Phenotype switching changes
-particle type without changing total particle number. Reorientation redistributes
-particles among the channels of a node. Propagation then moves velocity-channel
-particles deterministically to neighboring nodes.
+Every interaction is one of three kinds, defined by what it keeps:
+
+``birth_death``
+   changes the number of cells: birth, death, division.
+``phenotype_switch``
+   changes what a cell is. In classical models a phenotype is a species, and a
+   switch moves cells from one species to another; the number of cells at
+   every node stays the same. A classical model with one species has nothing
+   to switch to, so it rejects a phenotype switch. In identity-based models a
+   switch changes the parameters of individual cells.
+``reorientation``
+   rearranges the cells of a node over its channels and keeps the number of
+   cells of each species at the node. Boltzmann sampling of combined cues
+   (below) is the usual way to write one, but any rule that keeps these
+   numbers is a reorientation, including deterministic ones such as the HPP
+   collision rule, and moving cells between velocity and rest channels.
+
+Rules written with :func:`lgca.interaction` declare their kind and are checked
+against it after every step; see :doc:`/how_to/custom_interactions`.
+
+Species
+-------
+
+Classical models can have several species, e.g. two cell types, or migrating
+and resting cells of go-or-grow. With volume exclusion, each channel holds at
+most one cell of each species. Rules see the channel states as an array of
+shape ``dims + (n_species, K)``, also when there is only one species, so the
+same rule works for one and for several species. Arrays of single-species
+models keep their shape ``dims + (K,)`` outside the rules, in ``lgca.nodes``,
+recordings and model files.
+
+The library does not restrict where a species may sit. A model in which
+resting cells stay in rest channels, like go-or-grow, uses interactions that
+keep them there.
+
+Order
+-----
+
+The pipeline applies the interactions in the order of
+``InteractionPipelineSpec.operators``, followed by propagation. The order is
+part of the model: division before reorientation is a different model from
+reorientation before division, and the classical go-or-grow model is the
+sequence switch, growth, random walk of the migrating cells. The run metadata
+records the schedule as ``result.metadata["schedule"]``.
 
 Combining directional cues
 --------------------------
@@ -30,61 +73,52 @@ Supported reorientation terms
 -----------------------------
 
 Use :func:`lgca.pipeline.list_reorientation_terms` to retrieve the names in
-code. The aliases below intentionally remain available for readable model
-specifications and backwards compatibility.
+code. ``J(s')`` is the flux of a candidate state, the sum of the velocities of
+its cells. Every term is a field of the lattice state together with a
+coupling that turns it into a score; new terms are written the same way with
+:func:`lgca.reorientation_term`, and the built-in ones are defined in
+:mod:`lgca.builtin_rules`.
 
 .. list-table::
    :header-rows: 1
-   :widths: 22 31 25 22
+   :widths: 24 36 20 20
 
-   * - Term
-     - Interpretation
-     - Required input
-     - Notes
-   * - ``aggregation``
-     - Bias movement toward increasing local density.
-     - Neighbor density and boundary nodes.
-     - Density-gradient cue.
-   * - ``alignment``
-     - Favor channel axes aligned with neighboring particles.
-     - Neighbor channel state.
-     - Alias of the current nematic alignment score.
-   * - ``chemotaxis``
-     - Bias movement along a scalar-field gradient.
-     - ``parameters={"field": "name"}`` and a matching state field.
-     - Directional external cue.
-   * - ``contact_guidance``
-     - Align movement with a local director field.
-     - A vector state field; defaults to ``director``.
-     - Nematic external cue.
-   * - ``nematic``
-     - Align channel axes without distinguishing head from tail.
-     - Neighbor channel state.
-     - Alias of ``nematic_alignment``.
-   * - ``nematic_alignment``
-     - Align channel axes without distinguishing head from tail.
-     - Neighbor channel state.
-     - Canonical descriptive name.
-   * - ``persistent_motion``
-     - Favor the node's previous movement direction.
-     - Current local channel state.
-     - Alias of ``persistent_walk``.
-   * - ``persistent_walk``
-     - Favor the node's previous movement direction.
-     - Current local channel state.
-     - Persistent directional memory.
-   * - ``random_walk``
-     - Give every admissible channel state equal score.
-     - No additional input.
-     - Alias of ``uniform``.
+   * - Term (aliases)
+     - Score
+     - Coupling
+     - Input
+   * - ``random_walk`` (``uniform``)
+     - 0: all states are equally likely.
+     - rest
+     - none
    * - ``resting_bias``
-     - Favor admissible states with more occupied rest channels.
-     - At least one rest channel for a visible effect.
-     - Local motility-state bias.
-   * - ``uniform``
-     - Give every admissible channel state equal score.
-     - No additional input.
-     - Unbiased sampler term.
+     - Number of cells in rest channels.
+     - rest
+     - at least one rest channel
+   * - ``persistent_walk`` (``persistent_motion``)
+     - ``J(s) · J(s')``: cells keep their direction.
+     - flux
+     - the node's cells
+   * - ``polar_alignment``
+     - ``J_nb · J(s')`` with the flux ``J_nb`` of the neighbours.
+     - flux
+     - neighbouring cells
+   * - ``nematic_alignment`` (``nematic``, ``alignment``)
+     - Rewards sharing an axis with neighbouring cells.
+     - channels
+     - neighbouring cells
+   * - ``aggregation``
+     - ``∇ρ · J(s')``: up the gradient of the cell density.
+     - flux
+     - cell density
+   * - ``chemotaxis``
+     - ``∇f · J(s')``: up the gradient of a field.
+     - flux
+     - ``parameters={"field": name}``
+   * - ``contact_guidance``
+     - ``Σ (d · c_i)²`` over occupied channels: along a director field.
+     - channels
+     - a vector field, default ``director``
 
 All gradients are derivatives in lattice units, with a lattice spacing of one,
 on every geometry. This includes the density gradient used by aggregation, so a
@@ -109,18 +143,16 @@ transport is reciprocal across the seam. Odd-row models can be constructed for
 static plotting, but stepping (including direct propagation) rejects them before
 state or random-number changes.
 
-Particle-conserving phenotype switching
----------------------------------------
+Phenotype switching with volume exclusion
+-----------------------------------------
 
-For a particle-number-conserving switch, the complete channel state ``s`` is
-mapped to one admissible state ``s'``. The transition preserves
-``N(s') = N(s)``; it is not a sequence of independent channel writes. Sampling
-the complete state is important for volume exclusion because separate writes
-could collide, merge particles or accidentally create an invalid state.
-
-The same full-state principle is already used by particle-conserving
-volume-exclusion interactions such as random walk, alignment and chemotaxis.
-The population-dynamics tutorial demonstrates the invariant directly.
+With volume exclusion, a cell that switches species needs a channel that is
+free for its new species. The built-in ``phenotype_switch`` samples the
+complete new state of each node at once, so switches cannot collide.
+``LatticeState.switch_phenotype`` lets every cell try to switch on its own:
+a switch into an occupied channel fails, and when several cells compete for
+the same free channel, one of them wins at random. The population-dynamics
+tutorial demonstrates both.
 
 Polar versus nematic composition
 --------------------------------
