@@ -4,9 +4,23 @@ import numpy as np
 import pytest
 
 from lgca import reorientation_term
-from lgca.model import Description, ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model, run_model
-from lgca.pipeline import (InteractionPipelineSpec, ReorientationSpec, ReorientationTermSpec,
-                           _REORIENTATION_TERMS, _TERM_ALIASES, list_reorientation_terms)
+from lgca.model import (
+    Description,
+    ModelSpec,
+    SpaceSpec,
+    StateSpec,
+    TimeSpec,
+    build_model,
+    run_model,
+)
+from lgca.pipeline import (
+    _REORIENTATION_TERMS,
+    _TERM_ALIASES,
+    InteractionPipelineSpec,
+    ReorientationSpec,
+    ReorientationTermSpec,
+    list_reorientation_terms,
+)
 
 
 @pytest.fixture(autouse=True)

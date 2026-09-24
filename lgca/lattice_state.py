@@ -14,7 +14,8 @@ it (any number of cells per channel). The changes reach the model when
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 
@@ -126,9 +127,8 @@ class LatticeState:
         if np.any(value < 0) or np.any(value != np.round(value)):
             raise ValueError("counts must be non-negative integers")
         value = value.astype(np.int64)
-        if self._ve:
-            if np.any(value > 1):
-                raise ValueError("with volume exclusion a channel holds at most one cell of each species")
+        if self._ve and np.any(value > 1):
+            raise ValueError("with volume exclusion a channel holds at most one cell of each species")
         self._counts = value
 
     @property

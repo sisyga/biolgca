@@ -4,8 +4,17 @@ import numpy as np
 import pytest
 
 from lgca import interaction
-from lgca.model import (Description, ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model,
-                        model_spec_from_dict, model_spec_to_dict, run_model)
+from lgca.model import (
+    Description,
+    ModelSpec,
+    SpaceSpec,
+    StateSpec,
+    TimeSpec,
+    build_model,
+    model_spec_from_dict,
+    model_spec_to_dict,
+    run_model,
+)
 from lgca.pipeline import InteractionPipelineSpec
 from lgca.plugins import default_registry, describe_plugin
 from lgca.testing import InteractionCheckError, check_interaction

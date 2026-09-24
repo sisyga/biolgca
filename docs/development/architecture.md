@@ -5,6 +5,24 @@ Internal notes for maintainers, moved out of the user guide
 owns which numerical update while legacy interaction functions and native
 pipeline operators coexist (see phase 2 of `usability_roadmap.md`).
 
+## Rules on the lattice state
+
+`lgca.lattice_state.LatticeState` is the layer between rules and model
+classes. It copies the interior channel states of a classical model into an
+integer array with a species axis (`dims + (n_species, K)`), offers the
+per-cell operations (`remove_cells`, `divide_cells`, `add_cells`,
+`switch_phenotype`, `shuffle_cells`), neighbour sums and gradients that pad
+by the boundary conditions, and writes the result back with `commit()`, which
+checks the conservation law of the kind. Each operation is implemented once
+with volume exclusion (one cell per channel and species) and once without.
+
+`lgca.rules` turns functions of a `LatticeState` into registered operators
+(`@interaction`, via `FunctionInteractionOperator`) and into reorientation
+terms (`@reorientation_term`, a field plus a coupling, evaluated by
+`pipeline._FieldTerm`). `lgca.builtin_rules` defines the built-in rules and all
+built-in reorientation terms this way. `lgca.testing.check_interaction` runs
+a rule on every declared geometry and family.
+
 ## Numerical implementation ownership
 
 `lgca.identity_kernels.inherit_missing_properties` owns completion of a
@@ -52,8 +70,12 @@ Remaining duplication:
   `ib_interactions` and native classes in `pipeline`.
 * NoVE/identity-NoVE alignment, birth/death and switching occur in their legacy
   interaction modules and native pipeline classes.
-* Classical reorientation has legacy score code and dedicated pipeline operators;
-  composed spatial terms now prepare fields once per application.
+* Classical reorientation has legacy score code and dedicated pipeline operators
+  (`classical.alignment`, `classical.chemotaxis`, ...) next to the composed
+  terms of `builtin_rules`, which compute their fields once per application.
+* The legacy go-or-grow operators (`classical.go_or_grow`, `nove.go_or_grow`)
+  coexist with the rule-based pipeline `go_or_rest`, `go_or_grow.growth`,
+  `channel_random_walk`, which reproduces them in distribution.
 * `classical_operators` owns the previously extracted classical random walk.
 
 `operator_base` owns lifecycle contracts and metadata types;
@@ -70,7 +92,8 @@ scores in batches with a conservative 32 MiB temporary budget. This preserves
 site order and RNG draws; it does not change the transition model.
 
 Composed Boltzmann reorientation also batches sites by occupancy and caches
-candidate flux, nematic scores and rest occupancy once per group. Score batches
+candidate flux, velocity and full channel occupancy and rest occupancy once
+per group. Score batches
 and cached candidate features each have a 32 MiB budget; these are temporary
 array limits, not a total process-memory limit. Candidate enumeration has its
 own size guard. The sampler retains one categorical uniform draw per nonempty

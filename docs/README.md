@@ -20,7 +20,7 @@ execution counts; the build supplies rendered outputs.
 Run the documentation contracts independently with:
 
 ```bash
-uv run pytest -q tests/tutorial_notebooks_test.py tests/example_gallery_docs_test.py
+uv run pytest -q tests/docs_build_test.py tests/docs_snippets_test.py tests/readme_test.py tests/examples_gallery_test.py
 ```
 
 Historical notebooks live in [`../notebooks/`](../notebooks/) and are not part

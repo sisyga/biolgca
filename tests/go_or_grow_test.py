@@ -5,7 +5,14 @@ import numpy as np
 import pytest
 
 from lgca.builtin_rules import go_or_grow_layout
-from lgca.model import Description, ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
+from lgca.model import (
+    Description,
+    ModelSpec,
+    SpaceSpec,
+    StateSpec,
+    TimeSpec,
+    build_model,
+)
 from lgca.pipeline import InteractionPipelineSpec
 from lgca.testing import check_interaction
 

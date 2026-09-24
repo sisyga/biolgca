@@ -1,58 +1,128 @@
 # AGENTS.md – Quick Start for Developers
 
-This document provides guidelines and context for developers working on the `biolgca` project.
+Guidelines and context for developers and coding agents working on `biolgca`.
 
-## Project Overview
+## Project overview
 
-The `biolgca` package is a Python library for simulating lattice-gas cellular automata (LGCA) in biological contexts. It supports various types of LGCA models in different lattice geometries.
+`biolgca` is a Python library for lattice-gas cellular automata (LGCA) in
+biology. Models are classical (cells are counted) or identity-based (cells
+carry labels and traits), with or without volume exclusion, with one or
+several species, on 1D, square, hexagonal, cubic and 3D Moore lattices.
 
-### Key Files and Folders
+Two APIs coexist:
 
-- **`lgca/`**: Core package directory
-  - `__init__.py`: Package initialization, includes factory methods
-  - `base.py`: Base classes for LGCA models
-  - `lgca_1d.py`, `lgca_square.py`, `lgca_hex.py`, `lgca_cubic.py`: Implementation of LGCA models for different geometries
-  - `interactions.py`: Library of interaction rules
-  - `ib_interactions.py`: Identity-based interaction rules
-  - `plots.py`: Visualization utilities
+- **`ModelSpec` (current):** a model is a declarative spec (space, state,
+  time, interaction pipeline, observers) that can be saved as JSON/YAML and
+  run from Python or the `biolgca` CLI. New features go here.
+- **`get_lgca` (legacy):** builds an LGCA object with one interaction
+  function. It stays supported but gets no new interactions; phase 2 of the
+  roadmap plans to retire the legacy interaction modules.
 
-- **`tests/`**: Test suite
-  - Run tests with `pytest` from the project root
-  - Files follow naming convention `*_test.py`
+## Environment and commands
 
-- **`docs/`**: Documentation
-  - Source files in `docs/source/`
-  - Generated with Sphinx
+The environment is managed with uv; `uv sync` creates `.venv/` from the
+committed `uv.lock`. Run everything from the repository root:
 
-## Code Style
+```bash
+uv sync                         # install locked dependencies
+uv run pytest -q                # test suite (about 25 s)
+uv run python docs/build.py     # strict docs build, executes all tutorials
+uv run ruff check <files>       # lint the files you changed
+```
 
-### Python Style Guidelines
+After changing dependencies in `pyproject.toml`, run `uv lock` and commit
+`uv.lock`. CI (`.github/workflows/ci.yml`) runs the tests on Python 3.11 to
+3.14 and with the minimum dependency versions, executes the tutorials, smoke
+tests the installed wheel and CLI, and builds the docs.
 
-- Follow PEP 8 conventions
-- Use NumPy-style docstrings for functions and classes
-- Class names are CamelCase, methods and functions are snake_case
-- Variable names should be descriptive and indicate their purpose
-- Use type hints where appropriate
+## Where things are
 
-## Testing
+`lgca/`, the package:
 
-- The environment is managed with uv: `uv sync` creates `.venv/` from the committed `uv.lock`
-- Run the tests with `uv run pytest -q` from the project root before proposing a PR
-- After changing dependencies in `pyproject.toml`, run `uv lock` and commit `uv.lock`
-- Test files should be placed in the `tests/` directory
-- Use parameterized testing when testing similar functionality across different models
-- Tests should be deterministic (use fixed random seeds where appropriate)
+- Model API: `model.py` (`ModelSpec`, `build_model`, `run_model`, model files),
+  `pipeline.py` (`InteractionPipelineSpec`, `ReorientationSpec`, the Boltzmann
+  sampler, native operators), `simulation.py` (observers and recorders),
+  `initializers.py`, `cli.py`, `schemas/` (JSON schema of model files).
+- Interaction registry: `operator_base.py` (`PluginInfo`, operator base
+  classes), `operator_registry.py`, `plugins.py` (registration, parameter
+  validation and descriptions, built-in plugin catalogue).
+- Writing rules: `lattice_state.py` (`LatticeState`, the interior of a
+  classical model with a species axis and per-cell operations), `rules.py`
+  (the `@interaction` and `@reorientation_term` decorators), `builtin_rules.py`
+  (built-in rules and reorientation terms written with them, including
+  go-or-grow), `testing.py` (`check_interaction`).
+- Model classes: `base.py`, `nove_base.py`, `ib_base.py`, `nove_ib_base.py`,
+  `multispecies_base.py`; geometries in `lgca_1d.py`, `lgca_square.py`,
+  `lgca_hex.py`, `lgca_cubic.py`, `lgca_3dmoore.py` and `ms_*.py`.
+- Legacy interaction functions for `get_lgca`: `interactions.py`,
+  `nove_interactions.py`, `ib_interactions.py`, `nove_ib_interactions.py`,
+  `ms_interactions.py`. Do not add new rules here.
+- Plotting: `plots.py`, `plot_data.py`, `square_plotting.py`, `plotting.py`,
+  `mayavi_style.py` (optional 3D).
+- `examples/`: curated runnable models (`lgca.examples.run_example`).
 
-## Documentation
+Elsewhere:
 
-- Document all public APIs with NumPy-style docstrings
-- Include examples in docstrings where helpful
-- Keep the examples in docstrings and documentation synchronized with the current API
+- `tests/`: pytest files named `*_test.py`.
+- `docs/source/`: Sphinx user docs; the tutorials in `docs/source/tutorials/`
+  run during every docs build. `docs/development/`: maintainer notes, not
+  built: `usability_roadmap.md` (the current plan), `architecture.md`.
+- `benchmarks/`: profiling and benchmark scripts.
+- `notebooks/legacy/`: historical notebooks, not maintained.
+
+## Conventions
+
+- **Interactions** are of three kinds: `birth_death` changes the number of
+  cells, `phenotype_switch` moves cells between species (classical models)
+  or changes cell parameters (identity-based models), and `reorientation`
+  rearranges a node's cells over its channels, keeping the cells per species.
+  Operators run in the order they are listed, then propagation.
+- **New rules** are functions of a `LatticeState` registered with
+  `@interaction` or `@reorientation_term`; built-in ones go in
+  `builtin_rules.py`. Use the state's operations, which act per cell, and only
+  `state.rng` for random numbers. Class-based operators in `pipeline.py` are
+  for cases the decorators cannot express.
+- **Species axis:** rules see channel states as `dims + (n_species, K)`, also
+  for one species. Public arrays (`lgca.nodes`, recordings, model files) of
+  single-species models keep `dims + (K,)`.
+- **Capacity** is a crowding scale used in rates such as
+  `1 - density / capacity`. The hard limit is volume exclusion (one cell per
+  channel and species); single-species classical `birth_death` also treats
+  capacity as a hard limit, by design.
+- **Messages:** warn with `lgca._warnings.warn_user` (points at the user's
+  code); report progress with the `logging` logger `"lgca"`, never `print`.
+- **Reproducibility:** tests use fixed seeds. Statistical tests compare with
+  tolerances derived from standard errors and should fail for a wrong model.
+
+## Code style
+
+- PEP 8, lines up to about 110 characters; `ruff check` should pass for
+  new or rewritten modules (the legacy code is not yet clean).
+- NumPy-style docstrings for all public APIs, with examples where helpful.
+- CamelCase classes, snake_case functions and methods, descriptive names,
+  type hints where they help.
+- Match the surrounding code: comment density, naming and idiom.
+
+## Tests and documentation
+
+- Run `uv run pytest -q` before proposing changes; parametrize tests across
+  geometries and model families where behaviour should be the same.
+- Code in the README and in `docs/source/how_to/custom_interactions.rst` is
+  executed by `tests/readme_test.py` and `tests/docs_snippets_test.py`; keep it
+  runnable. Regenerate the README images with
+  `uv run python docs/images/readme/make_readme_images.py` when their code or
+  the plotted model changes.
+- Keep examples in docstrings, docs and tutorials in sync with the API. The
+  tutorials must run top to bottom without saved outputs.
+- Record user-facing changes in `CHANGELOG.md` under "Unreleased". When a
+  roadmap item is done or a design decision changes, add a dated status note
+  to `docs/development/usability_roadmap.md`.
 
 ## Contributing
 
-### PR Instructions
-
-- **Title format**: `[Fix|Feat|Docs] <one-line summary>`
-- **Body requirements**: Must include a "Testing Done" section
-- Include reference to issues being addressed (if applicable)
+- Commit or push only when asked. Development happens on `aidevelop`; the
+  default branch is `master`, which Read the Docs builds until the new
+  version is finished.
+- PR title format: `[Fix|Feat|Docs] <one-line summary>`.
+- PR body: include a "Testing Done" section and reference the issues
+  addressed, if any.

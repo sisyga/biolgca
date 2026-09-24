@@ -284,7 +284,14 @@ def test_identity_based_models_are_rejected():
 
 
 def _field_model(boundary):
-    from lgca.model import Description, ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
+    from lgca.model import (
+        Description,
+        ModelSpec,
+        SpaceSpec,
+        StateSpec,
+        TimeSpec,
+        build_model,
+    )
 
     signal = np.add.outer(np.arange(6.0), np.zeros(4))  # rises by 1 per node along x
     return build_model(ModelSpec(

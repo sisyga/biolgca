@@ -23,8 +23,9 @@ from __future__ import annotations
 
 import inspect
 import re
+from collections.abc import Callable, Iterable
 from dataclasses import replace
-from typing import Any, Callable, Iterable
+from typing import Any
 
 import numpy as np
 

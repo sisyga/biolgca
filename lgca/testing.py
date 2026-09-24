@@ -12,8 +12,9 @@ It is meant as a one-line test::
 from __future__ import annotations
 
 import warnings
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 import numpy as np
 
@@ -49,8 +50,8 @@ class InteractionReport:
 
     def __str__(self) -> str:
         checked = len(self.rows)
-        lines = [f"check_interaction({self.name!r}): {checked} models checked, "
-                 f"{'all passed' if self.passed else f'{len(self.failures)} problems'}"]
+        outcome = "all passed" if self.passed else f"{len(self.failures)} problems"
+        lines = [f"check_interaction({self.name!r}): {checked} models checked, {outcome}"]
         lines += [f"  - {failure}" for failure in self.failures]
         return "\n".join(lines)
 
@@ -203,7 +204,7 @@ def _check_case(entry, setup, kind, momentum, prepare) -> list[str]:
         second = _run(entry, setup, kind, momentum, prepare)
     except _Problems as problems:
         return problems.messages
-    except Exception as exc:  # the rule itself failed
+    except Exception as exc:  # noqa: BLE001 - any error of the rule is reported
         return [f"{type(exc).__name__}: {exc}"]
     if not np.array_equal(first, second):
         return ["the same seed gave different results; draw random numbers only from state.rng"]
@@ -251,8 +252,8 @@ def _ghost_leaks(lgca, before, ghosts) -> list[str]:
     lgca.nodes = after
     lgca.apply_boundaries()
     if not np.array_equal(lgca.nodes[lgca.nonborder], expected[lgca.nonborder]):
-        return ["changes to ghost nodes reach the lattice through the boundary conditions; "
-                "change only the interior (state.commit() does this)"]
+        return [("changes to ghost nodes reach the lattice through the boundary conditions; "
+                 "change only the interior (state.commit() does this)")]
     return []
 
 
@@ -288,19 +289,22 @@ def _compare(lgca, before, kind, momentum) -> list[str]:
     return problems
 
 
+def _cells_per_species(lgca, n_species):
+    interior = np.asarray(lgca.nodes[lgca.nonborder], dtype=np.int64)
+    return interior.reshape(-1, n_species, lgca.K).sum(axis=(0, 2))
+
+
 def _check_growth(entry, geometry, models, density, seed, expected, prepare) -> list[str]:
     problems = []
     for family, species in models:
         setup = _Setup(geometry, family, species, "periodic", density, seed, large=True)
         compiled = _build(entry, setup, prepare)
         lgca = compiled.lgca
-        counts = lambda: np.asarray(lgca.nodes[lgca.nonborder], dtype=np.int64).reshape(
-            -1, species, lgca.K).sum(axis=(0, 2))
         lgca.apply_boundaries()
         lgca.update_dynamic_fields()
-        start = counts()
+        start = _cells_per_species(lgca, species)
         compiled.pipeline.operators[0].apply(compiled.context, 1)
-        measured = (counts() - start) / np.maximum(start, 1)
+        measured = (_cells_per_species(lgca, species) - start) / np.maximum(start, 1)
         target = np.broadcast_to(np.asarray(expected, dtype=float), measured.shape)
         tolerance = 4 * np.sqrt(np.maximum(np.abs(target), 1e-3) / np.maximum(start, 1))
         for index in np.flatnonzero(np.abs(measured - target) > tolerance):
