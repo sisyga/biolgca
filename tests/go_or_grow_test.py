@@ -57,13 +57,13 @@ def _migrating_and_resting(nodes):
     return nodes[..., :6].sum(-1), nodes[..., 6:].sum(-1)
 
 
-def _pipeline(n_species, capacity="legacy"):
+def _pipeline(n_species, when_full="legacy"):
     switch = {key: PARAMETERS[key] for key in ("kappa", "theta")}
     growth = {key: PARAMETERS[key] for key in ("r_b", "r_d")}
     walk = {"channels": "velocity"} | ({"species": 0} if n_species == 2 else {})
     return [{"name": "go_or_rest" if n_species == 1 else "go_or_grow.switch",
-             "parameters": switch | {"capacity": capacity}},
-            {"name": "go_or_grow.growth", "parameters": growth | {"capacity": capacity}},
+             "parameters": switch | {"when_full": when_full}},
+            {"name": "go_or_grow.growth", "parameters": growth | {"when_full": when_full}},
             {"name": "channel_random_walk", "parameters": walk}]
 
 
@@ -91,7 +91,7 @@ def test_one_step_matches_the_legacy_rule_at_every_density(ve, n_species):
 def test_the_reject_mode_is_a_different_model():
     nodes = _legacy_nodes(True, seed=4)
     legacy = _migrating_and_resting(_step(nodes, [{"name": "classical.go_or_grow", "parameters": PARAMETERS}]))
-    reject = _migrating_and_resting(_step(nodes, _pipeline(1, capacity="reject")))
+    reject = _migrating_and_resting(_step(nodes, _pipeline(1, when_full="reject")))
     crowded = nodes.sum(-1) >= 7
 
     assert reject[1][crowded].mean() > legacy[1][crowded].mean() + 0.1
@@ -99,11 +99,11 @@ def test_the_reject_mode_is_a_different_model():
 
 @pytest.mark.parametrize("rule, parameters", [
     ("go_or_rest", {"kappa": 4.0, "theta": 0.5}),
-    ("go_or_rest", {"kappa": -4.0, "theta": 0.5, "capacity": "reject"}),
+    ("go_or_rest", {"kappa": -4.0, "theta": 0.5, "when_full": "reject"}),
     ("go_or_grow.switch", {"kappa": 4.0, "theta": 0.5}),
-    ("go_or_grow.switch", {"kappa": -4.0, "theta": 0.5, "capacity": "reject"}),
+    ("go_or_grow.switch", {"kappa": -4.0, "theta": 0.5, "when_full": "reject"}),
     ("go_or_grow.growth", {"r_b": 0.3, "r_d": 0.05}),
-    ("go_or_grow.growth", {"r_b": 0.3, "r_d": 0.05, "r_d_resting": 0.0, "capacity": "reject"}),
+    ("go_or_grow.growth", {"r_b": 0.3, "r_d": 0.05, "r_d_resting": 0.0, "when_full": "reject"}),
 ])
 def test_go_or_grow_rules_keep_each_species_in_its_channels(rule, parameters):
     species = 1 if rule == "go_or_rest" else 2

@@ -98,6 +98,42 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.__dict__["_nodes_array"] = value
         self.__dict__["_store"] = None
 
+    @property
+    def nodes_t(self):
+        """Recorded lists of labels per channel, shape ``(times,) + dims + (K,)``.
+
+        ``NodeRecorder`` stores compact cell tables (:attr:`cells_t`); the
+        lists are built when ``nodes_t`` is first read.
+        """
+        cached = self.__dict__.get("_nodes_t")
+        if cached is None:
+            history = self.__dict__.get("cells_t")
+            if history is None:
+                raise AttributeError("nodes_t")
+            cached = self.__dict__["_nodes_t"] = history.to_nodes()
+        return cached
+
+    @nodes_t.setter
+    def nodes_t(self, value):
+        self.__dict__["_nodes_t"] = value
+
+    def _start_cell_history(self, length):
+        """Record cell tables from now on (see ``NodeRecorder``); False if the boundary has no table."""
+        from .cells import CellHistory
+
+        if self._cell_table() is None:
+            return False
+        self.cells_t = CellHistory(length, self.dims, self.K)
+        self.__dict__["_nodes_t"] = None
+        return True
+
+    def _record_cells(self, index):
+        labels, slots = self._cell_table()
+        inner = self._slot_table()["interior"][slots]
+        inside = inner >= 0
+        self.cells_t.record(index, labels[inside], inner[inside])
+        self.__dict__["_nodes_t"] = None
+
     def set_bc(self, bc):
         super().set_bc(bc)
         self.__dict__["_slot_maps"] = None

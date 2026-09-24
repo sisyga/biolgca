@@ -111,8 +111,7 @@ def validate_plugin_parameters(
 
     canonical_capacity = getattr(getattr(context, "spec", None), "state", None)
     canonical_capacity = getattr(canonical_capacity, "capacity", None)
-    # a string is a mode of the rule (e.g. go_or_rest(capacity="reject")), not a carrying capacity
-    if canonical_capacity is not None and "capacity" in parameters and not isinstance(parameters["capacity"], str):
+    if canonical_capacity is not None and "capacity" in parameters:
         if parameters["capacity"] != canonical_capacity:
             raise ValueError(
                 f"{info.name}.capacity conflicts with model.state.capacity={canonical_capacity}"

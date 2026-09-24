@@ -428,3 +428,80 @@ def slot_maps(lgca):
     index[padded] = np.arange(len(padded))
     return {"boundary": boundary, "propagation": propagation, "source": source,
             "interior": index, "padded": padded, "shape": shape}
+
+
+class CellSnapshot:
+    """The cells at one recorded time: arrays with one entry per cell.
+
+    Attributes
+    ----------
+    label, channel : numpy.ndarray
+        Label and channel of every cell.
+    index : numpy.ndarray
+        Flat index of every cell's node in the lattice of shape ``dims``.
+    """
+
+    def __init__(self, label, index, channel, dims):
+        self.label = np.asarray(label, dtype=np.int64)
+        self.index = np.asarray(index, dtype=np.int64)
+        self.channel = np.asarray(channel, dtype=np.int64)
+        self._dims = tuple(dims)
+
+    def __len__(self) -> int:
+        return len(self.label)
+
+    def __repr__(self) -> str:
+        return f"<{len(self)} cells>"
+
+    @property
+    def node(self) -> tuple[np.ndarray, ...]:
+        """Coordinates of every cell's node; indexes arrays of shape ``dims``."""
+        return np.unravel_index(self.index, self._dims)
+
+
+class CellHistory:
+    """Recorded cells of an identity-based model, one :class:`CellSnapshot` per recorded time.
+
+    ``history[t]`` is the snapshot of the ``t``-th recorded time; the times
+    are the model's ``nodes_steps``. Snapshots are compact (two integers per
+    cell and channel); :meth:`to_nodes` builds the lists of labels per channel
+    that ``lgca.nodes_t`` shows.
+    """
+
+    def __init__(self, length, dims, K):
+        self._snapshots = [CellSnapshot((), (), (), dims) for _ in range(length)]
+        self.dims = tuple(dims)
+        self.K = int(K)
+
+    def __len__(self) -> int:
+        return len(self._snapshots)
+
+    def __getitem__(self, index) -> CellSnapshot:
+        return self._snapshots[index]
+
+    def __iter__(self):
+        return iter(self._snapshots)
+
+    def __repr__(self) -> str:
+        return f"<CellHistory: {len(self)} recorded times>"
+
+    def record(self, index, label, slot) -> None:
+        """Store the cells with labels ``label`` in interior slots ``node * K + channel``."""
+        slot = np.asarray(slot, dtype=np.int64)
+        self._snapshots[index] = CellSnapshot(np.array(label, dtype=np.int64), slot // self.K, slot % self.K,
+                                              self.dims)
+
+    def to_nodes(self) -> np.ndarray:
+        """Lists of labels per channel for every recorded time, shape ``(times,) + dims + (K,)``."""
+        size = int(np.prod(self.dims)) * self.K
+        history = np.empty((len(self), size), dtype=object)
+        for time, snapshot in enumerate(self._snapshots):
+            slot = snapshot.index * self.K + snapshot.channel
+            labels = snapshot.label[np.argsort(slot, kind="stable")].tolist()
+            ends = np.cumsum(np.bincount(slot, minlength=size)).tolist()
+            start = 0
+            row = history[time]
+            for position, end in enumerate(ends):
+                row[position] = labels[start:end]
+                start = end
+        return history.reshape((len(self),) + self.dims + (self.K,))

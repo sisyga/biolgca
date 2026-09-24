@@ -12,8 +12,10 @@ This file records notable user-facing changes. Changes remain under
   tables derived from the geometry's own transport code, and `lgca.nodes`
   builds the lists of labels only when it is read. A go-or-grow step on a
   100 x 100 lattice takes 13 ms (legacy `nove_ib.go_or_grow` 125 ms); code
-  that reads or edits `lgca.nodes` keeps working. Recording `nodes` every
-  step (`NodeRecorder`) still builds the lists.
+  that reads or edits `lgca.nodes` keeps working. `NodeRecorder` stores the
+  cells of such models as compact tables in `lgca.cells_t` (label, node and
+  channel of every cell per recorded time); `lgca.nodes_t` builds the lists
+  from them when it is first read.
 - Reorientation terms scaled by a cell trait:
   `ReorientationTermSpec("polar_alignment", beta=1.0, trait="alignment")`
   gives every cell of an identity-based model its own strength (also
@@ -81,7 +83,7 @@ This file records notable user-facing changes. Changes remain under
   and rest channels depending on density), `go_or_grow.growth` (death, and
   division of resting cells into rest channels, with separate death rates if
   wanted) and `channel_random_walk` (a random walk within a set of channels
-  and species). With `capacity="legacy"` (default) they reproduce
+  and species). With `when_full="legacy"` (default) they reproduce
   `classical.go_or_grow` and `nove.go_or_grow` in distribution; the example,
   tutorial 4 and the README use them. In the two-species form, migrating and
   resting cells are species and `go_or_grow.switch` is the switch.
@@ -143,6 +145,10 @@ This file records notable user-facing changes. Changes remain under
   persistence, the CLI, and installed-package smoke tests.
 
 ### Changed
+
+- The option of `go_or_rest`, `go_or_grow.switch` and `go_or_grow.growth`
+  for full channels is now called `when_full` ("legacy" or "reject"; it was
+  `capacity`, which is the crowding scale everywhere else).
 
 - The `chemotaxis` term uses the same gradient as `aggregation` and
   `LatticeState.gradient`: centred differences with ghost nodes, which for a
@@ -281,9 +287,6 @@ This file records notable user-facing changes. Changes remain under
   it and its descendants counted as an extra family. Cell 0 now belongs to
   family 1 like the other initial cells (homogeneous), or founds family 1
   (heterogeneous). Family counts and Muller plots of such runs change.
-- A rule parameter named `capacity` whose value is a string (the mode of
-  `go_or_rest` and `go_or_grow.growth`) no longer conflicts with
-  `StateSpec(capacity=...)`.
 
 - `get_lgca(ve=False)` without further arguments failed on every geometry:
   the default interaction (density-dependent alignment) needs zero rest

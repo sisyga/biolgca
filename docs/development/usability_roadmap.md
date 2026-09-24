@@ -277,7 +277,7 @@ motility, recorders and plots separate them, and the switch acts per cell
 from its current state.
 
 - The switch offers two ways to handle full target channels:
-  `capacity="legacy"` reproduces the current rule (the number of switching
+  `capacity="legacy"` (renamed `when_full` on 2026-09-24, see 2.2) reproduces the current rule (the number of switching
   cells is binomial over the cells that fit, and both directions are computed
   from the counts before the step); `capacity="reject"` lets each cell try and
   rejects a switch into full channels.
@@ -659,8 +659,12 @@ while the same work on flat per-cell arrays takes about 1 ms.
   contents with another channel (symmetric, the cell number is fixed), with
   O(1) bookkeeping per accepted swap; `parameters={"sweeps": 10}` gives
   `10 * K` proposals per node. Measured from a random start with a strong
-  field: 10 sweeps reach sampling noise for 4 and 6 cells on hex with one
-  rest channel; with six rest channels 20 are needed. Tests
+  field (occupied-first proposals, `sweeps * K` per node): 10 sweeps reach
+  a long reference chain within sampling noise for K = 5 (square, 4 cells),
+  12 (hex with 6 rest channels, 10 cells) and 27 (Moore, 15 cells); 5 do
+  not. (An earlier estimate of 20 sweeps counted proposals per cell.)
+  Decided (2026-09-24): the chain length scales with the total number of
+  channels, default 10 sweeps. Tests
   (`tests/trait_reorientation_test.py`): the labelled distribution matches
   enumeration for cells of strengths 0, 1, 2, 4 on 3600 hex nodes; equal
   strengths reproduce the classical sampler; the NoVE draw is per cell.
@@ -679,9 +683,14 @@ while the same work on flat per-cell arrays takes about 1 ms.
   like the list code on 5 geometries x 3 boundaries
   (`tests/cell_store_test.py`), and a pipeline of rules builds no lists.
   Speed (100 x 100 square, per step, NoVE): go-or-grow rules 13 ms (legacy
-  125 ms), `ReorientationSpec` 10 ms. `NodeRecorder` still builds the lists
-  every recorded step (52 ms per step); recording the table is left for
-  later.
+  125 ms), `ReorientationSpec` 10 ms.
+- Decided and done (2026-09-24): `NodeRecorder` stores cell tables for these
+  models (`lgca.cells_t`, a `CellHistory` of label, node and channel per
+  recorded time); `nodes_t` is built from them when first read (0.34 s for
+  21 times on 100 x 100). A step with recording takes 19 ms instead of 52.
+  The go-or-grow option for full channels is renamed `when_full` (it was
+  `capacity`, which elsewhere is the crowding scale; `theta` is relative to
+  that crowding scale).
 
 **2.3 Names without family prefixes** (B2)
 
@@ -786,7 +795,10 @@ model with a custom rule reruns from the CLI.
    with an optional DataFrame conversion.
 3. **Legacy removal timing.** Phase 2.4 deletes the legacy interaction
    functions. Is there external code (theses, papers) that imports them
-   directly and needs a deprecation release first?
+   directly and needs a deprecation release first? Decided (2026-09-24): no
+   deprecation release. The current `master` is archived and published
+   papers cite Zenodo snapshots, so this release replaces the legacy
+   interactions directly.
 4. **Preferred citation.** `CITATION.cff` currently lists the software with the
    two papers as references; decide whether one paper should be the preferred
    citation.

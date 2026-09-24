@@ -37,9 +37,9 @@ def _model(nodes, kappa, operators, traits=None, seed=1):
     ))
 
 
-def _pipeline(r_b, r_d, capacity="legacy"):
-    return [{"name": "go_or_rest", "parameters": {"kappa": "kappa", "theta": 0.5, "capacity": capacity}},
-            {"name": "go_or_grow.growth", "parameters": {"r_b": r_b, "r_d": r_d, "capacity": capacity}},
+def _pipeline(r_b, r_d, when_full="legacy"):
+    return [{"name": "go_or_rest", "parameters": {"kappa": "kappa", "theta": 0.5, "when_full": when_full}},
+            {"name": "go_or_grow.growth", "parameters": {"r_b": r_b, "r_d": r_d, "when_full": when_full}},
             {"name": "channel_random_walk", "parameters": {"channels": "velocity"}}]
 
 
@@ -150,9 +150,9 @@ def test_daughters_inherit_and_mutate_traits_and_can_found_families(ve):
 
 @pytest.mark.parametrize("rule, parameters", [
     ("go_or_rest", {"kappa": "kappa", "theta": 0.5}),
-    ("go_or_rest", {"kappa": 4.0, "theta": "theta", "capacity": "reject"}),
+    ("go_or_rest", {"kappa": 4.0, "theta": "theta", "when_full": "reject"}),
     ("go_or_grow.growth", {"r_b": "r_b", "r_d": 0.05, "mutation": {"r_b": 0.01}}),
-    ("go_or_grow.growth", {"r_b": 0.3, "r_d": "r_d", "capacity": "reject", "new_family": True}),
+    ("go_or_grow.growth", {"r_b": 0.3, "r_d": "r_d", "when_full": "reject", "new_family": True}),
     ("channel_random_walk", {"channels": "velocity"}),
 ])
 def test_rules_pass_the_interaction_check_on_identity_models(rule, parameters):

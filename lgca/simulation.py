@@ -222,10 +222,21 @@ class SimulationRunner:
 
 
 class NodeRecorder(Observer):
-    """Record full node configurations in ``lgca.nodes_t``."""
+    """Record full node configurations in ``lgca.nodes_t``.
+
+    Identity-based models without volume exclusion (periodic, reflecting or
+    absorbing boundaries) record compact cell tables in ``lgca.cells_t``, a
+    :class:`~lgca.cells.CellHistory` with the label, node and channel of every
+    cell at every recorded time; ``lgca.nodes_t`` builds the lists of labels
+    from them when it is first read.
+    """
 
     def setup(self, lgca, runner: SimulationRunner) -> None:
         length = _setup_sample_indices(self, lgca, runner, "nodes_steps")
+        start = getattr(lgca, "_start_cell_history", None)
+        self._cells = start is not None and start(length)
+        if self._cells:
+            return
         shape = (length,) + lgca.nodes[lgca.nonborder].shape
         if lgca.nodes.dtype == object:
             lgca.nodes_t = get_arr_of_empty_lists(shape)
@@ -234,7 +245,9 @@ class NodeRecorder(Observer):
 
     def on_step(self, lgca, step: int) -> None:
         index = self._sample_indices[step]
-        if lgca.nodes.dtype == object:
+        if self._cells:
+            lgca._record_cells(index)
+        elif lgca.nodes.dtype == object:
             lgca.nodes_t[index, ...] = _copy_arr_of_lists(lgca.nodes[lgca.nonborder])
         else:
             lgca.nodes_t[index, ...] = lgca.nodes[lgca.nonborder]

@@ -114,7 +114,7 @@ def contact_guidance(state, field="director"):
     return (director @ state.c) ** 2
 
 _MIGRATING, _RESTING = 0, 1
-_CAPACITY_MODES = ("legacy", "reject")
+_WHEN_FULL = ("legacy", "reject")
 
 
 @interaction(kind="reorientation", families=("classical", "nove", "ib", "nove_ib"), name="channel_random_walk")
@@ -137,7 +137,7 @@ def channel_random_walk(state, channels="all", species=None):
 
 @interaction(kind="reorientation", families=("classical", "nove", "ib", "nove_ib"), n_species=1,
              name="go_or_rest")
-def go_or_rest(state, kappa=5.0, theta=0.75, capacity="legacy"):
+def go_or_rest(state, kappa=5.0, theta=0.75, when_full="legacy"):
     """Moving cells start resting on crowded nodes, resting cells start moving on sparse ones.
 
     Parameters
@@ -147,19 +147,21 @@ def go_or_rest(state, kappa=5.0, theta=0.75, capacity="legacy"):
         kappa < 0 they move. In identity-based models, the name of a cell
         trait gives every cell its own value.
     theta : float or str
-        Density (cells per node over capacity) at which half of the cells
-        rest, or the name of a cell trait.
-    capacity : {"legacy", "reject"}
+        Relative density at which half of the cells rest, or the name of a
+        cell trait. The relative density is the number of cells at the node
+        over its capacity: the number of channels K with volume exclusion,
+        ``StateSpec.capacity`` (the crowding scale) without.
+    when_full : {"legacy", "reject"}
         With volume exclusion, what happens when a switching cell finds no free
         channel. "legacy" reproduces the original rule: the number of switching
         cells is drawn from the cells that fit into free channels. "reject":
         every cell tries to switch, and switches into full channels fail.
     """
-    _check_mode(capacity)
+    _check_mode(when_full)
     if state.restchannels < 1:
         raise ValueError("go_or_rest needs at least one rest channel for resting cells")
     if state.identity_based:
-        _go_or_rest_cells(state, kappa, theta, capacity)
+        _go_or_rest_cells(state, kappa, theta, when_full)
         return
     rest = tanh_switch(state.density / _node_capacity(state), _number(kappa, "kappa"), _number(theta, "theta"))
     velocity, rng = state.velocitychannels, state.rng
@@ -168,7 +170,7 @@ def go_or_rest(state, kappa=5.0, theta=0.75, capacity="legacy"):
     if state.volume_exclusion:
         n_m, n_r = moving.sum(-1), resting.sum(-1)
         free_rest, free_velocity = state.restchannels - n_r, velocity - n_m
-        if capacity == "legacy":
+        if when_full == "legacy":
             to_rest = rng.binomial(np.minimum(n_m, free_rest), rest)
             to_move = rng.binomial(np.minimum(n_r, free_velocity), 1 - rest)
         else:
@@ -185,7 +187,7 @@ def go_or_rest(state, kappa=5.0, theta=0.75, capacity="legacy"):
 
 
 @interaction(kind="phenotype_switch", families=("classical", "nove"), n_species=2, name="go_or_grow.switch")
-def go_or_grow_switch(state, kappa=5.0, theta=0.75, capacity="legacy"):
+def go_or_grow_switch(state, kappa=5.0, theta=0.75, when_full="legacy"):
     """Migrating cells start resting in crowded nodes, resting cells start migrating in sparse ones.
 
     The two-species form of go_or_rest: migrating cells are species 0 (in
@@ -197,17 +199,18 @@ def go_or_grow_switch(state, kappa=5.0, theta=0.75, capacity="legacy"):
         Steepness of the switch. With kappa > 0 crowded cells rest, with
         kappa < 0 they migrate.
     theta : float
-        Density (cells per node over capacity) at which half of the cells rest.
-    capacity : {"legacy", "reject"}
+        Relative density at which half of the cells rest: cells at the node
+        over K with volume exclusion, over ``StateSpec.capacity`` without.
+    when_full : {"legacy", "reject"}
         With volume exclusion, what happens when a switching cell finds no free
         channel. "legacy" reproduces the original rule: the number of switching
         cells is drawn from the cells that fit into free channels. "reject":
         every cell tries to switch, and switches into full channels fail.
     """
     _check_layout(state)
-    _check_mode(capacity)
+    _check_mode(when_full)
     rest = tanh_switch(state.density / _node_capacity(state), kappa, theta)
-    if state.volume_exclusion and capacity == "legacy":
+    if state.volume_exclusion and when_full == "legacy":
         counts = state.counts.copy()
         velocity = state.velocitychannels
         n_m = counts[..., _MIGRATING, :].sum(-1)
@@ -232,7 +235,7 @@ def go_or_grow_switch(state, kappa=5.0, theta=0.75, capacity="legacy"):
 
 
 @interaction(kind="birth_death", families=("classical", "nove", "ib", "nove_ib"), name="go_or_grow.growth")
-def go_or_grow_growth(state, r_b=0.2, r_d=0.01, r_d_resting=None, capacity="legacy", mutation=None,
+def go_or_grow_growth(state, r_b=0.2, r_d=0.01, r_d_resting=None, when_full="legacy", mutation=None,
                       new_family=False):
     """Cells die, and resting cells divide into free rest channels.
 
@@ -250,7 +253,7 @@ def go_or_grow_growth(state, r_b=0.2, r_d=0.01, r_d_resting=None, capacity="lega
         r_d_resting is given; or the name of a cell trait.
     r_d_resting : float, str or None
         Death probability of a resting cell. Default: r_d.
-    capacity : {"legacy", "reject"}
+    when_full : {"legacy", "reject"}
         With volume exclusion, how divisions meet full rest channels. "legacy"
         reproduces the original rule: the number of divisions is drawn from as
         many resting cells as there are free rest channels. "reject": every
@@ -262,9 +265,9 @@ def go_or_grow_growth(state, r_b=0.2, r_d=0.01, r_d_resting=None, capacity="lega
         Identity-based models: every daughter founds a new family, for
         lineage analyses such as Muller plots.
     """
-    _check_mode(capacity)
+    _check_mode(when_full)
     if state.identity_based:
-        _growth_cells(state, r_b, r_d, r_d_resting, capacity, mutation or {}, new_family)
+        _growth_cells(state, r_b, r_d, r_d_resting, when_full, mutation or {}, new_family)
         return
     r_b, r_d = _number(r_b, "r_b"), _number(r_d, "r_d")
     r_d_resting = None if r_d_resting is None else _number(r_d_resting, "r_d_resting")
@@ -283,7 +286,7 @@ def go_or_grow_growth(state, r_b=0.2, r_d=0.01, r_d_resting=None, capacity="lega
     crowding = state.density / _node_capacity(state)
     death = np.where(resting, r_d if r_d_resting is None else r_d_resting, r_d)
     state.remove_cells(np.broadcast_to(death, state.dims + death.shape))
-    if state.volume_exclusion and capacity == "legacy":
+    if state.volume_exclusion and when_full == "legacy":
         n_r = (state.counts * resting).sum(axis=(-2, -1))
         births = np.zeros(state.dims + (state.n_species,), dtype=np.int64)
         births[..., resting_species] = state.rng.binomial(np.minimum(n_r, state.restchannels - n_r), r_b)
@@ -295,7 +298,7 @@ def go_or_grow_growth(state, r_b=0.2, r_d=0.01, r_d_resting=None, capacity="lega
                        channels={resting_species: "rest"})
 
 
-def _go_or_rest_cells(state, kappa, theta, capacity):
+def _go_or_rest_cells(state, kappa, theta, when_full):
     """go_or_rest for identity-based models: every cell switches with its own probability."""
     cells, rng = state.cells, state.rng
     rho = state.density[cells.node] / _node_capacity(state)
@@ -308,7 +311,7 @@ def _go_or_rest_cells(state, kappa, theta, capacity):
         n_r = state.counts[..., 0, state.velocitychannels:].sum(-1)
         n_m = state.counts[..., 0, :state.velocitychannels].sum(-1)
         free_rest, free_velocity = state.restchannels - n_r, state.velocitychannels - n_m
-        if capacity == "legacy":  # the cells that fit try to switch
+        if when_full == "legacy":  # the cells that fit try to switch
             to_rest = cells.pick(~resting, free_rest) & to_rest
             to_move = cells.pick(resting, free_velocity) & to_move
         else:  # every cell tries; the successful ones are chosen at random
@@ -318,7 +321,7 @@ def _go_or_rest_cells(state, kappa, theta, capacity):
     cells.move(to_move, "velocity")
 
 
-def _growth_cells(state, r_b, r_d, r_d_resting, capacity, mutation, new_family):
+def _growth_cells(state, r_b, r_d, r_d_resting, when_full, mutation, new_family):
     """go_or_grow.growth for identity-based models: death and division per cell."""
     cells, rng = state.cells, state.rng
     crowding = state.density / _node_capacity(state)
@@ -332,7 +335,7 @@ def _growth_cells(state, r_b, r_d, r_d_resting, capacity, mutation, new_family):
     birth = _per_cell(cells, r_b, "r_b")
     if state.volume_exclusion:
         free_rest = state.restchannels - state.counts[..., 0, state.velocitychannels:].sum(-1)
-        if capacity == "legacy":  # as many resting cells as there are free rest channels try
+        if when_full == "legacy":  # as many resting cells as there are free rest channels try
             dividing = cells.pick(resting, free_rest) & (rng.random(len(cells)) < birth)
         else:
             dividing = resting & (rng.random(len(cells)) < birth)
@@ -382,9 +385,9 @@ def _node_capacity(state):
     return state.K if state.volume_exclusion else state.capacity
 
 
-def _check_mode(capacity):
-    if capacity not in _CAPACITY_MODES:
-        raise ValueError(f"capacity must be one of {_CAPACITY_MODES}, got {capacity!r}")
+def _check_mode(when_full):
+    if when_full not in _WHEN_FULL:
+        raise ValueError(f"when_full must be one of {_WHEN_FULL}, got {when_full!r}")
 
 
 def _spread(rng, number, channels):

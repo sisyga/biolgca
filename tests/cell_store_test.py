@@ -97,3 +97,37 @@ def test_changes_to_the_lists_reach_the_table():
     lgca.nodes[node] = lgca.nodes[node] + [10_000]  # e.g. a notebook edits a node
     labels, _ = lgca._cell_table()
     assert 10_000 in labels
+
+
+@pytest.mark.parametrize("bc", ["periodic", "reflecting"])
+def test_the_node_recorder_stores_cell_tables(bc, monkeypatch):
+    from lgca.model import AnalysisSpec, run_model
+    from lgca.simulation import NodeRecorder
+
+    built = []
+    original = nove_ib_base.NoVE_IBLGCA_base._nodes_from_store
+
+    def counted(self, *args):
+        built.append(1)
+        return original(self, *args)
+
+    monkeypatch.setattr(nove_ib_base.NoVE_IBLGCA_base, "_nodes_from_store", counted)
+    spec = ModelSpec(
+        space=SpaceSpec(geometry="hex", dims=(8, 8), boundary=bc),
+        state=StateSpec(density=3, restchannels=1, volume_exclusion=False, identity_based=True, capacity=8,
+                        traits={"kappa": 4.0}),
+        time=TimeSpec(steps=6, seed=2),
+        dynamics=InteractionPipelineSpec(operators=[
+            {"name": "go_or_rest", "parameters": {"kappa": "kappa", "theta": 0.5}},
+            {"name": "channel_random_walk"}]),
+        analysis=AnalysisSpec(observers=[NodeRecorder()]))
+    lgca = run_model(spec, showprogress=False).lgca
+    assert len(lgca.cells_t) == 7 and built in ([], [1])  # at most once, to estimate the recording size
+    snapshot = lgca.cells_t[-1]
+    counts = np.zeros(lgca.dims + (lgca.K,), dtype=int)
+    np.add.at(counts, snapshot.node + (snapshot.channel,), 1)
+    np.testing.assert_array_equal(counts, lgca.channel_pop[lgca.nonborder])
+    nodes_t = lgca.nodes_t  # built from the tables on first read
+    assert nodes_t.shape == (7,) + lgca.dims + (lgca.K,)
+    for time, recorded in enumerate(lgca.cells_t):
+        assert sorted(label for channel in nodes_t[time].flat for label in channel) == sorted(recorded.label)

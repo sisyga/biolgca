@@ -153,9 +153,10 @@ class ReorientationSpec:
     With volume exclusion, the labelled state of every node is sampled with
     a Metropolis chain that starts from a random arrangement of the node's
     cells and proposes to swap the contents of a channel holding a cell with
-    another channel, ``sweeps * K`` times per node. Ten sweeps reach the
-    Boltzmann distribution within sampling noise on hexagonal lattices with
-    one rest channel; more channels or strong fields need more.
+    another channel, ``sweeps * K`` times per node, so the chain grows with
+    the number of channels ``K``. With a strong cue, ten sweeps reached the
+    Boltzmann distribution within sampling noise from 5 channels (square) to
+    27 (Moore) and with 6 rest channels on hex; five did not.
 
     Attributes
     ----------

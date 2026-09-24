@@ -93,6 +93,19 @@ Built-in recorder observers include:
    * - ``FamilyPopulationRecorder``
      - ``lgca.fam_pop_t`` for supported family-tracking runs
 
+Identity-based models without volume exclusion record their cells in a
+compact form: ``NodeRecorder`` stores the label, node and channel of every
+cell at every recorded time in ``lgca.cells_t``, and ``lgca.nodes_t`` builds
+the familiar lists of labels per channel from it when it is first read.
+Analyses of individual cells are faster on ``cells_t`` directly, e.g. the mean
+trait of the cells at every recorded time:
+
+.. code-block:: python
+
+   kappa = np.asarray(lgca.props["kappa"])
+   mean_kappa = [kappa[cells.label].mean() for cells in lgca.cells_t]
+   density = np.bincount(lgca.cells_t[-1].index, minlength=lgca.cell_density[lgca.nonborder].size)
+
 Dense and sparse recorder results
 ---------------------------------
 
@@ -106,7 +119,7 @@ local step vector:
 
    * - Values
      - Steps
-   * - ``nodes_t``
+   * - ``nodes_t`` / ``cells_t``
      - ``nodes_steps``
    * - ``dens_t``
      - ``dens_steps``
