@@ -177,7 +177,7 @@ for r_d in (0.0, 0.2, 0.5):
         analysis=AnalysisSpec(observers=[PopulationRecorder()]),
     )
     result = run_model(spec, showprogress=False)
-    print(f"r_d = {r_d}: {result.data["population"][-1]} cells after 100 steps")
+    print(f"r_d = {r_d}: {result.data['population'][-1]} cells after 100 steps")
 ```
 
 `lgca.testing.check_interaction(crowding_death)` runs a rule on every lattice
@@ -222,7 +222,7 @@ Moore lattices. 3D rendering uses Mayavi, which is optional: install it with
 Without uv, install BioLGCA into any Python 3.11+ environment:
 
 ```bash
-python -m pip install -e .            # add ".[yaml]" or ".[plot3d]" for extras
+python -m pip install -e ".[notebooks]"   # JupyterLab; also ".[yaml]" or ".[plot3d]"
 ```
 
 This picks the newest compatible versions of the dependencies. `uv sync` instead

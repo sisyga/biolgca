@@ -194,7 +194,7 @@ class IBLGCA_base(LGCA_base, ABC):
 
         # prepare structures for identity information
         self.props = {}  # dictionary for cells' properties
-        self.maxlabel = self.nodes.max()  # maximum particle ID
+        self.maxlabel = int(self.nodes.max())  # maximum particle ID
 
         # compute initial value of fields computed from the lattice state
         # define self.cell_density and self.occupied

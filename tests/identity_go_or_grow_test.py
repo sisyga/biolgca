@@ -130,6 +130,7 @@ def test_daughters_inherit_and_mutate_traits_and_can_found_families(ve):
         {"name": "go_or_grow.growth", "parameters": {"r_b": 0.5, "r_d": 0.0, "mutation": {"kappa": 0.1},
                                                      "new_family": True}},
     ], traits={"kappa": 2.0, "theta": 0.5})
+    assert type(model.lgca.maxlabel) is int  # a NumPy integer + 1 is a float with NumPy 1.x
     first_new = model.lgca.maxlabel + 1
     model.step()
     lgca = model.lgca

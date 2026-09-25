@@ -316,7 +316,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         numbers = self.rng.poisson(lam=lam, size=self.dims + (self.K,))
         tempnodes = self.convert_int_to_ib(numbers)
         self.nodes[self.nonborder] = tempnodes
-        self.maxlabel = numbers.sum()
+        self.maxlabel = int(numbers.sum())
         self.update_dynamic_fields()
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, recordchanneldens=False,
