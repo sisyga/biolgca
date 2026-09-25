@@ -998,6 +998,18 @@ table.groupby("beta").x_flux.agg(["mean", "std"])
   automatically; tuples become lists in the schema.
 - `biolgca run model.json --plugins my_project.interactions` imports trusted
   plugin modules named on the command line (never from the model file).
+- Done (2026-09-25): `save_model_spec(..., max_inline_array=100)` moves
+  arrays with more than 100 elements (not object arrays) to
+  `<stem>.arrays.npz` next to the model file (references
+  `{"__ndarray_file__", "name", "dtype", "shape"}`; a stale array file is
+  removed when none is needed); JSON and YAML loading from a path resolves
+  them (same directory only, `allow_pickle=False`, shape and dtype checked).
+  The threshold is 100 elements, since a 30 x 30 float field is already 18 KB
+  of text. Tuples are written as lists (dims restored as a tuple);
+  `__tuple__` still loads. The CLI's resolved model keeps its array file
+  (reserved name). `--plugins` done with the sweep. Phase 3 is complete
+  apart from the quick-start restructuring of the docs (user decision:
+  `get_lgca` first, `ModelSpec` afterwards).
 
 Accept: tutorial 3's sweep is a single `sweep(...)` call with error bars; a
 model with a custom rule reruns from the CLI.

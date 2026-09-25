@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextvars
 import importlib.metadata
 import importlib.resources
 import difflib
@@ -27,6 +28,8 @@ from .simulation import DEFAULT_RECORDING_LIMIT_BYTES, RunData, SimulationRunner
 
 
 MODEL_SPEC_SCHEMA_VERSION = 1
+ARRAY_FILE_SUFFIX = ".arrays.npz"
+DEFAULT_MAX_INLINE_ARRAY = 100  # arrays with more elements go to the array file of save_model_spec
 MODEL_SPEC_INITIALIZER_NAMES = frozenset({"region", "from_npz"})
 
 __all__ = [
@@ -331,7 +334,7 @@ def model_spec_from_dict(data: Mapping[str, Any]) -> ModelSpec:
         ),
         space=SpaceSpec(
             geometry=space.get("geometry", "hex"),
-            dims=_from_jsonable(space.get("dims")),
+            dims=_dims_from_json(_from_jsonable(space.get("dims"))),
             boundary=space.get("boundary", "periodic"),
         ),
         state=StateSpec(
@@ -376,7 +379,8 @@ def model_spec_to_json(spec: ModelSpec, path: str | Path | None = None) -> str:
 def model_spec_from_json(source: str | Path) -> ModelSpec:
     """Read a :class:`ModelSpec` from JSON text or a JSON file path."""
 
-    return model_spec_from_dict(json.loads(_read_text_source(source)))
+    with _array_files(source):
+        return model_spec_from_dict(json.loads(_read_text_source(source)))
 
 
 def model_spec_to_yaml(spec: ModelSpec, path: str | Path | None = None) -> str:
@@ -406,34 +410,56 @@ def model_spec_from_yaml(source: str | Path) -> ModelSpec:
         import yaml
     except ImportError:
         try:
-            return model_spec_from_dict(json.loads(text))
+            data = json.loads(text)
         except json.JSONDecodeError as exc:
             raise RuntimeError(
                 "Reading YAML model specs requires PyYAML. Install biolgca[yaml] "
                 "or use a .json model spec."
             ) from exc
-    return model_spec_from_dict(yaml.safe_load(text))
+    else:
+        data = yaml.safe_load(text)
+    with _array_files(source):
+        return model_spec_from_dict(data)
 
 
 def save_model_spec(
     spec: ModelSpec,
     path: str | Path,
     file_format: str | None = None,
+    *,
+    max_inline_array: int | None = DEFAULT_MAX_INLINE_ARRAY,
 ) -> Path:
     """Save a model specification to ``.json``, ``.yaml`` or ``.yml``.
 
     This is the beginner-facing persistence helper. It chooses the format from
     the file suffix unless ``file_format`` is provided.
+
+    Arrays with more than ``max_inline_array`` elements, e.g. initial nodes or
+    fields, go to an array file next to the model file, ``<name>.arrays.npz``
+    (``model.json`` -> ``model.arrays.npz``); the model file refers to them by
+    name, and :func:`load_model_spec` reads them from there. Keep the two files
+    together. ``max_inline_array=None`` writes every array into the model file.
+    Arrays of Python objects (lists of labels) always stay in the model file.
     """
 
     target = Path(path)
     selected = _resolve_model_spec_format(target, file_format)
-    if selected == "json":
-        model_spec_to_json(spec, target)
-    elif selected == "yaml":
-        model_spec_to_yaml(spec, target)
-    else:
+    if selected not in ("json", "yaml"):
         raise ValueError("Use a .json, .yaml, or .yml file for model specs.")
+    array_file = target.with_name(target.stem + ARRAY_FILE_SUFFIX)
+    arrays: dict[str, np.ndarray] = {}
+    token = _ARRAY_SINK.set((array_file.name, max_inline_array, arrays))
+    try:
+        if selected == "json":
+            model_spec_to_json(spec, target)
+        else:
+            model_spec_to_yaml(spec, target)
+    finally:
+        _ARRAY_SINK.reset(token)
+    if arrays:
+        np.savez_compressed(array_file, **arrays)
+    elif array_file.exists():
+        array_file.unlink()  # left from an earlier save of this model
     return target
 
 
@@ -680,8 +706,21 @@ def describe_model_graph(spec: ModelSpec) -> dict[str, Any]:
     return {"schema_version": 1, "nodes": nodes, "edges": edges}
 
 
+# While save_model_spec writes: (name of the array file, largest inline array, arrays for the file)
+_ARRAY_SINK: contextvars.ContextVar = contextvars.ContextVar("lgca_array_sink", default=None)
+# While a model file is read: its directory and the array files read from it
+_ARRAY_SOURCE: contextvars.ContextVar = contextvars.ContextVar("lgca_array_source", default=None)
+
+
 def _to_jsonable(value):
     if isinstance(value, np.ndarray):
+        sink = _ARRAY_SINK.get()
+        if sink is not None and value.dtype != object and sink[1] is not None and value.size > sink[1]:
+            filename, _, arrays = sink
+            name = f"array_{len(arrays)}"
+            arrays[name] = value
+            return {"__ndarray_file__": filename, "name": name, "dtype": str(value.dtype),
+                    "shape": list(value.shape)}
         return {
             "__ndarray__": value.tolist(),
             "dtype": str(value.dtype),
@@ -689,9 +728,7 @@ def _to_jsonable(value):
         }
     if isinstance(value, np.generic):
         return value.item()
-    if isinstance(value, tuple):
-        return {"__tuple__": [_to_jsonable(item) for item in value]}
-    if isinstance(value, list):
+    if isinstance(value, (tuple, list)):  # tuples become lists
         return [_to_jsonable(item) for item in value]
     if isinstance(value, Mapping):
         return {str(key): _to_jsonable(item) for key, item in value.items()}
@@ -702,12 +739,62 @@ def _from_jsonable(value):
     if isinstance(value, Mapping):
         if "__ndarray__" in value:
             return np.asarray(value["__ndarray__"], dtype=value.get("dtype"))
-        if "__tuple__" in value:
+        if "__ndarray_file__" in value:
+            return _array_from_file(value)
+        if "__tuple__" in value:  # files written before tuples became lists
             return tuple(_from_jsonable(item) for item in value["__tuple__"])
         return {key: _from_jsonable(item) for key, item in value.items()}
     if isinstance(value, list):
         return [_from_jsonable(item) for item in value]
     return value
+
+
+def _dims_from_json(dims):
+    return tuple(dims) if isinstance(dims, list) else dims
+
+
+class _array_files:
+    """Read the array files of the model file ``source`` (if it is a path) while building its spec."""
+
+    def __init__(self, source):
+        path = _source_path(source) if not isinstance(source, Path) else source
+        self.base = None if path is None else path.resolve().parent
+
+    def __enter__(self):
+        self.token = _ARRAY_SOURCE.set((self.base, {}))
+
+    def __exit__(self, *exc):
+        _, opened = _ARRAY_SOURCE.get()
+        for archive in opened.values():
+            archive.close()
+        _ARRAY_SOURCE.reset(self.token)
+
+
+def _array_from_file(reference):
+    filename, name = reference.get("__ndarray_file__"), reference.get("name")
+    if (not isinstance(filename, str) or not isinstance(name, str) or Path(filename).name != filename
+            or "\\" in filename or not filename.endswith(".npz")):
+        raise ValueError(f"an array file must be a .npz file next to the model file, got {filename!r}")
+    source = _ARRAY_SOURCE.get()
+    if source is None or source[0] is None:
+        raise ValueError(f"the model refers to arrays in {filename}; load it from its file with "
+                         f"load_model_spec(path), with {filename} next to it")
+    base, opened = source
+    if filename not in opened:
+        path = base / filename
+        if not path.exists():
+            raise FileNotFoundError(f"the model refers to arrays in {filename}, which is missing next to "
+                                    f"the model file ({path}); keep the two files together")
+        opened[filename] = np.load(path, allow_pickle=False)
+    archive = opened[filename]
+    if name not in archive.files:
+        raise ValueError(f"{filename} has no array {name!r}")
+    array = archive[name]
+    if list(array.shape) != list(reference.get("shape", array.shape)) or (
+            "dtype" in reference and str(array.dtype) != reference["dtype"]):
+        raise ValueError(f"the array {name!r} in {filename} does not match the model file "
+                         f"(shape {list(array.shape)}, dtype {array.dtype})")
+    return array
 
 
 def _operator_to_dict(operator) -> dict[str, Any]:

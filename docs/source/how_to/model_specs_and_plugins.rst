@@ -106,6 +106,21 @@ raise an actionable portability error if a caller tries to save them.
    loaded = load_model_spec("model.json")
    result = run_model(loaded, showprogress=False)
 
+Arrays with more than 100 elements, such as initial nodes or fields, go to
+an array file next to the model file: ``save_model_spec(spec, "model.json")``
+also writes ``model.arrays.npz``, and the model file refers to its arrays by
+name. Keep the two files together; ``load_model_spec("model.json")`` reads the
+arrays from the file next to it. ``save_model_spec(...,
+max_inline_array=None)`` writes every array into the model file. Tuples are
+written as lists.
+
+Model files that use your own rules run from the command line with
+``--plugins``, which imports trusted modules before the model is built:
+
+.. code-block:: console
+
+   $ biolgca run model.json --plugins my_project.rules --output run/
+
 The packaged ``model-spec-v1.schema.json`` is intended for editors and
 development-time validation. Runtime loading uses BioLGCA's dependency-light
 strict parser, so ``jsonschema`` is needed only by contributors and tooling.
@@ -264,7 +279,7 @@ tables.
 See :doc:`custom_interactions` for the supported extension contract, complete
 registration example and conservation guidance. Portable model files resolve
 registered names only; importing third-party Python remains the responsibility
-of a trusted launcher.
+of a trusted launcher, e.g. ``biolgca run --plugins my_project.rules``.
 
 CLI measurement files
 ---------------------
@@ -293,7 +308,8 @@ represent samples, not elapsed time. Property/family histories and the
 ``lgca.plotting.animate(..., steps=...)`` facade use paired simulation times.
 Explicit history data defaults to dense times when ``steps`` is omitted.
 
-The CLI archives a portable ``model.resolved.json`` with relative observer paths.
+The CLI archives a portable ``model.resolved.json`` with relative observer paths,
+and its large arrays in ``model.resolved.arrays.npz``.
 NPZ initializer inputs are copied to ``resources/initial_state.npz`` and the
 archived declaration points there. Move the whole run directory together, then
 validate or rerun its model into a new output directory without ``--trusted-paths``.

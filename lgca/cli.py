@@ -299,7 +299,8 @@ def _preflight_output_namespace(spec, output_dir, *, trusted_paths):
         for parent in parents:
             directories[parent] = owner
 
-    for name in ("model.resolved.json", "metadata.json", "measurements.npz", "resources/initial_state.npz"):
+    for name in ("model.resolved.json", "model.resolved.arrays.npz", "metadata.json", "measurements.npz",
+                 "resources/initial_state.npz"):
         reserve(output_dir / name, "reserved archive " + name)
     if spec.analysis is None:
         return

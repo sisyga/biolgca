@@ -21,6 +21,11 @@ This file records notable user-facing changes. Changes remain under
   `sweep.json`. `biolgca run`, `validate` and `sweep` take `--plugins
   MODULE` to import trusted modules with your own rules.
 - pandas is a dependency (`pandas>=2.1`).
+- Model files keep large arrays in an array file: `save_model_spec(spec,
+  "model.json")` writes arrays with more than 100 elements (nodes, fields)
+  to `model.arrays.npz` next to it, and `load_model_spec` reads them from
+  there (`max_inline_array=None` keeps them inline). Tuples are written as
+  lists; files with `{"__tuple__": ...}` still load.
 - Tutorial 3 sweeps two cue strengths over ten seeds with one `sweep` call
   and plots error bars.
 - `result.data`: the data recorded in a model run by name, e.g.
