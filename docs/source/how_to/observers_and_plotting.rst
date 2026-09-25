@@ -77,21 +77,50 @@ Built-in recorder observers include:
    :header-rows: 1
 
    * - Observer
-     - Output
+     - Name in ``result.data``
+     - Attribute of the model
    * - ``NodeRecorder``
+     - ``"nodes"``
      - ``lgca.nodes_t``
    * - ``DensityRecorder``
+     - ``"density"``
      - ``lgca.dens_t``
    * - ``ChannelDensityRecorder``
+     - ``"channel_population"``
      - ``lgca.channel_pop_t``
    * - ``PopulationRecorder``
+     - ``"population"`` (or ``"n"``)
      - ``lgca.n_t``
    * - ``PerTypeRecorder``
+     - ``"moving"`` and ``"resting"``
      - ``lgca.velcells_t`` and ``lgca.restcells_t``
    * - ``OrderParameterRecorder``
+     - ``"entropy"``, ``"normalized_entropy"``, ``"polar_alignment"``,
+       ``"mean_alignment"``
      - NoVE entropy and alignment time series
    * - ``FamilyPopulationRecorder``
+     - ``"family_population"``
      - ``lgca.fam_pop_t`` for supported family-tracking runs
+   * - ``ScalarTimeSeriesRecorder``
+     - the names of its metrics
+     - a CSV file
+
+Recorded data of a model run
+----------------------------
+
+A model run with :func:`lgca.model.run_model` returns its recordings by name
+in ``result.data``, each with the steps at which it was recorded:
+
+.. code-block:: python
+
+   result = run_model(spec, showprogress=False)
+   print(list(result.data))               # what the run recorded
+   population = result.data["population"]  # one value per recorded step
+   steps = result.data.steps("population")
+
+A name that was not recorded raises a ``KeyError`` that lists the recorded
+names. The arrays are those on the model (``lgca.n_t``, ...) at the end of the
+run; a later run of the same model does not change them.
 
 Identity-based models without volume exclusion record their cells in a
 compact form: ``NodeRecorder`` stores the label, node and channel of every

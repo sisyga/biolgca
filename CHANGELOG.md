@@ -7,6 +7,12 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- `result.data`: the data recorded in a model run by name, e.g.
+  `result.data["population"]` (alias `"n"`), `result.data["density"]` or
+  the metrics of a `ScalarTimeSeriesRecorder`, with
+  `result.data.steps(name)`; `list(result.data)` shows what was recorded.
+  The attributes `lgca.n_t`, `lgca.dens_t`, ... remain. The tutorials,
+  README and examples use `result.data`.
 - `birth_death(channels=...)`: only the cells in a set of channels die and
   divide, and their daughters go to that set, e.g. `channels="rest"` for
   growth by resting cells; with volume exclusion the logistic factor counts

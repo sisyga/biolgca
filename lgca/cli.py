@@ -14,7 +14,7 @@ import numpy as np
 
 from .examples import describe_example, example_names, save_example_spec
 from .model import build_model, load_model_spec, save_model_spec
-from .simulation import CSVSnapshotObserver, ScalarTimeSeriesRecorder
+from .simulation import RECORDED, CSVSnapshotObserver, ScalarTimeSeriesRecorder
 
 
 def main(argv=None) -> int:
@@ -128,16 +128,10 @@ def _run(args) -> int:
     save_model_spec(portable_spec, output_dir / "model.resolved.json")
     result = compiled.run(showprogress=args.show_progress)
     measurements = {}
-    for data_name, steps_name in (
-        ("nodes_t", "nodes_steps"), ("dens_t", "dens_steps"), ("n_t", "n_steps"),
-        ("channel_pop_t", "channel_pop_steps"), ("velcells_t", "velcells_steps"),
-        ("restcells_t", "restcells_steps"), ("fam_pop_t", "fam_pop_steps"),
-        ("ent_t", "order_parameter_steps"), ("normEnt_t", "order_parameter_steps"),
-        ("polAlParam_t", "order_parameter_steps"), ("meanAlign_t", "order_parameter_steps"),
-    ):
-        if hasattr(result.lgca, data_name):
-            measurements[data_name] = getattr(result.lgca, data_name)
-            measurements[steps_name] = getattr(result.lgca, steps_name)
+    for name, (data_name, steps_name, _) in RECORDED.items():  # stored under the model's attribute names
+        if name in result.data:
+            measurements[data_name] = result.data[name]
+            measurements[steps_name] = result.data.steps(name)
     if measurements:
         np.savez_compressed(output_dir / "measurements.npz", **measurements)
         result.metadata["measurements_file"] = "measurements.npz"

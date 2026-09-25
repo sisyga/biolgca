@@ -390,10 +390,10 @@ class CellWeights:
     >>> from lgca import reorientation_term
     >>> from lgca.rules import CellWeights
     >>> @reorientation_term(coupling="rest")
-    ... def lazy_cells(state, trait="laziness"):
-    ...     '''Cells rest by their own laziness.'''
+    ... def lazy_cells(state):
+    ...     '''Cells rest by their own laziness, a trait.'''
     ...     cells = state.cells
-    ...     return CellWeights(cells.label, cells[trait])
+    ...     return CellWeights(cells.label, cells["laziness"])
     """
 
     def __init__(self, labels, values):
@@ -470,7 +470,7 @@ def reorientation_term(
     ...     '''Cells move in a fixed direction.'''
     ...     return np.asarray(direction, dtype=float)
     >>> drift(beta=2.0, direction=[0, 1])
-    ReorientationTermSpec(name='drift', beta=2.0, parameters={'direction': [0, 1]}, species=None, trait=None)
+    ReorientationTermSpec(name='drift', beta=2.0, parameters={'direction': [0, 1]}, species=None, trait=None, sensed_species=None)
     """
 
     def decorate(function):

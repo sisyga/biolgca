@@ -63,6 +63,8 @@ __all__ = [
     "OrderParameterRecorder",
     "PerTypeRecorder",
     "PopulationRecorder",
+    "RECORDED",
+    "RunData",
     "ScalarTimeSeriesRecorder",
     "Schedule",
     "SimulationRunner",
@@ -523,3 +525,107 @@ def _scalar_value(value):
     if hasattr(value, "item"):
         return value.item()
     return value
+
+
+# name in ``result.data`` -> (attribute of the model, attribute of its steps, meaning)
+RECORDED = {
+    "population": ("n_t", "n_steps", "number of cells (PopulationRecorder)"),
+    "density": ("dens_t", "dens_steps", "cells per node, or per node and species (DensityRecorder)"),
+    "nodes": ("nodes_t", "nodes_steps", "channel states of all nodes (NodeRecorder)"),
+    "channel_population": ("channel_pop_t", "channel_pop_steps", "cells per channel (ChannelDensityRecorder)"),
+    "moving": ("velcells_t", "velcells_steps", "cells in velocity channels per node (PerTypeRecorder)"),
+    "resting": ("restcells_t", "restcells_steps", "cells in rest channels per node (PerTypeRecorder)"),
+    "family_population": ("fam_pop_t", "fam_pop_steps", "cells per family (FamilyPopulationRecorder)"),
+    "entropy": ("ent_t", "order_parameter_steps", "entropy (OrderParameterRecorder)"),
+    "normalized_entropy": ("normEnt_t", "order_parameter_steps", "normalized entropy (OrderParameterRecorder)"),
+    "polar_alignment": ("polAlParam_t", "order_parameter_steps", "polar alignment (OrderParameterRecorder)"),
+    "mean_alignment": ("meanAlign_t", "order_parameter_steps", "mean alignment (OrderParameterRecorder)"),
+}
+_DATA_ALIASES = {"n": "population"}
+
+
+class RunData(Mapping):
+    """The data recorded in a run, by name, with the steps at which it was recorded.
+
+    ``data["population"]`` (alias ``data["n"]``) is an array with one entry per
+    recorded step, ``data.steps("population")`` the steps (counted from the
+    start of the run). The names are those of :data:`RECORDED` for the built-in
+    recorders, e.g. ``"density"`` for :class:`DensityRecorder`, and the metric
+    names of a :class:`ScalarTimeSeriesRecorder`; ``list(data)`` shows what a run
+    recorded. The arrays are the ones on the model (``lgca.n_t``, ...) at the
+    end of the run.
+
+    Examples
+    --------
+    >>> from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, AnalysisSpec, run_model
+    >>> from lgca.simulation import PopulationRecorder, Schedule
+    >>> spec = ModelSpec(space=SpaceSpec(geometry="lin", dims=20), state=StateSpec(density=0.5),
+    ...                  time=TimeSpec(steps=10, seed=1),
+    ...                  analysis=AnalysisSpec(observers=[PopulationRecorder(schedule=Schedule(every=5))]))
+    >>> result = run_model(spec, showprogress=False)
+    >>> list(result.data)
+    ['population']
+    >>> result.data.steps("n").tolist()
+    [0, 5, 10]
+    """
+
+    def __init__(self, values: Mapping[str, Any] | None = None, steps: Mapping[str, Any] | None = None):
+        self._values = dict(values or {})  # name -> array, or a function that returns it
+        self._steps = dict(steps or {})
+
+    @classmethod
+    def from_run(cls, lgca, observers=()) -> RunData:
+        """The data of the built-in recorders on ``lgca`` and of the scalar recorders among ``observers``."""
+        values, steps = {}, {}
+        for name, (attribute, steps_attribute, _) in RECORDED.items():
+            if steps_attribute in vars(lgca):  # every recorder sets its steps
+                # read lazily: the lists of labels of some identity-based models are built on demand
+                values[name] = _reader(lgca, attribute)
+                steps[name] = np.asarray(getattr(lgca, steps_attribute))
+        for observer in observers:
+            if isinstance(observer, ScalarTimeSeriesRecorder) and observer.records:
+                recorded = np.array([row["step"] for row in observer.records])
+                for name in observer.metrics:
+                    if name not in values:
+                        values[name] = np.array([row[name] for row in observer.records])
+                        steps[name] = recorded
+        return cls(values, steps)
+
+    def _name(self, name):
+        name = _DATA_ALIASES.get(name, name)
+        if name not in self._values:
+            recorded = ", ".join(self._values) or "nothing"
+            raise KeyError(f"{name!r} was not recorded; this run recorded {recorded}. Add a recorder to "
+                           f"ModelSpec.analysis, e.g. AnalysisSpec(observers=[DensityRecorder()])")
+        return name
+
+    def __getitem__(self, name):
+        name = self._name(name)
+        value = self._values[name]
+        if callable(value):
+            value = self._values[name] = value()
+        return value
+
+    def __iter__(self):
+        return iter(self._values)
+
+    def __len__(self):
+        return len(self._values)
+
+    def __contains__(self, name):
+        return _DATA_ALIASES.get(name, name) in self._values
+
+    def steps(self, name) -> np.ndarray:
+        """The steps at which ``name`` was recorded, counted from the start of the run."""
+        return self._steps[self._name(name)]
+
+    def __repr__(self):
+        return f"RunData({', '.join(self._values) or 'nothing recorded'})"
+
+
+def _reader(lgca, attribute):
+    """The recorded array, or a function that builds it (the lists of labels from a cell history)."""
+    history = vars(lgca).get("cells_t")
+    if attribute == "nodes_t" and history is not None and vars(lgca).get("_nodes_t") is None:
+        return history.to_nodes
+    return getattr(lgca, attribute)

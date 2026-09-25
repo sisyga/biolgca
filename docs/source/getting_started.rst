@@ -66,7 +66,7 @@ initial state, time horizon, interaction pipeline and recorded data explicit:
    )
 
    result = run_model(spec, showprogress=False)
-   print(result.lgca.n_t)
+   print(result.data["population"])
    result.lgca.plot_density()
 
 The explicit seed makes stochastic comparisons repeatable. The interaction

@@ -23,7 +23,7 @@ from .pipeline import (
     ReorientationTermSpec,
     compile_pipeline,
 )
-from .simulation import SimulationRunner, DEFAULT_RECORDING_LIMIT_BYTES
+from .simulation import DEFAULT_RECORDING_LIMIT_BYTES, RunData, SimulationRunner
 
 
 MODEL_SPEC_SCHEMA_VERSION = 1
@@ -1002,13 +1002,27 @@ class CompiledModel:
 
 @dataclass
 class ModelRunResult:
-    """Result returned by :func:`run_model`."""
+    """Result returned by :func:`run_model`.
+
+    Attributes
+    ----------
+    lgca : LGCA object
+        The model in its final state.
+    spec : ModelSpec
+        The specification that ran, with the seed that was used.
+    data : RunData
+        The recorded data by name, e.g. ``result.data["density"]``, with
+        ``result.data.steps("density")`` (see :class:`~lgca.simulation.RunData`).
+    metadata : dict
+        Versions, seed, schedule, timings and output paths of the run.
+    """
 
     lgca: Any
     spec: ModelSpec
     context: ModelContext
     pipeline: Any
     metadata: dict[str, Any]
+    data: Any = field(default_factory=lambda: RunData())
 
 
 def build_model(
@@ -1406,6 +1420,7 @@ def _run_compiled_model(compiled: CompiledModel, showprogress: bool = True,
         context=compiled.context,
         pipeline=compiled.pipeline,
         metadata=deepcopy(compiled.metadata),
+        data=RunData.from_run(lgca, observers),
     )
 
 

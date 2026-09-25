@@ -889,7 +889,8 @@ has no parity tests.
   and a trait-valued `beta` in `trait_switch` against the formula (a row
   normalisation without staying fails them), the tanh equivalence,
   overflow, validation.
-- Done (2026-09-25, delegated to Claude; to be confirmed): go-or-rest as a
+- Done (2026-09-25, delegated to Claude; confirmed by the user the same day: matching legacy
+  `go_or_rest` is not required, and no exact sampler is needed): go-or-rest as a
   Boltzmann reorientation is the new term `resting` (also a single cue),
   not a replacement of the rule `go_or_rest`. A lone cell rests with a
   switching probability `p` (`lgca.switching`, default the go-or-grow
@@ -953,6 +954,20 @@ table.groupby("beta").x_flux.agg(["mean", "std"])
 - `ModelRunResult.data` mapping observer outputs by name (`result.data["n"]`,
   `result.data["density"]`), with times; keep the `lgca.n_t` attributes for
   compatibility.
+
+- Done (2026-09-25): `ModelRunResult.data`, a `RunData` mapping (in
+  `lgca.simulation`, with the table `RECORDED`): built-in recorders under
+  descriptive names (`population` with alias `n`, `density`, `nodes`,
+  `channel_population`, `moving`, `resting`, `family_population`, order
+  parameters) and `ScalarTimeSeriesRecorder` metrics; `data.steps(name)`;
+  a missing name lists what was recorded. References are taken at the end
+  of the run (lazy lists of labels for NoVE identity-based histories), so a
+  later run does not change them. The CLI writes `measurements.npz` from the
+  same table (keys unchanged). Tutorials, README and examples migrated.
+  User decisions (2026-09-25): pandas becomes a dependency for `sweep`,
+  which takes the number of parallel workers as a parameter and offers a
+  long table (one row per run and time); `get_lgca` stays the quick start
+  and the way to run the included standard models, `ModelSpec` follows.
 
 **3.4 Model files** (B8)
 - Arrays above a size threshold go to an NPZ sidecar next to the JSON

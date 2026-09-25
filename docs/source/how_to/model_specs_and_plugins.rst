@@ -69,8 +69,9 @@ Minimal ModelSpec
    result.lgca.plot_density()
 
 The result exposes the final LGCA object, the compiled pipeline, metadata and
-any observer outputs. For example, ``NodeRecorder`` writes ``lgca.nodes_t`` and
-``DensityRecorder`` writes ``lgca.dens_t``.
+the recorded data by name: ``result.data["nodes"]`` from ``NodeRecorder`` and
+``result.data["density"]`` from ``DensityRecorder``, with
+``result.data.steps("density")`` (see :doc:`observers_and_plotting`).
 
 Portable model files
 --------------------

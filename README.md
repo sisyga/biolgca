@@ -177,7 +177,7 @@ for r_d in (0.0, 0.2, 0.5):
         analysis=AnalysisSpec(observers=[PopulationRecorder()]),
     )
     result = run_model(spec, showprogress=False)
-    print(f"r_d = {r_d}: {result.lgca.n_t[-1]} cells after 100 steps")
+    print(f"r_d = {r_d}: {result.data["population"][-1]} cells after 100 steps")
 ```
 
 `lgca.testing.check_interaction(crowding_death)` runs a rule on every lattice

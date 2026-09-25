@@ -26,7 +26,7 @@ cells. For example::
 
     allee = run_model(build_spec(), showprogress=False)
     invasion = run_model(build_spec(kappa=-4.0), showprogress=False)
-    print(allee.lgca.n_t[-1], invasion.lgca.n_t[-1])
+    print(allee.data["population"][-1], invasion.data["population"][-1])
 """
 
 from __future__ import annotations
