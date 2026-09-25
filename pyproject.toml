@@ -30,10 +30,10 @@ dependencies = [
     "numpy>=1.24",
     "scipy>=1.9.2",
     "tqdm>=4.64.1",
-    "matplotlib>=3.7",
+    # 3.9 or newer: IPython's notebook plotting no longer works with older versions.
+    "matplotlib>=3.9",
     # Tables of runs from lgca.study.sweep.
     "pandas>=2.1",
-    "jupyterlab>=4.0",
     # Progress bars and interactive widgets in notebooks.
     "ipywidgets>=8.0",
 ]
@@ -43,13 +43,17 @@ dependencies = [
 yaml = [
     "PyYAML>=6",
 ]
+# JupyterLab to run the tutorials; `uv sync` installs it through the `dev` group.
+notebooks = [
+    "jupyterlab>=4.0",
+]
 plot3d = [
     "mayavi>=4.9",
     # Mayavi needs a Qt binding for on-screen windows and animations.
     "PySide6>=6.4",
 ]
 
-# Contributor tooling (PEP 735). `uv sync` installs the `dev` group by default.
+# Contributor tooling (PEP 735). `uv sync` installs the `dev` group by default, JupyterLab included.
 [dependency-groups]
 test = [
     "pytest>=8",
@@ -66,6 +70,7 @@ docs = [
 dev = [
     { include-group = "test" },
     { include-group = "docs" },
+    "biolgca[notebooks]",
     "ruff",
 ]
 

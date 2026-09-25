@@ -428,11 +428,12 @@ This file records notable user-facing changes. Changes remain under
 - BioLGCA requires Python 3.11 or newer and supports Python 3.14; Python 3.10
   is no longer supported.
 - Runtime and optional dependencies declare the oldest versions the test suite
-  and tutorial notebooks pass with: numpy 1.24, scipy 1.9.2, matplotlib 3.7,
+  and tutorial notebooks pass with: numpy 1.24, scipy 1.9.2, matplotlib 3.9,
   tqdm 4.64.1, JupyterLab 4.0, PyYAML 6, Mayavi 4.9 and PySide6 6.4. Previously
   no minimum was declared, so pip could combine BioLGCA with releases that fail
-  at runtime. numpy 1.24 is needed to reject ragged node arrays, matplotlib 3.7
-  for inline plots in current Jupyter, and Mayavi 4.9 is the first release with
+  at runtime. numpy 1.24 is needed to reject ragged node arrays, matplotlib 3.9
+  for plots in notebooks with current IPython (older versions fail at the first
+  plot), and Mayavi 4.9 is the first release with
   binary wheels (older versions no longer build against current VTK).
 - The development environment is managed with uv. A committed `uv.lock` and
   `.python-version` pin the complete environment; `uv sync` installs it and CI
@@ -476,9 +477,13 @@ This file records notable user-facing changes. Changes remain under
   3D plots accept `size=` and `view=`.
 - The `plot3d` extra installs PySide6, which Mayavi needs to open windows and
   run animations.
-- Matplotlib and JupyterLab are part of the normal installation so students can
-  open the maintained notebooks and plot results without selecting extras.
-  Three-dimensional Mayavi rendering remains optional.
+- Matplotlib is part of the normal installation, so results can be plotted
+  without selecting extras. JupyterLab is in the `notebooks` extra: `uv sync`
+  installs it with the development tools, and with pip use
+  `pip install "biolgca[notebooks]"`. Installs without it (Colab, clusters,
+  editors with their own notebook support, packages depending on BioLGCA)
+  stay small: 35 packages instead of about 105. Three-dimensional Mayavi
+  rendering remains optional.
 - Documentation builds now start from clean generated sources and treat Sphinx
   warnings and notebook execution failures as errors.
 - Maintained notebooks construct `ModelSpec` and interaction pipelines in
@@ -487,6 +492,9 @@ This file records notable user-facing changes. Changes remain under
 
 ### Fixed
 
+- The largest cell label of identity-based models (`lgca.maxlabel`) is a
+  Python integer. It was a NumPy integer, and with NumPy 1.x `maxlabel + 1`
+  became a float that cannot index the trait arrays.
 - CSV files of `ScalarTimeSeriesRecorder` and `CSVSnapshotObserver` are
   written as UTF-8 on every system (Windows used its local encoding).
 - In identity-based models without volume exclusion, labels start at 0, and

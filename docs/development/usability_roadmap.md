@@ -1077,12 +1077,22 @@ Status (2026-09-25, user decisions):
 - 4.4: the adhesion model (Ilina et al. 2020) waits.
 - 4.5 done: a CI job runs the tests and the command line (including a
   sweep in worker processes) on Windows and macOS with Python 3.13
-  (`MPLBACKEND=Agg`); to be confirmed on the first push. Prepared locally:
+  (`MPLBACKEND=Agg`); confirmed on GitHub (2026-09-25). Prepared locally:
   CSV outputs written as UTF-8 (the Windows default is cp1252), a test of
   the process sweep with the spawn start method (the Windows one), and a
   clear error when a script runs a process sweep without a main guard
   (workers import the script; before, multiprocessing failed with an
   EOFError), documented in the how-to.
+- Lean installation (2026-09-25, user decision): JupyterLab moved from the
+  required dependencies to a `notebooks` extra, which the `dev` group
+  includes, so `uv sync` and `uv run jupyter lab` are unchanged; pip users
+  install `biolgca[notebooks]`. The wheel alone now installs 35 packages
+  (Colab, clusters, editors, dependent packages). `ipywidgets` stays
+  required. The matplotlib minimum rose to 3.9: with 3.7 current IPython
+  fails at the first plot in a notebook, which the minimum-version CI job
+  had not reached because of three Python 3.11 failures, fixed at the same
+  time (warnings pointed at library code, a README f-string needed 3.12, and
+  `maxlabel` was a NumPy integer).
 
 ## Part 3: Open decisions
 

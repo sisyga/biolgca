@@ -24,9 +24,9 @@ documentation tools. If your uv does not download Python automatically, which
 is the case for some Linux distribution packages, run ``uv python install``
 first.
 
-The installation includes NumPy, SciPy, tqdm, Matplotlib and JupyterLab, so it
-is sufficient for the maintained tutorials and ordinary one- and
-two-dimensional analysis. Launch JupyterLab from the repository root:
+The installation includes NumPy, SciPy, tqdm and Matplotlib, and ``uv sync``
+adds JupyterLab, so it is sufficient for the maintained tutorials and ordinary
+one- and two-dimensional analysis. Launch JupyterLab from the repository root:
 
 .. code-block:: bash
 
@@ -38,8 +38,10 @@ reproducible student project. Run your own scripts the same way, for example
 ``uv run python my_simulation.py``, or activate ``.venv`` as usual.
 
 Without uv, BioLGCA installs into any Python 3.11+ environment with
-``python -m pip install -e .``. This resolves the newest compatible package
-versions instead of the locked ones.
+``python -m pip install -e ".[notebooks]"``. This resolves the newest
+compatible package versions instead of the locked ones. Leave out
+``[notebooks]`` where JupyterLab is not needed, for example in Colab, on a
+cluster or in an editor that runs notebooks itself.
 
 Your first model
 ----------------
@@ -124,7 +126,7 @@ pipeline composition, input-path rules and model-file details.
 Optional dependencies
 ---------------------
 
-Two specialized features are optional extras:
+Optional features are extras:
 
 .. list-table::
    :header-rows: 1
@@ -132,6 +134,9 @@ Two specialized features are optional extras:
    * - Extra
      - Purpose
      - Install command
+   * - ``notebooks``
+     - JupyterLab, to open the tutorials
+     - included in ``uv sync``
    * - ``yaml``
      - YAML model-file syntax
      - ``uv sync --extra yaml``

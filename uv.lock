@@ -188,7 +188,6 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "ipywidgets" },
-    { name = "jupyterlab" },
     { name = "matplotlib" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
@@ -199,6 +198,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+notebooks = [
+    { name = "jupyterlab" },
+]
 plot3d = [
     { name = "mayavi" },
     { name = "pyside6" },
@@ -210,6 +212,7 @@ yaml = [
 [package.dev-dependencies]
 dev = [
     { name = "alabaster" },
+    { name = "biolgca", extra = ["notebooks"] },
     { name = "jsonschema" },
     { name = "myst-nb" },
     { name = "numpydoc" },
@@ -239,8 +242,8 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "ipywidgets", specifier = ">=8.0" },
-    { name = "jupyterlab", specifier = ">=4.0" },
-    { name = "matplotlib", specifier = ">=3.7" },
+    { name = "jupyterlab", marker = "extra == 'notebooks'", specifier = ">=4.0" },
+    { name = "matplotlib", specifier = ">=3.9" },
     { name = "mayavi", marker = "extra == 'plot3d'", specifier = ">=4.9" },
     { name = "numpy", specifier = ">=1.24" },
     { name = "pandas", specifier = ">=2.1" },
@@ -249,11 +252,12 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.9.2" },
     { name = "tqdm", specifier = ">=4.64.1" },
 ]
-provides-extras = ["yaml", "plot3d"]
+provides-extras = ["yaml", "notebooks", "plot3d"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "alabaster" },
+    { name = "biolgca", extras = ["notebooks"] },
     { name = "jsonschema", specifier = ">=4" },
     { name = "myst-nb" },
     { name = "numpydoc" },

@@ -20,12 +20,15 @@ def test_pyproject_separates_user_extras_from_contributor_groups():
     extras = pyproject["project"]["optional-dependencies"]
     groups = pyproject["dependency-groups"]
 
-    assert {"numpy", "scipy", "tqdm", "matplotlib", "jupyterlab"} <= dependencies
-    assert set(extras) == {"yaml", "plot3d"}
+    assert {"numpy", "scipy", "tqdm", "matplotlib", "ipywidgets"} <= dependencies
+    assert "jupyterlab" not in dependencies
+    assert set(extras) == {"yaml", "notebooks", "plot3d"}
+    assert {"jupyterlab"} <= {_name(requirement) for requirement in extras["notebooks"]}
     assert {"mayavi", "PySide6"} <= {_name(requirement) for requirement in extras["plot3d"]}
     assert any(requirement.startswith("pytest") for requirement in groups["test"])
     assert "myst-nb" in groups["docs"]
     assert "ruff" in groups["dev"]
+    assert "biolgca[notebooks]" in groups["dev"]
     assert {"include-group": "test"} in groups["dev"]
     assert {"include-group": "docs"} in groups["dev"]
 
