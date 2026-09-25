@@ -292,7 +292,8 @@ _PARAMETER_MEANINGS = {
     "director": "Direction of the guiding fibres at every node, with ghost nodes; defaults to "
                 "the first axis.",
     "rates": "Matrix of switch probabilities per time step: entry [a][b] is the probability "
-             "that a cell of species a becomes species b. Off-diagonal row sums must be <= 1.",
+             "that a cell of species a becomes species b. Off-diagonal row sums must be <= 1, "
+             "except for rows of weights in the Boltzmann form ({'rate': r, 'cues': [...]}).",
 }
 _PLUGIN_PARAMETER_MEANINGS = {
     ("custom.rest_or_align", "alpha"): "Preference for resting over alignment.",

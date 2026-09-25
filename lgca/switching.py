@@ -19,6 +19,22 @@ cue at which half of the maximal probability is reached, ``kappa`` the
 steepness; with ``kappa > 0`` cells switch more where the cue is large, with
 ``kappa < 0`` less. ``max`` defaults to 1.
 
+The Boltzmann form gives a switch a weight instead::
+
+    {"rate": 0.05, "cues": [{"name": "density", "beta": 3.0}]}
+
+stands for the weight ``w = rate * exp(Σ_k beta_k c_k)`` against staying,
+whose weight is 1: a single switch (an event of ``trait_switch`` or of
+mutations) happens with probability ``w / (1 + w)``, and a cell of species
+``a`` that can switch to several species (a row of the ``phenotype_switch``
+rates) becomes ``b`` with probability ``w_ab / (1 + Σ_b' w_ab')``. ``rate``
+is the weight where the cues are 0, and about the probability of a switch
+while the weights are small; the ``beta_k`` say how strongly the cues favour
+the switch. Unlike the probabilities above, the weights of a row need not
+sum to at most 1. For two states the two forms agree: ``rate = exp(-2 kappa
+theta)`` and ``beta = 2 kappa`` give ``w / (1 + w) = (1 + tanh(kappa (c -
+theta))) / 2``, with ``max`` 1.
+
 The cues are values of the lattice state at every node:
 
 ``"density"``
@@ -40,7 +56,8 @@ Every cue takes ``sensed_species`` (the species whose cells it reads, e.g.
 name cell traits, so that every cell responds with its own sensitivity, and
 ``{"name": "trait", "trait": "age"}`` is a cue with a value per cell. Cues of
 your own are functions of the lattice state that return a value per node,
-registered with :func:`switch_cue`.
+registered with :func:`switch_cue`. In the Boltzmann form ``beta`` may name a
+trait as well.
 """
 
 from __future__ import annotations
@@ -54,7 +71,7 @@ import numpy as np
 __all__ = ["Probability", "list_switch_cues", "parse_probability", "switch_cue"]
 
 _CUES: dict[str, Callable] = {}
-_RESPONSE = ("name", "kappa", "theta", "sensed_species")
+_RESPONSE = ("name", "kappa", "theta", "beta", "sensed_species")
 
 
 def switch_cue(function: Callable | None = None, *, name: str | None = None):
@@ -127,30 +144,34 @@ class _Cue:
 
 @dataclass(frozen=True)
 class Probability:
-    """A switching probability: a number, or ``max`` times the response to cues (see the module)."""
+    """A switching probability (see the module).
+
+    A number, or ``max`` times the response to cues; or, in the Boltzmann
+    form (``rate`` given), the weight ``rate * exp(Σ beta c)`` of switching
+    against staying. A cue's ``kappa`` holds its ``beta`` then, and its
+    ``theta`` is 0.
+    """
 
     max: float
     cues: tuple[_Cue, ...] = ()
+    rate: float | None = None
 
     @property
     def constant(self) -> bool:
         return not self.cues
 
+    @property
+    def boltzmann(self) -> bool:
+        return self.rate is not None
+
     def nodes(self, state) -> np.ndarray | float:
         """The probability at every node, shape ``state.dims`` (a number without cues)."""
-        if self.constant:
-            return self.max
-        total = np.zeros(state.dims)
-        for cue in self.cues:
-            if isinstance(cue.kappa, str) or isinstance(cue.theta, str) or cue.name == "trait":
-                raise ValueError(f"the cue {cue.name!r} reads cell traits, which only identity-based models have")
-            total += cue.kappa * (_values(state, cue) - cue.theta)
-        return self.max * (1 + np.tanh(total)) / 2
+        return self._probability(self.drive(state))
 
     def cells(self, state, which) -> np.ndarray | float:
         """The probability of the cells at positions ``which`` of ``state.cells``."""
         if self.constant:
-            return self.max
+            return self._probability(0.0)
         cells = state.cells
         total = np.zeros(len(which))
         for cue in self.cues:
@@ -161,7 +182,50 @@ class Probability:
             kappa = cells[cue.kappa][which] if isinstance(cue.kappa, str) else cue.kappa
             theta = cells[cue.theta][which] if isinstance(cue.theta, str) else cue.theta
             total += np.asarray(kappa, dtype=float) * (values - np.asarray(theta, dtype=float))
-        return self.max * (1 + np.tanh(total)) / 2
+        return self._probability(total)
+
+    def drive(self, state) -> np.ndarray | float:
+        """``Σ kappa (c - theta)`` (``Σ beta c`` in the Boltzmann form) at every node; 0 without cues."""
+        if self.constant:
+            return 0.0
+        total = np.zeros(state.dims)
+        for cue in self.cues:
+            if isinstance(cue.kappa, str) or isinstance(cue.theta, str) or cue.name == "trait":
+                raise ValueError(f"the cue {cue.name!r} reads cell traits, which only identity-based models have")
+            total += cue.kappa * (_values(state, cue) - cue.theta)
+        return total
+
+    def log_weight(self, state) -> np.ndarray | float:
+        """``log rate + Σ beta c`` at every node (Boltzmann form); ``-inf`` where the rate is 0."""
+        with np.errstate(divide="ignore"):
+            return np.log(self.rate) + self.drive(state)
+
+    def _probability(self, drive):
+        if self.boltzmann:  # w / (1 + w), computed without overflow
+            with np.errstate(divide="ignore"):
+                return _logistic(np.log(self.rate) + drive)
+        if self.constant:  # a number
+            return self.max
+        return self.max * (1 + np.tanh(drive)) / 2
+
+
+def _logistic(x):
+    x = np.asarray(x, dtype=float)
+    result = np.exp(-np.logaddexp(0.0, -x))
+    return float(result) if result.ndim == 0 else result
+
+
+def choice_probabilities(log_weights) -> list:
+    """The probabilities ``w_b / (1 + Σ_b' w_b')`` of switches with log weights ``log w_b``.
+
+    Staying has weight 1. The log weights are numbers or arrays of the same
+    shape; the result is one per switch.
+    """
+    stacked = np.stack(np.broadcast_arrays(*[np.asarray(value, dtype=float) for value in log_weights]))
+    largest = np.maximum(stacked.max(axis=0), 0.0)
+    scaled = np.exp(stacked - largest)
+    total = np.exp(-largest) + scaled.sum(axis=0)
+    return list(scaled / total)
 
 
 def parse_probability(spec, where: str = "probability") -> Probability:
@@ -169,17 +233,32 @@ def parse_probability(spec, where: str = "probability") -> Probability:
     if isinstance(spec, Probability):
         return spec
     if isinstance(spec, Mapping):
-        unknown = set(spec) - {"max", "cues"}
+        boltzmann = "rate" in spec
+        if boltzmann and "max" in spec:
+            raise ValueError(f"{where} has 'max' and 'rate'; give 'max' for the tanh form, 'rate' for the "
+                             f"Boltzmann form")
+        unknown = set(spec) - {"rate" if boltzmann else "max", "cues"}
         if unknown:
             raise ValueError(f"{where} has unknown keys {sorted(unknown)}; a probability that responds to "
-                             f"cues has 'max' and 'cues'")
+                             f"cues has 'max' (or 'rate') and 'cues'")
         cues = spec.get("cues") or []
         if isinstance(cues, Mapping) or not isinstance(cues, (list, tuple)):
             raise TypeError(f"{where}['cues'] must be a list of cues, e.g. [{{'name': 'density', 'kappa': 5, "
                             f"'theta': 0.5}}]")
-        return Probability(_probability(spec.get("max", 1.0), f"{where}['max']"),
-                           tuple(_cue(cue, f"{where}['cues'][{index}]") for index, cue in enumerate(cues)))
+        cues = tuple(_cue(cue, f"{where}['cues'][{index}]", boltzmann) for index, cue in enumerate(cues))
+        if boltzmann:
+            return Probability(1.0, cues, _rate(spec["rate"], f"{where}['rate']"))
+        return Probability(_probability(spec.get("max", 1.0), f"{where}['max']"), cues)
     return Probability(_probability(spec, where))
+
+
+def _rate(value, where):
+    if isinstance(value, bool) or not isinstance(value, (int, float, np.integer, np.floating)):
+        raise TypeError(f"{where} must be a number, the weight of the switch where the cues are 0, "
+                        f"got {value!r}")
+    if not (np.isfinite(value) and value >= 0):
+        raise ValueError(f"{where} must be a finite number >= 0, got {value}")
+    return float(value)
 
 
 def _probability(value, where):
@@ -191,7 +270,7 @@ def _probability(value, where):
     return float(value)
 
 
-def _cue(spec, where) -> _Cue:
+def _cue(spec, where, boltzmann=False) -> _Cue:
     if not isinstance(spec, Mapping) or "name" not in spec:
         raise TypeError(f"{where} must be a dict with a 'name', e.g. {{'name': 'density', 'kappa': 5, "
                         f"'theta': 0.5}}")
@@ -200,11 +279,19 @@ def _cue(spec, where) -> _Cue:
         raise ValueError(f"{where}: unknown cue {name!r}; the cues are {', '.join(list_switch_cues())}")
     if name == "trait" and not isinstance(spec.get("trait"), str):
         raise ValueError(f"{where}: the cue 'trait' needs the name of a trait, e.g. {{'trait': 'age'}}")
-    for key in ("kappa", "theta"):
-        value = spec.get(key, 1.0 if key == "kappa" else 0.0)
+    used, other = (("beta",), ("kappa", "theta")) if boltzmann else (("kappa", "theta"), ("beta",))
+    wrong = [key for key in other if key in spec]
+    if wrong:
+        form = ("the Boltzmann form ('rate') weighs cues with 'beta'" if boltzmann else
+                "the tanh form ('max') weighs cues with 'kappa' and 'theta'; 'beta' belongs to the "
+                "Boltzmann form ('rate')")
+        raise ValueError(f"{where} has {wrong}: {form}")
+    for key in used:
+        value = spec.get(key, 0.0 if key == "theta" else 1.0)
         if not isinstance(value, str) and (isinstance(value, bool) or not np.isfinite(float(value))):
             raise ValueError(f"{where}['{key}'] must be a number or the name of a cell trait, got {value!r}")
-    return _Cue(name, spec.get("kappa", 1.0), spec.get("theta", 0.0), spec.get("sensed_species"),
+    coefficient = spec.get("beta" if boltzmann else "kappa", 1.0)
+    return _Cue(name, coefficient, 0.0 if boltzmann else spec.get("theta", 0.0), spec.get("sensed_species"),
                 {key: value for key, value in spec.items() if key not in _RESPONSE})
 
 

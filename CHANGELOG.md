@@ -31,6 +31,14 @@ This file records notable user-facing changes. Changes remain under
   `density`, `field`, `gradient` and `flux` (for chosen species), traits as
   cues or as per-cell sensitivities, and cues of your own
   (`lgca.switch_cue`).
+- The Boltzmann form of switching probabilities: `{"rate": r, "cues":
+  [{"name": "density", "beta": 3.0}, ...]}` is the weight
+  `w = r exp(Σ beta cue)` of a switch against staying (weight 1). An event
+  of `trait_switch` or of a mutation happens with probability `w / (1 + w)`;
+  a row of `phenotype_switch` rates chooses among its switches and staying,
+  `w_ab / (1 + Σ w_ab')`, without the bound of 1 on the row. `beta` may name
+  a trait in identity-based models. For two states it is the tanh form with
+  `beta = 2 kappa` and `rate = exp(-2 kappa theta)`.
 - `directed_motion`, a cue by which cells move along a given vector field
   (`{"name": "directed_motion", "parameters": {"beta": 2, "field": "flow"}}`).
 - The research models of earlier versions as stacks of the generic rules, in

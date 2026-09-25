@@ -14,7 +14,8 @@ its traits change by random effects. Growth rules such as ``birth_death`` and
 
 With ``new_family=True`` every daughter that mutates founds a new family.
 The probability may respond to cues of the cell's surroundings, e.g. the
-local density (see :mod:`lgca.switching`), and ``"when": {"alignment": 0}``
+local density, or be given as a weight ``w`` in the Boltzmann form, for the
+probability ``w / (1 + w)`` (see :mod:`lgca.switching`), and ``"when": {"alignment": 0}``
 (or a range, ``[low, high]``) limits an event to the cells whose trait has
 that value. ``trait_switch`` applies the same events to living cells.
 A list of such blocks gives independent kinds of mutation, each with its own

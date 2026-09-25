@@ -876,6 +876,19 @@ has no parity tests.
   ms). Tests: success rate per fill level on every geometry (Moore with 27
   channels uses the non-enumerated placement), more switchers than channels,
   vacated channels.
+- Decided and done (2026-09-25, user): switching probabilities in the
+  Boltzmann form, `{"rate": r, "cues": [{"name", "beta", ...}]}`, the weight
+  `w = r exp(Σ beta_k c_k)` against staying: `w / (1 + w)` for a single
+  event (`trait_switch`, mutations), `w_ab / (1 + Σ w_ab')` within a
+  `phenotype_switch` row, with no row-sum bound (a row is all Boltzmann or
+  0; mixing forms in a row is refused). Cues take `beta` only (a threshold is
+  a factor of the rate); `beta` may name a trait. For two states it equals
+  the tanh form (`beta = 2 kappa`, `rate = exp(-2 kappa theta)`), documented
+  for teaching in the concepts page. Computed in log space, so large weights
+  do not overflow. Tests: row choice between two switches by density level
+  and a trait-valued `beta` in `trait_switch` against the formula (a row
+  normalisation without staying fails them), the tanh equivalence,
+  overflow, validation.
 
 ### Phase 3: Studying a model (two to three weeks)
 

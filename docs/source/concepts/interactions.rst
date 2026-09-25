@@ -159,6 +159,41 @@ resting (species 1) in crowded nodes and return at a constant rate:
        [0.05, 0],
    ]}}
 
+The Boltzmann form gives a switch a weight against staying instead of a
+probability, as the reorientation gives weights to channel states:
+
+.. code-block:: python
+
+   {"rate": 0.05, "cues": [{"name": "density", "beta": 3.0}]}
+
+is the weight ``w = rate * exp(Σ_k beta_k c_k)``, where staying has weight 1.
+A single switch, an event of ``trait_switch`` or of a mutation, happens with
+probability ``w / (1 + w)``. A cell of species ``a`` that may become one of
+several species chooses among them and staying: it becomes ``b`` with
+probability ``w_ab / (1 + Σ_b' w_ab')``. ``rate`` is the weight where all cues
+are 0; while the weights are small it is about the probability of the
+switch, and ``beta_k`` says how strongly cue ``k`` favours the switch. The
+weights of a row need no bound, since switching to one species takes
+probability from the others. Every switch of a row is written in the same form
+(or is 0). Species 0 that turns into species 1 in crowded nodes and into
+species 2 in sparse ones:
+
+.. code-block:: python
+
+   {"name": "phenotype_switch", "parameters": {"rates": [
+       [0, {"rate": 0.02, "cues": [{"name": "density", "beta": 5.0}]},
+           {"rate": 0.2, "cues": [{"name": "density", "beta": -5.0}]}],
+       [0.05, 0, 0],
+       [0.05, 0, 0],
+   ]}}
+
+For two states the forms agree: with ``beta = 2 kappa`` and
+``rate = exp(-2 kappa theta)``, ``w / (1 + w) = (1 + tanh(kappa (c - theta))) / 2``,
+the tanh switch with ``max`` 1. The tanh form describes one switch by its
+threshold and steepness. The Boltzmann form extends it to a choice among
+several states, as the Boltzmann weights of the reorientation extend a
+single cue to several.
+
 Switching traits
 ----------------
 

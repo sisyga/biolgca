@@ -39,7 +39,7 @@ from .base import channel_sum
 from .lattice_state import _species_indices, channel_mask, random_occupancy
 from .mutations import apply_mutations, parse_mutation
 from .rules import interaction, register_single_cue, reorientation_term
-from .switching import parse_probability
+from .switching import choice_probabilities, parse_probability
 
 __all__ = ["birth_death", "go_or_grow_growth", "go_or_grow_switch", "go_or_rest", "phenotype_switch",
            "random_walk", "tanh_switch", "trait_switch"]
@@ -453,6 +453,13 @@ def phenotype_switch(state, rates, channels="all"):
         "rates": [[0, {"max": 0.2, "cues": [{"name": "density", "kappa": 5, "theta": 0.5}]}],
                   [0.05, 0]]
 
+    or weights in the Boltzmann form, e.g. three species where species 0
+    turns into 1 in crowded nodes and into 2 along a signal::
+
+        "rates": [[0, {"rate": 0.02, "cues": [{"name": "density", "beta": 4}]},
+                      {"rate": 0.01, "cues": [{"name": "field", "field": "signal", "beta": 2}]}],
+                  [0.05, 0, 0], [0.05, 0, 0]]
+
     The number of cells at every node stays the same. A switching cell goes
     to a random channel of its new species in ``channels``; with volume
     exclusion the switch fails if that channel is occupied, so a cell
@@ -466,7 +473,11 @@ def phenotype_switch(state, rates, channels="all"):
     rates : list of lists
         ``n_species x n_species`` switching probabilities per time step, each
         a number or a response to cues; the diagonal is ignored, and the
-        (maximal) probabilities of each row must sum to at most 1.
+        (maximal) probabilities of each row must sum to at most 1. A row may
+        instead give weights in the Boltzmann form, ``{"rate": r, "cues":
+        [...]}``: a cell of species a becomes b with probability
+        ``w_ab / (1 + Σ_b' w_ab')``, staying having weight 1, with no bound on
+        the sum.
     channels : str or list of int
         Where switched cells go: a random channel of their new species in this
         set (``"all"``, ``"velocity"``, ``"rest"`` or indices), or ``"same"``:
@@ -482,18 +493,35 @@ def phenotype_switch(state, rates, channels="all"):
         raise ValueError(f"rates must be a {n_species} x {n_species} matrix, got {rates!r}")
     table = [[parse_probability(entry, f"rates[{a}][{b}]") for b, entry in enumerate(row)]
              for a, row in enumerate(rows)]
-    leaving = [sum(entry.max for b, entry in enumerate(row) if b != a) for a, row in enumerate(table)]
-    if max(leaving) > 1 + 1e-12:
-        raise ValueError("the switching probabilities of each species must sum to at most 1")
-    if all(entry.constant for row in table for entry in row):
-        matrix = np.array([[entry.max for entry in row] for row in table])
+    probabilities = [_switch_row(state, a, row) for a, row in enumerate(table)]
+    if all(np.ndim(p) == 0 for row in probabilities for p in row):
+        matrix = np.array(probabilities, dtype=float)
     else:
         matrix = np.zeros(state.dims + (n_species, n_species))
-        for a, row in enumerate(table):
-            for b, entry in enumerate(row):
-                if a != b:
-                    matrix[..., a, b] = entry.nodes(state)
+        for a, row in enumerate(probabilities):
+            for b, p in enumerate(row):
+                matrix[..., a, b] = p
     state.switch_phenotype(matrix, channels=channels)
+
+
+def _switch_row(state, a, row):
+    """The probabilities that a cell of species ``a`` becomes each species (0 on the diagonal)."""
+    others = [b for b in range(len(row)) if b != a]
+    boltzmann = [b for b in others if row[b].boltzmann]
+    result = [0.0] * len(row)
+    if boltzmann:
+        mixed = [b for b in others if not row[b].boltzmann and not (row[b].constant and row[b].max == 0)]
+        if mixed:
+            raise ValueError(f"rates[{a}] mixes the Boltzmann form ('rate') with probabilities in "
+                             f"rates[{a}]{mixed}; write every switch of a row as {{'rate': ...}} (or 0)")
+        for b, p in zip(boltzmann, choice_probabilities([row[b].log_weight(state) for b in boltzmann])):
+            result[b] = p
+        return result
+    if sum(row[b].max for b in others) > 1 + 1e-12:
+        raise ValueError("the switching probabilities of each species must sum to at most 1")
+    for b in others:
+        result[b] = row[b].nodes(state)
+    return result
 
 
 @interaction(kind="phenotype_switch", families=("ib", "nove_ib"), name="trait_switch")

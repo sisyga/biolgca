@@ -1,4 +1,8 @@
-"""Switching probabilities that respond to cues: p = max (1 + tanh(Σ kappa (cue - theta))) / 2."""
+"""Switching probabilities that respond to cues.
+
+The tanh form p = max (1 + tanh(Σ kappa (cue - theta))) / 2, and the Boltzmann form with weights
+w = rate exp(Σ beta cue) against staying.
+"""
 
 import numpy as np
 import pytest
@@ -167,6 +171,104 @@ def test_a_cue_of_your_own():
 ])
 def test_switching_probabilities_are_checked(rates, message):
     nodes = np.zeros(DIMS + (2, 5), dtype=bool)
+    model = _classical(True, [{"name": "phenotype_switch", "parameters": {"rates": rates}}], nodes)
+    if message is None:
+        model.step()
+        return
+    with pytest.raises((ValueError, TypeError), match=message):
+        model.step()
+
+
+def _weight(rate, beta, cue):
+    return rate * np.exp(beta * cue)
+
+
+@pytest.mark.parametrize("ve", [True, False])
+def test_boltzmann_rows_choose_between_several_switches(ve):
+    # species 0 turns into 1 (more in crowded nodes) or into 2 (less in crowded nodes); both are empty,
+    # so every switch finds a free channel
+    rng = np.random.default_rng(6)
+    nodes = np.zeros(DIMS + (3, 5), dtype=bool if ve else np.int64)
+    nodes[..., 0, :] = rng.random(DIMS + (5,)) < rng.random(DIMS + (1,)) if ve else rng.poisson(1.5, DIMS + (5,))
+    to_1 = {"rate": 0.3, "cues": [{"name": "density", "beta": 6.0}]}
+    to_2 = {"rate": 1.5, "cues": [{"name": "density", "beta": -4.0}]}
+    model = _classical(ve, [{"name": "phenotype_switch", "parameters": {"rates": [[0, to_1, to_2], [0, 0, 0],
+                                                                                  [0, 0, 0]]}}], nodes)
+    capacity = 5 * 3 if ve else 10
+    cells = nodes[..., 0, :].sum(-1)
+    model.step()
+    after = model.lgca.nodes[model.lgca.nonborder]
+
+    def probability(n, own, other):
+        rho = n / capacity
+        return _weight(*own, rho) / (1 + _weight(0.3, 6.0, rho) + _weight(1.5, -4.0, rho))
+
+    _assert_by_level(cells, cells, after[..., 1, :].sum(-1), lambda n: probability(n, (0.3, 6.0), None))
+    _assert_by_level(cells, cells, after[..., 2, :].sum(-1), lambda n: probability(n, (1.5, -4.0), None))
+
+
+@pytest.mark.parametrize("ve", [True, False])
+def test_a_boltzmann_event_happens_with_probability_w_over_1_plus_w(ve):
+    # trait_switch with a weight whose sensitivity is a trait of every cell
+    rng = np.random.default_rng(7)
+    switch = {"when": {"alignment": 0}, "traits": {"alignment": {"value": 1.0, "operation": "set"}},
+              "probability": {"rate": 0.4, "cues": [{"name": "density", "beta": "beta"}]}}
+    model = build_model(ModelSpec(
+        space=SpaceSpec(geometry="square", dims=DIMS),
+        state=StateSpec(density=2.5 if ve else 1.5, restchannels=1, identity_based=True, volume_exclusion=ve,
+                        capacity=None if ve else 8, traits={"alignment": 0.0, "beta": 0.0}),
+        time=TimeSpec(steps=1, seed=8),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "trait_switch", "parameters": {"switch": switch}}],
+                                         propagation=False)))
+    lgca = model.lgca
+    state = LatticeState(lgca)
+    cells = state.cells
+    beta = rng.choice([-3.0, 5.0], len(cells))
+    lgca.props["beta"][cells.label] = beta
+    rho = (state.density / state.capacity).reshape(-1)[cells.index]
+    model.step()
+    after = np.asarray(lgca.props["alignment"])[cells.label]
+    for value in (-3.0, 5.0):
+        chosen = beta == value
+        _assert_by_level(rho[chosen], np.ones(chosen.sum()), after[chosen] == 1.0,
+                         lambda level, value=value: _weight(0.4, value, level) / (1 + _weight(0.4, value, level)))
+
+
+def test_the_boltzmann_form_of_two_states_is_the_tanh_form():
+    rng = np.random.default_rng(9)
+    nodes = rng.poisson(0.7, DIMS + (2, 5))
+    model = _classical(False, [{"name": "random_walk"}], nodes)
+    state = LatticeState(model.lgca, capacity=10)
+    kappa, theta = 3.0, 0.4
+    tanh = parse_probability({"cues": [{"name": "density", "kappa": kappa, "theta": theta}]})
+    boltzmann = parse_probability({"rate": np.exp(-2 * kappa * theta),
+                                   "cues": [{"name": "density", "beta": 2 * kappa}]})
+    np.testing.assert_allclose(boltzmann.nodes(state), tanh.nodes(state), rtol=1e-12)
+    np.testing.assert_allclose(tanh.nodes(state), tanh_switch(state.density / 10, kappa, theta), rtol=1e-12)
+
+
+def test_boltzmann_weights_do_not_overflow():
+    nodes = np.full(DIMS + (2, 5), 3)
+    model = _classical(False, [{"name": "random_walk"}], nodes)
+    state = LatticeState(model.lgca, capacity=10)
+    huge = parse_probability({"rate": 1e300, "cues": [{"name": "density", "beta": 1e3}]})
+    tiny = parse_probability({"rate": 0.0, "cues": [{"name": "density", "beta": 1e3}]})
+    np.testing.assert_array_equal(huge.nodes(state), 1.0)
+    np.testing.assert_array_equal(tiny.nodes(state), 0.0)
+    assert parse_probability({"rate": 0.25}).nodes(state) == pytest.approx(0.2)
+
+
+@pytest.mark.parametrize("rates, message", [
+    ([[0, {"rate": 0.1}, 0.2], [0, 0, 0], [0, 0, 0]], r"mixes the Boltzmann form"),
+    ([[0, {"rate": 0.1, "max": 0.5}, 0], [0, 0, 0], [0, 0, 0]], "'max' and 'rate'"),
+    ([[0, {"rate": -1}, 0], [0, 0, 0], [0, 0, 0]], ">= 0"),
+    ([[0, {"rate": 1, "cues": [{"name": "density", "kappa": 2}]}, 0], [0, 0, 0], [0, 0, 0]], "'beta'"),
+    ([[0, {"max": 1, "cues": [{"name": "density", "beta": 2}]}, 0], [0, 0, 0], [0, 0, 0]], "Boltzmann"),
+    ([[0, {"rate": 5.0}, {"rate": 9.0}], [0, 0, 0], [0, 0, 0]], None),  # weights need not sum to 1
+    ([[0, {"rate": 5.0}, 0], [0, 0, 0], [0, 0, 0]], None),
+])
+def test_boltzmann_rates_are_checked(rates, message):
+    nodes = np.zeros(DIMS + (3, 5), dtype=bool)
     model = _classical(True, [{"name": "phenotype_switch", "parameters": {"rates": rates}}], nodes)
     if message is None:
         model.step()
