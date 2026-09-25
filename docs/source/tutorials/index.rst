@@ -11,6 +11,10 @@ copy it, change it and sweep its parameters.
 Run the lessons in order the first time. Each later notebook can also serve as
 an independent project starting point.
 
+Every lesson also runs in Google Colab without installing anything: the
+"Open in Colab" badge at its top opens it there, and its first cell installs
+BioLGCA (about a minute).
+
 .. toctree::
    :maxdepth: 1
    :numbered:

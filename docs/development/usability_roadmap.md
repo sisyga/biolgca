@@ -1061,6 +1061,16 @@ Status (2026-09-25, user decisions):
   with the merge to `master` (the badge links point at the notebooks there;
   their first cell installs BioLGCA from PyPI once released, from GitHub
   until then). The JupyterLite site is dropped (not needed).
+- Colab badges done (2026-09-25, user request): every tutorial has an
+  "Open in Colab" badge under its title and a first cell that, only in
+  Colab and only when `lgca` is missing, installs BioLGCA with pip from
+  GitHub (`biolgca @ git+https://github.com/sisyga/biolgca@aidevelop`).
+  Both point at `aidevelop` (master has no tutorials at these paths); at the
+  merge replace `aidevelop` by `master` in the six notebooks, and after a
+  PyPI release install `biolgca` from PyPI. The branch must be pushed for the
+  badges to work. Simulated install with pip from a git URL (Python 3.13):
+  37 s and 106 packages, of which JupyterLab and its server account for
+  about 70 (35 packages and 11 s without `jupyterlab`).
 - 4.3 theory is banked for later. The analyses useful for teaching are the
   linear stability of polar alignment, nematic alignment, aggregation and
   chemotaxis.

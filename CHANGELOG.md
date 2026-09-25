@@ -7,6 +7,8 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- "Open in Colab" badges on the tutorials; in Colab their first cell
+  installs BioLGCA.
 - CI runs the tests and the command line on Windows and macOS as well.
 - The preferred citation is Syga et al. 2026 (`CITATION.cff`, README,
   docs); the 2021 BIO-LGCA paper remains listed.
