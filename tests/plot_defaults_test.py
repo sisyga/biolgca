@@ -22,7 +22,7 @@ FAMILIES = {
     "multispecies_nove": dict(ve=False, n_species=2, interaction="birth", restchannels=1),
 }
 GEOMETRIES = {"lin": 12, "square": 6, "hex": (6, 6)}
-NEEDS_ARGUMENTS = {"plot_scalarfield", "plot_vectorfield"}
+NEEDS_ARGUMENTS = {"plot_scalarfield", "animate_scalarfield", "plot_vectorfield"}
 
 
 @pytest.fixture(autouse=True)

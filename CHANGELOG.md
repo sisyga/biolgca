@@ -7,6 +7,28 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- Fields that change during a run (first part of roadmap item 4.6): the
+  pipeline operator `pde` (`lgca.fields.PDESpec`, a new operator kind
+  `"field"`) updates a field of `StateSpec.fields` by one step of
+  `dc/dt = D Δc + P − L c`, in its listed place among the cell operators.
+  Terms: diffusion, decay, production (a number or a map) and cells that
+  secrete (`{"production": r}`) or take up the field (`{"uptake": r}`,
+  saturating with `"saturation": K, "n": 1`), selected by `species` and
+  `channels`; in identity-based models the rate may name a cell trait.
+  Boundaries: periodic, no flux (the default on non-periodic lattices), a
+  fixed value, or one condition per side on 1D, square and cubic lattices.
+  Solvers: `"implicit"` (backward Euler with SciPy's sparse solvers, the
+  default) and `"explicit"` (`scipy.integrate.solve_ivp`, RK45 by default).
+  The Laplacian uses the cells' neighbourhood on every lattice
+  (`lgca.fields.laplacian`). Chemotaxis and the `field` and `gradient` cues
+  read the updated field.
+- A number in `StateSpec.fields` is a uniform initial value.
+- `FieldRecorder(["oxygen"])` records fields: `result.data["oxygen"]`, and
+  `field_oxygen`/`field_oxygen_steps` in the `measurements.npz` of
+  `biolgca run` (one pair per recorded field).
+- `animate_scalarfield` animates a recorded field on square and hexagonal
+  lattices (also `lgca.plotting.animate(lgca, "scalarfield", data=...)`);
+  `plot_scalarfield` of 1D models draws a field history as a kymograph.
 - "Open in Colab" badges on the tutorials; in Colab their first cell
   installs BioLGCA.
 - CI runs the tests and the command line on Windows and macOS as well.

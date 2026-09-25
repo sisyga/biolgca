@@ -15,7 +15,12 @@ import numpy as np
 
 from .examples import describe_example, example_names, save_example_spec
 from .model import build_model, load_model_spec, save_model_spec
-from .simulation import RECORDED, CSVSnapshotObserver, ScalarTimeSeriesRecorder
+from .simulation import (
+    RECORDED,
+    CSVSnapshotObserver,
+    FieldRecorder,
+    ScalarTimeSeriesRecorder,
+)
 
 
 def main(argv=None) -> int:
@@ -164,6 +169,10 @@ def _run(args) -> int:
         if name in result.data:
             measurements[data_name] = result.data[name]
             measurements[steps_name] = result.data.steps(name)
+    for observer in (result.spec.analysis.observers if result.spec.analysis is not None else ()):
+        for name in observer.fields if isinstance(observer, FieldRecorder) else ():
+            measurements[f"field_{name}"] = result.data[name]
+            measurements[f"field_{name}_steps"] = result.data.steps(name)
     if measurements:
         np.savez_compressed(output_dir / "measurements.npz", **measurements)
         result.metadata["measurements_file"] = "measurements.npz"

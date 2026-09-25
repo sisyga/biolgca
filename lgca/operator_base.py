@@ -15,6 +15,7 @@ from typing import Any
 __all__ = [
     "BirthDeathOperator",
     "ConservationLaw",
+    "FieldOperator",
     "InteractionOperator",
     "ParameterSpec",
     "PhenotypeSwitchOperator",
@@ -248,3 +249,7 @@ class ReorientationOperator(InteractionOperator):
 
 class ReorientationTerm(InteractionOperator):
     """Marker base for terms combined by a reorientation sampler."""
+
+
+class FieldOperator(InteractionOperator):
+    """Marker base for operators that update a field and leave the cells unchanged."""

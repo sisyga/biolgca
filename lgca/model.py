@@ -158,8 +158,10 @@ class StateSpec:
     fields : mapping, default={}
         Named arrays that interactions can use, e.g. a scalar signal of shape
         ``dims`` for ``chemotaxis`` or a director field of shape
-        ``dims + (d,)`` for ``contact_guidance``. Each field becomes an
-        attribute of the LGCA object.
+        ``dims + (d,)`` for ``contact_guidance``; a number is the same value
+        at every node. Each field becomes an attribute of the LGCA object. A
+        field that a ``pde`` operator updates (:class:`lgca.fields.PDESpec`)
+        changes during the run; the others stay as given.
     traits : mapping, default={}
         Initial traits of the cells of an identity-based model, e.g.
         ``{"kappa": 4.0, "theta": 0.6}``. A value is either one number for all
@@ -647,6 +649,12 @@ def _validate_serialized_observer(observer, index: int) -> None:
         allowed = {"type", "schedule", "kind", "output_dir", "filename"}
     elif observer_type == "ScalarTimeSeriesRecorder":
         allowed = {"type", "schedule", "output_path"}
+    elif observer_type == "FieldRecorder":
+        allowed = {"type", "schedule", "fields"}
+        fields = observer.get("fields")
+        if (isinstance(fields, (str, bytes)) or not isinstance(fields, Sequence) or not fields
+                or not all(isinstance(name, str) for name in fields)):
+            raise TypeError(f"{path}.fields must be a list of field names")
     else:
         raise ValueError(f"{path}.type unknown observer {observer_type!r}")
     _reject_unknown_keys(observer, allowed, path)
@@ -691,6 +699,11 @@ def describe_model_graph(spec: ModelSpec) -> dict[str, Any]:
         for dependency in dependencies:
             add_node(f"field:{dependency}", "field", dependency)
             edges.append({"source": f"field:{dependency}", "target": operator_id})
+        if name == "pde":  # a field operator writes its field, not the cells
+            output = _operator_parameters(operator).get("field")
+            add_node(f"field:{output}", "field", output)
+            edges.append({"source": operator_id, "target": f"field:{output}"})
+            continue
         add_node("output:nodes", "output", "nodes")
         edges.append({"source": operator_id, "target": "output:nodes"})
 
@@ -882,7 +895,7 @@ def _observer_to_dict(observer) -> dict[str, Any]:
     supported = {
         "NodeRecorder", "PopulationRecorder", "DensityRecorder",
         "ChannelDensityRecorder", "PerTypeRecorder", "OrderParameterRecorder",
-        "FamilyPopulationRecorder", "CSVSnapshotObserver", "ScalarTimeSeriesRecorder",
+        "FamilyPopulationRecorder", "CSVSnapshotObserver", "ScalarTimeSeriesRecorder", "FieldRecorder",
     }
     observer_type = observer.__class__.__name__
     if observer_type not in supported:
@@ -911,6 +924,8 @@ def _observer_to_dict(observer) -> dict[str, Any]:
         if set(observer.metrics) != {"population"} or observer.metrics["population"] is not _total_population:
             raise TypeError("ScalarTimeSeriesRecorder serialization only supports the default population metric.")
         data["output_path"] = str(observer.output_path)
+    elif observer_type == "FieldRecorder":
+        data["fields"] = list(observer.fields)
     return data
 
 
@@ -920,6 +935,7 @@ def _observer_from_dict(data: Mapping[str, Any]):
         ChannelDensityRecorder,
         DensityRecorder,
         FamilyPopulationRecorder,
+        FieldRecorder,
         NodeRecorder,
         OrderParameterRecorder,
         PerTypeRecorder,
@@ -953,6 +969,8 @@ def _observer_from_dict(data: Mapping[str, Any]):
         )
     if observer_type == "ScalarTimeSeriesRecorder":
         return ScalarTimeSeriesRecorder(schedule=schedule, output_path=data.get("output_path"))
+    if observer_type == "FieldRecorder":
+        return FieldRecorder(data["fields"], schedule=schedule)
     raise ValueError(f"Unknown observer type {observer_type!r}.")
 
 
@@ -1031,13 +1049,26 @@ def _operator_graph_info(operator) -> tuple[str, set[str]]:
                 dependencies.add(str(field))
         return "reorientation.boltzmann", dependencies
     if isinstance(operator, Mapping):
-        return str(operator.get("name", "<missing>")), dependencies
-    name = getattr(operator, "name", "<missing>")
-    parameters = getattr(operator, "parameters", {})
-    field = parameters.get("field") if isinstance(parameters, Mapping) else None
+        name = str(operator.get("name", "<missing>"))
+    else:
+        name = str(getattr(operator, "name", "<missing>"))
+    parameters = _operator_parameters(operator)
+    if name == "pde":
+        production = parameters.get("production")
+        if isinstance(production, str):
+            dependencies.add(production)
+        return name, dependencies
+    if isinstance(operator, Mapping):
+        return name, dependencies
+    field = parameters.get("field")
     if field is not None:
         dependencies.add(str(field))
-    return str(name), dependencies
+    return name, dependencies
+
+
+def _operator_parameters(operator) -> Mapping[str, Any]:
+    parameters = operator.get("parameters") if isinstance(operator, Mapping) else getattr(operator, "parameters", {})
+    return parameters if isinstance(parameters, Mapping) else {}
 
 
 def _observer_output_name(observer) -> str:
@@ -1051,6 +1082,7 @@ def _observer_output_name(observer) -> str:
         "FamilyPopulationRecorder": "fam_pop_t",
         "CSVSnapshotObserver": "csv_snapshots",
         "ScalarTimeSeriesRecorder": "scalar_time_series",
+        "FieldRecorder": "fields",
     }
     return output_by_name.get(observer.__class__.__name__, observer.__class__.__name__)
 
@@ -1152,6 +1184,10 @@ def build_model(
     traits = _attach_traits(lgca, spec.state.traits)
     pipeline = compile_pipeline(spec.dynamics, context)
     _attach_fields(lgca, context.fields)
+    for operator in pipeline.operators:
+        attach = getattr(operator, "attach_field", None)
+        if attach is not None:  # a field operator pads its field by its boundary condition
+            attach(lgca)
     for name, values in traits.items():
         if lgca.props.get(name) is not values:
             warn_user(f"an interaction set the cell trait {name!r} when the model was built, so the "
@@ -1450,6 +1486,8 @@ def _attach_traits(lgca, traits: Mapping[str, Any]) -> dict[str, Any]:
 def _attach_fields(lgca, fields: Mapping[str, Any]) -> None:
     for name, value in fields.items():
         array = np.asarray(value)
+        if array.ndim == 0:  # a number: the same value at every node
+            array = np.full(tuple(lgca.dims), float(array))
         spatial_ndim = len(lgca.dims)
         spatial_shape = tuple(lgca.dims)
         target_shape = lgca.nodes.shape[:spatial_ndim]

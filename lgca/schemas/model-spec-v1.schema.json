@@ -125,7 +125,86 @@
           "type": "object",
           "additionalProperties": {"$ref": "#/$defs/jsonValue"}
         }
+      },
+      "if": {"properties": {"name": {"const": "pde"}}},
+      "then": {
+        "required": ["parameters"],
+        "properties": {"parameters": {"$ref": "#/$defs/pdeParameters"}}
       }
+    },
+    "pdeParameters": {
+      "type": "object",
+      "required": ["field"],
+      "additionalProperties": false,
+      "properties": {
+        "field": {"type": "string", "minLength": 1},
+        "diffusion": {"type": "number", "minimum": 0},
+        "decay": {"type": "number", "minimum": 0},
+        "production": {"oneOf": [{"type": "number", "minimum": 0}, {"type": "string", "minLength": 1}]},
+        "cells": {"type": "array", "items": {"$ref": "#/$defs/pdeCellTerm"}},
+        "boundary": {"$ref": "#/$defs/pdeBoundary"},
+        "solver": {"enum": ["explicit", "implicit"]},
+        "solver_options": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/jsonValue"}
+        }
+      }
+    },
+    "pdeRate": {"oneOf": [{"type": "number", "minimum": 0}, {"type": "string", "minLength": 1}]},
+    "pdeCellTerm": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "production": {"$ref": "#/$defs/pdeRate"},
+        "uptake": {"$ref": "#/$defs/pdeRate"},
+        "saturation": {"type": "number", "exclusiveMinimum": 0},
+        "n": {"type": "number", "minimum": 1},
+        "species": {
+          "oneOf": [
+            {"type": "integer", "minimum": 0},
+            {"type": "array", "items": {"type": "integer", "minimum": 0}, "minItems": 1}
+          ]
+        },
+        "channels": {
+          "oneOf": [
+            {"enum": ["all", "rest", "velocity"]},
+            {"type": "array", "items": {"type": "integer", "minimum": 0}, "minItems": 1}
+          ]
+        }
+      },
+      "oneOf": [{"required": ["production"]}, {"required": ["uptake"]}]
+    },
+    "pdeCondition": {
+      "oneOf": [
+        {"const": "no_flux"},
+        {
+          "type": "object",
+          "required": ["value"],
+          "additionalProperties": false,
+          "properties": {"value": {"type": "number", "minimum": 0}}
+        }
+      ]
+    },
+    "pdeBoundary": {
+      "oneOf": [
+        {"type": "null"},
+        {"const": "periodic"},
+        {"$ref": "#/$defs/pdeCondition"},
+        {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "properties": {
+            "x-": {"$ref": "#/$defs/pdeCondition"},
+            "x+": {"$ref": "#/$defs/pdeCondition"},
+            "y-": {"$ref": "#/$defs/pdeCondition"},
+            "y+": {"$ref": "#/$defs/pdeCondition"},
+            "z-": {"$ref": "#/$defs/pdeCondition"},
+            "z+": {"$ref": "#/$defs/pdeCondition"},
+            "default": {"$ref": "#/$defs/pdeCondition"}
+          }
+        }
+      ]
     },
     "reorientationTerm": {
       "type": "object",
@@ -217,6 +296,16 @@
             "kind": {"type": "string"},
             "output_dir": {"type": "string"},
             "filename": {"type": "string"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "fields"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {"const": "FieldRecorder"},
+            "schedule": {"$ref": "#/$defs/schedule"},
+            "fields": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}
           }
         },
         {

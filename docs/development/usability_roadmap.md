@@ -1061,6 +1061,13 @@ model with a custom rule reruns from the CLI.
   explicit, implicit and quasi-steady solvers. Specification:
   `docs/development/fields_spec.md` (draft 2026-09-25; design agreed
   2026-09-26).
+- Status (2026-09-26): phase 1 implemented: `lgca/fields.py`
+  (`PDESpec`, the `pde` operator of kind `"field"`, the Laplacian from the
+  geometry, boundaries, `explicit` and `implicit` solvers, cell terms),
+  `FieldRecorder`, `animate_scalarfield` and the 1D kymograph; chemotaxis
+  toward a secreted signal runs end to end (`tests/fields_test.py`).
+  Implementation choices are listed in the spec under "Phase 1 as built".
+  Next: phase 2 (steady solver, pyamg).
 
 Status (2026-09-25, user decisions):
 - Not yet at the publishing stage: the user has further features in mind

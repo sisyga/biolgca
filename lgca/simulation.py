@@ -46,6 +46,8 @@ def estimate_recording_bytes(lgca, timesteps, observers):
             per_frame = 4 * np.dtype(float).itemsize
         elif isinstance(observer, FamilyPopulationRecorder):
             per_frame = (int(getattr(lgca, "maxfamily", 0)) + 1) * np.dtype(float).itemsize
+        elif isinstance(observer, FieldRecorder):
+            per_frame = spatial * len(observer.fields) * np.dtype(float).itemsize
         else:
             continue
         total += samples * (per_frame + np.dtype(int).itemsize)
@@ -58,6 +60,7 @@ __all__ = [
     "ChannelDensityRecorder",
     "DensityRecorder",
     "FamilyPopulationRecorder",
+    "FieldRecorder",
     "NodeRecorder",
     "Observer",
     "OrderParameterRecorder",
@@ -185,6 +188,12 @@ class SimulationRunner:
                     raise ValueError(f"Multiple {kind.__name__} instances share LGCA output arrays; "
                                      "use one recorder per type and select samples afterward")
                 seen.add(kind)
+        recorded_fields = [name for observer in self.observers if isinstance(observer, FieldRecorder)
+                           for name in observer.fields]
+        twice = sorted({name for name in recorded_fields if recorded_fields.count(name) > 1})
+        if twice:
+            raise ValueError(f"the fields {twice} are recorded by several FieldRecorders; record each "
+                             "field with one")
         self.estimated_recording_bytes = estimate_recording_bytes(self.lgca, self.timesteps, self.observers)
         if (self.max_recording_bytes is not None
                 and self.estimated_recording_bytes > self.max_recording_bytes):
@@ -420,6 +429,68 @@ class FamilyPopulationRecorder(Observer):
         return False
 
 
+class FieldRecorder(Observer):
+    """Record fields of the model, e.g. one that a ``pde`` operator updates.
+
+    The history of each field is ``result.data[name]``, of shape
+    ``(samples,) + dims`` (interior nodes), with ``result.data.steps(name)``.
+
+    Parameters
+    ----------
+    fields : str or sequence of str
+        Names of fields of ``StateSpec.fields`` with one value per node.
+    schedule : Schedule, optional
+        When to record; default every step.
+
+    Examples
+    --------
+    >>> from lgca.simulation import FieldRecorder, Schedule
+    >>> recorder = FieldRecorder("oxygen", schedule=Schedule(every=10))
+    >>> recorder.fields
+    ('oxygen',)
+    """
+
+    def __init__(self, fields, schedule: Schedule | None = None):
+        super().__init__(schedule=schedule)
+        fields = (fields,) if isinstance(fields, str) else tuple(fields)
+        if not fields or not all(isinstance(name, str) and name for name in fields):
+            raise ValueError("FieldRecorder needs the names of one or more fields")
+        if len(set(fields)) != len(fields):
+            raise ValueError("FieldRecorder lists a field twice")
+        self.fields = fields
+        self.values: dict[str, np.ndarray] = {}
+        self.steps = np.zeros(0, dtype=int)
+
+    def setup(self, lgca, runner: SimulationRunner) -> None:
+        dims = tuple(lgca.dims)
+        for name in self.fields:
+            if name in RECORDED or name in _DATA_ALIASES:
+                raise ValueError(f"the field {name!r} has the name of a recording in result.data; "
+                                 "rename the field")
+            if not hasattr(lgca, name):
+                raise ValueError(f"FieldRecorder: the model has no field {name!r}; declare it in "
+                                 "StateSpec.fields")
+            if self._interior(lgca, name).shape != dims:
+                raise ValueError(f"FieldRecorder records fields with one value per node; {name!r} has "
+                                 f"shape {np.shape(getattr(lgca, name))}")
+        self.steps = np.fromiter((step for step in range(runner.timesteps + 1)
+                                  if self.schedule.should_run(step)), dtype=int)
+        self._sample_indices = {int(step): index for index, step in enumerate(self.steps)}
+        self.values = {name: np.zeros((len(self.steps),) + dims) for name in self.fields}
+
+    def on_step(self, lgca, step: int) -> None:
+        index = self._sample_indices[step]
+        for name in self.fields:
+            self.values[name][index] = self._interior(lgca, name)
+
+    @staticmethod
+    def _interior(lgca, name):
+        values = np.asarray(getattr(lgca, name))
+        if values.shape[:len(lgca.dims)] != tuple(lgca.dims):
+            values = values[lgca.nonborder]
+        return values
+
+
 TIMEEVO_HINT = "Record it with lgca.timeevo(..., record=True, recordN=True, recordpertype=True)"
 
 
@@ -555,7 +626,8 @@ class RunData(Mapping):
     recorded step, ``data.steps("population")`` the steps (counted from the
     start of the run). The names are those of :data:`RECORDED` for the built-in
     recorders, e.g. ``"density"`` for :class:`DensityRecorder`, and the metric
-    names of a :class:`ScalarTimeSeriesRecorder`; ``list(data)`` shows what a run
+    names of a :class:`ScalarTimeSeriesRecorder` and the field names of a
+    :class:`FieldRecorder`; ``list(data)`` shows what a run
     recorded. The arrays are the ones on the model (``lgca.n_t``, ...) at the
     end of the run.
 
@@ -589,6 +661,11 @@ class RunData(Mapping):
                 # read lazily: the lists of labels of some identity-based models are built on demand
                 values[name] = _reader(lgca, attribute)
                 steps[name] = np.asarray(getattr(lgca, steps_attribute))
+        for observer in observers:
+            if isinstance(observer, FieldRecorder):
+                for name in observer.fields:
+                    values[name] = observer.values[name]
+                    steps[name] = observer.steps
         for observer in observers:
             if isinstance(observer, ScalarTimeSeriesRecorder) and observer.records:
                 recorded = np.array([row["step"] for row in observer.records])

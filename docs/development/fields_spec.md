@@ -1,6 +1,7 @@
 # Fields: reaction–advection–diffusion equations coupled to the cells
 
-Status: design agreed (2026-09-26). Nothing implemented yet.
+Status: design agreed (2026-09-26). Phase 1 implemented (2026-09-26, see
+"Phase 1 as built").
 
 ## Goal
 
@@ -437,6 +438,69 @@ measured.
    - tutorial 8, aggregation: cells secrete a chemokine and move up its
      gradient (Keller–Segel on a lattice), with and without decay, showing
      the onset of aggregation.
+
+## Phase 1 as built (2026-09-26)
+
+`lgca/fields.py`, `FieldRecorder` in `simulation.py`, plots in
+`square_plotting.py` and `lgca_1d.py`, tests in `tests/fields_test.py`.
+Choices made while implementing, beyond the text above:
+
+- **No flux** drops the term of a neighbour beyond the edge (zero flux
+  through that face). The matrix is then symmetric with zero column sums, so
+  diffusion conserves the total to rounding on every lattice (tested). On 1D,
+  square and cubic lattices this equals edge padding; on the hexagonal and
+  Moore lattices, where a channel from an edge node can reach a ghost node
+  whose edge copy is another node, it is the conservative choice. The stored
+  ghost nodes of a no-flux field are edge-padded, as for static fields.
+- **Inflow lattices** (reflecting in x, periodic in y): the field wraps in y;
+  `boundary` sets the x sides.
+- **Implicit backend** `"auto"`: a matrix independent of the cells (no
+  uptake) is factored once (SuperLU); otherwise conjugate gradients with a
+  Jacobi preconditioner, started from the previous field. Measured on this
+  machine, square lattice, uptake by a disc of cells, rtol 10⁻⁶, median of
+  5 steps, fresh process each:
+
+  | one implicit step | 100², D=1 | 100², D=50 | 200², D=1 | 200², D=50 |
+  |---|---|---|---|---|
+  | SuperLU (`"direct"`) | 18 ms | 20 ms | 103 ms | 106 ms |
+  | CG, Jacobi (`"cg"`, the default here) | 1.4 ms | 3.6 ms | 9.7 ms | 38 ms |
+
+  Saturating uptake (`K = 0.1`) at 200², D=1: 11 Picard iterations,
+  33 ms per step with CG against 1018 ms with SuperLU. Tiny negative values
+  left by CG's rounding are set to zero.
+- **Secretion only** (the matrix is factored once), square lattice, density
+  0.5, median of 7 steps, fresh process each, against one random-walk step:
+
+  | | 100² | 200² | 400² |
+  |---|---|---|---|
+  | random walk (`ReorientationSpec()`) | 1.7 ms | 7.7 ms | 29 ms |
+  | `pde` implicit, D=1 | 0.9 ms | 4.3 ms | 22 ms |
+  | `pde` explicit (RK45), D=1, 62 evaluations | 1.8 ms | 7.9 ms | 28 ms |
+  | `pde` explicit (RK45), D=20, about 350 evaluations | 19 ms | 89 ms | 377 ms |
+
+- **Defaults**: implicit `rtol` 10⁻⁶ for CG and for the Picard iteration of
+  saturating uptake (`max_iterations` 20); explicit `rtol` 10⁻⁴, `atol`
+  10⁻⁶, values in `[−atol, 0)` set to zero, below that an error.
+  `solve_ivp` gets `t_eval=[1]`, so it keeps no intermediate states.
+- **`solver="steady"`** raises "not available yet" until phase 2;
+  `advection` and `reactions` are not parameters yet (phase 3), so they are
+  rejected as unknown.
+- **`FieldRecorder(fields, schedule=Schedule(every=...))`**, like the other
+  recorders (the text above wrote `every=`). The CLI writes
+  `field_<name>` and `field_<name>_steps` to `measurements.npz`, one pair per
+  recorded field (user decision 2026-09-26). A field named like a recording
+  (`"population"`) or recorded twice is refused before the run.
+- **Statistics** per field in `metadata["fields"][name]`: `calls`, and for
+  explicit steps `rhs_evaluations` and `max_rhs_evaluations`, for saturating
+  uptake `max_iterations_used`.
+- **Build**: `build_model` lets each field operator pad its field after the
+  static fields are attached (`attach_field`); the initial values must be
+  finite and non-negative. Field names must not collide with attributes of
+  the model, an existing rule: `c` (the velocities) is taken.
+- **Plots**: `animate_scalarfield(field_t, steps=...)` on square and
+  hexagonal lattices, with one colour scale for all frames; on 1D lattices
+  `plot_scalarfield` draws a history as a kymograph and a single profile as
+  a line.
 
 ## Later
 

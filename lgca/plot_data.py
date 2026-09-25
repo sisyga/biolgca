@@ -24,6 +24,9 @@ def resolve_animation_history(lgca, data_argument, data=None, steps=None,
     and cannot be channel-selected; implicit selection requires node history.
     """
     implicit = data is None
+    if implicit and data_argument == "field_t":
+        raise ValueError("pass the recorded field as data, e.g. data=result.data['signal'] with "
+                         "steps=result.data.steps('signal')")
     selected = channels != slice(None)
     attribute = "dens_t" if data_argument == "density_t" else "nodes_t"
     if implicit:

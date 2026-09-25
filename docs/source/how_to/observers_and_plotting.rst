@@ -104,6 +104,9 @@ Built-in recorder observers include:
    * - ``ScalarTimeSeriesRecorder``
      - the names of its metrics
      - a CSV file
+   * - ``FieldRecorder(["oxygen"])``
+     - the field names, e.g. ``"oxygen"``
+     - the history of a field, e.g. one updated by a ``pde`` operator
 
 Recorded data of a model run
 ----------------------------

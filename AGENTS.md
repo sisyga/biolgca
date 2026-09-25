@@ -56,7 +56,8 @@ tests the installed wheel and CLI, and builds the docs.
   them, including go-or-grow, `birth_death` and the switches),
   `mutations.py` (events that change cell traits: mutations of daughters and
   `trait_switch`), `switching.py` (switching probabilities that respond to
-  cues such as the density), `research_models.py`
+  cues such as the density), `fields.py` (the `pde` operator: fields that
+  diffuse, decay and are secreted or taken up by cells), `research_models.py`
   (published models as stacks of the rules, under the legacy names),
   `legacy_names.py` (the `get_lgca` interaction names, and the deprecated
   prefixed names of model files, as stacks of rules), `testing.py`
@@ -86,6 +87,7 @@ Elsewhere:
   cells, `phenotype_switch` moves cells between species (classical models)
   or changes cell parameters (identity-based models), and `reorientation`
   rearranges a node's cells over its channels, keeping the cells per species.
+  A fourth kind, `field`, changes no cells but a field (`pde`).
   Operators run in the order they are listed, then propagation.
 - **New rules** are functions of a `LatticeState` registered with
   `@interaction` or `@reorientation_term`; built-in ones go in

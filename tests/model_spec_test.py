@@ -454,13 +454,14 @@ def _state_for_plugin(plugin_name):
         if plugin_name.endswith("excitable_medium_ms"):
             return StateSpec(density=0.35, restchannels=1, n_species=2)
         return StateSpec(density=0.35, restchannels=1, volume_exclusion=False, n_species=2)
-    if plugin_name in ("chemotaxis", "contact_guidance", "directed_motion"):  # cues that read a named field
+    if plugin_name in ("chemotaxis", "contact_guidance", "directed_motion", "pde"):  # read a named field
         return StateSpec(density=0.35, restchannels=2, fields={
             "signal": np.arange(20.0).reshape(4, 5), "director": np.ones((4, 5, 2))})
     return StateSpec(density=0.35, restchannels=2)
 
 
 _PARAMETERS_FOR_PLUGIN = {"chemotaxis": {"field": "signal"}, "directed_motion": {"field": "director"},
+                          "pde": {"field": "signal", "diffusion": 1.0},
                           "trait_switch": {"switch": {"alignment": 0.1}},
                           "phenotype_switch": {"rates": [[0, 0.1], [0.2, 0]]}}
 

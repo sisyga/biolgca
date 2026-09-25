@@ -21,6 +21,7 @@ from ._warnings import warn_user
 __all__ = [
     "BirthDeathOperator",
     "ConservationLaw",
+    "FieldOperator",
     "InteractionOperator",
     "ParameterSpec",
     "PhenotypeSwitchOperator",
@@ -41,6 +42,7 @@ __all__ = [
 from .operator_base import (
     BirthDeathOperator,
     ConservationLaw,
+    FieldOperator,
     InteractionOperator,
     ParameterSpec,
     PhenotypeSwitchOperator,
@@ -211,6 +213,8 @@ def _law_for_kind(kind: str) -> ConservationLaw:
         return ConservationLaw(True, False, False, ("phenotype identity",))
     if kind == "reorientation":
         return ConservationLaw(True, True, False, ("channel occupancy",))
+    if kind == "field":
+        return ConservationLaw(True, True, True, ("field",))
     if kind == "propagation":
         return ConservationLaw(True, True, None, ("position",))
     return ConservationLaw(None, None, None)

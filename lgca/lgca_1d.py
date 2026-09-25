@@ -15,7 +15,7 @@ Supported LGCA types:
 - identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_1D`)
 """
 
-from .plot_data import history_steps, label_history_axis, select_density_history
+from .plot_data import history_steps, label_history_axis, select_density_history, select_scalar_field
 
 try:  # optional plotting dependency
     import matplotlib.ticker as mticker
@@ -481,6 +481,58 @@ class LGCA_1D(LGCA_base):
         label_history_axis(ax, times)
         return plot
 
+
+    def plot_scalarfield(self, field, steps=None, cmap='cividis', cbar=True, cbarlabel='Scalar field', vmin=None,
+                         vmax=None, colorbarwidth=0.03, **kwargs):
+        """
+        Plot a field on the lattice: its history as a kymograph (x axis: lattice, y axis: time), or one profile.
+
+        Parameters
+        ----------
+        field : array_like
+            A history of shape ``(frames,) + self.dims``, e.g. ``result.data["signal"]`` recorded by a
+            :class:`~lgca.simulation.FieldRecorder`, or one profile of shape ``self.dims`` (with or without
+            ghost nodes), drawn as a line.
+        steps : array_like, optional
+            Time step of each frame of a history, e.g. ``result.data.steps("signal")``; default 0, 1, 2, ...
+        cmap : str or :py:class:`matplotlib.colors.Colormap`, default='cividis'
+            Colour map of a kymograph.
+        cbar : bool, default=True
+            Draw a colour bar next to a kymograph.
+        cbarlabel : str, default='Scalar field'
+            Label of the colour bar, or of the y axis of a profile.
+        vmin, vmax : float, optional
+            Limits of the colour scale; default the range of the values.
+        colorbarwidth : float, default=0.03
+            Width of the colour bar axis.
+        **kwargs
+            Passed on to :py:meth:`setup_figure` for a kymograph, e.g. ``figsize`` or ``ax``.
+
+        Returns
+        -------
+        :py:class:`matplotlib.image.AxesImage` or :py:class:`matplotlib.lines.Line2D`
+            The kymograph, or the line of the profile.
+        """
+        field = np.asarray(field, dtype=float)
+        if field.ndim == 1:
+            profile = select_scalar_field(self, field)
+            fig, ax = lattice_axes(figindex=kwargs.get("figindex"), figsize=kwargs.get("figsize"),
+                                   ax=kwargs.get("ax"))
+            line, = ax.plot(self.xcoords, profile)
+            ax.set_xlabel('Lattice node $r \\, (\\varepsilon)$')
+            ax.set_ylabel(cbarlabel)
+            return line
+        if field.ndim != 2 or field.shape[1:] != tuple(self.dims):
+            raise ValueError(f"field must have shape {tuple(self.dims)} or (frames,) + {tuple(self.dims)}, "
+                             f"got {field.shape}")
+        fig, ax = self.setup_figure(field.shape[0], **kwargs)
+        plot = ax.imshow(field, interpolation='None', cmap=cmap, vmin=vmin, vmax=vmax)
+        if cbar:
+            cax = colorbar_axes(ax, size=colorbarwidth, pad=0.1)
+            fig.colorbar(plot, cax=cax, use_gridspec=True).set_label(cbarlabel)
+        plt.sca(ax)
+        label_history_axis(ax, history_steps(self, len(field), None, steps))
+        return plot
 
     def plot_flux(self, nodes_t=None, cbar=True, colorbarwidth=0.03, **kwargs):
         """

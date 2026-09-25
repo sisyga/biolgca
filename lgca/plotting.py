@@ -36,6 +36,7 @@ _ANIMATION_METHODS = {
     "configuration": ("animate_config", "nodes_t"),
     "flux": ("animate_flux", "nodes_t"),
     "flow": ("animate_flow", "nodes_t"),
+    "scalarfield": ("animate_scalarfield", "field_t"),
 }
 
 

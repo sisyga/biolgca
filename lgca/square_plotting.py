@@ -32,6 +32,7 @@ except ImportError:  # pragma: no cover - handled at runtime
 
 
 from .plot_data import (
+    history_steps,
     resolve_animation_history,
     select_density,
     select_density_history,
@@ -388,6 +389,55 @@ class SquarePlotMixin:
             plt.sca(ax)
 
         return fig, pc, cmap
+
+    def animate_scalarfield(self, field_t, steps=None, interval=100, vmin=None, vmax=None, repeat=True,
+                            save_path=None, save_kwargs=None, **kwargs):
+        """Animate the history of a field, e.g. one recorded by a :class:`~lgca.simulation.FieldRecorder`.
+
+        Parameters
+        ----------
+        field_t : array_like
+            Field values of shape ``(frames,) + self.dims``, e.g. ``result.data["oxygen"]``.
+        steps : array_like, optional
+            Time step of each frame, e.g. ``result.data.steps("oxygen")``; default 0, 1, 2, ...
+        interval : float, default=100
+            Delay between frames in milliseconds.
+        vmin, vmax : float, optional
+            Limits of the colour scale; default the smallest and largest value of the whole history, so
+            that all frames share one scale.
+        repeat : bool, default=True
+            Play the animation in a loop.
+        save_path : str or pathlib.Path, optional
+            Movie file to write, e.g. ``oxygen.gif``.
+        save_kwargs : dict, optional
+            Options of :py:meth:`matplotlib.animation.Animation.save`.
+        **kwargs
+            Passed on to :py:meth:`plot_scalarfield`, e.g. ``cmap`` or ``cbarlabel``.
+
+        Returns
+        -------
+        :class:`~lgca.plots.LatticeAnimation`
+        """
+        field_t = np.asarray(field_t, dtype=float)
+        if field_t.ndim != len(self.dims) + 1 or not len(field_t):
+            raise ValueError(f"field_t must have shape (frames,) + {tuple(self.dims)}, got {field_t.shape}")
+        frames = np.stack([select_scalar_field(self, frame) for frame in field_t])
+        steps = history_steps(self, len(frames), None, steps)
+        vmin = np.nanmin(frames) if vmin is None else vmin
+        vmax = np.nanmax(frames) if vmax is None else vmax
+        fig, artist, mappable = self.plot_scalarfield(frames[0], vmin=vmin, vmax=vmax, **kwargs)
+        title = artist.axes.set_title(f'Time $k =${steps[0]}')
+
+        def update(n):
+            title.set_text(f'Time $k =${steps[n]}')
+            if hasattr(artist, 'set_data'):
+                artist.set_data(frames[n].T)
+            else:
+                artist.set(facecolor=mappable.to_rgba(frames[n].ravel()))
+            return artist, title
+
+        return make_animation(fig, update, frames=len(frames), interval=interval, save_path=save_path,
+                              save_kwargs=save_kwargs, repeat=repeat)
 
     def plot_density(self, density=None, channels=slice(None), species=None, figindex=None, figsize=None, tight_layout=True,
                      cmap='viridis', vmax=None, edgecolor='None', cbar=True, cbarlabel='Particle number $n$', ax=None):
