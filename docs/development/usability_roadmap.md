@@ -1055,6 +1055,13 @@ model with a custom rule reruns from the CLI.
 **4.5 Platform coverage**
 - CI on Windows and macOS in addition to Linux.
 
+**4.6 Fields and multiscale models**
+- Reaction–advection–diffusion equations on the lattice's nodes, with cells
+  as sources and sinks, updated by a pipeline operator in its listed place;
+  explicit, implicit and quasi-steady solvers. Specification:
+  `docs/development/fields_spec.md` (draft 2026-09-25; design agreed
+  2026-09-26).
+
 Status (2026-09-25, user decisions):
 - Not yet at the publishing stage: the user has further features in mind
   before a release, so 4.1 (PyPI, Colab badges) waits. Colab badges come
