@@ -1,7 +1,8 @@
 cff-version: 1.2.0
 message: >-
-  If you use BioLGCA in published work, please cite the software and the
-  papers listed under references.
+  If you use BioLGCA in published work, please cite the paper given as the
+  preferred citation; the BIO-LGCA modelling class is described in the papers
+  listed under references.
 title: "BioLGCA: biological lattice-gas cellular automata in Python"
 type: software
 authors:
@@ -19,6 +20,19 @@ keywords:
   - lattice gas
   - biological modelling
   - collective cell migration
+preferred-citation:
+  type: article
+  title: "A novel cellular automaton approach for modeling genotypic and phenotypic heterogeneity in cell systems"
+  authors:
+    - given-names: Simon
+      family-names: Syga
+    - given-names: Josué Manik
+      family-names: Nava-Sedeño
+    - given-names: Andreas
+      family-names: Deutsch
+  journal: The European Physical Journal Special Topics
+  year: 2026
+  doi: 10.1140/epjs/s11734-026-02186-1
 references:
   - type: article
     title: "BIO-LGCA: A cellular automaton modelling class for analysing collective cell migration"

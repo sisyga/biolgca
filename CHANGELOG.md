@@ -7,6 +7,12 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- CI runs the tests and the command line on Windows and macOS as well.
+- The preferred citation is Syga et al. 2026 (`CITATION.cff`, README,
+  docs); the 2021 BIO-LGCA paper remains listed.
+- A process sweep started from a script without `if __name__ ==
+  "__main__":` fails with an explanation instead of a multiprocessing
+  `EOFError`.
 - `lgca.study`: `vary(spec, {"time.steps": 200, "kappa": 4})` returns a
   copy of a model with values changed by path (`dynamics.operators[0].kappa`,
   entries by name such as `operators[go_or_rest]`, or a short name that
@@ -479,6 +485,8 @@ This file records notable user-facing changes. Changes remain under
 
 ### Fixed
 
+- CSV files of `ScalarTimeSeriesRecorder` and `CSVSnapshotObserver` are
+  written as UTF-8 on every system (Windows used its local encoding).
 - In identity-based models without volume exclusion, labels start at 0, and
   `init_families` put cell 0 into family 0, the root of the family tree, so
   it and its descendants counted as an extra family. Cell 0 now belongs to

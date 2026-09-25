@@ -84,14 +84,17 @@ Citing BioLGCA
 
 If you use BioLGCA in published work, please cite:
 
-* Deutsch A, Nava-Sedeño JM, Syga S, Hatzikirou H (2021). BIO-LGCA: A cellular
-  automaton modelling class for analysing collective cell migration.
-  *PLoS Computational Biology* 17(6): e1009066.
-  `doi:10.1371/journal.pcbi.1009066 <https://doi.org/10.1371/journal.pcbi.1009066>`_
 * Syga S, Nava-Sedeño JM, Deutsch A (2026). A novel cellular automaton approach
   for modeling genotypic and phenotypic heterogeneity in cell systems.
   *The European Physical Journal Special Topics*.
   `doi:10.1140/epjs/s11734-026-02186-1 <https://doi.org/10.1140/epjs/s11734-026-02186-1>`_
+
+The BIO-LGCA modelling class is described in:
+
+* Deutsch A, Nava-Sedeño JM, Syga S, Hatzikirou H (2021). BIO-LGCA: A cellular
+  automaton modelling class for analysing collective cell migration.
+  *PLoS Computational Biology* 17(6): e1009066.
+  `doi:10.1371/journal.pcbi.1009066 <https://doi.org/10.1371/journal.pcbi.1009066>`_
 
 The repository's ``CITATION.cff`` contains the same references in a
 machine-readable form.

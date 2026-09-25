@@ -36,6 +36,7 @@ import re
 import tempfile
 from collections.abc import Iterable, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from concurrent.futures.process import BrokenProcessPool
 from copy import deepcopy
 from dataclasses import fields, is_dataclass, replace
 from importlib import import_module
@@ -424,19 +425,30 @@ def _execute(spec, jobs, measures, n_jobs, backend, plugins, showprogress, colum
             return results
         processes = backend == "processes"
         if processes:
+            if multiprocessing.current_process().name != "MainProcess":
+                # a worker imports the script that called sweep, and the script calls sweep again
+                raise RuntimeError(_MAIN_GUARD)
             _check_picklable(spec, measures)
             pool = ProcessPoolExecutor(n_jobs, mp_context=_start_method())
         else:
             pool = ThreadPoolExecutor(n_jobs)
-        with pool:
-            futures = {pool.submit(_guarded, spec, job, measures, plugins if processes else (), columns,
-                                   backend): index for index, job in enumerate(jobs)}
-            for future in as_completed(futures):
-                results[futures[future]] = future.result()
-                progress.update()
+        try:
+            with pool:
+                futures = {pool.submit(_guarded, spec, job, measures, plugins if processes else (), columns,
+                                       backend): index for index, job in enumerate(jobs)}
+                for future in as_completed(futures):
+                    results[futures[future]] = future.result()
+                    progress.update()
+        except (BrokenProcessPool, EOFError) as exc:
+            raise RuntimeError(f"the worker processes stopped ({type(exc).__name__}). {_MAIN_GUARD}") from exc
     finally:
         progress.close()
     return results
+
+
+_MAIN_GUARD = ("Worker processes import the script that runs the sweep; in a script, put the code that "
+               "calls sweep under  if __name__ == \"__main__\":  so that it runs only once. In a notebook, "
+               "define measures and rules in a module, or use backend=\"threads\".")
 
 
 def _start_method():

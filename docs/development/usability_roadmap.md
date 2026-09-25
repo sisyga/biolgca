@@ -1055,14 +1055,36 @@ model with a custom rule reruns from the CLI.
 **4.5 Platform coverage**
 - CI on Windows and macOS in addition to Linux.
 
+Status (2026-09-25, user decisions):
+- Not yet at the publishing stage: the user has further features in mind
+  before a release, so 4.1 (PyPI, Colab badges) waits. Colab badges come
+  with the merge to `master` (the badge links point at the notebooks there;
+  their first cell installs BioLGCA from PyPI once released, from GitHub
+  until then). The JupyterLite site is dropped (not needed).
+- 4.3 theory is banked for later. The analyses useful for teaching are the
+  linear stability of polar alignment, nematic alignment, aggregation and
+  chemotaxis.
+- 4.4: the adhesion model (Ilina et al. 2020) waits.
+- 4.5 done: a CI job runs the tests and the command line (including a
+  sweep in worker processes) on Windows and macOS with Python 3.13
+  (`MPLBACKEND=Agg`); to be confirmed on the first push. Prepared locally:
+  CSV outputs written as UTF-8 (the Windows default is cp1252), a test of
+  the process sweep with the spawn start method (the Windows one), and a
+  clear error when a script runs a process sweep without a main guard
+  (workers import the script; before, multiprocessing failed with an
+  EOFError), documented in the how-to.
+
 ## Part 3: Open decisions
 
 1. **Front door.** Keep `get_lgca` as the documented quick start (as the README
    now does) and `ModelSpec` for studies, or add a short `ModelSpec`
    constructor (for example `lgca.model(geometry="hex", dims=..., interactions=[...])`)
-   and retire `get_lgca` from the docs.
+   and retire `get_lgca` from the docs. Decided (2026-09-25): `get_lgca` is the
+   quick start and the way to run the standard models (tutorials 1 and 2);
+   `ModelSpec` follows from tutorial 3.
 2. **pandas** as a hard dependency for `sweep`, or return a list of records
-   with an optional DataFrame conversion.
+   with an optional DataFrame conversion. Decided (2026-09-25): pandas is a
+   dependency (`pandas>=2.1`).
 3. **Legacy removal timing.** Phase 2.4 deletes the legacy interaction
    functions. Is there external code (theses, papers) that imports them
    directly and needs a deprecation release first? Decided (2026-09-24): no
@@ -1071,7 +1093,9 @@ model with a custom rule reruns from the CLI.
    interactions directly.
 4. **Preferred citation.** `CITATION.cff` currently lists the software with the
    two papers as references; decide whether one paper should be the preferred
-   citation.
+   citation. Decided (2026-09-25): Syga et al. 2026 (EPJ ST) is the preferred
+   citation for now (a later paper may replace it); README and docs list it
+   first and the 2021 paper as the description of BIO-LGCA.
 
 Decided (2026-09-23): the species axis is internal only and public shapes stay
 backward compatible; the kind that changes species or cell parameters keeps

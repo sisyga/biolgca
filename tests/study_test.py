@@ -169,7 +169,14 @@ def test_processes_need_functions_they_can_import():
     assert table.n.tolist() == [1, 1]
 
 
-def test_worker_processes_import_the_plugins(tmp_path, monkeypatch):
+@pytest.mark.parametrize("method", ["default", "spawn"])  # spawn: as on Windows
+def test_worker_processes_import_the_plugins(tmp_path, monkeypatch, method):
+    import multiprocessing
+
+    from lgca import study
+
+    if method != "default":
+        monkeypatch.setattr(study, "_start_method", lambda: multiprocessing.get_context(method))
     (tmp_path / "sweep_plugin_rules.py").write_text(textwrap.dedent('''
         from lgca import interaction
 

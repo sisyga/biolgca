@@ -116,6 +116,15 @@ observers.
   notebook, but threads run only partly in parallel (about 1.5 to 2 times
   faster).
 
+Because the workers import the script that started the sweep, a script must
+run the sweep under a main guard, or every worker would start the sweep again:
+
+.. code-block:: python
+
+   if __name__ == "__main__":
+       table = sweep(spec, grid={"kappa": [-4, 0, 4]}, seeds=range(10), n_jobs=4)
+       table.to_csv("runs.csv")
+
 Files that observers would write, CSV snapshots and time series, are
 discarded in a sweep; measure what you need instead.
 

@@ -491,7 +491,7 @@ class ScalarTimeSeriesRecorder(Observer):
     def finalize(self, lgca, runner: SimulationRunner) -> None:
         if not self.records:
             return
-        with self.output_path.open("w", newline="") as handle:
+        with self.output_path.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=list(self.records[0]))
             writer.writeheader()
             writer.writerows(self.records)
@@ -512,7 +512,7 @@ def _snapshot_values(lgca, kind: str):
 
 def _write_array_csv(path: Path, values) -> None:
     array = np.asarray(values)
-    with path.open("w", newline="") as handle:
+    with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
         writer.writerow(["flat_index", "value"])
         for index, value in enumerate(array.ravel()):

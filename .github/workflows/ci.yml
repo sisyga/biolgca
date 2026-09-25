@@ -31,6 +31,36 @@ jobs:
       - name: Run tests
         run: uv run --no-sync python -m pytest -q
 
+  platforms:
+    name: Tests (${{ matrix.os }}, Python 3.13)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    env:
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - name: Install locked project and development dependencies
+        run: uv sync --locked
+      - name: Run tests
+        run: uv run --no-sync python -m pytest -q
+      - name: Command line, including a sweep in worker processes
+        shell: bash
+        run: |
+          uv run --no-sync biolgca examples export random_walk "$RUNNER_TEMP/model.json"
+          uv run --no-sync biolgca validate "$RUNNER_TEMP/model.json"
+          uv run --no-sync biolgca run "$RUNNER_TEMP/model.json" --output "$RUNNER_TEMP/run"
+          uv run --no-sync biolgca sweep "$RUNNER_TEMP/model.json" --vary steps=5,10 --seeds 0:2 \
+            --n-jobs 2 --output "$RUNNER_TEMP/sweep"
+          test -f "$RUNNER_TEMP/run/model.resolved.json"
+          test -f "$RUNNER_TEMP/sweep/table.csv"
+
   lowest-versions:
     name: Tests (Python 3.11, minimum dependency versions)
     runs-on: ubuntu-latest
