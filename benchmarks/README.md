@@ -26,3 +26,11 @@ The ``classical_square_composed_cues`` scenario includes composed nematic and
 aggregation terms plus sparse density recording every two steps. Its
 ``observer_policy`` distinguishes this retained-history benchmark from the
 unrecorded dynamics baselines.
+
+`fields.py` times the field solvers of `lgca.fields` (steady with multigrid,
+Jacobi CG and SuperLU, saturating uptake, implicit) against one go-or-grow
+step on 100², 200² and 400² lattices, each measurement in a fresh process:
+
+```bash
+uv run python benchmarks/fields.py --output fields.json
+```

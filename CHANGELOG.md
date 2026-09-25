@@ -18,11 +18,21 @@ This file records notable user-facing changes. Changes remain under
   Boundaries: periodic, no flux (the default on non-periodic lattices), a
   fixed value, or one condition per side on 1D, square and cubic lattices.
   Solvers: `"implicit"` (backward Euler with SciPy's sparse solvers, the
-  default) and `"explicit"` (`scipy.integrate.solve_ivp`, RK45 by default).
+  default), `"explicit"` (`scipy.integrate.solve_ivp`, RK45 by default) and
+  `"steady"`: the field at equilibrium with the current cells at every step
+  and when the model is built, for fields much faster than the cells
+  (oxygen, growth factors). The steady solver uses conjugate gradients with
+  an algebraic multigrid preconditioner (pyamg) that is kept while the cells
+  change little; it costs about one go-or-grow step on 100² to 400²
+  lattices (`benchmarks/fields.py`).
   The Laplacian uses the cells' neighbourhood on every lattice
   (`lgca.fields.laplacian`). Chemotaxis and the `field` and `gradient` cues
   read the updated field.
 - A number in `StateSpec.fields` is a uniform initial value.
+- New dependencies: `pyamg>=5.1` (not on Python 3.14, which it has no
+  wheels for yet; the steady solver then uses SciPy alone) and
+  `threadpoolctl>=3.0` (field solvers run with one BLAS thread, 3 to 9
+  times faster). The SciPy minimum rose from 1.9.2 to 1.11.
 - `FieldRecorder(["oxygen"])` records fields: `result.data["oxygen"]`, and
   `field_oxygen`/`field_oxygen_steps` in the `measurements.npz` of
   `biolgca run` (one pair per recorded field).

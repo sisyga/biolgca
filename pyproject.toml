@@ -28,7 +28,13 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=1.24",
-    "scipy>=1.9.2",
+    "scipy>=1.11",
+    # Multigrid preconditioner of the steady field solver (lgca.fields). 5.0 needs setuptools at import.
+    # No wheels for Python 3.14 yet (2026-09-26); there the solver uses SciPy alone.
+    "pyamg>=5.1; python_version < '3.14'",
+    # Field solvers run with one BLAS thread: waking NumPy's and SciPy's OpenBLAS threads for every
+    # vector operation of an iterative solver made it 3 to 9 times slower.
+    "threadpoolctl>=3.0",
     "tqdm>=4.64.1",
     # 3.9 or newer: IPython's notebook plotting no longer works with older versions.
     "matplotlib>=3.9",

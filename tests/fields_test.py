@@ -215,7 +215,7 @@ def test_negative_explicit_values_are_an_error():
 
 @pytest.mark.parametrize("parameters,message", [
     ({"solver": "explicit", "solver_options": {"method": "LSODA"}}, "LSODA"),
-    ({"solver": "steady"}, "not available yet"),
+    ({"solver": "steady", "solver_options": {"substeps": 2}}, "do not apply"),
     ({"solver_options": {"method": "RK45"}}, "do not apply"),
     ({"diffusion": -1.0}, "non-negative"),
     ({"cells": [{"uptake": 1.0, "production": 1.0}]}, "exactly one"),
@@ -236,6 +236,121 @@ def test_periodic_lattice_needs_a_periodic_field_and_sides_need_a_simple_lattice
         _build([PDESpec(field="u", boundary={"x-": {"value": 1.0}})], geometry="hex")
     with pytest.raises(ValueError, match="not a field"):
         _build([PDESpec(field="oxygen")])
+
+
+# ------------------------------------------------------------------ steady solver
+
+def _disc(size):
+    nodes = np.zeros((size, size, 5), dtype=bool)
+    x, y = np.meshgrid(np.arange(size), np.arange(size), indexing="ij")
+    nodes[(x - size / 2) ** 2 + (y - size / 2) ** 2 < (size / 4) ** 2] = True
+    return nodes
+
+
+def _steady_residual(compiled, diffusion, decay, uptake=0.0, saturation=None, production=0.0):
+    """D Δc + b - decay c - uptake(c) + P at every node, from the field the model stores."""
+    lgca = compiled.lgca
+    c = _field(compiled).ravel()
+    pde = next(operator for operator in compiled.pipeline.operators if operator.name == "pde")
+    A, source = laplacian(lgca, pde.boundary)
+    n = _counts(compiled).sum(axis=(-2, -1)).ravel()
+    taken = uptake * n * (c if saturation is None else c / (saturation + c))
+    return diffusion * (A @ c + source) - decay * c - taken + production
+
+
+@pytest.mark.parametrize("backend", ["auto", "direct", "cg", "amg"])
+@pytest.mark.parametrize("saturation", [None, 0.2])
+def test_steady_solves_the_equation(backend, saturation):
+    term = {"uptake": 0.3} if saturation is None else {"uptake": 0.3, "saturation": saturation}
+    compiled = _build([PDESpec(field="u", diffusion=4.0, decay=0.01, cells=[term], boundary={"value": 1.0},
+                               solver="steady", solver_options={"backend": backend, "rtol": 1e-10})],
+                      dims=(30, 30), nodes=_disc(30), restchannels=1, fields={"u": 0.0})
+    # solved when built, before any step
+    residual = _steady_residual(compiled, 4.0, 0.01, 0.3, saturation)
+    assert np.abs(residual).max() < 1e-7
+    assert _field(compiled).min() >= 0 and _field(compiled)[15, 15] < 0.5
+
+
+@pytest.mark.parametrize("geometry", GEOMETRIES)
+def test_steady_backends_agree_on_every_lattice(geometry):
+    dims = GEOMETRIES[geometry]
+    results = []
+    for backend in ("direct", "amg", "cg"):
+        compiled = _build([PDESpec(field="u", diffusion=2.0, cells=[{"uptake": 0.5}, {"production": 0.2}],
+                                   solver="steady", solver_options={"backend": backend, "rtol": 1e-10})],
+                          geometry=geometry, dims=dims, density=1.0, restchannels=1, seed=2)
+        results.append(_field(compiled))
+    np.testing.assert_allclose(results[1], results[0], rtol=1e-7, atol=1e-10)
+    np.testing.assert_allclose(results[2], results[0], rtol=1e-7, atol=1e-10)
+
+
+def test_steady_point_source_matches_the_fft_solution():
+    """Periodic square lattice: D Δc - k c + P δ = 0, solved in Fourier space with the same stencil."""
+    size, D, k = 32, 1.5, 0.02
+    source = np.zeros((size, size))
+    source[5, 9] = 2.0
+    compiled = _build([PDESpec(field="u", diffusion=D, decay=k, production="source", solver="steady",
+                               solver_options={"rtol": 1e-12})],
+                      dims=(size, size), boundary="periodic", fields={"u": 0.0, "source": source})
+    q = 2 * np.pi * np.fft.fftfreq(size)
+    symbol = D * (2 * np.cos(q)[:, None] + 2 * np.cos(q)[None, :] - 4) - k
+    exact = np.real(np.fft.ifft2(np.fft.fft2(-source) / symbol))
+    np.testing.assert_allclose(_field(compiled), exact, rtol=1e-9, atol=1e-12)
+
+
+@pytest.mark.parametrize("solver", ["implicit", "explicit"])
+def test_steady_is_the_long_time_limit(solver):
+    def model(solver, **options):
+        return _build([PDESpec(field="u", diffusion=1.0, decay=0.05, cells=[{"uptake": 0.2}],
+                               boundary={"value": 1.0}, solver=solver, solver_options=options)],
+                      dims=(16, 16), nodes=_disc(16), restchannels=1, fields={"u": 1.0})
+    steady = model("steady", rtol=1e-12)
+    transient = model(solver, **({"substeps": 1, "rtol": 1e-12} if solver == "implicit" else
+                                 {"rtol": 1e-8, "atol": 1e-12}))
+    for _ in range(300):
+        transient.step()
+    np.testing.assert_allclose(_field(transient), _field(steady), rtol=1e-8)
+
+
+def test_steady_reuses_the_multigrid_hierarchy():
+    turnover = {"name": "birth_death", "parameters": {"birth_rate": 0.1, "death_rate": 0.1}}
+    compiled = _build([turnover,  # the cells change every step, and the pde sees them as they are after it
+                       PDESpec(field="u", diffusion=1.0, decay=0.001, cells=[{"uptake": 0.05}],
+                               boundary={"value": 1.0}, solver="steady", solver_options={"backend": "amg"})],
+                      dims=(60, 60), nodes=_disc(60), restchannels=1, fields={"u": 1.0})
+    for _ in range(20):
+        compiled.step()
+        residual = _steady_residual(compiled, 1.0, 0.001, 0.05)
+        assert np.abs(residual).max() < 1e-5
+    assert 0.01 < _field(compiled).min() < 0.5
+    statistics = compiled.metadata["fields"]["u"]
+    assert statistics["amg_setups"] < 10  # the matrix changes every step; the hierarchy is kept most of the time
+    assert statistics["calls"] == 20
+
+
+def test_steady_without_pyamg(monkeypatch):
+    import lgca.fields
+    monkeypatch.setattr(lgca.fields, "_pyamg", lambda: None)
+    with pytest.raises(ValueError, match="needs pyamg"):
+        _build([PDESpec(field="u", decay=1.0, solver="steady", solver_options={"backend": "amg"})])
+    small = _build([PDESpec(field="u", diffusion=1.0, decay=0.1, cells=[{"uptake": 0.2}], solver="steady")],
+                   density=1.0, restchannels=1)
+    assert small.metadata["fields"]["u"]["backend"] == "direct"
+    monkeypatch.setattr(lgca.fields, "_DIRECT_LIMIT", 10)
+    large = _build([PDESpec(field="u", diffusion=1.0, decay=0.1, cells=[{"uptake": 0.2}], solver="steady")],
+                   density=1.0, restchannels=1)
+    assert large.metadata["fields"]["u"]["backend"] == "cg"
+    np.testing.assert_allclose(_field(large), _field(small), rtol=1e-5)
+
+
+def test_steady_needs_something_that_removes_the_field():
+    with pytest.raises(ValueError, match="no unique steady state"):
+        _build([PDESpec(field="u", diffusion=1.0, production=1.0, solver="steady")])
+    with pytest.raises(ValueError, match="without diffusion needs decay"):
+        _build([PDESpec(field="u", cells=[{"uptake": 1.0}], solver="steady")], density=1.0)
+    with pytest.raises(RuntimeError, match="no cells take up the field"):
+        _build([PDESpec(field="u", diffusion=1.0, cells=[{"uptake": 1.0}], solver="steady")])  # no cells
+    _build([PDESpec(field="u", diffusion=1.0, solver="steady", boundary={"value": 1.0})])  # a fixed value
 
 
 # ------------------------------------------------------------------ boundaries and ghost nodes

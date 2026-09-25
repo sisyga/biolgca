@@ -1067,7 +1067,12 @@ model with a custom rule reruns from the CLI.
   `FieldRecorder`, `animate_scalarfield` and the 1D kymograph; chemotaxis
   toward a secreted signal runs end to end (`tests/fields_test.py`).
   Implementation choices are listed in the spec under "Phase 1 as built".
-  Next: phase 2 (steady solver, pyamg).
+- Status (2026-09-26): phase 2 implemented: the `steady` solver (solved at
+  build time too; errors when no steady state exists), multigrid-
+  preconditioned CG with a reused hierarchy, pyamg and threadpoolctl as
+  dependencies, `benchmarks/fields.py`: the steady solve costs about one
+  go-or-grow step (spec, "Phase 2 as built"). Next: phase 3 (Hill form,
+  birth and death rates responding to cues, advection, `@reaction`).
 
 Status (2026-09-25, user decisions):
 - Not yet at the publishing stage: the user has further features in mind

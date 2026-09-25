@@ -1,7 +1,7 @@
 # Fields: reaction–advection–diffusion equations coupled to the cells
 
-Status: design agreed (2026-09-26). Phase 1 implemented (2026-09-26, see
-"Phase 1 as built").
+Status: design agreed (2026-09-26). Phases 1 and 2 implemented
+(2026-09-26, see "Phase 1 as built" and "Phase 2 as built").
 
 ## Goal
 
@@ -501,6 +501,57 @@ Choices made while implementing, beyond the text above:
   hexagonal lattices, with one colour scale for all frames; on 1D lattices
   `plot_scalarfield` draws a history as a kymograph and a single profile as
   a line.
+
+## Phase 2 as built (2026-09-26)
+
+- **`solver="steady"`** solves `(decay + L − D Δ) c = P + boundary source`
+  at every call and once in `build_model`, after the field is attached, so
+  the first operators of the first step see it at equilibrium.
+- **When no steady state exists**: at build time, no diffusion and no decay
+  (a node without cells has no loss), or no decay, no uptake term and no
+  fixed value; at run time, uptake is the only loss and no cell takes up the
+  field. Each raises an error that says what removes the field.
+- **Backends** as in "Solvers", with these details: `"amg"` is conjugate
+  gradients preconditioned by a pyamg smoothed-aggregation V-cycle, started
+  from the previous field. The hierarchy is rebuilt when a solve needs more
+  than twice the iterations of the first solve after the last rebuild, or
+  when an aged hierarchy has not converged after `4 × that + 10`
+  iterations (then the solve is repeated). With birth and death changing the
+  matrix every step, one hierarchy served 20 steps at up to 8 iterations.
+  Without pyamg: SuperLU up to 20 000 nodes, Jacobi-preconditioned CG above.
+  A constant matrix (no uptake) is factored once with `"auto"` and
+  `"direct"`. Saturating uptake: Picard iteration as in the implicit
+  solver (7 iterations per step in the benchmark).
+- **Dependencies**: `pyamg>=5.1; python_version < '3.14'` (5.0 imports
+  `pkg_resources` and fails without setuptools), `scipy>=1.11`, and
+  `threadpoolctl>=3.0` (not planned; see next point). The minimum versions
+  (Python 3.11, SciPy 1.11.1, NumPy 1.24, pyamg 5.1.0, threadpoolctl 3.0.0)
+  pass the whole test suite.
+- **BLAS threads**: NumPy and SciPy each load an OpenBLAS with one thread
+  per core (16 here). The iterative solvers spend their time in dot products
+  and norms of lattice size, for which waking the threads costs more than
+  the arithmetic, and timings varied between runs. Measured (steady amg /
+  steady cg / implicit cg, ms per step, 200²): 75 / 412 / 18 with 16
+  threads, 21 / 61 / 3.6 with one. Every field update therefore runs with
+  one BLAS thread (`threadpoolctl`, about 9 µs per update).
+- **Benchmark** `benchmarks/fields.py`: a disc of cells (radius a quarter of
+  the width) on a periodic square lattice takes up a field with D = 1,
+  production and decay 10⁻³, uptake 0.05 per cell; the cells divide and die
+  every step. Time of the `pde` operator per step, fresh process each,
+  median of 3, against one go-or-grow step (`go_or_rest`,
+  `go_or_grow.growth`, velocity random walk, with propagation):
+
+  | ms per step | 100² | 200² | 400² |
+  |---|---|---|---|
+  | go-or-grow step | 4.5 | 20.4 | 76.3 |
+  | steady, amg (default) | 6.4 | 20.6 | 78.5 |
+  | steady, cg (Jacobi) | 14.4 | 60.8 | 319 |
+  | steady, direct (SuperLU) | 38.9 | 302 | 1936 |
+  | steady, amg, saturating uptake (K = 0.1) | 24.5 | 81.5 | 298 |
+  | implicit, cg | 1.4 | 3.5 | 12.1 |
+
+  The default steady solver costs about one go-or-grow step and is 6, 15
+  and 25 times faster than SuperLU.
 
 ## Later
 
