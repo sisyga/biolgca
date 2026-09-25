@@ -71,6 +71,7 @@ import numpy as np
 __all__ = ["Probability", "list_switch_cues", "parse_probability", "switch_cue"]
 
 _CUES: dict[str, Callable] = {}
+LOG_ODDS_LIMIT = 500.0  # log odds of probabilities 0 and 1; exp(-500) is about 7e-218
 _RESPONSE = ("name", "kappa", "theta", "beta", "sensed_species")
 
 
@@ -164,14 +165,32 @@ class Probability:
     def boltzmann(self) -> bool:
         return self.rate is not None
 
+    @property
+    def reads_traits(self) -> bool:
+        """Whether a cue reads cell traits (identity-based models only)."""
+        return any(isinstance(cue.kappa, str) or isinstance(cue.theta, str) or cue.name == "trait"
+                   for cue in self.cues)
+
     def nodes(self, state) -> np.ndarray | float:
         """The probability at every node, shape ``state.dims`` (a number without cues)."""
         return self._probability(self.drive(state))
 
     def cells(self, state, which) -> np.ndarray | float:
         """The probability of the cells at positions ``which`` of ``state.cells``."""
+        return self._probability(self.cell_drive(state, which))
+
+    def log_odds(self, state) -> np.ndarray | float:
+        """``log(p / (1 - p))`` at every node, bounded to ``±LOG_ODDS_LIMIT`` where p is 0 or 1."""
+        return self._log_odds(self.drive(state))
+
+    def cell_log_odds(self, state, which) -> np.ndarray | float:
+        """``log(p / (1 - p))`` of the cells at positions ``which`` of ``state.cells``."""
+        return self._log_odds(self.cell_drive(state, which))
+
+    def cell_drive(self, state, which) -> np.ndarray | float:
+        """The drive (see :meth:`drive`) of the cells at positions ``which`` of ``state.cells``."""
         if self.constant:
-            return self._probability(0.0)
+            return 0.0
         cells = state.cells
         total = np.zeros(len(which))
         for cue in self.cues:
@@ -182,7 +201,7 @@ class Probability:
             kappa = cells[cue.kappa][which] if isinstance(cue.kappa, str) else cue.kappa
             theta = cells[cue.theta][which] if isinstance(cue.theta, str) else cue.theta
             total += np.asarray(kappa, dtype=float) * (values - np.asarray(theta, dtype=float))
-        return self._probability(total)
+        return total
 
     def drive(self, state) -> np.ndarray | float:
         """``Σ kappa (c - theta)`` (``Σ beta c`` in the Boltzmann form) at every node; 0 without cues."""
@@ -199,6 +218,20 @@ class Probability:
         """``log rate + Σ beta c`` at every node (Boltzmann form); ``-inf`` where the rate is 0."""
         with np.errstate(divide="ignore"):
             return np.log(self.rate) + self.drive(state)
+
+    def _log_odds(self, drive):
+        with np.errstate(divide="ignore"):
+            if self.boltzmann:
+                odds = np.log(self.rate) + drive
+            elif self.constant:
+                odds = np.log(self.max) - np.log1p(-self.max)
+            elif self.max == 1:  # (1 + tanh(x)) / 2 has the log odds 2 x
+                odds = 2 * np.asarray(drive, dtype=float)
+            else:  # p = max σ(2 x)
+                log_sigma = -np.logaddexp(0.0, -2 * np.asarray(drive, dtype=float))
+                odds = np.log(self.max) + log_sigma - np.log1p(-self.max * np.exp(log_sigma))
+        odds = np.clip(odds, -LOG_ODDS_LIMIT, LOG_ODDS_LIMIT)
+        return float(odds) if np.ndim(odds) == 0 else odds
 
     def _probability(self, drive):
         if self.boltzmann:  # w / (1 + w), computed without overflow

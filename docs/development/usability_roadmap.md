@@ -889,6 +889,36 @@ has no parity tests.
   and a trait-valued `beta` in `trait_switch` against the formula (a row
   normalisation without staying fails them), the tanh equivalence,
   overflow, validation.
+- Done (2026-09-25, delegated to Claude; to be confirmed): go-or-rest as a
+  Boltzmann reorientation is the new term `resting` (also a single cue),
+  not a replacement of the rule `go_or_rest`. A lone cell rests with a
+  switching probability `p` (`lgca.switching`, default the go-or-grow
+  switch), via the rest score `log(p/(1-p)) + log(v/r)`. Without volume
+  exclusion this is exactly `go_or_rest` followed by a velocity random walk.
+  With volume exclusion it is not close to `go_or_rest`
+  (`when_full="legacy"`): on the square lattice with one rest channel
+  (kappa 5, theta 0.75) the rest channel is occupied with 0.03/0.18/0.62 at
+  2/3/4 cells under `go_or_rest` (probability p whatever the number of
+  cells) and 0.08/0.57/0.96 under `resting` (Fisher's noncentral
+  hypergeometric law with odds `p/(1-p) · v/r`). So the legacy names and the
+  go-or-grow examples keep `go_or_rest`; the name `go_or_rest` was not
+  turned into a `ReorientationSpec` (a term of that name would also collide
+  with the rule as a single cue). Per-cell kappa and theta: reorientation
+  terms may return `CellWeights` (identity-based); `_cell_scores` sums
+  per-cell scores and `_metropolis` works on a `(cells, K)` score matrix
+  (trait-scaled chemotaxis unchanged in speed, 17 ms per step on 100 x 100
+  hex). Speed per step (100 x 100 hex, density 0.4): `resting` 2.1 ms vs
+  `go_or_rest` + `random_walk` 5.2 ms (classical), 3.2 vs 4.0 (NoVE), 2.3 vs
+  3.2 (NoVE identity-based with trait kappa), but 16.9 vs 3.8 for
+  identity-based with volume exclusion and trait kappa (Metropolis); an
+  exact sampler for per-cell rest scores is possible. `go_or_grow.switch`
+  stays as it is: the two-species legacy form, whose `"reject"` mode now
+  follows the `phenotype_switch` target-channel rule. Tests:
+  `tests/resting_test.py` (NoVE per density level against p; VE against the
+  noncentral hypergeometric law on lin/square/hex with one and two rest
+  channels; the Boltzmann form and beta = 0; trait kappa in both
+  identity-based families; two cells with their own odds at a node against
+  the exact Boltzmann weights).
 
 ### Phase 3: Studying a model (two to three weeks)
 

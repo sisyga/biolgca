@@ -69,6 +69,53 @@ def resting_bias(state):
     return 1.0
 
 
+_GO_OR_REST = {"cues": [{"name": "density", "kappa": 5.0, "theta": 0.75}]}
+
+
+@reorientation_term(coupling="rest", name="resting")
+def resting(state, probability=None):
+    """Cells rest with a probability that responds to cues, as in go-or-grow.
+
+    A cell alone at its node rests with ``probability`` and otherwise moves
+    to a random velocity channel. ``probability`` is a switching probability
+    (:mod:`lgca.switching`): a number, the go-or-grow switch
+    ``{"cues": [{"name": "density", "kappa": 5, "theta": 0.75}]}`` (the
+    default), or any other response to cues, also in the Boltzmann form; in
+    identity-based models its ``kappa`` and ``theta`` may name traits, so
+    that every cell rests by its own sensitivity.
+
+    The score is ``log(p / (1 - p)) + log(v / r)`` per cell in a rest channel,
+    with ``v`` velocity and ``r`` rest channels. Without volume exclusion
+    every cell rests with probability ``p``, as after ``go_or_rest`` and a
+    random walk over the velocity channels. With volume exclusion the cells
+    of a node choose a channel state together, ``P(s) ∝ exp(score · cells at
+    rest)``; the cells at rest then follow Fisher's noncentral hypergeometric
+    distribution, with odds ``p / (1 - p) · v / r`` of a rest channel against
+    a velocity channel. ``beta`` scales the score: 0 is a
+    random walk over all channels, 1 gives ``probability``.
+
+    Parameters
+    ----------
+    probability : float or dict
+        Probability that a cell alone at its node rests: a number or a response
+        to cues (:mod:`lgca.switching`). Default: the go-or-grow switch of the
+        node density, kappa 5 and theta 0.75.
+    """
+    from .rules import CellWeights
+
+    if state.restchannels < 1:
+        raise ValueError("resting needs at least one rest channel")
+    chance = parse_probability(_GO_OR_REST if probability is None else probability, "probability")
+    offset = np.log(state.velocitychannels / state.restchannels)
+    if chance.reads_traits:
+        if not state.identity_based:
+            raise ValueError("the probability of resting reads cell traits, which only identity-based "
+                             "models have")
+        cells = state.cells
+        return CellWeights(cells.label, chance.cell_log_odds(state, np.arange(len(cells))) + offset)
+    return chance.log_odds(state) + offset
+
+
 @reorientation_term(coupling="flux", name="persistent_walk", aliases="persistent_motion")
 def persistent_walk(state):
     """J(s) · J(s'): cells keep the direction they had at this node."""
@@ -184,7 +231,7 @@ def contact_guidance(state, field="director"):
 # "field": "signal"}} is a ReorientationSpec with this one term.
 for _cue, _aliases in ((polar_alignment, ()), (nematic_alignment, ("nematic",)),
                        (persistent_walk, ("persistent_motion",)), (aggregation, ()), (chemotaxis, ()), (directed_motion, ()),
-                       (contact_guidance, ()), (resting_bias, ()), (steric_repulsion, ())):
+                       (contact_guidance, ()), (resting_bias, ()), (resting, ()), (steric_repulsion, ())):
     register_single_cue(_cue, aliases=_aliases)
 
 @interaction(kind="birth_death", families=("classical", "nove", "ib", "nove_ib"), name="birth_death")

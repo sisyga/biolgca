@@ -33,8 +33,8 @@ from .lattice_state import LatticeState
 from .operator_base import InteractionOperator, PluginInfo
 from .plugins import _law_for_kind, register_plugin, validate_plugin_parameters
 
-__all__ = ["Interaction", "ReorientationCue", "Stack", "interaction", "register_single_cue", "reorientation_term",
-           "stack"]
+__all__ = ["CellWeights", "Interaction", "ReorientationCue", "Stack", "interaction", "register_single_cue",
+           "reorientation_term", "stack"]
 
 KINDS = ("birth_death", "phenotype_switch", "reorientation")
 FAMILIES = {"classical": "with volume exclusion", "nove": "without volume exclusion",
@@ -376,6 +376,34 @@ class StackOperator(InteractionOperator):
         return [operator.name for operator in self.operators]
 
 
+class CellWeights:
+    """Weights of a reorientation term per cell, for identity-based models.
+
+    A term with coupling ``"rest"`` returns one value per cell, shape
+    ``(cells,)``: the cell's score in each rest channel. A term with coupling
+    ``"channels"`` returns shape ``(cells, velocitychannels)`` or ``(cells,
+    K)``. ``values`` are in the order of ``state.cells``; their labels match
+    them with the cells when the reorientation runs.
+
+    Examples
+    --------
+    >>> from lgca import reorientation_term
+    >>> from lgca.rules import CellWeights
+    >>> @reorientation_term(coupling="rest")
+    ... def lazy_cells(state, trait="laziness"):
+    ...     '''Cells rest by their own laziness.'''
+    ...     cells = state.cells
+    ...     return CellWeights(cells.label, cells[trait])
+    """
+
+    def __init__(self, labels, values):
+        self.labels = np.asarray(labels)
+        self.values = np.asarray(values, dtype=float)
+        if len(self.values) != len(self.labels):
+            raise ValueError(f"CellWeights needs one row of values per cell: {len(self.labels)} labels, "
+                             f"{len(self.values)} rows")
+
+
 def reorientation_term(
     function: Callable | None = None,
     *,
@@ -406,7 +434,10 @@ def reorientation_term(
         ``dims + (K,)``; score ``Σ_i w_i n_i``.
 
     Arrays that broadcast to these shapes are accepted, e.g. one vector for
-    the whole lattice. The terms of a :class:`~lgca.pipeline.ReorientationSpec`
+    the whole lattice. In identity-based models a ``"rest"`` or ``"channels"``
+    term may instead return :class:`CellWeights`, a value per cell, so that
+    every cell has its own weights, e.g. a resting preference computed from
+    its traits. The terms of a :class:`~lgca.pipeline.ReorientationSpec`
     act in one decision, ``P(s') ∝ exp(Σ_k beta_k G_k(s'))``. Every coupling
     scores a channel state as the sum of the scores of its cells, so terms
     also work without volume exclusion, where each cell chooses its channel on

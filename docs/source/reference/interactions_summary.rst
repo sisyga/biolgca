@@ -62,6 +62,9 @@ The rules
      - Avoid crowded neighbouring nodes.
    * - ``resting_bias``
      - Prefer rest channels.
+   * - ``resting``
+     - Rest with a probability that responds to cues, e.g. in crowded nodes:
+       go-or-rest as a reorientation cue.
    * - ``go_or_rest``
      - Start resting on crowded nodes and moving on sparse ones.
    * - ``birth_death``
@@ -81,7 +84,7 @@ The rules
      - Barkley kinetics of resting inhibitors and moving activators
        (classical models).
 
-The cues from ``polar_alignment`` to ``resting_bias`` are terms of the
+The cues from ``polar_alignment`` to ``resting`` are terms of the
 Boltzmann reorientation; several combine into one decision in a
 :class:`~lgca.pipeline.ReorientationSpec`. :mod:`lgca.builtin_rules` holds
 their definitions, and :doc:`/how_to/research_models` the published models

@@ -99,6 +99,10 @@ class ReorientationTermSpec:
         (default ``"director"``).
     ``"resting_bias"``
         Number of cells in rest channels: cells prefer to rest.
+    ``"resting"``
+        A cell alone at its node rests with the switching probability
+        ``parameters["probability"]`` (:mod:`lgca.switching`; default the
+        go-or-grow switch of the density): go-or-rest as a term.
 
     New terms are written with :func:`lgca.reorientation_term`; the built-in
     terms above are defined the same way in :mod:`lgca.builtin_rules`, and
@@ -485,6 +489,7 @@ class _FieldTerm(_ReorientationTerm):
         self.coupling = definition.coupling
         self.field = None
         self.weights = None
+        self.cell_weights = None  # (labels, values of shape (cells, K)) for terms with a weight per cell
         self.step = 0
         self.fields_read: set[str] = set()
 
@@ -494,6 +499,7 @@ class _FieldTerm(_ReorientationTerm):
 
     def prepare(self, lgca):
         from .lattice_state import LatticeState
+        from .rules import CellWeights
 
         state = LatticeState(lgca, step=self.step)
         if self.sensed_species is not None:
@@ -503,8 +509,12 @@ class _FieldTerm(_ReorientationTerm):
         except KeyError as exc:
             raise ValueError(f"{self.name}: {exc.args[0] if exc.args else exc}") from exc
         self.fields_read |= state.fields_read
-        field = np.asarray(field, dtype=float)
         dims, velocity, d = state.dims, state.velocitychannels, state.c.shape[0]
+        if isinstance(field, CellWeights):
+            self._prepare_cells(field, state)
+            return
+        self.cell_weights = None
+        field = np.asarray(field, dtype=float)
         shapes = {"flux": [dims + (d,)], "nematic": [dims + (d, d)], "rest": [dims],
                   "channels": [dims + (velocity,), dims + (state.K,)]}[self.coupling]
         for shape in shapes:
@@ -531,8 +541,43 @@ class _FieldTerm(_ReorientationTerm):
             weights[..., :field.shape[-1]] = field
         self.weights = weights
 
+    def _prepare_cells(self, field, state):
+        if not state.identity_based:
+            raise ValueError(f"{self.name} returned CellWeights, which need an identity-based model")
+        if self.coupling not in ("rest", "channels"):
+            raise ValueError(f"{self.name} returned CellWeights; only terms with coupling 'rest' or "
+                             f"'channels' can have a weight per cell")
+        values, velocity, K = field.values, state.velocitychannels, state.K
+        weights = np.zeros((len(values), K))
+        if self.coupling == "rest" and values.shape == (len(values),):
+            weights[:, velocity:] = values[:, None]
+        elif self.coupling == "channels" and values.ndim == 2 and values.shape[1] in (velocity, K):
+            weights[:, :values.shape[1]] = values
+        else:
+            expected = "(cells,)" if self.coupling == "rest" else f"(cells, {velocity}) or (cells, {K})"
+            raise ValueError(f"{self.name} returned CellWeights of shape {values.shape}; coupling "
+                             f"{self.coupling!r} needs {expected}")
+        if not np.all(np.isfinite(weights)):
+            raise ValueError(f"{self.name} returned values that are not finite")
+        self.field = None
+        self.weights = None
+        self.cell_weights = (field.labels, weights)
+
     def dependencies(self) -> set[str]:
         return set(self.fields_read)
+
+
+def _match_cells(term, cells):
+    """The per-cell weights of ``term`` in the order of ``cells``, matched by label."""
+    labels, weights = term.cell_weights
+    if len(labels) == len(cells) and np.array_equal(labels, cells.label):
+        return weights
+    order = np.argsort(labels, kind="stable")
+    position = np.searchsorted(labels[order], cells.label)
+    position = np.minimum(position, len(labels) - 1)
+    if len(labels) == 0 or np.any(labels[order][position] != cells.label):
+        raise ValueError(f"{term.name} returned CellWeights that do not name every cell")
+    return weights[order[position]]
 
 
 # name -> term definition (see lgca.rules.reorientation_term); filled by lgca.builtin_rules
@@ -651,7 +696,8 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         mask = None if mask.all() else mask
         # only these species move; with one species (identity-based models) that is all cells
         still = self._still_species(getattr(lgca, "n_species", 1))
-        if any(term.trait is not None and term.beta != 0 for term in self.terms):
+        if any((term.trait is not None or term.cell_weights is not None) and term.beta != 0
+               for term in self.terms):
             self._apply_traits(lgca, step, not isinstance(lgca, NoVE_IBLGCA_base), mask)
             return
         weights = self._channel_weights(lgca)
@@ -797,20 +843,28 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         lgca.nodes[lgca.nonborder] = place_labels(labels, occupied, channels, lgca.rng)
 
     def _cell_scores(self, lgca, cells):
-        """Per-term weights of every cell's node and the cells' strengths.
+        """The score of every cell in every channel, shape ``(cells, K)``.
 
-        Returns ``weights`` of shape ``(terms, cells, K)`` and ``strength`` of
-        shape ``(terms, cells)``: a cell's score in channel ``i`` is
-        ``Σ_k beta_k strength_k w_ki``.
+        A cell's score in channel ``i`` is ``Σ_k beta_k strength_k w_ki``, with
+        ``w_ki`` the weights of term ``k`` at the cell's node (or of the cell,
+        for terms with :class:`~lgca.rules.CellWeights`) and ``strength_k`` the
+        cell's trait that scales the term (1 without one).
         """
         from .cells import trait_array
 
-        terms = [term for term in self.terms if term.beta != 0]
-        weights = np.stack([term.weights.reshape(-1, lgca.K)[cells.index] for term in terms])
-        strength = np.stack([term.beta * (trait_array(lgca, term.trait).values[cells.label].astype(float)
-                                          if term.trait is not None else np.ones(len(cells)))
-                             for term in terms])
-        return weights, strength
+        scores = np.zeros((len(cells), lgca.K))
+        for term in self.terms:
+            if term.beta == 0:
+                continue
+            if term.cell_weights is None:
+                weights = term.weights.reshape(-1, lgca.K)[cells.index]
+            else:
+                weights = _match_cells(term, cells)
+            strength = term.beta
+            if term.trait is not None:
+                strength = strength * trait_array(lgca, term.trait).values[cells.label].astype(float)[:, None]
+            scores += strength * weights
+        return scores
 
     def _apply_traits(self, lgca, step, volume_exclusion, mask=None):
         """Reorientation with a weight per cell: exact without volume exclusion, Metropolis with it.
@@ -823,12 +877,10 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         cells = state.cells
         channels = np.arange(lgca.K) if mask is None else np.flatnonzero(mask)
         moving = np.ones(len(cells), dtype=bool) if mask is None else mask[cells.channel]
-        weights, strength = self._cell_scores(lgca, cells)
-        weights, strength = weights[:, moving][..., channels], strength[:, moving]
+        scores = self._cell_scores(lgca, cells)[moving][:, channels]
         if volume_exclusion:
-            new = self._metropolis(cells.index[moving], weights, strength, len(channels), lgca.rng)
+            new = self._metropolis(cells.index[moving], scores, len(channels), lgca.rng)
         else:  # every cell draws its channel from its own weights
-            scores = np.einsum("tc,tck->ck", strength, weights)
             cumulative = np.cumsum(_softmax_last_axis(scores), axis=-1)
             draws = lgca.rng.random(len(scores)) * cumulative[:, -1]
             new = np.minimum((cumulative <= draws[:, None]).sum(axis=-1), len(channels) - 1)
@@ -838,7 +890,7 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         state._cells_changed()
         state.commit()
 
-    def _metropolis(self, index, weights, strength, K, rng):
+    def _metropolis(self, index, scores, K, rng):
         """New channels of the cells: a Metropolis chain per node, all nodes at once.
 
         The chain starts from a random arrangement of each node's cells and
@@ -863,19 +915,15 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         channel = permutation[row, rank]
         occupant = np.full((len(nodes), K), -1, dtype=np.int64)
         occupant[row, channel] = np.arange(n)
-        # scores of the cell in a channel: Σ_t strength[t, cell] * weights[t, cell, channel]
-        node_weights = np.zeros((weights.shape[0], len(nodes), K))
-        node_weights[:, row] = weights
-        padded = np.concatenate([strength, np.zeros((strength.shape[0], 1))], axis=1)  # -1: empty
+        # the score of a cell in a channel; row -1: an empty channel, score 0
+        padded = np.concatenate([scores, np.zeros((1, K))])
         rows = np.arange(len(nodes))
         for _ in range(int(self.sweeps) * K):
             cell = members[rows, (rng.random(len(nodes)) * per_row).astype(np.int64)]
             here = channel[cell]
             there = (here + rng.integers(1, K, len(nodes))) % K
             other = occupant[rows, there]
-            difference = padded[:, cell] - padded[:, other]
-            gain = (node_weights[:, rows, there] - node_weights[:, rows, here])
-            delta = (difference * gain).sum(axis=0)
+            delta = (padded[cell, there] - padded[cell, here]) + (padded[other, here] - padded[other, there])
             accept = rng.random(len(nodes)) < np.exp(np.minimum(delta, 0))
             r, c, o, h, t = rows[accept], cell[accept], other[accept], here[accept], there[accept]
             channel[c] = t

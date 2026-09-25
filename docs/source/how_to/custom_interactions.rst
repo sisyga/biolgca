@@ -193,6 +193,12 @@ one species. The built-in terms, from chemotaxis to nematic alignment, are
 written the same way in :mod:`lgca.builtin_rules`. Like the sampler, terms
 work for classical models with volume exclusion.
 
+In identity-based models, a ``"rest"`` or ``"channels"`` term may return a
+value per cell instead of per node, ``CellWeights(state.cells.label,
+values)`` from :mod:`lgca.rules`, e.g. a resting preference computed from
+every cell's traits; the built-in ``resting`` term does this when its
+probability names a trait.
+
 A deterministic rearrangement
 -----------------------------
 

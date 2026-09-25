@@ -88,6 +88,46 @@ legacy interactions computed such a cue at the start of the step but applied
 it after growth, also to the daughters; with separate operators the cue
 follows the order instead.
 
+Resting as a reorientation
+--------------------------
+
+``go_or_rest`` switches every cell between moving and resting on its own; a
+random walk over the velocity channels then turns the moving cells. The
+``resting`` term expresses the same choice as part of the Boltzmann
+reorientation: a lone cell rests with a switching probability ``p``
+(:mod:`lgca.switching`; by default the go-or-grow switch of the density,
+``kappa`` 5 and ``theta`` 0.75) and otherwise moves to a random velocity
+channel. The rest channels get the score ``log(p / (1 - p)) + log(v / r)``,
+where ``v`` and ``r`` are the numbers of velocity and rest channels; the
+second part cancels the larger number of velocity channels.
+
+.. code-block:: python
+
+   {"name": "resting", "parameters": {"probability": {
+       "cues": [{"name": "density", "kappa": 5.0, "theta": 0.75}]}}}
+
+As a term, resting combines with other cues in one decision, e.g. cells that
+rest in crowded nodes and otherwise follow a signal, and it takes any
+response to cues: fields, flux or a weight in the Boltzmann form. In
+identity-based models ``kappa`` and ``theta`` may name traits, so that every
+cell rests by its own sensitivity.
+
+- Without volume exclusion the two agree: every cell rests with probability
+  ``p``, as after ``go_or_rest`` and ``random_walk`` over the velocity
+  channels.
+- With volume exclusion they differ. ``go_or_rest`` lets as many cells try
+  to switch as there are free channels (``when_full="legacy"``), so a node's
+  single rest channel is occupied with probability ``p`` whatever the number
+  of cells. With ``resting`` the node's cells choose a channel state together,
+  weighted by the preferences of all of them, and the rest channel fills more
+  often in crowded nodes. For a square lattice with one rest channel,
+  ``kappa`` 5 and ``theta`` 0.75, it is occupied with probability 0.03, 0.18
+  and 0.62 at 2, 3 and 4 cells with ``go_or_rest``, and with 0.08, 0.57 and
+  0.96 with ``resting``.
+
+``go_or_rest`` remains the rule of the classical go-or-grow model and of the
+legacy interaction names.
+
 Growth
 ------
 
@@ -309,6 +349,12 @@ coupling that turns it into a score; new terms are written the same way with
    * - ``resting_bias``
      - Number of cells in rest channels.
      - rest
+     - at least one rest channel
+   * - ``resting``
+     - ``(log(p / (1 - p)) + log(v / r))`` times the cells in rest channels:
+       a lone cell rests with the switching probability ``p``, e.g. the
+       go-or-grow switch of the density (see below).
+     - rest (or per cell)
      - at least one rest channel
    * - ``persistent_walk`` (``persistent_motion``)
      - ``J(s) · J(s')``: cells keep their direction.

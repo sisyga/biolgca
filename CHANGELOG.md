@@ -39,6 +39,19 @@ This file records notable user-facing changes. Changes remain under
   `w_ab / (1 + Σ w_ab')`, without the bound of 1 on the row. `beta` may name
   a trait in identity-based models. For two states it is the tanh form with
   `beta = 2 kappa` and `rate = exp(-2 kappa theta)`.
+- `resting`, go-or-rest as a term of the Boltzmann reorientation: a cell
+  alone at its node rests with a switching probability (default the
+  go-or-grow switch of the density, kappa 5 and theta 0.75; any response to
+  cues, also in the Boltzmann form), via the rest score
+  `log(p / (1 - p)) + log(v / r)`. It combines with other cues in one
+  decision. Without volume exclusion every cell rests with `p`, as after
+  `go_or_rest` and a velocity random walk; with volume exclusion the node's
+  cells choose together, and crowded nodes fill their rest channels more
+  often than with `go_or_rest` (documented in the concepts page).
+  `go_or_rest` is unchanged.
+- Reorientation terms can give every cell its own weights in identity-based
+  models (`lgca.rules.CellWeights`), e.g. `resting` with `kappa` and `theta`
+  as traits. The Metropolis sampler works on per-cell scores.
 - `directed_motion`, a cue by which cells move along a given vector field
   (`{"name": "directed_motion", "parameters": {"beta": 2, "field": "flow"}}`).
 - The research models of earlier versions as stacks of the generic rules, in
