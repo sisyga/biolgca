@@ -8,5 +8,6 @@ Use these focused guides once you understand the basic simulation workflow.
 
    model_specs_and_plugins
    observers_and_plotting
+   studying_a_model
    custom_interactions
    research_models

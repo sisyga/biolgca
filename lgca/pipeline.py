@@ -50,8 +50,8 @@ class PhenotypeSwitchSpec:
     species ``a`` becomes species ``b`` with probability ``R[a][b]`` per time
     step (the diagonal is ignored); the rates may respond to cues of the
     surroundings (:mod:`lgca.switching`). The number of cells at a node is
-    conserved; a switch into a species without a free channel at the node
-    fails, and switched cells go to free channels of their new species. A
+    conserved; a switching cell goes to a random channel of its new species
+    and, with volume exclusion, fails if that channel is occupied. A
     phenotype switch needs several species (identity-based models change
     traits with ``trait_switch``); moving cells between velocity and rest
     channels of one species, as ``go_or_rest`` does, is a reorientation.

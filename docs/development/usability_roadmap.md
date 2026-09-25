@@ -969,6 +969,30 @@ table.groupby("beta").x_flux.agg(["mean", "std"])
   long table (one row per run and time); `get_lgca` stays the quick start
   and the way to run the included standard models, `ModelSpec` follows.
 
+- Done (2026-09-25): 3.1 and 3.2 in `lgca/study.py`. `vary` sets values by
+  path on frozen dataclasses, dicts and lists (copies); `[name]` selects
+  operators or terms by name, operator and term parameters can be named
+  directly, and a bare name resolves to its one place in the model
+  (space/state/time fields, given or default parameters of operators and
+  terms; ambiguity is an error listing the paths). `sweep` takes a grid
+  (product) or a list of combinations, seeds (default the model's),
+  measures (functions of the result, or recording names whose recorders are
+  added), `long`, `n_jobs`, `backend` ("processes" default, "threads"),
+  `plugins`; columns are the shortest distinguishing path ends (`kappa`,
+  `chemotaxis.beta`), rows in grid order with seeds innermost,
+  `table.attrs` holds paths and version (not a version column per row).
+  Every run gets its own copy of the observers (threads and serial runs
+  shared them) and observer files go to a temporary directory. Worker
+  processes use forkserver (spawn where missing), the same behaviour on
+  every system and no fork of a threaded process; measured 32 go-or-grow
+  runs: 4.75 s serial, 1.69 s with 4 processes, 0.73 s with 8, 2.23 s with 4
+  threads. CLI `biolgca sweep` (`--vary`, `--seeds`, `--measure`, `--long`,
+  `--n-jobs`, `--plugins`; `table.csv`, `sweep.json`) and `--plugins` on
+  `run` and `validate` (3.4, second item). Tutorial 3's sweep is one call
+  with error bars (betas widened to 0/2/5 and 10 seeds: with 0/1/2 and 5
+  seeds the chemotaxis response was lost in the noise). How-to page
+  `studying_a_model.rst`.
+
 **3.4 Model files** (B8)
 - Arrays above a size threshold go to an NPZ sidecar next to the JSON
   automatically; tuples become lists in the schema.

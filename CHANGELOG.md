@@ -7,6 +7,22 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- `lgca.study`: `vary(spec, {"time.steps": 200, "kappa": 4})` returns a
+  copy of a model with values changed by path (`dynamics.operators[0].kappa`,
+  entries by name such as `operators[go_or_rest]`, or a short name that
+  occurs once in the model). `sweep(spec, grid=..., seeds=..., measure=...)`
+  runs every combination and returns a pandas DataFrame with one row per
+  run, or with `long=True` one row per run and recorded step; measures are
+  functions of the result or names of recordings (whose recorders are added).
+  `n_jobs` runs several at the same time, in worker processes (default) or
+  threads (`backend="threads"`); `plugins` names modules the workers import.
+- `biolgca sweep model.json --vary kappa=-4,0,4 --seeds 0:10 --measure
+  population --long --n-jobs 4 --output runs/` writes `table.csv` and
+  `sweep.json`. `biolgca run`, `validate` and `sweep` take `--plugins
+  MODULE` to import trusted modules with your own rules.
+- pandas is a dependency (`pandas>=2.1`).
+- Tutorial 3 sweeps two cue strengths over ten seeds with one `sweep` call
+  and plots error bars.
 - `result.data`: the data recorded in a model run by name, e.g.
   `result.data["population"]` (alias `"n"`), `result.data["density"]` or
   the metrics of a `ScalarTimeSeriesRecorder`, with

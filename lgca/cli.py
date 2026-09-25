@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 import shutil
+import sys
 from copy import deepcopy
 from dataclasses import replace
+from importlib import import_module
 from pathlib import Path, PureWindowsPath
 
 import numpy as np
@@ -24,7 +25,7 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     try:
         return int(args.handler(args))
-    except (FileNotFoundError, KeyError, RuntimeError, TypeError, ValueError) as exc:
+    except (FileNotFoundError, ImportError, KeyError, RuntimeError, TypeError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
@@ -43,9 +44,13 @@ def _build_parser() -> argparse.ArgumentParser:
     export.add_argument("--overwrite", action="store_true")
     export.set_defaults(handler=_examples_export)
 
+    plugins_help = ("import these trusted modules first, e.g. the module that registers your own rules "
+                    "(comma-separated or repeated)")
+
     validate = commands.add_parser("validate", help="validate and compile a model")
     validate.add_argument("model", type=Path)
     validate.add_argument("--trusted-paths", action="store_true")
+    validate.add_argument("--plugins", action="append", default=[], metavar="MODULE", help=plugins_help)
     validate.set_defaults(handler=_validate)
 
     run = commands.add_parser("run", help="run a model into an explicit directory")
@@ -54,8 +59,33 @@ def _build_parser() -> argparse.ArgumentParser:
     run.add_argument("--overwrite", action="store_true")
     run.add_argument("--trusted-paths", action="store_true")
     run.add_argument("--show-progress", action="store_true")
+    run.add_argument("--plugins", action="append", default=[], metavar="MODULE", help=plugins_help)
     run.set_defaults(handler=_run)
+
+    sweep = commands.add_parser("sweep", help="run a model over parameter values and seeds into a table")
+    sweep.add_argument("model", type=Path)
+    sweep.add_argument("--output", type=Path, required=True, help="directory for table.csv and sweep.json")
+    sweep.add_argument("--vary", action="append", default=[], metavar="PATH=VALUES",
+                       help="values of a parameter, e.g. kappa=-4,0,4 or dynamics.operators[0].parameters.r_b=0.1,0.2;"
+                            " every combination runs (repeat for several parameters)")
+    sweep.add_argument("--seeds", default=None, help="seeds, e.g. 0:10 (0 to 9) or 1,2,3; default: the model's")
+    sweep.add_argument("--measure", action="append", default=[], metavar="NAME",
+                       help="a recording to measure as a time series, e.g. population (repeatable); "
+                            "default: the population at the end")
+    sweep.add_argument("--long", action="store_true", help="one row per run and recorded step")
+    sweep.add_argument("--n-jobs", type=int, default=1, help="number of runs at the same time")
+    sweep.add_argument("--overwrite", action="store_true")
+    sweep.add_argument("--show-progress", action="store_true")
+    sweep.add_argument("--plugins", action="append", default=[], metavar="MODULE", help=plugins_help)
+    sweep.set_defaults(handler=_sweep)
     return parser
+
+
+def _import_plugins(args) -> list[str]:
+    modules = [name.strip() for entry in args.plugins for name in entry.split(",") if name.strip()]
+    for module in modules:
+        import_module(module)
+    return modules
 
 
 def _examples_list(args) -> int:
@@ -78,6 +108,7 @@ def _examples_export(args) -> int:
 
 
 def _validate(args) -> int:
+    _import_plugins(args)
     model_path = _existing_model_path(args.model)
     spec = load_model_spec(model_path)
     _validate_output_declarations(spec, trusted_paths=args.trusted_paths)
@@ -91,6 +122,7 @@ def _validate(args) -> int:
 
 
 def _run(args) -> int:
+    _import_plugins(args)
     model_path = _existing_model_path(args.model)
     output_dir = args.output.resolve()
     if output_dir.exists() and not args.overwrite:
@@ -148,6 +180,61 @@ def _existing_model_path(path: Path) -> Path:
     if not resolved.is_file():
         raise FileNotFoundError(f"Could not find model spec file: {resolved}")
     return resolved
+
+
+def _sweep(args) -> int:
+    from .model import _package_version, model_spec_to_dict
+    from .study import final_population, sweep
+
+    plugins = _import_plugins(args)
+    model_path = _existing_model_path(args.model)
+    output_dir = args.output.resolve()
+    if output_dir.exists() and not args.overwrite:
+        raise ValueError(f"Output directory already exists: {output_dir}. Use --overwrite to reuse it.")
+    spec = load_model_spec(model_path)
+    grid = dict(_parse_vary(entry) for entry in args.vary)
+    seeds = None if args.seeds is None else _parse_seeds(args.seeds)
+    measure = {name: name for name in args.measure} or {"population": final_population}
+    table = sweep(spec, grid=grid or None, seeds=seeds, measure=measure, n_jobs=args.n_jobs, long=args.long,
+                  plugins=plugins, showprogress=args.show_progress)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    table.map(_csv_cell).to_csv(output_dir / "table.csv", index=False)
+    description = {
+        "model": model_spec_to_dict(spec), "grid": _json_safe(grid), "paths": table.attrs["paths"],
+        "seeds": _json_safe(sorted(set(table["seed"].tolist()))), "measure": list(measure), "long": args.long,
+        "plugins": plugins, "biolgca_version": _package_version(),
+    }
+    (output_dir / "sweep.json").write_text(json.dumps(_json_safe(description), indent=2), encoding="utf-8")
+    print(output_dir)
+    return 0
+
+
+def _parse_vary(entry):
+    path, separator, values = entry.partition("=")
+    if not separator or not path.strip() or not values.strip():
+        raise ValueError(f"--vary needs PATH=VALUES, e.g. kappa=-4,0,4; got {entry!r}")
+    return path.strip(), [_parse_value(value) for value in values.split(",")]
+
+
+def _parse_value(text):
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return text  # a word, e.g. a channel set such as velocity
+
+
+def _parse_seeds(text):
+    if ":" in text:
+        start, _, stop = text.partition(":")
+        return list(range(int(start), int(stop)))
+    return [int(seed) for seed in text.split(",")]
+
+
+def _csv_cell(value):
+    if isinstance(value, (np.ndarray, list, tuple, dict)):
+        return json.dumps(_json_safe(value))
+    return value
 
 
 def _validate_output_declarations(spec, *, trusted_paths: bool) -> None:
