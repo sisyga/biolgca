@@ -3,9 +3,10 @@ Tutorials
 
 These notebooks form the maintained learning path. They start with a complete
 LGCA model and progress through collective movement, combined cues, population
-dynamics, evolution and a reproducible student project. Every model and
-interaction pipeline is constructed in visible notebook cells so that you can
-copy it and change it.
+dynamics, evolution and a reproducible student project. Lessons 1 and 2 use
+standard models built by name with ``get_lgca``; from lesson 3 on, every model
+is written out as a ``ModelSpec`` in visible notebook cells, so that you can
+copy it, change it and sweep its parameters.
 
 Run the lessons in order the first time. Each later notebook can also serve as
 an independent project starting point.

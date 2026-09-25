@@ -895,6 +895,20 @@ class LGCA_base(ABC):
             observers.append(PerTypeRecorder())
         run_timeevo(self, timesteps=timesteps, observers=observers, showprogress=showprogress)
 
+    @property
+    def data(self):
+        """The data recorded by the last :meth:`timeevo`, by name, e.g. ``lgca.data["density"]``.
+
+        ``lgca.data.steps("density")`` gives the recorded steps; see
+        :class:`~lgca.simulation.RunData`. ``timeevo`` records the density by
+        default, the nodes with ``record=True``, the population with
+        ``recordN=True`` and the moving and resting cells with
+        ``recordpertype=True``.
+        """
+        from .simulation import TIMEEVO_HINT, RunData
+
+        return self.__dict__.get("_run_data") or RunData(hint=TIMEEVO_HINT)
+
     def calc_permutations(self):
         """
         Initialize lazy computation structures for permutations.

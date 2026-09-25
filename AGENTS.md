@@ -14,8 +14,9 @@ Two APIs coexist:
 - **`ModelSpec` (current):** a model is a declarative spec (space, state,
   time, interaction pipeline, observers) that can be saved as JSON/YAML and
   run from Python or the `biolgca` CLI. New features go here.
-- **`get_lgca` (legacy front door):** builds an LGCA object from an
-  interaction name of earlier versions. `legacy_names.py` translates every
+- **`get_lgca` (quick start):** builds an LGCA object from the name of a
+  standard model (the interaction names of earlier versions); the first
+  tutorials and the quick starts use it. `legacy_names.py` translates every
   name into a stack of rules and compiles it into a pipeline, so both APIs
   run the same code. It gets no new names; new rules go to `ModelSpec`.
 

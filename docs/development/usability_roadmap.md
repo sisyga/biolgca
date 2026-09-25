@@ -1010,6 +1010,14 @@ table.groupby("beta").x_flux.agg(["mean", "std"])
   (reserved name). `--plugins` done with the sweep. Phase 3 is complete
   apart from the quick-start restructuring of the docs (user decision:
   `get_lgca` first, `ModelSpec` afterwards).
+- Done (2026-09-25, user decision): `get_lgca` is the quick start and the
+  way to run the standard models; `ModelSpec` follows. Docs home and getting
+  started show `get_lgca` first; tutorials 1 and 2 use it (`lgca.data`
+  added for the recordings of the last `timeevo`, only of that run's
+  recorders); tutorial 3 opens with a bridge that lists the sections of a
+  `ModelSpec` and shows that the alignment model of lesson 2 written as a
+  spec gives the identical trajectory. AGENTS.md calls `get_lgca` the quick
+  start (still no new names). Phase 3 is done.
 
 Accept: tutorial 3's sweep is a single `sweep(...)` call with error bars; a
 model with a custom rule reruns from the CLI.

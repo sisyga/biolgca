@@ -28,6 +28,12 @@ This file records notable user-facing changes. Changes remain under
   lists; files with `{"__tuple__": ...}` still load.
 - Tutorial 3 sweeps two cue strengths over ten seeds with one `sweep` call
   and plots error bars.
+- `lgca.data` for models built with `get_lgca`: the recordings of the last
+  `timeevo` by name, as `result.data` of a model run.
+- The quick starts (docs home, getting started) and tutorials 1 and 2 use
+  `get_lgca` and its standard models; tutorial 3 introduces `ModelSpec`,
+  showing that a standard model written as a specification runs the same
+  trajectory, and the later tutorials use it.
 - `result.data`: the data recorded in a model run by name, e.g.
   `result.data["population"]` (alias `"n"`), `result.data["density"]` or
   the metrics of a `ScalarTimeSeriesRecorder`, with

@@ -420,10 +420,14 @@ class FamilyPopulationRecorder(Observer):
         return False
 
 
+TIMEEVO_HINT = "Record it with lgca.timeevo(..., record=True, recordN=True, recordpertype=True)"
+
+
 def run_timeevo(lgca, timesteps: int, observers, showprogress: bool) -> None:
-    """Compatibility helper for existing ``timeevo`` methods."""
+    """Compatibility helper for existing ``timeevo`` methods; the recordings become ``lgca.data``."""
 
     SimulationRunner(lgca, timesteps=timesteps, observers=observers, showprogress=showprogress).run()
+    lgca._run_data = RunData.from_run(lgca, observers, hint=TIMEEVO_HINT)
 
 
 class CSVSnapshotObserver(Observer):
@@ -527,19 +531,19 @@ def _scalar_value(value):
     return value
 
 
-# name in ``result.data`` -> (attribute of the model, attribute of its steps, meaning)
+# name in ``result.data`` -> (attribute of the model, attribute of its steps, recorder, meaning)
 RECORDED = {
-    "population": ("n_t", "n_steps", "number of cells (PopulationRecorder)"),
-    "density": ("dens_t", "dens_steps", "cells per node, or per node and species (DensityRecorder)"),
-    "nodes": ("nodes_t", "nodes_steps", "channel states of all nodes (NodeRecorder)"),
-    "channel_population": ("channel_pop_t", "channel_pop_steps", "cells per channel (ChannelDensityRecorder)"),
-    "moving": ("velcells_t", "velcells_steps", "cells in velocity channels per node (PerTypeRecorder)"),
-    "resting": ("restcells_t", "restcells_steps", "cells in rest channels per node (PerTypeRecorder)"),
-    "family_population": ("fam_pop_t", "fam_pop_steps", "cells per family (FamilyPopulationRecorder)"),
-    "entropy": ("ent_t", "order_parameter_steps", "entropy (OrderParameterRecorder)"),
-    "normalized_entropy": ("normEnt_t", "order_parameter_steps", "normalized entropy (OrderParameterRecorder)"),
-    "polar_alignment": ("polAlParam_t", "order_parameter_steps", "polar alignment (OrderParameterRecorder)"),
-    "mean_alignment": ("meanAlign_t", "order_parameter_steps", "mean alignment (OrderParameterRecorder)"),
+    "population": ("n_t", "n_steps", "PopulationRecorder", "number of cells"),
+    "density": ("dens_t", "dens_steps", "DensityRecorder", "cells per node, or per node and species"),
+    "nodes": ("nodes_t", "nodes_steps", "NodeRecorder", "channel states of all nodes"),
+    "channel_population": ("channel_pop_t", "channel_pop_steps", "ChannelDensityRecorder", "cells per channel"),
+    "moving": ("velcells_t", "velcells_steps", "PerTypeRecorder", "cells in velocity channels per node"),
+    "resting": ("restcells_t", "restcells_steps", "PerTypeRecorder", "cells in rest channels per node"),
+    "family_population": ("fam_pop_t", "fam_pop_steps", "FamilyPopulationRecorder", "cells per family"),
+    "entropy": ("ent_t", "order_parameter_steps", "OrderParameterRecorder", "entropy"),
+    "normalized_entropy": ("normEnt_t", "order_parameter_steps", "OrderParameterRecorder", "normalized entropy"),
+    "polar_alignment": ("polAlParam_t", "order_parameter_steps", "OrderParameterRecorder", "polar alignment"),
+    "mean_alignment": ("meanAlign_t", "order_parameter_steps", "OrderParameterRecorder", "mean alignment"),
 }
 _DATA_ALIASES = {"n": "population"}
 
@@ -569,16 +573,19 @@ class RunData(Mapping):
     [0, 5, 10]
     """
 
-    def __init__(self, values: Mapping[str, Any] | None = None, steps: Mapping[str, Any] | None = None):
+    def __init__(self, values: Mapping[str, Any] | None = None, steps: Mapping[str, Any] | None = None,
+                 hint: str = "Add a recorder to ModelSpec.analysis, e.g. AnalysisSpec(observers=[DensityRecorder()])"):
         self._values = dict(values or {})  # name -> array, or a function that returns it
         self._steps = dict(steps or {})
+        self._hint = hint
 
     @classmethod
-    def from_run(cls, lgca, observers=()) -> RunData:
-        """The data of the built-in recorders on ``lgca`` and of the scalar recorders among ``observers``."""
+    def from_run(cls, lgca, observers=(), **options) -> RunData:
+        """The data of the recorders among ``observers`` of a run of ``lgca``."""
+        recorders = {type(observer).__name__ for observer in observers}
         values, steps = {}, {}
-        for name, (attribute, steps_attribute, _) in RECORDED.items():
-            if steps_attribute in vars(lgca):  # every recorder sets its steps
+        for name, (attribute, steps_attribute, recorder, _) in RECORDED.items():
+            if recorder in recorders and steps_attribute in vars(lgca):
                 # read lazily: the lists of labels of some identity-based models are built on demand
                 values[name] = _reader(lgca, attribute)
                 steps[name] = np.asarray(getattr(lgca, steps_attribute))
@@ -589,14 +596,13 @@ class RunData(Mapping):
                     if name not in values:
                         values[name] = np.array([row[name] for row in observer.records])
                         steps[name] = recorded
-        return cls(values, steps)
+        return cls(values, steps, **options)
 
     def _name(self, name):
         name = _DATA_ALIASES.get(name, name)
         if name not in self._values:
             recorded = ", ".join(self._values) or "nothing"
-            raise KeyError(f"{name!r} was not recorded; this run recorded {recorded}. Add a recorder to "
-                           f"ModelSpec.analysis, e.g. AnalysisSpec(observers=[DensityRecorder()])")
+            raise KeyError(f"{name!r} was not recorded; this run recorded {recorded}. {self._hint}")
         return name
 
     def __getitem__(self, name):

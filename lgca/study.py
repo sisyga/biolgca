@@ -49,16 +49,6 @@ __all__ = ["final_population", "resolve_path", "sweep", "vary"]
 logger = logging.getLogger("lgca")
 
 _TOKEN = re.compile(r"\.?([A-Za-z_][A-Za-z0-9_]*)|\[([^\[\]]+)\]")
-# the recorder that records a name of result.data, added by sweep when a measure names it
-_RECORDERS = {
-    "population": "PopulationRecorder", "n": "PopulationRecorder", "density": "DensityRecorder",
-    "nodes": "NodeRecorder", "channel_population": "ChannelDensityRecorder", "moving": "PerTypeRecorder",
-    "resting": "PerTypeRecorder", "family_population": "FamilyPopulationRecorder",
-    "entropy": "OrderParameterRecorder", "normalized_entropy": "OrderParameterRecorder",
-    "polar_alignment": "OrderParameterRecorder", "mean_alignment": "OrderParameterRecorder",
-}
-
-
 def vary(spec, changes: Mapping[str, Any]):
     """A copy of ``spec`` with the values at the given paths replaced.
 
@@ -404,7 +394,8 @@ def _with_recorders(spec, measures):
     present = {type(observer).__name__ for observer in observers}
     for what in measures.values():
         if isinstance(what, str):
-            recorder = _RECORDERS.get(what)
+            name = simulation._DATA_ALIASES.get(what, what)
+            recorder = simulation.RECORDED[name][2] if name in simulation.RECORDED else None
             if recorder is not None and recorder not in present:
                 observers.append(getattr(simulation, recorder)())
                 present.add(recorder)

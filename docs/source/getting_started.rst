@@ -41,11 +41,37 @@ Without uv, BioLGCA installs into any Python 3.11+ environment with
 ``python -m pip install -e .``. This resolves the newest compatible package
 versions instead of the locked ones.
 
+Your first model
+----------------
+
+:func:`lgca.get_lgca` builds one of the standard models that come with
+BioLGCA from a few choices: the lattice, the initial density of cells, the
+interaction and the seed. ``timeevo`` runs it, and ``lgca.data`` holds what
+it recorded:
+
+.. code-block:: python
+
+   from lgca import get_lgca
+
+   lgca = get_lgca(geometry="square", dims=(20, 20), density=0.15,
+                   interaction="random_walk", seed=1)
+   lgca.timeevo(timesteps=30, recordN=True, showprogress=False)
+   print(lgca.data["population"])
+   lgca.plot_density()
+
+``lgca.interactions`` lists the standard models of a lattice: movement
+(random walk, alignment, aggregation, chemotaxis, ...), growth (birth and
+death, go-or-grow) and, for identity-based models (``ib=True``), published
+research models. Lessons 1 and 2 of the :doc:`tutorials/index` work this way;
+:doc:`reference/factory_reference` lists all options.
+
 Your first model specification
 ------------------------------
 
-The tutorials use :class:`lgca.model.ModelSpec`. Its sections make the lattice,
-initial state, time horizon, interaction pipeline and recorded data explicit:
+Each standard model is a list of rules. A :class:`lgca.model.ModelSpec` writes
+the whole model out: the lattice, initial state, time horizon, rules and
+recorded data. Its parts can be combined freely, saved as a file and varied
+systematically (lesson 3 onwards):
 
 .. code-block:: python
 
@@ -69,9 +95,10 @@ initial state, time horizon, interaction pipeline and recorded data explicit:
    print(result.data["population"])
    result.lgca.plot_density()
 
-The explicit seed makes stochastic comparisons repeatable. The interaction
-entry is visible and can be replaced or composed; lessons 2--4 show the
-supported patterns.
+The explicit seed makes stochastic comparisons repeatable. The rules are
+visible and can be replaced or composed; lessons 3 and 4 show the supported
+patterns, and :doc:`how_to/studying_a_model` how to sweep parameters and
+seeds.
 
 Saving and sharing a model
 --------------------------
@@ -116,14 +143,6 @@ With pip, use ``python -m pip install -e ".[yaml]"`` and so on. Contributor
 tools are dependency groups rather than extras: ``test``, ``docs`` and ``dev``
 (both). ``uv sync`` installs ``dev`` by default; ``uv sync --no-default-groups
 --group docs`` installs only the documentation tools.
-
-Legacy interactive factory
---------------------------
-
-The :func:`lgca.get_lgca` factory remains supported for existing code and quick
-interactive experiments. New teaching and reproducible projects use ModelSpec
-because it makes interactions, seeds and recorded data reviewable. See
-:doc:`reference/factory_reference` for the complete factory matrix.
 
 Developer checks
 ----------------

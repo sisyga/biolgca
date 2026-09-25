@@ -27,11 +27,24 @@ get BioLGCA and launch JupyterLab:
 :doc:`getting_started` explains the installation and alternatives to uv.
 Open ``docs/source/tutorials/01_fundamentals.ipynb`` for the first lesson.
 
-A reproducible model in Python
-------------------------------
+A first model in Python
+-----------------------
 
-BioLGCA separates lattice setup, state, time, interactions and analysis in a
-:class:`lgca.model.ModelSpec`:
+:func:`lgca.get_lgca` builds one of the standard models that come with
+BioLGCA by name:
+
+.. code-block:: python
+
+   from lgca import get_lgca
+
+   lgca = get_lgca(geometry="square", dims=(20, 20), density=0.15,
+                   interaction="random_walk", seed=1)
+   lgca.timeevo(timesteps=30, showprogress=False)
+   lgca.plot_density()
+
+For a study, a :class:`lgca.model.ModelSpec` writes every part of the model
+out, the lattice, state, time, rules and recorded data, so that rules can be
+combined, models saved as files and parameters swept:
 
 .. code-block:: python
 
@@ -52,9 +65,10 @@ BioLGCA separates lattice setup, state, time, interactions and analysis in a
    result = run_model(spec, showprogress=False)
    result.lgca.plot_density()
 
-The :doc:`how_to/model_specs_and_plugins` guide explains shareable JSON/YAML
-models and composed pipelines. The traditional :func:`lgca.get_lgca` factory
-remains supported and is documented in :doc:`reference/factory_reference`.
+:doc:`getting_started` introduces both, :doc:`reference/factory_reference` lists
+the options of ``get_lgca``, :doc:`how_to/model_specs_and_plugins` explains
+shareable JSON/YAML models and composed pipelines, and
+:doc:`how_to/studying_a_model` parameter sweeps.
 
 Scientific background
 ---------------------

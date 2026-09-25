@@ -76,3 +76,23 @@ def test_a_later_run_does_not_change_the_data_of_an_earlier_one():
     second = model.run(showprogress=False)  # continues the dynamics from the end of the first run
     np.testing.assert_array_equal(first.data["density"], before)
     np.testing.assert_array_equal(second.data["density"][0], before[-1])
+
+
+@pytest.mark.parametrize("options", [{}, {"ve": False}, {"ib": True}, {"n_species": 2}])
+def test_get_lgca_models_give_the_data_of_their_last_run(options):
+    import warnings
+
+    from lgca import get_lgca
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        lgca = get_lgca(geometry="square", dims=(8, 8), density=0.3, seed=1, **options)
+    with pytest.raises(KeyError, match="timeevo"):
+        lgca.data["density"]
+    lgca.timeevo(timesteps=4, record=True, recordN=True, showprogress=False)
+    assert list(lgca.data) == ["population", "density", "nodes"]
+    assert lgca.data["n"] is lgca.n_t and lgca.data.steps("nodes").tolist() == [0, 1, 2, 3, 4]
+    lgca.timeevo(timesteps=2, showprogress=False)  # only the density: the nodes of the first run are gone
+    assert list(lgca.data) == ["density"] and len(lgca.data["density"]) == 3
+    with pytest.raises(KeyError, match="record=True"):
+        lgca.data["nodes"]

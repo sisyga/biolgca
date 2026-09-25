@@ -160,7 +160,7 @@ def _run(args) -> int:
     save_model_spec(portable_spec, output_dir / "model.resolved.json")
     result = compiled.run(showprogress=args.show_progress)
     measurements = {}
-    for name, (data_name, steps_name, _) in RECORDED.items():  # stored under the model's attribute names
+    for name, (data_name, steps_name, _, _) in RECORDED.items():  # stored under the model's attribute names
         if name in result.data:
             measurements[data_name] = result.data[name]
             measurements[steps_name] = result.data.steps(name)
