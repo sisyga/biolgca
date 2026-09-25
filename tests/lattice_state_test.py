@@ -216,6 +216,66 @@ def test_a_switch_into_an_occupied_channel_is_rejected_with_volume_exclusion():
     np.testing.assert_array_equal(state.counts, nodes)
 
 
+SWITCH_DIMS = {"lin": (30000,), "square": (180, 180), "hex": (180, 180), "cubic": (32, 32, 32),
+               "moore": (40, 40, 40)}
+
+
+@pytest.mark.parametrize("geometry", list(SWITCH_DIMS))
+def test_a_switch_succeeds_if_its_random_target_channel_is_free(geometry):
+    """One switching cell into a species with n cells in C channels succeeds with probability 1 - n/C."""
+    rng = np.random.default_rng(3)
+    dims = SWITCH_DIMS[geometry]
+    channels = LatticeState(_model(geometry, n_species=2)).K
+    nodes = np.zeros(dims + (2, channels), dtype=bool)
+    nodes[..., 0, 0] = True
+    level = np.arange(np.prod(dims)).reshape(dims) % (channels + 1)
+    keys = rng.random(dims + (channels,))
+    nodes[..., 1, :] = np.argsort(np.argsort(keys, axis=-1), axis=-1) < level[..., None]
+    state = LatticeState(_model(geometry, n_species=2, nodes=nodes, seed=4))
+
+    switched = state.switch_phenotype([[0, 1], [0, 0]], channels="all")[..., 0, 1]
+
+    for n in range(channels + 1):
+        success = 1 - n / channels
+        trials = (level == n).sum()
+        error = np.sqrt(success * (1 - success) / trials)
+        assert abs(switched[level == n].mean() - success) <= 5 * error + 1e-12, (n, channels)
+    assert state.counts.max() <= 1
+    np.testing.assert_array_equal(state.density, nodes.sum(axis=(-2, -1)))
+    # the cells that switched sit on channels that were free for species 1
+    np.testing.assert_array_equal(state.counts[..., 1, :] & nodes[..., 1, :], nodes[..., 1, :])
+
+
+@pytest.mark.parametrize("channels, targets", [("all", 5), ("velocity", 4), ("rest", 1)])
+def test_more_switchers_than_channels_aim_at_every_channel_once(channels, targets):
+    """With at least as many switchers as channels, exactly the free channels of the set are filled."""
+    nodes = _nodes(True, 2, (40, 40), 5, 0)
+    nodes[..., 0, :] = True
+    nodes[:20, :, 1, 0] = True  # half of the nodes: one velocity channel of species 1 is occupied
+    state = LatticeState(_model(n_species=2, nodes=nodes, seed=2))
+
+    switched = state.switch_phenotype([[0, 1], [0, 0]], channels=channels)[..., 0, 1]
+
+    blocked = 1 if channels in ("all", "velocity") else 0
+    np.testing.assert_array_equal(switched[:20], targets - blocked)
+    np.testing.assert_array_equal(switched[20:], targets)
+    assert state.counts.max() <= 1
+    np.testing.assert_array_equal(state.density, nodes.sum(axis=(-2, -1)))
+    if targets < 5:  # which switchers succeed is random
+        assert len(np.unique(state.counts[20:, :, 0, :].reshape(-1, 5), axis=0)) > 1
+
+
+@pytest.mark.parametrize("channels", ["same", "all"])
+def test_a_channel_vacated_by_a_switch_is_not_free_in_the_same_step(channels):
+    nodes = _nodes(True, 2, (20, 20), 5, 1)
+    state = LatticeState(_model(n_species=2, nodes=nodes))
+
+    switched = state.switch_phenotype([[0, 1], [1, 0]], channels=channels)
+
+    assert switched.sum() == 0
+    np.testing.assert_array_equal(state.counts, nodes)
+
+
 def test_competing_switches_fill_each_free_channel_once():
     nodes = _nodes(True, 3, (40, 40), 5, 0)
     nodes[..., :2, :] = True  # species 0 and 1 both want the free channels of species 2

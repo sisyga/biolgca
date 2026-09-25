@@ -147,7 +147,9 @@ neighbourhood), the value and the ``gradient`` of a ``field``, and the
 identity-based models ``kappa`` and ``theta`` may name traits (every cell with
 its own sensitivity) and ``{"name": "trait", "trait": "age"}`` is a cue per
 cell. :func:`lgca.switch_cue` registers cues of your own, functions of the
-lattice state with a value per node. Migrating cells (species 0) that turn
+lattice state with a value per node. With volume exclusion, a switch into
+another species succeeds only if the channel it lands in is free, which
+lowers the realised rate (see below). Migrating cells (species 0) that turn
 resting (species 1) in crowded nodes and return at a constant rate:
 
 .. code-block:: python
@@ -336,10 +338,25 @@ Phenotype switching with volume exclusion
 With volume exclusion, a cell that switches species needs a channel that is
 free for its new species. ``phenotype_switch`` (and
 ``LatticeState.switch_phenotype``, on which it is built) lets every cell try
-to switch on its own: a switched cell goes to a random free channel of its
-new species at the node (``channels="same"``: it keeps its channel if that is
-free), a switch without a free channel fails, and when more cells switch
-than channels are free, the successful ones are chosen at random.
+to switch on its own: a switching cell picks a random channel of its new
+species at the node, in the set ``channels`` (all channels by default), and
+the switch fails if that channel is occupied. A cell switching with
+probability ``p`` into a species with ``n`` cells in ``C`` channels thus
+switches with probability ``p (1 - n / C)``, as a cell that divides into a
+random neighbouring site of a lattice model.
+
+- Cells that switch into the same species at a node pick distinct channels,
+  as daughters do, so they never collide. If they are more than the channels,
+  those that pick one are chosen at random and the others fail.
+- Occupancy is judged at the start of the step: a channel vacated by a cell
+  that switches away is free only in the next step. Two cells of different
+  species that would swap their species at a full node both stay.
+- With ``channels="same"`` a cell keeps its channel and switches only if it
+  is free for the new species; when cells of several species want the same
+  channel, one of them, chosen at random, succeeds.
+
+Cells whose switch fails keep their species. Without volume exclusion every
+switch succeeds, and a switched cell goes to a random channel of the set.
 
 Polar versus nematic composition
 --------------------------------

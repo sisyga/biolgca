@@ -865,6 +865,17 @@ has no parity tests.
   of all cells of the node being redistributed. Tests:
   `tests/switching_test.py` (probabilities by density and field level against
   the formula, per-cell sensitivities, when-conditions, custom cues).
+- Decided and done (2026-09-25, user): species switches with volume
+  exclusion aim at a random channel of the new species (in `channels`,
+  default all) and fail if it is occupied, so one switcher succeeds with
+  probability 1 - n/C; switchers into the same species pick distinct
+  channels (at most C of them, chosen at random); occupancy is judged at the
+  start of the step. `channels="same"` is unchanged. Before, a switch
+  succeeded whenever any channel was free. `LatticeState._switch_ve` also got
+  faster (100 x 100 hex, two species: 15.6 -> 7.3 ms, `"same"` 11.5 -> 7.6
+  ms). Tests: success rate per fill level on every geometry (Moore with 27
+  channels uses the non-enumerated placement), more switchers than channels,
+  vacated channels.
 
 ### Phase 3: Studying a model (two to three weeks)
 

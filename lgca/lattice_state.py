@@ -428,12 +428,19 @@ class LatticeState:
         row's other entries must sum to at most one. The number of cells at
         every node is kept.
 
-        With ``channels="same"`` a cell keeps its channel. Otherwise switched
-        cells move to free channels of the given set (see :meth:`add_cells`).
-        With volume exclusion, a switch needs a channel that is free for the
-        new species before the switch; when several cells compete for fewer
-        free channels, the successful ones are chosen at random and the others
-        keep their species.
+        With ``channels="same"`` a cell keeps its channel. Otherwise a switched
+        cell moves to a random channel of its new species in the given set (see
+        :meth:`add_cells`). With volume exclusion, the switch fails if that
+        channel is occupied; a single switching cell into a species with ``n``
+        cells in ``C`` channels thus succeeds with probability ``1 - n / C``.
+        Cells that switch into the same species at a node aim at distinct
+        channels; if they are more than the channels, those that aim at one
+        are chosen at random and the others fail. With ``channels="same"`` a
+        cell succeeds if its channel is free for the new species; cells of
+        different species that want the same channel get one random winner.
+        Occupancy is judged before the switch: a channel vacated by a cell
+        that switches away is not available in the same step. Cells whose
+        switch fails keep their species.
 
         Returns the number of switches per node, shape
         ``dims + (n_species, n_species)``, from species ``a`` (row) to ``b``.
@@ -689,10 +696,11 @@ class LatticeState:
         counts = self._counts
         n_species = self.n_species
         occupied = counts == 1
-        cumulative = np.cumsum(np.broadcast_to(transition[..., :, None, :], counts.shape + (n_species,)),
-                               axis=-1)
+        cumulative = np.cumsum(transition, axis=-1)
         draws = self.rng.random(counts.shape)
-        target = np.minimum((draws[..., None] >= cumulative).sum(axis=-1), n_species - 1)
+        target = np.zeros(counts.shape, dtype=np.int64)
+        for species in range(n_species - 1):
+            target += draws >= cumulative[..., :, species, None]
         own = np.arange(n_species)[:, None]
         free_before = counts == 0
         removed = np.zeros_like(counts)
@@ -710,23 +718,27 @@ class LatticeState:
                 accepted = candidates & winner & free_before[..., species, None, :]
                 added[..., species, :] = accepted.any(axis=-2)
             else:
-                slots = free_before[..., species, :] & allowed[species]
-                flat = scores.reshape(self._dims + (-1,))
-                ranks = np.argsort(np.argsort(flat, axis=-1), axis=-1).reshape(counts.shape)
-                accepted = candidates & (ranks < slots.sum(axis=-1)[..., None, None])
-                number = accepted.sum(axis=(-2, -1))
-                added[..., species, :] = self._choose_slots(slots, number)
+                # the switchers aim at distinct random channels of the set (at most one per
+                # channel, the others fail) and succeed where the channel was free before
+                options = np.flatnonzero(allowed[species])
+                aiming = np.minimum(candidates.sum(axis=(-2, -1)), len(options))
+                target_channels = np.zeros(self._dims + (self.K,), dtype=bool)
+                target_channels[..., options] = random_occupancy(self.rng, aiming, len(options))
+                landed = target_channels & free_before[..., species, :]
+                accepted = candidates & self._first(scores, landed.sum(axis=-1))
+                added[..., species, :] = landed
             removed += accepted
             switched[..., species] = accepted.sum(axis=-1)
         self._counts = counts - removed + added
         return switched
 
-    def _choose_slots(self, free, number):
-        """Pick ``number`` uniformly chosen free channels at every node for one species."""
-        scores = self.rng.random(free.shape)
-        scores[~free] = np.inf
-        ranks = np.argsort(np.argsort(scores, axis=-1), axis=-1)
-        return (ranks < number[..., None]).astype(np.int64)
+    def _first(self, scores, number):
+        """The ``number`` smallest ``scores`` of every node (over species and channels), as a mask."""
+        flat = scores.reshape(self._dims + (-1,))
+        ordered = np.sort(flat, axis=-1)
+        threshold = np.take_along_axis(ordered, np.maximum(number - 1, 0)[..., None], axis=-1)
+        chosen = (flat <= threshold) & (number[..., None] > 0)
+        return chosen.reshape(scores.shape)
 
 
 @functools.lru_cache(maxsize=64)

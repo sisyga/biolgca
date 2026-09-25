@@ -453,10 +453,13 @@ def phenotype_switch(state, rates, channels="all"):
         "rates": [[0, {"max": 0.2, "cues": [{"name": "density", "kappa": 5, "theta": 0.5}]}],
                   [0.05, 0]]
 
-    The number of cells at every node stays the same. With volume exclusion a
-    cell switches only if its new species has a free channel at the node;
-    when fewer channels are free than cells switch, the ones that succeed
-    are chosen at random.
+    The number of cells at every node stays the same. A switching cell goes
+    to a random channel of its new species in ``channels``; with volume
+    exclusion the switch fails if that channel is occupied, so a cell
+    switching into a species with n cells in C channels succeeds with
+    probability 1 - n/C. Cells switching into the same species at a node pick
+    distinct channels, and occupancy is judged before the switch (see
+    :meth:`LatticeState.switch_phenotype`).
 
     Parameters
     ----------
@@ -465,10 +468,10 @@ def phenotype_switch(state, rates, channels="all"):
         a number or a response to cues; the diagonal is ignored, and the
         (maximal) probabilities of each row must sum to at most 1.
     channels : str or list of int
-        Where switched cells go: a random free channel of their new species in
-        this set (``"all"``, ``"velocity"``, ``"rest"`` or indices), or
-        ``"same"``: they keep their channel (with volume exclusion only if it is
-        free for the new species).
+        Where switched cells go: a random channel of their new species in this
+        set (``"all"``, ``"velocity"``, ``"rest"`` or indices), or ``"same"``:
+        they keep their channel. With volume exclusion the channel must be free
+        for the new species.
     """
     n_species = state.n_species
     if n_species < 2:
@@ -645,7 +648,8 @@ def go_or_grow_switch(state, kappa=5.0, theta=0.75, when_full="legacy", density=
         With volume exclusion, what happens when a switching cell finds no free
         channel. "legacy" reproduces the original rule: the number of switching
         cells is drawn from the cells that fit into free channels. "reject":
-        every cell tries to switch, and switches into full channels fail.
+        every cell tries to switch into a random channel of its new kind, and
+        fails if it is occupied (as in ``phenotype_switch``).
     density : {"node", "neighbourhood"}
         The cells that set the relative density: those at the node, or the
         mean over the node and its neighbours.

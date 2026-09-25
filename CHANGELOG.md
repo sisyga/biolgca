@@ -243,9 +243,16 @@ This file records notable user-facing changes. Changes remain under
   64-bit integer when they are built.
 - `phenotype_switch` is a rule on the lattice state, 18 to 28 times faster
   (100 x 100 hex nodes: 16 ms per step with volume exclusion, 9 ms without,
-  instead of 463 and 164 ms). Switched cells go to a free channel of their
-  new species and the other cells stay in their channels; before, a switch
-  at a node redistributed all its cells over the channels.
+  instead of 463 and 164 ms; since the target channels below, 7 ms with
+  volume exclusion). A switching cell goes to a random channel of its new
+  species, and the other cells stay in their channels; before, a switch at a
+  node redistributed all its cells over the channels. With volume exclusion
+  the switch fails if that channel is occupied, so a cell switching into a
+  species with n cells in C channels succeeds with probability 1 - n/C
+  (before: whenever any channel was free). Cells switching into the same
+  species at a node pick distinct channels, and occupancy is judged at the
+  start of the step. `go_or_grow.switch(when_full="reject")` follows these
+  rules.
 
 - Faster rules: the lattice state reads and writes the interior as a view
   and keeps counts as `int8` with volume exclusion (`state.counts` has that
