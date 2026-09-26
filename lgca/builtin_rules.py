@@ -670,15 +670,32 @@ def random_walk(state, channels="all", species=None):
 
 
 @interaction(kind="reorientation", families=("classical", "nove", "ib", "nove_ib"), name="go_or_rest")
-def go_or_rest(state, kappa=5.0, theta=0.75, when_full="legacy", density="node", species=None):
-    """Moving cells start resting on crowded nodes, resting cells start moving on sparse ones.
+def go_or_rest(state, probability=None, kappa=None, theta=None, when_full="legacy", density="node",
+               species=None):
+    """Cells rest with a probability that responds to their surroundings, and move otherwise.
 
-    A moving cell starts resting with probability ``tanh_switch(rho, kappa,
-    theta)``, a resting cell starts moving with the complementary
-    probability; ``rho`` is the relative density of all cells at the node.
+    Every cell goes to a rest channel with probability ``p`` and to a
+    velocity channel otherwise: a moving cell starts resting with
+    probability ``p``, a resting cell starts moving with ``1 - p``. Cells
+    that keep moving keep their velocity channel; list ``random_walk`` with
+    ``channels="velocity"`` after it for new directions. ``p`` is a
+    switching probability (:mod:`lgca.switching`) that may respond to the
+    density, a field or any other cue, e.g. cells that stop where oxygen is
+    scarce, ``{"max": 0.9, "hill": [{"name": "field", "field": "oxygen",
+    "K": 0.1, "n": -2}]}``. The default is the go-or-grow switch, ``p =
+    tanh_switch(rho, kappa, theta)`` of the relative density ``rho`` of all
+    cells at the node, for which ``kappa`` and ``theta`` are a short form.
+
+    With volume exclusion a cell can only switch into a free channel of the
+    other kind; ``when_full`` says what happens when there is none.
 
     Parameters
     ----------
+    probability : float or dict, optional
+        The probability ``p`` that a cell rests: a number or a response to
+        cues (:mod:`lgca.switching`); in identity-based models its ``kappa``,
+        ``theta``, ``K`` and ``n`` may name traits. Instead of ``kappa`` and
+        ``theta``.
     kappa : float, sequence or str
         Steepness of the switch. With kappa > 0 crowded cells rest, with
         kappa < 0 they move. One number, one per species, or in
@@ -694,24 +711,46 @@ def go_or_rest(state, kappa=5.0, theta=0.75, when_full="legacy", density="node",
         cells is drawn from the cells that fit into free channels. "reject":
         every cell tries to switch, and switches into full channels fail.
     density : {"node", "neighbourhood"}
-        The cells that set the relative density: those at the node, or the
-        mean over the node and its neighbours.
+        The cells that set the relative density of ``kappa`` and ``theta``:
+        those at the node, or the mean over the node and its neighbours (for
+        ``probability``, the density cue's ``scope``).
     species : int, list of int or None
         Classical models with several species: the species whose cells switch;
         the others keep their channels (but count for the density). Default:
         all.
     """
     _check_mode(when_full)
+    chance = None
+    if probability is not None:
+        if kappa is not None or theta is not None:
+            raise ValueError("go_or_rest takes a probability or kappa and theta (the short form of the density "
+                             "switch), not both")
+        if density != "node":
+            raise ValueError("density sets the density of kappa and theta; with a probability, give the density "
+                             "cue a scope, {'name': 'density', 'scope': 'neighbourhood', ...}")
+        chance = parse_probability(probability, "probability")
+    kappa = 5.0 if kappa is None else kappa
+    theta = 0.75 if theta is None else theta
     if state.restchannels < 1:
         raise ValueError("go_or_rest needs at least one rest channel for resting cells")
     still = None if species is None else np.setdiff1d(np.arange(state.n_species),
                                                       _species_indices(species, state.n_species))
     if state.identity_based:
-        _go_or_rest_cells(state, kappa, theta, when_full, density)
+        cells = state.cells
+        if chance is not None:
+            rest = chance.cells(state, np.arange(len(cells)))
+        else:
+            rho = _relative_density(state, density)[cells.node]
+            rest = tanh_switch(rho, _per_cell(cells, kappa, "kappa"), _per_cell(cells, theta, "theta"))
+        _go_or_rest_cells(state, rest, when_full)
         return
-    kappa = _per_species(kappa, "kappa", state.n_species, probability=False)
-    theta = _per_species(theta, "theta", state.n_species, probability=False)
-    rest = tanh_switch(_relative_density(state, density)[..., None], kappa, theta)  # per species
+    if chance is not None:  # the same probability for every species
+        rest = np.broadcast_to(np.asarray(chance.nodes(state), dtype=float)[..., None],
+                               state.dims + (state.n_species,))
+    else:
+        kappa = _per_species(kappa, "kappa", state.n_species, probability=False)
+        theta = _per_species(theta, "theta", state.n_species, probability=False)
+        rest = tanh_switch(_relative_density(state, density)[..., None], kappa, theta)  # per species
     velocity, rng = state.velocitychannels, state.rng
     cells = state.counts
     moving, resting = cells[..., :velocity], cells[..., velocity:]
@@ -854,11 +893,9 @@ def go_or_grow_growth(state, r_b=0.2, r_d=0.01, r_d_resting=None, when_full="leg
                        channels={resting_species: "rest"})
 
 
-def _go_or_rest_cells(state, kappa, theta, when_full, density):
-    """go_or_rest for identity-based models: every cell switches with its own probability."""
+def _go_or_rest_cells(state, rest, when_full):
+    """go_or_rest for identity-based models: every cell rests with its own probability ``rest``."""
     cells, rng = state.cells, state.rng
-    rho = _relative_density(state, density)[cells.node]
-    rest = tanh_switch(rho, _per_cell(cells, kappa, "kappa"), _per_cell(cells, theta, "theta"))
     resting = cells.in_channels("rest")
     to_rest = ~resting & (rng.random(len(cells)) < rest)
     to_move = resting & (rng.random(len(cells)) < 1 - rest)

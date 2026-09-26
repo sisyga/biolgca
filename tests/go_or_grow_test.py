@@ -143,3 +143,59 @@ def test_the_rules_need_two_species_in_their_channels():
     ))
     with pytest.raises(ValueError, match="velocity channels"):
         compiled.step()
+
+
+# go_or_rest with a probability that responds to cues (lgca.switching)
+
+def _rest_model(nodes, parameters, identity=False, fields=None):
+    ve = nodes.dtype == bool
+    return build_model(ModelSpec(
+        space=SpaceSpec(geometry="square", dims=nodes.shape[:2]),
+        state=StateSpec(nodes=nodes, restchannels=1, volume_exclusion=ve, identity_based=identity,
+                        capacity=None if ve else 8, fields=fields or {}),
+        time=TimeSpec(steps=1, seed=3),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "go_or_rest", "parameters": parameters}],
+                                         propagation=False)))
+
+
+@pytest.mark.parametrize("ve, identity", [(True, False), (False, False), (True, True)])
+def test_kappa_and_theta_are_the_density_switch(ve, identity):
+    # the same random numbers: the short form and the probability give the same cells
+    rng = np.random.default_rng(5)
+    counts = rng.random((30, 30, 5)) < 0.5 if ve else rng.poisson(0.8, (30, 30, 5))
+    if identity:  # labels
+        counts = np.where(counts, np.cumsum(counts).reshape(counts.shape), 0).astype(np.uint64)
+    short = _rest_model(counts, {"kappa": 4.0, "theta": 0.4}, identity)
+    cue = _rest_model(counts, {"probability": {"cues": [{"name": "density", "kappa": 4.0, "theta": 0.4}]}},
+                      identity)
+    short.step()
+    cue.step()
+    np.testing.assert_array_equal(cue.lgca.nodes, short.lgca.nodes)
+
+
+def test_cells_rest_with_a_probability_that_responds_to_a_field():
+    # no volume exclusion: every cell rests with p(field), whatever its channel before
+    rng = np.random.default_rng(6)
+    counts = rng.poisson(1.0, (100, 60, 5))
+    level = np.repeat(np.arange(5), 20)[:, None] * np.ones((1, 60)) / 4
+    probability = {"max": 0.9, "hill": [{"name": "field", "field": "oxygen", "K": 0.3, "n": -2}]}
+    model = _rest_model(counts, {"probability": probability}, fields={"oxygen": level})
+    model.step()
+    after = model.lgca.nodes[model.lgca.nonborder]
+    resting, cells = after[..., 4:].sum(-1), after.sum(-1)
+    for value in np.unique(level):
+        at = level == value
+        n = cells[at].sum()
+        p = 0.9 * 0.09 / (0.09 + value ** 2)
+        assert abs(resting[at].sum() / n - p) < 4 * np.sqrt(p * (1 - p) / n), value
+
+
+@pytest.mark.parametrize("parameters, message", [
+    ({"probability": 0.5, "kappa": 2.0}, "not both"),
+    ({"probability": 0.5, "density": "neighbourhood"}, "scope"),
+    ({"probability": {"max": 2.0}}, "must be a probability"),
+])
+def test_go_or_rest_parameters_are_checked(parameters, message):
+    model = _rest_model(np.zeros((5, 5, 5), dtype=bool), parameters)
+    with pytest.raises(ValueError, match=message):
+        model.step()

@@ -66,7 +66,8 @@ The rules
      - Rest with a probability that responds to cues, e.g. in crowded nodes:
        go-or-rest as a reorientation cue.
    * - ``go_or_rest``
-     - Start resting on crowded nodes and moving on sparse ones.
+     - Rest with a probability that responds to cues (by default the
+       density: rest on crowded nodes, move on sparse ones), move otherwise.
    * - ``birth_death``
      - Die and divide; crowded nodes have less room for daughters.
    * - ``go_or_grow.growth``

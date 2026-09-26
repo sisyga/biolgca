@@ -91,9 +91,19 @@ follows the order instead.
 Resting as a reorientation
 --------------------------
 
-``go_or_rest`` switches every cell between moving and resting on its own; a
-random walk over the velocity channels then turns the moving cells. The
-``resting`` term expresses the same choice as part of the Boltzmann
+``go_or_rest`` puts every cell in a rest channel with a probability ``p``
+and in a velocity channel otherwise; a random walk over the velocity channels
+then turns the moving cells. ``p`` is a switching probability
+(:mod:`lgca.switching`), by default the go-or-grow switch of the density,
+for which ``kappa`` and ``theta`` are a short form; cells that stop where a
+field is scarce, for example:
+
+.. code-block:: python
+
+   {"name": "go_or_rest", "parameters": {"probability": {
+       "max": 0.9, "hill": [{"name": "field", "field": "oxygen", "K": 0.1, "n": -2}]}}}
+
+The ``resting`` term expresses the same choice as part of the Boltzmann
 reorientation: a lone cell rests with a switching probability ``p``
 (:mod:`lgca.switching`; by default the go-or-grow switch of the density,
 ``kappa`` 5 and ``theta`` 0.75) and otherwise moves to a random velocity

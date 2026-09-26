@@ -34,6 +34,9 @@ This file records notable user-facing changes. Changes remain under
   of saturating responses `cⁿ / (Kⁿ + cⁿ)` to cues (decreasing for negative
   `n`), wherever the tanh and Boltzmann forms are accepted; `K` and `n` may
   name traits.
+- `go_or_rest` takes `probability=`, any switching probability, so cells
+  can rest in response to a field or any other cue; `kappa` and `theta`
+  remain the short form of the density switch.
 - `birth_rate` and `death_rate` of `birth_death` accept switching
   probabilities (tanh, Boltzmann and Hill forms, also one per species), so
   cells can divide and die in response to fields, the density and other
