@@ -29,7 +29,8 @@ def clean_registries():
     _TERM_ALIASES.clear(), _TERM_ALIASES.update(term_aliases)
 
 
-@pytest.mark.parametrize("page, blocks", [("how_to/custom_interactions.rst", 5), ("how_to/research_models.rst", 3)])
+@pytest.mark.parametrize("page, blocks", [("how_to/custom_interactions.rst", 5), ("how_to/research_models.rst", 3),
+                                        ("how_to/fields.rst", 6)])
 def test_page_code_runs(page, blocks, clean_registries):
     matplotlib.use("Agg")
     namespace = {"print": lambda *args, **kwargs: None}

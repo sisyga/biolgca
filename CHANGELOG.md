@@ -7,6 +7,13 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- Tutorials 7, oxygen-limited growth (a colony that takes up oxygen
+  supplied from the edges grows as a proliferating rim around a hypoxic
+  core; an identity-based colony in which division and consumption evolve
+  together), and 8, aggregation (cells that secrete a chemokine and follow
+  it: the onset of aggregation, and how decay stops coarsening). A how-to,
+  "Fields and multiscale models", collects the options of the `pde`
+  operator.
 - Fields that change during a run (first part of roadmap item 4.6): the
   pipeline operator `pde` (`lgca.fields.PDESpec`, a new operator kind
   `"field"`) updates a field of `StateSpec.fields` by one step of

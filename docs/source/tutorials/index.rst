@@ -3,7 +3,9 @@ Tutorials
 
 These notebooks form the maintained learning path. They start with a complete
 LGCA model and progress through collective movement, combined cues, population
-dynamics, evolution and a reproducible student project. Lessons 1 and 2 use
+dynamics, evolution and a reproducible student project, and on to models in
+which cells and the molecules around them act on each other: growth limited
+by oxygen and aggregation toward a signal the cells secrete. Lessons 1 and 2 use
 standard models built by name with ``get_lgca``; from lesson 3 on, every model
 is written out as a ``ModelSpec`` in visible notebook cells, so that you can
 copy it, change it and sweep its parameters.
@@ -25,3 +27,5 @@ BioLGCA (about a minute).
    04_population_dynamics
    05_evolutionary_lgca
    06_student_project
+   07_oxygen_limited_growth
+   08_aggregation

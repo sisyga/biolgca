@@ -190,7 +190,8 @@ growth rules, movement biases and a deterministic collision rule, and tutorial
 
 ## Learn
 
-Six notebooks take you from the first random walk to a reproducible project.
+Eight notebooks take you from the first random walk to a reproducible project
+and to cells that act on the molecules around them.
 Every model is built in visible cells and the notebooks run in CI, so they
 always work with the current code.
 
@@ -202,6 +203,8 @@ always work with the current code.
 | [4. Population dynamics](docs/source/tutorials/04_population_dynamics.ipynb) | add birth, death and phenotype switching; go-or-grow |
 | [5. Evolutionary LGCA](docs/source/tutorials/05_evolutionary_lgca.ipynb) | track heritable traits across stochastic replicates |
 | [6. Student project](docs/source/tutorials/06_student_project.ipynb) | write, test and share your own interaction |
+| [7. Oxygen-limited growth](docs/source/tutorials/07_oxygen_limited_growth.ipynb) | couple cells to a field they take up; let consumption evolve |
+| [8. Aggregation](docs/source/tutorials/08_aggregation.ipynb) | find the onset of chemotactic aggregation toward a secreted signal |
 
 The [example gallery](docs/source/example_gallery.rst) collects further
 ready-to-run models, one per question.

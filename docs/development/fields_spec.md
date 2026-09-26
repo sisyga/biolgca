@@ -632,6 +632,33 @@ Choices made while implementing, beyond the text above:
   nested in an operator's parameters reads (`{"name": "field"|"gradient",
   "field": ...}`), e.g. `field:oxygen → birth_death`.
 
+## Phase 4 as built (2026-09-26)
+
+- **Tutorial 7** (`07_oxygen_limited_growth.ipynb`, 22 s): unit conversion
+  (`D = 1.8·10⁴`), a steady oxygen field with saturating uptake (20 per
+  cell, `K_m = 0.05`) supplied at the edges of a 100² lattice, division and
+  hypoxic death in the Hill form, `go_or_rest` with probability 0.8 so the
+  colony stays compact (no volume exclusion, capacity 8); snapshots, radial
+  profiles of divisions and deaths, growth against a colony without
+  uptake. Identity-based part: `"max": "r_b"` (added for it: the maximum of
+  a probability may name a trait) with uptake `"r_b"` and `D = 100` (the
+  same steady field as `D = 2·10⁴`, uptake 20 at `r_b = 0.1`), against a
+  control consuming 0.1. Checked over six seeds before writing the text:
+  mean `r_b` after 300 steps 0.13–0.16 in both, cells 8458–9705 against
+  11337–12309.
+- **Tutorial 8** (`08_aggregation.ipynb`, 15 s): 1D lattice without volume
+  exclusion, chemokine with `D = 1`, production 0.1 per cell, implicit
+  solver, `chemotaxis`; kymographs of cells and field (`plot_scalarfield`);
+  the continuum Keller–Segel criterion; a sweep over `beta` × decay (onset
+  near 0.05–0.1 without decay, 0.1 with 0.01, 0.25 with 0.1); coarsening
+  without decay against a settled number of aggregates with decay (3000
+  steps); 2D snapshots.
+- **How-to** `docs/source/how_to/fields.rst`, with its Python blocks run by
+  `tests/docs_snippets_test.py`.
+- **Also found and fixed**: `lgca.study.vary` could not change the
+  parameters of a `PDESpec` (they are fields of the dataclass, not a
+  `parameters` mapping); `go_or_rest` takes `probability=` (user request).
+
 ## Later
 
 Systems of fields solved together (implicit coupling of reactions),

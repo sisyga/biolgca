@@ -1078,6 +1078,12 @@ model with a custom rule reruns from the CLI.
   upwind advection (steady solver with pyamg's AIR multigrid: 1.2-2
   go-or-grow steps per step up to Péclet 6), and `@reaction` (spec,
   "Phase 3 as built"). Next: phase 4, tutorials 7 and 8 and the how-to.
+- Status (2026-09-26): phase 4 done: tutorials 7 (oxygen-limited growth,
+  with an evolving division rate that sets consumption) and 8
+  (aggregation), the how-to "Fields and multiscale models". Along the way
+  (user request) `go_or_rest` takes any switching probability, and the
+  maximum of a probability may name a trait. The fields feature (4.6) is
+  complete as specified; "Later" in the spec lists extensions.
 
 Status (2026-09-25, user decisions):
 - Not yet at the publishing stage: the user has further features in mind
@@ -1090,7 +1096,8 @@ Status (2026-09-25, user decisions):
   Colab and only when `lgca` is missing, installs BioLGCA with pip from
   GitHub (`biolgca @ git+https://github.com/sisyga/biolgca@aidevelop`).
   Both point at `aidevelop` (master has no tutorials at these paths); at the
-  merge replace `aidevelop` by `master` in the six notebooks, and after a
+  merge replace `aidevelop` by `master` in the tutorial notebooks (eight since
+  2026-09-26), and after a
   PyPI release install `biolgca` from PyPI. The branch must be pushed for the
   badges to work. Simulated install with pip from a git URL (Python 3.13):
   37 s and 106 packages, of which JupyterLab and its server account for
