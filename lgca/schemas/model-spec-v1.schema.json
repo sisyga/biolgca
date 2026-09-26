@@ -142,6 +142,15 @@
         "decay": {"type": "number", "minimum": 0},
         "production": {"oneOf": [{"type": "number", "minimum": 0}, {"type": "string", "minLength": 1}]},
         "cells": {"type": "array", "items": {"$ref": "#/$defs/pdeCellTerm"}},
+        "reactions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {"name": {"type": "string", "minLength": 1}},
+            "additionalProperties": {"$ref": "#/$defs/jsonValue"}
+          }
+        },
         "advection": {
           "oneOf": [
             {"type": "array", "items": {"type": "number"}, "minItems": 1, "maxItems": 3},

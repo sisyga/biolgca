@@ -1073,6 +1073,11 @@ model with a custom rule reruns from the CLI.
   dependencies, `benchmarks/fields.py`: the steady solve costs about one
   go-or-grow step (spec, "Phase 2 as built"). Next: phase 3 (Hill form,
   birth and death rates responding to cues, advection, `@reaction`).
+- Status (2026-09-26): phase 3 implemented: the Hill form of switching
+  probabilities, `birth_rate`/`death_rate` in every probability form,
+  upwind advection (steady solver with pyamg's AIR multigrid: 1.2-2
+  go-or-grow steps per step up to Péclet 6), and `@reaction` (spec,
+  "Phase 3 as built"). Next: phase 4, tutorials 7 and 8 and the how-to.
 
 Status (2026-09-25, user decisions):
 - Not yet at the publishing stage: the user has further features in mind

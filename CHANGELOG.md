@@ -46,6 +46,12 @@ This file records notable user-facing changes. Changes remain under
   about `|v|/2`). With advection the iterative solvers use BiCGSTAB, and the
   steady solver pyamg's AIR multigrid, which stays at a few iterations per
   step also when advection dominates.
+- Reactions of your own in the `pde` operator: `@lgca.reaction` (also
+  `lgca.fields.reaction`) registers `function(state, c, **parameters)`
+  returning `(production, loss_rate)`, used as `reactions=[{"name": ...,
+  parameter: value}]`. Terms that depend on the field are iterated to
+  convergence in the implicit and steady solvers; fields that react with
+  each other are updated in the order of their operators.
 - New dependencies: `pyamg>=5.1` (not on Python 3.14, which it has no
   wheels for yet; the steady solver then uses SciPy alone) and
   `threadpoolctl>=3.0` (field solvers run with one BLAS thread, 3 to 9

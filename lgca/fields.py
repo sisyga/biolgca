@@ -40,6 +40,7 @@ from __future__ import annotations
 import dataclasses
 import functools
 import inspect
+import warnings
 from collections.abc import Mapping, Sequence
 from math import prod
 from typing import Any, ClassVar
@@ -54,7 +55,7 @@ from .lattice_state import LatticeState, _species_indices, channel_mask
 from .operator_base import FieldOperator, ParameterSpec, PluginInfo
 from .plugins import _law_for_kind, register_plugin
 
-__all__ = ["PDEOperator", "PDESpec", "laplacian"]
+__all__ = ["PDEOperator", "PDESpec", "laplacian", "list_reactions", "reaction"]
 
 SOLVERS = ("explicit", "implicit", "steady")
 _EXPLICIT_METHODS = ("RK23", "RK45", "DOP853", "BDF", "Radau")
@@ -69,6 +70,51 @@ _DIRECT_LIMIT = 20_000
 _SIDES = ("x-", "x+", "y-", "y+", "z-", "z+")
 _PER_SIDE_GEOMETRIES = ("lin", "square", "cubic")
 _CELL_TERM_KEYS = {"production", "uptake", "saturation", "n", "species", "channels"}
+_REACTIONS: dict[str, Any] = {}
+
+
+def reaction(function=None, *, name: str | None = None):
+    """Register ``function(state, c, **parameters)`` as a reaction of the ``pde`` operator.
+
+    The function gets the lattice state (the cells as the previous operator
+    left them, and every field through ``state.field``) and the field's
+    current values ``c`` (shape ``state.dims``, read-only), and returns
+    ``(production, loss_rate)``: numbers or arrays of shape ``state.dims``,
+    both non-negative, entering the equation as ``+ production - loss_rate
+    * c``. Writing every reaction this way keeps the field non-negative in
+    the implicit and steady solvers. Terms that depend on ``c`` are iterated
+    to convergence (``solver_options`` ``rtol`` and ``max_iterations``).
+
+    The operator uses it by name, with the parameters after ``c``:
+    ``PDESpec(field="activator", reactions=[{"name": "activation", "rate": 2.0}])``.
+    Several fields that react with each other are updated one after another,
+    in the order of their operators (operator splitting, first order in
+    time).
+
+    Examples
+    --------
+    Self-activation that saturates, lost in proportion to an inhibitor:
+
+    >>> from lgca.fields import reaction
+    >>> @reaction
+    ... def activation(state, c, rate=1.0, inhibitor="inhibitor"):
+    ...     return rate * c**2 / (1 + c**2), 0.1 * state.field(inhibitor)
+    """
+
+    def register(function):
+        parameters = list(inspect.signature(function).parameters)
+        if len(parameters) < 2:
+            raise TypeError(f"a reaction takes the lattice state and the field's values, "
+                            f"function(state, c, **parameters); {function.__name__} takes {parameters}")
+        _REACTIONS[name or function.__name__] = function
+        return function
+
+    return register if function is None else register(function)
+
+
+def list_reactions() -> tuple[str, ...]:
+    """The names of the registered reactions."""
+    return tuple(sorted(_REACTIONS))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -101,6 +147,9 @@ class PDESpec:
         and ``"channels"`` (``"all"``, ``"rest"`` or ``"velocity"``). In
         identity-based models ``r`` may name a cell trait, so every cell
         secretes or consumes at its own rate.
+    reactions : sequence of mapping, default=()
+        Reactions registered with :func:`reaction`, each ``{"name": ...}``
+        with its parameters, e.g. ``[{"name": "activation", "rate": 2.0}]``.
     advection : sequence of float or str, optional
         Velocity ``v`` of the term ``-∇·(v c)`` in nodes per step: a vector
         with one component per dimension (Cartesian, also on hexagonal
@@ -127,7 +176,8 @@ class PDESpec:
     solver_options : mapping, default={}
         Implicit and steady: ``backend`` (``"auto"``, ``"direct"``,
         ``"cg"``, ``"amg"``), ``rtol`` (1e-6, for the iterative solver and
-        the iteration of saturating uptake), ``max_iterations`` (20);
+        the iteration of saturating uptake and reactions), ``max_iterations``
+        (20);
         implicit also ``substeps`` (1). Explicit: ``method`` (``"RK45"``;
         also ``"RK23"``, ``"DOP853"``, ``"BDF"``, ``"Radau"``), ``rtol``
         (1e-4), ``atol`` (1e-6), ``warn_evaluations`` (200).
@@ -158,6 +208,7 @@ class PDESpec:
     decay: float = 0.0
     production: float | str = 0.0
     cells: Sequence[Mapping[str, Any]] = ()
+    reactions: Sequence[Mapping[str, Any]] = ()
     advection: Sequence[float] | str | None = None
     boundary: str | Mapping[str, Any] | None = None
     solver: str = "implicit"
@@ -169,12 +220,14 @@ class PDESpec:
         parameters = {"field": self.field}
         defaults = {"diffusion": 0.0, "decay": 0.0, "production": 0.0, "advection": None, "boundary": None,
                     "solver": "implicit"}
-        for name in ("diffusion", "decay", "production", "cells", "advection", "boundary", "solver",
-                     "solver_options"):
+        for name in ("diffusion", "decay", "production", "cells", "reactions", "advection", "boundary",
+                     "solver", "solver_options"):
             value = getattr(self, name)
-            if name in ("cells", "solver_options"):
-                if value:
-                    parameters[name] = ([dict(term) for term in value] if name == "cells" else dict(value))
+            if name in ("cells", "reactions", "solver_options"):
+                if value:  # plain lists and dicts for model files; the operator checks the entries
+                    parameters[name] = (dict(value) if isinstance(value, Mapping)
+                                        else [dict(term) if isinstance(term, Mapping) else term for term in value]
+                                        if isinstance(value, (list, tuple)) else value)
             elif name == "advection" and isinstance(value, (tuple, np.ndarray)):
                 parameters[name] = np.asarray(value).tolist()  # a list in model files
             elif value != defaults[name]:
@@ -225,6 +278,10 @@ class PDEOperator(FieldOperator):
         if isinstance(cells, (Mapping, str, bytes)) or not isinstance(cells, Sequence):
             raise TypeError("pde.cells must be a list of cell terms, e.g. [{'uptake': 0.1}]")
         self.cell_terms = [_CellTerm.parse(term, index) for index, term in enumerate(cells)]
+        reactions = parameters.get("reactions", ())
+        if isinstance(reactions, (Mapping, str, bytes)) or not isinstance(reactions, Sequence):
+            raise TypeError("pde.reactions must be a list of reactions, e.g. [{'name': 'activation'}]")
+        self.reactions = [_Reaction.parse(entry, index) for index, entry in enumerate(reactions)]
         self.advection = _advection(parameters.get("advection"))
         self.boundary = parameters.get("boundary")
         self.solver = parameters.get("solver", "implicit")
@@ -265,6 +322,7 @@ class PDEOperator(FieldOperator):
             if production.shape not in (self._dims, np.shape(lgca.cell_density)):
                 raise ValueError(f"pde.production field {self.production!r} must have shape {self._dims}")
         self._sides = _parse_boundary(self.boundary, lgca)
+        self._fixed = any(isinstance(condition, float) for pair in self._sides for condition in pair)
         self.laplacian, self._laplacian_source = _assemble_laplacian(lgca, self._sides)
         n = self.laplacian.shape[0]
         if isinstance(self.advection, str):
@@ -332,7 +390,9 @@ class PDEOperator(FieldOperator):
         return "amg" if _pyamg() is not None else "direct" if n <= _DIRECT_LIMIT else "cg"
 
     def _check_steady_state_exists(self):
-        fixed = any(isinstance(condition, float) for pair in self._sides for condition in pair)
+        if self.reactions:  # a reaction may remove the field; a singular problem fails when solved
+            return
+        fixed = self._fixed
         uptake = any(term.kind == "uptake" for term in self.cell_terms)
         if self.diffusion == 0 and self.decay == 0:
             raise ValueError(f"pde {self.field!r}: the steady solver without diffusion needs decay, so that "
@@ -378,7 +438,8 @@ class PDEOperator(FieldOperator):
     # ---------------------------------------------------------------- sources
 
     def _sources(self, lgca, step):
-        """Production and linear loss rate per node from the cells and the map; saturating terms."""
+        """Production and linear loss rate per node from the cells and the map, and the terms that
+        depend on the field: functions of its values that return (production, loss rate)."""
         n = self._A.shape[0]
         production = self._b.copy()
         if isinstance(self.production, str):
@@ -389,8 +450,8 @@ class PDEOperator(FieldOperator):
         elif self.production:
             production += self.production
         loss = np.zeros(n)
-        saturating = []
-        if self.cell_terms:
+        nonlinear = []
+        if self.cell_terms or self.reactions:
             state = LatticeState(lgca, step=step)
             for term in self.cell_terms:
                 weights = term.weights(state)
@@ -398,20 +459,23 @@ class PDEOperator(FieldOperator):
                     production += weights
                 elif term.saturation is None:
                     loss += weights
-                else:
-                    saturating.append((weights, term.saturation, term.n))
-        return production, loss, saturating
+                elif np.any(weights):
+                    nonlinear.append(functools.partial(_saturating_uptake, weights, term.saturation, term.n))
+            for entry in self.reactions:
+                nonlinear.append(functools.partial(entry.evaluate, state, self._dims))
+        return production, loss, nonlinear
 
     # ---------------------------------------------------------------- solvers
 
-    def _explicit(self, c, production, loss, saturating):
+    def _explicit(self, c, production, loss, nonlinear):
         options = self.options
         A = self._A
 
         def rhs(_t, values):
             change = A @ values + production - loss * values
-            for weights, K, n in saturating:
-                change -= weights * _hill(values, K, n)
+            for term in nonlinear:
+                made, lost = term(values)
+                change += made - lost * values
             return change
 
         method = options["method"]
@@ -438,57 +502,83 @@ class PDEOperator(FieldOperator):
                                f"{c.min():.3g}); use solver='implicit', which keeps the field non-negative")
         return np.maximum(c, 0.0)
 
-    def _implicit(self, c, production, loss, saturating):
+    def _implicit(self, c, production, loss, nonlinear):
         dt = 1.0 / self.options["substeps"]
         if getattr(self, "_base_dt", None) != dt:
             self._base = (sp.identity(self._A.shape[0], format="csr") - dt * self._A).tocsr()
             self._base_dt = dt
         for _ in range(self.options["substeps"]):
-            c = self._solve_system(self._base, dt, c + dt * production, c, loss, saturating)
+            c = self._solve_system(self._base, dt, c + dt * production, c, loss, nonlinear)
         return c
 
-    def _steady(self, c, production, loss, saturating):
-        if self.decay == 0 and not np.any(self._b) and not (np.any(loss) or any(
-                np.any(weights) for weights, _, _ in saturating)):
+    def _steady(self, c, production, loss, nonlinear):
+        if (self.decay == 0 and not np.any(self._b) and not self.reactions
+                and not np.any(loss) and not nonlinear):
             raise RuntimeError(f"pde {self.field!r}: no cells take up the field, and nothing else removes it, "
                                "so it has no steady state; add decay or a fixed value at the boundary")
-        return self._solve_system(self._steady_base, 1.0, production, c, loss, saturating)
+        with warnings.catch_warnings():  # a singular matrix is reported below
+            warnings.simplefilter("ignore", spla.MatrixRankWarning)
+            c = self._solve_system(self._steady_base, 1.0, production, c, loss, nonlinear)
+        if not np.all(np.isfinite(c)):
+            raise RuntimeError(f"pde {self.field!r}: the steady problem has no unique solution; something must "
+                               "remove the field (decay, uptake, a reaction's loss rate or a fixed boundary "
+                               "value)")
+        return c
 
-    def _solve_system(self, base, scale, right, start, loss, saturating):
-        """Solve ``(base + scale diag(L)) c = right``, with the loss rate L of uptake by cells.
+    def _solve_system(self, base, scale, right, start, loss, nonlinear):
+        """Solve ``(base + scale diag(L)) c = right + scale P``.
 
-        Saturating uptake depends on c: its loss rate is evaluated at the current iterate and the
-        linear problem solved again (Picard iteration), starting from ``start``.
+        ``L`` is the loss rate of uptake by cells plus that of the terms that depend on c (saturating
+        uptake, reactions), which also add their production ``P``. These are evaluated at the current
+        iterate and the linear problem solved again (Picard iteration), starting from ``start``,
+        until c changes by less than ``rtol`` or the terms no longer change.
         """
-        if not saturating:
-            if not np.any(loss):
-                return self._solve_constant(base, right, start)
-            return self._solve(base + sp.diags(scale * loss), right, start)
+        if not nonlinear:
+            return self._solve_linear(base, scale, right, start, loss)
         options = self.options
         previous = start
+        made, lost = _evaluate(nonlinear, previous, loss)
         for iteration in range(1, options["max_iterations"] + 1):
-            total = loss + sum(weights * _hill_rate(previous, K, n) for weights, K, n in saturating)
-            new = self._solve(base + sp.diags(scale * total), right, previous)
+            new = self._solve_linear(base, scale, right + scale * made, previous, lost)
             change = np.max(np.abs(new - previous), initial=0.0)
             previous = new
-            if change <= options["rtol"] * max(np.max(np.abs(new), initial=0.0), 1e-300):
+            new_made, new_lost = _evaluate(nonlinear, new, loss)
+            if (change <= options["rtol"] * max(np.max(np.abs(new), initial=0.0), 1e-300)
+                    or (np.array_equal(new_made, made) and np.array_equal(new_lost, lost))):
                 break
+            made, lost = new_made, new_lost
         else:
             if not self._warned:
                 self._warned = True
-                warn_user(f"pde {self.field!r}: saturating uptake did not converge in "
-                          f"{options['max_iterations']} iterations; raise solver_options 'max_iterations'"
+                warn_user(f"pde {self.field!r}: the terms that depend on the field (saturating uptake, "
+                          f"reactions) did not converge in {options['max_iterations']} iterations; raise "
+                          "solver_options 'max_iterations'"
                           + (" or use substeps" if self.solver == "implicit" else ""))
         stats = self.statistics
         stats["max_iterations_used"] = max(stats.get("max_iterations_used", 0), iteration)
         return previous
+
+    def _solve_linear(self, base, scale, right, start, loss):
+        if not np.any(loss):  # the matrix does not depend on the cells
+            if self.solver == "steady" and self.decay == 0 and not self._fixed:
+                # nothing removes the field: -A is singular (SuperLU may miss it by rounding)
+                raise RuntimeError(f"pde {self.field!r}: the steady problem has no unique solution; something "
+                                   "must remove the field (decay, uptake, a reaction's loss rate or a fixed "
+                                   "boundary value)")
+            return self._solve_constant(base, right, start)
+        return self._solve(base + sp.diags(scale * loss), right, start)
 
     def _solve_constant(self, matrix, right, start):
         """Solve with a matrix that does not depend on the cells: factor it once."""
         if self.options["backend"] not in ("auto", "direct"):
             return self._solve(matrix, right, start)
         if self._lu_matrix is not matrix:
-            self._lu = spla.splu(matrix.tocsc())
+            try:
+                self._lu = spla.splu(matrix.tocsc())
+            except RuntimeError as exc:  # SuperLU: "Factor is exactly singular"
+                raise RuntimeError(f"pde {self.field!r}: the problem has no unique solution ({exc}); something "
+                                   "must remove the field (decay, uptake, a reaction's loss rate or a fixed "
+                                   "boundary value)") from None
             self._lu_matrix = matrix
         return np.maximum(self._lu.solve(right), 0.0)
 
@@ -570,6 +660,56 @@ class PDEOperator(FieldOperator):
         return values
 
 
+class _Reaction:
+    """One entry of ``pde.reactions``: a registered reaction and its parameters."""
+
+    def __init__(self, name, function, parameters, path):
+        self.name, self.function, self.parameters, self.path = name, function, parameters, path
+
+    @classmethod
+    def parse(cls, entry, index):
+        path = f"pde.reactions[{index}]"
+        if not isinstance(entry, Mapping) or not isinstance(entry.get("name"), str):
+            raise TypeError(f"{path} must be a mapping with the name of a reaction, e.g. {{'name': 'activation', "
+                            "'rate': 2.0}")
+        name = entry["name"]
+        if name not in _REACTIONS:
+            raise ValueError(f"{path}: no reaction {name!r} is registered (registered: "
+                             f"{', '.join(list_reactions()) or 'none'}); register it with lgca.fields.reaction "
+                             "before the model is built")
+        function = _REACTIONS[name]
+        parameters = {key: value for key, value in entry.items() if key != "name"}
+        signature = inspect.signature(function)
+        try:
+            signature.bind(None, None, **parameters)
+        except TypeError as exc:
+            accepted = list(signature.parameters)[2:]
+            raise ValueError(f"{path}: the reaction {name!r} takes the parameters {accepted}; {exc}") from None
+        return cls(name, function, parameters, path)
+
+    def evaluate(self, state, dims, c):
+        """Production and loss rate per node, flattened, at the field values c."""
+        values = c.reshape(dims).view()
+        values.flags.writeable = False
+        result = self.function(state, values, **self.parameters)
+        if not isinstance(result, tuple) or len(result) != 2:
+            raise TypeError(f"the reaction {self.name!r} must return (production, loss_rate), got "
+                            f"{type(result).__name__}")
+        terms = []
+        for label, value in zip(("production", "loss rate"), result):
+            try:
+                value = np.broadcast_to(np.asarray(value, dtype=float), dims)
+            except ValueError:
+                raise ValueError(f"the {label} of the reaction {self.name!r} must be a number or one value per "
+                                 f"node, shape {dims}; got shape {np.shape(value)}") from None
+            if not np.all(np.isfinite(value)) or value.min(initial=0.0) < 0:
+                raise ValueError(f"the {label} of the reaction {self.name!r} must be finite and non-negative; "
+                                 f"its smallest value is {np.min(value):.3g}. Write a loss as a loss rate "
+                                 "times c")
+            terms.append(value.ravel())
+        return terms[0], terms[1]
+
+
 class _CellTerm:
     """One entry of ``pde.cells``: secretion or uptake by cells."""
 
@@ -643,9 +783,19 @@ class _CellTerm:
 
 # ------------------------------------------------------------------- helpers
 
-def _hill(c, K, n):
-    c = np.maximum(c, 0.0)
-    return c**n / (K**n + c**n)
+def _saturating_uptake(weights, K, n, c):
+    """Production and loss rate of saturating uptake at the field values c."""
+    return 0.0, weights * _hill_rate(c, K, n)
+
+
+def _evaluate(nonlinear, c, loss):
+    """Production and total loss rate of the terms that depend on the field, at the values c."""
+    made, lost = np.zeros_like(c), loss.copy()
+    for term in nonlinear:
+        production, rate = term(c)
+        made += production
+        lost += rate
+    return made, lost
 
 
 def _hill_rate(c, K, n):
@@ -918,6 +1068,9 @@ PDE_INFO = PluginInfo(
                                            "{'production': r}, {'uptake': r} or {'uptake': r, "
                                            "'saturation': K, 'n': 1}, optionally with 'species' and "
                                            "'channels'. In identity-based models r may name a cell trait."),
+        "reactions": ParameterSpec(default=[],
+                                   description="Reactions registered with lgca.fields.reaction: a list of "
+                                               "mappings {'name': ..., parameter: value, ...}."),
         "advection": ParameterSpec(default=None,
                                    description="Velocity v of the advection term -div(v c) in nodes per "
                                                "time step: a vector with one component per dimension, or "
@@ -941,7 +1094,8 @@ PDE_INFO = PluginInfo(
     port_status="native",
     test_status="unit_tested",
     description="Updates a field by one time step of a reaction-advection-diffusion equation, "
-                "dc/dt = D Laplace(c) - div(v c) + P - L c, with secretion and uptake by the cells.",
+                "dc/dt = D Laplace(c) - div(v c) + P - L c, with secretion and uptake by the cells "
+                "and reactions of your own.",
 )
 
 

@@ -34,6 +34,7 @@ from .lattice_state import LatticeState
 from .rules import interaction, reorientation_term, stack
 from .mutations import mutation_effect
 from .switching import switch_cue
+from .fields import reaction
 from . import builtin_rules as _builtin_rules  # registers the decorated built-in interactions
 from . import fields as _fields  # registers the pde operator
 from . import research_models as _research_models  # registers the research models as stacks

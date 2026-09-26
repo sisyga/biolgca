@@ -57,7 +57,8 @@ tests the installed wheel and CLI, and builds the docs.
   `mutations.py` (events that change cell traits: mutations of daughters and
   `trait_switch`), `switching.py` (switching probabilities that respond to
   cues such as the density), `fields.py` (the `pde` operator: fields that
-  diffuse, decay and are secreted or taken up by cells), `research_models.py`
+  diffuse, decay, are advected and are secreted or taken up by cells, and
+  `@reaction` for reactions of your own), `research_models.py`
   (published models as stacks of the rules, under the legacy names),
   `legacy_names.py` (the `get_lgca` interaction names, and the deprecated
   prefixed names of model files, as stacks of rules), `testing.py`

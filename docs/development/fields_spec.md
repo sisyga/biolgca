@@ -609,6 +609,25 @@ Choices made while implementing, beyond the text above:
   | steady cg (Jacobi BiCGSTAB), v = 5 | 83.2 | 436 | 2345 |
   | implicit cg, v = 5 | 5.4 | 16.9 | 59.2 |
 
+- **Reactions** (`@reaction`, also exported as `lgca.reaction`): the
+  function gets the `LatticeState` and the field's values (shape `dims`,
+  read-only) and returns `(production, loss_rate)`, numbers or arrays of
+  shape `dims`, checked to be finite and non-negative. Parameters are
+  checked against the function's signature when the operator is built.
+  Saturating uptake and reactions share one Picard iteration: the terms are
+  evaluated at the current iterate, the linear problem solved, and the
+  iteration stops when c changes by less than `rtol` or the evaluated terms
+  did not change (so a reaction that does not depend on c costs one solve,
+  tested). While no term has a loss the matrix is the constant one and
+  reuses its factorization. The explicit solver calls the reactions in
+  every right-hand-side evaluation. Tested against production and decay,
+  secretion by cells, the exact logistic solution (explicit), the backward
+  Euler fixed point (implicit), the stable state (steady), and the order of
+  two operators (splitting). With reactions the build-time check for a
+  steady state is skipped (a reaction may remove the field); a steady field
+  with no loss, no decay and no fixed value raises when solved. Reactions
+  are Python functions: a model file that uses one needs the module that
+  registers it imported first (as for `switch_cue`).
 - **Graph**: `describe_model_graph` adds an edge from every field that a cue
   nested in an operator's parameters reads (`{"name": "field"|"gradient",
   "field": ...}`), e.g. `field:oxygen → birth_death`.

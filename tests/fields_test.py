@@ -13,7 +13,7 @@ import scipy.sparse.linalg as spla
 from scipy.integrate import solve_ivp
 
 from lgca import get_lgca
-from lgca.fields import PDESpec, laplacian
+from lgca.fields import PDESpec, laplacian, reaction
 from lgca.model import (
     AnalysisSpec,
     ModelSpec,
@@ -776,3 +776,151 @@ def test_advection_in_a_model_file(tmp_path):
     assert data["model"]["dynamics"]["operators"][0]["parameters"]["advection"] == [0.3, 0]
     np.testing.assert_array_equal(run_model(load_model_spec(path), showprogress=False).data["signal"],
                                   run_model(spec, showprogress=False).data["signal"])
+
+
+# ------------------------------------------------------------------ reactions
+
+@reaction(name="test_constant")
+def _constant_reaction(state, c, production=0.0, rate=0.0):
+    return production, rate
+
+
+@reaction(name="test_logistic")
+def _logistic_reaction(state, c, r=1.0):
+    return r * c, r * c  # d c / dt = r c (1 - c)
+
+
+@reaction(name="test_secretion")
+def _secretion_reaction(state, c, rate=1.0):
+    return rate * state.density, 0.0
+
+
+@reaction(name="test_copy")
+def _copy_reaction(state, c, source="u"):
+    return state.field(source), 0.0
+
+
+@pytest.mark.parametrize("solver,options", [("implicit", {}), ("implicit", {"backend": "cg"}), ("explicit", {}),
+                                            ("steady", {}), ("steady", {"backend": "amg"})])
+def test_a_constant_reaction_is_production_and_decay(solver, options):
+    initial = np.random.default_rng(10).random((10, 8))
+    fields = []
+    for terms in ({"production": 0.3, "decay": 0.2},
+                  {"reactions": [{"name": "test_constant", "production": 0.3, "rate": 0.2}]}):
+        compiled = _build([PDESpec(field="u", diffusion=0.5, solver=solver,
+                                   solver_options={**options, **({"rtol": 1e-10} if solver != "explicit" else {})},
+                                   **terms)], fields={"u": initial})
+        for _ in range(3):
+            compiled.step()
+        fields.append(_field(compiled))
+    np.testing.assert_allclose(fields[1], fields[0], rtol=1e-8)
+
+
+def test_a_reaction_that_does_not_depend_on_the_field_needs_one_solve():
+    compiled = _build([PDESpec(field="u", diffusion=0.5, reactions=[{"name": "test_secretion", "rate": 0.2}])],
+                      density=0.4, restchannels=1)
+    compiled.step()
+    assert compiled.metadata["fields"]["u"]["max_iterations_used"] == 1
+
+
+def test_a_reaction_can_read_the_cells():
+    fields = []
+    for terms in ({"cells": [{"production": 0.2}]}, {"reactions": [{"name": "test_secretion", "rate": 0.2}]}):
+        compiled = _build([PDESpec(field="u", diffusion=0.5, decay=0.1, **terms)], density=0.4, restchannels=1,
+                          seed=4)
+        for _ in range(2):
+            compiled.step()
+        fields.append(_field(compiled))
+    np.testing.assert_allclose(fields[1], fields[0], rtol=1e-12)
+
+
+def test_logistic_growth_of_a_field():
+    r, c0 = 0.8, 0.1
+    # explicit: the exact solution of dc/dt = r c (1 - c)
+    compiled = _build([PDESpec(field="u", reactions=[{"name": "test_logistic", "r": r}], solver="explicit",
+                               solver_options={"rtol": 1e-9, "atol": 1e-12})], fields={"u": c0})
+    for _ in range(4):
+        compiled.step()
+    exact = c0 * np.exp(4 * r) / (1 - c0 + c0 * np.exp(4 * r))
+    np.testing.assert_allclose(_field(compiled), exact, rtol=1e-7)
+    # implicit: backward Euler, c - c_old = r c (1 - c), iterated to its fixed point
+    compiled = _build([PDESpec(field="u", reactions=[{"name": "test_logistic", "r": r}],
+                               solver_options={"rtol": 1e-12, "max_iterations": 200})], fields={"u": c0})
+    compiled.step()
+    backward = (-(1 - r) + np.sqrt((1 - r) ** 2 + 4 * r * c0)) / (2 * r)
+    np.testing.assert_allclose(_field(compiled), backward, rtol=1e-9)
+    # steady: the stable state c = 1
+    compiled = _build([PDESpec(field="u", diffusion=1.0, reactions=[{"name": "test_logistic", "r": r}],
+                               solver="steady", solver_options={"rtol": 1e-11})], fields={"u": c0})
+    np.testing.assert_allclose(_field(compiled), 1.0, rtol=1e-9)
+
+
+def test_fields_that_react_are_updated_in_the_order_of_their_operators():
+    # u gains 1 per step; v gains u, as the first operator left it
+    compiled = _build([PDESpec(field="u", production=1.0),
+                       PDESpec(field="v", reactions=[{"name": "test_copy", "source": "u"}])],
+                      fields={"u": 2.0, "v": 0.0})
+    compiled.step()
+    np.testing.assert_allclose(_field(compiled, "u"), 3.0)
+    np.testing.assert_allclose(_field(compiled, "v"), 3.0)
+    compiled.step()
+    np.testing.assert_allclose(_field(compiled, "v"), 7.0)
+
+
+@reaction(name="test_negative")
+def _negative_reaction(state, c):
+    return -c - 1.0, 0.0
+
+
+@reaction(name="test_single")
+def _single_reaction(state, c):
+    return c
+
+
+@reaction(name="test_shape")
+def _shape_reaction(state, c):
+    return np.ones(3), 0.0
+
+
+@pytest.mark.parametrize("reactions, message", [
+    ([{"name": "test_unknown"}], "no reaction 'test_unknown' is registered"),
+    ([{"name": "test_constant", "speed": 1.0}], r"takes the parameters \['production', 'rate'\]"),
+    ([{"rate": 1.0}], "the name of a reaction"),
+    ({"name": "test_constant"}, "a list of reactions"),
+    ([{"name": "test_negative"}], "production of the reaction 'test_negative' must be finite and non-negative"),
+    ([{"name": "test_single"}], r"must return \(production, loss_rate\)"),
+    ([{"name": "test_shape"}], "one value per node"),
+])
+def test_invalid_reactions_are_explained(reactions, message):
+    with pytest.raises((ValueError, TypeError), match=message):
+        compiled = _build([PDESpec(field="u", reactions=reactions)])
+        compiled.step()
+
+
+def test_a_reaction_takes_the_state_and_the_field():
+    with pytest.raises(TypeError, match="takes the lattice state and the field's values"):
+        reaction(lambda state: 0.0)
+
+
+def test_a_steady_field_that_nothing_removes_is_an_error():
+    with pytest.raises(RuntimeError, match="no unique solution"):
+        _build([PDESpec(field="u", diffusion=1.0, reactions=[{"name": "test_constant", "production": 1.0}],
+                        solver="steady")], boundary="periodic")
+
+
+def test_reactions_in_a_model_file(tmp_path):
+    spec = ModelSpec(
+        space=SpaceSpec(geometry="square", dims=(8, 8)),
+        state=StateSpec(density=0.3, restchannels=1, fields={"u": 0.5}),
+        time=TimeSpec(steps=3, seed=2),
+        dynamics=InteractionPipelineSpec(operators=[
+            PDESpec(field="u", diffusion=0.5, reactions=[{"name": "test_logistic", "r": 0.3},
+                                                         {"name": "test_secretion", "rate": 0.1}])]),
+        analysis=AnalysisSpec(observers=[FieldRecorder(["u"])]))
+    path = save_model_spec(spec, tmp_path / "model.json")
+    data = json.loads(path.read_text())
+    jsonschema.Draft202012Validator(load_model_spec_schema()).validate(data)
+    assert data["model"]["dynamics"]["operators"][0]["parameters"]["reactions"][0] == {"name": "test_logistic",
+                                                                                       "r": 0.3}
+    np.testing.assert_array_equal(run_model(load_model_spec(path), showprogress=False).data["u"],
+                                  run_model(spec, showprogress=False).data["u"])
