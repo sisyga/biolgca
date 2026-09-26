@@ -1066,6 +1066,16 @@ model with a custom rule reruns from the CLI.
 - An advanced example of multispecies tumour growth without volume exclusion
   on hexagonal and 3D Moore lattices, colouring nodes by the local mean class
   property (replaces the removed `multispecies_nove_tumor_growth_demo.py`).
+- Status (2026-09-26, user decisions): zoo first, then the course pack.
+  Zoo specified in `docs/development/zoo_spec.md` with eight entries
+  (Böttger 2015; Syga 2026 EPJ ST; Syga 2024 PLoS CB in 2D; three models
+  without a paper: `go_or_grow_glioblastoma`, `evo_steric`,
+  `birthdeath_cancerdfe`; excitable media 2019; Ilina 2020 with a 2D
+  spheroid). Course pack: for MSc students of physics, applied mathematics
+  and computational modelling, one semester, one 45-minute exercise every
+  second week; solutions public in the repository; figures and animations,
+  no slide decks. Entry 1 (Allee effect) built: `lgca.zoo`, notebook in
+  `docs/source/zoo/`, executed by the docs build and CI.
 
 **4.5 Platform coverage**
 - CI on Windows and macOS in addition to Linux.

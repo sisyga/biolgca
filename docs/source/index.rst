@@ -68,8 +68,9 @@ combined, models saved as files and parameters swept:
 :doc:`getting_started` introduces both, :doc:`reference/factory_reference` lists
 the options of ``get_lgca``, :doc:`how_to/model_specs_and_plugins` explains
 shareable JSON/YAML models and composed pipelines,
-:doc:`how_to/exploring` running a model live with sliders, and
-:doc:`how_to/studying_a_model` parameter sweeps.
+:doc:`how_to/exploring` running a model live with sliders,
+:doc:`how_to/studying_a_model` parameter sweeps, and the :doc:`zoo/index`
+published models to rerun and extend.
 
 Scientific background
 ---------------------
@@ -116,4 +117,5 @@ distributed under the BSD 3-clause license.
    how_to/index
    concepts/index
    example_gallery
+   zoo/index
    reference/index

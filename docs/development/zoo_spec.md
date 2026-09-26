@@ -1,7 +1,8 @@
 # Model zoo: published LGCA models you can rerun
 
-Status: draft, 2026-09-26 (roadmap 4.4, first part). The course pack follows
-the zoo and gets its own section once the zoo is built.
+Status: agreed 2026-09-26 (roadmap 4.4, first part); entry 1 built (see
+"Entry 1 as built"). The course pack follows the zoo and gets its own
+section once the zoo is built.
 
 ## Goal
 
@@ -94,11 +95,21 @@ one. Built from `birth_death`, `go_or_rest` and `random_walk`.
 
 ### 2. Genotypic and phenotypic heterogeneity (Syga, Nava-Sedeño, Deutsch 2026, EPJ ST)
 
-Fig 3. The paper is not open to me (Springer asks for a login and there is
-no preprint); the abstract describes a growing population whose inherited,
-mutating genotype sets the proliferation rate, travelling-wave invasion
-with the fastest cells at the leading edge, and a mean-field prediction.
-Needs the PDF to specify.
+Identity-based without volume exclusion (evo-LGCA); the trait is the
+proliferation rate α. Per step: death (δ = 0.01), division with
+α(1 − n/K), every daughter mutates (p_μ = 1) with α′ ~ N(α, σ²), σ² = 10⁻⁴;
+then all cells are redistributed over the channels, velocity channels with
+weight 1 and the rest channel with e^γ, γ set so that D = 0.14. Square
+lattice 500 × 10, reflecting; cells start at the left edge with α₀ = 0.2 at
+density Ψ₀ = 1 − δ/α₀. K and the run length are in the supplement, which we
+do not have; chosen so that the front crosses most of the lattice.
+
+Reproduced: Fig 3: (a) kymograph of the density projected on x, (b) front
+position (first x with density below 0.1 Ψ₀) against the Fisher-KPP
+predictions v = 2√(D(ᾱ − δ)) with ᾱ = α₀, the population mean, and the mean
+of the fastest 10% (best), (c) kymograph of the mean α, (d) mean α over
+time with one standard deviation. Checked: the front accelerates, and the
+mean α is highest at the front.
 
 ### 3. Evolution of phenotypic plasticity (Syga et al. 2024, PLoS Comput Biol 20: e1012003)
 
@@ -146,11 +157,23 @@ the outcome (adaptation or decline) over a grid of (p_d, p_p) with seeds.
 
 ### 7. Discrete excitable media (Syga, Nava-Sedeño, Brusch, Deutsch 2019, in The Frontiers Collection, pp. 253–264)
 
-Fig 2. The chapter is not open to me; the rule exists as
-`excitable_medium` (Barkley-type: activators in velocity channels,
-inhibitors in rest channels, N fast activator reactions per step). Needs
-the chapter or a description of Fig 2 to specify; likely candidates are
-spiral waves from a broken wave front and a travelling pulse.
+Classical, hexagonal lattice, absorbing boundaries; activators X in the 6
+velocity channels, inhibitors Y in a = K − 6 rest channels. Per step:
+R_Y once (birth with P⁺ = ρ_X, death with P⁻ = ρ_Y), R_X N times (birth with
+ρ_X²(1 + (ρ_Y + B)/A), death with ρ_X(ρ_Y + B)/A + ρ_X³), mixing of X over the
+velocity channels, propagation. This is `excitable_medium` (A = alpha,
+B = beta). Mean field: the Barkley model ∂ρ_X = D∇²ρ_X + N f,
+∂ρ_Y = g, f = ρ_X(1 − ρ_X)(ρ_X − (ρ_Y + B)/A), g = ρ_X − ρ_Y, D = 1/4 in lattice
+units.
+
+Reproduced: Fig 2 with A = 0.75, B = 0.02, N = 50, K = 23, starting from
+four quadrants (ρ_X, ρ_Y) = (0, 0), (1, 0), (0, 1), (1, 1): (a) the LGCA
+spiral, red ∝ ρ_X and green ∝ ρ_Y, early and late (break-up into smaller
+spirals); (b) the Barkley model from the same start, solved with two
+`pde` operators and a `@reaction`; (c) the nullclines of f and g with the
+direction of ρ_X; (d) a histogram of the LGCA node states (ρ_X, ρ_Y) after
+a transient with the PDE orbit of one node on top. Things to try: the mean
+return time against A (Fig 3a).
 
 ### 8. Jamming transitions in invasion (Ilina et al. 2020, Nat Cell Biol 22: 1103–1115)
 
@@ -178,8 +201,11 @@ Reproduced: Fig 5d, the four regimes (low and high adhesion β × low and
 high ECM density: flux vectors coloured by the local velocity correlation,
 single cells marked), and a coarse version of the phase diagram Fig 5e
 (β and ρ_ECM on a small log grid; the paper's 51 × 51 grid with
-`full=True`). In higher dimensions: the same model on a cubic lattice (b = 6,
-invasion along z from a sheet), where the paper has no counterpart.
+`full=True`). Beyond the paper (user decision 2026-09-26): invasion in 2D
+from a spheroid, a disc of cells at ρ_0 in the centre of the lattice that
+keeps supplying cells (the influx acts on the disc's nodes, as the
+`spheroid` mask of the original code does), instead of the pseudo-1D sheet
+moving up from one edge.
 
 New pieces written in the module: the four energy terms as
 `@reorientation_term`s (reading the `ecm` field), ECM degradation as a
@@ -193,13 +219,32 @@ rule.
 2. Entry 3, then 8 (the most new pieces), then 4–6, then 2 and 7 once the
    papers are here.
 
-## Open questions
+## Decisions
 
-1. Entry 2 and 7: the PDFs (or which figure panels to reproduce).
-2. Entry 8: the definition and the code agree except for the scale of the
-   adhesion potential: the definition has u = n_nb (1 − n_nb/n_crit)⁺ / (2 n_crit),
-   the code `nbs (1 − nbs/n_crit)⁺ / n_crit · 2`, four times larger (the
-   pressure strength is called γ in the code, β_steric in the definition).
-   Follow the code that made the figure, and note the factor?
-3. Entry 8, "higher dims": a 3D cubic version, as assumed here?
-4. Entries 4–6: the proposed questions and figures.
+Decided 2026-09-26: the entries and figures above; entries 4–6 as
+proposed; entry 8 follows the definition's adhesion potential
+u = n_nb (1 − n_nb/n_crit)⁺ / (2 n_crit) (the original code has four times
+that; noted in the notebook) and adds the 2D spheroid; the papers of
+entries 2 and 7 are in `docs/development/papers/` (ignored by git, not
+distributed).
+
+## Entry 1 as built
+
+- Order R1–R4 as in the paper: `go_or_grow.growth` (death, then division
+  of resting cells into free rest channels), `go_or_rest`, `random_walk`
+  over the velocity channels. The go-or-grow of `get_lgca` switches first.
+- Initial condition: uniform random density ϱ₀ over the whole lattice (the
+  "averaged cell density" of Fig 3). Defaults 50 × 50, 1000 steps;
+  `full=True` 100 × 100, 5000.
+- The movies S1/S2 (κ = 1.1, θ = 0.375) cannot be reproduced: with Eq (1)
+  as printed r_s r_b > r_d at every density, and four runs from the movies'
+  disc on 100 × 100 all grew to the capacity. The notebook says so and uses
+  Fig 3's parameters (κ = 4.4, θ = 0.75) for "same start, two fates".
+- Found: the simulated threshold is ϱ₀ ≈ 0.25 (12 seeds per density: all
+  decline at ≤ 0.24, all grow at ≥ 0.28, bimodal at 0.26: 3 of 12 extinct,
+  9 at capacity 0.86 after 4000 steps), far below the mean-field 0.415.
+  Averaging the per-capita rate over binomially occupied nodes gives 0.240
+  (`per_capita_growth_nodes`): the threshold is set by fluctuations of the
+  node density. The notebook explains this.
+- Runtime of the notebook: about 85 s (a 4000-step sweep of 12 seeds and a
+  1000-step sweep of 8 densities × 12 seeds, both with 4 processes).

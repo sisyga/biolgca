@@ -7,6 +7,15 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- Model zoo (`lgca.zoo`, roadmap 4.4): published LGCA models written with
+  the current rules, each a module with a card (reference, question, result
+  reproduced, fidelity), the paper's parameters with their spec paths,
+  `build_spec(full=False, ...)` and measurements, and a notebook that
+  reproduces a result of the paper. `lgca.zoo.catalogue()`, `load(name)`,
+  `parameter_table(name)`. First entry: the emerging Allee effect of
+  go-or-grow (Böttger et al. 2015): extinction frequency against the
+  initial density, bimodal fates near the threshold, and why the lattice's
+  threshold (0.25) lies far below the mean-field one (0.42).
 - `lgca.explore(spec, controls)` (roadmap item 4.2) runs a model live in a
   Jupyter notebook (JupyterLab, Colab, VS Code): play, pause, step and
   reset buttons, the steps per frame, sliders or dropdowns for the

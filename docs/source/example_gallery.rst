@@ -14,6 +14,9 @@ Each example has its own source file under ``lgca/examples``. The source files
 are useful recipes and regression-tested starting points, but they do not
 replace the explanatory notebooks.
 
+Published models built from these mechanisms, with the results of their
+papers reproduced, are in the :doc:`zoo/index`.
+
 Study one example file
 ----------------------
 

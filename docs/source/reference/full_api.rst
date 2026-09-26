@@ -21,6 +21,7 @@ Core modules for the declarative simulation API:
 - :mod:`lgca.explorer`
 - :mod:`lgca.plotting`
 - :mod:`lgca.examples`
+- :mod:`lgca.zoo`
 
 .. autosummary::
    :toctree: _autosummary
