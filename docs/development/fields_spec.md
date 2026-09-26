@@ -553,6 +553,31 @@ Choices made while implementing, beyond the text above:
   The default steady solver costs about one go-or-grow step and is 6, 15
   and 25 times faster than SuperLU.
 
+## Phase 3 as built (2026-09-26)
+
+- **Hill form** in `lgca.switching`: a `Probability` with `hill=True` keeps
+  a cue's `n` in `kappa` and its `K` in `theta` (as the Boltzmann form keeps
+  `beta` in `kappa`). The response is computed as
+  `log σ(n (log c − log K))`, which is `log(cⁿ / (Kⁿ + cⁿ))` for either sign
+  of `n` and has no overflow; the drive of a Hill probability is the sum of
+  these logarithms, so `nodes`, `cells` and `log_odds` (used by `resting`)
+  work unchanged. `K` is required (no natural default), `n` defaults to 1;
+  `K ≤ 0` and `n = 0` are refused when parsed, and for trait values when
+  evaluated. The keys `K` and `n` are not passed to the cue function, so a
+  registered cue with parameters of these names cannot be used in the Hill
+  form.
+- **`birth_rate`/`death_rate`**: a mapping (or a list per species with at
+  least one mapping) is evaluated per node and species before the step; the
+  classical code paths take per-node probabilities of shape
+  `dims + (n_species,)` where they took one per species. Numbers, lists of
+  numbers and trait names take the old paths, so existing results are
+  unchanged (the suite's regression tests pass). Identity-based models
+  evaluate the probability per cell, so trait-valued `kappa`, `theta`, `K`
+  and `n` work there.
+- **Graph**: `describe_model_graph` adds an edge from every field that a cue
+  nested in an operator's parameters reads (`{"name": "field"|"gradient",
+  "field": ...}`), e.g. `field:oxygen → birth_death`.
+
 ## Later
 
 Systems of fields solved together (implicit coupling of reactions),

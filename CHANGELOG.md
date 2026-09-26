@@ -29,6 +29,17 @@ This file records notable user-facing changes. Changes remain under
   (`lgca.fields.laplacian`). Chemotaxis and the `field` and `gradient` cues
   read the updated field.
 - A number in `StateSpec.fields` is a uniform initial value.
+- The Hill form of switching probabilities, `{"max": 0.1, "hill": [{"name":
+  "field", "field": "oxygen", "K": 0.2, "n": 1}]}`: `max` times a product
+  of saturating responses `cⁿ / (Kⁿ + cⁿ)` to cues (decreasing for negative
+  `n`), wherever the tanh and Boltzmann forms are accepted; `K` and `n` may
+  name traits.
+- `birth_rate` and `death_rate` of `birth_death` accept switching
+  probabilities (tanh, Boltzmann and Hill forms, also one per species), so
+  cells can divide and die in response to fields, the density and other
+  cues. Numbers and trait names mean what they meant.
+- The model graph (`describe_model_graph`) draws the fields that the cues
+  of an operator's probabilities read.
 - New dependencies: `pyamg>=5.1` (not on Python 3.14, which it has no
   wheels for yet; the steady solver then uses SciPy alone) and
   `threadpoolctl>=3.0` (field solvers run with one BLAS thread, 3 to 9

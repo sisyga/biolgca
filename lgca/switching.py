@@ -35,6 +35,20 @@ sum to at most 1. For two states the two forms agree: ``rate = exp(-2 kappa
 theta)`` and ``beta = 2 kappa`` give ``w / (1 + w) = (1 + tanh(kappa (c -
 theta))) / 2``, with ``max`` 1.
 
+The Hill form multiplies saturating responses::
+
+    {"max": 0.1, "hill": [{"name": "field", "field": "oxygen", "K": 0.2, "n": 1}]}
+
+stands for ``p = max * Π_k c_k^n_k / (K_k^n_k + c_k^n_k)``: the cue gives
+half the maximum at ``c = K``, ``n`` sets the steepness (``n = 1``, the
+default, is Michaelis–Menten), and a negative ``n`` gives the decreasing
+response ``K^|n| / (K^|n| + c^|n|)``, e.g. death that rises as a field runs
+out. Several cues multiply, as independent limiting factors. Cue values must
+not be negative; ``K`` must be positive and ``n`` not 0. In a row of
+``phenotype_switch`` rates it is a probability like the tanh form. A
+probability uses one form: ``"cues"`` with ``"max"`` (tanh), ``"cues"`` with
+``"rate"`` (Boltzmann) or ``"hill"``.
+
 The cues are values of the lattice state at every node:
 
 ``"density"``
@@ -57,7 +71,7 @@ name cell traits, so that every cell responds with its own sensitivity, and
 ``{"name": "trait", "trait": "age"}`` is a cue with a value per cell. Cues of
 your own are functions of the lattice state that return a value per node,
 registered with :func:`switch_cue`. In the Boltzmann form ``beta`` may name a
-trait as well.
+trait as well, in the Hill form ``K`` and ``n``.
 """
 
 from __future__ import annotations
@@ -73,6 +87,9 @@ __all__ = ["Probability", "list_switch_cues", "parse_probability", "switch_cue"]
 _CUES: dict[str, Callable] = {}
 LOG_ODDS_LIMIT = 500.0  # log odds of probabilities 0 and 1; exp(-500) is about 7e-218
 _RESPONSE = ("name", "kappa", "theta", "beta", "sensed_species")
+_HILL = ("name", "K", "n", "sensed_species")
+_FORMS = ("a probability uses one form: 'cues' with 'max' (tanh), 'cues' with 'rate' (Boltzmann) or "
+          "'hill'")
 
 
 def switch_cue(function: Callable | None = None, *, name: str | None = None):
@@ -150,12 +167,14 @@ class Probability:
     A number, or ``max`` times the response to cues; or, in the Boltzmann
     form (``rate`` given), the weight ``rate * exp(Σ beta c)`` of switching
     against staying. A cue's ``kappa`` holds its ``beta`` then, and its
-    ``theta`` is 0.
+    ``theta`` is 0. In the Hill form (``hill`` true) a cue's ``kappa`` holds
+    its ``n`` and its ``theta`` its ``K``.
     """
 
     max: float
     cues: tuple[_Cue, ...] = ()
     rate: float | None = None
+    hill: bool = False
 
     @property
     def constant(self) -> bool:
@@ -200,19 +219,36 @@ class Probability:
                 values = _values(state, cue).reshape(-1)[cells.index[which]]
             kappa = cells[cue.kappa][which] if isinstance(cue.kappa, str) else cue.kappa
             theta = cells[cue.theta][which] if isinstance(cue.theta, str) else cue.theta
-            total += np.asarray(kappa, dtype=float) * (values - np.asarray(theta, dtype=float))
+            total += self._response(cue, values, np.asarray(kappa, dtype=float), np.asarray(theta, dtype=float))
         return total
 
     def drive(self, state) -> np.ndarray | float:
-        """``Σ kappa (c - theta)`` (``Σ beta c`` in the Boltzmann form) at every node; 0 without cues."""
+        """``Σ kappa (c - theta)`` at every node; 0 without cues.
+
+        ``Σ beta c`` in the Boltzmann form, and in the Hill form the logarithm
+        of the product of the responses, ``Σ log(c^n / (K^n + c^n))``.
+        """
         if self.constant:
             return 0.0
         total = np.zeros(state.dims)
         for cue in self.cues:
             if isinstance(cue.kappa, str) or isinstance(cue.theta, str) or cue.name == "trait":
                 raise ValueError(f"the cue {cue.name!r} reads cell traits, which only identity-based models have")
-            total += cue.kappa * (_values(state, cue) - cue.theta)
+            total += self._response(cue, _values(state, cue), cue.kappa, cue.theta)
         return total
+
+    def _response(self, cue, values, kappa, theta):
+        """A cue's term of the drive."""
+        if not self.hill:
+            return kappa * (values - theta)
+        # log(c^n / (K^n + c^n)) = log σ(n (log c - log K)), which also holds for n < 0
+        if np.any(values < 0):
+            raise ValueError(f"the cue {cue.name!r} has negative values (down to {np.min(values):g}); the Hill "
+                             f"form needs values >= 0")
+        if np.any(theta <= 0) or np.any(kappa == 0):
+            raise ValueError(f"the cue {cue.name!r} of the Hill form needs K > 0 and n != 0 for every cell")
+        with np.errstate(divide="ignore"):
+            return -np.logaddexp(0.0, -kappa * (np.log(values) - np.log(theta)))
 
     def log_weight(self, state) -> np.ndarray | float:
         """``log rate + Σ beta c`` at every node (Boltzmann form); ``-inf`` where the rate is 0."""
@@ -223,6 +259,9 @@ class Probability:
         with np.errstate(divide="ignore"):
             if self.boltzmann:
                 odds = np.log(self.rate) + drive
+            elif self.hill and not self.constant:  # log p - log(1 - p), p = max exp(drive)
+                log_p = np.log(self.max) + np.asarray(drive, dtype=float)
+                odds = log_p - np.log(-np.expm1(np.minimum(log_p, 0.0)))
             elif self.constant:
                 odds = np.log(self.max) - np.log1p(-self.max)
             elif self.max == 1:  # (1 + tanh(x)) / 2 has the log odds 2 x
@@ -239,6 +278,8 @@ class Probability:
                 return _logistic(np.log(self.rate) + drive)
         if self.constant:  # a number
             return self.max
+        if self.hill:
+            return self.max * np.exp(drive)
         return self.max * (1 + np.tanh(drive)) / 2
 
 
@@ -265,6 +306,8 @@ def parse_probability(spec, where: str = "probability") -> Probability:
     """A probability from a number or ``{"max": ..., "cues": [...]}`` (see the module)."""
     if isinstance(spec, Probability):
         return spec
+    if isinstance(spec, Mapping) and "hill" in spec:
+        return _hill(spec, where)
     if isinstance(spec, Mapping):
         boltzmann = "rate" in spec
         if boltzmann and "max" in spec:
@@ -272,8 +315,7 @@ def parse_probability(spec, where: str = "probability") -> Probability:
                              f"Boltzmann form")
         unknown = set(spec) - {"rate" if boltzmann else "max", "cues"}
         if unknown:
-            raise ValueError(f"{where} has unknown keys {sorted(unknown)}; a probability that responds to "
-                             f"cues has 'max' (or 'rate') and 'cues'")
+            raise ValueError(f"{where} has unknown keys {sorted(unknown)}; {_FORMS}")
         cues = spec.get("cues") or []
         if isinstance(cues, Mapping) or not isinstance(cues, (list, tuple)):
             raise TypeError(f"{where}['cues'] must be a list of cues, e.g. [{{'name': 'density', 'kappa': 5, "
@@ -303,15 +345,49 @@ def _probability(value, where):
     return float(value)
 
 
-def _cue(spec, where, boltzmann=False) -> _Cue:
+def _hill(spec, where) -> Probability:
+    unknown = set(spec) - {"max", "hill"}
+    if unknown:
+        raise ValueError(f"{where} has {sorted(unknown)} next to 'hill'; {_FORMS}")
+    cues = spec["hill"] or []
+    if isinstance(cues, Mapping) or not isinstance(cues, (list, tuple)):
+        raise TypeError(f"{where}['hill'] must be a list of cues, e.g. [{{'name': 'field', 'field': 'oxygen', "
+                        f"'K': 0.2, 'n': 1}}]")
+    cues = tuple(_hill_cue(cue, f"{where}['hill'][{index}]") for index, cue in enumerate(cues))
+    return Probability(_probability(spec.get("max", 1.0), f"{where}['max']"), cues, hill=True)
+
+
+def _hill_cue(spec, where) -> _Cue:
+    name = _cue_name(spec, where, "{'name': 'field', 'field': 'oxygen', 'K': 0.2}")
+    wrong = [key for key in ("kappa", "theta", "beta") if key in spec]
+    if wrong:
+        raise ValueError(f"{where} has {wrong}: the Hill form ('hill') has 'K', the cue value of half the "
+                         f"maximum, and 'n', the steepness")
+    if "K" not in spec:
+        raise ValueError(f"{where} needs 'K', the value of the cue at which the response is half its maximum")
+    K, n = spec["K"], spec.get("n", 1.0)
+    if not isinstance(K, str) and (isinstance(K, bool) or not float(K) > 0 or not np.isfinite(float(K))):
+        raise ValueError(f"{where}['K'] must be a number > 0 or the name of a cell trait, got {K!r}")
+    if not isinstance(n, str) and (isinstance(n, bool) or float(n) == 0 or not np.isfinite(float(n))):
+        raise ValueError(f"{where}['n'] must be a number other than 0 (negative for a decreasing response) or "
+                         f"the name of a cell trait, got {n!r}")
+    return _Cue(name, n if isinstance(n, str) else float(n), K if isinstance(K, str) else float(K),
+                spec.get("sensed_species"), {key: value for key, value in spec.items() if key not in _HILL})
+
+
+def _cue_name(spec, where, example):
     if not isinstance(spec, Mapping) or "name" not in spec:
-        raise TypeError(f"{where} must be a dict with a 'name', e.g. {{'name': 'density', 'kappa': 5, "
-                        f"'theta': 0.5}}")
+        raise TypeError(f"{where} must be a dict with a 'name', e.g. {example}")
     name = spec["name"]
     if name not in _CUES and name != "trait":
         raise ValueError(f"{where}: unknown cue {name!r}; the cues are {', '.join(list_switch_cues())}")
     if name == "trait" and not isinstance(spec.get("trait"), str):
         raise ValueError(f"{where}: the cue 'trait' needs the name of a trait, e.g. {{'trait': 'age'}}")
+    return name
+
+
+def _cue(spec, where, boltzmann=False) -> _Cue:
+    name = _cue_name(spec, where, "{'name': 'density', 'kappa': 5, 'theta': 0.5}")
     used, other = (("beta",), ("kappa", "theta")) if boltzmann else (("kappa", "theta"), ("beta",))
     wrong = [key for key in other if key in spec]
     if wrong:

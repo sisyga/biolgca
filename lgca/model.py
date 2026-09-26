@@ -1053,17 +1053,28 @@ def _operator_graph_info(operator) -> tuple[str, set[str]]:
     else:
         name = str(getattr(operator, "name", "<missing>"))
     parameters = _operator_parameters(operator)
+    _cue_fields(parameters, dependencies)
     if name == "pde":
         production = parameters.get("production")
         if isinstance(production, str):
             dependencies.add(production)
         return name, dependencies
-    if isinstance(operator, Mapping):
-        return name, dependencies
     field = parameters.get("field")
     if field is not None:
         dependencies.add(str(field))
     return name, dependencies
+
+
+def _cue_fields(value, fields: set[str]) -> None:
+    """Add the fields read by the cues (``{"name": "field", "field": ...}``) nested in ``value``."""
+    if isinstance(value, Mapping):
+        if value.get("name") in ("field", "gradient") and isinstance(value.get("field"), str):
+            fields.add(value["field"])
+        for item in value.values():
+            _cue_fields(item, fields)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            _cue_fields(item, fields)
 
 
 def _operator_parameters(operator) -> Mapping[str, Any]:

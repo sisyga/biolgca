@@ -154,6 +154,20 @@ operators, one with only ``death_rate`` and then one with only
 with ``birth_rate`` into free channels, and the capacity becomes a hard limit
 on the cells per node.
 
+Both rates may respond to the cell's surroundings, in any form of a switching
+probability (below): e.g. cells that divide where oxygen is plentiful and die
+where it runs out,
+
+.. code-block:: python
+
+   {"name": "birth_death", "parameters": {
+       "birth_rate": {"max": 0.1, "hill": [{"name": "field", "field": "oxygen", "K": 0.2}]},
+       "death_rate": {"max": 0.05, "hill": [{"name": "field", "field": "oxygen", "K": 0.05, "n": -2}]},
+   }}
+
+or death that rises with crowding, ``{"max": 0.2, "cues": [{"name":
+"density", "kappa": 8.0, "theta": 0.8}]}``. A list gives one rate per species.
+
 In identity-based models the rates can differ between cells: the name of a
 trait, e.g. ``"birth_rate": "r_b"``, gives every cell its own value.
 Daughters inherit all traits of their mother. A mutation is an event: a
@@ -233,6 +247,24 @@ the tanh switch with ``max`` 1. The tanh form describes one switch by its
 threshold and steepness. The Boltzmann form extends it to a choice among
 several states, as the Boltzmann weights of the reorientation extend a
 single cue to several.
+
+The Hill form multiplies saturating responses, the kinetics of receptors and
+enzymes:
+
+.. code-block:: python
+
+   {"max": 0.1, "hill": [{"name": "field", "field": "oxygen", "K": 0.2, "n": 1}]}
+
+is ``p = max * Π_k c_k^n_k / (K_k^n_k + c_k^n_k)``. Cue ``k`` gives half the
+maximum at ``c_k = K_k``, ``n_k`` sets the steepness (``n = 1``, the default,
+is Michaelis–Menten), and a negative ``n`` gives the decreasing response
+``K^|n| / (K^|n| + c^|n|)``, e.g. death under hypoxia. Several cues multiply
+as independent limiting factors, e.g. division that needs both oxygen and a
+growth factor. Unlike the tanh form, the response is 0 (or ``max`` for
+negative ``n``) where the cue is 0, so the cues must not be negative. ``K``
+and ``n`` may name traits. In a row of ``phenotype_switch`` rates it is a
+probability, like the tanh form. A probability uses one form: ``"cues"`` with
+``"max"``, ``"cues"`` with ``"rate"``, or ``"hill"``.
 
 Switching traits
 ----------------

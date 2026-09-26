@@ -275,3 +275,111 @@ def test_boltzmann_rates_are_checked(rates, message):
         return
     with pytest.raises((ValueError, TypeError), match=message):
         model.step()
+
+
+# The Hill form p = max Π c^n / (K^n + c^n), K^|n| / (K^|n| + c^|n|) for n < 0
+
+def _hill(c, K, n):
+    c, K = np.asarray(c, dtype=float), np.asarray(K, dtype=float)
+    return K ** -n / (K ** -n + c ** -n) if n < 0 else c ** n / (K ** n + c ** n)
+
+
+def _field_state(values, **fields):
+    nodes = np.zeros(DIMS + (2, 5), dtype=np.int64)
+    model = _classical(False, [{"name": "random_walk"}], nodes, fields={"u": values, **fields})
+    return LatticeState(model.lgca, capacity=10)
+
+
+@pytest.mark.parametrize("n", [1, 2, 0.5, -1, -3])
+def test_the_hill_form_is_half_its_maximum_at_K_and_saturates(n):
+    values = np.zeros(DIMS)
+    values[:, :30] = np.linspace(0, 1e4, 60)[:, None]
+    values[:, 30] = 0.3  # c = K
+    state = _field_state(values)
+    p = parse_probability({"max": 0.6, "hill": [{"name": "field", "field": "u", "K": 0.3, "n": n}]})
+    probability = p.nodes(state)
+    np.testing.assert_allclose(probability, 0.6 * _hill(values, 0.3, n), rtol=1e-12, atol=1e-300)
+    np.testing.assert_allclose(probability[:, 30], 0.3, rtol=1e-12)
+    assert probability[0, 0] == (0.0 if n > 0 else 0.6)  # c = 0
+    assert probability[-1, 0] == pytest.approx(0.6 if n > 0 else 0.0, abs=1e-4 if abs(n) >= 1 else 5e-3)
+    with np.errstate(divide="ignore"):
+        np.testing.assert_allclose(p.log_odds(state), np.clip(np.log(probability / (1 - probability)), -500, 500),
+                                   rtol=1e-9)
+
+
+def test_hill_responses_multiply():
+    rng = np.random.default_rng(11)
+    u, v = rng.random(DIMS) * 2, rng.random(DIMS) * 3
+    state = _field_state(u, v=v)
+    p = parse_probability({"max": 0.9, "hill": [{"name": "field", "field": "u", "K": 0.5, "n": 2},
+                                                {"name": "field", "field": "v", "K": 1.0, "n": -1}]})
+    np.testing.assert_allclose(p.nodes(state), 0.9 * _hill(u, 0.5, 2) * _hill(v, 1.0, -1), rtol=1e-12)
+    assert p.max == 0.9 and parse_probability({"hill": []}).nodes(state) == 1.0
+
+
+def test_hill_parameters_may_be_traits_of_every_cell():
+    model = build_model(ModelSpec(
+        space=SpaceSpec(geometry="square", dims=DIMS),
+        state=StateSpec(density=1.5, restchannels=1, identity_based=True, volume_exclusion=False, capacity=8,
+                        traits={"K": 0.0, "n": 0.0}, fields={"u": np.random.default_rng(12).random(DIMS)}),
+        time=TimeSpec(steps=1, seed=4),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "random_walk"}], propagation=False)))
+    lgca = model.lgca
+    state = LatticeState(lgca)
+    cells = state.cells
+    rng = np.random.default_rng(13)
+    K, n = rng.uniform(0.1, 1.0, len(cells)), rng.choice([-2.0, 1.0, 3.0], len(cells))
+    lgca.props["K"][cells.label], lgca.props["n"][cells.label] = K, n
+    p = parse_probability({"max": 0.5, "hill": [{"name": "field", "field": "u", "K": "K", "n": "n"}]})
+    c = state.field("u").reshape(-1)[cells.index]
+    expected = np.where(n > 0, c ** n / (K ** n + c ** n), K ** -n / (K ** -n + c ** -n))
+    np.testing.assert_allclose(p.cells(state, np.arange(len(cells))), 0.5 * expected, rtol=1e-12)
+    lgca.props["K"][cells.label[0]] = 0.0
+    with pytest.raises(ValueError, match="K > 0"):
+        p.cells(state, np.arange(len(cells)))
+
+
+@pytest.mark.parametrize("ve", [True, False])
+def test_species_switch_in_the_hill_form(ve):
+    rng = np.random.default_rng(14)
+    nodes = np.zeros(DIMS + (2, 5), dtype=bool if ve else np.int64)
+    nodes[..., 0, :] = rng.random(DIMS + (5,)) < 0.5 if ve else rng.poisson(1.2, DIMS + (5,))
+    rate = {"max": 0.8, "hill": [{"name": "density", "K": 0.3, "n": 2}]}
+    model = _classical(ve, [{"name": "phenotype_switch", "parameters": {"rates": [[0, rate], [0, 0]]}}], nodes)
+    capacity = 5 * 2 if ve else 10
+    cells = nodes[..., 0, :].sum(-1)
+    model.step()
+    switched = model.lgca.nodes[model.lgca.nonborder][..., 1, :].sum(-1)
+    _assert_by_level(cells, cells, switched, lambda n: 0.8 * _hill(n / capacity, 0.3, 2))
+
+
+@pytest.mark.parametrize("probability, message", [
+    ({"hill": [{"name": "field", "field": "u"}]}, "needs 'K'"),
+    ({"hill": [{"name": "field", "field": "u", "K": 0}]}, r"'K'\] must be a number > 0"),
+    ({"hill": [{"name": "field", "field": "u", "K": 1, "n": 0}]}, r"'n'\] must be a number other than 0"),
+    ({"hill": [{"name": "field", "field": "u", "K": 1, "kappa": 2}]}, "the Hill form"),
+    ({"hill": [], "cues": []}, "uses one form"),
+    ({"rate": 1, "hill": []}, "uses one form"),
+    ({"max": 2, "hill": []}, "must be a probability"),
+    ({"hill": {"name": "density", "K": 1}}, "list of cues"),
+    ({"hill": [{"name": "densty", "K": 1}]}, "unknown cue"),
+])
+def test_hill_probabilities_are_checked(probability, message):
+    with pytest.raises((ValueError, TypeError), match=message):
+        parse_probability(probability)
+
+
+def test_the_hill_form_needs_cue_values_that_are_not_negative():
+    values = np.zeros(DIMS)
+    values[3, 4] = -0.5
+    p = parse_probability({"hill": [{"name": "field", "field": "u", "K": 1}]})
+    with pytest.raises(ValueError, match="cue 'field' has negative values"):
+        p.nodes(_field_state(values))
+
+
+def test_hill_and_boltzmann_do_not_mix_in_a_row():
+    nodes = np.zeros(DIMS + (3, 5), dtype=bool)
+    rates = [[0, {"rate": 0.1}, {"max": 0.2, "hill": [{"name": "density", "K": 0.5}]}], [0, 0, 0], [0, 0, 0]]
+    model = _classical(True, [{"name": "phenotype_switch", "parameters": {"rates": rates}}], nodes)
+    with pytest.raises(ValueError, match="mixes the Boltzmann form"):
+        model.step()

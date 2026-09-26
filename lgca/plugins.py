@@ -257,9 +257,10 @@ _PARAMETER_MEANINGS = {
     "r_b": "Probability per time step that a cell divides.",
     "r_d": "Probability per time step that a cell dies.",
     "birth_rate": "Probability per time step that a cell divides into a free channel of its node; "
-                  "one value per species or a single value for all.",
+                  "one value per species or a single value for all, or a probability that responds to "
+                  "cues such as a field (lgca.switching).",
     "death_rate": "Probability per time step that a cell dies; one value per species or a single "
-                  "value for all.",
+                  "value for all, or a probability that responds to cues such as a field (lgca.switching).",
     "beta": "Sensitivity to the directional cue: the weight of its score in the reorientation "
             "probability, P(state) ~ exp(beta * score). 0 gives a random walk.",
     "kappa": _SWITCH,

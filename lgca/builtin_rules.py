@@ -32,6 +32,7 @@ resting cells in rest channels.
 from __future__ import annotations
 
 import functools
+from collections.abc import Mapping
 
 import numpy as np
 
@@ -39,7 +40,7 @@ from .base import channel_sum
 from .lattice_state import _species_indices, channel_mask, random_occupancy
 from .mutations import apply_mutations, parse_mutation
 from .rules import interaction, register_single_cue, reorientation_term
-from .switching import choice_probabilities, parse_probability
+from .switching import Probability, choice_probabilities, parse_probability
 
 __all__ = ["birth_death", "go_or_grow_growth", "go_or_grow_switch", "go_or_rest", "phenotype_switch",
            "random_walk", "tanh_switch", "trait_switch"]
@@ -269,12 +270,17 @@ def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_m
 
     Parameters
     ----------
-    birth_rate : float, sequence or str
+    birth_rate : float, sequence, str or dict
         Probability per time step that a cell tries to divide: one number,
-        one per species, or in identity-based models the name of a cell trait
-        (a value per cell).
-    death_rate : float, sequence or str
-        Probability per time step that a cell dies, given like ``birth_rate``.
+        one per species, in identity-based models the name of a cell trait
+        (a value per cell), or a probability that responds to cues
+        (:mod:`lgca.switching`), e.g. division that needs oxygen,
+        ``{"max": 0.1, "hill": [{"name": "field", "field": "oxygen", "K":
+        0.2}]}``; also one such probability per species.
+    death_rate : float, sequence, str or dict
+        Probability per time step that a cell dies, given like ``birth_rate``;
+        e.g. death under hypoxia, ``{"max": 0.05, "hill": [{"name": "field",
+        "field": "oxygen", "K": 0.05, "n": -2}]}``.
     crowding : bool
         False: cells divide with ``birth_rate`` regardless of crowding;
         daughters take free channels, and ``state.capacity`` is a hard limit
@@ -322,12 +328,13 @@ def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_m
         raise ValueError("mutation and new_family change cell traits and families, which only "
                          "identity-based models have")
     n_species, rng = state.n_species, state.rng
-    death = _per_species(death_rate, "death_rate", n_species)
-    birth = _per_species(birth_rate, "birth_rate", n_species)
+    # one probability per species, or per node and species if a probability responds to cues
+    death = _species_rates(state, death_rate, "death_rate")
+    birth = _species_rates(state, birth_rate, "birth_rate")
     if species is not None:  # the other species neither die nor divide
         still = np.setdiff1d(np.arange(n_species), _species_indices(species, n_species))
         death, birth = death.copy(), birth.copy()  # not the caller's arrays
-        death[still] = birth[still] = 0.0
+        death[..., still] = birth[..., still] = 0.0
     matrix = _mutation_matrix(mutation_matrix, n_species)
     in_set = channel_mask(channels, state.K, state.velocitychannels)
     every = in_set.all()
@@ -344,12 +351,13 @@ def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_m
         # booleans and float32 keep the temporaries small, which is what makes this fast
         occupied = nodes.astype(bool)
         b = np.asarray(birth[..., None], dtype=np.float32)
-        d = np.asarray(death[:, None], dtype=np.float32)
+        d = np.asarray(death[..., None], dtype=np.float32)
         draw = rng.random(nodes.shape, dtype=np.float32)
         dying = occupied & ((draw < b * d) | ((draw >= b) & (draw < b + d * (1 - b))))
         births = (occupied & (draw < b)).view(np.uint8) @ np.ones(state.K, dtype=np.int64)
     else:
-        deaths = _by_species(rng, nodes, death, axis=-2)
+        deaths = (_by_species(rng, nodes, death, axis=-2) if death.ndim == 1
+                  else rng.binomial(nodes, death[..., None]))
         births = _by_species(rng, counts, birth, axis=-1) if birth.ndim == 1 else rng.binomial(counts, birth)
     if matrix is not None:
         births = rng.multinomial(births, matrix).sum(axis=-2)
@@ -374,8 +382,8 @@ def _birth_death_cells(state, birth_rate, death_rate, crowding, mutation, new_fa
     """birth_death for identity-based models: death and division per cell, decided at once."""
     cells, rng = state.cells, state.rng
     in_set = channel_mask(channels, state.K, state.velocitychannels)
-    dying = rng.random(len(cells)) < _per_cell(cells, death_rate, "death_rate")
-    birth = _per_cell(cells, birth_rate, "birth_rate")
+    dying = rng.random(len(cells)) < _cell_rates(state, death_rate, "death_rate")
+    birth = _cell_rates(state, birth_rate, "birth_rate")
     density = state.density
     if crowding and state.has_capacity:
         birth = birth * np.clip(1 - density / state.capacity, 0, 1)[cells.node]
@@ -450,6 +458,31 @@ def _per_species(value, name, n_species, probability=True):
     if probability and np.any((rates < 0) | (rates > 1)):
         raise ValueError(f"{name} must be probabilities, got {value!r}")
     return rates
+
+
+def _species_rates(state, value, name):
+    """Probabilities per species, shape ``(n_species,)``, or ``dims + (n_species,)`` if one responds to cues."""
+    n_species = state.n_species
+    responds = isinstance(value, (Mapping, Probability))
+    entries = [value] * n_species if responds else value
+    if not isinstance(entries, (list, tuple)) or not any(isinstance(entry, (Mapping, Probability))
+                                                         for entry in entries):
+        return _per_species(value, name, n_species)
+    if len(entries) != n_species:
+        raise ValueError(f"{name} must be one probability or one per species ({n_species}), got {value!r}")
+    rates = np.empty(state.dims + (n_species,))
+    for index, entry in enumerate(entries):
+        where = name if responds else f"{name}[{index}]"
+        rates[..., index] = parse_probability(entry, where).nodes(state)
+    return rates
+
+
+def _cell_rates(state, value, name):
+    """A probability per cell: a number, the named trait, or a probability that responds to cues."""
+    cells = state.cells
+    if isinstance(value, (Mapping, Probability)):
+        return np.broadcast_to(parse_probability(value, name).cells(state, np.arange(len(cells))), len(cells))
+    return _per_cell(cells, value, name)
 
 
 def _mutation_matrix(value, n_species):

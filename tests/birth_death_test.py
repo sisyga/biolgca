@@ -339,3 +339,109 @@ def test_a_channel_set_without_volume_exclusion_changes_nothing_else():
     after = model.lgca.nodes[model.lgca.nonborder]
     np.testing.assert_array_equal(after[..., 2:], before[..., 2:])
     assert np.all(after[..., :2] >= before[..., :2]) and after[..., :2].sum() > before[..., :2].sum()
+
+
+# birth_rate and death_rate that respond to cues (lgca.switching)
+
+def _levels_model(family_ve, identity, parameters, n_nodes=20000, levels=5, n_species=1, traits=None):
+    """One cell per node (and species) in channel 0 of a 1D lattice; the field u has ``levels`` values."""
+    K = 3
+    occupied = np.zeros((n_nodes,) + ((n_species,) if n_species > 1 else ()) + (K,), dtype=bool)
+    occupied[..., 0] = True
+    if identity:
+        nodes = _labels(occupied) if family_ve else _lists(occupied.astype(int))
+    else:
+        nodes = occupied if family_ve else occupied.astype(int)
+    level = np.arange(n_nodes) * levels // n_nodes
+    model = build_model(ModelSpec(
+        space=SpaceSpec(geometry="lin", dims=(n_nodes,)),
+        state=StateSpec(nodes=nodes, restchannels=1, volume_exclusion=family_ve, identity_based=identity,
+                        capacity=None if family_ve else 4, n_species=n_species, traits=traits or {},
+                        fields={"u": level / (levels - 1)}),
+        time=TimeSpec(steps=1, seed=21),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "birth_death", "parameters": parameters}],
+                                         propagation=False)))
+    return model, level, (K if family_ve else 4) * (n_species if family_ve and not identity else 1)
+
+
+def _assert_one_cell_per_level(after, level, p_birth, p_death, capacity):
+    """One cell per node: after one step 0, 1 or 2 cells, with the probabilities of the node's level."""
+    for value in np.unique(level):
+        u = value / level.max()
+        q, d = p_birth(u) * (1 - 1 / capacity), p_death(u)
+        expected = np.array([d * (1 - q), (1 - d) * (1 - q) + d * q, (1 - d) * q])
+        at = after[level == value]
+        observed = np.bincount(at, minlength=3)[:3] / at.size
+        np.testing.assert_allclose(observed, expected, atol=4 * np.sqrt(0.25 / at.size), err_msg=str(u))
+
+
+FORMS = {
+    "tanh": ({"max": 0.8, "cues": [{"name": "field", "field": "u", "kappa": 4.0, "theta": 0.5}]},
+             lambda u: 0.8 * (1 + np.tanh(4.0 * (u - 0.5))) / 2),
+    "boltzmann": ({"rate": 0.5, "cues": [{"name": "field", "field": "u", "beta": 2.0}]},
+                  lambda u: 0.5 * np.exp(2 * u) / (1 + 0.5 * np.exp(2 * u))),
+    "hill": ({"max": 0.7, "hill": [{"name": "field", "field": "u", "K": 0.4, "n": 2}]},
+             lambda u: 0.7 * u ** 2 / (0.16 + u ** 2)),
+}
+HYPOXIC_DEATH = ({"max": 0.4, "hill": [{"name": "field", "field": "u", "K": 0.3, "n": -2}]},
+                 lambda u: 0.4 * 0.09 / (0.09 + u ** 2))
+
+
+@pytest.mark.parametrize("form", FORMS)
+@pytest.mark.parametrize("family, ve, identity", FAMILIES)
+def test_birth_and_death_rates_respond_to_cues(family, ve, identity, form):
+    (birth, p_birth), (death, p_death) = FORMS[form], HYPOXIC_DEATH
+    model, level, capacity = _levels_model(ve, identity, {"birth_rate": birth, "death_rate": death})
+    model.step()
+    after = model.lgca.cell_density[model.lgca.nonborder].astype(int)
+    _assert_one_cell_per_level(after, level, p_birth, p_death, capacity)
+
+
+def test_a_rate_that_responds_to_cues_may_read_traits():
+    # every cell divides with its own half-saturation constant
+    model, level, capacity = _levels_model(False, True, {"birth_rate": {"max": 0.9, "hill": [
+        {"name": "field", "field": "u", "K": "K"}]}}, traits={"K": 0.5})
+    model.step()
+    after = model.lgca.cell_density[model.lgca.nonborder].astype(int)
+    _assert_one_cell_per_level(after, level, lambda u: 0.9 * u / (0.5 + u), lambda u: 0.0, capacity)
+
+
+@pytest.mark.parametrize("ve", [True, False])
+def test_species_rates_that_respond_to_cues(ve):
+    # species 0 divides by the Hill form, species 1 at a constant rate and dies where u is low; with
+    # species=[0] species 1 is left alone
+    hill, p_hill = FORMS["hill"]
+    parameters = {"birth_rate": [hill, 0.3], "death_rate": [0.0, HYPOXIC_DEATH[0]]}
+    # with volume exclusion the room is K = 3 channels per species; without, the capacity 4 for the two
+    # cells of the node, which _assert_one_cell_per_level (one cell, 1 - 1/4) gets as a factor on the rate
+    room, capacity = (1.0, 3) if ve else ((1 - 2 / 4) / (1 - 1 / 4), 4)
+    for species in (None, [0]):
+        model, level, _ = _levels_model(ve, False, {**parameters, "species": species}, n_species=2)
+        model.step()
+        after = model.lgca.nodes[model.lgca.nonborder].sum(-1).astype(int)
+        _assert_one_cell_per_level(after[:, 0], level, lambda u: p_hill(u) * room, lambda u: 0.0, capacity)
+        if species is None:
+            _assert_one_cell_per_level(after[:, 1], level, lambda u: 0.3 * room, HYPOXIC_DEATH[1], capacity)
+        else:
+            np.testing.assert_array_equal(after[:, 1], 1)
+
+
+@pytest.mark.parametrize("parameters, identity, message", [
+    ({"birth_rate": {"max": 0.5, "cues": [{"name": "field", "field": "u", "kappa": "k"}]}}, False,
+     "reads cell traits"),
+    ({"birth_rate": [{"max": 0.5, "hill": []}]}, False, r"one per species \(2\)"),
+    ({"death_rate": {"max": 1.5, "hill": []}}, False, "must be a probability"),
+    ({"death_rate": {"hill": [{"name": "field", "field": "u"}]}}, True, "needs 'K'"),
+])
+def test_rates_that_respond_to_cues_are_checked(parameters, identity, message):
+    model, _, _ = _levels_model(True, identity, parameters, n_nodes=100, n_species=1 if identity else 2)
+    with pytest.raises((ValueError, TypeError), match=message):
+        model.step()
+
+
+def test_the_model_graph_shows_the_fields_a_rate_reads():
+    from lgca.model import describe_model_graph
+
+    model, _, _ = _levels_model(True, False, {"birth_rate": FORMS["hill"][0], "death_rate": 0.1}, n_nodes=10)
+    edges = describe_model_graph(model.spec)["edges"]
+    assert {"source": "field:u", "target": "operator:0:birth_death"} in edges
