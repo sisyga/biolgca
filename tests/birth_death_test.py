@@ -398,9 +398,9 @@ def test_birth_and_death_rates_respond_to_cues(family, ve, identity, form):
 
 
 def test_a_rate_that_responds_to_cues_may_read_traits():
-    # every cell divides with its own half-saturation constant
-    model, level, capacity = _levels_model(False, True, {"birth_rate": {"max": 0.9, "hill": [
-        {"name": "field", "field": "u", "K": "K"}]}}, traits={"K": 0.5})
+    # every cell divides with its own maximal rate and half-saturation constant
+    model, level, capacity = _levels_model(False, True, {"birth_rate": {"max": "top", "hill": [
+        {"name": "field", "field": "u", "K": "K"}]}}, traits={"K": 0.5, "top": 0.9})
     model.step()
     after = model.lgca.cell_density[model.lgca.nonborder].astype(int)
     _assert_one_cell_per_level(after, level, lambda u: 0.9 * u / (0.5 + u), lambda u: 0.0, capacity)

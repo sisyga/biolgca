@@ -383,3 +383,45 @@ def test_hill_and_boltzmann_do_not_mix_in_a_row():
     model = _classical(True, [{"name": "phenotype_switch", "parameters": {"rates": rates}}], nodes)
     with pytest.raises(ValueError, match="mixes the Boltzmann form"):
         model.step()
+
+
+@pytest.mark.parametrize("form", ["tanh", "hill", "constant"])
+def test_the_maximum_may_be_a_trait_of_every_cell(form):
+    model = build_model(ModelSpec(
+        space=SpaceSpec(geometry="square", dims=DIMS),
+        state=StateSpec(density=1.5, restchannels=1, identity_based=True, volume_exclusion=False, capacity=8,
+                        traits={"top": 0.0}, fields={"u": np.random.default_rng(15).random(DIMS)}),
+        time=TimeSpec(steps=1, seed=4),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "random_walk"}], propagation=False)))
+    lgca = model.lgca
+    state = LatticeState(lgca)
+    cells = state.cells
+    top = np.random.default_rng(16).random(len(cells))
+    lgca.props["top"][cells.label] = top
+    c = state.field("u").reshape(-1)[cells.index]
+    spec, response = {
+        "tanh": ({"max": "top", "cues": [{"name": "field", "field": "u", "kappa": 3.0, "theta": 0.5}]},
+                 (1 + np.tanh(3.0 * (c - 0.5))) / 2),
+        "hill": ({"max": "top", "hill": [{"name": "field", "field": "u", "K": 0.4}]}, c / (0.4 + c)),
+        "constant": ({"max": "top", "cues": []}, 1.0),
+    }[form]
+    p = parse_probability(spec)
+    everyone = np.arange(len(cells))
+    np.testing.assert_allclose(p.cells(state, everyone), top * response, rtol=1e-12)
+    probability = top * response
+    np.testing.assert_allclose(p.cell_log_odds(state, everyone),
+                               np.clip(np.log(probability / (1 - probability)), -500, 500), rtol=1e-9)
+    assert p.reads_traits
+    with pytest.raises(ValueError, match="names a cell trait"):
+        p.nodes(state)
+    lgca.props["top"][cells.label[0]] = 1.5
+    with pytest.raises(ValueError, match=r"must lie in \[0, 1\]"):
+        p.cells(state, everyone)
+
+
+def test_a_trait_maximum_needs_an_identity_based_model():
+    nodes = np.zeros(DIMS + (2, 5), dtype=bool)
+    model = _classical(True, [{"name": "phenotype_switch", "parameters": {"rates": [[0, {"max": "top"}], [0, 0]]}}],
+                       nodes)
+    with pytest.raises(ValueError, match="names a cell trait"):
+        model.step()

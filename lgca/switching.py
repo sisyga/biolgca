@@ -71,7 +71,8 @@ name cell traits, so that every cell responds with its own sensitivity, and
 ``{"name": "trait", "trait": "age"}`` is a cue with a value per cell. Cues of
 your own are functions of the lattice state that return a value per node,
 registered with :func:`switch_cue`. In the Boltzmann form ``beta`` may name a
-trait as well, in the Hill form ``K`` and ``n``.
+trait as well, in the Hill form ``K`` and ``n``, and in the tanh and Hill forms
+``max``, e.g. a maximal division rate that evolves.
 """
 
 from __future__ import annotations
@@ -171,7 +172,7 @@ class Probability:
     its ``n`` and its ``theta`` its ``K``.
     """
 
-    max: float
+    max: float | str
     cues: tuple[_Cue, ...] = ()
     rate: float | None = None
     hill: bool = False
@@ -186,25 +187,41 @@ class Probability:
 
     @property
     def reads_traits(self) -> bool:
-        """Whether a cue reads cell traits (identity-based models only)."""
-        return any(isinstance(cue.kappa, str) or isinstance(cue.theta, str) or cue.name == "trait"
-                   for cue in self.cues)
+        """Whether ``max`` or a cue reads cell traits (identity-based models only)."""
+        return isinstance(self.max, str) or any(
+            isinstance(cue.kappa, str) or isinstance(cue.theta, str) or cue.name == "trait" for cue in self.cues)
 
     def nodes(self, state) -> np.ndarray | float:
         """The probability at every node, shape ``state.dims`` (a number without cues)."""
-        return self._probability(self.drive(state))
+        return self._probability(self.drive(state), self._node_max())
 
     def cells(self, state, which) -> np.ndarray | float:
         """The probability of the cells at positions ``which`` of ``state.cells``."""
-        return self._probability(self.cell_drive(state, which))
+        return self._probability(self.cell_drive(state, which), self._cell_max(state, which))
 
     def log_odds(self, state) -> np.ndarray | float:
         """``log(p / (1 - p))`` at every node, bounded to ``±LOG_ODDS_LIMIT`` where p is 0 or 1."""
-        return self._log_odds(self.drive(state))
+        return self._log_odds(self.drive(state), self._node_max())
 
     def cell_log_odds(self, state, which) -> np.ndarray | float:
         """``log(p / (1 - p))`` of the cells at positions ``which`` of ``state.cells``."""
-        return self._log_odds(self.cell_drive(state, which))
+        return self._log_odds(self.cell_drive(state, which), self._cell_max(state, which))
+
+    def _node_max(self):
+        if isinstance(self.max, str):
+            # a model mismatch rather than a wrong type, as for the traits of cues
+            raise ValueError(f"the maximal probability {self.max!r} names a cell trait, which only "  # noqa: TRY004
+                             "identity-based models have")
+        return self.max
+
+    def _cell_max(self, state, which):
+        if not isinstance(self.max, str):
+            return self.max
+        values = np.asarray(state.cells[self.max][which], dtype=float)
+        if values.size and not (np.all(values >= 0) and np.all(values <= 1)):
+            raise ValueError(f"the trait {self.max!r} is the maximal probability, so it must lie in [0, 1]; its "
+                             f"values range from {values.min():.3g} to {values.max():.3g}")
+        return values
 
     def cell_drive(self, state, which) -> np.ndarray | float:
         """The drive (see :meth:`drive`) of the cells at positions ``which`` of ``state.cells``."""
@@ -255,32 +272,32 @@ class Probability:
         with np.errstate(divide="ignore"):
             return np.log(self.rate) + self.drive(state)
 
-    def _log_odds(self, drive):
+    def _log_odds(self, drive, maximum):
         with np.errstate(divide="ignore"):
             if self.boltzmann:
                 odds = np.log(self.rate) + drive
             elif self.hill and not self.constant:  # log p - log(1 - p), p = max exp(drive)
-                log_p = np.log(self.max) + np.asarray(drive, dtype=float)
+                log_p = np.log(maximum) + np.asarray(drive, dtype=float)
                 odds = log_p - np.log(-np.expm1(np.minimum(log_p, 0.0)))
             elif self.constant:
-                odds = np.log(self.max) - np.log1p(-self.max)
-            elif self.max == 1:  # (1 + tanh(x)) / 2 has the log odds 2 x
+                odds = np.log(maximum) - np.log1p(-maximum) + np.zeros_like(drive, dtype=float)
+            elif np.ndim(maximum) == 0 and maximum == 1:  # (1 + tanh(x)) / 2 has the log odds 2 x
                 odds = 2 * np.asarray(drive, dtype=float)
             else:  # p = max σ(2 x)
                 log_sigma = -np.logaddexp(0.0, -2 * np.asarray(drive, dtype=float))
-                odds = np.log(self.max) + log_sigma - np.log1p(-self.max * np.exp(log_sigma))
+                odds = np.log(maximum) + log_sigma - np.log1p(-maximum * np.exp(log_sigma))
         odds = np.clip(odds, -LOG_ODDS_LIMIT, LOG_ODDS_LIMIT)
         return float(odds) if np.ndim(odds) == 0 else odds
 
-    def _probability(self, drive):
+    def _probability(self, drive, maximum):
         if self.boltzmann:  # w / (1 + w), computed without overflow
             with np.errstate(divide="ignore"):
                 return _logistic(np.log(self.rate) + drive)
-        if self.constant:  # a number
-            return self.max
+        if self.constant:  # a number, or the trait of every cell
+            return maximum
         if self.hill:
-            return self.max * np.exp(drive)
-        return self.max * (1 + np.tanh(drive)) / 2
+            return maximum * np.exp(drive)
+        return maximum * (1 + np.tanh(drive)) / 2
 
 
 def _logistic(x):
@@ -323,8 +340,13 @@ def parse_probability(spec, where: str = "probability") -> Probability:
         cues = tuple(_cue(cue, f"{where}['cues'][{index}]", boltzmann) for index, cue in enumerate(cues))
         if boltzmann:
             return Probability(1.0, cues, _rate(spec["rate"], f"{where}['rate']"))
-        return Probability(_probability(spec.get("max", 1.0), f"{where}['max']"), cues)
+        return Probability(_maximum(spec.get("max", 1.0), f"{where}['max']"), cues)
     return Probability(_probability(spec, where))
+
+
+def _maximum(value, where):
+    """``max``: a probability, or in identity-based models the name of a trait."""
+    return value if isinstance(value, str) else _probability(value, where)
 
 
 def _rate(value, where):
@@ -354,7 +376,7 @@ def _hill(spec, where) -> Probability:
         raise TypeError(f"{where}['hill'] must be a list of cues, e.g. [{{'name': 'field', 'field': 'oxygen', "
                         f"'K': 0.2, 'n': 1}}]")
     cues = tuple(_hill_cue(cue, f"{where}['hill'][{index}]") for index, cue in enumerate(cues))
-    return Probability(_probability(spec.get("max", 1.0), f"{where}['max']"), cues, hill=True)
+    return Probability(_maximum(spec.get("max", 1.0), f"{where}['max']"), cues, hill=True)
 
 
 def _hill_cue(spec, where) -> _Cue:

@@ -35,7 +35,8 @@ This file records notable user-facing changes. Changes remain under
   "field", "field": "oxygen", "K": 0.2, "n": 1}]}`: `max` times a product
   of saturating responses `cⁿ / (Kⁿ + cⁿ)` to cues (decreasing for negative
   `n`), wherever the tanh and Boltzmann forms are accepted; `K` and `n` may
-  name traits.
+  name traits. In identity-based models `max` may name a trait too, e.g. a
+  maximal division rate that evolves while division responds to a field.
 - `go_or_rest` takes `probability=`, any switching probability, so cells
   can rest in response to a field or any other cue; `kappa` and `theta`
   remain the short form of the density switch.

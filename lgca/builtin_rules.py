@@ -597,6 +597,10 @@ def _switch_row(state, a, row):
         for b, p in zip(boltzmann, choice_probabilities([row[b].log_weight(state) for b in boltzmann])):
             result[b] = p
         return result
+    traits = [b for b in others if isinstance(row[b].max, str)]
+    if traits:
+        raise ValueError(f"rates[{a}]{traits} has a maximal probability that names a cell trait, which only "
+                         "identity-based models have")
     if sum(row[b].max for b in others) > 1 + 1e-12:
         raise ValueError("the switching probabilities of each species must sum to at most 1")
     for b in others:
