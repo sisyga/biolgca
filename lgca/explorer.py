@@ -60,12 +60,14 @@ def explore(spec, controls: Mapping[str, Any] | None = None, *, view: str = "den
         Parameters of the dynamics change the running model; other values build it again.
     view : str, default="density"
         What the lattice panel shows first: ``"density"``, ``"density: species i"`` (several
-        species), ``"flux"`` (square and hexagonal lattices) or the name of a field. A dropdown
-        changes it. 1D lattices show the last ``window`` steps as a kymograph, time running down.
+        species), ``"flux"`` (square and hexagonal lattices), the name of a field, or, in
+        identity-based models, ``"mean <trait>"``, the mean trait of the cells at each node. A
+        dropdown changes it. 1D lattices show the last ``window`` steps as a kymograph, time running down.
     measure : str, list of str, mapping or None, default="population"
         Quantities plotted over time beside the lattice, evaluated after every step:
-        ``"population"``, the name of a field (its mean), or a mapping of labels to functions of the
-        LGCA object that return a number. ``None`` shows the lattice only.
+        ``"population"``, the name of a field (its mean), a trait of an identity-based model (its
+        mean over the cells), or a mapping of labels to functions of the LGCA object that return a
+        number. ``None`` shows the lattice only.
     steps_per_frame : int, default=1
         Model steps between two frames; a slider changes it.
     interval : float, default=0.1
@@ -443,7 +445,7 @@ class Explorer:
 # -------------------------------------------------------------------- panels
 
 class _Lattice:
-    """The density, flux or a field on a square or hexagonal lattice."""
+    """The density, flux, a field or a mean trait on a square or hexagonal lattice."""
 
     def __init__(self, lgca, view, axes, explorer):
         self.view = view
@@ -458,10 +460,12 @@ class _Lattice:
                                                               tight_layout=False, cbarlabel=label)
         elif kind == "flux":
             _, self.artist, self.mappable = lgca.plot_flux(ax=axes, tight_layout=False)
-        else:
-            values = _field(lgca, index)
-            _, self.artist, self.mappable = lgca.plot_scalarfield(values, ax=axes, tight_layout=False,
-                                                                  cbarlabel=index, **_limits(values))
+        else:  # a field, or the mean trait of the cells at each node (clear where there are none)
+            values = _scalar(lgca, kind, index)
+            label, cmap = (index, "cividis") if kind == "field" else (f"mean {index}", "viridis")
+            _, self.artist, self.mappable = lgca.plot_scalarfield(values, ax=axes, tight_layout=False, cmap=cmap,
+                                                                  cbarlabel=label, mask=np.isnan(values),
+                                                                  **_limits(values))
 
     def update(self, explorer):
         """Show the current state; False if the figure must be drawn again."""
@@ -476,7 +480,7 @@ class _Lattice:
         elif kind == "flux":
             self.artist.set(facecolor=_flux_colours(lgca, self.mappable))
         else:
-            values = _field(lgca, index)
+            values = _scalar(lgca, kind, index)
             self.mappable.set_clim(**_limits(values))
             self._show(values)
 
@@ -497,10 +501,10 @@ class _Kymograph:
         self.axes = axes
         self.kind, index = _kind(view, lgca)
         self.history = explorer._histories[view]
-        cmap = {"density": "hot_r", "flux": "RdBu_r"}.get(self.kind, "cividis")
+        cmap = {"density": "hot_r", "flux": "RdBu_r", "trait": "viridis"}.get(self.kind, "cividis")
         self.image = axes.imshow(self.history, aspect="auto", interpolation="nearest", cmap=cmap)
         label = {"density": "Cells $n$" if index is None else f"Cells of species {index}",
-                 "flux": "Flux $j_x$"}.get(self.kind, index)
+                 "flux": "Flux $j_x$", "trait": f"mean {index}"}.get(self.kind, index)
         colorbar = axes.figure.colorbar(self.image, cax=colorbar_axes(axes))
         colorbar.set_label(label)
         axes.set_xlabel("$x$")
@@ -625,11 +629,24 @@ def _measures(measure, spec) -> dict[str, Callable]:
             functions[name] = _total_population
         elif name in fields:
             functions[f"mean {name}"] = lambda lgca, name=name: float(np.mean(_field(lgca, name)))
+        elif spec.state.identity_based:  # a trait; an unknown one fails when the model is built
+            functions[f"mean {name}"] = lambda lgca, name=name: _cells_mean(lgca, name)
         else:
             raise ValueError(f"unknown measure {name!r}; give 'population', a field "
-                             f"({', '.join(map(repr, fields)) or 'the model has none'}) or a mapping of labels to "
-                             "functions of the LGCA object")
+                             f"({', '.join(map(repr, fields)) or 'the model has none'}), a trait of an "
+                             "identity-based model, or a mapping of labels to functions of the LGCA object")
     return functions
+
+
+def _cells_mean(lgca, name):
+    """Mean trait of all cells; NaN without cells."""
+    from .lattice_state import LatticeState
+
+    cells = LatticeState(lgca).cells
+    if name not in cells.traits:
+        raise KeyError(f"the cells have no trait {name!r}; their traits are {list(cells.traits)}")
+    values = np.asarray(cells[name], dtype=float)
+    return float(values.mean()) if len(values) else float("nan")
 
 
 def _views(lgca, spec):
@@ -640,7 +657,12 @@ def _views(lgca, spec):
     if n_species > 1:
         views += [f"density: species {index}" for index in range(n_species)]
     views.append("flux")
-    return views + list(spec.state.fields or {})
+    views += list(spec.state.fields or {})
+    if spec.state.identity_based:  # e.g. "mean kappa": the mean trait of the cells at each node
+        from .lattice_state import LatticeState
+
+        views += [f"mean {name}" for name in LatticeState(lgca).cells.traits if name != "family"]
+    return views
 
 
 def _kind(view, lgca):
@@ -648,6 +670,8 @@ def _kind(view, lgca):
         return view, None
     if view.startswith("density: species "):
         return "density", int(view.rsplit(" ", 1)[1])
+    if view.startswith("mean ") and view[5:] in getattr(lgca, "props", {}):
+        return "trait", view[5:]
     return "field", view
 
 
@@ -658,7 +682,7 @@ def _values(lgca, view):
         return _density(lgca, index)
     if kind == "flux":
         return lgca.calc_flux(lgca._channel_counts(lgca.nodes[lgca.nonborder]).astype(float))[..., 0]
-    return _field(lgca, index)
+    return _scalar(lgca, kind, index)
 
 
 def _density(lgca, species=None):
@@ -685,6 +709,15 @@ def _volume_exclusion(lgca):
     return not isinstance(lgca, NoVE_LGCA_base)
 
 
+def _scalar(lgca, kind, name):
+    """The values of a field, or the mean trait of the cells at each node (NaN where there are none)."""
+    if kind == "trait":
+        from .plot_data import mean_trait
+
+        return mean_trait(lgca, name)
+    return _field(lgca, name)
+
+
 def _field(lgca, name):
     from .plot_data import select_scalar_field
 
@@ -692,6 +725,8 @@ def _field(lgca, name):
 
 
 def _limits(values):
+    if not np.isfinite(values).any():  # e.g. a trait without cells
+        return {"vmin": 0.0, "vmax": 1.0}
     low, high = float(np.nanmin(values)), float(np.nanmax(values))
     if not high > low:
         high = low + (abs(low) or 1.0) * 1e-3

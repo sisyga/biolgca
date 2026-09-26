@@ -248,3 +248,22 @@ distributed).
   node density. The notebook explains this.
 - Runtime of the notebook: about 85 s (a 4000-step sweep of 12 seeds and a
   1000-step sweep of 8 densities × 12 seeds, both with 4 processes).
+
+## Entry 3 as built
+
+- `phenotypic_plasticity`: death (`birth_death`), switch (`go_or_rest`
+  with the trait `kappa` and the neighbourhood density), division
+  (`go_or_grow.growth`, r_b scaled by 1 − n/K without volume exclusion,
+  mutation of κ in every daughter), random walk. `regime(1|2|3)` sets
+  (θ, δ). `geometry="lin"` gives the paper's 1D runs (1001 nodes, K = 100,
+  1000 steps, 3–8 s each), so Fig 3 A–F is reproduced at the paper's size
+  as well; 2D defaults 120 × 120, 200 steps (S1–S3 Figs: 250, 300 with
+  `full=True`).
+- Checked (two seeds, 1D and 2D, also at the small sizes of the tests):
+  regime 1 κ ≈ −0.5 everywhere, 61–69 % migrating; regime 2 mean κ of the
+  inner half of the cells +2.5 (2D) / +5 (1D), of the outermost tenth −2.4
+  / −0.4 to −1.2 (the 1D front is a few dozen nodes of κ ≈ −3 to −7);
+  regime 3 κ < 0 throughout, −2.6 core, −0.9 rim (2D).
+- Needed on the way: `lgca.plot_data.mean_trait` and "mean <trait>" views
+  and trait measures in `lgca.explore`.
+- Notebook runtime about 45 s.

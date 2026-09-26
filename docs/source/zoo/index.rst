@@ -31,6 +31,12 @@ size that runs in about a minute, and states what differs from the paper.
        divide?
      - square, classical with volume exclusion; go-or-grow
      - Böttger et al. 2015
+   * - :doc:`phenotypic_plasticity`
+     - How does the switch between migrating and dividing evolve in a growing
+       tumour, and where do the strategies end up?
+     - hexagonal and 1D, identity-based without volume exclusion; evolving
+       go-or-grow switch
+     - Syga et al. 2024
 
 The single mechanisms behind these models are in the :doc:`../example_gallery`
 and the :doc:`../tutorials/index`.
@@ -40,3 +46,4 @@ and the :doc:`../tutorials/index`.
    :hidden:
 
    allee_effect
+   phenotypic_plasticity

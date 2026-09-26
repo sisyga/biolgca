@@ -140,3 +140,24 @@ def select_scalar_field(lgca, field):
             f"scalar field must have spatial shape {tuple(lgca.dims)}, got {field.shape}"
         )
     return field
+
+
+def mean_trait(lgca, name):
+    """Mean of the cell trait ``name`` at every node of an identity-based model; NaN where no cell is.
+
+    Returns
+    -------
+    numpy.ndarray
+        One value per node, shape ``lgca.dims``.
+    """
+    from .lattice_state import LatticeState
+
+    cells = LatticeState(lgca).cells
+    if name not in cells.traits:
+        raise KeyError(f"the cells have no trait {name!r}; their traits are {list(cells.traits)}")
+    index = np.ravel_multi_index(cells.node, tuple(lgca.dims))
+    size = int(np.prod(lgca.dims))
+    count = np.bincount(index, minlength=size)
+    total = np.bincount(index, weights=np.asarray(cells[name], dtype=float), minlength=size)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return (total / count).reshape(tuple(lgca.dims))

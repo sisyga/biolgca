@@ -337,3 +337,33 @@ def test_the_current_spec_runs_on_its_own(close):
     explorer.set(birth_rate=0.7)
     result = run_model(explorer.spec, showprogress=False)
     assert result.spec.dynamics.operators[0]["parameters"]["birth_rate"] == 0.7
+
+
+@pytest.mark.parametrize("geometry, dims, volume_exclusion", [("hex", (12, 10), False), ("square", (10, 10), True),
+                                                              ("lin", 30, False)])
+def test_identity_based_models_show_the_mean_trait_per_node(geometry, dims, volume_exclusion, close):
+    operators = [{"name": "go_or_grow_kappa", "parameters": {"kappa": 2.0}}]
+    spec = _spec(geometry, dims, operators=operators, identity_based=True, volume_exclusion=volume_exclusion,
+                 restchannels=1, **({} if volume_exclusion else {"capacity": 8}))
+    explorer = explore(spec, view="mean kappa", measure=["population", "kappa"])
+    close(explorer)
+    assert "mean kappa" in explorer._view.options
+    explorer.advance(3)
+    assert explorer.frame().startswith(PNG)
+    from lgca.lattice_state import LatticeState
+    from lgca.plot_data import mean_trait
+
+    cells = LatticeState(explorer.lgca).cells
+    assert explorer._series["mean kappa"][-1] == pytest.approx(np.mean(cells["kappa"]))
+    means = mean_trait(explorer.lgca, "kappa")
+    occupied = explorer.lgca.cell_density[explorer.lgca.nonborder] > 0
+    assert np.isnan(means[~occupied]).all() and np.isfinite(means[occupied]).all()
+    first = tuple(np.argwhere(occupied)[0])
+    here = np.all(np.stack(cells.node, -1) == np.array(first), axis=-1)
+    assert means[first] == pytest.approx(np.mean(cells["kappa"][here]))
+
+
+def test_an_unknown_trait_measure_is_explained():
+    spec = _spec(operators=[{"name": "random_walk"}], identity_based=True)
+    with pytest.raises(KeyError, match="no trait 'speed'"):
+        explore(spec, measure="speed")

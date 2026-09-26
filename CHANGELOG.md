@@ -15,7 +15,13 @@ This file records notable user-facing changes. Changes remain under
   `parameter_table(name)`. First entry: the emerging Allee effect of
   go-or-grow (Böttger et al. 2015): extinction frequency against the
   initial density, bimodal fates near the threshold, and why the lattice's
-  threshold (0.25) lies far below the mean-field one (0.42).
+  threshold (0.25) lies far below the mean-field one (0.42). Second entry:
+  the evolution of phenotypic plasticity (Syga et al. 2024): the three
+  evolutionary regimes of the go-or-grow switch in 2D (S1–S3 Figs) and in
+  1D at the paper's size (Fig 3 A–F).
+- `lgca.explore` shows the mean trait of the cells at each node
+  (`view="mean kappa"`) in identity-based models, and takes a trait as a
+  measure (its mean over the cells).
 - `lgca.explore(spec, controls)` (roadmap item 4.2) runs a model live in a
   Jupyter notebook (JupyterLab, Colab, VS Code): play, pause, step and
   reset buttons, the steps per frame, sliders or dropdowns for the

@@ -95,3 +95,53 @@ def test_allee_parameters_can_be_varied_by_their_paths():
     spec = vary(allee.build_spec(), {allee.PARAMETERS["kappa"].path: -1.0, allee.PARAMETERS["r_b"].path: 0.3})
     assert spec.dynamics.operators[1]["parameters"]["kappa"] == -1.0
     assert spec.dynamics.operators[0]["parameters"]["r_b"] == 0.3
+
+
+# ------------------------------------------------------------------ phenotypic plasticity
+
+from lgca.zoo import phenotypic_plasticity as plasticity
+
+SMALL = {"hex": {"size": 60, "steps": 120}, "lin": {"geometry": "lin", "size": 401, "steps": 400}}
+
+
+def test_plasticity_starts_with_capacity_cells_of_uniform_kappa():
+    for geometry, capacity, channels in (("hex", 50, 7), ("lin", 100, 3)):
+        spec = plasticity.build_spec(geometry=geometry)
+        assert spec.state.capacity == capacity and spec.state.nodes.shape[-1] == channels
+        assert spec.state.nodes.sum() == capacity and spec.state.nodes[..., -1].sum() == capacity  # resting
+        kappa = spec.state.traits["kappa"]
+        assert len(kappa) == capacity and -4 <= kappa.min() and kappa.max() <= 4
+    assert plasticity.build_spec(full=True).space.dims == (250, 250)
+    assert plasticity.build_spec(full=True).time.steps == 300
+    with pytest.raises(ValueError, match="'hex'"):
+        plasticity.build_spec(geometry="square")
+    with pytest.raises(KeyError, match="regimes 1, 2 and 3"):
+        plasticity.regime(4)
+
+
+@pytest.mark.parametrize("geometry", ["hex", "lin"])
+@pytest.mark.parametrize("seed", [3, 4])
+def test_the_three_regimes_of_the_paper(geometry, seed):
+    summary = {number: plasticity.core_and_rim(run_model(plasticity.regime(number, seed=seed, **SMALL[geometry]),
+                                                         showprogress=False).lgca)
+               for number in (1, 2, 3)}
+    # 1: no death; independent cells (κ ≈ 0) and the most migration
+    assert -1.5 < summary[1]["all"] < 0.5
+    assert summary[1]["migrating"] > 0.5 and summary[1]["migrating"] > summary[2]["migrating"]
+    # 2: attractive core (κ > 0), repulsive rim (κ < 0)
+    assert summary[2]["core"] > 0.5 and summary[2]["rim"] < -0.5
+    # 3: repulsive throughout, weaker at the rim
+    assert summary[3]["all"] < -0.5 and summary[3]["core"] < summary[3]["rim"] < 0
+
+
+def test_node_maps_and_profiles_count_the_cells():
+    run = run_model(plasticity.regime(2, size=40, steps=60), showprogress=False)
+    maps = plasticity.node_maps(run.lgca)
+    np.testing.assert_array_equal(maps["cells"], run.lgca.cell_density[run.lgca.nonborder])
+    assert np.isnan(maps["kappa"][maps["cells"] == 0]).all()
+    profile = plasticity.radial_profiles(run.lgca, bins=6)
+    assert profile["r"].shape == (6,) and np.all(np.diff(profile["r"]) > 0)
+    np.testing.assert_allclose(profile["cells"], profile["migrating"] + profile["resting"])
+    record = plasticity.kymographs(plasticity.regime(2, geometry="lin", size=101, steps=30), every=10)
+    assert record["cells"].shape == (4, 101) and list(record["steps"]) == [0, 10, 20, 30]
+    assert record["cells"][0].sum() == 100
