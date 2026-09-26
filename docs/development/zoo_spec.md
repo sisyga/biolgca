@@ -288,3 +288,32 @@ distributed).
 - One run takes about 0.8 s (sheet) and 1.3 s (spheroid, 80 × 80); the
   paper's 51 × 51 × 5 grid (`FULL_GRID`) about three hours on one core. The
   notebook runs a 6 × 6 log grid with two seeds, about 30 s in all.
+
+## Entries 2 and 7 as built
+
+- `evolving_front` (entry 2): `birth_death` with the trait `r_b` as birth
+  rate (scaled by 1 − n/K without volume exclusion) and a normal mutation
+  in every daughter (bounds [0, 1]), then a Boltzmann reorientation with
+  `resting_bias` β = γ = ln(b/4D − b), so a cell moves with probability 4D
+  (D = p_move/4 on the square lattice). K = 100 and 1000 steps chosen (not
+  in the main text). `record()` gives the kymographs, the front and the α
+  statistics; about 25 s.
+- Found: the population mean predicts the front best (rms 5 nodes over
+  1000 steps, K = 100, two seeds; 13 with K = 50), the fastest 10 % overshoot
+  (53, 57; 55), also over the first 500 steps (3–4 against 21–22), and
+  front-region means overshoot as well. The paper reports the fastest 10 %
+  as best. Without mutation the front moves at 0.29 (K = 100) and 0.27
+  (K = 30) against v(α₀) = 0.33: the discreteness of the leading edge
+  (Brunet–Derrida) slows it, so a lower α compensates. Stated in the
+  notebook; flagged to the user.
+- `excitable_media` (entry 7): the built-in `excitable_medium`, absorbing
+  hexagonal lattice, K = 23, four quadrants, 100 × 100 and 600 steps
+  (200 × 200 and 2000 with `full=True`). The mean field in lattice units is
+  ∂ρ_X = D Δρ_X + (N/b) f, ∂ρ_Y = g/a with D = 1/4 (each of the N reactions
+  changes n_X = b ρ_X by f); the chapter's Eq 8 is its rescaled form.
+  Integrated with explicit Euler (20 substeps per step) on the lattice's
+  Laplacian (`lgca.fields.laplacian`, Dirichlet 0), in the module
+  (`barkley`), rather than two `pde` operators: the fast reaction needs
+  small steps. Same wavelength and period as the LGCA at first; the LGCA
+  spiral breaks up later, as in the chapter; the node states follow the
+  mean-field orbit (Fig 2d). About 6 s.

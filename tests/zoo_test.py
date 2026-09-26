@@ -238,3 +238,70 @@ def test_the_spheroid_is_a_disc_that_supplies_cells():
     assert spec.state.nodes.sum() == 3 * source.sum()
     with pytest.raises(ValueError, match="'sheet'"):
         jamming.build_spec(setup="ring")
+
+
+# ------------------------------------------------------------------ evolving front
+
+from lgca.zoo import evolving_front
+
+
+def test_gamma_sets_the_diffusion_coefficient():
+    gamma = evolving_front.gamma_for(0.14)
+    assert 4 / (4 + np.exp(gamma)) == pytest.approx(4 * 0.14)
+    with pytest.raises(ValueError, match="between 0 and 1/4"):
+        evolving_front.gamma_for(0.3)
+    np.testing.assert_allclose(evolving_front.predicted_front([0, 10, 20], 0.2, 5.0),
+                               5.0 + evolving_front.wave_speed(0.2) * np.array([0, 10, 20]))
+
+
+def test_without_mutation_the_front_moves_near_the_fisher_kpp_speed():
+    """Slower by the discreteness of the leading edge: 0.27 instead of 0.33 at K = 30."""
+    record = evolving_front.record(evolving_front.build_spec(p_mu=0.0, length=200, width=4, capacity=30,
+                                                             steps=400, seed=3), every=20)
+    speed = np.polyfit(record["steps"][5:], record["front"][5:], 1)[0]
+    assert 0.7 * evolving_front.wave_speed(0.2) < speed < evolving_front.wave_speed(0.2)
+    assert np.all(record["alpha_mean"] == pytest.approx(0.2))
+
+
+def test_the_fastest_cells_gather_at_the_front():
+    record = evolving_front.record(evolving_front.build_spec(length=200, width=4, capacity=30, steps=400, seed=3),
+                                   every=400)
+    alpha, position = record["alpha"][-1], record["front"][-1]
+    assert np.nanmean(alpha[position - 20:position]) > np.nanmean(alpha[:20]) + 0.1
+    assert record["alpha_mean"][-1] > 0.25 and record["alpha_top"][-1] > record["alpha_mean"][-1]
+
+
+# ------------------------------------------------------------------ excitable media
+
+from lgca.zoo import excitable_media
+
+
+def test_the_reaction_terms_and_their_nullclines():
+    rho = np.linspace(0, 1, 11)
+    f, _ = excitable_media.reaction(rho, 0.75 * rho - 0.02)  # the middle branch of f = 0
+    np.testing.assert_allclose(f, 0, atol=1e-15)
+    np.testing.assert_allclose(excitable_media.reaction(rho, rho)[1], 0)
+    nodes = excitable_media.quadrants(10)
+    x, y = excitable_media.fractions(nodes)
+    assert x[7, 2] == 1 and y[7, 2] == 0 and x[2, 7] == 0 and y[2, 7] == 1 and x[7, 7] == y[7, 7] == 1
+    assert x[2, 2] == y[2, 2] == 0
+
+
+def test_spirals_persist_in_the_lgca_and_its_mean_field():
+    run = run_model(excitable_media.build_spec(size=60, steps=300, record_every=100), showprogress=False)
+    x, y = excitable_media.fractions(np.asarray(run.data["nodes"])[-1])
+    assert 0.1 < x.mean() < 0.6 and 0.1 < y.mean() < 0.6  # still excited after 300 steps
+    x_0, y_0 = excitable_media.fractions(np.asarray(run.data["nodes"])[0])
+    pde = excitable_media.barkley(run.lgca, x_0, y_0, steps=300, record_every=100, probe=(30, 30))
+    assert pde["x"].shape == (4, 60, 60) and pde["probe"].shape == (301, 2)
+    assert 0.1 < pde["x"][-1].mean() < 0.6
+    assert np.ptp(pde["probe"][150:, 0]) > 0.8  # the node goes around the excitation loop
+
+
+def test_mean_return_time_of_a_periodic_node():
+    nodes = np.zeros((20, 2, 23), dtype=bool)
+    for frame in range(20):  # n_X runs through 0, 1, 2, 3 and repeats: period 4
+        nodes[frame, :, :frame % 4] = True
+    assert excitable_media.mean_return_time(nodes) == 4
+    nodes[1:, 1] = True  # a node that never returns to its first state is left out
+    assert excitable_media.mean_return_time(nodes) == 4

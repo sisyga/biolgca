@@ -31,12 +31,24 @@ size that runs in about a minute, and states what differs from the paper.
        divide?
      - square, classical with volume exclusion; go-or-grow
      - Böttger et al. 2015
+   * - :doc:`evolving_front`
+     - How does a population whose proliferation rate evolves invade empty
+       space, and where do the fastest-dividing cells end up?
+     - square strip, identity-based without volume exclusion (evolutionary
+       LGCA); evolving division rate
+     - Syga et al. 2026
    * - :doc:`phenotypic_plasticity`
      - How does the switch between migrating and dividing evolve in a growing
        tumour, and where do the strategies end up?
      - hexagonal and 1D, identity-based without volume exclusion; evolving
        go-or-grow switch
      - Syga et al. 2024
+   * - :doc:`excitable_media`
+     - Do spiral waves survive when an excitable medium consists of a small
+       number of discrete individuals?
+     - hexagonal, two species, classical with volume exclusion; excitable
+       birth and death
+     - Syga et al. 2019
    * - :doc:`jamming`
      - How do cell–cell adhesion and confinement by the matrix decide whether
        cancer cells invade as a jammed sheet, a fluid sheet or single cells?
@@ -52,5 +64,7 @@ and the :doc:`../tutorials/index`.
    :hidden:
 
    allee_effect
+   evolving_front
    phenotypic_plasticity
+   excitable_media
    jamming

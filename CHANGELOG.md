@@ -22,7 +22,11 @@ This file records notable user-facing changes. Changes remain under
   invasion (Ilina et al. 2020): the invasion modes of Fig 5d, a coarse phase
   diagram (Fig 5e) and, beyond the paper, invasion from a spheroid; its
   energy terms, matrix degradation and influx are written with the public
-  decorators in the entry's module.
+  decorators in the entry's module. Further entries: evolution at an
+  invasion front (Syga et al. 2026, the evolutionary LGCA: the front
+  accelerates as the fastest-dividing cells gather at it) and discrete
+  excitable media (Syga et al. 2019: spiral waves in the LGCA and in its
+  mean field, Barkley's model, and their break-up by fluctuations).
 - Rules of the kind `"field"` change fields but no cells, with
   `LatticeState.set_field(name, values)` (also available to other rules),
   e.g. a matrix degraded by the cells.
