@@ -29,6 +29,8 @@ This file records notable user-facing changes. Changes remain under
   (`lgca.fields.laplacian`). Chemotaxis and the `field` and `gradient` cues
   read the updated field.
 - A number in `StateSpec.fields` is a uniform initial value.
+- `lgca.study.vary` and `sweep` change the parameters of a `PDESpec`
+  (e.g. `"decay"` or `"dynamics.operators[pde].parameters.cells[0].uptake"`).
 - The Hill form of switching probabilities, `{"max": 0.1, "hill": [{"name":
   "field", "field": "oxygen", "K": 0.2, "n": 1}]}`: `max` times a product
   of saturating responses `cⁿ / (Kⁿ + cⁿ)` to cues (decreasing for negative

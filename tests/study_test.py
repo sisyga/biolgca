@@ -69,6 +69,20 @@ def test_vary_reaches_terms_and_nested_parameters():
     run_model(variant, showprogress=False)
 
 
+def test_vary_reaches_the_fields_of_a_pde():
+    from lgca.fields import PDESpec
+
+    spec = ModelSpec(
+        space=SpaceSpec(geometry="lin", dims=20), state=StateSpec(density=0.3, restchannels=1, fields={"u": 0.0}),
+        time=TimeSpec(steps=2, seed=1),
+        dynamics=InteractionPipelineSpec(operators=[PDESpec(field="u", diffusion=1.0, cells=[{"uptake": 0.1}])]))
+    variant = vary(spec, {"decay": 0.2, "dynamics.operators[pde].parameters.cells[0].uptake": 0.3,
+                          "dynamics.operators[0].diffusion": 2.0})
+    assert variant.dynamics.operators[0] == PDESpec(field="u", diffusion=2.0, decay=0.2, cells=[{"uptake": 0.3}])
+    assert resolve_path(spec, "decay") == "dynamics.operators[0].parameters.decay"
+    run_model(variant, showprogress=False)
+
+
 def test_short_names_find_the_one_place_with_that_name():
     spec = _growth()
     assert resolve_path(spec, "steps") == "time.steps"

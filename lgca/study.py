@@ -252,6 +252,8 @@ def _set(node, tokens, value, where, parent):
         if "parameters" in names and parent == "entry":
             parameters = dict(node.parameters or {})
             return replace(node, parameters=_set(parameters, tokens, value, f"{where}.parameters", "parameters"))
+        if key == "parameters" and parent == "entry" and rest:  # its parameters are fields, e.g. PDESpec
+            return _set(node, rest, value, where, "entry")
         raise KeyError(_unknown(key, names, where))
     if isinstance(node, Mapping):
         if parent == "entry" and "name" in node and key != "name":
