@@ -44,7 +44,9 @@ tests the installed wheel and CLI, and builds the docs.
 - Model API: `model.py` (`ModelSpec`, `build_model`, `run_model`, model files),
   `pipeline.py` (`InteractionPipelineSpec`, `ReorientationSpec`, the Boltzmann
   sampler, native operators), `simulation.py` (observers and recorders),
-  `initializers.py`, `cli.py`, `schemas/` (JSON schema of model files).
+  `initializers.py`, `cli.py`, `schemas/` (JSON schema of model files),
+  `study.py` (`vary`, `sweep`), `explorer.py` (`lgca.explore`, a model running
+  live in a notebook).
 - Interaction registry: `operator_base.py` (`PluginInfo`, operator base
   classes), `operator_registry.py`, `plugins.py` (registration, parameter
   validation and descriptions, built-in plugin catalogue).

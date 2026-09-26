@@ -1034,6 +1034,21 @@ model with a custom rule reruns from the CLI.
 **4.2 Live exploration**
 - `lgca.explore(spec)` with ipywidgets: sliders for β, density and rates,
   play/pause, flux or density view (optional `widgets` extra).
+- Status (2026-09-26, user decisions): done in `lgca/explorer.py`
+  (`lgca.explore`). Decided: a change of a parameter of the dynamics applies
+  to the running lattice (the pipeline is compiled again for it; a steady
+  field is solved again), other values (density, dims, seed, ...) build the
+  model again; sliders are named by the user with ranges (paths and short
+  names of `vary`), no automatic sliders; frames are PNGs drawn by
+  Matplotlib (Agg) into an `ipywidgets.Image`, not ipympl, so it works in
+  JupyterLab, Colab and VS Code without a new dependency (ipywidgets is
+  already required, so no `widgets` extra); views: density (per species),
+  flux, fields, a 1D kymograph, and a time series panel. Added by me: every
+  change is tried on a copy for one step first (rates are checked only when
+  a model steps), frames run in a background thread and only one explorer
+  plays at a time (a cell run again would otherwise leave a model running).
+  Drawing a frame takes 60-100 ms at 50² to 100² nodes. Checked in a Jupyter
+  kernel (nbclient); not yet checked by hand in Colab or VS Code.
 
 **4.3 Theory next to simulation**
 - `lgca.theory`: mean-field equations and linear stability (dispersion

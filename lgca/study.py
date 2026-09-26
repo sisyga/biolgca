@@ -271,6 +271,56 @@ def _set(node, tokens, value, where, parent):
     raise KeyError(f"{where or 'the model'} has no entries; cannot set {key!r} in {type(node).__name__}")
 
 
+def _get(node, tokens, where="", parent=None):
+    """The value at a path, or the default of a parameter the model leaves out; mirrors :func:`_set`."""
+    if not tokens:
+        return node
+    (kind, key), rest = tokens[0], tokens[1:]
+    if kind == "index":
+        if not isinstance(node, (list, tuple)):
+            raise KeyError(f"{where or 'the model'} is not a list; [{key}] needs a list")
+        entry = parent if parent in ("operators", "terms") else None
+        return _get(node[_select(node, key, where)], rest, f"{where}[{key}]", entry)
+    here = f"{where}.{key}" if where else key
+    if is_dataclass(node) and not isinstance(node, type):
+        names = [f.name for f in fields(node)]
+        if key in names:
+            return _get(getattr(node, key), rest, here, key)
+        if "parameters" in names and parent in ("operators", "terms"):
+            return _parameter(node, node.parameters, tokens, where, parent)
+        if key == "parameters" and parent in ("operators", "terms") and rest:  # e.g. PDESpec
+            return _get(node, rest, where, parent)
+        raise KeyError(_unknown(key, names, where))
+    if isinstance(node, Mapping):
+        if parent in ("operators", "terms") and "name" in node and key != "name":
+            return _parameter(node, node.get("parameters"), rest if key == "parameters" else tokens, where, parent)
+        if key not in node:
+            raise KeyError(_unknown(key, list(node), where))
+        return _get(node[key], rest, here, key)
+    raise KeyError(f"{where or 'the model'} has no entries; cannot read {key!r} in {type(node).__name__}")
+
+
+def _parameter(entry, parameters, tokens, where, parent):
+    parameters = parameters or {}
+    (_, key), rest = tokens[0], tokens[1:]
+    if key in parameters:
+        return _get(parameters[key], rest, f"{where}.parameters.{key}", key)
+    from .pipeline import _REORIENTATION_TERMS, _TERM_ALIASES
+    from .plugins import describe_plugin
+
+    name = _name_of(entry)
+    try:
+        if parent == "terms":
+            specs = _REORIENTATION_TERMS[_TERM_ALIASES.get(name, name)].info.parameter_specs
+        else:
+            specs = describe_plugin(name).parameter_specs
+    except (KeyError, ValueError, TypeError):
+        specs = {}
+    if key not in specs or rest:
+        raise KeyError(_unknown(key, list(parameters) + list(specs), f"{where}.parameters"))
+    return specs[key].default
+
+
 def _select(items, key, where):
     if isinstance(key, int):
         if not -len(items) <= key < len(items):

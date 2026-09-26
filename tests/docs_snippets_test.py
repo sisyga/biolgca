@@ -30,7 +30,7 @@ def clean_registries():
 
 
 @pytest.mark.parametrize("page, blocks", [("how_to/custom_interactions.rst", 5), ("how_to/research_models.rst", 3),
-                                        ("how_to/fields.rst", 6)])
+                                        ("how_to/fields.rst", 6), ("how_to/exploring.rst", 3)])
 def test_page_code_runs(page, blocks, clean_registries):
     matplotlib.use("Agg")
     namespace = {"print": lambda *args, **kwargs: None}

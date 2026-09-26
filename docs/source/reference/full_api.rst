@@ -18,6 +18,7 @@ Core modules for the declarative simulation API:
 - :mod:`lgca.testing`
 - :mod:`lgca.simulation`
 - :mod:`lgca.study`
+- :mod:`lgca.explorer`
 - :mod:`lgca.plotting`
 - :mod:`lgca.examples`
 

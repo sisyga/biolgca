@@ -24,6 +24,7 @@ With BioLGCA you can:
   guidance, aggregation, birth and death, go-or-grow and phenotype switching;
 - write a new interaction as a small Python class and use it like a built-in;
 - track individual cells with heritable traits to study evolution;
+- watch a model run in a notebook while you change its parameters with sliders;
 - run on 1D, square, hexagonal and 3D lattices; and
 - save every model as a JSON file that reruns exactly from its seed.
 
@@ -204,7 +205,7 @@ always work with the current code.
 | [5. Evolutionary LGCA](docs/source/tutorials/05_evolutionary_lgca.ipynb) | track heritable traits across stochastic replicates |
 | [6. Student project](docs/source/tutorials/06_student_project.ipynb) | write, test and share your own interaction |
 | [7. Oxygen-limited growth](docs/source/tutorials/07_oxygen_limited_growth.ipynb) | couple cells to a field they take up; let consumption evolve |
-| [8. Aggregation](docs/source/tutorials/08_aggregation.ipynb) | find the onset of chemotactic aggregation toward a secreted signal |
+| [8. Aggregation](docs/source/tutorials/08_aggregation.ipynb) | find the onset of chemotactic aggregation toward a secreted signal, and watch it live |
 
 The [example gallery](docs/source/example_gallery.rst) collects further
 ready-to-run models, one per question.

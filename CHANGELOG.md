@@ -7,6 +7,20 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- `lgca.explore(spec, controls)` (roadmap item 4.2) runs a model live in a
+  Jupyter notebook (JupyterLab, Colab, VS Code): play, pause, step and
+  reset buttons, the steps per frame, sliders or dropdowns for the
+  parameters you name (paths and short names as in `lgca.study.vary`), a
+  choice of view (density, per species, flux, or a field; a kymograph of
+  the last steps on 1D lattices) and a time series of the population, the
+  mean of a field or your own measures. A change of a parameter of the
+  dynamics applies to the running lattice, which keeps its cells; a change
+  of the lattice, state or seed builds the model again. Every change is
+  tried first on a copy for one step, so an invalid value is explained and
+  the control goes back. `explorer.spec` is the model with the current
+  values. Frames are drawn with Matplotlib into an ipywidgets image, about
+  ten per second; no new dependencies. How-to "Exploring a model live";
+  tutorial 8 explores the onset of aggregation with it.
 - Tutorials 7, oxygen-limited growth (a colony that takes up oxygen
   supplied from the edges grows as a proliferating rim around a hypoxic
   core; an identity-based colony in which division and consumption evolve
