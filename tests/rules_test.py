@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from lgca import interaction
+from lgca.lattice_state import LatticeState
 from lgca.model import (
     Description,
     ModelSpec,
@@ -300,3 +301,71 @@ def test_check_interaction_catches_ghost_nodes_that_leak_into_the_lattice():
     failures = "\n".join(report.failures)
     assert "reflecting: step 1: changes to ghost nodes reach the lattice" in failures
     assert "periodic" not in failures
+
+
+# ------------------------------------------------------------------ rules that change fields
+
+def _field_model(operators, family, boundary="reflecting", fields=None):
+    return build_model(ModelSpec(
+        space=SpaceSpec(geometry="square", dims=(6, 5), boundary=boundary),
+        state=StateSpec(density=1.0, restchannels=1, identity_based=family in ("ib", "nove_ib"),
+                        volume_exclusion=family in ("classical", "ib"),
+                        fields=fields or {"ecm": np.linspace(0.5, 1.5, 30).reshape(6, 5)}),
+        time=TimeSpec(steps=1, seed=2),
+        dynamics=InteractionPipelineSpec(operators=operators, propagation=False)))
+
+
+@pytest.mark.parametrize("family", ["classical", "nove", "ib", "nove_ib"])
+@pytest.mark.parametrize("boundary", ["reflecting", "periodic"])
+def test_a_field_rule_changes_a_field_and_no_cells(family, boundary):
+    @interaction(kind="field", families=("classical", "nove", "ib", "nove_ib"), name="decay_where_cells")
+    def decay_where_cells(state, rate=0.5):
+        state.set_field("ecm", state.field("ecm") * (1 - rate * state.density / state.capacity))
+
+    model = _field_model([{"name": "decay_where_cells", "parameters": {"rate": 0.5}}], family, boundary)
+    lattice = model.lgca
+    before, nodes = np.array(lattice.ecm[lattice.nonborder]), np.array(lattice.nodes, copy=True)
+    capacity = LatticeState(lattice).capacity
+    model.step()
+    density = lattice.cell_density[lattice.nonborder]
+    expected = before * (1 - 0.5 * density / capacity)
+    np.testing.assert_allclose(lattice.ecm[lattice.nonborder], expected)
+    assert np.array_equal(lattice.nodes, nodes) if nodes.dtype != object else True
+    # the ghost nodes take the values at the edge, as when the model is built
+    np.testing.assert_allclose(lattice.ecm[0, 1:-1], lattice.ecm[1, 1:-1])
+    assert describe_plugin("decay_where_cells").operator_kind == "field"
+
+
+def test_a_field_rule_must_not_change_cells():
+    @interaction(kind="field", families="classical", name="sneaky")
+    def sneaky(state):
+        state.remove_cells(1.0)
+
+    model = _field_model([{"name": "sneaky"}], "classical")
+    with pytest.raises(ValueError, match="changes fields only"):
+        model.step()
+
+
+@pytest.mark.parametrize("values, message", [(np.ones((2, 2)), "has shape"), (np.full((6, 5), np.nan), "finite")])
+def test_set_field_checks_the_values(values, message):
+    @interaction(kind="field", families="classical", name="bad_field")
+    def bad_field(state):
+        state.set_field("ecm", values)
+
+    model = _field_model([{"name": "bad_field"}], "classical")
+    with pytest.raises(ValueError, match=message):
+        model.step()
+
+
+def test_a_birth_death_rule_may_also_set_a_field():
+    @interaction(kind="birth_death", families="classical", name="die_and_mark")
+    def die_and_mark(state):
+        state.set_field("ecm", state.field("ecm") + state.density)
+        state.remove_cells(1.0)
+
+    model = _field_model([{"name": "die_and_mark"}], "classical")
+    lattice = model.lgca
+    before = np.array(lattice.ecm[lattice.nonborder]) + lattice.cell_density[lattice.nonborder]
+    model.step()
+    np.testing.assert_allclose(lattice.ecm[lattice.nonborder], before)
+    assert lattice.cell_density.sum() == 0

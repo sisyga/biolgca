@@ -37,6 +37,12 @@ size that runs in about a minute, and states what differs from the paper.
      - hexagonal and 1D, identity-based without volume exclusion; evolving
        go-or-grow switch
      - Syga et al. 2024
+   * - :doc:`jamming`
+     - How do cell–cell adhesion and confinement by the matrix decide whether
+       cancer cells invade as a jammed sheet, a fluid sheet or single cells?
+     - hexagonal, classical with volume exclusion; adhesion, alignment,
+       matrix confinement and degradation
+     - Ilina et al. 2020
 
 The single mechanisms behind these models are in the :doc:`../example_gallery`
 and the :doc:`../tutorials/index`.
@@ -47,3 +53,4 @@ and the :doc:`../tutorials/index`.
 
    allee_effect
    phenotypic_plasticity
+   jamming

@@ -18,7 +18,14 @@ This file records notable user-facing changes. Changes remain under
   threshold (0.25) lies far below the mean-field one (0.42). Second entry:
   the evolution of phenotypic plasticity (Syga et al. 2024): the three
   evolutionary regimes of the go-or-grow switch in 2D (S1–S3 Figs) and in
-  1D at the paper's size (Fig 3 A–F).
+  1D at the paper's size (Fig 3 A–F). Third entry: jamming transitions in
+  invasion (Ilina et al. 2020): the invasion modes of Fig 5d, a coarse phase
+  diagram (Fig 5e) and, beyond the paper, invasion from a spheroid; its
+  energy terms, matrix degradation and influx are written with the public
+  decorators in the entry's module.
+- Rules of the kind `"field"` change fields but no cells, with
+  `LatticeState.set_field(name, values)` (also available to other rules),
+  e.g. a matrix degraded by the cells.
 - `lgca.explore` shows the mean trait of the cells at each node
   (`view="mean kappa"`) in identity-based models, and takes a trait as a
   measure (its mean over the cells).

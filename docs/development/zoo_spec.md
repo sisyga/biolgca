@@ -267,3 +267,24 @@ distributed).
 - Needed on the way: `lgca.plot_data.mean_trait` and "mean <trait>" views
   and trait measures in `lgca.explore`.
 - Notebook runtime about 45 s.
+
+## Entry 8 as built
+
+- `jamming`: influx (`jamming.influx`, birth_death), one Boltzmann
+  reorientation with `jamming.pressure` (flux, β_steric), `jamming.confinement`
+  (rest, the `ecm` field) and `jamming.adhesion` (channels: aggregation and
+  both alignment parts, so that one β scales all of adhesion, as in the
+  paper), then `jamming.degradation` (a rule of the new kind `"field"`); the
+  order of the original code. Neighbour sums see no cells beyond the walls.
+- Needed on the way: rule kind `"field"` and `LatticeState.set_field`
+  (fields keep edge-padded ghosts, as when the model is built).
+- Adhesion potential: the definition's (user decision), with
+  `adhesion_scale=4` for the code's. Measured (sheet, ρ̄_ECM = 0.2, two
+  seeds, single cells over 200 steps / correlation): definition β = 0.2,
+  1, 3, 5, 10: 2847/0.16, 2216/0.18, 1480/0.26, 1262/0.35, 520/0.54; code:
+  2414/0.17, 1432/0.20, 161/0.31, 16/0.36, 1/0.49. The paper's region 2
+  (no release) spans most of 0 ≤ β ≤ 10, as with the code's potential;
+  flagged to the user. The notebook uses β = 10 as strong adhesion.
+- One run takes about 0.8 s (sheet) and 1.3 s (spheroid, 80 × 80); the
+  paper's 51 × 51 × 5 grid (`FULL_GRID`) about three hours on one core. The
+  notebook runs a 6 × 6 log grid with two seeds, about 30 s in all.

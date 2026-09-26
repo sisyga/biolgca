@@ -145,3 +145,96 @@ def test_node_maps_and_profiles_count_the_cells():
     record = plasticity.kymographs(plasticity.regime(2, geometry="lin", size=101, steps=30), every=10)
     assert record["cells"].shape == (4, 101) and list(record["steps"]) == [0, 10, 20, 30]
     assert record["cells"][0].sum() == 100
+
+
+# ------------------------------------------------------------------ jamming
+
+from lgca.lattice_state import LatticeState
+from lgca.zoo import jamming
+
+
+def _random_hex(seed=5, size=8):
+    from lgca import get_lgca
+
+    rng = np.random.default_rng(seed)
+    nodes = rng.random((size, size, jamming.K)) < 0.45
+    return get_lgca(geometry="hex", dims=(size, size), nodes=nodes, restchannels=3, bc="reflecting")
+
+
+def _neighbours(lattice):
+    """For every node, its neighbours and the unit vectors to them, from the coordinates alone."""
+    x, y = lattice.xcoords.ravel(), lattice.ycoords.ravel()
+    distance = np.hypot(x[:, None] - x[None], y[:, None] - y[None])
+    return [(np.flatnonzero(np.isclose(row, 1.0)), x, y) for row in distance]
+
+
+def test_adhesion_and_pressure_follow_the_model_definition():
+    lattice = _random_hex()
+    state = LatticeState(lattice)
+    b, rho_0, K = 6, jamming.RHO_0, jamming.K
+    counts = state.counts[..., 0, :].reshape(-1, K)
+    n = counts.sum(-1).astype(float)
+    c = state.c.T  # (b, 2)
+    flux = counts[:, :b] @ c
+    resting = counts[:, b:].sum(-1)
+    near = _neighbours(lattice)
+    n_nb = np.array([n[index].sum() for index, _, _ in near])
+    n_crit = (b + 1) * rho_0
+    u = n_nb * np.clip(1 - n_nb / n_crit, 0, None) / (2 * n_crit)
+    excess = np.clip(n - rho_0, 0, None) / (K - rho_0)
+    adhesion = jamming.adhesion.function(state).reshape(-1, K)
+    pressure = jamming.pressure.function(state).reshape(-1, 2)
+    for node, (index, x, y) in enumerate(near):
+        directions = np.stack([x[index] - x[node], y[index] - y[node]], -1)
+        gradient_u = directions.T @ u[index]
+        flux_nb = flux[index].sum(0)
+        expected = c @ (gradient_u + flux_nb / (2 * b))
+        np.testing.assert_allclose(adhesion[node, :b], expected, atol=1e-12)
+        np.testing.assert_allclose(adhesion[node, b:], resting[index].sum() / (b * rho_0))
+        np.testing.assert_allclose(pressure[node], -(directions.T @ excess[index]), atol=1e-12)
+
+
+def test_matrix_degradation_and_influx():
+    spec = jamming.build_spec(ecm=2.0, rate=0.5)
+    only = lambda *names: vary(spec, {"dynamics.operators": [op for op in spec.dynamics.operators
+                                                            if isinstance(op, dict) and op["name"] in names],
+                                      "dynamics.propagation": False})
+    model = build_model(only("jamming.degradation"))
+    lattice = model.lgca
+    n = lattice.cell_density[lattice.nonborder].copy()
+    model.step()
+    np.testing.assert_allclose(lattice.ecm[lattice.nonborder], 2.0 * (1 - n / jamming.K))
+    # influx: every free channel of the two lowest rows is filled with probability 0.5
+    model = build_model(only("jamming.influx"))
+    lattice = model.lgca
+    before = lattice.cell_density[lattice.nonborder].copy()
+    free = (jamming.K - before[:, :2]).sum()
+    model.step()
+    after = lattice.cell_density[lattice.nonborder]
+    np.testing.assert_array_equal(after[:, 2:], before[:, 2:])
+    added = (after - before).sum()
+    assert abs(added - 0.5 * free) < 4 * np.sqrt(free * 0.25)
+
+
+def test_the_invasion_modes():
+    """Weak adhesion and a sparse matrix release single cells; a dense matrix or strong adhesion stops
+    it; only adhesion correlates the movement of neighbours (Fig 5d, e)."""
+    def mode(beta, ecm):
+        runs = [jamming.invasion_mode(run_model(jamming.build_spec(beta=beta, ecm=ecm, seed=seed),
+                                                showprogress=False)) for seed in (1, 2)]
+        return {key: np.mean([run[key] for run in runs]) for key in runs[0]}
+
+    free, confined, adhesive = mode(0.2, 0.2), mode(0.2, 5.0), mode(10.0, 0.2)
+    assert free["single_cells"] > 4 * confined["single_cells"]
+    assert free["single_cells"] > 4 * adhesive["single_cells"]
+    assert adhesive["correlation"] > free["correlation"] + 0.2
+    assert abs(confined["correlation"] - free["correlation"]) < 0.1
+
+
+def test_the_spheroid_is_a_disc_that_supplies_cells():
+    spec = jamming.build_spec(setup="spheroid", radius=5)
+    source = spec.state.fields["source"]
+    assert spec.space.dims == (80, 80) and 70 < source.sum() < 100  # about π 5² nodes
+    assert spec.state.nodes.sum() == 3 * source.sum()
+    with pytest.raises(ValueError, match="'sheet'"):
+        jamming.build_spec(setup="ring")

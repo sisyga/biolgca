@@ -30,7 +30,7 @@ from ._card import Parameter, ZooEntry
 
 __all__ = ["ENTRIES", "Parameter", "ZooEntry", "catalogue", "load", "parameter_table"]
 
-ENTRIES = ("allee_effect", "phenotypic_plasticity")
+ENTRIES = ("allee_effect", "phenotypic_plasticity", "jamming")
 
 
 def load(name: str) -> ModuleType:

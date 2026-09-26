@@ -36,7 +36,7 @@ from .plugins import _law_for_kind, register_plugin, validate_plugin_parameters
 __all__ = ["CellWeights", "Interaction", "ReorientationCue", "Stack", "interaction", "register_single_cue",
            "reorientation_term", "stack"]
 
-KINDS = ("birth_death", "phenotype_switch", "reorientation")
+KINDS = ("birth_death", "phenotype_switch", "reorientation", "field")
 FAMILIES = {"classical": "with volume exclusion", "nove": "without volume exclusion",
             "ib": "identity-based with volume exclusion", "nove_ib": "identity-based without volume exclusion"}
 GEOMETRIES = ("lin", "square", "hex", "cubic", "moore")
@@ -60,10 +60,12 @@ def interaction(
 
     Parameters
     ----------
-    kind : {"birth_death", "phenotype_switch", "reorientation"}
+    kind : {"birth_death", "phenotype_switch", "reorientation", "field"}
         What the rule does. A reorientation must keep the number of cells of
         each species at every node, a phenotype switch the number of cells at
-        every node; both are checked after every call.
+        every node, and a field rule changes fields only
+        (:meth:`~lgca.lattice_state.LatticeState.set_field`), no cells; these
+        are checked after every call.
     families : str or sequence of str
         Model families the rule is written for: ``"classical"`` (with volume
         exclusion, at most one cell per channel and species), ``"nove"``

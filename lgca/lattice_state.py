@@ -25,7 +25,7 @@ import numpy as np
 
 __all__ = ["LatticeState"]
 
-_KINDS = (None, "birth_death", "phenotype_switch", "reorientation")
+_KINDS = (None, "birth_death", "phenotype_switch", "reorientation", "field")
 
 
 class LatticeState:
@@ -79,6 +79,7 @@ class LatticeState:
         self._lgca = lgca
         self._kind = kind
         self.fields_read: set[str] = set()  # names passed to field() or gradient(), for dependencies
+        self._fields_written: dict[str, np.ndarray] = {}  # set_field(), written by commit()
         self._step = int(step)
         self._dims = tuple(int(size) for size in lgca.dims)
         # lgca.nonborder as slices: the interior as a view, without copying through index arrays
@@ -114,6 +115,7 @@ class LatticeState:
                          else self.species_density if kind == "reorientation" else None)
         self._initial_cells = (None if self._cells is None or kind not in ("reorientation", "phenotype_switch")
                                else (self._cells.index.copy(), self._cells.label.copy()))
+        self._initial_counts = self._counts.copy() if kind == "field" else None
 
     def __repr__(self) -> str:
         exclusion = "with" if self._ve else "without"
@@ -258,6 +260,31 @@ class LatticeState:
         values = values.view()
         values.flags.writeable = False
         return values
+
+    def set_field(self, name: str, values) -> None:
+        """Replace the values of the field ``name`` at every node; written into the model by :meth:`commit`.
+
+        ``values`` has the shape of :meth:`field`, ``dims + (...)``. Beyond the lattice edge the
+        field takes the values at the edge, as when the model is built; a ``pde`` operator sets its
+        own boundary values when it runs next. Rules that change fields but no cells have the kind
+        ``"field"``, e.g. a matrix degraded by the cells::
+
+            @interaction(kind="field", families="classical")
+            def degradation(state, rate=0.1):
+                state.set_field("ecm", state.field("ecm") * (1 - rate * state.density / state.capacity))
+        """
+        current = self.field(name)
+        values = np.asarray(values, dtype=float)
+        if values.shape != current.shape:
+            raise ValueError(f"field {name!r} has shape {current.shape}; set_field got {values.shape}")
+        if not np.all(np.isfinite(values)):
+            raise ValueError(f"the new values of field {name!r} must be finite")
+        self._fields_written[name] = values.copy()
+
+    @property
+    def fields_written(self) -> tuple[str, ...]:
+        """Names of the fields changed with :meth:`set_field`."""
+        return tuple(self._fields_written)
 
     def _padded_field(self, name):
         """The field as the model stores it, with ghost nodes, or padded like cells."""
@@ -498,6 +525,9 @@ class LatticeState:
         elif self._kind == "phenotype_switch":
             changed = self.density != self._initial
             what = "the number of cells"
+        elif self._kind == "field":
+            changed = np.any(self._counts != self._initial_counts, axis=(-2, -1))
+            what = "its cells (it changes fields only)"
         else:
             changed = None
         if changed is not None and np.any(changed):
@@ -520,6 +550,13 @@ class LatticeState:
             interior = self._counts if self._has_species_axis else self._counts[..., 0, :]
             lgca.nodes[self._interior] = interior
         lgca.update_dynamic_fields()
+        for name, values in self._fields_written.items():
+            stored = np.asarray(getattr(lgca, name))
+            if stored.shape[:len(self._dims)] == self._dims:
+                setattr(lgca, name, values)
+            else:  # stored with ghost nodes, which take the edge values
+                width = [(int(lgca.r_int),) * 2] * len(self._dims) + [(0, 0)] * (values.ndim - len(self._dims))
+                setattr(lgca, name, np.pad(values, width, mode="edge"))
 
     # --------------------------------------------------------------- helpers
 
