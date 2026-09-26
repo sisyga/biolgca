@@ -604,3 +604,175 @@ def test_field_plots():
     plt.close("all")
     del animation, dispatched
     gc.collect()
+
+
+# ------------------------------------------------------------------ advection
+
+def _inner(lgca):
+    """Nodes whose neighbours are all inside the lattice."""
+    inner = np.ones(lgca.dims, dtype=bool)
+    for axis in range(len(lgca.dims)):
+        index = [slice(None)] * len(lgca.dims)
+        for edge in (0, -1):
+            index[axis] = edge
+            inner[tuple(index)] = False
+    return inner
+
+
+def _advection_matrix(lgca, velocity, boundary=None):
+    from lgca.fields import _assemble_advection, _parse_boundary
+
+    velocity = np.broadcast_to(velocity, tuple(lgca.dims) + (len(lgca.dims),)).reshape(-1, len(lgca.dims))
+    return _assemble_advection(lgca, _parse_boundary(boundary, lgca), velocity)
+
+
+@pytest.mark.parametrize("geometry", GEOMETRIES)
+def test_upwind_advection_is_exact_for_linear_profiles(geometry):
+    # -div(v c) = -v·a for c = a·x and a constant v; this also checks that the channels pair with lgca.c
+    lgca = get_lgca(geometry=geometry, dims=GEOMETRIES[geometry], bc="reflecting", density=0,
+                    interaction="only_propagation")
+    rng = np.random.default_rng(5)
+    d = len(lgca.dims)
+    for _ in range(3):
+        a, v = rng.normal(size=d), rng.normal(size=d)
+        profile = sum(a_k * x_k for a_k, x_k in zip(a, _coordinates(lgca)))
+        M, _ = _advection_matrix(lgca, v)
+        result = (M @ profile.ravel()).reshape(lgca.dims)
+        np.testing.assert_allclose(result[_inner(lgca)], -v @ a, rtol=1e-10)
+
+
+@pytest.mark.parametrize("geometry", GEOMETRIES)
+@pytest.mark.parametrize("boundary", ["periodic", "reflecting"])
+def test_upwind_advection_conserves_and_is_an_m_matrix(geometry, boundary):
+    lgca = get_lgca(geometry=geometry, dims=GEOMETRIES[geometry], bc=boundary, density=0,
+                    interaction="only_propagation")
+    velocity = np.random.default_rng(6).normal(size=tuple(lgca.dims) + (len(lgca.dims),))
+    M, source = _advection_matrix(lgca, velocity)
+    np.testing.assert_allclose(np.asarray(M.sum(axis=0)).ravel(), 0, atol=1e-12)
+    off_diagonal = M - sp.diags(M.diagonal())
+    assert off_diagonal.min() >= 0 and M.diagonal().max() <= 0 and not source.any()
+
+
+def test_fixed_values_flow_in_and_the_field_flows_out():
+    lgca = get_lgca(geometry="lin", dims=4, bc="reflecting", density=0, interaction="only_propagation")
+    M, source = _advection_matrix(lgca, [0.5], {"x-": {"value": 2.0}, "x+": {"value": 0.0}})
+    np.testing.assert_allclose(M.toarray(), [[-0.5, 0, 0, 0], [0.5, -0.5, 0, 0], [0, 0.5, -0.5, 0],
+                                             [0, 0, 0.5, -0.5]])
+    np.testing.assert_allclose(source, [1.0, 0, 0, 0])
+
+
+@pytest.mark.parametrize("geometry, dims", [("lin", (240,)), ("square", (240, 3))])
+def test_an_advected_pulse_moves_at_v_and_spreads_with_D_plus_half_v(geometry, dims):
+    # first-order upwinding adds a diffusion of |v| / 2: the variance grows by (2 D + v) per step
+    D, v, steps = 0.5, 0.8, 40
+    x = np.arange(dims[0], dtype=float)
+    pulse = np.exp(-(x - 60) ** 2 / 50)
+    initial = pulse if geometry == "lin" else np.repeat(pulse[:, None], dims[1], axis=1)
+    velocity = [v] if geometry == "lin" else [v, 0.0]
+    compiled = _build([PDESpec(field="u", diffusion=D, advection=velocity, solver="explicit",
+                               solver_options={"rtol": 1e-9, "atol": 1e-12})],
+                      geometry=geometry, dims=dims if geometry != "lin" else dims[0], fields={"u": initial})
+
+    def moments(c):
+        profile = c if c.ndim == 1 else c[:, 0]
+        mass = profile.sum()
+        mean = (x * profile).sum() / mass
+        return mass, mean, ((x - mean) ** 2 * profile).sum() / mass
+
+    mass, mean, variance = moments(initial)
+    for _ in range(steps):
+        compiled.step()
+    new_mass, new_mean, new_variance = moments(_field(compiled))
+    assert new_mass == pytest.approx(mass, rel=1e-9)
+    assert new_mean - mean == pytest.approx(v * steps, rel=1e-6)
+    assert new_variance - variance == pytest.approx((2 * D + v) * steps, rel=1e-5)
+
+
+def _advection_residual(compiled, diffusion, decay, velocity, uptake):
+    lgca = compiled.lgca
+    c = _field(compiled).ravel()
+    pde = next(operator for operator in compiled.pipeline.operators if operator.name == "pde")
+    A, source = laplacian(lgca, pde.boundary)
+    M, inflow = _advection_matrix(lgca, velocity, pde.boundary)
+    n = _counts(compiled).sum(axis=(-2, -1)).ravel()
+    return diffusion * (A @ c + source) + M @ c + inflow - decay * c - uptake * n * c
+
+
+@pytest.mark.parametrize("backend", ["auto", "direct", "cg", "amg"])
+@pytest.mark.parametrize("solver", ["steady", "implicit"])
+def test_advection_with_every_backend(backend, solver):
+    # supply from the left, carried to the right past a disc of cells that takes it up
+    boundary = {"x-": {"value": 1.0}, "x+": {"value": 0.0}, "default": "no_flux"}
+    compiled = _build([PDESpec(field="u", diffusion=1.0, decay=0.01, advection=[0.6, 0.2],
+                               cells=[{"uptake": 0.3}], boundary=boundary, solver=solver,
+                               solver_options={"backend": backend, "rtol": 1e-10})],
+                      dims=(30, 30), nodes=_disc(30), restchannels=1)
+    if solver == "implicit":  # 400 steps reach the steady state
+        for _ in range(400):
+            compiled.step()
+    residual = _advection_residual(compiled, 1.0, 0.01, [0.6, 0.2], 0.3)
+    assert np.abs(residual).max() < (1e-7 if solver == "steady" else 1e-6)
+    c = _field(compiled)
+    assert c.min() >= 0 and c[25, 15] < c[5, 15]
+    statistics = compiled.metadata["fields"]["u"]
+    assert statistics["backend"] == ({"auto": "amg" if solver == "steady" else "cg"}.get(backend, backend))
+
+
+def test_saturating_uptake_with_advection():
+    boundary = {"x-": {"value": 1.0}, "default": "no_flux"}
+    fields = []
+    for backend in ("direct", "amg"):
+        compiled = _build([PDESpec(field="u", diffusion=1.0, advection=[0.5, 0.0], boundary=boundary,
+                                   cells=[{"uptake": 0.3, "saturation": 0.2}], solver="steady",
+                                   solver_options={"backend": backend, "rtol": 1e-10, "max_iterations": 60})],
+                          dims=(30, 30), nodes=_disc(30), restchannels=1)
+        fields.append(_field(compiled))
+    np.testing.assert_allclose(fields[1], fields[0], rtol=1e-7, atol=1e-10)
+
+
+def test_a_velocity_field_is_read_at_every_step():
+    size = 16
+    y = np.arange(size)
+    shear = np.zeros((size, size, 2))
+    shear[..., 0] = np.sin(2 * np.pi * y / size)[None, :]  # flow along x that changes sign across y
+    initial = np.random.default_rng(8).random((size, size))
+    compiled = _build([PDESpec(field="u", diffusion=0.2, advection="flow")], dims=(size, size),
+                      boundary="periodic", fields={"u": initial, "flow": shear})
+    for _ in range(5):
+        compiled.step()
+    c = _field(compiled).copy()
+    assert c.sum() == pytest.approx(initial.sum(), rel=1e-6)
+    assert "flow" in compiled.pipeline.operators[0].dependencies()
+    compiled.lgca.flow[...] = 0.0  # the flow stops: pure diffusion from now on
+    compiled.step()
+    still = _build([PDESpec(field="u", diffusion=0.2)], dims=(size, size), boundary="periodic", fields={"u": c})
+    still.step()
+    np.testing.assert_allclose(_field(compiled), _field(still), rtol=1e-6, atol=1e-10)
+
+
+@pytest.mark.parametrize("advection, fields, message", [
+    ([1.0], {}, "one component per dimension"),
+    ({"x": 1.0}, {}, "velocity vector"),
+    ([1.0, np.inf], {}, "finite"),
+    ([1.0, "fast"], {}, "vector of numbers"),
+    ("flow", {}, "not in StateSpec.fields"),
+    ("flow", {"flow": 1.0}, "a velocity per node"),
+    ("flow", {"flow": np.full((10, 8, 2), np.nan)}, "must be finite"),
+])
+def test_invalid_advection_is_explained(advection, fields, message):
+    with pytest.raises((ValueError, TypeError), match=message):
+        _build([PDESpec(field="u", diffusion=1.0, advection=advection)], fields={"u": 0.0, **fields})
+
+
+def test_advection_in_a_model_file(tmp_path):
+    spec = _secretion_model()
+    operators = list(spec.dynamics.operators)
+    operators[0] = PDESpec(field="signal", diffusion=1.0, decay=0.1, advection=(0.3, 0), cells=[{"production": 0.2}])
+    spec = ModelSpec(space=spec.space, state=spec.state, time=spec.time,
+                     dynamics=InteractionPipelineSpec(operators=operators), analysis=spec.analysis)
+    path = save_model_spec(spec, tmp_path / "model.json")
+    data = json.loads(path.read_text())
+    jsonschema.Draft202012Validator(load_model_spec_schema()).validate(data)
+    assert data["model"]["dynamics"]["operators"][0]["parameters"]["advection"] == [0.3, 0]
+    np.testing.assert_array_equal(run_model(load_model_spec(path), showprogress=False).data["signal"],
+                                  run_model(spec, showprogress=False).data["signal"])

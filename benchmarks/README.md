@@ -28,7 +28,8 @@ aggregation terms plus sparse density recording every two steps. Its
 unrecorded dynamics baselines.
 
 `fields.py` times the field solvers of `lgca.fields` (steady with multigrid,
-Jacobi CG and SuperLU, saturating uptake, implicit) against one go-or-grow
+Jacobi CG and SuperLU, saturating uptake, implicit, with and without
+advection) against one go-or-grow
 step on 100², 200² and 400² lattices, each measurement in a fresh process:
 
 ```bash

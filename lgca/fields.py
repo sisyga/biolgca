@@ -6,17 +6,19 @@ the concentration of oxygen or of a chemoattractant. The pipeline operator
 
 .. math::
 
-    \\partial_t c = D \\Delta c + P(x) - L(x)\\, c,
+    \\partial_t c = D \\Delta c - \\nabla \\cdot (v c) + P(x) - L(x)\\, c,
 
-where ``D`` is the diffusion coefficient, ``P`` the production per node and
-step (a constant, a map, and secretion by cells) and ``L`` the loss rate
-(decay and uptake by cells). Parameters are in lattice units per LGCA step:
-``D`` in nodes² per step, rates per step.
+where ``D`` is the diffusion coefficient, ``v`` the advection velocity, ``P``
+the production per node and step (a constant, a map, and secretion by cells)
+and ``L`` the loss rate (decay and uptake by cells). Parameters are in lattice
+units per LGCA step: ``D`` in nodes² per step, ``v`` in nodes per step, rates
+per step.
 
 The Laplacian uses the neighbourhood of the cells,
 ``Δc(x) ≈ w Σ_i (c(x + c_i) − c(x))`` over the velocity channels ``c_i`` with
 ``w = 2d / Σ_i |c_i|²``, exact for quadratic functions on every lattice. It is
-assembled once per model as a sparse matrix.
+assembled once per model as a sparse matrix. Advection is upwinded along the
+same channels.
 
 The field keeps its place as an attribute of the model, with ghost nodes filled
 according to its boundary condition after every update, so the cues that read
@@ -99,6 +101,14 @@ class PDESpec:
         and ``"channels"`` (``"all"``, ``"rest"`` or ``"velocity"``). In
         identity-based models ``r`` may name a cell trait, so every cell
         secretes or consumes at its own rate.
+    advection : sequence of float or str, optional
+        Velocity ``v`` of the term ``-∇·(v c)`` in nodes per step: a vector
+        with one component per dimension (Cartesian, also on hexagonal
+        lattices), or the name of a field of ``StateSpec.fields`` of shape
+        ``dims + (d,)``, a velocity per node (read at every step). Upwinding
+        keeps ``c ≥ 0`` and conserves the total, and adds a numerical
+        diffusion of about ``|v| / 2``; the result is accurate where
+        ``D`` is large against it.
     boundary : str or mapping, optional
         ``"periodic"`` (the default, and the only choice, on periodic
         lattices), ``"no_flux"`` (the default otherwise), ``{"value": c_b}``
@@ -130,7 +140,10 @@ class PDESpec:
     preconditioned by an algebraic multigrid hierarchy (pyamg) that is
     rebuilt only when the number of iterations has doubled; without pyamg
     (Python 3.14) it factors lattices of up to 20 000 nodes and uses the
-    Jacobi preconditioner above.
+    Jacobi preconditioner above. With advection the matrix is not symmetric:
+    BiCGSTAB replaces conjugate gradients, and the multigrid hierarchy is
+    pyamg's approximate ideal restriction (AIR) instead of smoothed
+    aggregation.
 
     Examples
     --------
@@ -145,6 +158,7 @@ class PDESpec:
     decay: float = 0.0
     production: float | str = 0.0
     cells: Sequence[Mapping[str, Any]] = ()
+    advection: Sequence[float] | str | None = None
     boundary: str | Mapping[str, Any] | None = None
     solver: str = "implicit"
     solver_options: Mapping[str, Any] = dataclasses.field(default_factory=dict)
@@ -153,13 +167,16 @@ class PDESpec:
     def parameters(self) -> dict[str, Any]:
         """The parameters of the ``pde`` operator; defaults are left out."""
         parameters = {"field": self.field}
-        defaults = {"diffusion": 0.0, "decay": 0.0, "production": 0.0, "boundary": None,
+        defaults = {"diffusion": 0.0, "decay": 0.0, "production": 0.0, "advection": None, "boundary": None,
                     "solver": "implicit"}
-        for name in ("diffusion", "decay", "production", "cells", "boundary", "solver", "solver_options"):
+        for name in ("diffusion", "decay", "production", "cells", "advection", "boundary", "solver",
+                     "solver_options"):
             value = getattr(self, name)
             if name in ("cells", "solver_options"):
                 if value:
                     parameters[name] = ([dict(term) for term in value] if name == "cells" else dict(value))
+            elif name == "advection" and isinstance(value, (tuple, np.ndarray)):
+                parameters[name] = np.asarray(value).tolist()  # a list in model files
             elif value != defaults[name]:
                 parameters[name] = value
         return parameters
@@ -208,6 +225,7 @@ class PDEOperator(FieldOperator):
         if isinstance(cells, (Mapping, str, bytes)) or not isinstance(cells, Sequence):
             raise TypeError("pde.cells must be a list of cell terms, e.g. [{'uptake': 0.1}]")
         self.cell_terms = [_CellTerm.parse(term, index) for index, term in enumerate(cells)]
+        self.advection = _advection(parameters.get("advection"))
         self.boundary = parameters.get("boundary")
         self.solver = parameters.get("solver", "implicit")
         if self.solver not in SOLVERS:
@@ -220,8 +238,7 @@ class PDEOperator(FieldOperator):
 
     def dependencies(self) -> set[str]:
         read = {self.field}
-        if isinstance(self.production, str):
-            read.add(self.production)
+        read.update(name for name in (self.production, self.advection) if isinstance(name, str))
         return read
 
     def outputs(self) -> set[str]:
@@ -248,22 +265,60 @@ class PDEOperator(FieldOperator):
             if production.shape not in (self._dims, np.shape(lgca.cell_density)):
                 raise ValueError(f"pde.production field {self.production!r} must have shape {self._dims}")
         self._sides = _parse_boundary(self.boundary, lgca)
-        self.laplacian, boundary_source = _assemble_laplacian(lgca, self._sides)
+        self.laplacian, self._laplacian_source = _assemble_laplacian(lgca, self._sides)
         n = self.laplacian.shape[0]
-        # the linear part without cells: A c + b
-        self._A = (self.diffusion * self.laplacian - self.decay * sp.identity(n, format="csr")).tocsr()
-        self._b = self.diffusion * boundary_source
+        if isinstance(self.advection, str):
+            self._velocity_shape = self._dims + (len(self._dims),)
+            if self.advection not in fields:
+                raise ValueError(f"pde.advection names the field {self.advection!r}, which is not in "
+                                 "StateSpec.fields")
+        elif self.advection is not None and len(self.advection) != len(self._dims):
+            raise ValueError(f"pde.advection must have one component per dimension ({len(self._dims)}), got "
+                             f"{list(self.advection)}")
         for term in self.cell_terms:
             term.setup(lgca, context.spec.state)
         self._backend = self._resolve_backend(n)
-        self._lu = self._lu_matrix = self._amg = None
+        self._velocity = None
+        self._assemble(lgca)
         if self.solver == "steady":
             self._check_steady_state_exists()
-            self._steady_base = (-self._A).tocsr()
         self.statistics.update({"solver": self.solver, "calls": 0})
         if self.solver != "explicit":
             self.statistics["backend"] = self._backend
         context.metadata.setdefault("fields", {})[self.field] = self.statistics
+
+    def _assemble(self, lgca):
+        """The linear part without cells, ``A c + b``, with the current velocity; resets the solvers."""
+        n = self.laplacian.shape[0]
+        self._A = (self.diffusion * self.laplacian - self.decay * sp.identity(n, format="csr")).tocsr()
+        self._b = self.diffusion * self._laplacian_source
+        if self.advection is not None:
+            velocity = self._read_velocity(lgca)
+            advection, source = _assemble_advection(lgca, self._sides, velocity.reshape(n, -1))
+            self._A = (self._A + advection).tocsr()
+            self._b = self._b + source
+            self._velocity = velocity
+        self._lu = self._lu_matrix = self._amg = None
+        self._base_dt = None
+        if self.solver == "steady":
+            self._steady_base = (-self._A).tocsr()
+
+    def _read_velocity(self, lgca):
+        if not isinstance(self.advection, str):
+            return np.broadcast_to(np.asarray(self.advection, dtype=float), self._dims + (len(self._dims),))
+        values = np.asarray(getattr(lgca, self.advection), dtype=float)
+        if values.shape[len(self._dims):] != (len(self._dims),):
+            raise ValueError(f"pde.advection field {self.advection!r} must hold a velocity per node, shape "
+                             f"{self._velocity_shape}; got {values.shape}")
+        if values.shape[:len(self._dims)] != self._dims:
+            values = values[self._interior]
+        if not np.all(np.isfinite(values)):
+            raise ValueError(f"pde.advection field {self.advection!r} must be finite")
+        return values
+
+    @property
+    def _symmetric(self):
+        return self.advection is None
 
     def _resolve_backend(self, n):
         backend = self.options.get("backend")
@@ -307,6 +362,8 @@ class PDEOperator(FieldOperator):
             self._advance(lgca, step)
 
     def _advance(self, lgca, step):
+        if isinstance(self.advection, str) and not np.array_equal(self._read_velocity(lgca), self._velocity):
+            self._assemble(lgca)  # the velocity field has changed
         stored = getattr(lgca, self.field)
         c = np.array(stored[self._interior], dtype=float).ravel()
         production, loss, saturating = self._sources(lgca, step)
@@ -440,19 +497,23 @@ class PDEOperator(FieldOperator):
             values = spla.spsolve(matrix.tocsc(), right)
         elif self._backend == "amg":
             values = self._solve_amg(matrix, right, start)
-        else:  # symmetric positive definite: conjugate gradients, Jacobi preconditioner
+        else:  # conjugate gradients (BiCGSTAB with advection), Jacobi preconditioner
             values, _ = self._cg(matrix, right, start, sp.diags(1.0 / matrix.diagonal()))
         # the exact solution is non-negative; rounding may leave tiny negative values where c is nearly zero
         return np.maximum(values, 0.0)
 
     def _solve_amg(self, matrix, right, start):
-        """CG preconditioned by a multigrid hierarchy of an earlier matrix, rebuilt when it has aged.
+        """CG (BiCGSTAB with advection) preconditioned by a multigrid hierarchy of an earlier matrix.
 
         The hierarchy is rebuilt when a solve needs twice the iterations of the first solve after the
         last rebuild, or fails to converge; the cells change the matrix only a little per step.
         """
         if self._amg is None or self._amg_stale:
-            self._amg = _pyamg().smoothed_aggregation_solver(matrix.tocsr())
+            # with advection the matrix is not symmetric: approximate ideal restriction (AIR), made for
+            # upwinded advection, needed 2-4 iterations where smoothed aggregation needed up to 945
+            pyamg = _pyamg()
+            self._amg = (pyamg.smoothed_aggregation_solver(matrix.tocsr()) if self._symmetric
+                         else pyamg.air_solver(matrix.tocsr()))
             self._amg_reference, self._amg_stale = None, False
             self.statistics["amg_setups"] = self.statistics.get("amg_setups", 0) + 1
         # an old hierarchy gets a few times its first number of iterations before it is rebuilt
@@ -475,15 +536,16 @@ class PDEOperator(FieldOperator):
         def counted(_):
             count[0] += 1
 
-        values, info = _cg(matrix, right, x0=start, rtol=self.options["rtol"], M=preconditioner,
-                           callback=counted, maxiter=maxiter or 10 * len(right))
+        method = spla.cg if self._symmetric else spla.bicgstab
+        values, info = _krylov(method, matrix, right, x0=start, rtol=self.options["rtol"], M=preconditioner,
+                               callback=counted, maxiter=maxiter or 10 * len(right))
         stats = self.statistics
         stats["max_linear_iterations"] = max(stats.get("max_linear_iterations", 0), count[0])
         if info != 0:
             if maxiter is not None:
                 return None, count[0]
             raise RuntimeError(f"pde {self.field!r}: the iterative solver did not converge "
-                               f"(scipy.sparse.linalg.cg returned {info}); try solver_options "
+                               f"(scipy.sparse.linalg.{method.__name__} returned {info}); try solver_options "
                                "{'backend': 'direct'}")
         return values, count[0]
 
@@ -592,10 +654,10 @@ def _hill_rate(c, K, n):
     return c**(n - 1) / (K**n + c**n)
 
 
-def _cg(matrix, right, *, x0, rtol, M, callback, maxiter):
-    """scipy.sparse.linalg.cg with a relative tolerance; SciPy < 1.12 calls it ``tol``."""
+def _krylov(method, matrix, right, *, x0, rtol, M, callback, maxiter):
+    """scipy.sparse.linalg.cg or bicgstab with a relative tolerance; SciPy < 1.12 calls it ``tol``."""
     tolerance = {"rtol": rtol} if "rtol" in _CG_PARAMETERS else {"tol": rtol}
-    return spla.cg(matrix, right, x0=x0, atol=0.0, M=M, maxiter=maxiter, callback=callback, **tolerance)
+    return method(matrix, right, x0=x0, atol=0.0, M=M, maxiter=maxiter, callback=callback, **tolerance)
 
 
 _CG_PARAMETERS = inspect.signature(spla.cg).parameters
@@ -639,6 +701,24 @@ def _non_negative(value, path):
     if not np.isfinite(value) or value < 0:
         raise ValueError(f"{path} must be a non-negative number, got {value}")
     return value
+
+
+def _advection(value):
+    """None, the name of a velocity field, or a vector of finite numbers."""
+    if value is None or (isinstance(value, str) and value):
+        return value
+    if isinstance(value, (str, bytes, Mapping)) or not isinstance(value, (Sequence, np.ndarray)):
+        raise TypeError(f"pde.advection must be a velocity vector, e.g. [0.5, 0.0], or the name of a field "
+                        f"of velocities; got {value!r}")
+    vector = []
+    for component in value:
+        if isinstance(component, (bool, str)) or np.ndim(component) != 0:
+            raise ValueError(f"pde.advection must be a vector of numbers, got {value!r}")
+        component = float(component)
+        if not np.isfinite(component):
+            raise ValueError(f"pde.advection must be finite, got {value!r}")
+        vector.append(component)
+    return tuple(vector)
 
 
 def _solver_options(solver, options):
@@ -735,13 +815,16 @@ def _condition(value, path):
     raise ValueError(f"{path} must be 'no_flux' or {{'value': c}}, got {value!r}")
 
 
-def _assemble_laplacian(lgca, sides):
-    """Sparse Laplacian over the velocity channels, and the source of fixed values beyond the edge."""
+def _neighbours(lgca, sides):
+    """The neighbour of every node through every velocity channel, and the value beyond each edge.
+
+    Returns ``(rows, columns, fixed)``, flattened over nodes and channels (channel ``i`` of node ``x``
+    at ``x * b + i``, pairing with ``lgca.c[:, i]``): the node, its neighbour (negative beyond the
+    edge) and, for neighbours beyond the edge, the fixed value there (NaN for no flux).
+    """
     dims = tuple(int(size) for size in lgca.dims)
     n = prod(dims)
     width = int(lgca.r_int)
-    c = np.asarray(lgca.c, dtype=float).reshape(len(dims), -1)
-    w = 2 * len(dims) / float(np.sum(c**2))
     # interior nodes are numbered; ghost nodes hold their node (wrapped) or -1 - (2 axis + side)
     codes = np.arange(n, dtype=float).reshape(dims)
     for axis, (lower, _) in enumerate(sides):
@@ -755,18 +838,60 @@ def _assemble_laplacian(lgca, sides):
     neighbours = np.rint(lgca.channel_weight(codes)[interior]).astype(np.int64).reshape(n, -1)
     rows = np.repeat(np.arange(n), neighbours.shape[1])
     columns = neighbours.ravel()
-    inside = columns >= 0
-    diagonal = -w * np.bincount(rows[inside], minlength=n).astype(float)
-    source = np.zeros(n)
-    ghost = -1 - columns[~inside]
     values = np.array([np.nan if condition is None else condition
                        for pair in sides for condition in (pair if pair[0] != "periodic" else (None, None))])
-    fixed = values[ghost]
-    held = ~np.isnan(fixed)
-    ghost_rows = rows[~inside][held]
-    diagonal -= w * np.bincount(ghost_rows, minlength=n)
-    source += w * np.bincount(ghost_rows, weights=fixed[held], minlength=n)
+    fixed = np.full(len(columns), np.nan)
+    fixed[columns < 0] = values[-1 - columns[columns < 0]]
+    return rows, columns, fixed
+
+
+def _channel_vectors(lgca):
+    """The velocity channels as columns, shape ``(d, b)``, and the weight ``w = 2d / Σ|c_i|²``."""
+    d = len(lgca.dims)
+    c = np.asarray(lgca.c, dtype=float).reshape(d, -1)
+    return c, 2 * d / float(np.sum(c**2))
+
+
+def _assemble_laplacian(lgca, sides):
+    """Sparse Laplacian over the velocity channels, and the source of fixed values beyond the edge."""
+    n = prod(int(size) for size in lgca.dims)
+    _, w = _channel_vectors(lgca)
+    rows, columns, fixed = _neighbours(lgca, sides)
+    inside = columns >= 0
+    held = ~inside & ~np.isnan(fixed)  # a fixed value beyond the edge; no flux drops the face
+    diagonal = -w * np.bincount(rows[inside | held], minlength=n).astype(float)
+    source = w * np.bincount(rows[held], weights=fixed[held], minlength=n)
     matrix = sp.coo_matrix((np.full(inside.sum(), w), (rows[inside], columns[inside])), shape=(n, n))
+    return (matrix + sp.diags(diagonal)).tocsr(), source
+
+
+def _assemble_advection(lgca, sides, velocity):
+    """``-∇·(v c) ≈ M c + s`` by first-order upwinding over the velocity channels.
+
+    The flux through the face between ``x`` and its neighbour ``x + c_i`` is ``w (v·c_i) c`` with
+    ``c`` taken at the upwind node and ``v`` averaged over the two nodes (``velocity`` has shape
+    ``(n, d)``). Each face is shared by its two nodes, so the total is conserved; the off-diagonal
+    entries are non-negative, so the implicit and steady solutions stay non-negative. No flux drops
+    the faces beyond the edge; beyond a fixed value, inflow brings that value and outflow leaves.
+    """
+    n = prod(int(size) for size in lgca.dims)
+    c, w = _channel_vectors(lgca)
+    rows, columns, fixed = _neighbours(lgca, sides)
+    along = velocity @ c  # v·c_i at every node, shape (n, b)
+    flow = w * along.ravel()  # outward flow through each face
+    inside = np.flatnonzero(columns >= 0)
+    flow[inside] = w * (along.ravel()[inside] + along[columns[inside], inside % c.shape[1]]) / 2
+    inside = columns >= 0
+    beyond = ~inside & ~np.isnan(fixed)
+    open_face = inside | beyond
+    outflow = open_face & (flow > 0)
+    inflow = flow < 0
+    # (an empty bincount is of integers, even with weights)
+    diagonal = -np.bincount(rows[outflow], weights=flow[outflow], minlength=n).astype(float)
+    source = np.bincount(rows[inflow & beyond], weights=-flow[inflow & beyond] * fixed[inflow & beyond],
+                         minlength=n).astype(float)
+    taken = inflow & inside
+    matrix = sp.coo_matrix((-flow[taken], (rows[taken], columns[taken])), shape=(n, n))
     return (matrix + sp.diags(diagonal)).tocsr(), source
 
 
@@ -793,6 +918,10 @@ PDE_INFO = PluginInfo(
                                            "{'production': r}, {'uptake': r} or {'uptake': r, "
                                            "'saturation': K, 'n': 1}, optionally with 'species' and "
                                            "'channels'. In identity-based models r may name a cell trait."),
+        "advection": ParameterSpec(default=None,
+                                   description="Velocity v of the advection term -div(v c) in nodes per "
+                                               "time step: a vector with one component per dimension, or "
+                                               "the name of a field of velocities, shape dims + (d,)."),
         "boundary": ParameterSpec(default=None,
                                   description="'periodic' (periodic lattices), 'no_flux' (default "
                                               "otherwise), {'value': c} or, on 1D, square and cubic "
@@ -811,8 +940,8 @@ PDE_INFO = PluginInfo(
     conservation_law=_law_for_kind("field"),
     port_status="native",
     test_status="unit_tested",
-    description="Updates a field by one time step of a reaction-diffusion equation, "
-                "dc/dt = D Laplace(c) + P - L c, with secretion and uptake by the cells.",
+    description="Updates a field by one time step of a reaction-advection-diffusion equation, "
+                "dc/dt = D Laplace(c) - div(v c) + P - L c, with secretion and uptake by the cells.",
 )
 
 

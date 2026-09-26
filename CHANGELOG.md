@@ -40,6 +40,12 @@ This file records notable user-facing changes. Changes remain under
   cues. Numbers and trait names mean what they meant.
 - The model graph (`describe_model_graph`) draws the fields that the cues
   of an operator's probabilities read.
+- Advection in the `pde` operator: `advection=[vx, vy]` or the name of a
+  field of velocities adds `−∇·(v c)`, upwinded along the channels of every
+  lattice (conserves the total, keeps `c ≥ 0`, adds a numerical diffusion of
+  about `|v|/2`). With advection the iterative solvers use BiCGSTAB, and the
+  steady solver pyamg's AIR multigrid, which stays at a few iterations per
+  step also when advection dominates.
 - New dependencies: `pyamg>=5.1` (not on Python 3.14, which it has no
   wheels for yet; the steady solver then uses SciPy alone) and
   `threadpoolctl>=3.0` (field solvers run with one BLAS thread, 3 to 9

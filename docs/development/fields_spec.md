@@ -574,6 +574,41 @@ Choices made while implementing, beyond the text above:
   unchanged (the suite's regression tests pass). Identity-based models
   evaluate the probability per cell, so trait-valued `kappa`, `theta`, `K`
   and `n` work there.
+- **Advection** (`advection=[vx, ...]` or the name of a field of shape
+  `dims + (d,)`, read at every step and the matrix reassembled when it
+  changes): the flux through the face between `x` and `x + c_i` is
+  `w (v·c_i) c_upwind` with the Laplacian's weight `w`, which makes the
+  scheme exact for linear profiles on every lattice (`w Σ c_i c_iᵀ = 2 I`;
+  tested, which also checks that the channels pair with `lgca.c`). `v` on a
+  face is the mean of its two nodes, so every face flux is shared and the
+  total conserved (zero column sums, tested for random velocity fields).
+  Faces beyond a no-flux edge are dropped; beyond a fixed value, inflow
+  brings the value and outflow leaves. The numerical diffusion is exactly
+  `|v|/2` in 1D (tested: an advected pulse's variance grows by `2D + v` per
+  step). `v` is Cartesian, also on hexagonal lattices.
+- **Solvers with advection**: the matrix is not symmetric, so the Krylov
+  method is BiCGSTAB instead of CG (Jacobi for `"cg"` and the implicit
+  default). For `"amg"`, smoothed aggregation degrades as advection grows
+  (200², uptake by a disc, preconditioner of an earlier matrix, rtol 10⁻⁶):
+  BiCGSTAB needed 2 iterations at `|v|/D` = 0.02 and 0.5, 66 at 5 and 945
+  (5.6 s) at 50. pyamg's approximate ideal restriction (AIR, `air_solver`,
+  available from pyamg 5.1) needed 2–4 at every speed, with a setup of
+  0.2–0.4 s, kept across steps; so `"amg"` uses AIR when there is
+  advection. GMRES with smoothed aggregation (33–63 iterations) and
+  incomplete LU (200–315) were slower. Benchmark (`benchmarks/fields.py`,
+  `v = (0.5, 0.25)` and `(5, 2.5)`, D = 1, ms per step, one hierarchy per
+  run, at most 4 iterations):
+
+  | ms per step | 100² | 200² | 400² |
+  |---|---|---|---|
+  | go-or-grow step | 4.3 | 20.7 | 72.9 |
+  | steady amg, no advection | 6.3 | 20.6 | 77.9 |
+  | steady amg (AIR), v = 0.5 | 6.9 | 25.6 | 111 |
+  | steady amg (AIR), v = 5 | 6.8 | 31.8 | 152 |
+  | steady direct, v = 5 | 33.7 | 284 | 1906 |
+  | steady cg (Jacobi BiCGSTAB), v = 5 | 83.2 | 436 | 2345 |
+  | implicit cg, v = 5 | 5.4 | 16.9 | 59.2 |
+
 - **Graph**: `describe_model_graph` adds an edge from every field that a cue
   nested in an operator's parameters reads (`{"name": "field"|"gradient",
   "field": ...}`), e.g. `field:oxygen → birth_death`.
