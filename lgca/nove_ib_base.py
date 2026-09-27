@@ -285,6 +285,10 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
             self.channel_pop = self.length_checker(self.nodes)  # population of a channel
         self.cell_density = self.channel_pop.sum(-1)  # population of a node
 
+    def _channel_populations(self):
+        """Cells per channel, from the table if it is the state (reading ``nodes`` would build lists)."""
+        return self.channel_pop
+
     def _channel_counts(self, nodes, history=False):
         """Return channel populations for label lists; count arrays pass through."""
         nodes = np.asarray(nodes)
@@ -562,12 +566,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         if 'family' not in self.props:
             raise RuntimeError("Family properties are not recorded by the LGCA, choose suitable interaction.")
 
-        cells_alive_list = []
-        for site_list_collection in self.nodes[self.nonborder].flat:
-            cells_alive_list.extend(site_list_collection)
-
-        cells_alive = np.array(cells_alive_list,
-                               dtype=np.intp)  # indices of live cells # nonborder needed for uniqueness
+        cells_alive = self._labels_alive()
         cell_fam = np.array(self.props['family'])  # convert for indexing
         cell_fam_alive = cell_fam[cells_alive]  # filter family array for families of live cells
         fam_alive, fam_pop = np.unique(cell_fam_alive, return_counts=True)  # count number of cells for each family
@@ -582,10 +581,23 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         Calculate which families are alive.
         :returns: np.ndarray - array of family IDs in ascending order
         """
-        cells_alive = _flatten_ids(self.nodes[self.nonborder])  # nonborder needed for uniqueness
+        cells_alive = self._labels_alive()
         cell_fam = np.array(self.props['family'])  # convert for indexing
         cell_fam_alive = cell_fam[cells_alive]  # filter family array for families of live cells
         return np.unique(cell_fam_alive) # remove duplicate entries
+
+    def _labels_alive(self):
+        """Labels of the cells at interior nodes.
+
+        Read from the cell table when it is the state: reading ``nodes`` would make the lists the
+        state, and the table rebuilt from them orders the cells differently, which changes the
+        random numbers each cell gets in later steps, so recording would change the run.
+        """
+        store = self.__dict__.get("_store")
+        if store is not None:
+            labels, slots = store
+            return labels[self._slot_table()["interior"][slots] >= 0]
+        return _flatten_ids(self.nodes[self.nonborder])  # nonborder needed for uniqueness
 
 
 __all__ = ["NoVE_IBLGCA_base"]

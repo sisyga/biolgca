@@ -600,6 +600,14 @@ This file records notable user-facing changes. Changes remain under
 
 ### Fixed
 
+- Recording no longer changes a run of an identity-based model without
+  volume exclusion. `FamilyPopulationRecorder`, `PerTypeRecorder`,
+  `OrderParameterRecorder` and the flux views of `lgca.explore` read
+  `lgca.nodes`, which builds the label lists from the cell table; the table
+  rebuilt from the lists orders the cells differently, so the cells got
+  other random numbers in later steps and a recorded run differed from an
+  unrecorded one with the same seed (in distribution the dynamics were
+  right). They now read the cell table.
 - The largest cell label of identity-based models (`lgca.maxlabel`) is a
   Python integer. It was a NumPy integer, and with NumPy 1.x `maxlabel + 1`
   became a float that cannot index the trait arrays.

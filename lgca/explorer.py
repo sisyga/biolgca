@@ -681,8 +681,19 @@ def _values(lgca, view):
     if kind == "density":
         return _density(lgca, index)
     if kind == "flux":
-        return lgca.calc_flux(lgca._channel_counts(lgca.nodes[lgca.nonborder]).astype(float))[..., 0]
+        return lgca.calc_flux(_channel_counts(lgca).astype(float))[..., 0]
     return _scalar(lgca, kind, index)
+
+
+def _channel_counts(lgca):
+    """Cells per channel of the interior nodes.
+
+    Identity-based models without volume exclusion hold them without label lists; reading
+    ``lgca.nodes`` would build the lists and change the order of the cells in later steps.
+    """
+    populations = getattr(lgca, "_channel_populations", None)
+    nodes = populations() if populations is not None else lgca.nodes
+    return lgca._channel_counts(nodes[lgca.nonborder])
 
 
 def _density(lgca, species=None):
@@ -735,7 +746,7 @@ def _limits(values):
 
 def _flux_colours(lgca, mappable):
     """Colours of :meth:`plot_flux`: the direction of the flux, grey where it vanishes, clear where empty."""
-    counts = lgca._channel_counts(lgca.nodes[lgca.nonborder])
+    counts = _channel_counts(lgca)
     jx, jy = np.moveaxis(lgca.calc_flux(counts), -1, 0)
     density = counts.sum(-1)
     colours = mappable.to_rgba(np.angle(jx + 1j * jy, deg=True) % 360.)

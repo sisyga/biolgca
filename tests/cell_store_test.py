@@ -131,3 +131,31 @@ def test_the_node_recorder_stores_cell_tables(bc, monkeypatch):
     assert nodes_t.shape == (7,) + lgca.dims + (lgca.K,)
     for time, recorded in enumerate(lgca.cells_t):
         assert sorted(label for channel in nodes_t[time].flat for label in channel) == sorted(recorded.label)
+
+
+@pytest.mark.parametrize("recorder", ["NodeRecorder", "DensityRecorder", "PopulationRecorder", "ChannelDensityRecorder",
+                                      "PerTypeRecorder", "OrderParameterRecorder", "FamilyPopulationRecorder"])
+def test_recording_does_not_change_the_run(recorder):
+    """Observers read the state without changing it, e.g. the order of the cells in the table,
+    which decides the random numbers each cell gets in later steps."""
+    from dataclasses import replace
+
+    from lgca import simulation
+    from lgca.model import AnalysisSpec, run_model
+
+    nodes = np.zeros((12, 12, 7), dtype=np.int64)
+    nodes[6, 6, -1] = 20
+    spec = ModelSpec(
+        space=SpaceSpec(geometry="hex", dims=(12, 12), boundary="reflecting"),
+        state=StateSpec(nodes=nodes, restchannels=1, volume_exclusion=False, identity_based=True, capacity=20,
+                        traits={"r_b": 0.3}),
+        time=TimeSpec(steps=40, seed=3),
+        dynamics=InteractionPipelineSpec(operators=[
+            {"name": "birth_death", "parameters": {"birth_rate": "r_b", "death_rate": 0.05, "new_family": True,
+                                                   "mutation": {"probability": 0.1, "traits": {"r_b": {
+                                                       "distribution": "normal", "scale": 0.02}}}}},
+            {"name": "random_walk"}]))
+    observer = getattr(simulation, recorder)(simulation.Schedule(every=3))
+    plain = run_model(spec, showprogress=False).lgca
+    recorded = run_model(replace(spec, analysis=AnalysisSpec(observers=[observer])), showprogress=False).lgca
+    assert _labels(recorded.nodes[recorded.nonborder]) == _labels(plain.nodes[plain.nonborder])

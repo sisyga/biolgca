@@ -119,6 +119,10 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         self.update_dynamic_fields()
 
 
+    def _channel_populations(self):
+        """Cells per channel, padded like ``nodes``; measures read it instead of ``nodes``."""
+        return self.nodes
+
     def calc_entropy(self, base=None):
         """
         Calculate entropy of the lattice.
@@ -157,7 +161,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         if N == 0:
             return 0.0
         # calculate flux only for non-boundary nodes, result is a flux vector at each node position
-        flux = self.calc_flux(self.nodes[self.nonborder])
+        flux = self.calc_flux(self._channel_populations()[self.nonborder])
         # Sum every particle population, including species, before the vector norm.
         axes = tuple(range(flux.ndim - 1))
         # sum fluxes up accordingly
@@ -187,7 +191,7 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         if N == 0:
             return 0.0
         # Calculate the director field
-        flux = self.calc_flux(self.nodes)
+        flux = self.calc_flux(self._channel_populations())
         # # retrieve number of particles and reshape to combine with flux
         norm_factor = np.where(self.cell_density > 0, self.cell_density, 1)
         norm_factor = 1 / norm_factor
