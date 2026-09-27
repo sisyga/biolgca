@@ -43,6 +43,13 @@ size that runs in about a minute, and states what differs from the paper.
      - hexagonal and 1D, identity-based without volume exclusion; evolving
        go-or-grow switch
      - Syga et al. 2024
+   * - :doc:`clonal_go_or_grow`
+     - When driver mutations change both how fast cells divide and when
+       they switch between migrating and dividing, which clones win in a
+       growing tumour, and where?
+     - hexagonal, identity-based without volume exclusion; go-or-grow with
+       clones
+     - new model
    * - :doc:`excitable_media`
      - Do spiral waves survive when an excitable medium consists of a small
        number of discrete individuals?
@@ -66,5 +73,6 @@ and the :doc:`../tutorials/index`.
    allee_effect
    evolving_front
    phenotypic_plasticity
+   clonal_go_or_grow
    excitable_media
    jamming

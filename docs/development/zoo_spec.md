@@ -319,3 +319,32 @@ distributed).
   small steps. Same wavelength and period as the LGCA at first; the LGCA
   spiral breaks up later, as in the chapter; the node states follow the
   mean-field orbit (Fig 2d). About 6 s.
+
+## Entry 4 as built
+
+- `clonal_go_or_grow`: `go_or_rest` (κ per cell, neighbourhood density),
+  `birth_death` (death), `go_or_grow.growth` (r_b per cell; a daughter
+  mutates with r_m = 0.01, founds a clone, r_b × 1.1, κ + N(0, Δκ²)),
+  `random_walk`; the order of `go_or_grow_glioblastoma`, and the test
+  checks that the two give the same runs. κ₀ = 0 (user decision
+  2026-09-27; κ₀ = 5 shrinks the colony, an Allee effect), r_d = 0.05.
+  `evolve_kappa=False` mutates only r_b.
+- Δκ = 1 (research model: 0.2). Measured 2026-09-27 on 150 × 150, 400
+  steps, three seeds: evolving/fixed cells 1.45, 1.18, 1.31; mean κ ≈ −1
+  throughout (core −1.05, rim −1.03); mean r_b 0.23 against 0.22. With
+  Δκ = 0.2: 1.03–1.06 and κ ≈ −0.1 after 400 steps (1.08–1.21, κ −0.1 to
+  −0.4 after 600 steps on 200 × 200). The previous session's "10–20 %
+  larger, rim more repulsive than the core" came from tumours pressing
+  against the walls of a 100 × 100 lattice; corrected. Default 150 × 150,
+  400 steps (radius ≈ 66); `full` 250 × 250, 700 steps. Notebook ≈ 45 s.
+- Muller plot coloured by the clone's κ (`_clones.family_trait`; needs
+  `norm=`, since `PropertyColourMapper` defaults to vmin = 0). An early
+  repulsive clone takes over most of the tumour.
+- Found and fixed on the way (2cec137): `FamilyPopulationRecorder`,
+  `PerTypeRecorder`, `OrderParameterRecorder` and explore's flux views read
+  `lgca.nodes` of NoVE identity-based models, which reorders the cell
+  table, so recorded runs differed from unrecorded ones with the same seed.
+- `lgca/zoo/_clones.py`: family depth (drivers per cell), Noble's n and D,
+  dominant clone per node, the largest clones for plotting, the (n, D)
+  bounds, family traits.
+

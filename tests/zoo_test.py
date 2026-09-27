@@ -1,5 +1,6 @@
 """lgca.zoo: every entry builds, its parameters are where its card says, and it reproduces its paper."""
 
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -7,7 +8,9 @@ import pytest
 from scipy.optimize import brentq
 
 from lgca import zoo
+from lgca.lattice_state import LatticeState
 from lgca.model import build_model, run_model
+from lgca.pipeline import InteractionPipelineSpec
 from lgca.study import _get, _tokens, vary
 from lgca.zoo import allee_effect as allee
 
@@ -147,9 +150,87 @@ def test_node_maps_and_profiles_count_the_cells():
     assert record["cells"][0].sum() == 100
 
 
+# ------------------------------------------------------------------ clones (entries 4 and 5)
+
+from lgca.zoo import _clones
+from lgca.zoo import clonal_go_or_grow as clonal
+
+
+class _Tree:
+    """A stand-in model with a family tree and cells, for the clone measures."""
+
+    def __init__(self, ancestor, families, nodes, dims):
+        self.family_props = {"ancestor": ancestor}
+        self.maxfamily = len(ancestor) - 1
+        self.props = {"family": families}
+        self.dims = dims
+        self._nodes = nodes
+
+
+def test_clonal_indices_count_drivers_and_diversity(monkeypatch):
+    # families: 1 the initial clone, 2 and 3 its mutants, 4 a mutant of 2
+    tree = _Tree([0, 0, 1, 1, 2], None, None, (3,))
+    np.testing.assert_array_equal(_clones.family_depth(tree), [0, 1, 2, 2, 3])
+    families = np.array([1, 1, 2, 4, 4, 4])
+    monkeypatch.setattr(_clones, "cell_families", lambda lgca: families)
+    indices = _clones.clonal_indices(tree)
+    p = np.array([2, 1, 3]) / 6
+    assert indices["n"] == pytest.approx((2 * 1 + 1 * 2 + 3 * 3) / 6)
+    assert indices["D"] == pytest.approx(1 / np.sum(p ** 2)) and indices["clones"] == 3
+    bounds = _clones.diversity_bounds([1.0, 1.5, 2.5])
+    np.testing.assert_allclose(bounds["upper"], [1.0, 4.0, np.inf])
+    np.testing.assert_allclose(bounds["sweeps"], [1.0, 2.0, 2.0])
+
+
+def test_dominant_and_largest_clones():
+    run = run_model(clonal.build_spec(size=30, steps=60, r_m=0.2, seed=2), showprogress=False)
+    lattice = run.lgca
+    dominant = _clones.dominant_clone(lattice)
+    cells = LatticeState(lattice).cells
+    families = _clones.cell_families(lattice)
+    node = np.ravel_multi_index(cells.node, lattice.dims)
+    for index in np.unique(node)[:40]:  # the dominant family is the most frequent one at the node
+        counts = np.bincount(families[node == index])
+        assert counts[dominant.flat[index]] == counts.max()
+    assert np.all(dominant[lattice.cell_density[lattice.nonborder] == 0] == -1)
+    ranks = _clones.largest_clones(dominant, number=3)
+    assert np.isnan(ranks[dominant < 0]).all() and set(np.unique(ranks[dominant >= 0])) <= {0, 1, 2, 3}
+    # every cell of a clone has the clone's κ, which the Muller plot is coloured by
+    kappa = np.asarray(_clones.family_trait(lattice, "kappa"))
+    np.testing.assert_allclose(kappa[families], np.asarray(cells["kappa"], dtype=float))
+
+
+def test_clonal_go_or_grow_setup_and_research_model():
+    spec = clonal.build_spec()
+    assert spec.space.dims == (150, 150) and spec.time.steps == 400 and spec.state.nodes.sum() == 50
+    assert spec.state.nodes[75, 75, -1] == 50 and spec.state.traits == {"r_b": 0.2, "kappa": 0.0}
+    assert clonal.build_spec(full=True).space.dims == (250, 250)
+    fixed = clonal.build_spec(evolve_kappa=False).dynamics.operators[2]["parameters"]["mutation"]
+    assert set(fixed["traits"]) == {"r_b"}
+    # the entry writes out the research model go_or_grow_glioblastoma: the same runs
+    small = clonal.build_spec(size=30, steps=40, r_m=0.1, seed=4)
+    research = replace(small, dynamics=InteractionPipelineSpec(operators=[{
+        "name": "go_or_grow_glioblastoma", "parameters": {"r_b": 0.2, "r_d": 0.05, "r_m": 0.1, "fitness_increase": 1.1,
+                                                          "theta": 0.5, "kappa": 0.0, "kappa_std": 1.0}}]))
+    runs = [run_model(s, showprogress=False).lgca for s in (small, research)]
+    cells = [LatticeState(lattice).cells for lattice in runs]
+    assert len(cells[0]) == len(cells[1]) > 50
+    for trait in ("r_b", "kappa"):
+        np.testing.assert_array_equal(np.sort(np.asarray(cells[0][trait])), np.sort(np.asarray(cells[1][trait])))
+
+
+@pytest.mark.parametrize("seed", [3, 4])
+def test_an_evolving_switch_turns_repulsive_and_speeds_up_growth(seed):
+    runs = {evolve: clonal.core_and_rim(run_model(clonal.build_spec(size=80, steps=250, evolve_kappa=evolve,
+                                                                    seed=seed), showprogress=False).lgca)
+            for evolve in (True, False)}
+    assert runs[True]["kappa"]["all"] < -0.4 and runs[False]["kappa"]["all"] == 0
+    assert runs[True]["cells"] > 1.1 * runs[False]["cells"]
+    assert runs[True]["r_b"]["all"] > 0.21 and runs[False]["r_b"]["all"] > 0.2  # drivers are selected
+
+
 # ------------------------------------------------------------------ jamming
 
-from lgca.lattice_state import LatticeState
 from lgca.zoo import jamming
 
 

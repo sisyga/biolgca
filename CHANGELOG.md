@@ -26,7 +26,11 @@ This file records notable user-facing changes. Changes remain under
   invasion front (Syga et al. 2026, the evolutionary LGCA: the front
   accelerates as the fastest-dividing cells gather at it) and discrete
   excitable media (Syga et al. 2019: spiral waves in the LGCA and in its
-  mean field, Barkley's model, and their break-up by fluctuations).
+  mean field, Barkley's model, and their break-up by fluctuations). A new
+  model: clonal evolution of the go-or-grow switch (the research model
+  `go_or_grow_glioblastoma`), in which drivers change the birth rate and the
+  switch; repulsive clones take over and the tumour grows faster than with
+  a fixed switch. `ZooEntry` cards of new models have no paper.
 - Rules of the kind `"field"` change fields but no cells, with
   `LatticeState.set_field(name, values)` (also available to other rules),
   e.g. a matrix degraded by the cells.
