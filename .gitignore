@@ -71,3 +71,6 @@ __pycache__/
 # OS files
 .DS_Store
 Thumbs.db
+
+# papers and theses for reference only, not distributed
+docs/development/papers/

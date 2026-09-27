@@ -49,7 +49,7 @@ CARD = ZooEntry(
                "against the Fisher-KPP predictions, and the mean proliferation rate over time",
     mechanisms=("evolving trait", "mutation", "logistic division", "death", "random walk with resting"),
     lattice="square strip, 4 velocity channels and 1 rest channel, identity-based without volume exclusion",
-    fidelity="same rules; K and the run length are not given in the main text and are chosen here",
+    fidelity="same rules; K = 100 and 1000 steps, as in the paper's code (not given in its text)",
 )
 
 B = 4  # velocity channels of the square lattice
@@ -77,7 +77,7 @@ PARAMETERS = {
     "D": Parameter("D", "diffusion coefficient, set by the rest-channel weight γ", 0.14),
     "gamma": Parameter("γ", "rest-channel weight, ln(b / 4D − b)", gamma_for(0.14),
                        "dynamics.operators[1].terms[resting_bias].beta"),
-    "capacity": Parameter("K", "carrying capacity of a node (chosen here)", 100, "state.capacity"),
+    "capacity": Parameter("K", "carrying capacity of a node (from the paper's code)", 100, "state.capacity"),
 }
 
 
@@ -89,7 +89,9 @@ def build_spec(full: bool = False, *, alpha_0: float = 0.2, delta: float = 0.01,
     Parameters
     ----------
     full : bool, default=False
-        1400 steps, until the front approaches the right edge; by default 1000.
+        The default is already the paper's run (K = 100, 1000 steps, from the paper's code, until
+        the front reaches the right edge); ``full`` changes nothing and is there for symmetry with
+        the other entries.
     alpha_0, delta, p_mu, sigma : float
         Initial proliferation rate α₀, death probability δ, mutation probability p_μ and standard
         deviation σ of a mutation of α (normal, kept within [0, 1]).
@@ -118,7 +120,7 @@ def build_spec(full: bool = False, *, alpha_0: float = 0.2, delta: float = 0.01,
         space=SpaceSpec(geometry="square", dims=(length, width), boundary="reflecting"),
         state=StateSpec(nodes=nodes, restchannels=1, identity_based=True, volume_exclusion=False,
                         capacity=capacity, traits={"r_b": alpha_0}),
-        time=TimeSpec(steps=steps if steps is not None else 1400 if full else 1000, seed=seed),
+        time=TimeSpec(steps=steps if steps is not None else 1000, seed=seed),
         dynamics=InteractionPipelineSpec(operators=[
             # death with δ and division with α (1 − n/K) at the same time; every daughter's α mutates
             {"name": "birth_death", "parameters": {"death_rate": delta, "birth_rate": "r_b", "mutation": mutation}},
@@ -179,13 +181,27 @@ def wave_speed(alpha, D: float = 0.14, delta: float = 0.01):
     return 2 * np.sqrt(D * np.clip(np.asarray(alpha, dtype=float) - delta, 0, None))
 
 
-def predicted_front(steps, alpha, x_0: float, D: float = 0.14, delta: float = 0.01) -> np.ndarray:
+def discreteness(capacity: float) -> float:
+    """Factor ``1 - 4 / ln(K)²`` by which a front of discrete cells is slower than the continuum front.
+
+    At the leading edge there are only a few cells, and a node holds at most about ``K`` of them;
+    the continuum speed assumes arbitrarily small densities ahead of the front (Brunet and Derrida
+    1997). The paper's code multiplies its predictions by this factor, 0.81 for K = 100.
+    """
+    return 1 - 4 / np.log(capacity) ** 2
+
+
+def predicted_front(steps, alpha, x_0: float, D: float = 0.14, delta: float = 0.01,
+                    capacity: float | None = None) -> np.ndarray:
     """Front position if it moved at the Fisher-KPP speed of the proliferation rate ``alpha(t)``.
 
     ``alpha`` is a number or one value per entry of ``steps``; the speed is integrated with the
-    trapezoidal rule from ``x_0`` at ``steps[0]``.
+    trapezoidal rule from ``x_0`` at ``steps[0]``. With ``capacity``, the speed is corrected for the
+    discreteness of the front (:func:`discreteness`), as in the paper.
     """
     steps = np.asarray(steps, dtype=float)
     speed = wave_speed(np.broadcast_to(alpha, steps.shape), D, delta)
+    if capacity is not None:
+        speed = speed * discreteness(capacity)
     increments = 0.5 * (speed[1:] + speed[:-1]) * np.diff(steps)
     return x_0 + np.concatenate([[0.0], np.cumsum(increments)])

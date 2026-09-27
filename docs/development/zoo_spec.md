@@ -295,17 +295,19 @@ distributed).
   rate (scaled by 1 − n/K without volume exclusion) and a normal mutation
   in every daughter (bounds [0, 1]), then a Boltzmann reorientation with
   `resting_bias` β = γ = ln(b/4D − b), so a cell moves with probability 4D
-  (D = p_move/4 on the square lattice). K = 100 and 1000 steps chosen (not
-  in the main text). `record()` gives the kymographs, the front and the α
+  (D = p_move/4 on the square lattice). K = 100 and 1000 steps, as in the
+  paper's code. `record()` gives the kymographs, the front and the α
   statistics; about 25 s.
-- Found: the population mean predicts the front best (rms 5 nodes over
-  1000 steps, K = 100, two seeds; 13 with K = 50), the fastest 10 % overshoot
-  (53, 57; 55), also over the first 500 steps (3–4 against 21–22), and
-  front-region means overshoot as well. The paper reports the fastest 10 %
-  as best. Without mutation the front moves at 0.29 (K = 100) and 0.27
-  (K = 30) against v(α₀) = 0.33: the discreteness of the leading edge
-  (Brunet–Derrida) slows it, so a lower α compensates. Stated in the
-  notebook; flagged to the user.
+- Found at first: the population mean predicts the front best (rms 5
+  nodes), the fastest 10 % overshoot (53). Resolved 2026-09-27 from the
+  thesis code (Zenodo 10.5281/zenodo.10014813, `spatialgrowth_gag.ipynb`):
+  the paper ran K = 100 for 1000 steps (as here) and multiplied its
+  predictions by the discreteness correction 1 − 4/ln²K = 0.81; with it the
+  fastest 10 % predict best (rms 4.6 against 44 for the mean), as in Fig
+  3b, whose curves stand in the same ratios as ours × 0.81. The notebook
+  now applies the correction (`predicted_front(..., capacity=K)`) and says
+  that without it the ranking flips. Without mutation the front moves at
+  0.29 (K = 100) against v(α₀) = 0.33, a smaller slow-down than 0.81.
 - `excitable_media` (entry 7): the built-in `excitable_medium`, absorbing
   hexagonal lattice, K = 23, four quadrants, 100 × 100 and 600 steps
   (200 × 200 and 2000 with `full=True`). The mean field in lattice units is

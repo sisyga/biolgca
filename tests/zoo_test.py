@@ -252,6 +252,10 @@ def test_gamma_sets_the_diffusion_coefficient():
         evolving_front.gamma_for(0.3)
     np.testing.assert_allclose(evolving_front.predicted_front([0, 10, 20], 0.2, 5.0),
                                5.0 + evolving_front.wave_speed(0.2) * np.array([0, 10, 20]))
+    # the paper's correction for the discreteness of the front: 1 - 4 / ln²K, 0.81 at K = 100
+    assert evolving_front.discreteness(100) == pytest.approx(0.8114, abs=1e-4)
+    np.testing.assert_allclose(evolving_front.predicted_front([0, 10, 20], 0.2, 5.0, capacity=100),
+                               5.0 + 0.8114 * evolving_front.wave_speed(0.2) * np.array([0, 10, 20]), rtol=1e-4)
 
 
 def test_without_mutation_the_front_moves_near_the_fisher_kpp_speed():
