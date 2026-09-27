@@ -348,3 +348,29 @@ distributed).
   dominant clone per node, the largest clones for plotting, the (n, D)
   bounds, family traits.
 
+## Entry 5 as built
+
+- `evolution_modes` (user 2026-09-27: `evo_steric` was meant with a hard
+  capacity and crowding that slows movement towards crowded nodes, inspired
+  by Noble et al. 2022; the thesis code's `stericevo.ipynb` starts a full
+  hexagonal tissue of 512-cell demes and planned Noble's D over α, μ, δ).
+  `birth_death` with `crowding=False` (divide with r_b while n < K), r_d =
+  0.1, r_b = 0.2, drivers r_m = 1e-4 × 1.1, new families; one Boltzmann
+  reorientation with `evolution_modes.contact_inhibition` (velocity channel
+  scores −ρ of the node it points to, ρ = n/K; my choice, legacy used raw
+  counts, where α = 2 at K = 64 freezes the tissue) and `resting_bias` γ.
+- Default: grow from one full node at the centre, 40 × 40 hexagonal
+  glands of K = 64, 1000 steps (≈ 9 s per run); `full`: 60 × 60, K = 512,
+  2000 steps; `start="full"` for an established tissue.
+- Measured (seed 1): α = 0: n 2.52, D 3.7 (sweeps); 2.5: 2.95, 6.7; 5:
+  2.12, 20.5 (along the upper bound 1/(2 − n)²: star-shaped); 7.5: 1.34,
+  2.1; 10: 1.08, 1.2 (stalled); γ = 5 (same bulk motility as α = 5): 1.64,
+  4.4 and slower invasion. Contact inhibition invades as fast as mixing.
+  Tests: small tissue (20 × 20, K = 32, r_m = 1e-3, 600 steps) α = 0 gives
+  n > 2, α = 10 n < 1.5, two seeds; the moving fraction in a full periodic
+  tissue equals 6e^−α/(6e^−α + 1).
+- Noble's modes need the intermediate-branching curve (supplement) and
+  tumours grown from one cell; the notebook plots the (n, D) plane with the
+  upper bound and the sweep curve and reads them as a guide, no automatic
+  classification. Notebook ≈ 60 s.
+

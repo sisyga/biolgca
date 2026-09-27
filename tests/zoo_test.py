@@ -229,6 +229,49 @@ def test_an_evolving_switch_turns_repulsive_and_speeds_up_growth(seed):
     assert runs[True]["r_b"]["all"] > 0.21 and runs[False]["r_b"]["all"] > 0.2  # drivers are selected
 
 
+from lgca.zoo import evolution_modes as modes
+
+
+def test_evolution_modes_setup():
+    spec = modes.build_spec()
+    assert spec.space.dims == (40, 40) and spec.state.capacity == 64 and spec.time.steps == 1000
+    assert spec.state.nodes.sum() == 64 and spec.state.nodes[20, 20, -1] == 64
+    assert spec.dynamics.operators[0]["parameters"]["crowding"] is False  # a hard capacity
+    full = modes.build_spec(full=True)
+    assert full.space.dims == (60, 60) and full.state.capacity == 512
+    assert np.all(modes.build_spec(start="full").state.nodes[..., -1] == 64)
+    with pytest.raises(ValueError, match="'full' or 'centre'"):
+        modes.build_spec(start="edge")
+    assert modes.moving_fraction(0.0) == pytest.approx(6 / 7)
+    assert modes.moving_fraction(5.0) == pytest.approx(modes.moving_fraction(0.0, gamma=5.0))
+
+
+@pytest.mark.parametrize("alpha", [0.0, 2.0])
+def test_contact_inhibition_sets_the_moving_fraction_in_a_full_tissue(alpha):
+    spec = modes.build_spec(alpha=alpha, start="full", size=12, r_b=0.0, r_d=0.0, steps=1)
+    spec = replace(spec, space=replace(spec.space, boundary="periodic"))  # every neighbour is full
+    lattice = run_model(spec, showprogress=False).lgca
+    counts = lattice.channel_pop[lattice.nonborder]
+    moving = counts[..., :6].sum() / counts.sum()
+    expected = modes.moving_fraction(alpha)
+    assert abs(moving - expected) < 4 * np.sqrt(expected * (1 - expected) / counts.sum())
+
+
+@pytest.mark.parametrize("seed", [1, 2])
+def test_contact_inhibition_holds_evolution_back(seed):
+    """Drivers spread through a mixing tissue, but hardly beyond their gland when cells stop moving."""
+    final = {}
+    for alpha in (0.0, 10.0):
+        _, record = modes.record(modes.build_spec(alpha=alpha, size=20, capacity=32, steps=600, r_m=1e-3,
+                                                  seed=seed), every=600)
+        final[alpha] = {key: record[key][-1] for key in ("n", "D", "r_b")}
+        assert record["cells"][-1] > 0.9 * 20 * 20 * 32 * 0.5  # the tissue is full
+    assert final[0.0]["n"] > 2 and final[10.0]["n"] < 1.5
+    assert final[0.0]["D"] > final[10.0]["D"] and final[0.0]["r_b"] > final[10.0]["r_b"] + 0.01
+    n, D = final[0.0]["n"], final[0.0]["D"]
+    assert n >= 2 or D <= 1 / (2 - n) ** 2  # the bound of Noble et al.
+
+
 # ------------------------------------------------------------------ jamming
 
 from lgca.zoo import jamming

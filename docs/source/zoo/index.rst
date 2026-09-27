@@ -50,6 +50,12 @@ size that runs in about a minute, and states what differs from the paper.
      - hexagonal, identity-based without volume exclusion; go-or-grow with
        clones
      - new model
+   * - :doc:`evolution_modes`
+     - Does it matter for how a tumour evolves whether its cells keep
+       moving through the crowded tissue or stop where it is full?
+     - hexagonal, identity-based without volume exclusion; glands with a
+       hard capacity, driver mutations, contact inhibition
+     - new model, after Noble et al. 2022
    * - :doc:`excitable_media`
      - Do spiral waves survive when an excitable medium consists of a small
        number of discrete individuals?
@@ -74,5 +80,6 @@ and the :doc:`../tutorials/index`.
    evolving_front
    phenotypic_plasticity
    clonal_go_or_grow
+   evolution_modes
    excitable_media
    jamming
