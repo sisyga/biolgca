@@ -1,8 +1,8 @@
 # Building the BioLGCA documentation
 
 The documentation source is in [`source/`](source/). It uses Sphinx and
-MyST-NB; the six notebooks in [`source/tutorials/`](source/tutorials/) are
-executed from clean kernels during every build.
+MyST-NB; the notebooks in [`source/tutorials/`](source/tutorials/) and
+[`source/zoo/`](source/zoo/) are executed from clean kernels during every build.
 
 From the repository root (`uv sync` installs the documentation tools as part of
 the default `dev` group):

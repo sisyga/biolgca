@@ -42,11 +42,12 @@ particle properties and labels can be restored atomically.
 Runtime control and parameter studies
 -------------------------------------
 
-ModelSpec plus explicit run directories provide the stable building blocks for
-future parameter scans, but BioLGCA does not yet provide a scan scheduler.
-Pause/resume controls, live parameter editing and a second live custom-quantity
-window are separate future UI/runtime projects; they are not part of the
-portable configuration contract.
+Parameter scans, stochastic replicates and parallel workers are supported by
+``lgca.study.sweep`` and the CLI; see :doc:`/how_to/studying_a_model`.
+The notebook explorer supports pause/resume and live parameter editing; see
+:doc:`/how_to/exploring`. A distributed scan scheduler and a second live
+custom-quantity window remain future UI/runtime projects, outside the portable
+configuration contract.
 
 Scientific observables and family workflows
 -------------------------------------------
@@ -64,5 +65,5 @@ removed because they relied on undocumented model attributes (``ecm``,
 ``spheroid``) and silently changed the interaction radius. The model of
 cell–cell adhesion, matrix confinement and jamming in breast cancer invasion
 (Ilina et al., *Nat. Cell Biol.* 2020, https://doi.org/10.1038/s41556-020-0552-6)
-is planned as an advanced tutorial that composes adhesion, pressure and
-matrix-degradation terms in a ModelSpec pipeline.
+is available in :doc:`/zoo/jamming`. It composes adhesion, pressure,
+matrix confinement, degradation and influx in a ModelSpec pipeline.

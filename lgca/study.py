@@ -182,6 +182,11 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
     combinations, paths = _combinations(spec, grid)
     columns = _column_names(paths)
     measures = _measures(measure)
+    reserved = set(columns.values()) | {"seed"} | ({"step"} if long else set())
+    conflicts = reserved.intersection(measures)
+    if conflicts:
+        raise ValueError(f"measure names conflict with sweep columns: {sorted(conflicts)}; "
+                         "give these measures different names")
     spec = _with_recorders(spec, measures)
     seeds = [spec.time.seed] if seeds is None else [int(seed) for seed in seeds]
     if not seeds:
@@ -284,6 +289,8 @@ def _get(node, tokens, where="", parent=None):
     here = f"{where}.{key}" if where else key
     if is_dataclass(node) and not isinstance(node, type):
         names = [f.name for f in fields(node)]
+        if key == "parameters" and "parameters" in names and rest and parent in ("operators", "terms"):
+            return _parameter(node, node.parameters, rest, where, parent)
         if key in names:
             return _get(getattr(node, key), rest, here, key)
         if "parameters" in names and parent in ("operators", "terms"):

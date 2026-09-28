@@ -22,7 +22,7 @@ With BioLGCA you can:
 
 - combine built-in mechanisms: random walk, alignment, chemotaxis, contact
   guidance, aggregation, birth and death, go-or-grow and phenotype switching;
-- write a new interaction as a small Python class and use it like a built-in;
+- write a new interaction as a decorated Python function and use it like a built-in;
 - track individual cells with heritable traits to study evolution;
 - watch a model run in a notebook while you change its parameters with sliders;
 - run on 1D, square, hexagonal and 3D lattices; and

@@ -6,6 +6,7 @@ import difflib
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from math import comb
 from typing import Any
 
 import numpy as np
@@ -609,12 +610,17 @@ def list_reorientation_terms() -> tuple[str, ...]:
     return tuple(sorted(set(_REORIENTATION_TERMS) | set(_TERM_ALIASES)))
 
 
-def _candidate_matrix(candidates):
-    """Candidate channel states as floats, for one matrix product with the channel weights."""
-    matrix_bytes = candidates.size * np.dtype(float).itemsize
+def _check_candidate_size(channels, candidates):
+    """Refuse oversized candidate tables before enumerating their states."""
+    matrix_bytes = channels * candidates * np.dtype(float).itemsize
     if matrix_bytes > _MAX_CANDIDATE_BATCH_BYTES:
         raise ValueError(f"Candidate states require {matrix_bytes:,} bytes; "
                          "reduce channels or use a model without volume exclusion")
+
+
+def _candidate_matrix(candidates):
+    """Candidate channel states as floats, for one matrix product with the channel weights."""
+    _check_candidate_size(candidates.shape[1], len(candidates))
     return candidates.astype(float)
 
 
@@ -819,6 +825,7 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         ndim = len(lgca.dims)
         multispecies = counts.ndim > ndim
         for count in np.unique(counts[counts > 0]):
+            _check_candidate_size(nodes.shape[-1], comb(nodes.shape[-1], int(count)))
             candidates = occupations(nodes.shape[-1], int(count)) if subset else lgca.get_permutations(int(count))
             matrix = _candidate_matrix(candidates)
             for indices in _candidate_batches(counts == count, len(candidates)):
@@ -899,8 +906,8 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         of cells is fixed, so the proposal is symmetric.
         """
         n = len(index)
-        if n == 0:
-            return np.zeros(0, dtype=np.int64)
+        if n == 0 or K == 1:
+            return np.zeros(n, dtype=np.int64)
         nodes, row = np.unique(index, return_inverse=True)
         per_row = np.bincount(row)
         # position of each cell among the cells of its node

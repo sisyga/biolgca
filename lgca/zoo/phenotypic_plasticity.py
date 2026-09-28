@@ -204,10 +204,15 @@ def radial_profiles(lgca, bins: int = 12) -> dict[str, np.ndarray]:
 
 def core_and_rim(lgca, rim: float = 0.1) -> dict[str, float]:
     """Mean κ of the cells in the core (the inner half of the cells by distance from the centre) and at
-    the rim (the outermost fraction ``rim`` of the cells), of all cells, and the fraction migrating."""
+    the rim (the outermost fraction ``rim`` of the cells), of all cells, and the fraction migrating.
+
+    All measures are NaN when the population is extinct.
+    """
     from lgca.lattice_state import LatticeState
 
     cells = LatticeState(lgca).cells
+    if not len(cells):
+        return {key: float("nan") for key in ("core", "rim", "all", "migrating")}
     distance = _distance(lgca)[cells.node]
     kappa = np.asarray(cells["kappa"], dtype=float)
     inner, outer = np.quantile(distance, [0.5, 1 - rim])

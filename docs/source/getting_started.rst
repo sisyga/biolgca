@@ -32,10 +32,11 @@ one- and two-dimensional analysis. Launch JupyterLab from the repository root:
 
    uv run jupyter lab
 
-Then open ``docs/source/tutorials/01_fundamentals.ipynb``. The six
+Then open ``docs/source/tutorials/01_fundamentals.ipynb``. The eight
 :doc:`tutorials/index` notebooks progress from a first random walk to a
-reproducible student project. Run your own scripts the same way, for example
-``uv run python my_simulation.py``, or activate ``.venv`` as usual.
+reproducible student project and coupled cell–field models. Run your own scripts
+the same way, for example ``uv run python my_simulation.py``, or activate
+``.venv`` as usual.
 
 Without uv, BioLGCA installs into any Python 3.11+ environment with
 ``python -m pip install -e ".[notebooks]"``. This resolves the newest

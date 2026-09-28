@@ -103,6 +103,7 @@ jobs:
           source /tmp/biolgca-release-smoke/.venv/bin/activate
           cd /tmp/biolgca-release-smoke
           python -c "from lgca import get_lgca; lgca = get_lgca(dims=3, seed=1); print(lgca.__class__.__name__)"
+          python -c "from lgca import zoo; from lgca.model import run_model; assert len(zoo.catalogue()) == len(zoo.ENTRIES); run_model(zoo.load('allee_effect').build_spec(steps=1), showprogress=False)"
           biolgca examples export random_walk model.json
           biolgca validate model.json
           biolgca run model.json --output run

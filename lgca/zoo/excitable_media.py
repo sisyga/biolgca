@@ -11,7 +11,7 @@ probability ρ_X and death probability ρ_Y, and X reacts N times, with birth pr
 over the velocity channels and move. ρ_X and ρ_Y are the occupied fractions of the velocity and of
 the rest channels. The mean field is Barkley's model,
 
-    ∂ρ_X/∂t = D Δρ_X + N f,   ∂ρ_Y/∂t = g,
+    ∂ρ_X/∂t = D Δρ_X + (N / 6) f,   ∂ρ_Y/∂t = g / (K − 6),
     f = ρ_X (1 − ρ_X) (ρ_X − (ρ_Y + B)/A),   g = ρ_X − ρ_Y,
 
 with D = 1/4 in lattice units. The rule is the built-in ``excitable_medium`` (A = ``alpha``,
@@ -177,5 +177,7 @@ def mean_return_time(nodes_t, start: int = 0) -> float:
     reference = counts[start]
     same = np.all(counts[start + 1:] == reference, axis=-1)  # frames × nodes
     returned = same.any(axis=0)
+    if not returned.any():
+        return float("nan")
     first = np.argmax(same, axis=0) + 1
-    return float(first[returned].mean()) if returned.any() else float("nan")
+    return float(first[returned].mean())

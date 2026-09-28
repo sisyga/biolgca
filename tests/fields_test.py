@@ -360,6 +360,20 @@ def test_steady_needs_something_that_removes_the_field():
     _build([PDESpec(field="u", diffusion=1.0, solver="steady", boundary={"value": 1.0})])  # a fixed value
 
 
+@pytest.mark.parametrize("production", [0.0, 1.0])
+def test_zero_fixed_boundary_removes_the_field_in_a_steady_problem(production):
+    size = 9
+    compiled = _build([PDESpec(field="u", diffusion=1.0, production=production,
+                               solver="steady", boundary={"value": 0.0})],
+                      geometry="lin", dims=size, fields={"u": 2.0})
+    # Discrete Poisson equation c'' + production = 0, with c[-1] = c[size] = 0.
+    x = np.arange(size)
+    expected = production * (x + 1) * (size - x) / 2
+    np.testing.assert_allclose(_field(compiled), expected, atol=1e-12)
+    compiled.step()
+    np.testing.assert_allclose(_field(compiled), expected, atol=1e-12)
+
+
 # ------------------------------------------------------------------ boundaries and ghost nodes
 
 @pytest.mark.parametrize("boundary,geometry,lattice", [
@@ -752,6 +766,10 @@ def test_a_velocity_field_is_read_at_every_step():
     c = _field(compiled).copy()
     assert c.sum() == pytest.approx(initial.sum(), rel=1e-6)
     assert "flow" in compiled.pipeline.operators[0].dependencies()
+    # Change it twice: the cached velocity must not alias the mutable field.
+    compiled.lgca.flow[...] *= -1.0
+    compiled.step()
+    c = _field(compiled).copy()
     compiled.lgca.flow[...] = 0.0  # the flow stops: pure diffusion from now on
     compiled.step()
     still = _build([PDESpec(field="u", diffusion=0.2)], dims=(size, size), boundary="periodic", fields={"u": c})

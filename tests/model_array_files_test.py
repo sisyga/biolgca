@@ -90,3 +90,30 @@ def test_the_command_line_keeps_the_array_file_of_the_resolved_model(tmp_path):
     assert (tmp_path / "run" / "model.resolved.arrays.npz").exists()
     resolved = load_model_spec(tmp_path / "run" / "model.resolved.json")
     np.testing.assert_array_equal(resolved.state.nodes, _spec().state.nodes)
+
+
+@pytest.mark.parametrize("suffix", [".json", ".yaml"])
+@pytest.mark.parametrize("populated", [False, True])
+def test_identity_label_lists_keep_their_shape_when_round_tripped(tmp_path, suffix, populated):
+    nodes = np.empty((4, 3), dtype=object)
+    for label, index in enumerate(np.ndindex(nodes.shape), start=1):
+        nodes[index] = [label] if populated else []
+    spec = ModelSpec(
+        space=SpaceSpec(geometry="lin", dims=4),
+        state=StateSpec(nodes=nodes, identity_based=True, volume_exclusion=False, restchannels=1),
+        time=TimeSpec(steps=1, seed=2),
+    )
+    loaded = load_model_spec(save_model_spec(spec, tmp_path / f"identity{suffix}"))
+    assert loaded.state.nodes.shape == nodes.shape
+    assert loaded.state.nodes.tolist() == nodes.tolist()
+    original = run_model(spec, showprogress=False)
+    restored = run_model(loaded, showprogress=False)
+    assert restored.lgca.nodes.tolist() == original.lgca.nodes.tolist()
+
+
+def test_inline_empty_arrays_preserve_all_dimensions():
+    from lgca.model import model_spec_to_json
+
+    spec = ModelSpec(state=StateSpec(traits={"empty": np.empty((0, 3))}))
+    restored = model_spec_from_json(model_spec_to_json(spec))
+    assert restored.state.traits["empty"].shape == (0, 3)

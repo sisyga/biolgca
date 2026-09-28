@@ -127,6 +127,17 @@ def test_nove_identity_2d_property_plot_uses_given_state():
     assert np.ma.getmaskarray(collection.get_array()).all()
 
 
+@pytest.mark.parametrize("mask", [None, False, True])
+def test_hex_scalar_field_broadcasts_scalar_masks(mask):
+    model = get_lgca(geometry="hex", dims=(3, 4), density=0, interaction="only_propagation")
+    field = np.ma.array(np.arange(12).reshape(3, 4))
+
+    _, collection, _ = model.plot_scalarfield(field, mask=mask, cbar=False)
+
+    assert len(collection.get_paths()) == 12
+    np.testing.assert_array_equal(collection.get_facecolor()[:, -1], 0 if mask else 1)
+
+
 def test_nove_identity_2d_property_histogram_without_seaborn():
     lgca = _run("nove_identity", "square")
 

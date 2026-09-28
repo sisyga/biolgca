@@ -134,11 +134,18 @@ def node_maps(lgca) -> dict[str, np.ndarray]:
 
 def core_and_rim(lgca, rim: float = 0.1) -> dict[str, float]:
     """Mean κ and birth rate of the cells in the core (the inner half by distance from the centre), at
-    the rim (the outermost fraction ``rim``) and of all cells, with the cells and clones of the tumour."""
+    the rim (the outermost fraction ``rim``) and of all cells, with the cells and clones of the tumour.
+
+    An extinct population has zero cells and clones and NaN trait means.
+    """
     from lgca.lattice_state import LatticeState
     from lgca.zoo.phenotypic_plasticity import _distance
 
     cells = LatticeState(lgca).cells
+    if not len(cells):
+        return {"cells": 0, "clones": 0,
+                **{trait: {region: float("nan") for region in ("core", "rim", "all")}
+                   for trait in ("kappa", "r_b")}}
     distance = _distance(lgca)[cells.node]
     inner, outer = np.quantile(distance, [0.5, 1 - rim])
     summary = {"cells": len(cells), "clones": clonal_indices(lgca)["clones"]}

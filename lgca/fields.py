@@ -355,7 +355,7 @@ class PDEOperator(FieldOperator):
             advection, source = _assemble_advection(lgca, self._sides, velocity.reshape(n, -1))
             self._A = (self._A + advection).tocsr()
             self._b = self._b + source
-            self._velocity = velocity
+            self._velocity = velocity.copy()
         self._lu = self._lu_matrix = self._amg = None
         self._base_dt = None
         if self.solver == "steady":
@@ -512,7 +512,7 @@ class PDEOperator(FieldOperator):
         return c
 
     def _steady(self, c, production, loss, nonlinear):
-        if (self.decay == 0 and not np.any(self._b) and not self.reactions
+        if (self.decay == 0 and not self._fixed and not self.reactions
                 and not np.any(loss) and not nonlinear):
             raise RuntimeError(f"pde {self.field!r}: no cells take up the field, and nothing else removes it, "
                                "so it has no steady state; add decay or a fixed value at the boundary")

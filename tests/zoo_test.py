@@ -150,10 +150,24 @@ def test_node_maps_and_profiles_count_the_cells():
     assert record["cells"][0].sum() == 100
 
 
+def test_plasticity_core_and_rim_handles_extinction():
+    run = run_model(plasticity.build_spec(size=3, steps=1, delta=1, alpha=0), showprogress=False)
+    assert run.lgca.total_population() == 0
+    assert all(np.isnan(value) for value in plasticity.core_and_rim(run.lgca).values())
+
+
 # ------------------------------------------------------------------ clones (entries 4 and 5)
 
 from lgca.zoo import _clones
 from lgca.zoo import clonal_go_or_grow as clonal
+
+
+def test_clonal_core_and_rim_handles_extinction():
+    run = run_model(clonal.build_spec(size=3, steps=1, r_d=1, r_b=0), showprogress=False)
+    summary = clonal.core_and_rim(run.lgca)
+    assert summary["cells"] == summary["clones"] == 0
+    for trait in ("kappa", "r_b"):
+        assert all(np.isnan(value) for value in summary[trait].values())
 
 
 class _Tree:
@@ -433,6 +447,12 @@ def test_mean_return_time_of_a_periodic_node():
     assert excitable_media.mean_return_time(nodes) == 4
     nodes[1:, 1] = True  # a node that never returns to its first state is left out
     assert excitable_media.mean_return_time(nodes) == 4
+
+
+def test_mean_return_time_without_future_frames_is_undefined():
+    nodes = np.zeros((2, 3, 23), dtype=bool)
+    assert np.isnan(excitable_media.mean_return_time(nodes, start=1))
+    assert np.isnan(excitable_media.mean_return_time(nodes[:1]))
 
 
 # ------------------------------------------------------------------ mutational meltdown

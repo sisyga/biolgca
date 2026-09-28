@@ -9,6 +9,7 @@ import pytest
 
 from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, run_model
 from lgca.pipeline import (
+    BirthDeathSpec,
     InteractionPipelineSpec,
     ReorientationSpec,
     ReorientationTermSpec,
@@ -100,6 +101,19 @@ def test_short_names_find_the_one_place_with_that_name():
         resolve_path(_movement(), "beta")  # both terms
 
 
+@pytest.mark.parametrize("parameters", [{}, {"birth_rate": 0.3}])
+def test_dataclass_and_mapping_operators_expose_the_same_parameter_values(parameters):
+    from lgca.study import _get, _tokens
+
+    values = []
+    for operator in ({"name": "birth_death", "parameters": parameters},
+                     BirthDeathSpec("birth_death", parameters=parameters)):
+        spec = ModelSpec(dynamics=InteractionPipelineSpec(operators=[operator]))
+        path = resolve_path(spec, "birth_rate")
+        values.append(_get(spec, _tokens(path)))
+    assert values[0] == values[1] == parameters.get("birth_rate", 0.0)
+
+
 @pytest.mark.parametrize("changes, message", [
     ({"time.stpes": 3}, "did you mean 'steps'"),
     ({"dynamics.operators[7].kappa": 1}, "has 3 entries"),
@@ -123,6 +137,13 @@ def test_a_sweep_has_one_row_per_run_in_order():
     assert table.population.iloc[-1] == expected
     assert table.attrs["paths"]["birth_rate"] == "dynamics.operators[0].parameters.birth_rate"
     assert table.attrs["biolgca_version"]
+
+
+@pytest.mark.parametrize("name, long", [("birth_rate", False), ("seed", False), ("step", True)])
+def test_measures_cannot_overwrite_sweep_coordinates(name, long):
+    with pytest.raises(ValueError, match="measure names conflict with sweep columns"):
+        sweep(_growth(), grid={"birth_rate": [0.1, 0.2]}, seeds=[1],
+              measure={name: final_population}, long=long, showprogress=False)
 
 
 def test_explicit_combinations_and_the_seed_of_the_model():

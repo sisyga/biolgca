@@ -348,11 +348,9 @@ class SquarePlotMixin:
         field = select_scalar_field(self, field)
 
         if mask is None:
-            if hasattr(field, 'mask'):
-                mask = field.mask
-
-            else: mask = np.zeros_like(field, dtype=bool)
-
+            mask = np.ma.getmaskarray(field)
+        else:
+            mask = np.broadcast_to(np.asarray(mask, dtype=bool), field.shape)
 
         cmap = plt.get_cmap(cmap)
         norm = Normalize(vmin=vmin, vmax=vmax)

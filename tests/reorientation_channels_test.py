@@ -85,6 +85,38 @@ def test_a_restricted_sampler_is_the_sampler_of_the_channel_subset():
     assert after[:, 4].all()
 
 
+@pytest.mark.parametrize("channels", ["rest", [0]])
+def test_trait_reorientation_on_one_channel_keeps_labels(channels):
+    nodes = np.arange(1, 16, dtype=np.uint64).reshape(5, 3)
+    model = build_model(ModelSpec(
+        space=SpaceSpec(geometry="lin", dims=5),
+        state=StateSpec(nodes=nodes, restchannels=1, identity_based=True, traits={"strength": 1.0}),
+        time=TimeSpec(steps=1, seed=2),
+        dynamics=InteractionPipelineSpec(operators=[ReorientationSpec(
+            terms=[ReorientationTermSpec("resting_bias", trait="strength")],
+            parameters={"channels": channels})], propagation=False)))
+    model.step()
+    np.testing.assert_array_equal(model.lgca.nodes[model.lgca.nonborder], nodes)
+
+
+def test_large_channel_subsets_are_rejected_before_enumeration(monkeypatch):
+    nodes = np.zeros((2, 2, 2, 27), dtype=bool)
+    nodes[..., :13] = True
+    model = build_model(ModelSpec(
+        space=SpaceSpec(geometry="moore", dims=(2, 2, 2)),
+        state=StateSpec(nodes=nodes, restchannels=1),
+        dynamics=InteractionPipelineSpec(operators=[ReorientationSpec(
+            terms=[ReorientationTermSpec("persistent_walk")],
+            parameters={"channels": "velocity"})], propagation=False)))
+
+    def oversized_enumeration(*args):
+        pytest.fail("enumerating 10,400,600 channel states would exhaust memory")
+
+    monkeypatch.setattr("lgca.pipeline.occupations", oversized_enumeration)
+    with pytest.raises(ValueError, match="Candidate states require"):
+        model.step()
+
+
 @pytest.mark.parametrize("bc", ["periodic", "reflecting"])
 @pytest.mark.parametrize("geometry, dims", [("lin", (9,)), ("square", (6, 7)), ("hex", (8, 8)),
                                             ("cubic", (5, 4, 6)), ("moore", (5, 4, 6))])

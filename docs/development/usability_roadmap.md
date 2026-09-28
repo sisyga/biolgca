@@ -11,6 +11,14 @@ and mean-field theory next to simulation.
 The document has three parts: the issues found (with IDs used throughout), the
 phased plan with API sketches and acceptance criteria, and open decisions.
 
+Review status (2026-09-28): a cross-cutting code review fixed bounded issues in
+model-file round trips, sweep columns/default lookup, PDE solvers, restricted
+reorientation, plotting, zoo measurements and wheel packaging. The remaining
+reproducibility, capacity, sweep-resource and observer-output issues are recorded
+with reproductions in [the code review](code_review_2026-09-28.md). These are
+follow-up corrections to completed features; the remaining zoo and publication
+work below is still planned.
+
 ## Reference point: Morpheus
 
 Morpheus (https://gitlab.com/morpheus.lab/morpheus) is a multiscale modelling

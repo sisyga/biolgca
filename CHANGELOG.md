@@ -615,6 +615,23 @@ This file records notable user-facing changes. Changes remain under
 
 ### Fixed
 
+- Built wheels include the model zoo; the installed-package CI smoke test
+  imports its catalogue and runs an entry.
+- Model files preserve the shape of inline arrays, including empty arrays
+  and identity-based channel lists, when loaded from JSON or YAML.
+- Sweeps reject measure names that overwrite parameter, seed or step
+  columns. Explorer controls read omitted parameter defaults consistently
+  from dataclass and dictionary operator specifications.
+- The steady field solver accepts fixed boundaries with value zero, and
+  advection responds to successive in-place changes of a velocity field.
+- Trait-based reorientation works when restricted to a single channel.
+  Oversized candidate tables are rejected before enumeration, including
+  restricted channel subsets on Moore lattices.
+- Hexagonal scalar-field plots render all sites when given an unmasked
+  masked array or a scalar boolean mask.
+- Zoo core/rim summaries handle extinction, and excitable-medium return
+  times are NaN when no later frame exists. The documented Barkley equation
+  now agrees with the implemented scaling.
 - Recording no longer changes a run of an identity-based model without
   volume exclusion. `FamilyPopulationRecorder`, `PerTypeRecorder`,
   `OrderParameterRecorder` and the flux views of `lgca.explore` read

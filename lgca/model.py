@@ -751,7 +751,26 @@ def _to_jsonable(value):
 def _from_jsonable(value):
     if isinstance(value, Mapping):
         if "__ndarray__" in value:
-            return np.asarray(value["__ndarray__"], dtype=value.get("dtype"))
+            dtype = np.dtype(value.get("dtype")) if value.get("dtype") is not None else None
+            shape = value.get("shape")
+            if dtype == np.dtype(object) and shape is not None:
+                # A channel's list of cell labels is one object, even when every
+                # channel has the same number of labels (including zero).
+                array = np.empty(shape, dtype=object)
+
+                def restore(items, index=()):
+                    if len(index) == array.ndim:
+                        array[index] = items
+                    else:
+                        if len(items) != array.shape[len(index)]:
+                            raise ValueError("inline array data does not match its shape")
+                        for position, item in enumerate(items):
+                            restore(item, index + (position,))
+
+                restore(value["__ndarray__"])
+                return array
+            array = np.asarray(value["__ndarray__"], dtype=dtype)
+            return array if shape is None else array.reshape(shape)
         if "__ndarray_file__" in value:
             return _array_from_file(value)
         if "__tuple__" in value:  # files written before tuples became lists

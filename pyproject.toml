@@ -89,7 +89,7 @@ Documentation = "https://biolgca.readthedocs.io/"
 biolgca = "lgca.cli:main"
 
 [tool.setuptools]
-packages = ["lgca", "lgca.examples", "lgca.schemas"]
+packages = ["lgca", "lgca.examples", "lgca.schemas", "lgca.zoo"]
 
 [tool.setuptools.package-data]
 "lgca.schemas" = ["*.json"]
