@@ -179,7 +179,7 @@ channels directly from each observed state.
 
 Square/hexagonal Matplotlib renderers are exercised with configuration, flux,
 flow and density data across classical, identity and NoVE backends. Cubic and
-Moore Mayavi configuration/density/flux animations use the same resolver and
+Moore Mayavi animations use the same resolver and
 label each frame with its recorded time. They open an interactive window and
 return the Mayavi ``Animator``; pass ``show=False`` inside an application that
 already runs a GUI event loop. With the ``plot3d`` extra installed, the test
@@ -316,10 +316,10 @@ family:
      - 2D
    * - ``"density_cubes"``
      - 3D
-     - none
+     - 3D
    * - ``"scalarfield"`` with ``field="oxygen"``
      - 2D and 3D
-     - 2D
+     - 2D and 3D
 
 ``field=`` names a field of ``StateSpec.fields``, drawn with its values at
 each observed step. 1D models have neither snapshots nor animations: their
@@ -363,6 +363,17 @@ movie directly:
    lgca.timeevo(timesteps=50, record=True, showprogress=False)
    lgca.animate_density(save_path="outputs/density_3d_direct.mp4")
    lgca.animate_flux(save_path="outputs/flux_3d.gif", size=(1000, 800))
+
+The 3D plots are ``plot_density`` (nested translucent isosurfaces at
+``contours=`` levels), ``plot_density_cubes`` (one coloured cube per occupied
+node), ``plot_flux``, ``plot_config``, ``plot_scalarfield`` and, for
+identity-based models, ``plot_prop_spatial``. Each has an ``animate_*``
+counterpart for a recorded run (``animate_scalarfield(result.data["oxygen"],
+steps=result.data.steps("oxygen"))`` for a field), and density, flux and
+configuration also a ``live_animate_*`` one that simulates while it draws.
+Isosurface levels and colour scales stay fixed for a whole animation. A field
+with masked or NaN nodes, such as a mean trait, is drawn as cubes at the other
+nodes.
 
 Video files such as ``.mp4`` need ffmpeg; ``.gif`` files use Pillow.
 ``save_kwargs`` takes the options of Matplotlib's ``Animation.save`` (``fps``,

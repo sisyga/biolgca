@@ -36,6 +36,7 @@ _PLOT_METHODS = {
 
 _ANIMATION_METHODS = {
     "density": ("animate_density", "density_t"),
+    "density_cubes": ("animate_density_cubes", "density_t"),
     "config": ("animate_config", "nodes_t"),
     "configuration": ("animate_config", "nodes_t"),
     "flux": ("animate_flux", "nodes_t"),
@@ -142,7 +143,7 @@ class AnimationObserver(Observer):
     run: with `save_path`, every frame is rendered offscreen, the movie is
     written and :attr:`animation` is its path; otherwise :attr:`animation` is a
     Mayavi ``Animator`` that plays after :func:`mayavi.mlab.show` is called.
-    ``kind="scalarfield"`` animates the field named by ``field=`` (2D models).
+    ``kind="scalarfield"`` animates the field named by ``field=``.
     1D models have no animations: plot the recorded run as a kymograph.
     """
 

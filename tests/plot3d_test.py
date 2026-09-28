@@ -117,6 +117,30 @@ def test_isosurface_levels_stay_fixed_when_frames_change_the_data_range():
     contour.mlab_source.set(scalars=density)
 
     assert list(contour.contour.contours) == [2.0, 6.0]
+    assert contour_levels(contour) == [2.0, 6.0]
+
+
+def contour_levels(contour):
+    """The levels the VTK filter draws, which can differ from the Mayavi trait."""
+    vtk_filter = contour.contour.contour_filter
+    return [vtk_filter.get_value(i) for i in range(vtk_filter.number_of_contours)]
+
+
+def test_isosurfaces_are_drawn_at_the_requested_levels_after_a_constant_first_frame(monkeypatch):
+    model = make_model("classical", dims=(6, 6, 6), steps=0)
+    x, y, z = np.meshgrid(*[np.arange(6)] * 3, indexing="ij")
+    field = np.exp(-((x - 3) ** 2 + (y - 3) ** 2 + (z - 3) ** 2) / 4)
+    run_frames(monkeypatch)
+    figures = []
+    build = model._scalarfield_figure
+    monkeypatch.setattr(model, "_scalarfield_figure", lambda *args, **kwargs: figures.append(build(*args, **kwargs))
+                        or figures[-1])
+
+    model.animate_scalarfield(np.stack([0 * field, field]), contours=[0.25, 0.5])
+
+    contour = figures[0][1]
+    assert contour_levels(contour) == [0.25, 0.5]
+    assert contour.actor.mapper.input.number_of_points > 0
 
 
 def test_integer_colour_bar_centres_one_bin_and_label_on_each_particle_number():
@@ -199,7 +223,7 @@ def open_scenes():
     return sum(len(engine.scenes) for engine in registry.engines.values())
 
 
-@pytest.mark.parametrize("kind", ["density", "flux", "config"])
+@pytest.mark.parametrize("kind", ["density", "density_cubes", "flux", "config"])
 def test_movie_has_one_frame_per_recorded_step_and_leaves_no_window(kind, tmp_path):
     Image = pytest.importorskip("PIL.Image")
     model = make_model("nove", steps=4)
@@ -252,4 +276,102 @@ def test_plotting_observers_write_3d_snapshots_and_movies(tmp_path):
             assert np.count_nonzero(np.any(np.asarray(image.convert("RGB")) < 250, axis=-1)) > 1000
     with Image.open(movie.animation) as frames:
         assert frames.n_frames == 4
+    assert open_scenes() == 0
+
+
+def test_density_cube_animation_shows_cubes_at_the_occupied_nodes_of_every_frame(monkeypatch, capfd):
+    model = make_model("nove", dims=(4, 4, 4), steps=0)
+    density_t = np.zeros((3,) + model.dims, dtype=int)
+    density_t[0, 1, 2, 3] = 2
+    density_t[2, :2, 0, 0] = [1, 5]  # frame 1 is empty
+    shown = []
+    figures = []
+    build = model._density_cubes_figure
+    monkeypatch.setattr(model, "_density_cubes_figure", lambda *args, **kwargs: figures.append(build(*args, **kwargs))
+                        or figures[-1])
+
+    def play(fig, update, frames, label, interval, show, **kwargs):
+        for frame in range(frames):
+            update(frame)
+            source = figures[0][1].mlab_source
+            visible = np.asarray(source.u, dtype=bool)
+            shown.append((visible.copy(), np.asarray(source.scalars)[visible]))
+
+    monkeypatch.setattr(cubic, "play", play)
+    model.animate_density_cubes(density_t=density_t)
+
+    for (visible, values), density in zip(shown, density_t):
+        np.testing.assert_array_equal(visible, density > 0)
+        np.testing.assert_array_equal(values, density[density > 0])
+    assert figures[0][1].glyph.glyph.scale_factor == 0.9
+    assert "ERR" not in capfd.readouterr().err
+
+
+def test_field_animation_draws_masked_and_nan_nodes_as_hidden_cubes(monkeypatch):
+    model = make_model("classical", dims=(3, 3, 3), steps=0)
+    field_t = np.ones((2,) + model.dims)
+    field_t[0, 0, 0, 0] = np.nan
+    field_t = np.ma.masked_array(field_t, mask=np.zeros_like(field_t, dtype=bool))
+    field_t.mask[1, 2, 2, 2] = True
+    run_frames(monkeypatch)
+    figures = []
+    build = model._scalarfield_figure
+    monkeypatch.setattr(model, "_scalarfield_figure", lambda *args, **kwargs: figures.append(build(*args, **kwargs))
+                        or figures[-1])
+
+    model.animate_scalarfield(field_t)
+
+    cubes = figures[0][1]
+    visible = np.asarray(cubes.mlab_source.u, dtype=bool)  # the last frame
+    assert not visible[2, 2, 2] and visible[0, 0, 0] and visible.sum() == 26
+
+
+def test_live_config_animation_steps_the_simulation(monkeypatch):
+    model = make_model("ms_moore", steps=0)
+    run_frames(monkeypatch, n_frames=3)
+    figures = []
+    build = model._config_figure
+    monkeypatch.setattr(model, "_config_figure", lambda *args, **kwargs: figures.append(build(*args, **kwargs))
+                        or figures[-1])
+    reference = make_model("ms_moore", steps=2)
+
+    model.live_animate_config()
+
+    velocity = model._channel_counts(reference.nodes[reference.nonborder])[..., : model.velocitychannels]
+    np.testing.assert_array_equal(np.ravel(figures[0][1].mlab_source.scalars), np.ravel(velocity))
+
+
+def test_field_and_density_cube_observers_write_3d_movies(tmp_path):
+    Image = pytest.importorskip("PIL.Image")
+    from lgca.fields import PDESpec
+    from lgca.model import (
+        AnalysisSpec,
+        ModelSpec,
+        SpaceSpec,
+        StateSpec,
+        TimeSpec,
+        run_model,
+    )
+    from lgca.pipeline import InteractionPipelineSpec
+    from lgca.plotting import AnimationObserver
+    from lgca.simulation import FieldRecorder
+
+    signal = AnimationObserver(kind="scalarfield", field="signal", save_path=tmp_path / "signal.gif")
+    cubes = AnimationObserver(kind="density_cubes", save_path=tmp_path / "cubes.gif")
+    spec = ModelSpec(
+        space=SpaceSpec(geometry="cubic", dims=(5, 5, 5), boundary="reflecting"),
+        state=StateSpec(density=0.2, restchannels=1, fields={"signal": 0.0}),
+        time=TimeSpec(steps=3, seed=1),
+        dynamics=InteractionPipelineSpec(operators=[
+            PDESpec(field="signal", diffusion=1.0, decay=0.05, cells=[{"production": 0.1}]),
+            {"name": "random_walk"},
+        ]),
+        analysis=AnalysisSpec(observers=[FieldRecorder(["signal"]), signal, cubes]),
+    )
+
+    run_model(spec, showprogress=False)
+
+    for movie in (signal, cubes):
+        with Image.open(movie.animation) as frames:
+            assert frames.n_frames == 4
     assert open_scenes() == 0

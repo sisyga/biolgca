@@ -398,6 +398,10 @@ This file records notable user-facing changes. Changes remain under
 - Focused regression coverage for propagation, boundary conditions,
   initialization, time evolution, interactions, plotting contracts, model
   persistence, the CLI, and installed-package smoke tests.
+- 3D plots: cubic and Moore models animate fields (`animate_scalarfield`,
+  `AnimationObserver(kind="scalarfield", field=...)`) and the density as
+  cubes (`animate_density_cubes`, `kind="density_cubes"`), and show the
+  channel configuration live (`live_animate_config`), as 2D models do.
 
 ### Changed
 
@@ -615,6 +619,12 @@ This file records notable user-facing changes. Changes remain under
 
 ### Fixed
 
+- 3D isosurfaces (`plot_density`, `plot_scalarfield` and their animations
+  on cubic and Moore lattices) are drawn at the levels of `contours=`, which
+  stay fixed during an animation. They were drawn at five levels spread over
+  the data of the first frame, and an animation that started from an empty
+  lattice or a uniform field showed no surfaces at all. 3D scalar fields hide
+  NaN nodes as they hide masked ones.
 - Built wheels include the model zoo; the installed-package CI smoke test
   imports its catalogue and runs an entry.
 - Model files preserve the shape of inline arrays, including empty arrays

@@ -21,6 +21,7 @@ from lgca.mayavi_style import (
 )
 
 from .plot_data import (
+    history_steps,
     resolve_animation_history,
     select_density,
     select_density_history,
@@ -372,6 +373,28 @@ class LGCA_Cubic(LGCA_base):
         style_surface(cubes.actor, opacity)
         return cubes
 
+    def _animated_voxels(self, fig, values, visible, colormap, opacity, vmin, vmax, cube_size, **kwargs):
+        """Cubes of an animation, showing the first frame; :py:meth:`_set_voxels` shows the next ones.
+
+        Every node has a cube whose edge length is `cube_size` at visible nodes and 0 at hidden ones. Changing
+        the number of glyphs instead makes VTK read past the end of its arrays.
+        """
+        size = np.asarray(visible, dtype=float)
+        zero = np.zeros_like(size)
+        cubes = mlab.quiver3d(*self._node_centres(), size, zero, zero, scalars=np.where(visible, values, vmin),
+                              mode="cube", scale_mode="vector", scale_factor=cube_size, colormap=colormap, vmin=vmin,
+                              vmax=vmax, figure=fig, **kwargs)
+        cubes.glyph.color_mode = "color_by_scalar"
+        cubes.glyph.glyph_source.glyph_position = "center"
+        style_surface(cubes.actor, opacity)
+        return cubes
+
+    @staticmethod
+    def _set_voxels(cubes, values, visible):
+        """Show the cubes at the visible nodes of a frame, coloured by `values`."""
+        vmin = cubes.module_manager.scalar_lut_manager.data_range[0]
+        cubes.mlab_source.set(u=np.asarray(visible, dtype=float), scalars=np.where(visible, values, vmin))
+
     def _isosurfaces(self, fig, values, contours, colormap, opacity, vmin, vmax, **kwargs):
         """Draw translucent isosurfaces of ``values`` at ``contours`` evenly spaced or explicit levels."""
         if np.ndim(contours) == 0:
@@ -380,9 +403,11 @@ class LGCA_Cubic(LGCA_base):
                                  **kwargs)
         # Mayavi clips levels to the current data range; pin the range to the colour scale so that
         # levels stay fixed when animation frames change the data.
+        # contour3d leaves automatic levels on, which the filter takes from the data of the first frame.
         component = contour.contour
         component.auto_update_range = False
         component.trait_set(_data_min=float(vmin), _data_max=float(vmax), trait_change_notify=False)
+        component.auto_contours = False
         component.contours = [float(c) for c in contours]
         style_surface(contour.actor, opacity)
         return contour
@@ -396,6 +421,51 @@ class LGCA_Cubic(LGCA_base):
         if cbar:
             add_colorbar(contour, cbarlabel, 0, vmax, integer=True, discrete=False)
         return fig, contour
+
+    def _density_cubes_figure(self, density, colormap, opacity, vmax, cube_size, cbar, cbarlabel, size, view,
+                              animated=False, **kwargs):
+        fig = new_figure(size)
+        voxels = self._animated_voxels if animated else self._voxels
+        cubes = voxels(fig, density, density > 0, colormap, opacity, 0, vmax, cube_size, **kwargs)
+        decorate_domain(fig, self.dims, view=view)
+        if cbar and cubes is not None:
+            add_colorbar(cubes, cbarlabel, 0, vmax, integer=True)
+        return fig, cubes
+
+    @staticmethod
+    def _hidden_nodes(field, mask=None):
+        """Nodes of a scalar field that are not drawn: masked entries, NaN and `mask`."""
+        hidden = np.ma.getmaskarray(field) | ~np.isfinite(np.ma.getdata(field))
+        if mask is not None:
+            hidden = hidden | np.asarray(mask, dtype=bool)
+        return hidden
+
+    @staticmethod
+    def _field_limits(shown, vmin, vmax):
+        """Colour scale limits; default the range of the shown values."""
+        if vmin is None:
+            vmin = float(shown.min()) if shown.size else 0.0
+        if vmax is None:
+            vmax = float(shown.max()) if shown.size else 1.0
+        if vmax <= vmin:
+            vmin, vmax = vmin - 0.5, vmax + 0.5
+        return vmin, vmax
+
+    def _scalarfield_figure(self, values, hidden, cubes, colormap, opacity, cbar, cbarlabel, vmin, vmax, contours,
+                            cube_size, size, view, animated=False, **kwargs):
+        """Draw a scalar field as cubes at the shown nodes, or as isosurfaces if ``cubes`` is False."""
+        fig = new_figure(size)
+        if cubes:
+            voxels = self._animated_voxels if animated else self._voxels
+            obj = voxels(fig, values, ~hidden, colormap, 1.0 if opacity is None else opacity, vmin, vmax,
+                         cube_size, **kwargs)
+        else:
+            obj = self._isosurfaces(fig, values, contours, colormap, 0.35 if opacity is None else opacity, vmin,
+                                    vmax, **kwargs)
+        decorate_domain(fig, self.dims, view=view)
+        if cbar and obj is not None:
+            add_colorbar(obj, cbarlabel, vmin, vmax)
+        return fig, obj
 
     @staticmethod
     def _sphere_sizes(counts, limit):
@@ -537,12 +607,8 @@ class LGCA_Cubic(LGCA_base):
         density = self._node_density(density, channels, species)
         if vmax is None:
             vmax = self._count_limit(density, self._density_capacity(channels))
-        fig = new_figure(size)
-        cubes = self._voxels(fig, density, density > 0, colormap, opacity, 0, vmax, cube_size, **kwargs)
-        decorate_domain(fig, self.dims, view=view)
-        if cbar and cubes is not None:
-            add_colorbar(cubes, cbarlabel, 0, vmax, integer=True)
-        return fig, cubes
+        return self._density_cubes_figure(density, colormap, opacity, vmax, cube_size, cbar, cbarlabel, size, view,
+                                          **kwargs)
 
     def plot_scalarfield(self, field, mask=None, colormap="viridis", opacity=None, cbar=True,
                          cbarlabel="Scalar field", vmin=None, vmax=None, contours=3, cube_size=0.9, size=None,
@@ -550,13 +616,14 @@ class LGCA_Cubic(LGCA_base):
         """
         Plot a scalar field on the lattice with Mayavi.
 
-        Nodes that are masked are hidden. A field with hidden nodes, such as the mean cell property of occupied
+        Masked and NaN nodes are hidden. A field with hidden nodes, such as the mean cell property of occupied
         nodes, is drawn as one cube per visible node; a complete field is drawn as isosurfaces.
 
         Parameters
         ----------
         field : :py:class:`numpy.ndarray` or :py:class:`numpy.ma.MaskedArray`
-            Values with dimensions ``self.dims`` (or including the border). Masked entries are hidden.
+            Values with dimensions ``self.dims`` (or including the border). Masked and NaN entries are hidden,
+            e.g. nodes without cells in :func:`lgca.plot_data.mean_trait`.
         mask : :py:class:`numpy.ndarray` of bool, optional
             Additional nodes to hide (True = hidden).
         colormap : str, default='viridis'
@@ -588,28 +655,11 @@ class LGCA_Cubic(LGCA_base):
             The colormap.
         """
         field = select_scalar_field(self, field)
-        hidden = np.ma.getmaskarray(field)
-        if mask is not None:
-            hidden = hidden | np.asarray(mask, dtype=bool)
+        hidden = self._hidden_nodes(field, mask)
         values = np.ma.getdata(field).astype(float)
-        shown = values[~hidden]
-        if vmin is None:
-            vmin = float(shown.min()) if shown.size else 0.0
-        if vmax is None:
-            vmax = float(shown.max()) if shown.size else 1.0
-        if vmax <= vmin:
-            vmin, vmax = vmin - 0.5, vmax + 0.5
-
-        fig = new_figure(size)
-        if hidden.any():
-            obj = self._voxels(fig, values, ~hidden, colormap, 1.0 if opacity is None else opacity, vmin, vmax,
-                               cube_size, **kwargs)
-        else:
-            obj = self._isosurfaces(fig, values, contours, colormap, 0.35 if opacity is None else opacity, vmin,
-                                    vmax, **kwargs)
-        decorate_domain(fig, self.dims, view=view)
-        if cbar and obj is not None:
-            add_colorbar(obj, cbarlabel, vmin, vmax)
+        vmin, vmax = self._field_limits(values[~hidden], vmin, vmax)
+        fig, obj = self._scalarfield_figure(values, hidden, hidden.any(), colormap, opacity, cbar, cbarlabel, vmin,
+                                            vmax, contours, cube_size, size, view, **kwargs)
         return fig, obj, colormap
 
     def plot_flux(self, nodes=None, scale_factor=None, color=INK, colormap="viridis", opacity=1.0, cbar=False,
@@ -841,6 +891,96 @@ class LGCA_Cubic(LGCA_base):
             return play(fig, update, len(counts_t), lambda frame: f"t = {steps[frame]}", interval, show,
                         save_path=save_path, save_kwargs=save_kwargs)
 
+    def animate_density_cubes(self, density_t=None, colormap="viridis", opacity=1.0, cube_size=0.9, cbar=True,
+                              interval=100, steps=None, channels=slice(None), species=None, vmax=None, show=True,
+                              save_path=None, save_kwargs=None, **kwargs):
+        """
+        Animate the density of a recorded simulation as one coloured cube per occupied node with Mayavi.
+
+        Parameters
+        ----------
+        density_t, interval, steps, vmax, show, save_path, save_kwargs
+            As in :py:meth:`animate_density`.
+        colormap, opacity, cube_size, cbar, channels, species
+            As in :py:meth:`plot_density_cubes`.
+        **kwargs
+            As in :py:meth:`plot_density_cubes`.
+
+        Returns
+        -------
+        mayavi.tools.animator.Animator or pathlib.Path
+            The animation controller, or the movie file if `save_path` is given.
+        """
+        density_t, steps = resolve_animation_history(self, "density_t", density_t, steps, channels)
+        density_t = select_density_history(self, density_t, species)
+        if vmax is None:
+            vmax = self._count_limit(density_t, self._density_capacity(channels))
+        with offscreen(save_path is not None):
+            fig, cubes = self._density_cubes_figure(density_t[0], colormap, opacity, vmax, cube_size, cbar,
+                                                    kwargs.pop("cbarlabel", "Particles"), kwargs.pop("size", None),
+                                                    kwargs.pop("view", None), animated=True, **kwargs)
+
+            def update(frame):
+                self._set_voxels(cubes, density_t[frame], density_t[frame] > 0)
+
+            return play(fig, update, len(density_t), lambda frame: f"t = {steps[frame]}", interval, show,
+                        save_path=save_path, save_kwargs=save_kwargs)
+
+    def animate_scalarfield(self, field_t, steps=None, interval=100, vmin=None, vmax=None, mask=None,
+                            colormap="viridis", opacity=None, cbar=True, cbarlabel="Scalar field", contours=3,
+                            cube_size=0.9, show=True, save_path=None, save_kwargs=None, **kwargs):
+        """
+        Animate the history of a field with Mayavi, e.g. one recorded by a :class:`~lgca.simulation.FieldRecorder`.
+
+        A field with hidden (masked or NaN) nodes in any frame is drawn as one cube per visible node, a complete
+        field as isosurfaces at levels that stay fixed for the whole animation.
+
+        Parameters
+        ----------
+        field_t : array_like
+            Field values of shape ``(frames,) + self.dims``, e.g. ``result.data["oxygen"]``.
+        steps : array_like, optional
+            Time step of each frame, e.g. ``result.data.steps("oxygen")``; default 0, 1, 2, ...
+        vmin, vmax : float, optional
+            Limits of the colour scale; default the smallest and largest shown value of the whole history, so that
+            all frames share one scale.
+        mask : :py:class:`numpy.ndarray` of bool, optional
+            Nodes to hide in every frame (True = hidden).
+        interval, show, save_path, save_kwargs
+            As in :py:meth:`animate_density`.
+        colormap, opacity, cbar, cbarlabel, contours, cube_size
+            As in :py:meth:`plot_scalarfield`.
+        **kwargs
+            As in :py:meth:`plot_scalarfield`.
+
+        Returns
+        -------
+        mayavi.tools.animator.Animator or pathlib.Path
+            The animation controller, or the movie file if `save_path` is given.
+        """
+        field_t = np.ma.asanyarray(field_t)
+        if field_t.ndim != len(self.dims) + 1 or not len(field_t):
+            raise ValueError(f"field_t must have shape (frames,) + {tuple(self.dims)}, got {field_t.shape}")
+        frames = [select_scalar_field(self, frame) for frame in field_t]
+        hidden_t = np.stack([self._hidden_nodes(frame, mask) for frame in frames])
+        values_t = np.stack([np.ma.getdata(frame).astype(float) for frame in frames])
+        steps = history_steps(self, len(values_t), None, steps)
+        vmin, vmax = self._field_limits(values_t[~hidden_t], vmin, vmax)
+        cubes = hidden_t.any()
+        with offscreen(save_path is not None):
+            fig, obj = self._scalarfield_figure(values_t[0], hidden_t[0], cubes, colormap, opacity, cbar, cbarlabel,
+                                                vmin, vmax, contours, cube_size, kwargs.pop("size", None),
+                                                kwargs.pop("view", None), animated=True, **kwargs)
+
+            def update(frame):
+                if cubes:
+                    self._set_voxels(obj, values_t[frame], ~hidden_t[frame])
+                else:
+                    obj.mlab_source.set(scalars=values_t[frame])
+
+            return play(fig, update, len(values_t), lambda frame: f"t = {steps[frame]}", interval, show,
+                        save_path=save_path, save_kwargs=save_kwargs)
+
     def live_animate_density(self, interval=100, channels=slice(None), species=None, contours=3, colormap="viridis",
                              opacity=0.35, vmax=None, smooth=0.0, cbar=True, show=True, **kwargs):
         """
@@ -917,6 +1057,50 @@ class LGCA_Cubic(LGCA_base):
             quiver.mlab_source.set(u=flux[..., 0], v=flux[..., 1], w=flux[..., 2],
                                    scalars=np.linalg.norm(flux, axis=-1))
             scatter.mlab_source.set(scalars=self._stationary_sizes(flux, density, limit))
+
+        return play(fig, update, None, lambda frame: f"t = {frame}", interval, show)
+
+    def live_animate_config(self, interval=100, vmax=None, color=MUTED, colormap="viridis", cbar=True, show=True,
+                            **kwargs):
+        """
+        Simulate and show the channel configuration after every time step until the window is closed.
+
+        Parameters
+        ----------
+        vmax : float, optional
+            Upper limit of the arrow colour scale. Default: the number of species with volume exclusion, twice the
+            initial largest channel population otherwise.
+        interval, show
+            As in :py:meth:`animate_density`.
+        color, colormap, cbar
+            As in :py:meth:`plot_config`.
+        **kwargs
+            As in :py:meth:`plot_config`.
+
+        Returns
+        -------
+        mayavi.tools.animator.Animator
+            The animation controller.
+        """
+        def state():
+            counts = self._channel_counts(self.nodes[self.nonborder]).astype(float)
+            return counts[..., : self.velocitychannels], counts[..., self.velocitychannels:].sum(-1)
+
+        velocity, rest = state()
+        n_species = getattr(self, "n_species", 1)
+        velocity_limit = vmax or self._count_limit(2 * velocity, n_species)
+        rest_limit = self._count_limit(2 * rest, self.restchannels * n_species)
+        fig, quiver, scatter = self._config_figure(velocity, rest, velocity_limit, rest_limit, color, colormap, cbar,
+                                                   kwargs.pop("size", None), kwargs.pop("view", None), **kwargs)
+
+        def update(frame):
+            if frame:
+                self.timestep()
+            velocity, rest = state()
+            u, v, w = self._config_vectors(velocity)
+            quiver.mlab_source.set(u=u, v=v, w=w, scalars=velocity)
+            if scatter is not None:
+                scatter.mlab_source.set(scalars=self._sphere_sizes(rest, rest_limit))
 
         return play(fig, update, None, lambda frame: f"t = {frame}", interval, show)
 
