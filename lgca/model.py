@@ -1436,13 +1436,17 @@ def _build_lgca(spec: ModelSpec):
     if spec.state.capacity is not None and not spec.state.volume_exclusion:
         kwargs["capacity"] = spec.state.capacity
     kwargs.update(dict(spec.state.parameters))
-    return get_lgca(
+    lgca = get_lgca(
         geometry=spec.space.geometry,
         ib=spec.state.identity_based,
         ve=spec.state.volume_exclusion,
         n_species=spec.state.n_species,
         **kwargs,
     )
+    # every LatticeState of the model reads it, e.g. of rules, reorientation terms and field reactions;
+    # lgca.capacity of volume-exclusion models stays the channel count (the colour scale of plots)
+    lgca._state_capacity = spec.state.capacity
+    return lgca
 
 
 def _metadata_from_spec(spec: ModelSpec, lgca=None) -> dict[str, Any]:
@@ -1450,7 +1454,9 @@ def _metadata_from_spec(spec: ModelSpec, lgca=None) -> dict[str, Any]:
     boundary = getattr(lgca, "bc", spec.space.boundary)
     dims = tuple(getattr(lgca, "dims", spec.space.dims or ()))
     restchannels = getattr(lgca, "restchannels", spec.state.restchannels)
-    capacity = getattr(lgca, "capacity", getattr(lgca, "K", spec.state.capacity))
+    capacity = spec.state.capacity  # the crowding scale of all rules (see LatticeState)
+    if capacity is None and lgca is not None:
+        capacity = spec.state.n_species * lgca.K if spec.state.volume_exclusion else lgca.capacity
     return {
         "title": spec.description.title,
         "biolgca_version": _package_version(),

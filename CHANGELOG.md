@@ -646,6 +646,13 @@ This file records notable user-facing changes. Changes remain under
   of `run()` (so a run continued after `step()` calls differed from one
   uninterrupted run), or a notebook. A cell table rebuilt from label lists
   that were read but not changed keeps the order of its cells.
+- Reorientation terms and field reactions see `StateSpec.capacity` as
+  rules do. With volume exclusion they used the number of channels, so a
+  density cue such as that of `resting` or a reaction written with
+  `state.density / state.capacity` responded to another crowding scale than
+  the rules of the same model. `LatticeState(model.lgca)` uses it too, and
+  the run metadata records it as `capacity` (it recorded the number of
+  channels of volume-exclusion models).
 - The largest cell label of identity-based models (`lgca.maxlabel`) is a
   Python integer. It was a NumPy integer, and with NumPy 1.x `maxlabel + 1`
   became a float that cannot index the trait arrays.

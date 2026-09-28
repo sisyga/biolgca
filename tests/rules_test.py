@@ -369,3 +369,50 @@ def test_a_birth_death_rule_may_also_set_a_field():
     model.step()
     np.testing.assert_allclose(lattice.ecm[lattice.nonborder], before)
     assert lattice.cell_density.sum() == 0
+
+
+@pytest.mark.parametrize("capacity", [None, 12])
+@pytest.mark.parametrize("volume_exclusion,identity_based", [(True, False), (False, False), (True, True),
+                                                               (False, True)])
+def test_every_kind_of_rule_sees_the_same_capacity(volume_exclusion, identity_based, capacity):
+    """Rules, reorientation terms and field reactions get their LatticeState from different places;
+    all must see StateSpec.capacity, also with volume exclusion, where it is optional."""
+    from lgca import reorientation_term
+    from lgca.fields import _REACTIONS, PDESpec, reaction
+    from lgca.pipeline import ReorientationSpec, ReorientationTermSpec
+
+    seen = {}
+
+    @interaction(kind="birth_death", families=("classical", "nove", "ib", "nove_ib"), name="capacity_probe")
+    def capacity_probe(state):
+        """Records the capacity it sees."""
+        seen["interaction"] = state.capacity, state.has_capacity
+
+    @reorientation_term(coupling="rest", name="capacity_probe_term")
+    def capacity_probe_term(state):
+        """Records the capacity it sees."""
+        seen["term"] = state.capacity, state.has_capacity
+        return 0.0
+
+    @reaction(name="capacity_probe_reaction")
+    def capacity_probe_reaction(state, c):
+        seen["reaction"] = state.capacity, state.has_capacity
+        return 0.0, 0.0
+
+    try:
+        compiled = build_model(ModelSpec(
+            space=SpaceSpec(geometry="square", dims=(4, 4)),
+            state=StateSpec(density=0.5, restchannels=1, volume_exclusion=volume_exclusion,
+                            identity_based=identity_based, capacity=capacity, fields={"u": 0.0}),
+            time=TimeSpec(steps=1, seed=1),
+            dynamics=InteractionPipelineSpec(operators=[
+                {"name": "capacity_probe"},
+                ReorientationSpec(terms=[ReorientationTermSpec("capacity_probe_term")]),
+                PDESpec(field="u", reactions=[{"name": "capacity_probe_reaction"}])])))
+        compiled.step()
+    finally:
+        _REACTIONS.pop("capacity_probe_reaction", None)
+    expected = (capacity, True) if capacity is not None else (5, False) if volume_exclusion else (compiled.lgca.K, True)
+    assert seen == {"interaction": expected, "term": expected, "reaction": expected}
+    assert compiled.metadata["capacity"] == expected[0]
+    assert LatticeState(compiled.lgca).capacity == expected[0]

@@ -22,6 +22,9 @@ work below is still planned.
 Review follow-up (2026-09-28): R7 decided (capacity of `evolution_modes` limits
 division only). R1 fixed: a cell table rebuilt from label lists that were read
 but not changed keeps its order, so no reader of `lgca.nodes` changes a run.
+R2 fixed: `StateSpec.capacity` is recorded on the lattice at build and is the
+default of every `LatticeState` (rules, reorientation terms, reactions) and the
+`capacity` of the metadata.
 
 ## Reference point: Morpheus
 
