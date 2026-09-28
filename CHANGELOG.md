@@ -657,6 +657,12 @@ This file records notable user-facing changes. Changes remain under
   `biolgca sweep --vary seed=...`) and asks for `seeds=` (`--seeds`). The
   seed of the grid was replaced by the seeds of the sweep, so rows labelled
   with different seeds were identical runs.
+- Models that read a file, e.g. the state of a `from_npz` initializer, can
+  be swept: `sweep(..., resource_base=, trusted_paths=)` passes the
+  directory to every run (also in worker processes), and `biolgca sweep`
+  uses the directory of the model file and takes `--trusted-paths`. It
+  copies the file to `resources/` in the output directory, as `biolgca run`
+  does, so the model in `sweep.json` can be run again.
 - The largest cell label of identity-based models (`lgca.maxlabel`) is a
   Python integer. It was a NumPy integer, and with NumPy 1.x `maxlabel + 1`
   became a float that cannot index the trait arrays.

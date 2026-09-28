@@ -80,6 +80,7 @@ def _build_parser() -> argparse.ArgumentParser:
     sweep.add_argument("--long", action="store_true", help="one row per run and recorded step")
     sweep.add_argument("--n-jobs", type=int, default=1, help="number of runs at the same time")
     sweep.add_argument("--overwrite", action="store_true")
+    sweep.add_argument("--trusted-paths", action="store_true")
     sweep.add_argument("--show-progress", action="store_true")
     sweep.add_argument("--plugins", action="append", default=[], metavar="MODULE", help=plugins_help)
     sweep.set_defaults(handler=_sweep)
@@ -146,20 +147,7 @@ def _run(args) -> int:
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    initializer = portable_spec.state.initializer
-    if initializer is not None and initializer["name"] == "from_npz":
-        from .initializers import resolve_resource_path
-
-        parameters = dict(initializer.get("parameters", {}))
-        source = resolve_resource_path(parameters["path"], resource_base=model_path.parent,
-                                       trusted_paths=args.trusted_paths)
-        target = output_dir / "resources" / "initial_state.npz"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if source != target.resolve():
-            shutil.copyfile(source, target)
-        parameters["path"] = "resources/initial_state.npz"
-        portable_spec = replace(portable_spec, state=replace(portable_spec.state,
-            initializer={"name": "from_npz", "parameters": parameters}))
+    portable_spec = _with_copied_resources(portable_spec, model_path, output_dir, args.trusted_paths)
     # Record the seed actually used, including one drawn for an unseeded model.
     portable_spec = replace(portable_spec, time=replace(portable_spec.time, seed=compiled.spec.time.seed))
     save_model_spec(portable_spec, output_dir / "model.resolved.json")
@@ -184,6 +172,27 @@ def _run(args) -> int:
     return 0
 
 
+def _with_copied_resources(spec, model_path: Path, output_dir: Path, trusted_paths: bool):
+    """The model with the file of its ``from_npz`` initializer copied to the output directory.
+
+    The spec saved there (``model.resolved.json``, ``sweep.json``) then refers to the copy.
+    """
+    initializer = spec.state.initializer
+    if initializer is None or initializer["name"] != "from_npz":
+        return spec
+    from .initializers import resolve_resource_path
+
+    parameters = dict(initializer.get("parameters", {}))
+    source = resolve_resource_path(parameters["path"], resource_base=model_path.parent,
+                                   trusted_paths=trusted_paths)
+    target = output_dir / "resources" / "initial_state.npz"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if source != target.resolve():
+        shutil.copyfile(source, target)
+    parameters["path"] = "resources/initial_state.npz"
+    return replace(spec, state=replace(spec.state, initializer={"name": "from_npz", "parameters": parameters}))
+
+
 def _existing_model_path(path: Path) -> Path:
     resolved = path.resolve()
     if not resolved.is_file():
@@ -205,11 +214,13 @@ def _sweep(args) -> int:
     seeds = None if args.seeds is None else _parse_seeds(args.seeds)
     measure = {name: name for name in args.measure} or {"population": final_population}
     table = sweep(spec, grid=grid or None, seeds=seeds, measure=measure, n_jobs=args.n_jobs, long=args.long,
-                  plugins=plugins, showprogress=args.show_progress)
+                  plugins=plugins, showprogress=args.show_progress, resource_base=model_path.parent,
+                  trusted_paths=args.trusted_paths)
     output_dir.mkdir(parents=True, exist_ok=True)
     table.map(_csv_cell).to_csv(output_dir / "table.csv", index=False)
+    portable_spec = _with_copied_resources(spec, model_path, output_dir, args.trusted_paths)
     description = {
-        "model": model_spec_to_dict(spec), "grid": _json_safe(grid), "paths": table.attrs["paths"],
+        "model": model_spec_to_dict(portable_spec), "grid": _json_safe(grid), "paths": table.attrs["paths"],
         "seeds": _json_safe(sorted(set(table["seed"].tolist()))), "measure": list(measure), "long": args.long,
         "plugins": plugins, "biolgca_version": _package_version(),
     }

@@ -147,3 +147,9 @@ population at the end of every run. ``--plugins my_project.rules`` imports
 trusted modules with your own rules first; ``biolgca run`` and
 ``biolgca validate`` take it as well. Modules are never imported because a
 model file names them.
+
+Files that the model reads, such as the state of a ``from_npz`` initializer,
+are found next to the model file (from Python: ``sweep(...,
+resource_base="path/to/model_dir")``), and ``--trusted-paths`` allows paths
+outside its directory. The sweep copies such a file to ``resources/`` in the
+output directory, and the model in ``sweep.json`` refers to the copy.

@@ -26,6 +26,7 @@ R2 fixed: `StateSpec.capacity` is recorded on the lattice at build and is the
 default of every `LatticeState` (rules, reorientation terms, reactions) and the
 `capacity` of the metadata. R3 fixed: seeds come only from `seeds=`; a seed in
 the grid is rejected (chosen over honouring grid seeds: one way to give seeds).
+R4 fixed: `sweep` and `biolgca sweep` take the resource base and trusted paths.
 
 ## Reference point: Morpheus
 

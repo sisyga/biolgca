@@ -109,7 +109,7 @@ def final_population(result) -> int:
 def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | None = None, *,
           seeds: Iterable[int] | None = None, measure: Mapping[str, Any] | None = None, n_jobs: int = 1,
           backend: str = "processes", long: bool = False, plugins: Sequence[str] = (),
-          showprogress: bool = True):
+          showprogress: bool = True, resource_base: str | Path | None = None, trusted_paths: bool = False):
     """Run a model for every combination of parameter values and seeds; one table row per run.
 
     Parameters
@@ -146,6 +146,12 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
         own rules (``"my_project.rules"``).
     showprogress : bool, default=True
         Show a progress bar over the runs.
+    resource_base : str or Path, optional
+        Directory against which relative resource paths of the model are resolved, e.g. the file of
+        a ``from_npz`` initializer; usually the directory of the model file. As in
+        :func:`~lgca.model.run_model`.
+    trusted_paths : bool, default=False
+        Allow resource paths outside ``resource_base``, as in :func:`~lgca.model.run_model`.
 
     Every run has its own copy of the model's observers. Files that observers would write (CSV
     snapshots and time series) are discarded; measure what you need instead, e.g. the metrics of
@@ -194,7 +200,9 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
     if seeds == [None]:
         seeds = [_drawn_seed()]
     jobs = [(combination, seed) for combination in combinations for seed in seeds]
-    results = _execute(spec, jobs, measures, n_jobs, backend, tuple(plugins), showprogress, columns)
+    resources = {"resource_base": None if resource_base is None else str(Path(resource_base).resolve()),
+                 "trusted_paths": bool(trusted_paths)}
+    results = _execute(spec, jobs, measures, n_jobs, backend, tuple(plugins), showprogress, columns, resources)
     rows = []
     for (combination, seed), measured in zip(jobs, results):
         base = {columns[path]: value for path, value in combination.items()}
@@ -475,7 +483,7 @@ def _drawn_seed():
     return int(np.random.SeedSequence().generate_state(1, np.uint32)[0])
 
 
-def _execute(spec, jobs, measures, n_jobs, backend, plugins, showprogress, columns):
+def _execute(spec, jobs, measures, n_jobs, backend, plugins, showprogress, columns, resources):
     from tqdm.auto import tqdm
 
     if isinstance(n_jobs, bool) or not isinstance(n_jobs, (int, np.integer)) or n_jobs < 1:
@@ -488,7 +496,7 @@ def _execute(spec, jobs, measures, n_jobs, backend, plugins, showprogress, colum
     try:
         if n_jobs == 1 or len(jobs) == 1:
             for index, job in enumerate(jobs):
-                results[index] = _guarded(spec, job, measures, (), columns, None)
+                results[index] = _guarded(spec, job, measures, (), columns, None, resources)
                 progress.update()
             return results
         processes = backend == "processes"
@@ -503,7 +511,7 @@ def _execute(spec, jobs, measures, n_jobs, backend, plugins, showprogress, colum
         try:
             with pool:
                 futures = {pool.submit(_guarded, spec, job, measures, plugins if processes else (), columns,
-                                       backend): index for index, job in enumerate(jobs)}
+                                       backend, resources): index for index, job in enumerate(jobs)}
                 for future in as_completed(futures):
                     results[futures[future]] = future.result()
                     progress.update()
@@ -539,13 +547,13 @@ def _check_picklable(spec, measures):
                         f"n_jobs=1") from None
 
 
-def _guarded(spec, job, measures, plugins, columns, backend):
+def _guarded(spec, job, measures, plugins, columns, backend, resources):
     """One run, with the run named in errors."""
     combination, seed = job
     try:
         for module in plugins:
             import_module(module)
-        return _run_one(spec, combination, seed, measures)
+        return _run_one(spec, combination, seed, measures, resources)
     except Exception as exc:
         label = ", ".join([f"{columns[path]}={value!r}" for path, value in combination.items()] + [f"seed={seed}"])
         hint = ""
@@ -557,7 +565,7 @@ def _guarded(spec, job, measures, plugins, columns, backend):
         raise RuntimeError(f"the run with {label} failed: {type(exc).__name__}: {exc}.{hint}") from exc
 
 
-def _run_one(spec, combination, seed, measures):
+def _run_one(spec, combination, seed, measures, resources):
     from .model import AnalysisSpec, run_model
     from .simulation import CSVSnapshotObserver, ScalarTimeSeriesRecorder
 
@@ -572,7 +580,7 @@ def _run_one(spec, combination, seed, measures):
             elif isinstance(observer, CSVSnapshotObserver):
                 observer.output_dir = Path(scratch) / f"snapshots_{index}"
         variant = replace(variant, analysis=AnalysisSpec(observers=observers))
-        result = run_model(variant, showprogress=False)
+        result = run_model(variant, showprogress=False, **resources)
     measured = {}
     for name, what in measures.items():
         if isinstance(what, str):

@@ -304,3 +304,40 @@ def test_the_command_line_sweeps_into_a_table(tmp_path):
     assert main(["sweep", str(tmp_path / "model.json"), "--vary", "birth_rate=0,0.5", "--measure", "population",
                  "--long", "--n-jobs", "2", "--output", str(long)]) == 0
     assert len(pd.read_csv(long / "table.csv")) == 10
+
+
+def _from_npz(directory):
+    from lgca.model import save_model_spec
+
+    np.savez(directory / "state.npz", nodes=np.ones((4, 2), dtype=bool))
+    spec = ModelSpec(space=SpaceSpec(geometry="lin", dims=4),
+                     state=StateSpec(initializer={"name": "from_npz", "parameters": {"path": "state.npz"}}),
+                     time=TimeSpec(steps=0, seed=1))
+    save_model_spec(spec, directory / "model.json")
+    return spec
+
+
+@pytest.mark.parametrize("n_jobs, backend", [(1, "processes"), (2, "threads"), (2, "processes")])
+def test_sweeps_read_the_resources_of_the_model(tmp_path, n_jobs, backend):
+    spec = _from_npz(tmp_path)
+    with pytest.raises(RuntimeError, match="require resource_base"):
+        sweep(spec, showprogress=False)
+    table = sweep(spec, seeds=[1, 2], n_jobs=n_jobs, backend=backend, resource_base=tmp_path, showprogress=False)
+    assert table.population.tolist() == [8, 8]
+
+
+def test_the_command_line_sweeps_a_model_with_resources(tmp_path):
+    import json
+
+    from lgca.cli import main
+    from lgca.model import build_model, model_spec_from_dict
+
+    _from_npz(tmp_path)
+    output = tmp_path / "runs"
+    assert main(["validate", str(tmp_path / "model.json")]) == 0
+    assert main(["sweep", str(tmp_path / "model.json"), "--seeds", "1,2", "--output", str(output)]) == 0
+    assert pd.read_csv(output / "table.csv").population.tolist() == [8, 8]
+    description = json.loads((output / "sweep.json").read_text())
+    assert description["model"]["model"]["state"]["initializer"]["parameters"]["path"] == "resources/initial_state.npz"
+    compiled = build_model(model_spec_from_dict(description["model"]), resource_base=output)  # usable later
+    assert compiled.lgca.cell_density[compiled.lgca.nonborder].sum() == 8
