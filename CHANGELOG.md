@@ -35,8 +35,13 @@ This file records notable user-facing changes. Changes remain under
   hard capacity and driver mutations; the more cells stop moving in a full
   tissue, the more the tumour's evolution changes from one sweep after
   another to branching and finally stalls, measured with Noble's indices
-  (drivers per cell, clonal diversity). `ZooEntry` cards of new models have
-  no paper.
+  (drivers per cell, clonal diversity). And drivers, passengers and
+  mutational meltdown (Syga 2023, PhD thesis, after McFarland et al. 2014):
+  the tug-of-war around the critical population size N*, invasion as an
+  escape, and a coarse probability-of-cancer diagram; a control without
+  mutations shows that small immobile tumours die out by chance, and only
+  tumours near N* by their mutational load. `ZooEntry` cards of new models
+  have no paper.
 - Rules of the kind `"field"` change fields but no cells, with
   `LatticeState.set_field(name, values)` (also available to other rules),
   e.g. a matrix degraded by the cells.

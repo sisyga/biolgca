@@ -29,7 +29,11 @@ from lgca.model import (
     StateSpec,
     TimeSpec,
 )
-from lgca.pipeline import InteractionPipelineSpec, ReorientationSpec, ReorientationTermSpec
+from lgca.pipeline import (
+    InteractionPipelineSpec,
+    ReorientationSpec,
+    ReorientationTermSpec,
+)
 from lgca.simulation import PopulationRecorder, Schedule
 from lgca.zoo._card import Parameter, ZooEntry
 
@@ -254,7 +258,7 @@ def scan(n0s, gammas, seeds=range(10), n_jobs: int = 1, **options):
 
         method = "forkserver" if "forkserver" in multiprocessing.get_all_start_methods() else "spawn"
         with ProcessPoolExecutor(n_jobs, mp_context=multiprocessing.get_context(method)) as pool:
-            results = list(pool.map(_scan_one, tasks, chunksize=4))
+            results = list(pool.map(_scan_one, tasks))  # one run per task: their lengths differ a lot
     table = pd.DataFrame(tasks, columns=["n0", "gamma", "seed", "options"]).drop(columns="options")
     table["outcome"] = results
     return table

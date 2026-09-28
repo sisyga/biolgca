@@ -374,3 +374,28 @@ distributed).
   upper bound and the sweep curve and reads them as a guide, no automatic
   classification. Notebook ≈ 60 s.
 
+## Entry 6 as built
+
+- `mutational_meltdown`, from the thesis (user 2026-09-27: its analysis
+  chapters) and the thesis code (Zenodo 10.5281/zenodo.10014813,
+  `mullersratchet.ipynb`, `paramscan_spatialratchet.py`). α₀ = 0.5,
+  p_d = 7e-6, p_p = 0.05, effects exponential with means α₀ s_d = 0.1 and
+  α₀ s_p = 5e-4 (bounds [0, 1]), N* = T_p s_p/(T_d s_d²) = 178.6.
+- Isolated nodes (`isolated_nodes`): δ = 0.25, K = 2N₀, cells die and
+  divide only in the rest channel (`channels="rest"`), so nodes exchange no
+  cells; 40 000 steps = 10⁴ generations (generation = 1/δ steps, as the
+  code's time axis). Reproduces thesis Fig 4 (N*/2 declines, 3 of 4
+  extinct; 2N* grows). First attempt without `channels="rest"` let
+  daughters move: 20 "isolated" nodes formed one population of ~2000 > N*
+  and all grew.
+- Invasion (`build_spec`, `outcome`, `scan`): δ = 0.375 (the code of the
+  diagram; the text says 0.25, with which small tumours escape at larger γ
+  than in the figure), K = N₀/(1 − δ/α₀), ⌈4N*/N₀⌉ nodes, stop at
+  extinction or max(2N₀, N*) cells, 20 000-step limit (`full`: 100 000).
+  Scan 5 × 5 × 6 on four processes reproduces the diagram's shape.
+- Found: without mutations, N₀ = N*/10 (18 cells per node) dies out at
+  γ ≥ 8 just the same: demographic extinction (a founder survives with
+  1 − δ/α₀ = 1/4). At N₀ = N*/2 and γ = 16, without mutations 8 of 8
+  persist, with them most go extinct: meltdown. The thesis reads the whole
+  diagram as meltdown; the notebook shows the control. Notebook ≈ 85 s.
+

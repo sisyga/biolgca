@@ -56,6 +56,13 @@ size that runs in about a minute, and states what differs from the paper.
      - hexagonal, identity-based without volume exclusion; glands with a
        hard capacity, driver mutations, contact inhibition
      - new model, after Noble et al. 2022
+   * - :doc:`mutational_meltdown`
+     - Rare strong drivers against frequent weak passengers: when does a
+       tumour's own mutational load drive it extinct, and can invasion
+       rescue it?
+     - 1D, identity-based without volume exclusion (evolutionary LGCA);
+       driver and passenger mutations
+     - Syga 2023 (thesis)
    * - :doc:`excitable_media`
      - Do spiral waves survive when an excitable medium consists of a small
        number of discrete individuals?
@@ -81,5 +88,6 @@ and the :doc:`../tutorials/index`.
    phenotypic_plasticity
    clonal_go_or_grow
    evolution_modes
+   mutational_meltdown
    excitable_media
    jamming

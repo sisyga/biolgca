@@ -433,3 +433,45 @@ def test_mean_return_time_of_a_periodic_node():
     assert excitable_media.mean_return_time(nodes) == 4
     nodes[1:, 1] = True  # a node that never returns to its first state is left out
     assert excitable_media.mean_return_time(nodes) == 4
+
+
+# ------------------------------------------------------------------ mutational meltdown
+
+from lgca.zoo import mutational_meltdown as meltdown
+
+
+def test_meltdown_setup_follows_the_thesis_code():
+    assert meltdown.critical_size() == pytest.approx(5e6 * 1e-3 / (700 * 0.2 ** 2))
+    spec = meltdown.build_spec(n0=0.25)  # N₀ = N*/4 = 45 cells, K = N₀ / (1 − δ/α₀) = 4 N₀
+    cells = spec.state.nodes.sum()
+    assert cells == spec.state.nodes[0, -1] == 45 and spec.state.capacity == 179
+    assert spec.space.dims == int(np.ceil(4 * meltdown.critical_size() / 45))
+    mutations = spec.dynamics.operators[0]["parameters"]["mutation"]
+    assert [m["probability"] for m in mutations] == [pytest.approx(0.05), pytest.approx(7e-6)]
+    assert mutations[0]["traits"]["r_b"]["scale"] == pytest.approx(5e-4)
+    assert mutations[1]["traits"]["r_b"]["scale"] == pytest.approx(0.1)
+    isolated = meltdown.isolated_nodes(0.5, nodes=3)  # K = 2 N₀ with δ = 0.25
+    assert isolated.state.capacity == 179 and np.all(isolated.state.nodes[:, -1] == 90)  # N₀ = K/2, rounded
+
+
+def test_isolated_nodes_exchange_no_cells_and_passengers_lower_alpha():
+    history = meltdown.node_histories(meltdown.isolated_nodes(0.5, nodes=3, p_d=0.0, steps=300), every=300)
+    lattice = build_model(meltdown.isolated_nodes(0.5, nodes=3, steps=1)).lgca
+    assert lattice.K == 3 and np.all(history["cells"][-1] > 40)
+    # only passengers: α falls by about δ p_p α₀ s_p per step and cell (all daughters of a
+    # turnover δ per step carry a passenger with probability p_p)
+    strong = meltdown.node_histories(meltdown.isolated_nodes(0.5, nodes=3, p_d=0.0, p_p=1.0, s_p=0.002,
+                                                             steps=300), every=300)
+    decline = 0.5 - np.nanmean(strong["alpha"][-1])
+    assert 0.25 * 300 * 0.002 * 0.5 * 0.5 < decline < 0.25 * 300 * 0.002 * 0.5 * 2
+    assert np.nanmean(history["alpha"][-1]) > 0.5 - 0.25 * 300 * 0.05 * 5e-4 * 3
+
+
+def test_moving_rescues_small_tumours_that_die_out_without_any_mutation():
+    """At N₀ = N*/10 a node holds 18 cells: immobile tumours die out by chance, mobile ones invade."""
+    table = meltdown.scan([0.1], [0.0, 16.0], seeds=range(3), p_p=0.0, p_d=0.0)
+    assert list(table.columns) == ["n0", "gamma", "seed", "outcome"] and len(table) == 6
+    outcomes = table.groupby("gamma")["outcome"].agg(set)
+    assert outcomes[0.0] == {"cancer"} and outcomes[16.0] == {"extinct"}
+    result, steps, history = meltdown.outcome(meltdown.build_spec(n0=0.1, gamma=0.0, seed=1), history=True)
+    assert result == "cancer" and history["cells"][-1] >= meltdown.critical_size() and history["extent"][-1] > 1
