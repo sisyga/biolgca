@@ -29,6 +29,9 @@ the grid is rejected (chosen over honouring grid seeds: one way to give seeds).
 R4 fixed: `sweep` and `biolgca sweep` take the resource base and trusted paths.
 R5 fixed (user decision: discard by default, keeping optional): file-only observers
 do not run in sweeps; `keep_files=True` gives every run its own folder.
+R6 fixed (user decision: measurements belong to the notebook, not the spec):
+`jamming.build_spec` is the model alone, `ScalarTimeSeriesRecorder` writes a file
+only when given a path, zoo specs round-trip in a fresh process with `--plugins`.
 
 ## Reference point: Morpheus
 

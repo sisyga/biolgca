@@ -33,7 +33,6 @@ import logging
 import multiprocessing
 import pickle
 import re
-import tempfile
 from collections.abc import Iterable, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from concurrent.futures.process import BrokenProcessPool
@@ -583,11 +582,9 @@ def _run_one(spec, combination, seed, measures, resources, folder=None):
     variant = replace(variant, time=replace(variant.time, seed=seed))
     # every run its own observers (they keep state), and their files in a folder of the run or nowhere
     observers = deepcopy(tuple(variant.analysis.observers)) if variant.analysis is not None else ()
-    with tempfile.TemporaryDirectory(prefix="lgca-sweep-") as scratch:
-        observers = tuple(observer for index, observer in enumerate(observers)
-                          if _redirect(observer, Path(scratch) / f"observer_{index}", folder))
-        variant = replace(variant, analysis=AnalysisSpec(observers=observers))
-        result = run_model(variant, showprogress=False, **resources)
+    observers = tuple(observer for observer in observers if _redirect(observer, folder))
+    variant = replace(variant, analysis=AnalysisSpec(observers=observers))
+    result = run_model(variant, showprogress=False, **resources)
     measured = {}
     for name, what in measures.items():
         if isinstance(what, str):
@@ -598,15 +595,17 @@ def _run_one(spec, combination, seed, measures, resources, folder=None):
     return measured
 
 
-def _redirect(observer, scratch, folder):
+def _redirect(observer, folder):
     """Send the files of an observer to the run's ``folder`` in its destination, or with no folder
-    to ``scratch``; False if the observer only draws or writes files that nobody would see."""
+    nowhere; False if the observer only draws or writes files that nobody would see."""
     from .plotting import AnimationObserver, PlotSnapshotObserver
     from .simulation import CSVSnapshotObserver, ScalarTimeSeriesRecorder
 
     if isinstance(observer, ScalarTimeSeriesRecorder):
-        observer.output_path = (scratch / "series.csv" if folder is None
-                                else observer.output_path.parent / folder / observer.output_path.name)
+        if folder is None or observer.output_path is None:
+            observer.output_path = None  # the values stay in result.data
+        else:
+            observer.output_path = observer.output_path.parent / folder / observer.output_path.name
     elif isinstance(observer, (CSVSnapshotObserver, PlotSnapshotObserver)):
         if folder is None or observer.output_dir is None:
             return False

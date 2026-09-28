@@ -18,6 +18,13 @@ size that runs in about a minute, and states what differs from the paper.
    spec = allee.build_spec(density=0.3)  # a lgca.model.ModelSpec
    zoo.parameter_table("allee_effect")  # the paper's symbols and their paths in the spec
 
+``build_spec`` returns the model alone; what the notebooks measure, they
+add to it. Every spec can be saved as a model file. Entries that define
+rules of their own (``jamming``, ``evolution_modes``) register them when
+their module is imported, so a saved model of such an entry runs in a new
+Python process after ``import lgca.zoo.jamming``, or with
+``biolgca run model.json --plugins lgca.zoo.jamming``.
+
 .. list-table::
    :header-rows: 1
    :widths: 22 38 25 15
@@ -53,8 +60,8 @@ size that runs in about a minute, and states what differs from the paper.
    * - :doc:`evolution_modes`
      - Does it matter for how a tumour evolves whether its cells keep
        moving through the crowded tissue or stop where it is full?
-     - hexagonal, identity-based without volume exclusion; glands with a
-       hard capacity, driver mutations, contact inhibition
+     - hexagonal, identity-based without volume exclusion; glands whose
+       capacity stops division, driver mutations, contact inhibition
      - new model, after Noble et al. 2022
    * - :doc:`mutational_meltdown`
      - Rare strong drivers against frequent weak passengers: when does a

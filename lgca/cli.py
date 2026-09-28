@@ -276,7 +276,7 @@ def _validate_output_declarations(spec, *, trusted_paths: bool) -> None:
                 observer.filename.format(kind=observer.kind, step=0),
                 trusted_paths=trusted_paths,
             )
-        elif isinstance(observer, ScalarTimeSeriesRecorder):
+        elif isinstance(observer, ScalarTimeSeriesRecorder) and observer.output_path is not None:
             _validate_relative_output(observer.output_path, trusted_paths=trusted_paths)
 
 
@@ -285,6 +285,8 @@ def _resolve_output_paths(spec, output_dir: Path, *, trusted_paths: bool) -> Non
     if spec.analysis is None:
         return
     for observer in spec.analysis.observers:
+        if isinstance(observer, ScalarTimeSeriesRecorder) and observer.output_path is None:
+            observer.output_path = Path("time_series.csv")  # the command line keeps what it records
         if isinstance(observer, CSVSnapshotObserver):
             observer.output_dir = _output_path(
                 observer.output_dir, output_dir, trusted_paths=trusted_paths

@@ -941,8 +941,10 @@ def _observer_to_dict(observer) -> dict[str, Any]:
         from .simulation import _total_population
 
         if set(observer.metrics) != {"population"} or observer.metrics["population"] is not _total_population:
-            raise TypeError("ScalarTimeSeriesRecorder serialization only supports the default population metric.")
-        data["output_path"] = str(observer.output_path)
+            raise TypeError("ScalarTimeSeriesRecorder serialization only supports the default population metric; "
+                            "attach recorders of your own metrics in Python, after loading the model")
+        if observer.output_path is not None:
+            data["output_path"] = str(observer.output_path)
     elif observer_type == "FieldRecorder":
         data["fields"] = list(observer.fields)
     return data

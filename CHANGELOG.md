@@ -671,6 +671,20 @@ This file records notable user-facing changes. Changes remain under
   in a folder per run named after its values and seed, e.g.
   `snapshots/kappa=2_seed=1/`. Plotting observers draw one at a time, so
   that runs in threads do not draw into each other's figures.
+- The model of the zoo entry `jamming` can be saved as a model file:
+  `build_spec` returns the model alone, and the notebook records the
+  observables (`single_cells`, `velocity_correlation`) with a recorder of
+  its own. `build_spec` takes `steps` (default 250, of which
+  `jamming.TRANSIENT = 50` are the transient) instead of `transient` and
+  `steps`. Runs no longer share a CSV file in the temporary directory. A
+  test saves every entry and runs it in a new Python process; loading a
+  model that names the rules of an entry that was not imported says which
+  module to import (`--plugins lgca.zoo.jamming`).
+- `ScalarTimeSeriesRecorder` writes a CSV file only to an `output_path`
+  you give; the values are in `result.data` under the metrics' names. It
+  wrote `time_series.csv` to the working directory by default. `biolgca
+  run` still writes `time_series.csv` to its output directory.
+- The zoo index no longer calls the capacity of `evolution_modes` hard.
 - The largest cell label of identity-based models (`lgca.maxlabel`) is a
   Python integer. It was a NumPy integer, and with NumPy 1.x `maxlabel + 1`
   became a float that cannot index the trait arrays.

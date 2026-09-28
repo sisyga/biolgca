@@ -338,6 +338,17 @@ def _record_timing(timing, name: str, kind: str, elapsed: float) -> None:
     aggregate["max_seconds"] = max(aggregate["max_seconds"], elapsed)
 
 
+def _zoo_hint(name) -> str:
+    """How to register a rule of a zoo entry, whose names start with the entry's, e.g. ``jamming.influx``."""
+    from .zoo import ENTRIES
+
+    entry = str(name).partition(".")[0]
+    if entry not in ENTRIES:
+        return ""
+    return (f" (a rule of the zoo entry {entry!r}: import lgca.zoo.{entry} before loading the model; "
+            f"on the command line --plugins lgca.zoo.{entry})")
+
+
 def compile_pipeline(spec: InteractionPipelineSpec | None, context) -> CompiledPipeline:
     """Compile a pipeline spec into executable operators."""
 
@@ -351,7 +362,7 @@ def compile_pipeline(spec: InteractionPipelineSpec | None, context) -> CompiledP
             operators.append(_compile_operator(operator_spec))
         except KeyError as exc:
             name = _operator_name(operator_spec)
-            raise ValueError(f"dynamics.operators[{index}] unknown operator {name!r}") from exc
+            raise ValueError(f"dynamics.operators[{index}] unknown operator {name!r}{_zoo_hint(name)}") from exc
         except ValueError as exc:
             message = str(exc)
             separator = "" if message.startswith(".") else " "
@@ -771,7 +782,7 @@ class BoltzmannReorientationOperator(ReorientationOperator):
             definition = _REORIENTATION_TERMS.get(_TERM_ALIASES.get(term_spec.name, term_spec.name))
             if definition is None:
                 matches = difflib.get_close_matches(term_spec.name, list_reorientation_terms(), n=1)
-                hint = f" (did you mean {matches[0]!r}?)" if matches else ""
+                hint = _zoo_hint(term_spec.name) or (f" (did you mean {matches[0]!r}?)" if matches else "")
                 raise ValueError(f".terms[{index}] unknown reorientation term {term_spec.name!r}{hint}")
             try:
                 terms.append(_FieldTerm(term_spec, definition))

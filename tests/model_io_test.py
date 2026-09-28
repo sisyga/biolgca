@@ -14,6 +14,7 @@ from lgca.model import (
     TimeSpec,
     describe_model_graph,
     migrate_model_spec_dict,
+    model_spec_from_dict,
     model_spec_from_json,
     model_spec_from_yaml,
     model_spec_to_dict,
@@ -230,3 +231,23 @@ def test_cli_writes_the_seed_it_used_into_the_resolved_model(tmp_path):
 
     resolved = load_model_spec(tmp_path / "run" / "model.resolved.json")
     assert isinstance(resolved.time.seed, int)
+
+
+def test_time_series_go_to_a_file_only_when_asked(tmp_path, monkeypatch):
+    """Recordings of your own metrics stay in result.data; a file is written only to output_path,
+    and by the command line into its output directory."""
+    from lgca.cli import main
+
+    monkeypatch.chdir(tmp_path)
+    spec = ModelSpec(space=SpaceSpec(geometry="lin", dims=4), state=StateSpec(density=0.5),
+                     time=TimeSpec(steps=3, seed=1),
+                     analysis=AnalysisSpec(observers=[ScalarTimeSeriesRecorder()]))
+    result = run_model(spec, showprogress=False)
+    assert len(result.data["population"]) == 4 and list(tmp_path.iterdir()) == []
+    assert result.metadata["output_paths"] == []
+    saved = model_spec_to_dict(spec)["model"]["analysis"]["observers"][0]
+    assert "output_path" not in saved
+    assert model_spec_from_dict(model_spec_to_dict(spec)).analysis.observers[0].output_path is None
+    save_model_spec(spec, tmp_path / "model.json")
+    assert main(["run", str(tmp_path / "model.json"), "--output", str(tmp_path / "run")]) == 0
+    assert len((tmp_path / "run" / "time_series.csv").read_text().splitlines()) == 5

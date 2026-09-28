@@ -544,7 +544,20 @@ class CSVSnapshotObserver(Observer):
 
 
 class ScalarTimeSeriesRecorder(Observer):
-    """Record scalar metrics over time and write them to CSV."""
+    """Record scalar metrics over time, and write them to a CSV file if ``output_path`` is given.
+
+    Parameters
+    ----------
+    metrics : mapping, optional
+        Name -> function of the model that returns a number. Default: the population.
+        The values are in ``result.data`` under these names.
+    schedule : Schedule, optional
+        The steps at which the metrics are recorded. Default: every step.
+    output_path : str or Path, optional
+        CSV file with a column ``step`` and a column per metric, written at the end of
+        the run. Default: no file. ``biolgca run`` writes ``time_series.csv`` in its
+        output directory.
+    """
 
     def __init__(
         self,
@@ -554,12 +567,13 @@ class ScalarTimeSeriesRecorder(Observer):
     ):
         super().__init__(schedule=schedule)
         self.metrics = dict(metrics or {"population": _total_population})
-        self.output_path = Path("time_series.csv" if output_path is None else output_path)
+        self.output_path = None if output_path is None else Path(output_path)
         self.records: list[dict[str, Any]] = []
 
     def setup(self, lgca, runner: SimulationRunner) -> None:
         self.records = []
-        self.output_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.output_path is not None:
+            self.output_path.parent.mkdir(parents=True, exist_ok=True)
 
     def on_step(self, lgca, step: int) -> None:
         row = {"step": step}
@@ -568,7 +582,7 @@ class ScalarTimeSeriesRecorder(Observer):
         self.records.append(row)
 
     def finalize(self, lgca, runner: SimulationRunner) -> None:
-        if not self.records:
+        if not self.records or self.output_path is None:
             return
         with self.output_path.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=list(self.records[0]))

@@ -13,6 +13,10 @@ death, cells pick channels: a velocity channel pointing to a node with relative 
 the weight ``exp(-α ρ)`` (contact inhibition: cells avoid moving into crowded nodes), the rest
 channel ``exp(γ)`` (cells prefer to rest). In a full tissue every direction is crowded, so the
 larger ``α``, the fewer cells move; at the edge of a colony cells still move out into free space.
+
+The contact-inhibition term is defined below; importing this module registers it, so a model of this
+entry saved to a file runs in a new Python process after ``import lgca.zoo.evolution_modes``, or with
+``biolgca run model.json --plugins lgca.zoo.evolution_modes``.
 """
 
 from __future__ import annotations

@@ -103,7 +103,7 @@ Built-in recorder observers include:
      - ``lgca.fam_pop_t`` for supported family-tracking runs
    * - ``ScalarTimeSeriesRecorder``
      - the names of its metrics
-     - a CSV file
+     - a CSV file if ``output_path`` is given
    * - ``FieldRecorder(["oxygen"])``
      - the field names, e.g. ``"oxygen"``
      - the history of a field, e.g. one updated by a ``pde`` operator

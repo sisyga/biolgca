@@ -33,6 +33,32 @@ def test_every_entry_has_a_card_parameters_and_a_notebook(name):
     assert zoo.parameter_table(name).shape[0] == len(module.PARAMETERS)
 
 
+def test_every_entry_is_saved_and_runs_in_a_new_process(tmp_path):
+    """build_spec is the model alone, without functions, so that it can be saved as a model file; a
+    new Python process runs it once it has imported the entry, which registers the entry's rules."""
+    import subprocess
+    import sys
+
+    from lgca.model import save_model_spec
+
+    for name in zoo.ENTRIES:
+        save_model_spec(zoo.load(name).build_spec(), tmp_path / f"{name}.json")
+    script = (
+        "import sys\n"
+        "from lgca.cli import main\n"
+        "for name in sys.argv[2:]:\n"
+        "    path = f'{sys.argv[1]}/{name}.json'\n"
+        "    if main(['validate', path, '--plugins', f'lgca.zoo.{name}']) != 0:\n"
+        "        sys.exit(f'{name} does not validate')\n"
+    )
+    done = subprocess.run([sys.executable, "-c", script, str(tmp_path), *zoo.ENTRIES], capture_output=True,
+                          text=True, cwd=tmp_path, timeout=300, check=False)
+    assert done.returncode == 0, done.stderr
+    fresh = subprocess.run([sys.executable, "-m", "lgca.cli", "validate", str(tmp_path / "jamming.json")],
+                           capture_output=True, text=True, cwd=tmp_path, timeout=120, check=False)
+    assert fresh.returncode == 2 and "--plugins lgca.zoo.jamming" in fresh.stderr
+
+
 def test_the_catalogue_lists_the_entries_in_order():
     assert [card.name for card in zoo.catalogue()] == list(zoo.ENTRIES)
     with pytest.raises(KeyError, match="has no entry"):
@@ -354,11 +380,24 @@ def test_matrix_degradation_and_influx():
     assert abs(added - 0.5 * free) < 4 * np.sqrt(free * 0.25)
 
 
-def test_the_invasion_modes():
+def _observed(spec):
+    """The model with the observables of Fig 5e recorded after the transient, as in the notebook."""
+    from lgca.model import AnalysisSpec
+    from lgca.simulation import ScalarTimeSeriesRecorder, Schedule
+
+    recorder = ScalarTimeSeriesRecorder(
+        metrics={"single_cells": jamming.single_cells, "correlation": jamming.velocity_correlation},
+        schedule=Schedule(steps=range(jamming.TRANSIENT + 1, spec.time.steps + 1)))
+    return replace(spec, analysis=AnalysisSpec(observers=[recorder]))
+
+
+def test_the_invasion_modes(tmp_path, monkeypatch):
     """Weak adhesion and a sparse matrix release single cells; a dense matrix or strong adhesion stops
     it; only adhesion correlates the movement of neighbours (Fig 5d, e)."""
+    monkeypatch.chdir(tmp_path)
+
     def mode(beta, ecm):
-        runs = [jamming.invasion_mode(run_model(jamming.build_spec(beta=beta, ecm=ecm, seed=seed),
+        runs = [jamming.invasion_mode(run_model(_observed(jamming.build_spec(beta=beta, ecm=ecm, seed=seed)),
                                                 showprogress=False)) for seed in (1, 2)]
         return {key: np.mean([run[key] for run in runs]) for key in runs[0]}
 
@@ -367,6 +406,7 @@ def test_the_invasion_modes():
     assert free["single_cells"] > 4 * adhesive["single_cells"]
     assert adhesive["correlation"] > free["correlation"] + 0.2
     assert abs(confined["correlation"] - free["correlation"]) < 0.1
+    assert list(tmp_path.iterdir()) == []  # the recordings are in the results, not in files
 
 
 def test_the_spheroid_is_a_disc_that_supplies_cells():

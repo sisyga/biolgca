@@ -19,19 +19,22 @@ channel. The invasion mode is read from the cumulative number of single cells an
 correlation between neighbouring nodes.
 
 The terms and rules below are written with the public decorators, as an example of adding the
-rules of a paper to the library.
+rules of a paper to the library. Importing this module registers them, so a model of this entry
+saved to a file runs in a new Python process after ``import lgca.zoo.jamming``, or with
+``biolgca run model.json --plugins lgca.zoo.jamming``.
+
+:func:`build_spec` is the model alone. The observables are functions of the lattice
+(:func:`single_cells`, :func:`velocity_correlation`); the notebook records them after the
+transient with a :class:`~lgca.simulation.ScalarTimeSeriesRecorder`, and :func:`invasion_mode`
+summarises the recordings.
 """
 
 from __future__ import annotations
-
-import tempfile
-from pathlib import Path
 
 import numpy as np
 
 from lgca.lattice_state import LatticeState
 from lgca.model import (
-    AnalysisSpec,
     Description,
     ModelSpec,
     SpaceSpec,
@@ -44,7 +47,6 @@ from lgca.pipeline import (
     ReorientationTermSpec,
 )
 from lgca.rules import interaction, reorientation_term
-from lgca.simulation import ScalarTimeSeriesRecorder, Schedule
 from lgca.zoo._card import Parameter, ZooEntry
 
 CARD = ZooEntry(
@@ -204,8 +206,17 @@ def velocity_correlation(lgca) -> float:
     return float(np.nanmean(values)) if np.isfinite(values).any() else float("nan")
 
 
+#: steps before the observables of Fig 5e are recorded; the paper records the 200 steps after them
+TRANSIENT = 50
+
+
 def invasion_mode(result) -> dict[str, float]:
-    """The observables of Fig 5e: single cells summed over the observed steps, and the mean correlation."""
+    """The observables of Fig 5e: single cells summed over the observed steps, and the mean correlation.
+
+    Reads the recordings ``"single_cells"`` and ``"correlation"`` of the run, e.g. of
+    ``ScalarTimeSeriesRecorder(metrics={"single_cells": single_cells, "correlation": velocity_correlation},
+    schedule=Schedule(steps=range(TRANSIENT + 1, 251)))``.
+    """
     return {"single_cells": float(np.sum(result.data["single_cells"])),
             "correlation": float(np.nanmean(result.data["correlation"]))}
 
@@ -225,7 +236,7 @@ def mean_correlation(result) -> float:
 def build_spec(full: bool = False, *, beta: float = 1.0, ecm: float = 1.0, setup: str = "sheet",
                beta_steric: float = 5.0, alpha: float = 1.0, rate: float = 0.05, rho_0: float = RHO_0,
                adhesion_scale: float = 1.0,
-               size: int | None = None, radius: int = 6, transient: int = 50, steps: int = 200,
+               size: int | None = None, radius: int = 6, steps: int = TRANSIENT + 200,
                seed: int | None = 1) -> ModelSpec:
     """The model of Ilina et al. (2020), Fig 5.
 
@@ -251,8 +262,9 @@ def build_spec(full: bool = False, *, beta: float = 1.0, ecm: float = 1.0, setup
         Side of the lattice; default 50 for the sheet, 80 for the spheroid.
     radius : int, default=6
         Radius of the spheroid.
-    transient, steps : int
-        Steps before the observables are recorded, and steps recorded.
+    steps : int, default=250
+        Steps of the run: the paper's transient of 50 steps (:data:`TRANSIENT`) and 200 steps in
+        which it records the observables.
     seed : int or None, default=1
         Seed of the run and of the initial cells.
     """
@@ -275,17 +287,12 @@ def build_spec(full: bool = False, *, beta: float = 1.0, ecm: float = 1.0, setup
     nodes = np.zeros(dims + (K,), dtype=bool)
     for index in np.argwhere(source > 0):
         nodes[tuple(index)][rng.choice(K, size=int(rho_0), replace=False)] = True
-    series = ScalarTimeSeriesRecorder(
-        metrics={"single_cells": single_cells, "correlation": velocity_correlation},
-        schedule=Schedule(steps=range(transient + 1, transient + steps + 1)),
-        output_path=Path(tempfile.gettempdir()) / "lgca_zoo_jamming.csv",
-    )
     return ModelSpec(
         description=Description(title=f"{CARD.title}: β = {beta}, ρ̄_ECM = {ecm}, {setup}", details=CARD.citation),
         space=SpaceSpec(geometry="hex", dims=dims, boundary="reflecting"),
         state=StateSpec(nodes=nodes, restchannels=K - 6,
                         fields={"ecm": float(ecm), "source": source}),
-        time=TimeSpec(steps=transient + steps, seed=seed),
+        time=TimeSpec(steps=steps, seed=seed),
         dynamics=InteractionPipelineSpec(operators=[
             # the order of the original code: influx, reorientation, matrix degradation
             {"name": "jamming.influx", "parameters": {"source": "source", "rate": rate}},
@@ -297,7 +304,6 @@ def build_spec(full: bool = False, *, beta: float = 1.0, ecm: float = 1.0, setup
             ]),
             {"name": "jamming.degradation", "parameters": {"field": "ecm", "alpha": alpha}},
         ]),
-        analysis=AnalysisSpec(observers=[series]),
     )
 
 
