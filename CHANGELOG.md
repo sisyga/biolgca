@@ -653,6 +653,10 @@ This file records notable user-facing changes. Changes remain under
   the rules of the same model. `LatticeState(model.lgca)` uses it too, and
   the run metadata records it as `capacity` (it recorded the number of
   channels of volume-exclusion models).
+- `sweep` rejects a seed in the grid (`"time.seed"` or `"seed"`, also
+  `biolgca sweep --vary seed=...`) and asks for `seeds=` (`--seeds`). The
+  seed of the grid was replaced by the seeds of the sweep, so rows labelled
+  with different seeds were identical runs.
 - The largest cell label of identity-based models (`lgca.maxlabel`) is a
   Python integer. It was a NumPy integer, and with NumPy 1.x `maxlabel + 1`
   became a float that cannot index the trait arrays.

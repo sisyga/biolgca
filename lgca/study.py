@@ -119,7 +119,7 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
     grid : mapping or list of mappings, optional
         Path (see the module) -> list of values; every combination of the values runs. A list of
         mappings gives the combinations explicitly, e.g. ``[{"kappa": 2, "theta": 0.3}, ...]``.
-        Default: the model as it is.
+        Default: the model as it is. The seed is not varied here but with ``seeds``.
     seeds : iterable of int, optional
         The seeds; every combination runs once per seed. Default: the seed of ``spec`` (one drawn
         from the operating system if it has none, and recorded in the table).
@@ -391,16 +391,25 @@ def _combinations(spec, grid):
     if grid is None:
         return [{}], []
     if isinstance(grid, Mapping):
-        paths = [resolve_path(spec, path) for path in grid]
+        paths = [_grid_path(spec, path) for path in grid]
         values = []
         for path, options in zip(paths, grid.values()):
             if isinstance(options, (str, bytes, Mapping)) or not isinstance(options, Iterable):
                 raise TypeError(f"grid[{path!r}] must be a list of values, got {options!r}")
             values.append(list(options))
         return [dict(zip(paths, point)) for point in itertools.product(*values)], paths
-    points = [{resolve_path(spec, path): value for path, value in point.items()} for point in grid]
+    points = [{_grid_path(spec, path): value for path, value in point.items()} for point in grid]
     paths = list(dict.fromkeys(path for point in points for path in point))
     return points, paths
+
+
+def _grid_path(spec, path):
+    """The full path of a varied value; the seed is not one (every run gets its seed from ``seeds``)."""
+    resolved = resolve_path(spec, path)
+    if _tokens(resolved) == [("name", "time"), ("name", "seed")]:
+        raise ValueError(f"the seed cannot be varied in the grid ({path!r}); give the seeds with seeds=, "
+                         f"e.g. seeds=[11, 22] (CLI: --seeds 11,22), and every combination runs once per seed")
+    return resolved
 
 
 def _column_names(paths):

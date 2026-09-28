@@ -146,6 +146,30 @@ def test_measures_cannot_overwrite_sweep_coordinates(name, long):
               measure={name: final_population}, long=long, showprogress=False)
 
 
+@pytest.mark.parametrize("grid, seeds", [
+    ({"time.seed": [11, 22]}, None),
+    ({"seed": [11, 22]}, None),
+    ({"birth_rate": [0.1], "seed": [11, 22]}, [1, 2]),
+    ([{"birth_rate": 0.1, "time.seed": 11}, {"birth_rate": 0.2}], None),
+])
+def test_the_seed_is_not_varied_in_the_grid(grid, seeds):
+    """A seed in the grid would be replaced by the seeds of the sweep, and the rows labelled with it
+    would be identical runs."""
+    with pytest.raises(ValueError, match=r"seed cannot be varied in the grid .*seeds="):
+        sweep(_growth(steps=0), grid=grid, seeds=seeds, showprogress=False)
+
+
+def test_the_command_line_takes_seeds_from_seeds_not_vary(tmp_path, capsys):
+    from lgca.cli import main
+    from lgca.model import save_model_spec
+
+    save_model_spec(_growth(steps=0), tmp_path / "model.json")
+    assert main(["sweep", str(tmp_path / "model.json"), "--vary", "seed=11,22",
+                 "--output", str(tmp_path / "runs")]) == 2
+    assert "--seeds 11,22" in capsys.readouterr().err
+    assert not (tmp_path / "runs").exists()
+
+
 def test_explicit_combinations_and_the_seed_of_the_model():
     table = sweep(_growth(seed=9), grid=[{"birth_rate": 0.0}, {"birth_rate": 0.2, "kappa": 1.0}],
                   showprogress=False)

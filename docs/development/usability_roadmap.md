@@ -24,7 +24,8 @@ division only). R1 fixed: a cell table rebuilt from label lists that were read
 but not changed keeps its order, so no reader of `lgca.nodes` changes a run.
 R2 fixed: `StateSpec.capacity` is recorded on the lattice at build and is the
 default of every `LatticeState` (rules, reorientation terms, reactions) and the
-`capacity` of the metadata.
+`capacity` of the metadata. R3 fixed: seeds come only from `seeds=`; a seed in
+the grid is rejected (chosen over honouring grid seeds: one way to give seeds).
 
 ## Reference point: Morpheus
 
