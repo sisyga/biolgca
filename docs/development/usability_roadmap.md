@@ -1073,6 +1073,13 @@ model with a custom rule reruns from the CLI.
   plays at a time (a cell run again would otherwise leave a model running).
   Drawing a frame takes 60-100 ms at 50² to 100² nodes. Checked in a Jupyter
   kernel (nbclient); not yet checked by hand in Colab or VS Code.
+- Status (2026-09-28, user decision): 3D lattices are explored with
+  Matplotlib, not Mayavi (no GUI dependency, works in Colab): a perspective
+  view (scatter of the nodes with cells, or where a field lies in the upper
+  half of its range; flux as arrows; a *turn* slider, since the PNG frames
+  cannot be turned with the mouse) and planes (`slice=`), drawn by the square
+  lattice's plots. Measured: 0.05 s per frame at 20³, 0.2 s at 40³ in
+  perspective; planes 0.03 s.
 
 **4.3 Theory next to simulation**
 - `lgca.theory`: mean-field equations and linear stability (dispersion

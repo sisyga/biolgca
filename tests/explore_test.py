@@ -247,9 +247,94 @@ def test_it_takes_a_model_spec():
         explore(lgca.get_lgca(geometry="lin", dims=10))
 
 
-def test_three_dimensional_lattices_are_refused():
-    with pytest.raises(ValueError, match="1D, square and hexagonal"):
-        explore(_spec("cubic", (5, 5, 5)))
+@pytest.mark.parametrize("geometry", ["cubic", "moore"])
+@pytest.mark.parametrize("family", [{}, {"volume_exclusion": False}, {"identity_based": True}, {"n_species": 2}])
+def test_every_view_draws_in_3d_and_in_every_plane(geometry, family, close):
+    spec = _spec(geometry, (6, 5, 4), fields={"signal": 0.5}, **family)
+    explorer = explore(spec)
+    close(explorer)
+    for show in explorer._slice.options:
+        explorer._slice.value = show
+        for view in explorer._view.options:
+            explorer._view.value = view
+            explorer.advance(1)
+            assert explorer.frame().startswith(PNG)
+    assert explorer._status.value == ""
+
+
+def test_a_plane_shows_the_values_of_its_nodes(close):
+    explorer = explore(_chemotaxis("cubic", (6, 5, 4)), view="signal", slice=("y", 1))
+    close(explorer)
+    explorer.advance(2)
+    assert explorer._panel.axes.get_title() == "$y = 1$"
+    signal = explorer.lgca.signal[explorer.lgca.nonborder]
+    np.testing.assert_allclose(explorer._panel.artist.get_array(), signal[:, 1, :].T)
+    explorer._position.value = 3
+    np.testing.assert_allclose(explorer._panel.artist.get_array(), signal[:, 3, :].T)
+
+    explorer._view.value = "density"
+    density = explorer.lgca.cell_density[explorer.lgca.nonborder]
+    np.testing.assert_array_equal(explorer._panel.artist.get_array(), density[:, 3, :].T)
+
+
+def test_a_plane_shows_the_flux_in_the_plane(close):
+    explorer = explore(_spec("cubic", (4, 4, 4), density=0.0), view="flux", slice="x")
+    close(explorer)
+    nodes = np.zeros_like(explorer.lgca.nodes)
+    inside = tuple(1 + np.array([2, 1, 3]))  # x = 2, y = 1, z = 3 with a border of one node
+    nodes[inside + (0,)] = True  # +x: normal to the plane, no flux in it
+    nodes[inside[:1] + (1, 1) + (2,)] = True  # +y at x = 2, y = 0, z = 0: flux in the plane
+    explorer.lgca.nodes[...] = nodes
+    explorer.lgca.update_dynamic_fields()
+    explorer._redraw()
+
+    assert explorer._position.value == 2 and explorer._position.description == "x"
+    colours = explorer._panel.artist.get_facecolor().reshape(4, 4, 4)  # the plane's (y, z) nodes
+    np.testing.assert_allclose(colours[1, 3], [0.5, 0.5, 0.5, 1])  # a cell, but no flux in the plane
+    assert colours[0, 0, 3] == 1 and not np.allclose(colours[0, 0, :3], 0.5)  # coloured by its direction
+    assert colours[2, 2, 3] == 0  # empty
+
+
+def test_the_perspective_view_shows_the_nodes_with_cells_and_turns(close):
+    explorer = explore(_spec("cubic", (6, 5, 4), volume_exclusion=False, capacity=8))
+    close(explorer)
+    explorer.advance(1)
+    density = explorer.lgca.cell_density[explorer.lgca.nonborder]
+    points = np.column_stack(explorer._panel.artist._offsets3d)
+    np.testing.assert_array_equal(np.sort(points, axis=0), np.sort(np.argwhere(density > 0), axis=0))
+    np.testing.assert_array_equal(np.sort(explorer._panel.artist.get_array()), np.sort(density[density > 0]))
+    assert explorer._position.layout.display == "none" and explorer._turn.layout.display is None
+    explorer._turn.value = 30
+    assert explorer._panel.axes.azim == 30
+
+
+def test_the_perspective_view_shows_where_a_field_is_high(close):
+    explorer = explore(_chemotaxis("cubic", (6, 5, 4)), view="signal")
+    close(explorer)
+    assert explorer._panel.artist is None  # the field starts uniform
+    assert "everywhere" in explorer._panel.axes.get_title()
+    explorer.advance(3)
+    signal = explorer.lgca.signal[explorer.lgca.nonborder]
+    high = signal >= (signal.min() + signal.max()) / 2
+    assert len(explorer._panel.artist.get_array()) == high.sum()
+
+
+@pytest.mark.parametrize("option, message", [
+    ("w", "must be 'x', 'y' or 'z'"),
+    (("z", 1.5), "must be 'x', 'y' or 'z'"),
+    (("z", 4), "outside the lattice"),
+])
+def test_invalid_planes_are_explained(option, message):
+    with pytest.raises(ValueError, match=message):
+        explore(_spec("cubic", (6, 5, 4)), slice=option)
+
+
+def test_only_3d_lattices_have_planes(close):
+    with pytest.raises(ValueError, match="cuts 3D lattices"):
+        explore(_growth(), slice="z")
+    explorer = explore(_growth())
+    close(explorer)
+    assert explorer._slice.layout.display == "none" and explorer._turn.layout.display == "none"
 
 
 def test_measures_are_plotted_every_step(close):

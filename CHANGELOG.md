@@ -398,6 +398,10 @@ This file records notable user-facing changes. Changes remain under
 - Focused regression coverage for propagation, boundary conditions,
   initialization, time evolution, interactions, plotting contracts, model
   persistence, the CLI, and installed-package smoke tests.
+- `lgca.explore` draws 3D lattices: in perspective (the nodes with cells,
+  where a field is high, or the flux as arrows), turned with a slider, or as
+  a plane that a slider moves through the lattice (`slice="z"` or
+  `slice=("z", 3)`). It uses Matplotlib, so it needs no Mayavi.
 - 3D plots: cubic and Moore models animate fields (`animate_scalarfield`,
   `AnimationObserver(kind="scalarfield", field=...)`) and the density as
   cubes (`animate_density_cubes`, `kind="density_cubes"`), and show the

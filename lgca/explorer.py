@@ -2,8 +2,9 @@
 
 :func:`explore` shows a model of a :class:`~lgca.model.ModelSpec` running in a Jupyter notebook
 (JupyterLab, Colab, VS Code), with play/pause, a step button, the number of steps per frame and a
-choice of view: the density, the flux on 2D lattices, or a field. A panel beside it plots the
-population, or other measures, over time::
+choice of view: the density, the flux, or a field. A panel beside it plots the population, or other
+measures, over time. 3D lattices are drawn in perspective, turned with a slider, or cut by a plane
+that a slider moves through the lattice::
 
     import lgca
 
@@ -42,7 +43,8 @@ _PLAYING: weakref.WeakSet = weakref.WeakSet()  # explorers whose model is runnin
 
 def explore(spec, controls: Mapping[str, Any] | None = None, *, view: str = "density",
             measure: str | Sequence[str] | Mapping[str, Any] | None = "population", steps_per_frame: int = 1,
-            interval: float = 0.1, window: int = 100, figsize: tuple[float, float] | None = None) -> Explorer:
+            interval: float = 0.1, window: int = 100, figsize: tuple[float, float] | None = None,
+            slice: str | tuple[str, int] | None = None) -> Explorer:
     """Run a model live in a notebook, with sliders for some of its parameters.
 
     Parameters
@@ -60,9 +62,13 @@ def explore(spec, controls: Mapping[str, Any] | None = None, *, view: str = "den
         Parameters of the dynamics change the running model; other values build it again.
     view : str, default="density"
         What the lattice panel shows first: ``"density"``, ``"density: species i"`` (several
-        species), ``"flux"`` (square and hexagonal lattices), the name of a field, or, in
-        identity-based models, ``"mean <trait>"``, the mean trait of the cells at each node. A
-        dropdown changes it. 1D lattices show the last ``window`` steps as a kymograph, time running down.
+        species), ``"flux"``, the name of a field, or, in identity-based models, ``"mean <trait>"``,
+        the mean trait of the cells at each node. A dropdown changes it. 1D lattices show the last
+        ``window`` steps as a kymograph, time running down.
+
+        3D lattices are drawn in perspective: the nodes with cells, coloured by the density or
+        the mean trait; the nodes where a field lies in the upper half of its range; or the flux
+        as arrows. A slider turns the lattice.
     measure : str, list of str, mapping or None, default="population"
         Quantities plotted over time beside the lattice, evaluated after every step:
         ``"population"``, the name of a field (its mean), a trait of an identity-based model (its
@@ -76,6 +82,11 @@ def explore(spec, controls: Mapping[str, Any] | None = None, *, view: str = "den
         Steps shown by the kymograph of a 1D lattice.
     figsize : (float, float), optional
         Size of the figure in inches.
+    slice : {"x", "y", "z"} or (str, int), optional
+        3D lattices: show the plane through the lattice normal to this axis instead of the
+        perspective view, drawn like a square lattice, e.g. ``"z"`` for the middle plane
+        ``z = lz // 2`` or ``("z", 3)`` for ``z = 3``. The flux shows its components in the plane.
+        A dropdown switches between the perspective view and the planes, a slider moves the plane.
 
     Returns
     -------
@@ -98,7 +109,7 @@ def explore(spec, controls: Mapping[str, Any] | None = None, *, view: str = "den
     >>> explorer.close()
     """
     return Explorer(spec, controls, view=view, measure=measure, steps_per_frame=steps_per_frame,
-                    interval=interval, window=window, figsize=figsize)
+                    interval=interval, window=window, figsize=figsize, slice=slice)
 
 
 @dataclass
@@ -125,7 +136,7 @@ class Explorer:
     """
 
     def __init__(self, spec, controls=None, *, view="density", measure="population", steps_per_frame=1,
-                 interval=0.1, window=100, figsize=None):
+                 interval=0.1, window=100, figsize=None, slice=None):
         import ipywidgets as widgets
 
         from .model import ModelSpec
@@ -176,10 +187,25 @@ class Explorer:
         self._status = widgets.HTML()
         self._image = widgets.Image(format="png")
         self._view = widgets.Dropdown(description="view")
+        # 3D lattices: the perspective view or a plane, its position, and the angle of the perspective view
+        axis, position = _slice_option(slice)
+        self._slice = widgets.Dropdown(options=["3D", "slice x", "slice y", "slice z"],
+                                       value="3D" if axis is None else f"slice {axis}", description="show")
+        self._position = widgets.IntSlider(min=0, max=0, description=axis or "z", continuous_update=False)
+        self._plane_axis = None
+        self._turn = widgets.IntSlider(value=-60, min=-180, max=180, step=5, description="turn",
+                                       continuous_update=False)
         self._build()  # also fills the options of the view
         if view not in self._view.options:
             raise ValueError(f"view {view!r} is not available for this model; choose one of "
                              f"{list(self._view.options)}")
+        if axis is not None:
+            if len(self.lgca.dims) != 3:
+                raise ValueError(f"slice= cuts 3D lattices, not a {self.lgca.geometry!r} lattice")
+            size = self.lgca.dims["xyz".index(axis)]
+            if position is not None and not 0 <= position < size:
+                raise ValueError(f"the {axis} = {position} plane lies outside the lattice (0 <= {axis} < {size})")
+            self._position.value = size // 2 if position is None else position
         with self._lock:
             self._set_view(view)
         self._view.value = view
@@ -188,11 +214,15 @@ class Explorer:
         self._next.on_click(lambda _: self._guarded(self.advance))
         self._reset.on_click(lambda _: self._guarded(self.reset))
         self._view.observe(lambda change: self._guarded(self._set_view, change["new"], draw=True), "value")
+        self._slice.observe(lambda change: self._guarded(self._sliced), "value")
+        self._position.observe(lambda change: self._guarded(self._redraw), "value")
+        self._turn.observe(lambda change: self._guarded(self._redraw), "value")
         for control in self._controls:
             control.widget.observe(self._changed(control), "value")
         buttons = widgets.HBox([self._play, self._next, self._reset, self._speed, self._label])
         sliders = [control.widget for control in self._controls]
-        self.widget = widgets.VBox([buttons, widgets.HBox([self._view]), *sliders, self._image, self._status])
+        views = widgets.HBox([self._view, self._slice, self._position, self._turn])
+        self.widget = widgets.VBox([buttons, views, *sliders, self._image, self._status])
         self._draw()
 
     # ---------------------------------------------------------------- public
@@ -287,6 +317,7 @@ class Explorer:
         self._error = None
         current = self._view.value if self._view.value in options else options[0]
         self._quiet, self._view.options, self._view.value, self._quiet = True, options, current, False
+        self._fit_slice_controls()
         self._measure()
         if hasattr(self, "_figure"):  # not while the explorer is made: the view is set afterwards
             self._set_view(current)
@@ -395,8 +426,12 @@ class Explorer:
             plt.close(figure)  # drawn into the widget, not shown by the notebook
             grid = figure.add_gridspec(1, 2 if self._measures else 1, width_ratios=[1.3, 1][:1 + bool(self._measures)],
                                        wspace=0.45)
-            axes = figure.add_subplot(grid[0])
-            self._panel = (_Kymograph if len(lgca.dims) == 1 else _Lattice)(lgca, view, axes, self)
+            if len(lgca.dims) < 3:
+                panel = _Kymograph if len(lgca.dims) == 1 else _Lattice
+            else:
+                panel = _Space if self._slice.value == "3D" else _Slice
+            axes = figure.add_subplot(grid[0], projection="3d" if panel is _Space else None)
+            self._panel = panel(lgca, view, axes, self)
             self._series_axes = figure.add_subplot(grid[1]) if self._measures else None
             self._lines = {}
             if self._series_axes is not None:
@@ -429,6 +464,40 @@ class Explorer:
         axes.autoscale_view()
         axes.set_xlim(0, max(self.step, 1))
 
+    def _redraw(self):
+        """Draw the current state again, e.g. after the plane or the angle changed."""
+        with self._lock:
+            self._update()
+            self._draw_locked()
+
+    def _sliced(self):
+        """Switch between the perspective view and a plane of a 3D lattice."""
+        with self._lock:
+            self._fit_slice_controls()
+            self._set_view(self._view.value)
+            self._draw_locked()
+
+    def _fit_slice_controls(self):
+        """Show the controls of 3D lattices for the current choice; the plane stays inside the lattice."""
+        dims = self.model.lgca.dims
+        three_d = len(dims) == 3
+        sliced = three_d and self._slice.value != "3D"
+        self._slice.layout.display = None if three_d else "none"
+        self._position.layout.display = None if sliced else "none"
+        self._turn.layout.display = None if three_d and not sliced else "none"
+        if sliced:
+            axis = self._slice.value[-1]
+            size = dims["xyz".index(axis)]
+            self._quiet = True
+            try:
+                self._position.max = size - 1  # moves the plane inside a smaller lattice
+                if axis != self._plane_axis:  # a new axis starts in the middle
+                    self._position.value = size // 2
+                    self._position.description = axis
+            finally:
+                self._quiet = False
+            self._plane_axis = axis
+
     def _render(self):
         buffer = io.BytesIO()
         self._figure.savefig(buffer, format="png", dpi=80)
@@ -451,36 +520,37 @@ class _Lattice:
         self.view = view
         self.scales = explorer._scales  # tops of the density scales, kept when the figure is drawn again
         kind, index = _kind(view, lgca)
+        plotter = self._plotter(lgca, explorer)
         if kind == "density":
-            density = _density(lgca, index)
+            density = self._density(lgca, index)
             self.vmax = self.scales[view] = max(self.scales.get(view) or _density_scale(lgca, index),
                                                 int(np.ceil(density.max())))
             label = "Cells $n$" if index is None else f"Cells of species {index}"
-            _, self.artist, self.mappable = lgca.plot_density(density=density, ax=axes, vmax=self.vmax,
-                                                              tight_layout=False, cbarlabel=label)
+            _, self.artist, self.mappable = plotter.plot_density(density=density, ax=axes, vmax=self.vmax,
+                                                                 tight_layout=False, cbarlabel=label)
         elif kind == "flux":
-            _, self.artist, self.mappable = lgca.plot_flux(ax=axes, tight_layout=False)
+            _, self.artist, self.mappable = plotter.plot_flux(ax=axes, tight_layout=False)
         else:  # a field, or the mean trait of the cells at each node (clear where there are none)
-            values = _scalar(lgca, kind, index)
+            values = self._scalar(lgca, kind, index)
             label, cmap = (index, "cividis") if kind == "field" else (f"mean {index}", "viridis")
-            _, self.artist, self.mappable = lgca.plot_scalarfield(values, ax=axes, tight_layout=False, cmap=cmap,
-                                                                  cbarlabel=label, mask=np.isnan(values),
-                                                                  **_limits(values))
+            _, self.artist, self.mappable = plotter.plot_scalarfield(values, ax=axes, tight_layout=False, cmap=cmap,
+                                                                     cbarlabel=label, mask=np.isnan(values),
+                                                                     **_limits(values))
 
     def update(self, explorer):
         """Show the current state; False if the figure must be drawn again."""
         lgca = explorer.model.lgca
         kind, index = _kind(self.view, lgca)
         if kind == "density":
-            values = _density(lgca, index)
+            values = self._density(lgca, index)
             if values.max() > self.vmax:  # more cells than the colour scale has colours
                 self.scales[self.view] = max(2 * self.vmax, int(np.ceil(values.max())))
                 return False
             self._show(values)
         elif kind == "flux":
-            self.artist.set(facecolor=_flux_colours(lgca, self.mappable))
+            self.artist.set(facecolor=_direction_colours(*self._flux(lgca), self.mappable))
         else:
-            values = _scalar(lgca, kind, index)
+            values = self._scalar(lgca, kind, index)
             self.mappable.set_clim(**_limits(values))
             self._show(values)
 
@@ -489,6 +559,152 @@ class _Lattice:
             self.artist.set_data(values.T)
         else:
             self.artist.set(facecolor=self.mappable.to_rgba(values.ravel()))
+
+    # What is drawn and with which lattice; a plane of a 3D lattice (_Slice) replaces them.
+
+    def _plotter(self, lgca, explorer):
+        return lgca
+
+    def _density(self, lgca, index):
+        return _density(lgca, index)
+
+    def _scalar(self, lgca, kind, index):
+        return _scalar(lgca, kind, index)
+
+    def _flux(self, lgca):
+        """The two components of the flux and the number of cells at each node."""
+        counts = _channel_counts(lgca)
+        jx, jy = np.moveaxis(lgca.calc_flux(counts), -1, 0)
+        return jx, jy, counts.sum(-1)
+
+
+class _Slice(_Lattice):
+    """One plane of a 3D lattice, drawn like a square lattice; the flux shows its components in the plane."""
+
+    def __init__(self, lgca, view, axes, explorer):
+        self.axis = "xyz".index(explorer._slice.value[-1])
+        self.position = explorer._position
+        self.axes = axes
+        super().__init__(lgca, view, axes, explorer)
+        first, second = (name for i, name in enumerate("xyz") if i != self.axis)
+        axes.set_xlabel(f"${first}$")
+        axes.set_ylabel(f"${second}$")
+
+    def update(self, explorer):
+        self.axes.set_title(f"${'xyz'[self.axis]} = {self.position.value}$")
+        return super().update(explorer)
+
+    def _plane(self, values):
+        return np.take(values, self.position.value, axis=self.axis)
+
+    def _plotter(self, lgca, explorer):
+        shape = tuple(size for i, size in enumerate(lgca.dims) if i != self.axis)
+        planes = explorer.__dict__.setdefault("_planes", {})
+        if shape not in planes:
+            planes[shape] = _plane_lattice(shape)
+        return planes[shape]
+
+    def _density(self, lgca, index):
+        return self._plane(_density(lgca, index))
+
+    def _scalar(self, lgca, kind, index):
+        return self._plane(_scalar(lgca, kind, index))
+
+    def _flux(self, lgca):
+        counts = _channel_counts(lgca)
+        flux = self._plane(lgca.calc_flux(counts.astype(float)))
+        first, second = (i for i in range(3) if i != self.axis)
+        return flux[..., first], flux[..., second], self._plane(counts.sum(-1))
+
+
+class _Space:
+    """A 3D lattice in perspective: the nodes with cells, where a field is high, or the flux as arrows."""
+
+    ELEVATION = 25
+
+    def __init__(self, lgca, view, axes, explorer):
+        from matplotlib import colors
+        from matplotlib import pyplot as plt
+        from matplotlib.ticker import MaxNLocator
+
+        self.view = view
+        self.axes = axes
+        self.scales = explorer._scales
+        self.kind, self.index = _kind(view, lgca)
+        self.artist = None
+        dims = lgca.dims
+        axes.set(xlim=(-0.5, dims[0] - 0.5), ylim=(-0.5, dims[1] - 0.5), zlim=(-0.5, dims[2] - 0.5),
+                 xlabel="$x$", ylabel="$y$", zlabel="$z$")
+        axes.set_box_aspect(dims, zoom=1.25)
+        for axis in (axes.xaxis, axes.yaxis, axes.zaxis):
+            axis.set_major_locator(MaxNLocator(4, integer=True))
+        axes.tick_params(labelsize="small", pad=0)
+        self.marker = (130 / max(dims)) ** 2  # markers of neighbouring nodes about touch
+        self.mappable = None
+        if self.kind == "density":
+            density = _density(lgca, self.index)
+            self.vmax = self.scales[view] = max(self.scales.get(view) or _density_scale(lgca, self.index),
+                                                int(np.ceil(density.max())))
+            # the colours of the square lattice: one per number of cells
+            cmap = plt.get_cmap("viridis")
+            norm = (colors.BoundaryNorm(1 + np.arange(self.vmax + 1), cmap.N) if self.vmax > 1
+                    else colors.Normalize(vmin=0, vmax=1))
+            self.mappable = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
+            colorbar = axes.figure.colorbar(self.mappable, ax=axes, shrink=0.7, pad=0.18)
+            numbers = np.arange(1, self.vmax + 1, max(1, int(np.ceil(self.vmax / 8))))
+            colorbar.set_ticks(numbers + 0.5 if self.vmax > 1 else numbers, labels=numbers)
+            colorbar.set_label("Cells $n$" if self.index is None else f"Cells of species {self.index}")
+        elif self.kind == "flux":
+            # arrows keep their scale: the largest flux a node can have with volume exclusion, else the current one
+            self.scale = 0.9 / lgca._max_node_flux() if _volume_exclusion(lgca) else None
+        else:
+            cmap = "cividis" if self.kind == "field" else "viridis"
+            self.mappable = plt.cm.ScalarMappable(norm=colors.Normalize(), cmap=cmap)
+            self.mappable.set_clim(**_limits(_scalar(lgca, self.kind, self.index)))
+            colorbar = axes.figure.colorbar(self.mappable, ax=axes, shrink=0.7, pad=0.18)
+            colorbar.set_label(self.index if self.kind == "field" else f"mean {self.index}")
+
+    def update(self, explorer):
+        """Show the current state; False if the figure must be drawn again."""
+        lgca = explorer.model.lgca
+        self.axes.view_init(elev=self.ELEVATION, azim=explorer._turn.value)
+        if self.artist is not None:
+            self.artist.remove()
+            self.artist = None
+        if self.kind == "flux":
+            counts = _channel_counts(lgca).astype(float)
+            flux = lgca.calc_flux(counts)
+            moving = np.linalg.norm(flux, axis=-1) > 1e-9
+            largest = float(np.linalg.norm(flux, axis=-1).max(initial=0))
+            scale = self.scale or (0.9 / largest if largest > 0 else 1.0)
+            if moving.any():
+                self.artist = self.axes.quiver(*np.nonzero(moving), *np.moveaxis(scale * flux[moving], -1, 0),
+                                               pivot="middle", color="0.2", linewidth=1.1, arrow_length_ratio=0.35)
+            return None
+        if self.kind == "density":
+            values = _density(lgca, self.index)
+            if values.max() > self.vmax:  # more cells than the colour scale has colours
+                self.scales[self.view] = max(2 * self.vmax, int(np.ceil(values.max())))
+                return False
+            shown = values > 0
+        else:
+            values = _scalar(lgca, self.kind, self.index)
+            limits = _limits(values)
+            self.mappable.set_clim(**limits)
+            if self.kind == "field":  # a field has a value everywhere: show where it is high
+                low, high = float(np.nanmin(values)), float(np.nanmax(values))
+                if high > low:
+                    shown = values >= (low + high) / 2
+                    self.axes.set_title(f"{self.index} in the upper half of its range", fontsize="medium")
+                else:
+                    shown = np.zeros(values.shape, dtype=bool)
+                    self.axes.set_title(f"{self.index} = {low:.3g} everywhere", fontsize="medium")
+            else:
+                shown = np.isfinite(values)  # the nodes with cells
+        if shown.any():
+            self.artist = self.axes.scatter(*np.nonzero(shown), c=values[shown], s=self.marker,
+                                            cmap=self.mappable.get_cmap(), norm=self.mappable.norm, linewidths=0)
+        return None
 
 
 class _Kymograph:
@@ -650,8 +866,6 @@ def _cells_mean(lgca, name):
 
 
 def _views(lgca, spec):
-    if len(lgca.dims) > 2:
-        raise ValueError(f"explore draws 1D, square and hexagonal lattices, not {lgca.geometry!r}")
     views = ["density"]
     n_species = 1 if spec.state.identity_based else int(spec.state.n_species)
     if n_species > 1:
@@ -744,15 +958,31 @@ def _limits(values):
     return {"vmin": low, "vmax": high}
 
 
-def _flux_colours(lgca, mappable):
+def _direction_colours(jx, jy, density, mappable):
     """Colours of :meth:`plot_flux`: the direction of the flux, grey where it vanishes, clear where empty."""
-    counts = _channel_counts(lgca)
-    jx, jy = np.moveaxis(lgca.calc_flux(counts), -1, 0)
-    density = counts.sum(-1)
     colours = mappable.to_rgba(np.angle(jx + 1j * jy, deg=True) % 360.)
     colours[..., -1] = np.sign(density)
     colours[(jx ** 2 + jy ** 2) < 1e-6, :3] = 0.5
     return colours.reshape(-1, 4)
+
+
+def _slice_option(option):
+    """The axis and position of ``slice=`` ("z" or ("z", 3)); (None, None) for the perspective view."""
+    if option is None:
+        return None, None
+    axis, position = option, None
+    if isinstance(option, (tuple, list)) and len(option) == 2:
+        axis, position = option
+    if axis not in ("x", "y", "z") or not (position is None or isinstance(position, (int, np.integer))):
+        raise ValueError(f"slice must be 'x', 'y' or 'z', or an axis and a node such as ('z', 3), got {option!r}")
+    return axis, None if position is None else int(position)
+
+
+def _plane_lattice(shape):
+    """A square lattice of the shape of a plane, which draws the planes of a 3D lattice."""
+    from .lgca_square import LGCA_Square
+
+    return LGCA_Square(dims=shape, density=0, restchannels=0)
 
 
 def _figsize(lgca, series):

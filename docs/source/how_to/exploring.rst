@@ -78,8 +78,31 @@ The dropdown *view* chooses what the lattice panel shows: the density
 (``"flux"``, coloured by its direction) or any field of the model. Square
 and hexagonal lattices show the current state. 1D lattices show a kymograph
 of the last ``window`` steps (default 100), time running down, for every
-view at once, so switching views keeps the history. 3D lattices are not
-drawn.
+view at once, so switching views keeps the history.
+
+3D lattices (cubic and Moore) get a second dropdown, *show*:
+
+- ``"3D"`` draws the lattice in perspective: the nodes with cells, coloured
+  by their number of cells or their mean trait, the nodes where a field lies
+  in the upper half of its range, or the flux as arrows. The slider *turn*
+  turns the lattice about its vertical axis.
+- ``"slice x"``, ``"slice y"`` and ``"slice z"`` draw one plane through the
+  lattice like a square lattice, and a slider moves the plane. The plane shows
+  the inside of the lattice, which the perspective view hides, and the flux
+  shows its components in the plane, coloured by their direction.
+
+.. code-block:: python
+
+   from dataclasses import replace
+
+   cube = replace(spec, space=SpaceSpec(geometry="cubic", dims=(20, 20, 20)))
+   explorer = lgca.explore(cube, slice="z")  # the plane z = 10, the middle
+   explorer = lgca.explore(cube, view="flux", slice=("x", 5))  # the flux in the plane x = 5
+
+Both use Matplotlib, so exploring needs no Mayavi. The perspective view draws
+a frame in about 0.05 s up to 20³ nodes and 0.2 s at 40³; planes are fast at
+any size. For figures and movies of 3D models, use the Mayavi plots (see
+:doc:`observers_and_plotting`).
 
 The panel beside the lattice plots measures over time, evaluated after every
 step:
