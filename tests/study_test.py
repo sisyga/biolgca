@@ -341,3 +341,62 @@ def test_the_command_line_sweeps_a_model_with_resources(tmp_path):
     assert description["model"]["model"]["state"]["initializer"]["parameters"]["path"] == "resources/initial_state.npz"
     compiled = build_model(model_spec_from_dict(description["model"]), resource_base=output)  # usable later
     assert compiled.lgca.cell_density[compiled.lgca.nonborder].sum() == 8
+
+
+def _drawing(directory):
+    from lgca.model import AnalysisSpec
+    from lgca.plotting import AnimationObserver, PlotSnapshotObserver
+    from lgca.simulation import CSVSnapshotObserver
+
+    return ModelSpec(
+        space=SpaceSpec(geometry="square", dims=(4, 4)), state=StateSpec(density=0.5),
+        time=TimeSpec(steps=1, seed=1),
+        analysis=AnalysisSpec(observers=[
+            PlotSnapshotObserver(output_dir=directory / "snapshots", cbar=False),
+            AnimationObserver(save_path=directory / "movies" / "density.gif", close=True, cbar=False),
+            CSVSnapshotObserver(output_dir=directory / "csv")]))
+
+
+def test_a_sweep_keeps_no_files_by_default(tmp_path):
+    """Runs over several values would write to the same files; a sweep draws and writes none."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    table = sweep(_drawing(tmp_path), grid={"density": [0.0, 2.0]}, showprogress=False)
+    assert len(table) == 2 and list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("n_jobs, backend", [(1, "processes"), (2, "threads"), (2, "processes")])
+def test_kept_files_go_to_a_folder_per_run(tmp_path, n_jobs, backend):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    sweep(_drawing(tmp_path), grid={"density": [0.0, 2.0]}, seeds=[1], n_jobs=n_jobs, backend=backend,
+          keep_files=True, showprogress=False)
+    runs = ["density=0.0_seed=1", "density=2.0_seed=1"]
+    assert sorted(path.name for path in (tmp_path / "snapshots").iterdir()) == runs
+    for run in runs:
+        assert sorted(path.name for path in (tmp_path / "snapshots" / run).iterdir()) == [
+            "density_00000.png", "density_00001.png"]
+        assert (tmp_path / "movies" / run / "density.gif").is_file()
+        assert (tmp_path / "csv" / run / "density_00001.csv").is_file()
+    empty, full = (pd.read_csv(tmp_path / "csv" / run / "density_00000.csv").value.sum() for run in runs)
+    assert empty == 0 and full > 0
+
+
+def test_the_command_line_keeps_files_on_request(tmp_path):
+    from lgca.cli import main
+    from lgca.model import AnalysisSpec, save_model_spec
+    from lgca.simulation import CSVSnapshotObserver, ScalarTimeSeriesRecorder
+
+    spec = vary(_growth(steps=2), {"analysis": AnalysisSpec(observers=[
+        CSVSnapshotObserver(output_dir="snapshots"), ScalarTimeSeriesRecorder(output_path="series.csv")])})
+    save_model_spec(spec, tmp_path / "model.json")
+    arguments = ["sweep", str(tmp_path / "model.json"), "--vary", "birth_rate=0,0.5"]
+    assert main([*arguments, "--output", str(tmp_path / "plain")]) == 0
+    assert sorted(path.name for path in (tmp_path / "plain").iterdir()) == ["sweep.json", "table.csv"]
+    assert main([*arguments, "--keep-files", "--output", str(tmp_path / "kept")]) == 0
+    for run in ("birth_rate=0_seed=1", "birth_rate=0.5_seed=1"):
+        assert (tmp_path / "kept" / "snapshots" / run / "density_00002.csv").is_file()
+        assert len(pd.read_csv(tmp_path / "kept" / run / "series.csv")) == 3
+    assert not (tmp_path / "snapshots").exists() and not (tmp_path / "series.csv").exists()

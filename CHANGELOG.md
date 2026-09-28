@@ -663,6 +663,14 @@ This file records notable user-facing changes. Changes remain under
   uses the directory of the model file and takes `--trusted-paths`. It
   copies the file to `resources/` in the output directory, as `biolgca run`
   does, so the model in `sweep.json` can be run again.
+- Runs of a sweep no longer write to the same files. Plot snapshots and
+  movies of every run went to the observer's path, so each run overwrote
+  the previous one's (in parallel, at the same time). A sweep now keeps no
+  files by default: observers that only draw or write files do not run.
+  `sweep(..., keep_files=True)` (`biolgca sweep --keep-files`) keeps them,
+  in a folder per run named after its values and seed, e.g.
+  `snapshots/kappa=2_seed=1/`. Plotting observers draw one at a time, so
+  that runs in threads do not draw into each other's figures.
 - The largest cell label of identity-based models (`lgca.maxlabel`) is a
   Python integer. It was a NumPy integer, and with NumPy 1.x `maxlabel + 1`
   became a float that cannot index the trait arrays.

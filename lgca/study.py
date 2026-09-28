@@ -109,7 +109,8 @@ def final_population(result) -> int:
 def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | None = None, *,
           seeds: Iterable[int] | None = None, measure: Mapping[str, Any] | None = None, n_jobs: int = 1,
           backend: str = "processes", long: bool = False, plugins: Sequence[str] = (),
-          showprogress: bool = True, resource_base: str | Path | None = None, trusted_paths: bool = False):
+          showprogress: bool = True, resource_base: str | Path | None = None, trusted_paths: bool = False,
+          keep_files: bool = False):
     """Run a model for every combination of parameter values and seeds; one table row per run.
 
     Parameters
@@ -152,10 +153,15 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
         :func:`~lgca.model.run_model`.
     trusted_paths : bool, default=False
         Allow resource paths outside ``resource_base``, as in :func:`~lgca.model.run_model`.
+    keep_files : bool, default=False
+        Keep the files that observers write: every run writes into a folder of its own, named
+        after its values and seed (e.g. ``kappa=2_seed=1``), inside the observer's destination,
+        e.g. ``snapshots/kappa=2_seed=1/density_00010.png``.
 
-    Every run has its own copy of the model's observers. Files that observers would write (CSV
-    snapshots and time series) are discarded; measure what you need instead, e.g. the metrics of
-    a ``ScalarTimeSeriesRecorder`` by their names.
+    Every run has its own copy of the model's observers. By default a sweep keeps no files:
+    observers that only draw or write files (plot snapshots, movies, CSV snapshots) do not run,
+    and the files of time series are discarded; measure what you need instead, e.g. the metrics
+    of a ``ScalarTimeSeriesRecorder`` by their names.
 
     Returns
     -------
@@ -202,9 +208,14 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
     jobs = [(combination, seed) for combination in combinations for seed in seeds]
     resources = {"resource_base": None if resource_base is None else str(Path(resource_base).resolve()),
                  "trusted_paths": bool(trusted_paths)}
+    if keep_files:
+        spec = _absolute_destinations(spec)  # workers may start in another directory
+        jobs = [(combination, seed, folder) for (combination, seed), folder in zip(jobs, _run_folders(jobs, columns))]
+    else:
+        jobs = [(combination, seed, None) for combination, seed in jobs]
     results = _execute(spec, jobs, measures, n_jobs, backend, tuple(plugins), showprogress, columns, resources)
     rows = []
-    for (combination, seed), measured in zip(jobs, results):
+    for (combination, seed, _), measured in zip(jobs, results):
         base = {columns[path]: value for path, value in combination.items()}
         base["seed"] = seed
         rows.extend(_rows(base, measured, long))
@@ -549,11 +560,11 @@ def _check_picklable(spec, measures):
 
 def _guarded(spec, job, measures, plugins, columns, backend, resources):
     """One run, with the run named in errors."""
-    combination, seed = job
+    combination, seed, folder = job
     try:
         for module in plugins:
             import_module(module)
-        return _run_one(spec, combination, seed, measures, resources)
+        return _run_one(spec, combination, seed, measures, resources, folder)
     except Exception as exc:
         label = ", ".join([f"{columns[path]}={value!r}" for path, value in combination.items()] + [f"seed={seed}"])
         hint = ""
@@ -565,20 +576,16 @@ def _guarded(spec, job, measures, plugins, columns, backend, resources):
         raise RuntimeError(f"the run with {label} failed: {type(exc).__name__}: {exc}.{hint}") from exc
 
 
-def _run_one(spec, combination, seed, measures, resources):
+def _run_one(spec, combination, seed, measures, resources, folder=None):
     from .model import AnalysisSpec, run_model
-    from .simulation import CSVSnapshotObserver, ScalarTimeSeriesRecorder
 
     variant = vary(spec, combination)
     variant = replace(variant, time=replace(variant.time, seed=seed))
-    # every run its own observers (they keep state), and files written by observers go nowhere
+    # every run its own observers (they keep state), and their files in a folder of the run or nowhere
     observers = deepcopy(tuple(variant.analysis.observers)) if variant.analysis is not None else ()
     with tempfile.TemporaryDirectory(prefix="lgca-sweep-") as scratch:
-        for index, observer in enumerate(observers):
-            if isinstance(observer, ScalarTimeSeriesRecorder):
-                observer.output_path = Path(scratch) / f"series_{index}.csv"
-            elif isinstance(observer, CSVSnapshotObserver):
-                observer.output_dir = Path(scratch) / f"snapshots_{index}"
+        observers = tuple(observer for index, observer in enumerate(observers)
+                          if _redirect(observer, Path(scratch) / f"observer_{index}", folder))
         variant = replace(variant, analysis=AnalysisSpec(observers=observers))
         result = run_model(variant, showprogress=False, **resources)
     measured = {}
@@ -589,6 +596,51 @@ def _run_one(spec, combination, seed, measures, resources):
             value = what(result)
             measured[name] = _as_series(value)
     return measured
+
+
+def _redirect(observer, scratch, folder):
+    """Send the files of an observer to the run's ``folder`` in its destination, or with no folder
+    to ``scratch``; False if the observer only draws or writes files that nobody would see."""
+    from .plotting import AnimationObserver, PlotSnapshotObserver
+    from .simulation import CSVSnapshotObserver, ScalarTimeSeriesRecorder
+
+    if isinstance(observer, ScalarTimeSeriesRecorder):
+        observer.output_path = (scratch / "series.csv" if folder is None
+                                else observer.output_path.parent / folder / observer.output_path.name)
+    elif isinstance(observer, (CSVSnapshotObserver, PlotSnapshotObserver)):
+        if folder is None or observer.output_dir is None:
+            return False
+        observer.output_dir = observer.output_dir / folder
+    elif isinstance(observer, AnimationObserver):
+        if folder is None or observer.save_path is None:
+            return False
+        observer.save_path = observer.save_path.parent / folder / observer.save_path.name
+    return True
+
+
+def _absolute_destinations(spec):
+    """The model with the destinations of its observers' files as absolute paths."""
+    from .model import AnalysisSpec
+
+    if spec.analysis is None:
+        return spec
+    observers = deepcopy(tuple(spec.analysis.observers))
+    for observer in observers:
+        for attribute in ("output_path", "output_dir", "save_path"):
+            path = getattr(observer, attribute, None)
+            if isinstance(path, Path):
+                setattr(observer, attribute, path.absolute())
+    return replace(spec, analysis=AnalysisSpec(observers=observers))
+
+
+def _run_folders(jobs, columns):
+    """A folder name per run from its values and seed, e.g. ``kappa=2_seed=1``; unique."""
+    names = []
+    for combination, seed in jobs:
+        parts = [f"{columns[path]}={value}" for path, value in combination.items()] + [f"seed={seed}"]
+        names.append(re.sub(r"[^A-Za-z0-9=._+-]+", "-", "_".join(parts)))
+    repeated = {name for name in names if names.count(name) > 1}
+    return [f"{name}_run{index}" if name in repeated else name for index, name in enumerate(names)]
 
 
 class _Series:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from contextlib import nullcontext
 from pathlib import Path
 
@@ -19,6 +20,9 @@ __all__ = [
     "plot",
 ]
 
+
+# pyplot keeps one current figure per process: runs in threads (a sweep) must not draw at the same time
+_RENDER_LOCK = threading.RLock()
 
 _PLOT_METHODS = {
     "density": "plot_density",
@@ -93,7 +97,7 @@ class PlotSnapshotObserver(Observer):
             self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def on_step(self, lgca, step: int) -> None:
-        with _render_context(lgca, offscreen=self.close):
+        with _RENDER_LOCK, _render_context(lgca, offscreen=self.close):
             result = plot(lgca, kind=self.kind, **self.plot_kwargs)
             fig = _figure_from_result(result)
             if self.retain_results:
@@ -151,6 +155,10 @@ class AnimationObserver(Observer):
         self.frame_steps.append(step)
 
     def finalize(self, lgca, runner) -> None:
+        with _RENDER_LOCK:
+            self._render(lgca)
+
+    def _render(self, lgca) -> None:
         data = _frames_to_array(self.frames)
         kwargs = dict(self.animation_kwargs)
         if _resolve_animation(self.kind)[1] == "density_t":

@@ -125,8 +125,12 @@ run the sweep under a main guard, or every worker would start the sweep again:
        table = sweep(spec, grid={"kappa": [-4, 0, 4]}, seeds=range(10), n_jobs=4)
        table.to_csv("runs.csv")
 
-Files that observers would write, CSV snapshots and time series, are
-discarded in a sweep; measure what you need instead.
+A sweep keeps no files by default: observers that only draw or write files
+(plot snapshots, movies, CSV snapshots) do not run, and the files of time
+series are discarded; measure what you need instead. With
+``keep_files=True`` every run writes its files into a folder of its own,
+named after its values and seed, inside the observer's destination, e.g.
+``snapshots/kappa=2_seed=1/density_00010.png``.
 
 From the command line
 ---------------------
@@ -143,7 +147,9 @@ version):
 ``--vary`` takes a path or a short name and comma-separated values (numbers,
 ``true``/``false``, or words); ``--seeds`` a range ``0:10`` or a list
 ``1,2,3``; ``--measure`` names recordings, and without it the table has the
-population at the end of every run. ``--plugins my_project.rules`` imports
+population at the end of every run. ``--keep-files`` keeps the files of the
+model's observers in a folder per run inside the output directory.
+``--plugins my_project.rules`` imports
 trusted modules with your own rules first; ``biolgca run`` and
 ``biolgca validate`` take it as well. Modules are never imported because a
 model file names them.

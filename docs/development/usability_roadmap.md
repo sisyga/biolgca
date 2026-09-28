@@ -27,6 +27,8 @@ default of every `LatticeState` (rules, reorientation terms, reactions) and the
 `capacity` of the metadata. R3 fixed: seeds come only from `seeds=`; a seed in
 the grid is rejected (chosen over honouring grid seeds: one way to give seeds).
 R4 fixed: `sweep` and `biolgca sweep` take the resource base and trusted paths.
+R5 fixed (user decision: discard by default, keeping optional): file-only observers
+do not run in sweeps; `keep_files=True` gives every run its own folder.
 
 ## Reference point: Morpheus
 

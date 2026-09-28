@@ -78,6 +78,8 @@ def _build_parser() -> argparse.ArgumentParser:
                        help="a recording to measure as a time series, e.g. population (repeatable); "
                             "default: the population at the end")
     sweep.add_argument("--long", action="store_true", help="one row per run and recorded step")
+    sweep.add_argument("--keep-files", action="store_true",
+                       help="keep the files of the model's observers, in a folder per run (e.g. kappa=2_seed=1)")
     sweep.add_argument("--n-jobs", type=int, default=1, help="number of runs at the same time")
     sweep.add_argument("--overwrite", action="store_true")
     sweep.add_argument("--trusted-paths", action="store_true")
@@ -210,12 +212,15 @@ def _sweep(args) -> int:
     if output_dir.exists() and not args.overwrite:
         raise ValueError(f"Output directory already exists: {output_dir}. Use --overwrite to reuse it.")
     spec = load_model_spec(model_path)
+    running = deepcopy(spec)
+    if args.keep_files:  # the files of every run in a folder of its own in the output directory
+        _resolve_output_paths(running, output_dir, trusted_paths=args.trusted_paths)
     grid = dict(_parse_vary(entry) for entry in args.vary)
     seeds = None if args.seeds is None else _parse_seeds(args.seeds)
     measure = {name: name for name in args.measure} or {"population": final_population}
-    table = sweep(spec, grid=grid or None, seeds=seeds, measure=measure, n_jobs=args.n_jobs, long=args.long,
+    table = sweep(running, grid=grid or None, seeds=seeds, measure=measure, n_jobs=args.n_jobs, long=args.long,
                   plugins=plugins, showprogress=args.show_progress, resource_base=model_path.parent,
-                  trusted_paths=args.trusted_paths)
+                  trusted_paths=args.trusted_paths, keep_files=args.keep_files)
     output_dir.mkdir(parents=True, exist_ok=True)
     table.map(_csv_cell).to_csv(output_dir / "table.csv", index=False)
     portable_spec = _with_copied_resources(spec, model_path, output_dir, args.trusted_paths)
