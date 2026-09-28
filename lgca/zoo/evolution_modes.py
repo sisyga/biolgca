@@ -4,9 +4,10 @@ A new model (the research model ``evo_steric`` of earlier biolgca versions), aft
 (2022), who showed that the spatial structure of a tumour and the way its cells disperse decide how
 it evolves: by selective sweeps, by branching or almost neutrally.
 
-Every node is a deme, a gland, that holds at most ``K`` cells (a hard capacity). Cells divide with
-their own birth rate ``r_b`` as long as the node has room and die with probability ``r_d``, so a
-full node turns over like a Moran process. A daughter acquires a driver mutation with probability
+Every node is a deme, a gland, of capacity ``K``. Cells divide with their own birth rate ``r_b`` as
+long as the node has fewer than ``K`` cells, and die with probability ``r_d``, so a full node turns
+over like a Moran process. ``K`` limits division only: cells that move in may crowd a node beyond
+it, until deaths bring it back below. A daughter acquires a driver mutation with probability
 ``r_m``: it founds a clone and its birth rate is multiplied by a fitness factor. After birth and
 death, cells pick channels: a velocity channel pointing to a node with relative density ``ρ`` has
 the weight ``exp(-α ρ)`` (contact inhibition: cells avoid moving into crowded nodes), the rest
@@ -50,7 +51,7 @@ CARD = ZooEntry(
     doi=None,
     reproduces="no paper: clonal diversity D and drivers per cell n (the indices of Noble et al.) as the "
                "motility of cells in crowded tissue decreases",
-    mechanisms=("driver mutations", "clones", "hard carrying capacity", "contact inhibition of locomotion",
+    mechanisms=("driver mutations", "clones", "division limited by a capacity", "contact inhibition of locomotion",
                 "resting bias"),
     lattice="hexagonal, one rest channel, identity-based without volume exclusion",
     fidelity="new model",
@@ -76,7 +77,7 @@ PARAMETERS = {
                        0.0, "dynamics.operators[1].terms[evolution_modes.contact_inhibition].beta"),
     "gamma": Parameter("γ", "resting bias: weight exp(γ) of the rest channel", 0.0,
                        "dynamics.operators[1].terms[resting_bias].beta"),
-    "capacity": Parameter("K", "cells a node (a gland) holds at most", 64, "state.capacity"),
+    "capacity": Parameter("K", "cells of a node (a gland) at which division stops", 64, "state.capacity"),
 }
 
 
@@ -98,7 +99,8 @@ def build_spec(full: bool = False, *, alpha: float = 0.0, gamma: float = 0.0, r_
     r_m, fitness : float
         Probability of a driver mutation per daughter and its factor on the birth rate.
     capacity : int, optional
-        Cells a node holds at most; default 64, 512 with ``full``.
+        Cells of a node at which division stops; default 64, 512 with ``full``. Cells that move in
+        can crowd a node beyond it.
     start : {"centre", "full"}, default="centre"
         One full node at the centre, from which the tumour grows, or every node full of resting
         cells of one clone (an established tissue).
@@ -127,7 +129,7 @@ def build_spec(full: bool = False, *, alpha: float = 0.0, gamma: float = 0.0, r_
                         capacity=capacity, traits={"r_b": r_b}),
         time=TimeSpec(steps=steps if steps is not None else 2000 if full else 1000, seed=seed),
         dynamics=InteractionPipelineSpec(operators=[
-            # death with r_d; division with r_b while the node has room (hard capacity); drivers found clones
+            # death with r_d; division with r_b while the node has fewer than K cells; drivers found clones
             {"name": "birth_death", "parameters": {"birth_rate": "r_b", "death_rate": r_d, "crowding": False,
                                                    "mutation": driver, "new_family": True}},
             # velocity channels weighted exp(-α ρ_neighbour), the rest channel exp(γ)

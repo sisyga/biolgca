@@ -31,8 +31,8 @@ This file records notable user-facing changes. Changes remain under
   `go_or_grow_glioblastoma`), in which drivers change the birth rate and the
   switch; repulsive clones take over and the tumour grows faster than with
   a fixed switch. And contact inhibition and the mode of tumour evolution
-  (the research model `evo_steric`, after Noble et al. 2022): glands with a
-  hard capacity and driver mutations; the more cells stop moving in a full
+  (the research model `evo_steric`, after Noble et al. 2022): glands whose
+  capacity stops division, and driver mutations; the more cells stop moving in a full
   tissue, the more the tumour's evolution changes from one sweep after
   another to branching and finally stalls, measured with Noble's indices
   (drivers per cell, clonal diversity). And drivers, passengers and

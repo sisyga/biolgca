@@ -398,4 +398,10 @@ distributed).
   1 − δ/α₀ = 1/4). At N₀ = N*/2 and γ = 16, without mutations 8 of 8
   persist, with them most go extinct: meltdown. The thesis reads the whole
   diagram as meltdown; the notebook shows the control. Notebook ≈ 85 s.
+- Capacity (code review 2026-09-28, R7; user decision 2026-09-28): K limits
+  division only. Cells moving in can crowd a gland beyond K until deaths
+  bring it back; in a full tissue after 400 steps 16 % of glands are above
+  K (max 1.27 K) with α = 0, 1.4 % with α = 5, none with α = 10. Documented
+  in the module and notebook; a test shows migration exceeding K and
+  division alone not.
 

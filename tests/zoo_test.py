@@ -475,3 +475,14 @@ def test_moving_rescues_small_tumours_that_die_out_without_any_mutation():
     assert outcomes[0.0] == {"cancer"} and outcomes[16.0] == {"extinct"}
     result, steps, history = meltdown.outcome(meltdown.build_spec(n0=0.1, gamma=0.0, seed=1), history=True)
     assert result == "cancer" and history["cells"][-1] >= meltdown.critical_size() and history["extent"][-1] > 1
+
+
+def test_the_capacity_of_evolution_modes_limits_division_not_migration():
+    """K stops division; cells that move in may crowd a gland beyond K (code review R7, by design)."""
+    spec = modes.build_spec(size=8, capacity=16, start="full", r_b=0.0, r_d=0.0, steps=1, seed=1)
+    lattice = run_model(spec, showprogress=False).lgca
+    assert lattice.cell_density[lattice.nonborder].max() > 16 and lattice.cell_density.sum() == 64 * 16
+    spec = modes.build_spec(size=8, capacity=16, start="full", r_b=1.0, r_d=0.0, steps=5, seed=1)
+    lattice = run_model(replace(spec, dynamics=replace(spec.dynamics, operators=spec.dynamics.operators[:1])),
+                        showprogress=False).lgca  # without movement no gland exceeds K
+    assert lattice.cell_density[lattice.nonborder].max() == 16
