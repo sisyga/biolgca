@@ -19,6 +19,10 @@ with reproductions in [the code review](code_review_2026-09-28.md). These are
 follow-up corrections to completed features; the remaining zoo and publication
 work below is still planned.
 
+Review follow-up (2026-09-28): R7 decided (capacity of `evolution_modes` limits
+division only). R1 fixed: a cell table rebuilt from label lists that were read
+but not changed keeps its order, so no reader of `lgca.nodes` changes a run.
+
 ## Reference point: Morpheus
 
 Morpheus (https://gitlab.com/morpheus.lab/morpheus) is a multiscale modelling

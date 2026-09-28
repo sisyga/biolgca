@@ -73,7 +73,9 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     of every cell), which rules on the lattice state, the boundary conditions
     and propagation update without building lists. ``nodes`` builds the
     object array from the table when it is read; whichever of the two was
-    written last is the state, and both are while neither was written.
+    written last is the state, and both are while neither was written. A
+    table rebuilt from lists that were read but not changed keeps the order
+    of its cells, so reading ``nodes`` does not change the rest of a run.
     """
 
     def __init_subclass__(cls, **kwargs):
@@ -89,6 +91,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
             if self.__dict__.get("_nodes_array") is None:
                 self.__dict__["_nodes_array"] = self._nodes_from_store(*store)
             self.__dict__["_store"] = None
+            self.__dict__["_store_read"] = store  # its order of the cells, kept if the lists stay unchanged
         try:
             return self.__dict__["_nodes_array"]
         except KeyError:
@@ -98,6 +101,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     def nodes(self, value):
         self.__dict__["_nodes_array"] = value
         self.__dict__["_store"] = None
+        self.__dict__["_store_read"] = None
 
     @property
     def nodes_t(self):
@@ -166,8 +170,25 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
             labels = np.fromiter((label for slot in used for label in flat[slot]), dtype=np.int64,
                                  count=int(lengths.sum()))
             store = (labels, np.repeat(used, lengths[used]))
+            read = self.__dict__.pop("_store_read", None)
+            if read is not None and self._same_cells(read, store):
+                store = read
             self.__dict__["_store"] = store  # the lists stay valid until either is written
         return store
+
+    @staticmethod
+    def _same_cells(read, rebuilt):
+        """Whether the lists built from the table ``read`` were not changed.
+
+        The lists order the cells by channel, so the table rebuilt from them orders
+        them differently than ``read`` did; since the order of the cells decides which
+        random numbers each cell gets, reading ``nodes`` (e.g. to plot the state)
+        would change the rest of the run unless the old order is kept.
+        """
+        if len(read[0]) != len(rebuilt[0]):
+            return False
+        order = np.argsort(read[1], kind="stable")
+        return np.array_equal(read[0][order], rebuilt[0]) and np.array_equal(read[1][order], rebuilt[1])
 
     def _set_cell_table(self, labels, slots):
         """Make the table of labels and padded slots the state of the model."""

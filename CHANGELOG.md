@@ -640,6 +640,12 @@ This file records notable user-facing changes. Changes remain under
   other random numbers in later steps and a recorded run differed from an
   unrecorded one with the same seed (in distribution the dynamics were
   right). They now read the cell table.
+- Reading `lgca.nodes` no longer changes the rest of a run of an
+  identity-based model without volume exclusion, whoever reads it: plotting
+  and animation observers, the estimate of the recording size at the start
+  of `run()` (so a run continued after `step()` calls differed from one
+  uninterrupted run), or a notebook. A cell table rebuilt from label lists
+  that were read but not changed keeps the order of its cells.
 - The largest cell label of identity-based models (`lgca.maxlabel`) is a
   Python integer. It was a NumPy integer, and with NumPy 1.x `maxlabel + 1`
   became a float that cannot index the trait arrays.

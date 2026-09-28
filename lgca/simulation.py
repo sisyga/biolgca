@@ -26,14 +26,17 @@ def estimate_recording_bytes(lgca, timesteps, observers):
     """
     total = 0
     spatial = math.prod(lgca.dims)
-    channels = math.prod(lgca.nodes.shape[len(lgca.dims):])
+    # not lgca.nodes: it would build the label lists of identity-based models without volume exclusion
+    populations = getattr(lgca, "_channel_populations", None)
+    nodes = populations() if populations is not None else lgca.nodes
+    channels = math.prod(nodes.shape[len(lgca.dims):])
     species = getattr(lgca, "n_species", 1)
     for observer in observers:
         schedule = getattr(observer, "schedule", None) or Schedule()
         samples = (timesteps // schedule.every + 1 if schedule.steps is None
                    else sum(step <= timesteps for step in schedule.steps))
         if isinstance(observer, NodeRecorder):
-            per_frame = spatial * channels * lgca.nodes.dtype.itemsize
+            per_frame = spatial * channels * nodes.dtype.itemsize
         elif isinstance(observer, DensityRecorder):
             per_frame = spatial * species * observer.resolve_dtype(lgca).itemsize
         elif isinstance(observer, PopulationRecorder):

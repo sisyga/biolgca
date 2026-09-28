@@ -159,3 +159,86 @@ def test_recording_does_not_change_the_run(recorder):
     plain = run_model(spec, showprogress=False).lgca
     recorded = run_model(replace(spec, analysis=AnalysisSpec(observers=[observer])), showprogress=False).lgca
     assert _labels(recorded.nodes[recorded.nonborder]) == _labels(plain.nodes[plain.nonborder])
+
+
+def _growth_spec(geometry, dims, bc, steps=12):
+    return ModelSpec(
+        space=SpaceSpec(geometry=geometry, dims=dims, boundary=bc),
+        state=StateSpec(density=1, restchannels=1, volume_exclusion=False, identity_based=True, capacity=10,
+                        traits={"r_b": 0.3}),
+        time=TimeSpec(steps=steps, seed=3),
+        dynamics=InteractionPipelineSpec(operators=[
+            {"name": "birth_death", "parameters": {"birth_rate": "r_b", "death_rate": 0.05, "mutation": {
+                "probability": 0.2, "traits": {"r_b": {"distribution": "normal", "scale": 0.02}}}}},
+            {"name": "random_walk"}]))
+
+
+def _outcome(lgca):
+    """Labels of the cells per channel in the order of the lists, and their traits."""
+    nodes = lgca.nodes[lgca.nonborder]
+    labels = [label for channel in nodes.flat for label in channel]
+    return [list(channel) for channel in nodes.flat], np.asarray(lgca.props["r_b"])[labels]
+
+
+@pytest.mark.parametrize("bc", ["periodic", "reflecting", "absorbing"])
+@pytest.mark.parametrize("geometry,dims", GEOMETRIES)
+def test_reading_the_lists_does_not_change_the_run(geometry, dims, bc):
+    """Reading ``nodes`` between steps (a plot, a notebook) keeps the order of the cells in the table,
+    which decides the random numbers each cell gets in later steps."""
+    plain, read = build_model(_growth_spec(geometry, dims, bc)), build_model(_growth_spec(geometry, dims, bc))
+    for step in range(12):
+        plain.step()
+        read.step()
+        if step % 3 == 0:
+            assert read.lgca.nodes.dtype == object  # builds the lists, which become the state
+    assert read.lgca.__dict__["_store"] is not None
+    labels, traits = _outcome(read.lgca)
+    expected_labels, expected_traits = _outcome(plain.lgca)
+    assert labels == expected_labels
+    np.testing.assert_array_equal(traits, expected_traits)
+
+
+def test_changed_lists_still_reach_the_table():
+    model = build_model(_growth_spec("square", (6, 6), "periodic"))
+    model.step()
+    labels, slots = model.lgca._cell_table()
+    nodes = model.lgca.nodes
+    channel = nodes.reshape(-1)[slots[0]]
+    channel.reverse()  # same cells in the same channels, in another order
+    channel.append(10_000)
+    new_labels, _ = model.lgca._cell_table()
+    assert 10_000 in new_labels and len(new_labels) == len(labels) + 1
+
+
+@pytest.mark.parametrize("bc", ["periodic", "reflecting"])
+def test_continuing_a_run_equals_one_run(bc):
+    from dataclasses import replace
+
+    spec = _growth_spec("hex", (8, 8), bc, steps=15)
+    whole = build_model(spec)
+    whole.run(showprogress=False)
+    split = build_model(spec)
+    for _ in range(5):
+        split.step()
+    split.spec = replace(split.spec, time=replace(split.spec.time, steps=10))
+    split.run(showprogress=False)  # estimates its recording size from the state
+    assert _outcome(split.lgca)[0] == _outcome(whole.lgca)[0]
+
+
+@pytest.mark.parametrize("observer", ["animation", "snapshot"])
+def test_plotting_does_not_change_the_run(observer, tmp_path):
+    from dataclasses import replace
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    from lgca.model import AnalysisSpec, run_model
+    from lgca.plotting import AnimationObserver, PlotSnapshotObserver
+    from lgca.simulation import Schedule
+
+    spec = _growth_spec("square", (8, 8), "reflecting", steps=15)
+    observer = (AnimationObserver(kind="flux", schedule=Schedule(every=3), cbar=False) if observer == "animation"
+                else PlotSnapshotObserver(output_dir=tmp_path, schedule=Schedule(every=3), cbar=False))
+    plain = run_model(spec, showprogress=False).lgca
+    plotted = run_model(replace(spec, analysis=AnalysisSpec(observers=[observer])), showprogress=False).lgca
+    assert _outcome(plotted)[0] == _outcome(plain)[0]
