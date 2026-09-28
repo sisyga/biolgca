@@ -685,6 +685,12 @@ This file records notable user-facing changes. Changes remain under
   wrote `time_series.csv` to the working directory by default. `biolgca
   run` still writes `time_series.csv` to its output directory.
 - The zoo index no longer calls the capacity of `evolution_modes` hard.
+- `PlotSnapshotObserver` and `AnimationObserver` draw a field by its name:
+  `kind="scalarfield", field="oxygen"`. Without `field=` they failed only
+  when the first frame was drawn (the animation after the whole run).
+  `PlotSnapshotObserver` on a 1D model fails when the run starts and says
+  to plot the recorded run as a kymograph; it failed at the first
+  snapshot. The documentation lists the kinds each observer draws.
 - The largest cell label of identity-based models (`lgca.maxlabel`) is a
   Python integer. It was a NumPy integer, and with NumPy 1.x `maxlabel + 1`
   became a float that cannot index the trait arrays.

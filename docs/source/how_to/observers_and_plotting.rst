@@ -298,7 +298,35 @@ specification instead of a post-processing step.
 
 The plotting observers require the optional plotting dependencies and use the
 same backend methods as ``lgca.plot_density()``, ``lgca.animate_density()`` and
-the related geometry-specific helpers.
+the related geometry-specific helpers. They draw these kinds, on every model
+family:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 35 35
+
+   * - ``kind``
+     - ``PlotSnapshotObserver``
+     - ``AnimationObserver``
+   * - ``"density"``, ``"config"``, ``"flux"``
+     - 2D and 3D
+     - 2D and 3D
+   * - ``"flow"``
+     - 2D
+     - 2D
+   * - ``"density_cubes"``
+     - 3D
+     - none
+   * - ``"scalarfield"`` with ``field="oxygen"``
+     - 2D and 3D
+     - 2D
+
+``field=`` names a field of ``StateSpec.fields``, drawn with its values at
+each observed step. 1D models have neither snapshots nor animations: their
+plots are kymographs of the whole run, e.g. ``result.lgca.plot_density()``
+after a ``DensityRecorder``, or ``plot_scalarfield(result.data["oxygen"])``
+after a ``FieldRecorder``. An observer that cannot draw its kind on a model
+fails when the run starts, before the first step.
 
 Three-dimensional plots and movies
 ----------------------------------

@@ -32,6 +32,8 @@ do not run in sweeps; `keep_files=True` gives every run its own folder.
 R6 fixed (user decision: measurements belong to the notebook, not the spec):
 `jamming.build_spec` is the model alone, `ScalarTimeSeriesRecorder` writes a file
 only when given a path, zoo specs round-trip in a fresh process with `--plugins`.
+R8 fixed (user decision): `field=` for scalar-field snapshots and animations,
+1D snapshots rejected at setup, support matrix documented. All review items done.
 
 ## Reference point: Morpheus
 

@@ -412,3 +412,69 @@ def test_plotting_observers_reject_plot_kinds_the_model_lacks_before_the_run():
         PlotSnapshotObserver(kind="flow").setup(lgca, runner)
     with pytest.raises(ValueError, match="'flow'"):
         AnimationObserver(kind="flow").setup(lgca, runner)
+
+
+def _field_model(geometry, observers, steps=3, dims=(6, 6)):
+    from lgca.fields import PDESpec
+    from lgca.model import AnalysisSpec, ModelSpec, SpaceSpec, StateSpec, TimeSpec
+    from lgca.pipeline import InteractionPipelineSpec
+    from lgca.simulation import FieldRecorder
+
+    return ModelSpec(
+        space=SpaceSpec(geometry=geometry, dims=dims), state=StateSpec(density=0.5, fields={"signal": 0.0}),
+        time=TimeSpec(steps=steps, seed=1),
+        dynamics=InteractionPipelineSpec(operators=[PDESpec(field="signal", diffusion=0.1,
+                                                            cells=[{"production": 1.0}])]),
+        analysis=AnalysisSpec(observers=[FieldRecorder("signal"), *observers]))
+
+
+@pytest.mark.parametrize("geometry", ["square", "hex"])
+def test_observers_draw_and_animate_a_field_by_its_name(geometry, tmp_path):
+    from lgca.model import run_model
+
+    movie = AnimationObserver(kind="scalarfield", field="signal", save_path=tmp_path / "signal.gif", close=True)
+    snapshot = PlotSnapshotObserver(kind="scalarfield", field="signal", output_dir=tmp_path, retain_results=True)
+    result = run_model(_field_model(geometry, [movie, snapshot]), showprogress=False)
+    recorded = result.data["signal"]
+    assert recorded[-1].max() > 0 and (tmp_path / "signal.gif").is_file()
+    assert sorted(path.name for path in tmp_path.glob("*.png")) == [f"scalarfield_{step:05d}.png" for step in range(4)]
+    step, (_, artist, mappable) = snapshot.results[-1]
+    assert step == 3 and mappable.colorbar.ax.get_ylabel() == "signal"
+    drawn = artist.get_array() if geometry == "square" else None
+    if drawn is not None:
+        np.testing.assert_allclose(np.asarray(drawn).T, recorded[-1])
+    plt.close("all")
+
+
+@pytest.mark.parametrize("observer, message", [
+    (lambda: AnimationObserver(kind="scalarfield"), "needs field="),
+    (lambda: PlotSnapshotObserver(kind="scalarfield"), "needs field="),
+    (lambda: AnimationObserver(kind="scalarfield", field="oxygen"), "no field 'oxygen'"),
+    (lambda: PlotSnapshotObserver(kind="scalarfield", field="oxygen"), "no field 'oxygen'"),
+    (lambda: AnimationObserver(kind="density", field="signal"), "field= names the field of kind='scalarfield'"),
+])
+def test_observers_that_cannot_draw_fail_before_the_first_step(observer, message):
+    """Also with a late schedule: an error must not first appear after a long run."""
+    from lgca.model import run_model
+    from lgca.simulation import CallbackObserver
+
+    steps = []
+    spec = _field_model("square", [CallbackObserver(lambda lgca, step: steps.append(step)), observer()], steps=50)
+    spec.analysis.observers[-1].schedule = Schedule(steps=[50])
+    with pytest.raises(ValueError, match=message):
+        run_model(spec, showprogress=False)
+    assert steps == []
+
+
+@pytest.mark.parametrize("kind", ["density", "flux", "scalarfield"])
+def test_one_dimensional_models_have_no_snapshots(kind):
+    from lgca.model import run_model
+    from lgca.simulation import CallbackObserver
+
+    steps = []
+    spec = _field_model("lin", [CallbackObserver(lambda lgca, step: steps.append(step)),
+                                PlotSnapshotObserver(kind=kind, field="signal", schedule=Schedule(steps=[50]))],
+                        steps=50, dims=10)
+    with pytest.raises(ValueError, match="1D models are drawn as kymographs"):
+        run_model(spec, showprogress=False)
+    assert steps == []

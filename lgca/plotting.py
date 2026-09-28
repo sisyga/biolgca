@@ -64,6 +64,11 @@ def animate(lgca, kind: str = "density", data=None, steps=None, **kwargs):
 class PlotSnapshotObserver(Observer):
     """Create static plot snapshots during a simulation run.
 
+    ``kind="scalarfield"`` draws a field of the model, named by ``field=``, e.g.
+    ``PlotSnapshotObserver(kind="scalarfield", field="oxygen")``. 1D models have no
+    snapshots: their plots are kymographs of the whole run, drawn after it from
+    recordings (e.g. ``result.lgca.plot_density()`` after a ``DensityRecorder``).
+
     Snapshots of 3D (cubic and Moore) models are rendered with Mayavi. When they
     are closed after saving (the default with `output_dir`), they are rendered
     offscreen without opening windows.
@@ -90,15 +95,32 @@ class PlotSnapshotObserver(Observer):
         self.paths = []
 
     def setup(self, lgca, runner) -> None:
-        _model_method(lgca, self.kind, _resolve_kind(self.kind, _PLOT_METHODS))
+        if len(lgca.dims) == 1:
+            raise ValueError("PlotSnapshotObserver draws the lattice at a step, but 1D models are drawn as "
+                             "kymographs of the whole run: record the run (DensityRecorder, NodeRecorder for "
+                             "the flux, FieldRecorder for a field) and plot after it, e.g. "
+                             "result.lgca.plot_density()")
+        method_name = _resolve_kind(self.kind, _PLOT_METHODS)
+        _model_method(lgca, self.kind, method_name)
+        if method_name == "plot_scalarfield":
+            field = self.plot_kwargs.get("field")
+            if field is None:
+                raise ValueError("PlotSnapshotObserver(kind='scalarfield') needs field=, the name of the field "
+                                 "to draw, e.g. field='oxygen'")
+            if isinstance(field, str):
+                _field_values(lgca, field)
         self.results = []
         self.paths = []
         if self.output_dir is not None:
             self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def on_step(self, lgca, step: int) -> None:
+        kwargs = dict(self.plot_kwargs)
+        if isinstance(kwargs.get("field"), str):  # the field's values at this step
+            kwargs.setdefault("cbarlabel", kwargs["field"])
+            kwargs["field"] = _field_values(lgca, kwargs["field"])
         with _RENDER_LOCK, _render_context(lgca, offscreen=self.close):
-            result = plot(lgca, kind=self.kind, **self.plot_kwargs)
+            result = plot(lgca, kind=self.kind, **kwargs)
             fig = _figure_from_result(result)
             if self.retain_results:
                 self.results.append((step, result))
@@ -120,6 +142,8 @@ class AnimationObserver(Observer):
     run: with `save_path`, every frame is rendered offscreen, the movie is
     written and :attr:`animation` is its path; otherwise :attr:`animation` is a
     Mayavi ``Animator`` that plays after :func:`mayavi.mlab.show` is called.
+    ``kind="scalarfield"`` animates the field named by ``field=`` (2D models).
+    1D models have no animations: plot the recorded run as a kymograph.
     """
 
     def __init__(
@@ -129,10 +153,12 @@ class AnimationObserver(Observer):
         save_path=None,
         save_kwargs: dict | None = None,
         close: bool = False,
+        field: str | None = None,
         **animation_kwargs,
     ):
         super().__init__(schedule=schedule)
         self.kind = kind
+        self.field = field
         self.save_path = None if save_path is None else Path(save_path)
         self.save_kwargs = dict(save_kwargs or {})
         self.close = close
@@ -142,7 +168,15 @@ class AnimationObserver(Observer):
         self.animation = None
 
     def setup(self, lgca, runner) -> None:
-        _model_method(lgca, self.kind, _resolve_animation(self.kind)[0])
+        method_name, data_argument = _resolve_animation(self.kind)
+        _model_method(lgca, self.kind, method_name)
+        if data_argument == "field_t":
+            if self.field is None:
+                raise ValueError("AnimationObserver(kind='scalarfield') needs field=, the name of the field to "
+                                 "animate, e.g. field='oxygen'")
+            _field_values(lgca, self.field)
+        elif self.field is not None:
+            raise ValueError(f"field= names the field of kind='scalarfield', not of kind={self.kind!r}")
         if self.schedule.steps is not None and not any(step <= runner.timesteps for step in self.schedule.steps):
             raise ValueError("Animation schedule selects no frames in this run; "
                              f"include a local step between 0 and {runner.timesteps}")
@@ -151,7 +185,8 @@ class AnimationObserver(Observer):
         self.animation = None
 
     def on_step(self, lgca, step: int) -> None:
-        self.frames.append(_capture_frame(lgca, self.kind, self.animation_kwargs.get("channels", slice(None))))
+        self.frames.append(_capture_frame(lgca, self.kind, self.animation_kwargs.get("channels", slice(None)),
+                                          field=self.field))
         self.frame_steps.append(step)
 
     def finalize(self, lgca, runner) -> None:
@@ -163,6 +198,8 @@ class AnimationObserver(Observer):
         kwargs = dict(self.animation_kwargs)
         if _resolve_animation(self.kind)[1] == "density_t":
             kwargs.pop("channels", None)  # Frame capture already selected the channels.
+        if self.field is not None:
+            kwargs.setdefault("cbarlabel", self.field)
         if _uses_mayavi(lgca):
             self.frames = []
             kwargs.setdefault("show", False)
@@ -258,8 +295,22 @@ def _close_figure(fig) -> None:
         mlab.close(fig)
 
 
-def _capture_frame(lgca, kind: str, channels=slice(None)):
+def _field_values(lgca, name):
+    """The values of the field ``name`` of the model (``StateSpec.fields``) at the interior nodes."""
+    from .plot_data import select_scalar_field
+
+    if not isinstance(name, str) or not hasattr(lgca, name):
+        raise ValueError(f"the model has no field {name!r}; declare it in StateSpec.fields")
+    try:
+        return select_scalar_field(lgca, getattr(lgca, name))
+    except (IndexError, ValueError) as exc:
+        raise ValueError(f"{name!r} is not a field with one value per node") from exc
+
+
+def _capture_frame(lgca, kind: str, channels=slice(None), field=None):
     method_name, data_argument = _resolve_animation(kind)
+    if data_argument == "field_t":
+        return np.array(_field_values(lgca, field), dtype=float, copy=True)
     if data_argument == "density_t":
         if channels != slice(None):
             nodes = lgca.nodes[lgca.nonborder][..., channels]
