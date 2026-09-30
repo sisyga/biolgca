@@ -35,6 +35,51 @@ only when given a path, zoo specs round-trip in a fresh process with `--plugins`
 R8 fixed (user decision): `field=` for scalar-field snapshots and animations,
 1D snapshots rejected at setup, support matrix documented. All review items done.
 
+Review status (2026-09-30): a further cross-feature review corrected 26 bounded
+defect groups and added 86 regression cases. It covers model-file fidelity,
+cell/count validation, field numerics and rule reads, sweep/archive reproducibility,
+recorders, Explorer, zoo summaries and Windows documentation generation. See
+[the current code review](code_review_2026-09-30.md) for evidence and validation.
+Three architectural findings remain: incomplete state transactions and rule-kind
+contracts (CR-A1), nonlinear steady/Picard solver robustness (CR-A2), and ownership of
+compiled configuration/provenance (CR-A3). Suggested order: CR-A1, then CR-A3, then CR-A2,
+each with the acceptance tests in the report. The new PDE guard prevents
+publication of unconverged results; it does not resolve CR-A2's harder valid cases.
+(The review's architecture IDs were A1 to A3; they are renamed so that they do not
+collide with the issue IDs below.)
+
+Review follow-up (2026-09-30): a second pass confirmed the 26 fixes. It completed
+11 of them and relaxed F11 and F18, which rejected valid cases, and it fixed
+further bounded defects found along the way (shared operator objects in threaded
+sweeps, a field rule replacing a cell's identity, BDF/Radau without the Jacobian
+of nonlinear terms, and others; see the follow-up section of the review). The
+architecture findings were re-assessed with prototypes; the recommended designs,
+phased PRs and the decisions they need are in
+[architecture_proposals_2026-09-30.md](architecture_proposals_2026-09-30.md).
+Recommended order changed: CR-A3's first PR (models own their configuration and
+operator objects), then CR-A1 (contract checks, then step rollback), with CR-A2
+(Newton's method for saturating uptake) in parallel.
+
+Architecture decisions (2026-10-01): operator objects in a spec are templates,
+copied for every model, and a reorientation rule may not write traits. CR-A3 PR1
+is done: every model builds from and keeps its own copy of the spec, and runs its
+own copies of operator objects (`model.pipeline.operators[i]`); objects that
+cannot be copied are rejected at build, and by `sweep` before the first run.
+Measurements for the open decisions are in the proposals document: warning
+instead of raising is exact for operation-level contract violations but not for
+direct writes to the cell arrays, and the entry checks cost nothing measurable;
+Newton is 2 to 5 times cheaper per step than Picard also when the field is much
+faster than the cells; input hashes help only where the library compares hashes
+it wrote itself. Also fixed: without pyamg, steady 3D fields with uptake no
+longer factor their matrix in every solve. Decisions 3 to 5 were then taken as
+recommended there (contract violations warn with their own category, strict in
+CI, direct writes raise, rollback on by default; Newton by default for
+saturating uptake; hashes in run metadata and pins only in references the library
+writes). Next: CR-A1 PR0, then PR1 and PR3; CR-A2 PR1 in parallel. Local starting
+points (git-ignored): `outputs/code-review-2026-09-30/followup-probes/round3/`,
+e.g. `newton/newton_patch.py` (validated Newton and chord prototype) and
+`contracts/entry_checks.diff` (the entry checks, adapted to the current tree).
+
 ## Reference point: Morpheus
 
 Morpheus (https://gitlab.com/morpheus.lab/morpheus) is a multiscale modelling
