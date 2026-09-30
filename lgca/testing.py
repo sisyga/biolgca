@@ -89,7 +89,7 @@ def check_interaction(
     Parameters
     ----------
     rule : Interaction or str
-        A rule made with :func:`lgca.interaction`, or the name of a
+        A rule made with :func:`lgca.interaction <lgca.rules.interaction>`, or the name of a
         registered interaction.
     parameters : mapping, optional
         Parameters of the rule.

@@ -26,7 +26,7 @@ Every interaction is one of three kinds, defined by what it keeps:
    numbers is a reorientation, including deterministic ones such as the HPP
    collision rule, and moving cells between velocity and rest channels.
 
-Rules written with :func:`lgca.interaction` declare their kind and are checked
+Rules written with :func:`lgca.interaction <lgca.rules.interaction>` declare their kind and are checked
 against it after every step; see :doc:`/how_to/custom_interactions`.
 
 Species
@@ -373,7 +373,7 @@ Use :func:`lgca.pipeline.list_reorientation_terms` to retrieve the names in
 code. ``J(s')`` is the flux of a candidate state, the sum of the velocities of
 its cells. Every term is a field of the lattice state together with a
 coupling that turns it into a score; new terms are written the same way with
-:func:`lgca.reorientation_term`, and the built-in ones are defined in
+:func:`lgca.reorientation_term <lgca.rules.reorientation_term>`, and the built-in ones are defined in
 :mod:`lgca.builtin_rules`.
 
 .. list-table::

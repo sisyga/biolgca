@@ -69,6 +69,8 @@ def test_current_named_fields_steer_next_step_once_per_operator(name, writer, mo
         state=StateSpec(nodes=nodes, fields={"signal": field}),
         dynamics=InteractionPipelineSpec(operators=operators, propagation=False),
     ))
+    if writer:
+        field_writer = model.pipeline.operators[0]  # the model's own copy of the operator object
     term = model.pipeline.operators[-1].terms[0]
     calls = []
     original = term.prepare

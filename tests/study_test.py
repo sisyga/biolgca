@@ -189,6 +189,44 @@ def test_results_do_not_depend_on_the_number_of_workers(backend):
         np.testing.assert_array_equal(a, b)
 
 
+@pytest.mark.parametrize("state", [{}, {"volume_exclusion": False}, {"identity_based": True},
+                                   {"identity_based": True, "volume_exclusion": False}],
+                         ids=["classical", "nove", "ib", "nove_ib"])
+def test_threads_sweeps_of_an_operator_object_equal_serial_sweeps(state):
+    import threading
+
+    from lgca import interaction
+    from lgca.plugins import create_plugin
+    from lgca.rules import FunctionInteractionOperator
+
+    # every run builds its model from one operator object, which learns the model's capacity: the runs in
+    # threads ran with each other's capacities
+    def model(*operators):
+        return ModelSpec(space=SpaceSpec(geometry="lin", dims=30), time=TimeSpec(steps=30, seed=7),
+                         state=StateSpec(density=1.0, restchannels=1, capacity=2, **state),
+                         dynamics=InteractionPipelineSpec(operators=list(operators), propagation=False))
+
+    all_built = threading.Barrier(6, timeout=30)
+
+    @interaction(kind="birth_death", families=("classical", "nove", "ib", "nove_ib"), register=False,
+                 name="study_test.wait_until_all_runs_are_built")
+    def wait_until_all_runs_are_built(state):
+        """Changes nothing; the runs in threads start stepping together."""
+        if state.step == 1:
+            all_built.wait()
+
+    operator = create_plugin("birth_death", {"birth_rate": 0.5})
+    grid = {"state.capacity": [2, 50, 3]}
+    named = sweep(model({"name": "birth_death", "parameters": {"birth_rate": 0.5}}), grid=grid, seeds=[1, 2],
+                  showprogress=False)
+    serial = sweep(model(operator), grid=grid, seeds=[1, 2], showprogress=False)
+    threads = sweep(model(FunctionInteractionOperator(wait_until_all_runs_are_built), operator), grid=grid,
+                    seeds=[1, 2], n_jobs=6, backend="threads", showprogress=False)
+    pd.testing.assert_frame_equal(serial, named)
+    pd.testing.assert_frame_equal(threads, named)
+    assert operator.capacity is None  # the object in the spec is a template: it never runs
+
+
 def test_a_recording_is_measured_as_a_time_series_and_long_tables_spread_it():
     measure = {"population": "population", "final": final_population}
     wide = sweep(_growth(steps=4), grid={"birth_rate": [0.0, 0.5]}, seeds=[1], measure=measure,
@@ -217,6 +255,46 @@ def test_functions_may_return_series_indexed_by_step():
         sweep(_growth(steps=4), seeds=[1], measure={"population": "population",
                                                     "raw": lambda result: result.data["population"]},
               long=True, showprogress=False)
+
+
+@pytest.mark.parametrize("recorder", ["PopulationRecorder", "ScalarTimeSeriesRecorder"])
+def test_long_tables_keep_runs_that_recorded_nothing(recorder):
+    from lgca import simulation
+    from lgca.model import AnalysisSpec
+
+    observer = getattr(simulation, recorder)(schedule=simulation.Schedule(steps=[10]))  # after a transient
+    spec = vary(_growth(), {"analysis": AnalysisSpec(observers=[observer])})
+    measure = {"population": "population", "final": final_population}
+    long = sweep(spec, grid={"steps": [4, 12]}, seeds=[1, 2], measure=measure, long=True, showprogress=False)
+    wide = sweep(spec, grid={"steps": [4, 12]}, seeds=[1, 2], measure=measure, showprogress=False)
+    assert long.columns.tolist() == ["steps", "seed", "step", "final", "population"]
+    assert long[["steps", "seed"]].values.tolist() == [[4, 1], [4, 2], [12, 1], [12, 2]]
+    assert long.final.tolist() == wide.final.tolist()
+    assert long.step.isna().tolist() == [True, True, False, False]
+    assert long.population.isna().tolist() == [True, True, False, False]
+
+
+def test_processes_sweeps_take_operator_objects_of_registered_rules():
+    import pickle
+
+    from lgca.plugins import create_plugin
+
+    # a rule, a stack and a reorientation term pickle by reference, like functions: the workers import them
+    for name, parameters in [("birth_death", {"birth_rate": 0.5}), ("go_or_grow_kappa", {}),
+                             ("polar_alignment", {"beta": 2.0})]:
+        operator = create_plugin(name, parameters)
+        copied = pickle.loads(pickle.dumps(operator))
+        assert type(copied) is type(operator) and copied.parameters == operator.parameters
+        assert getattr(copied, "rule", None) is getattr(operator, "rule", None)
+    spec = ModelSpec(space=SpaceSpec(geometry="square", dims=(8, 8)), time=TimeSpec(steps=5, seed=1),
+                     state=StateSpec(density=0.5, restchannels=1, volume_exclusion=False, capacity=4),
+                     dynamics=InteractionPipelineSpec(operators=[
+                         create_plugin("birth_death", {"birth_rate": 0.5}),
+                         create_plugin("polar_alignment", {"beta": 2.0})]))
+    grid = {"state.capacity": [2, 6]}
+    serial = sweep(spec, grid=grid, seeds=[1, 2], showprogress=False)
+    processes = sweep(spec, grid=grid, seeds=[1, 2], n_jobs=2, showprogress=False)
+    pd.testing.assert_frame_equal(processes, serial)
 
 
 def test_processes_need_functions_they_can_import():

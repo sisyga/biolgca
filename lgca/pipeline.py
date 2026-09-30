@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import difflib
 import time
 from collections.abc import Mapping, Sequence
@@ -13,6 +14,7 @@ import numpy as np
 
 from ._warnings import warn_user
 from .lattice_state import channel_mask, occupations
+from .operator_base import _COPYING_TEMPLATES
 from .plugins import (
     ConservationLaw,
     InteractionOperator,
@@ -105,7 +107,7 @@ class ReorientationTermSpec:
         ``parameters["probability"]`` (:mod:`lgca.switching`; default the
         go-or-grow switch of the density): go-or-rest as a term.
 
-    New terms are written with :func:`lgca.reorientation_term`; the built-in
+    New terms are written with :func:`lgca.reorientation_term <lgca.rules.reorientation_term>`; the built-in
     terms above are defined the same way in :mod:`lgca.builtin_rules`, and
     each of them is also an operator of its own (one cue), e.g.
     ``{"name": "chemotaxis", "parameters": {"beta": 2.0, "field": "signal"}}``.
@@ -114,7 +116,7 @@ class ReorientationTermSpec:
     ----------
     name : str
         One of the names above or of a term defined with
-        :func:`lgca.reorientation_term`; :func:`list_reorientation_terms`
+        :func:`lgca.reorientation_term <lgca.rules.reorientation_term>`; :func:`list_reorientation_terms`
         lists them.
     beta : float, default=1.0
         Weight (sensitivity) of the term; 0 switches it off, negative values
@@ -215,8 +217,15 @@ class InteractionPipelineSpec:
           interaction (see :func:`lgca.plugins.list_plugins`);
         - a :class:`ReorientationSpec` combining directional cues;
         - a :class:`BirthDeathSpec` or :class:`PhenotypeSwitchSpec`;
-        - an :class:`~lgca.operator_base.InteractionOperator` instance (Python
-          only; it cannot be saved to a model file).
+        - an :class:`~lgca.operator_base.InteractionOperator` instance. One of
+          a registered interaction (e.g. from :func:`lgca.plugins.create_plugin`)
+          is saved to a model file by its name and parameters; any other is
+          Python only. The object is a template: every model built from the
+          spec runs its own copy, ``model.pipeline.operators[i]``, so models
+          built from one spec do not affect each other, and what an operator
+          stores while it runs is found on that copy, not on the object.
+
+        A :class:`ReorientationTermSpec` belongs in a :class:`ReorientationSpec`.
     propagation : bool or str, default="default"
         ``"default"`` or ``True`` moves the cells after the interactions;
         ``False``, ``None``, ``"none"`` or ``"disabled"`` keeps them in place,
@@ -357,9 +366,10 @@ def compile_pipeline(spec: InteractionPipelineSpec | None, context) -> CompiledP
             or isinstance(spec.propagation, str) and spec.propagation in {"default", "none", "disabled"}):
         raise ValueError("dynamics.propagation must be a boolean, null, 'default', 'none', or 'disabled'")
     operators = []
+    memo = _template_memo(context)  # one for all entries: operator objects that refer to each other still do
     for index, operator_spec in enumerate(spec.operators):
         try:
-            operators.append(_compile_operator(operator_spec))
+            operators.append(_compile_operator(operator_spec, memo))
         except KeyError as exc:
             name = _operator_name(operator_spec)
             raise ValueError(f"dynamics.operators[{index}] unknown operator {name!r}{_zoo_hint(name)}") from exc
@@ -373,11 +383,15 @@ def compile_pipeline(spec: InteractionPipelineSpec | None, context) -> CompiledP
     return pipeline
 
 
-def _compile_operator(spec) -> InteractionOperator:
+def _compile_operator(spec, memo=None) -> InteractionOperator:
+    """The operator of one entry; ``memo`` of the copies of operator objects (see :func:`_template_copy`)."""
     if isinstance(spec, InteractionOperator):
-        return spec
+        return _template_copy(spec, memo)
     if isinstance(spec, ReorientationSpec):
         return BoltzmannReorientationOperator(spec)
+    if isinstance(spec, ReorientationTermSpec):  # compiled by name, it would lose beta, species and trait
+        raise ValueError(f"is a reorientation term ({spec.name!r}); put it in ReorientationSpec(terms=[...]), "  # noqa: TRY004
+                         f"or give one cue by name, e.g. {{'name': {spec.name!r}, 'parameters': {{'beta': 2.0}}}}")
     if isinstance(spec, (BirthDeathSpec, PhenotypeSwitchSpec)):
         return create_plugin(spec.name, spec.parameters)
     if isinstance(spec, Mapping):
@@ -389,6 +403,57 @@ def _compile_operator(spec) -> InteractionOperator:
     if name is None:
         raise ValueError("requires a 'name'")
     return create_plugin(name, parameters)
+
+
+def _template_copy(operator: InteractionOperator, memo=None) -> InteractionOperator:
+    """The model's own copy of an operator object given in a spec; the object is a template.
+
+    ``validate`` and ``setup`` store what an operator learns about its model on it (the capacity, the
+    operators of a stack, the matrices of a field), so every model runs a copy and the object in the spec
+    never runs. Everything the operator holds is copied with it, except the observers of the model (in
+    ``memo``, see :func:`_template_memo`) and rules, term definitions and their
+    :class:`~lgca.operator_base.PluginInfo`, descriptions that the copies share (they copy as themselves).
+    The operator objects of one list are copied with one ``memo``: an object that refers to another of
+    the list refers to its copy.
+    """
+    try:
+        return _copy_templates(operator, {} if memo is None else memo)
+    except Exception as exc:  # noqa: BLE001 - any failure, e.g. of a lock, or a RecursionError of __getattr__
+        raise ValueError(
+            f"({operator.name!r}) cannot be copied ({_copy_failure(exc)}); every model runs its own copy of an "
+            f"operator object given in its spec. Give {type(operator).__name__} a __deepcopy__ method that "
+            "leaves out what cannot be copied, or register the rule and give it by name, "
+            "{'name': ..., 'parameters': {...}}") from None
+
+
+def _copy_templates(value, memo):
+    """``copy.deepcopy(value, memo)``, in which operator objects leave out what their ``setup`` computes again."""
+    token = _COPYING_TEMPLATES.set(True)
+    try:
+        return copy.deepcopy(value, memo)
+    finally:
+        _COPYING_TEMPLATES.reset(token)
+
+
+def _template_memo(context) -> dict:
+    """The memo for copying operator objects: the observers of the model are shared, not copied.
+
+    An operator may refer to an observer of ``spec.analysis`` (e.g. to log events); its copy then refers to
+    the same observer, which records the run for the caller.
+    """
+    analysis = getattr(getattr(context, "spec", None), "analysis", None)
+    observers = () if analysis is None else analysis.observers
+    return {id(observer): observer for observer in observers}
+
+
+def _copy_failure(exc: BaseException) -> str:
+    """Why a copy failed, for an error message."""
+    if isinstance(exc, RecursionError):
+        return ("RecursionError: maximum recursion depth exceeded, e.g. by a __getattr__ that reads an "
+                "attribute the copy does not have yet")
+    if isinstance(exc, (TypeError, copy.Error)):
+        return str(exc)
+    return f"{type(exc).__name__}: {exc}"
 
 
 def _operator_name(spec) -> str:
@@ -880,7 +945,11 @@ class BoltzmannReorientationOperator(ReorientationOperator):
                 weights = _match_cells(term, cells)
             strength = term.beta
             if term.trait is not None:
-                strength = strength * trait_array(lgca, term.trait).values[cells.label].astype(float)[:, None]
+                values = trait_array(lgca, term.trait).values[cells.label].astype(float)
+                if not np.all(np.isfinite(values)):
+                    raise ValueError(f"the trait {term.trait!r}, which scales the term {term.name!r}, "
+                                     "must be finite for every cell")
+                strength = strength * values[:, None]
             scores += strength * weights
         return scores
 

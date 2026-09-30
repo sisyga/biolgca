@@ -409,6 +409,48 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- Every model owns its configuration. `build_model` (and so `run_model`,
+  `sweep`, `lgca.explore` and the command line) builds from its own copy of
+  the spec and keeps it as `model.spec` / `result.spec`: changes the caller
+  makes afterwards to the dicts, lists and arrays of the spec (operator
+  parameters, also nested ones such as switch rates, initial nodes, traits,
+  the initializer, the operator list) reach neither the running model nor
+  `model.spec`, and the running model does not change `model.spec` (a lattice
+  of label lists gets lists of its own). Operator objects in
+  `dynamics.operators` (e.g. from `create_plugin`, or your own
+  `InteractionOperator` subclasses), also those a stack returns, are
+  templates: every model runs its own copy, `model.pipeline.operators[i]`,
+  and the object in the spec never runs. Before, all models built from one
+  spec ran the same object, which stores what it learns about its model (the
+  capacity, a stack's operators, a field's matrices): building a second model
+  changed the first one's dynamics (a capacity-2 model grew to 1,593 cells
+  instead of 70 after a capacity-50 variant was built from the same object),
+  runs of a sweep in threads were labelled with a capacity they did not run
+  with, and an Explorer change that was rejected still changed the running
+  model. The operator objects of one list (the model's, or a stack's) are
+  copied together, so operators that refer to each other still do, and
+  everything an operator holds is copied with it, also a list or dict handed
+  to its constructor and the object of a bound method: code that reads an
+  operator object after a run, or a list the operator appends to, must read
+  `model.pipeline.operators[i]` instead, or hand the operator an observer of
+  `spec.analysis`. Observers, rules, reorientation-term definitions,
+  `PluginInfo` and functions are shared, not copied. An operator or another
+  part of the spec that cannot be copied (a lock, an open file, a wrapper
+  whose `__getattr__` recurses) is rejected when the model is built, and by
+  `sweep` before the first run, also in a value of the grid, with a message
+  naming it; an operator then needs a `__deepcopy__` method. A `pde`
+  operator that has already run can serve as a template: its copies start
+  with fresh statistics and leave out its matrices, which the new model
+  computes. The copy costs well under a millisecond for most models (0.04 ms
+  for a 50 x 50 model, 0.3 ms for 200 x 200 identity-based nodes given as a
+  label array); nodes given as lists of labels (identity-based without
+  volume exclusion) are copied for `model.spec` and for the lattice, about
+  20 ms each for 200 x 200 nodes (the build takes about a sixth longer). The
+  copy takes memory as long as the model exists: initial nodes, traits and
+  fields given as arrays are held by `model.spec` and by the lattice, and
+  label lists nearly double the memory of a model after its first step
+  (67 instead of 38 MB for 300 x 300 nodes). `lgca.explore` keeps one copy
+  for itself and its model.
 - The interaction names of `get_lgca` run stacks of the rules without family
   prefix (`lgca.legacy_names`): `get_lgca(interaction="alignment", beta=2)`
   runs `polar_alignment`, `interaction="go_or_grow"` runs `go_or_rest`,
@@ -623,6 +665,97 @@ This file records notable user-facing changes. Changes remain under
 
 ### Fixed
 
+- Model files keep the `sensed_species` of reorientation terms, all parameters
+  of single-cue operators made with `create_plugin` (beta, `sensed_species`,
+  trait and the cue's own parameters), NumPy numbers in the spec (e.g. a seed
+  or capacity from `np.arange`) and a term's trait given as a NumPy string.
+  Species-specific channel sets (`channels={0: ...}`) keep working after a JSON
+  round trip, which turns their keys into strings. A reorientation term placed
+  directly in `dynamics.operators` ran with beta 1 and was saved without its
+  settings; building and saving reject it with a pointer to
+  `ReorientationSpec(terms=[...])`.
+  `time.seed` must be a non-negative integer.
+- Cell numbers: assigned counts are checked for node totals beyond the signed
+  int64 of the samplers before conversion (float counts by their exact totals)
+  and are copied, not shared with the caller; `add_cells` and
+  `divide_cells(channels="same")` refuse results beyond it. Cell selectors
+  reject float positions, out-of-range or wrapping indices and 2-D position
+  arrays such as `np.argwhere` output (integral floats and 2-D arrays used to be
+  accepted); `shuffle_cells` and `random_walk` reject negative, wrapping,
+  boolean and float species.
+- Non-finite runtime values no longer silently change events: rates and cues
+  read from traits, traits that scale reorientation terms, mutation effects and
+  mutation results that overflow raise an error that names the trait, and
+  mutation conditions with reversed or NaN ranges raise. A mutation event checks
+  all its traits and computes all its effects before writing any, so a rejected
+  event changes no trait. A failed `divide(new_family=True)` no longer leaves
+  trait arrays of different lengths, which made every later division fail.
+- Rules of kind `field` in identity-based models must keep every cell's label,
+  node and channel: a division followed by a kill replaced a cell unnoticed.
+  `FamilyPopulationRecorder` follows families founded in a rule body, and on a
+  model without cell identities it raises a clear error.
+- Fields: rules read their own `set_field` updates, also through `gradient`;
+  steady fields inside (nested) stacks are at equilibrium from the first step;
+  production maps must be finite and non-negative; a non-finite solver result is
+  rejected and leaves the field unchanged; a declared field is always copied to
+  the lattice. Saturating uptake and reactions iterate until both the change and
+  the residual are within `rtol`. A solve still within 1000 times this tolerance
+  after `max_iterations` warns and uses the last iterate; a worse one raises and
+  says whether to raise `max_iterations` or to use `solver="explicit"`. Before,
+  every unconverged iterate was published after one warning, however far off.
+  Hill uptake no longer overflows at extreme concentrations. The `"auto"`
+  backend factors a matrix that does not depend on the cells once on lattices
+  of up to 10⁶, 10⁵ and 6,000 nodes in 1D, 2D and 3D (steady fields in 3D, and
+  without pyamg in any dimension, up to 20,000) and iterates above; before, it
+  factored every such matrix, however large, so seeded runs with such a field
+  on larger lattices change within the solver tolerance. Without pyamg, a
+  steady field whose matrix the cells change (uptake) on a 3D lattice is solved
+  with conjugate gradients; before, lattices of up to 20,000 nodes factored that
+  matrix again in every solve (1.8 s per solve at 27³ nodes, against about
+  15 ms).
+  Multigrid hierarchies are built with a fixed seed, so that runs with a steady
+  field repeat exactly. `metadata["fields"]` names the backend used and counts
+  failed updates. BDF and Radau get the Jacobian of saturating uptake and
+  reactions (hundreds to thousands of times fewer evaluations on stiff uptake).
+  Integer solver options are stored as integers, and invalid ones (infinite,
+  NaN, strings, booleans) raise an error naming the option. A steady solution
+  that overflows is reported as such, not as having no unique solution.
+- Sweeps reject grid keys that set the same parameter, or a part of another
+  (aliases, named or negative operator selectors, `time` with `time.steps`),
+  empty axes and grids, and seeds that are not non-negative integers. Run
+  folders are bounded in length and distinct also on case-insensitive file
+  systems. Long tables keep a run that recorded nothing. Runs in threads no
+  longer share the operator objects of the model or the grid (see "Every
+  model owns its configuration" under Changed). Operator objects of
+  registered rules, stacks and reorientation terms pickle by reference, like
+  functions, so sweeps in worker processes (the default with `n_jobs` > 1)
+  take them; before, such a model had to run in threads.
+  Short parameter names (`vary`, `sweep`, `explore`) no longer fail on a model
+  that holds a single-cue operator object.
+  `biolgca sweep` rejects a repeated `--vary`, archives every varied NPZ input
+  (reading all of them first, so that a sweep into its own folder keeps its
+  inputs) and records in `sweep.json` which file each copy was made from; the
+  model's own file is not needed when every run replaces it.
+  `mutational_meltdown.scan` accepts generators and rejects invalid seeds.
+- Recorders: metric names cannot be `step` or an alias of `result.data`.
+  Recorders that would write the same output name are rejected before the first
+  step, and by `biolgca validate`, `biolgca run` and `sweep` before anything is
+  written, unless they record the same quantity (a `PopulationRecorder` and a
+  population CSV may use different schedules). Subclassed recorders and scalar
+  schedules without samples appear in `result.data`, and sweeps measure the
+  metrics of an existing `ScalarTimeSeriesRecorder` instead of adding a
+  recorder. `ScalarTimeSeriesRecorder(metrics={})` raises.
+- `lgca.explore` offers only scalar fields as views and measures, starts with
+  vector fields such as advection velocities, works under windowed matplotlib
+  backends such as TkAgg (its figure never opens a window or stays in pyplot),
+  rejects controls that set the same place or a part of another, accepts a
+  control for a whole parameter mapping, and warns when it cannot try a change
+  on a copy of the model.
+- Zoo: clone-trait summaries include the first cell in models without volume
+  exclusion; radial profiles handle extinction and a colony at the centre.
+- Documentation: the decorator API pages get distinct file names (strict builds
+  on Windows), and references to `lgca.interaction`, `lgca.stack` and
+  `lgca.reorientation_term` link to them.
 - 3D isosurfaces (`plot_density`, `plot_scalarfield` and their animations
   on cubic and Moore lattices) are drawn at the levels of `contours=`, which
   stay fixed during an animation. They were drawn at five levels spread over

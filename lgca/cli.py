@@ -20,6 +20,7 @@ from .simulation import (
     CSVSnapshotObserver,
     FieldRecorder,
     ScalarTimeSeriesRecorder,
+    check_observers,
 )
 
 
@@ -195,6 +196,56 @@ def _with_copied_resources(spec, model_path: Path, output_dir: Path, trusted_pat
     return replace(spec, state=replace(spec.state, initializer={"name": "from_npz", "parameters": parameters}))
 
 
+def _with_copied_sweep_resources(spec, grid, model_path, output_dir, trusted_paths):
+    """Archive the NPZ files the runs of a sweep read and keep their declarations portable.
+
+    Returns the model and the grid, which refer to the copies, and archived path -> path as given.
+    If the grid sets the initializer of every run, no run reads the model's own file: it is copied
+    only if it exists (it may be a placeholder).
+    """
+    from .initializers import resolve_resource_path
+    from .study import _canonical_path, vary
+
+    initializers = {"state.initializer", "state.initializer.parameters", "state.initializer.parameters.path"}
+    # Read every file before writing a copy: a file may be in resources/ of the output directory itself.
+    varied, staged = False, []
+    for path, options in grid.items():
+        canonical = _canonical_path(spec, path)
+        if canonical not in initializers:
+            continue
+        varied = True
+        for index, value in enumerate(options):
+            initializer = vary(spec, {path: value}).state.initializer
+            if initializer is None or initializer.get("name") != "from_npz":
+                continue
+            parameters = dict(initializer.get("parameters", {}))
+            source = resolve_resource_path(parameters["path"], resource_base=model_path.parent,
+                                           trusted_paths=trusted_paths)
+            staged.append((path, index, canonical, parameters, source.read_bytes()))
+    portable_spec, sources = spec, {}
+    base = spec.state.initializer
+    if base is not None and base["name"] == "from_npz":
+        given = base.get("parameters", {})["path"]
+        if not varied or resolve_resource_path(given, resource_base=model_path.parent,
+                                               trusted_paths=trusted_paths).is_file():
+            portable_spec = _with_copied_resources(spec, model_path, output_dir, trusted_paths)
+            sources["resources/initial_state.npz"] = given
+    portable_grid = deepcopy(grid)
+    for count, (path, index, canonical, parameters, data) in enumerate(staged, start=1):
+        target = output_dir / "resources" / f"initial_state_{count}.npz"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        sources[f"resources/{target.name}"] = parameters["path"]
+        parameters["path"] = f"resources/{target.name}"
+        if canonical == "state.initializer":
+            portable_grid[path][index] = {"name": "from_npz", "parameters": parameters}
+        elif canonical == "state.initializer.parameters":
+            portable_grid[path][index] = parameters
+        else:
+            portable_grid[path][index] = parameters["path"]
+    return portable_spec, portable_grid, sources
+
+
 def _existing_model_path(path: Path) -> Path:
     resolved = path.resolve()
     if not resolved.is_file():
@@ -215,7 +266,12 @@ def _sweep(args) -> int:
     running = deepcopy(spec)
     if args.keep_files:  # the files of every run in a folder of its own in the output directory
         _resolve_output_paths(running, output_dir, trusted_paths=args.trusted_paths)
-    grid = dict(_parse_vary(entry) for entry in args.vary)
+    grid = {}
+    for entry in args.vary:
+        path, values = _parse_vary(entry)
+        if path in grid:
+            raise ValueError(f"--vary repeats {path!r}; give each parameter once")
+        grid[path] = values
     seeds = None if args.seeds is None else _parse_seeds(args.seeds)
     measure = {name: name for name in args.measure} or {"population": final_population}
     table = sweep(running, grid=grid or None, seeds=seeds, measure=measure, n_jobs=args.n_jobs, long=args.long,
@@ -223,11 +279,12 @@ def _sweep(args) -> int:
                   trusted_paths=args.trusted_paths, keep_files=args.keep_files)
     output_dir.mkdir(parents=True, exist_ok=True)
     table.map(_csv_cell).to_csv(output_dir / "table.csv", index=False)
-    portable_spec = _with_copied_resources(spec, model_path, output_dir, args.trusted_paths)
+    portable_spec, portable_grid, resources = _with_copied_sweep_resources(spec, grid, model_path, output_dir,
+                                                                           args.trusted_paths)
     description = {
-        "model": model_spec_to_dict(portable_spec), "grid": _json_safe(grid), "paths": table.attrs["paths"],
+        "model": model_spec_to_dict(portable_spec), "grid": _json_safe(portable_grid), "paths": table.attrs["paths"],
         "seeds": _json_safe(sorted(set(table["seed"].tolist()))), "measure": list(measure), "long": args.long,
-        "plugins": plugins, "biolgca_version": _package_version(),
+        "resources": resources, "plugins": plugins, "biolgca_version": _package_version(),
     }
     (output_dir / "sweep.json").write_text(json.dumps(_json_safe(description), indent=2), encoding="utf-8")
     print(output_dir)
@@ -265,6 +322,7 @@ def _csv_cell(value):
 def _validate_output_declarations(spec, *, trusted_paths: bool) -> None:
     if spec.analysis is None:
         return
+    check_observers(spec.analysis.observers)  # as the run would, but before anything is written
     for observer in spec.analysis.observers:
         if (observer.__class__.__name__ == "NodeRecorder" and spec.state.identity_based
                 and not spec.state.volume_exclusion):

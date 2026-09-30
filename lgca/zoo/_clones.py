@@ -107,11 +107,15 @@ def family_trait(lgca, name: str) -> list[float]:
     family 0, which holds no cells, gets the value of the initial clone.
     """
     from lgca.cells import trait_array
+    from lgca.nove_ib_base import NoVE_IBLGCA_base
 
-    families = np.asarray(trait_array(lgca, "family").values, dtype=np.int64)[1:]  # label 0 is no cell
-    values = np.asarray(trait_array(lgca, name).values, dtype=float)[1:]
+    # Label 0 is an empty channel only with volume exclusion; otherwise it is a real cell.
+    start = 0 if isinstance(lgca, NoVE_IBLGCA_base) else 1
+    families = np.asarray(trait_array(lgca, "family").values, dtype=np.int64)[start:]
+    values = np.asarray(trait_array(lgca, name).values, dtype=float)[start:]
     result = np.full(int(lgca.maxfamily) + 1, np.nan)
     present, first = np.unique(families, return_index=True)
     result[present] = values[first]
-    result[0] = result[1]
+    if len(result) > 1:
+        result[0] = result[1]
     return result.tolist()

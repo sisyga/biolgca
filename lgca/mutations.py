@@ -104,24 +104,35 @@ class _Effect:
     def apply(self, rng, values):
         new = self._changed(values, self.draw(rng, len(values)))
         if not self.redraw:
-            return np.clip(new, self.low, self.high)
+            return _finite(np.clip(new, self.low, self.high))
         for _ in range(_REDRAWS):
             outside = (new < self.low) | (new > self.high)
             if not outside.any():
-                return new
+                return _finite(new)
             new[outside] = self._changed(values[outside], self.draw(rng, int(outside.sum())))
         raise ValueError(f"mutation effects keep falling outside the bounds [{self.low}, {self.high}] "
                          f"after {_REDRAWS} draws; use 'at_bounds': 'clip'")
 
     def _changed(self, values, effects):
         effects = np.asarray(effects, dtype=float)
-        if self.operation == "add":
-            return values + effects
-        if self.operation == "subtract":
-            return values - effects
-        if self.operation == "set":
-            return np.broadcast_to(effects, np.shape(values)).copy()
-        return values * effects
+        if not np.all(np.isfinite(effects)):
+            raise ValueError("mutation effects must contain finite values")
+        with np.errstate(over="ignore"):  # apply clips a result beyond the float range or rejects it
+            if self.operation == "add":
+                return values + effects
+            if self.operation == "subtract":
+                return values - effects
+            if self.operation == "set":
+                return np.broadcast_to(effects, np.shape(values)).copy()
+            return values * effects
+
+
+def _finite(traits):
+    """Mutated traits; finite effects can still overflow them, e.g. a factor applied again and again."""
+    if not np.all(np.isfinite(traits)):
+        raise ValueError("mutated traits must stay finite; limit the trait with 'bounds' or use "
+                         "smaller effects")
+    return traits
 
 
 @dataclass(frozen=True)
@@ -173,6 +184,11 @@ def _when(conditions, where):
                          np.inf if condition[1] is None else float(condition[1]))
         else:
             low = high = float(condition)
+            if not np.isfinite(low):
+                raise ValueError(f"{where}[{name!r}] must be a finite value or a range [low, high], "
+                                 f"got {condition!r}")
+        if not low <= high:
+            raise ValueError(f"{where}[{name!r}] must give a value or a range [low, high] with low <= high")
         ranges[name] = (low, high)
     return ranges
 
@@ -183,19 +199,26 @@ def apply_mutations(state, daughters, mutations) -> np.ndarray:
     Also changes the traits of any other cells, e.g. all living cells for a switch of traits.
     """
     cells, rng = state.cells, state.rng
+    for mutation in mutations:  # every trait the events name, before the first one changes
+        for name in (*mutation.when, *mutation.traits):
+            _require_trait(state, name)
     mutated = np.zeros(len(daughters), dtype=bool)
     for mutation in mutations:
         events = rng.random(len(daughters)) < mutation.probability.cells(state, daughters)
         for name, (low, high) in mutation.when.items():
-            _require_trait(state, name)
             values = np.asarray(cells[name][daughters], dtype=float)
             events &= (values >= low) & (values <= high)
         mutated |= events
         which = daughters[events]
+        # all effects of the event before any is written: a rejected effect leaves every trait as it was
+        changed = {}
         for name, effect in mutation.traits.items():
-            _require_trait(state, name)
-            values = np.asarray(cells[name][which], dtype=float)
-            cells.set_trait(which, name, effect.apply(rng, values))
+            try:
+                changed[name] = effect.apply(rng, np.asarray(cells[name][which], dtype=float))
+            except ValueError as exc:
+                raise ValueError(f"trait {name!r}: {exc}") from None
+        for name, values in changed.items():
+            cells.set_trait(which, name, values)
     return mutated
 
 
@@ -236,6 +259,8 @@ def _draw(kind, source, parameters: dict[str, Any], where) -> Callable:
         if parameters:
             raise ValueError(f"{where}: a fixed 'value' takes no parameters, got {sorted(parameters)}")
         value = float(source)
+        if not np.isfinite(value):
+            raise ValueError(f"{where}['value'] must be finite")
         return lambda rng, size: np.full(size, value)
     if kind == "distribution":
         if source not in _DISTRIBUTIONS:

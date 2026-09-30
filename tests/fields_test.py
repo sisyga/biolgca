@@ -1,8 +1,11 @@
 """Fields updated by the pde operator: the Laplacian, boundaries, solvers and the coupling to cells."""
 
+import copy
+import decimal
 import gc
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 
@@ -243,6 +246,163 @@ def test_periodic_lattice_needs_a_periodic_field_and_sides_need_a_simple_lattice
         _build([PDESpec(field="oxygen")])
 
 
+@pytest.mark.parametrize("value", [np.inf, np.nan, None, "abc", 2.5, True, 0, -1])
+@pytest.mark.parametrize("option", ["substeps", "max_iterations"])
+def test_integer_solver_options_are_explained(option, value):
+    with pytest.raises(ValueError, match=rf"solver_options {option} must be a positive integer, got {value!r}"):
+        _build([PDESpec(field="u", decay=1.0, solver_options={option: value})])
+
+
+@pytest.mark.parametrize("geometry, dims, factored", [
+    ("lin", 20_001, True),  # the sparse LU of a 1D lattice stays small: factor once
+    ("cubic", (20, 20, 20), False),  # 8000 nodes in 3D: about 10^7 LU entries, and CG is faster per step
+])
+def test_auto_backend_factors_a_constant_field_while_sparse_lu_is_cheap(monkeypatch, geometry, dims, factored):
+    from lgca import fields
+
+    factorizations = []
+    splu = fields.spla.splu
+    monkeypatch.setattr(fields.spla, "splu", lambda matrix: factorizations.append(matrix.shape) or splu(matrix))
+    compiled = _build([PDESpec(field="u", diffusion=1, decay=1)], geometry=geometry, dims=dims,
+                      fields={"u": 1.0})
+    compiled.step()
+    compiled.step()
+    assert len(factorizations) == int(factored)
+    # the statistics name the route the solves took
+    assert compiled.metadata["fields"]["u"]["backend"] == ("direct" if factored else "cg")
+    np.testing.assert_allclose(_field(compiled), 0.25, rtol=1e-5)
+
+
+@pytest.mark.parametrize("amg", [False, pytest.param(True, marks=needs_pyamg)])
+def test_the_steady_solver_factors_a_constant_3d_field_once(monkeypatch, amg):
+    from lgca import fields
+
+    if not amg:
+        monkeypatch.setattr(fields, "_pyamg", lambda: None)
+    factorizations = []
+    splu = fields.spla.splu
+    monkeypatch.setattr(fields.spla, "splu", lambda matrix: factorizations.append(matrix.shape) or splu(matrix))
+    # 6400 nodes, above the 3D limit of implicit steps: a steady matrix is ill-conditioned, and reusing its
+    # factors is faster than multigrid iterations in every step
+    compiled = _build([PDESpec(field="u", diffusion=1, decay=1, production=1, solver="steady")],
+                      geometry="cubic", dims=(20, 20, 16))
+    compiled.step()
+    compiled.step()
+    assert len(factorizations) == 1
+    assert compiled.metadata["fields"]["u"]["backend"] == "direct"
+    np.testing.assert_allclose(_field(compiled), 1.0)
+
+
+def test_a_pde_operator_object_that_has_run_can_be_copied_for_the_runs_of_a_sweep():
+    from lgca.plugins import create_plugin
+    from lgca.study import sweep
+
+    def model(pde):
+        return ModelSpec(space=SpaceSpec(geometry="square", dims=(10, 10)), time=TimeSpec(steps=3, seed=1),
+                         state=StateSpec(density=0.3, fields={"u": 0.0}),
+                         dynamics=InteractionPipelineSpec(operators=[
+                             pde, {"name": "chemotaxis", "parameters": {"field": "u", "beta": 2.0}}]))
+
+    spec = model(create_plugin("pde", {"field": "u", "diffusion": 0.5, "decay": 0.1, "cells": [{"production": 1.0}]}))
+    fresh = sweep(spec, seeds=[1, 2], n_jobs=2, backend="threads", showprogress=False)
+    ran = run_model(spec, showprogress=False).pipeline.operators[0]  # it holds the LU factors of its matrix
+    again = sweep(model(ran), seeds=[1, 2], n_jobs=2, backend="threads", showprogress=False)
+    assert again.population.tolist() == fresh.population.tolist()
+
+
+@pytest.mark.parametrize("solver, options, cells", [
+    ("implicit", {}, [{"production": 1.0}]),  # LU factors, which cannot be copied
+    ("steady", {}, [{"production": 1.0}]),
+    ("explicit", {}, [{"production": 1.0}]),  # statistics that add up over the calls
+    pytest.param("steady", {"backend": "amg"}, [{"production": 1.0}, {"uptake": 0.2}], marks=needs_pyamg),
+])
+def test_a_pde_operator_that_has_run_serves_as_template_for_a_new_model(solver, options, cells):
+    from lgca.plugins import create_plugin
+
+    parameters = {"field": "u", "diffusion": 0.5, "decay": 0.1, "cells": cells, "solver": solver,
+                  "solver_options": options}
+
+    def build(pde, dims):
+        return _build([pde, {"name": "random_walk"}], dims=dims, density=0.3, seed=4, propagation=True)
+
+    template = create_plugin("pde", parameters)
+    first = build(template, (10, 10))
+    for _ in range(3):
+        first.step()
+    ran = first.pipeline.operators[0]  # with the matrices, solver caches and statistics of the first model
+    second, fresh = build(ran, (12, 8)), build(create_plugin("pde", parameters), (12, 8))
+    # the template in the second model's spec leaves out the matrices, which only take memory there
+    assert hasattr(ran, "laplacian") and not hasattr(second.spec.dynamics.operators[0], "laplacian")
+    assert hasattr(copy.deepcopy(ran), "_A")  # a plain copy, e.g. of a model that runs, keeps them
+    for _ in range(2):
+        second.step()
+        fresh.step()
+    np.testing.assert_array_equal(_field(second), _field(fresh))
+    assert second.metadata["fields"]["u"] == fresh.metadata["fields"]["u"]  # counted from its first step
+    # the first model steps on with its own operator, and the object in its spec never ran
+    reference = build(create_plugin("pde", parameters), (10, 10))
+    for _ in range(4):
+        reference.step()
+    first.step()
+    np.testing.assert_array_equal(_field(first), _field(reference))
+    assert first.metadata["fields"]["u"] == reference.metadata["fields"]["u"]
+    assert template.statistics == {"solver": solver, "calls": 0} and not hasattr(template, "laplacian")
+
+
+@needs_pyamg
+def test_multigrid_solves_repeat_whatever_numpys_global_generator_did():
+    fields = []
+    for global_seed in (1, 2):
+        np.random.seed(global_seed)
+        compiled = _build([PDESpec(field="u", diffusion=1, production=1, cells=[{"uptake": 0.2}], solver="steady",
+                                   solver_options={"backend": "amg"})], dims=(22, 22), density=0.3, seed=5)
+        compiled.step()
+        fields.append(_field(compiled).copy())
+    np.testing.assert_array_equal(*fields)
+    # the global generator continues as if the hierarchy had not been built
+    np.random.seed(3)
+    expected = np.random.rand()
+    np.random.seed(3)
+    _build([PDESpec(field="u", diffusion=1, production=1, cells=[{"uptake": 0.2}], solver="steady",
+                    solver_options={"backend": "amg"})], dims=(22, 22), density=0.3, seed=5)
+    assert np.random.rand() == expected
+
+
+def test_every_failed_field_update_is_counted():
+    compiled = _build([PDESpec(field="u", production=1e308, decay=1e-10)], fields={"u": 1e308})
+    with np.errstate(over="ignore"), pytest.raises(RuntimeError, match="non-finite"):
+        compiled.step()
+    assert compiled.metadata["fields"]["u"]["failures"] == 1
+
+
+@reaction(name="test_stiff_loss")
+def _stiff_loss_reaction(state, c, rate=1e3):
+    return 1.0, rate * state.density
+
+
+@pytest.mark.parametrize("terms", [{"cells": [{"uptake": 100.0, "saturation": 0.01}]},
+                                   {"reactions": [{"name": "test_stiff_loss"}]}])
+def test_bdf_and_radau_get_the_jacobian_of_the_terms_that_depend_on_the_field(terms):
+    nodes = np.zeros((50, 3), dtype=int)
+    nodes[::2, 2] = 1  # a resting cell on every other node: the field stays uneven
+    fields, evaluations = {}, {}
+    for method in ("RK45", "BDF", "Radau"):
+        options = {"method": method, "warn_evaluations": 10**9}
+        compiled = _build([PDESpec(field="u", diffusion=1.0, **terms, solver="explicit", solver_options=options)],
+                          geometry="lin", dims=50, fields={"u": 2.0}, nodes=nodes, restchannels=1,
+                          volume_exclusion=False)
+        compiled.step()
+        fields[method] = _field(compiled)
+        evaluations[method] = compiled.metadata["fields"]["u"]["rhs_evaluations"]
+    # with only the linear part as their Jacobian, BDF needed about 3000 to 40 000 evaluations and Radau
+    # 10 000 to 100 000
+    assert evaluations["BDF"] < 1000 and evaluations["Radau"] < 1000
+    assert fields["RK45"].min() > 1e-5 and fields["RK45"].max() > 0.1
+    # within ten times the solvers' tolerances (rtol 1e-4, atol 1e-6)
+    np.testing.assert_allclose(fields["BDF"], fields["RK45"], rtol=1e-3, atol=1e-5)
+    np.testing.assert_allclose(fields["Radau"], fields["RK45"], rtol=1e-3, atol=1e-5)
+
+
 # ------------------------------------------------------------------ steady solver
 
 def _disc(size):
@@ -350,6 +510,30 @@ def test_steady_without_pyamg(monkeypatch):
     np.testing.assert_allclose(_field(large), _field(small), rtol=1e-5)
 
 
+def test_steady_without_pyamg_does_not_factor_the_matrices_of_3d_cells_in_every_step(monkeypatch):
+    # the cells change the matrix every step; one sparse LU per solve took 1.8 s at 27^3, CG 15 ms
+    import lgca.fields
+    monkeypatch.setattr(lgca.fields, "_pyamg", lambda: None)
+    factorizations = []
+    spsolve = lgca.fields.spla.spsolve
+    monkeypatch.setattr(lgca.fields.spla, "spsolve",
+                        lambda matrix, right: factorizations.append(matrix.shape) or spsolve(matrix, right))
+    pde = dict(field="u", diffusion=1.0, cells=[{"uptake": 0.2}], boundary={"value": 1.0}, solver="steady")
+    turnover = {"name": "birth_death", "parameters": {"birth_rate": 0.2, "death_rate": 0.2}}
+    auto, direct = (_build([turnover, PDESpec(**pde, solver_options=options)], geometry="cubic", dims=(8, 8, 8),
+                           density=1.0, restchannels=1, fields={"u": 1.0})
+                    for options in ({}, {"backend": "direct"}))
+    factorizations.clear()  # the forced model's solve at build
+    for _ in range(3):
+        auto.step()
+    assert auto.metadata["fields"]["u"]["backend"] == "cg"
+    assert factorizations == []
+    for _ in range(3):
+        direct.step()
+    assert len(factorizations) == 3  # forced, it still factors every matrix
+    np.testing.assert_allclose(_field(auto), _field(direct), rtol=1e-5)
+
+
 def test_steady_needs_something_that_removes_the_field():
     with pytest.raises(ValueError, match="no unique steady state"):
         _build([PDESpec(field="u", diffusion=1.0, production=1.0, solver="steady")])
@@ -372,6 +556,24 @@ def test_zero_fixed_boundary_removes_the_field_in_a_steady_problem(production):
     np.testing.assert_allclose(_field(compiled), expected, atol=1e-12)
     compiled.step()
     np.testing.assert_allclose(_field(compiled), expected, atol=1e-12)
+
+
+@reaction(name="test_cell_loss")
+def _cell_loss_reaction(state, c, rate=1.0):
+    return 1.0, rate * state.density
+
+
+def test_a_steady_problem_is_called_singular_only_where_nothing_removes_the_field():
+    # decay removes the field, but the solution, 1e308 / 1e-10, overflows
+    with np.errstate(over="ignore"), pytest.raises(RuntimeError, match="non-finite field values"):
+        _build([PDESpec(field="u", production=1e308, decay=1e-10, solver="steady")], geometry="lin", dims=3)
+    # without diffusion, nothing removes the field at the nodes without cells
+    nodes = np.zeros((4, 3), dtype=int)
+    nodes[0, 2] = 1
+    with pytest.raises(RuntimeError, match="no unique solution"):
+        _build([PDESpec(field="u", reactions=[{"name": "test_cell_loss"}], solver="steady",
+                        solver_options={"backend": "direct"})],
+               geometry="lin", dims=4, nodes=nodes, restchannels=1, volume_exclusion=False)
 
 
 # ------------------------------------------------------------------ boundaries and ghost nodes
@@ -952,3 +1154,173 @@ def test_reactions_in_a_model_file(tmp_path):
                                                                                        "r": 0.3}
     np.testing.assert_array_equal(run_model(load_model_spec(path), showprogress=False).data["u"],
                                   run_model(spec, showprogress=False).data["u"])
+
+
+# ------------------------------------------------------------------ iteration of nonlinear terms
+
+@reaction(name="test_idle")
+def _idle_reaction(state, c):
+    return 0.0, 0.0
+
+
+@reaction(name="test_weak_loss")
+def _weak_loss_reaction(state, c, rate=1e-7):
+    return 0.0, rate * (1 + c / (1e6 + c))
+
+
+@pytest.mark.parametrize("backend", ["auto", "direct", "cg", AMG])
+@pytest.mark.parametrize("name", ["test_idle", "test_weak_loss"])
+def test_converged_reactions_are_accepted_at_the_rounding_of_ill_conditioned_steady_solves(name, backend):
+    # diffusion 2e4 against a loss rate near 1e-6: the condition number is near 1e11, so the linear solve
+    # leaves a relative residual above rtol that solving again with the same terms cannot reduce
+    production = np.random.default_rng(0).uniform(0.5, 1.5, (20, 20))
+    compiled = _build([PDESpec(field="u", diffusion=2e4, decay=1e-6, production="production", solver="steady",
+                               reactions=[{"name": name}], solver_options={"backend": backend})],
+                      dims=(20, 20), fields={"u": 0.0, "production": production})
+    u = _field(compiled)
+    loss = 1e-6 + (0.0 if name == "test_idle" else 1e-7 * (1 + u / (1e6 + u)))
+    # without flux across the boundary, the loss balances the production
+    np.testing.assert_allclose(np.sum(loss * u), production.sum(), rtol=1e-4)
+
+
+def _uptake_spec(solver="implicit", size=40, extent=12, diffusion=2.0, uptake=1.0, **solver_options):
+    """A spheroid that takes up a nutrient supplied at the boundary, as in the tutorial."""
+    return ModelSpec(
+        space=SpaceSpec(geometry="square", dims=(size, size), boundary="reflecting"), time=TimeSpec(seed=3),
+        state=StateSpec(restchannels=1, volume_exclusion=False, capacity=8, fields={"u": 1.0}, initializer={
+            "name": "region", "parameters": {"extent": [extent, extent], "density": 0.8}}),
+        dynamics=InteractionPipelineSpec(operators=[
+            PDESpec(field="u", diffusion=diffusion, cells=[{"uptake": uptake, "saturation": 0.05}],
+                    boundary={"value": 1.0}, solver=solver, solver_options=solver_options),
+        ]),
+    )
+
+
+def test_slowly_converging_saturating_uptake_warns_and_publishes_an_accurate_field():
+    # Michaelis-Menten uptake converges linearly: 20 iterations end just above the tolerance, with a field
+    # far more accurate than the time step. That is a warning, not an aborted run.
+    reference = build_model(_uptake_spec(rtol=1e-12, max_iterations=1000))
+    reference.step()
+    compiled = build_model(_uptake_spec())
+    with pytest.warns(UserWarning, match="did not converge in 20 iterations.*the last iterate is used"):
+        compiled.step()
+    assert compiled.metadata["fields"]["u"]["calls"] == 1
+    np.testing.assert_allclose(_field(compiled), _field(reference), rtol=0, atol=1e-4)
+
+
+@pytest.mark.parametrize("solver", ["steady", "implicit"])
+def test_the_direct_backend_iterates_saturating_uptake_to_rtol(solver):
+    # the fixed boundary value dominates the source terms, so the residual alone would stop the iteration
+    # early; the change of the field must also fall below rtol
+    fields = []
+    for options in ({"backend": "direct", "rtol": 1e-12, "max_iterations": 1000}, {"backend": "direct"}):
+        compiled = build_model(_uptake_spec(solver, size=30, extent=10, diffusion=2e4, uptake=20.0, **options))
+        if solver == "implicit":
+            compiled.step()
+        fields.append(_field(compiled))
+    np.testing.assert_allclose(fields[1], fields[0], rtol=1e-6)
+
+
+def test_slow_convergence_far_from_the_tolerance_fails_and_estimates_the_iterations_needed():
+    needed = build_model(_uptake_spec(diffusion=1.0, max_iterations=100))
+    needed.step()
+    needed = needed.metadata["fields"]["u"]["max_iterations_used"]
+    compiled = build_model(_uptake_spec(diffusion=1.0, max_iterations=10))
+    with pytest.raises(RuntimeError, match="did not converge in 10 iterations") as error:
+        compiled.step()
+    estimate = int(re.search(r"converges slowly: set solver_options 'max_iterations' to about (\d+)",
+                             str(error.value)).group(1))
+    assert abs(estimate - needed) <= needed / 4
+    statistics = compiled.metadata["fields"]["u"]
+    assert statistics["failures"] == 1 and statistics["last_tolerance_ratio"] > 1e3
+    np.testing.assert_array_equal(_field(compiled), 1.0)
+
+
+def test_a_cycling_iteration_fails_and_suggests_the_explicit_solver():
+    nodes = np.zeros((3, 3), dtype=int)
+    nodes[:, 2] = 1
+    steep = [{"uptake": 4.0, "saturation": 1.0, "n": 64}]
+    compiled = _build([PDESpec(field="u", cells=steep)], geometry="lin", dims=3, fields={"u": 2.0},
+                      nodes=nodes, restchannels=1, volume_exclusion=False)
+    with pytest.raises(RuntimeError, match="cycles or stalls, which more iterations do not cure.*"
+                                           "use solver='explicit'"):
+        compiled.step()
+    with pytest.raises(RuntimeError, match="cycles or stalls.*solver='explicit' can approach the steady state"):
+        _build([PDESpec(field="u", production=1.0, decay=0.01, cells=steep, solver="steady")], geometry="lin",
+               dims=3, fields={"u": 2.0}, nodes=nodes, restchannels=1, volume_exclusion=False)
+
+
+@pytest.mark.parametrize("solver, decay, initial", [("implicit", 0.0, 1e308), ("steady", 1e-10, 1.0)])
+def test_a_nonfinite_iterate_fails_at_once(monkeypatch, solver, decay, initial):
+    from lgca.fields import PDEOperator
+
+    solves = []
+    solve_linear = PDEOperator._solve_linear
+    monkeypatch.setattr(PDEOperator, "_solve_linear",
+                        lambda self, *args: solves.append(1) or solve_linear(self, *args))
+    nodes = np.zeros((3, 3), dtype=int)
+    nodes[:, 2] = 1
+    operators = [PDESpec(field="u", diffusion=1.0, decay=decay, production=1e308,
+                         cells=[{"uptake": 1.0, "saturation": 1.0}], solver=solver,
+                         solver_options={"backend": "direct"})]  # the iterative solvers fail on their own
+    compiled = None
+    with np.errstate(over="ignore", invalid="ignore"), pytest.raises(RuntimeError, match="non-finite field"):
+        compiled = _build(operators, geometry="lin", dims=3, fields={"u": initial}, nodes=nodes,
+                          restchannels=1, volume_exclusion=False)
+        compiled.step()  # the steady solver fails when the model is built
+    assert len(solves) == 1  # no further iterations
+    if solver == "implicit":
+        assert compiled.metadata["fields"]["u"]["failures"] == 1
+        np.testing.assert_array_equal(_field(compiled), 1e308)
+
+
+def test_hill_uptake_at_zero_concentration():
+    from lgca.fields import _hill_derivative, _hill_rate
+
+    c = np.zeros(3)
+    np.testing.assert_array_equal(_hill_rate(c, 0.05, 1), 20.0)  # the loss rate 1 / K
+    np.testing.assert_array_equal(_hill_rate(c, 0.05, 2.5), 0.0)
+    np.testing.assert_array_equal(_hill_derivative(c, 0.05, 1), 20.0)
+    np.testing.assert_array_equal(_hill_derivative(c, 0.05, 2.5), 0.0)
+
+
+def _exact_hill(c, K, n):
+    """The loss rate c^(n-1) / (K^n + c^n) and the derivative of the uptake, n c^(n-1) K^n / (K^n + c^n)^2,
+    to 40 digits."""
+    with decimal.localcontext() as context:
+        context.prec = 40
+        c, K, n = decimal.Decimal(c), decimal.Decimal(K), decimal.Decimal(n)
+        c_n, K_n = (n * c.ln()).exp(), (n * K.ln()).exp()
+        rate = c_n / c / (K_n + c_n)
+        return float(rate), float(n * rate * K_n / (K_n + c_n))
+
+
+@pytest.mark.parametrize("n", [1, 1.5, 2, 4, 64])
+@pytest.mark.parametrize("K", [1e-300, 1e-100, 0.05, 1.0, 1e100, 1e300])
+def test_hill_uptake_is_exact_from_underflow_to_overflow(K, n):
+    from lgca.fields import _hill_derivative, _hill_rate, _hill_rate_log
+
+    with np.errstate(over="ignore"):
+        c = K * np.logspace(-40, 40, 81)
+    c = c[(c > 0) & np.isfinite(c)]
+    rate, derivative = _hill_rate(c, K, n), _hill_derivative(c, K, n)
+    exact = np.array([_exact_hill(value, K, n) for value in c])
+    # relative to the exact values, and absolute below the smallest normal number, where floats lose digits;
+    # the log form loses digits in proportion to n |log c|
+    tiny = np.finfo(float).tiny
+    np.testing.assert_allclose(rate, exact[:, 0], rtol=1e-11, atol=tiny)
+    np.testing.assert_allclose(derivative, exact[:, 1], rtol=1e-11, atol=tiny)
+    # the direct formula where no power over- or underflows, the log form elsewhere: they agree
+    np.testing.assert_allclose(rate, _hill_rate_log(c, K, n), rtol=1e-11, atol=tiny)
+
+
+def test_hill_uptake_uses_the_log_form_only_where_a_power_overflows(monkeypatch):
+    from lgca import fields
+
+    evaluated = []
+    log_form = fields._hill_rate_log
+    monkeypatch.setattr(fields, "_hill_rate_log", lambda c, K, n: evaluated.append(c.size) or log_form(c, K, n))
+    fields._hill_rate(np.linspace(0.0, 10.0, 1000), 0.05, 2)
+    assert evaluated == []
+    fields._hill_rate(np.array([0.0, 1.0, 1e200]), 0.05, 2)  # (1e200)^2 overflows
+    assert evaluated == [1]

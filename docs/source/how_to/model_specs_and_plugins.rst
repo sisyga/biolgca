@@ -73,6 +73,18 @@ the recorded data by name: ``result.data["nodes"]`` from ``NodeRecorder`` and
 ``result.data["density"]`` from ``DensityRecorder``, with
 ``result.data.steps("density")`` (see :doc:`observers_and_plotting`).
 
+A model runs its own copy of the spec it was built from, ``result.spec`` (or
+``model.spec`` of :func:`~lgca.model.build_model`): changing the dicts, lists
+or arrays of ``spec`` afterwards, or building further models from it, does not
+change a model already built. To run a changed spec, build a new model, e.g.
+from :func:`lgca.study.vary` (the new spec shares the parts it does not change
+with the old one: change it with ``vary`` rather than in place). Operator
+objects in the spec are templates too; the model's own copies are
+``result.pipeline.operators`` (see :doc:`custom_interactions`). Observers,
+rules and functions are shared: the observers record the run for you. The
+model keeps its copy as long as it exists, so initial nodes, traits and fields
+given as arrays take their memory twice, in ``result.spec`` and in the lattice.
+
 Portable model files
 --------------------
 

@@ -174,6 +174,63 @@ def test_an_invalid_value_is_explained_and_the_control_goes_back(name, control, 
     explorer.advance(1)
 
 
+@pytest.mark.parametrize("live", [False, True])
+def test_a_rejected_change_leaves_the_running_model_as_it_was(live, close):
+    from lgca import interaction
+    from lgca.plugins import create_plugin
+    from lgca.rules import FunctionInteractionOperator
+
+    @interaction(kind="birth_death", families=("nove",), register=False, name="explore_test.at_most_capacity_10")
+    def at_most_capacity_10(state):
+        """Rejects a capacity above 10 when it runs."""
+        if state.capacity > 10:
+            raise ValueError("this rule needs a capacity of at most 10")
+
+    def spec():
+        # the growth and the field are operator objects: a change is tried on a model built from them, and
+        # before, the objects were those of the running model
+        return _spec("lin", 40, operators=[
+            create_plugin("pde", {"field": "u", "diffusion": 0.5, "decay": 0.1, "cells": [{"production": 1.0}]}),
+            create_plugin("birth_death", {"birth_rate": 0.5}),
+            FunctionInteractionOperator(at_most_capacity_10),
+            {"name": "birth_death", "parameters": {"death_rate": 0.1}}],
+            density=1.0, volume_exclusion=False, capacity=2, fields={"u": 0.0})
+
+    reference = build_model(spec())
+    explorer = explore(spec(), {"capacity": [2, 50], "death_rate": (-1.0, 1.0)})
+    close(explorer)
+    explorer.advance(3)
+    with pytest.raises(ValueError):
+        if live:
+            explorer.set(death_rate=-0.5)  # rejected when the new pipeline is set up, after the field
+        else:
+            explorer.set(capacity=50)  # rejected by the rule when the new model is tried for a step
+    explorer.advance(10)
+    for _ in range(13):
+        reference.step()
+    np.testing.assert_array_equal(explorer.lgca.nodes, reference.lgca.nodes)
+    np.testing.assert_array_equal(explorer.lgca.u, reference.lgca.u)
+    assert explorer.model.metadata["fields"]["u"] == reference.metadata["fields"]["u"]
+    # the spec of the explorer holds templates: the model runs copies of them
+    template = explorer.spec.dynamics.operators[0]
+    assert template is not explorer.model.pipeline.operators[0] and template.statistics["calls"] == 0
+
+
+def test_the_explorer_keeps_one_copy_of_the_initial_state(close):
+    nodes = np.zeros((12, 12, 5), dtype=int)
+    nodes[4:8, 4:8] = 1
+    spec = _growth(nodes=nodes, density=None, volume_exclusion=False, capacity=4)
+    explorer = explore(spec, {"birth_rate": (0.0, 1.0), "capacity": [4, 6]})
+    close(explorer)
+    nodes[:] = 0  # the caller's later changes do not reach the explorer
+    explorer.reset()
+    assert explorer.spec.state.nodes is not nodes and explorer.spec.state.nodes.sum() == 80
+    # the model keeps the explorer's copy: a second one would only take memory (large label lists)
+    for change in (lambda: None, lambda: explorer.set(birth_rate=0.5), lambda: explorer.set(capacity=6)):
+        change()
+        assert explorer.model.spec.state.nodes is explorer.spec.state.nodes
+
+
 def test_controls_are_made_from_ranges_lists_and_widgets(close):
     log = widgets.FloatLogSlider(min=-3, max=0)
     explorer = explore(_chemotaxis(), {
@@ -223,6 +280,14 @@ def test_labels_tell_equal_names_apart(close):
     ({"birth_rate": "fast"}, TypeError, "must be"),
     ({"birth_rate": []}, ValueError, "lists no values"),
     ({"birth_rate": (0.0, 1.0), "dynamics.operators[0].parameters.birth_rate": (0.0, 1.0)}, ValueError,
+     "the same place"),
+    ({"birth_rate": (0.0, 1.0), "dynamics.operators[birth_death].birth_rate": (0.0, 1.0)}, ValueError,
+     "the same place"),
+    ({"birth_rate": (0.0, 1.0), "dynamics.operators[-2].parameters.birth_rate": (0.0, 1.0)}, ValueError,
+     "the same place"),
+    # one control sets a part of what another sets: a change of the whole would undo the part
+    ({"birth_rate": (0.0, 1.0), "dynamics.operators[0]": [{"name": "birth_death"}]}, ValueError, "the same place"),
+    ({"dynamics.operators[0].parameters": [{"birth_rate": 0.2}], "birth_rate": (0.0, 1.0)}, ValueError,
      "the same place"),
 ])
 def test_invalid_controls_are_explained(controls, error, message):
@@ -364,6 +429,53 @@ def test_the_colour_scale_grows_with_the_cells(close):
     top = explorer._panel.vmax
     explorer.advance(12)
     assert explorer._panel.vmax >= explorer.lgca.cell_density[explorer.lgca.nonborder].max() > top
+
+
+@pytest.mark.parametrize("backend", ["agg", "tkagg"])
+def test_the_figure_is_drawn_without_pyplot(backend, close):
+    # a figure of pyplot is shown by the notebook, and closing it early broke windowed backends such as TkAgg
+    import matplotlib.pyplot as plt
+
+    before = matplotlib.get_backend()
+    try:
+        plt.switch_backend(backend)
+    except ImportError:  # no display, e.g. on a server
+        pytest.skip(f"the {backend} backend needs a display")
+    try:
+        for spec in (_growth(), _spec("lin", 20), _spec("cubic", (4, 4, 4))):
+            explorer = explore(spec, view="flux")
+            close(explorer)
+            explorer.advance(2)
+            explorer._view.value = "density"
+            assert explorer.frame().startswith(PNG)
+            assert explorer._status.value == ""
+            assert plt.get_fignums() == []
+    finally:
+        plt.switch_backend(before)
+
+
+def test_the_figure_works_where_pyplot_takes_only_its_own_figures(monkeypatch, close):
+    # the plots of 2D lattices make their axes current: for a figure without a manager, matplotlib < 3.11 (the
+    # minimum is 3.9) refuses, and 3.11 opens a window of the backend, with TkAgg a crash in the playing thread
+    import matplotlib.pyplot as plt
+    from matplotlib.figure import Figure
+
+    figure = plt.figure
+
+    def older_figure(num=None, *args, **kwargs):
+        if isinstance(num, Figure) and num.canvas.manager is None:
+            raise ValueError("The passed figure is not managed by pyplot")
+        return figure(num, *args, **kwargs)
+
+    monkeypatch.setattr(plt, "figure", older_figure)
+    for spec in (_growth(), _spec("hex", (6, 6)), _spec("cubic", (4, 4, 4))):
+        explorer = explore(spec, view="flux", slice="z" if len(spec.space.dims) == 3 else None)
+        close(explorer)
+        explorer.advance(1)
+        explorer._view.value = "density"
+        assert explorer.frame().startswith(PNG)
+        assert explorer._status.value == ""
+        assert plt.get_fignums() == []
 
 
 def test_a_kymograph_keeps_every_view_when_switching(close):

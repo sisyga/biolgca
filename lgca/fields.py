@@ -40,9 +40,11 @@ from __future__ import annotations
 import dataclasses
 import functools
 import inspect
+import threading
 import warnings
 from collections.abc import Mapping, Sequence
-from math import prod
+from math import isfinite, prod
+from numbers import Integral, Real
 from typing import Any, ClassVar
 
 import numpy as np
@@ -52,7 +54,7 @@ from scipy.sparse import linalg as spla
 
 from ._warnings import warn_user
 from .lattice_state import LatticeState, _species_indices, channel_mask
-from .operator_base import FieldOperator, ParameterSpec, PluginInfo
+from .operator_base import _COPYING_TEMPLATES, FieldOperator, ParameterSpec, PluginInfo
 from .plugins import _law_for_kind, register_plugin
 
 __all__ = ["PDEOperator", "PDESpec", "laplacian", "list_reactions", "reaction"]
@@ -65,8 +67,17 @@ _SOLVER_OPTIONS = {
     "steady": {"backend": "auto", "rtol": 1e-6, "max_iterations": 20},
 }
 _BACKENDS = ("auto", "direct", "cg", "amg")
-# without pyamg, the steady solver factors matrices of up to this many nodes and iterates above
+# without pyamg, the steady solver factors matrices of up to this many nodes (in 3D only constant ones) and
+# iterates above
 _DIRECT_LIMIT = 20_000
+# by the number of dimensions, "auto" factors a constant matrix once on lattices of up to this many nodes;
+# the fill-in of sparse LU grows with the dimension (about 10^7 entries and 1 s at 10^6 nodes in 1D, 10^5
+# in 2D and 8000 in 3D), and above these sizes an implicit step is faster with CG. A steady matrix is
+# ill-conditioned: reusing its factors beats multigrid iterations in every step up to _DIRECT_LIMIT.
+_FACTOR_LIMIT = {1: 1_000_000, 2: 100_000, 3: 6_000}
+# a nonlinear solve that stops within this factor of its tolerance is slow, not wrong: warn and use it
+_SLOW_CONVERGENCE_FACTOR = 1e3
+_AMG_LOCK = threading.Lock()  # multigrid setups of runs in threads take turns with np.random
 _SIDES = ("x-", "x+", "y-", "y+", "z-", "z+")
 _PER_SIDE_GEOMETRIES = ("lin", "square", "cubic")
 _CELL_TERM_KEYS = {"production", "uptake", "saturation", "n", "species", "channels"}
@@ -181,19 +192,31 @@ class PDESpec:
         implicit also ``substeps`` (1). Explicit: ``method`` (``"RK45"``;
         also ``"RK23"``, ``"DOP853"``, ``"BDF"``, ``"Radau"``), ``rtol``
         (1e-4), ``atol`` (1e-6), ``warn_evaluations`` (200).
+        The terms that depend on the field (saturating uptake, reactions)
+        are iterated until an iteration changes the field by at most
+        ``rtol`` relative to its largest value and the residual of the
+        equation is at most ``rtol`` relative to its source terms (which a
+        fixed boundary value dominates). An iteration still within a factor
+        1000 of this tolerance after ``max_iterations`` converges slowly: it
+        warns and uses the last iterate. Further off, it raises an error
+        that says whether to raise ``max_iterations`` or to use the explicit
+        solver.
 
     Notes
     -----
     The ``"auto"`` backend factors a matrix that does not depend on the cells
-    once (no uptake). Otherwise the implicit solver uses conjugate gradients
-    with a Jacobi preconditioner, and the steady solver conjugate gradients
-    preconditioned by an algebraic multigrid hierarchy (pyamg) that is
-    rebuilt only when the number of iterations has doubled; without pyamg
-    (Python 3.14) it factors lattices of up to 20 000 nodes and uses the
-    Jacobi preconditioner above. With advection the matrix is not symmetric:
-    BiCGSTAB replaces conjugate gradients, and the multigrid hierarchy is
-    pyamg's approximate ideal restriction (AIR) instead of smoothed
-    aggregation.
+    once (no uptake) on lattices of up to 1 000 000 nodes in 1D, 100 000 in
+    2D and 6 000 in 3D (the steady solver in 3D up to 20 000), where the
+    factorization stays cheap; larger lattices use the iterative backend.
+    Otherwise the implicit solver uses conjugate gradients with a Jacobi
+    preconditioner, and the steady solver conjugate gradients preconditioned
+    by an algebraic multigrid hierarchy (pyamg) that is rebuilt only when the
+    number of iterations has doubled, and built with a fixed seed so that runs
+    repeat; without pyamg (Python 3.14) it factors 1D and 2D lattices of up to
+    20 000 nodes and uses the Jacobi preconditioner above and in 3D. With
+    advection the matrix is not symmetric: BiCGSTAB replaces conjugate
+    gradients, and the multigrid hierarchy is pyamg's approximate ideal
+    restriction (AIR) instead of smoothed aggregation.
 
     Examples
     --------
@@ -321,6 +344,7 @@ class PDEOperator(FieldOperator):
             production = np.asarray(getattr(lgca, self.production), dtype=float)
             if production.shape not in (self._dims, np.shape(lgca.cell_density)):
                 raise ValueError(f"pde.production field {self.production!r} must have shape {self._dims}")
+            self._production_values(lgca)
         self._sides = _parse_boundary(self.boundary, lgca)
         self._fixed = any(isinstance(condition, float) for pair in self._sides for condition in pair)
         self.laplacian, self._laplacian_source = _assemble_laplacian(lgca, self._sides)
@@ -340,7 +364,9 @@ class PDEOperator(FieldOperator):
         self._assemble(lgca)
         if self.solver == "steady":
             self._check_steady_state_exists()
-        self.statistics.update({"solver": self.solver, "calls": 0})
+        # a fresh record for this model, also on a copy of an operator that ran in another model
+        self.statistics = {"solver": self.solver, "calls": 0}
+        self._warned = False
         if self.solver != "explicit":
             self.statistics["backend"] = self._backend
         context.metadata.setdefault("fields", {})[self.field] = self.statistics
@@ -387,7 +413,11 @@ class PDEOperator(FieldOperator):
             return backend
         if self.solver == "implicit":  # I - dt A is well conditioned: Jacobi suffices
             return "cg"
-        return "amg" if _pyamg() is not None else "direct" if n <= _DIRECT_LIMIT else "cg"
+        if _pyamg() is not None:
+            return "amg"
+        # this backend solves the matrices that the cells change, one factorization per solve: in 3D the fill-in
+        # makes that slow (1.8 s at 27^3 against 15 ms with CG); constant matrices are factored once regardless
+        return "direct" if n <= _DIRECT_LIMIT and len(self._dims) < 3 else "cg"
 
     def _check_steady_state_exists(self):
         if self.reactions:  # a reaction may remove the field; a singular problem fails when solved
@@ -419,7 +449,27 @@ class PDEOperator(FieldOperator):
 
     def _update(self, lgca, step):
         with _single_threaded_blas():
-            self._advance(lgca, step)
+            try:
+                self._advance(lgca, step)
+            except RuntimeError:  # the solver failed; the field is unchanged
+                self.statistics["failures"] = self.statistics.get("failures", 0) + 1
+                raise
+
+    # matrices that setup computes again for every model: a copy as a template for a new model leaves them out
+    _SETUP_MATRICES: ClassVar[tuple[str, ...]] = (
+        "laplacian", "_laplacian_source", "_A", "_b", "_base", "_base_dt", "_steady_base", "_amg",
+        "_amg_reference", "_amg_stale", "_velocity")
+
+    def __getstate__(self):
+        """Copies and pickles, e.g. for the runs of a sweep, leave out the LU factors, which cannot be copied;
+        they are computed again when needed. A copy as a template for a new model (an operator object in a
+        spec, e.g. one that ran in another model) also leaves out the matrices, which its setup computes."""
+        state = dict(self.__dict__)
+        state["_lu"] = state["_lu_matrix"] = None
+        if _COPYING_TEMPLATES.get():
+            for name in self._SETUP_MATRICES:
+                state.pop(name, None)
+        return state
 
     def _advance(self, lgca, step):
         if isinstance(self.advection, str) and not np.array_equal(self._read_velocity(lgca), self._velocity):
@@ -433,6 +483,8 @@ class PDEOperator(FieldOperator):
             c = self._implicit(c, production, loss, saturating)
         else:
             c = self._steady(c, production, loss, saturating)
+        if not np.all(np.isfinite(c)):
+            raise RuntimeError(f"pde {self.field!r}: the solver produced non-finite field values")
         stored[...] = self._pad(c.reshape(self._dims))
 
     # ---------------------------------------------------------------- sources
@@ -443,10 +495,7 @@ class PDEOperator(FieldOperator):
         n = self._A.shape[0]
         production = self._b.copy()
         if isinstance(self.production, str):
-            values = np.asarray(getattr(lgca, self.production), dtype=float)
-            if values.shape != self._dims:
-                values = values[self._interior]
-            production += values.ravel()
+            production += self._production_values(lgca).ravel()
         elif self.production:
             production += self.production
         loss = np.zeros(n)
@@ -465,6 +514,15 @@ class PDEOperator(FieldOperator):
                 nonlinear.append(functools.partial(entry.evaluate, state, self._dims))
         return production, loss, nonlinear
 
+    def _production_values(self, lgca):
+        values = np.asarray(getattr(lgca, self.production), dtype=float)
+        if values.shape != self._dims:
+            values = values[self._interior]
+        if not np.all(np.isfinite(values)) or np.any(values < 0):
+            raise ValueError(f"pde.production field {self.production!r} must be finite and non-negative; "
+                             "write consumption as an uptake or reaction loss rate")
+        return values
+
     # ---------------------------------------------------------------- solvers
 
     def _explicit(self, c, production, loss, nonlinear):
@@ -479,7 +537,20 @@ class PDEOperator(FieldOperator):
             return change
 
         method = options["method"]
-        implicit = {"jac": (A - sp.diags(loss)).tocsc()} if method in ("BDF", "Radau") else {}
+        implicit = {}
+        if method in ("BDF", "Radau"):
+            def jacobian(_t, values):
+                """d(rhs)/dc: saturating uptake by its derivative, reactions by their current loss rate."""
+                rate = loss.copy()
+                for term in nonlinear:
+                    if getattr(term, "func", None) is _saturating_uptake:
+                        weights, K, n = term.args
+                        rate += weights * _hill_derivative(values, K, n)
+                    else:
+                        rate += term(values)[1]
+                return (A - sp.diags(rate)).tocsc()
+
+            implicit = {"jac": jacobian if nonlinear else jacobian(0.0, c)}
         # t_eval keeps only the final state: solve_ivp stores every step otherwise
         solution = solve_ivp(rhs, (0.0, 1.0), c, method=method, t_eval=[1.0], rtol=options["rtol"],
                              atol=options["atol"], **implicit)
@@ -516,45 +587,90 @@ class PDEOperator(FieldOperator):
                 and not np.any(loss) and not nonlinear):
             raise RuntimeError(f"pde {self.field!r}: no cells take up the field, and nothing else removes it, "
                                "so it has no steady state; add decay or a fixed value at the boundary")
-        with warnings.catch_warnings():  # a singular matrix is reported below
-            warnings.simplefilter("ignore", spla.MatrixRankWarning)
-            c = self._solve_system(self._steady_base, 1.0, production, c, loss, nonlinear)
-        if not np.all(np.isfinite(c)):
-            raise RuntimeError(f"pde {self.field!r}: the steady problem has no unique solution; something must "
-                               "remove the field (decay, uptake, a reaction's loss rate or a fixed boundary "
-                               "value)")
-        return c
+        # SuperLU finds the matrix singular where nothing removes the field; other non-finite values (an
+        # overflowing solution) are reported as such
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", spla.MatrixRankWarning)
+            try:
+                return self._solve_system(self._steady_base, 1.0, production, c, loss, nonlinear)
+            except spla.MatrixRankWarning:
+                raise RuntimeError(f"pde {self.field!r}: the steady problem has no unique solution; something "
+                                   "must remove the field (decay, uptake, a reaction's loss rate or a fixed "
+                                   "boundary value)") from None
 
     def _solve_system(self, base, scale, right, start, loss, nonlinear):
         """Solve ``(base + scale diag(L)) c = right + scale P``.
 
         ``L`` is the loss rate of uptake by cells plus that of the terms that depend on c (saturating
         uptake, reactions), which also add their production ``P``. These are evaluated at the current
-        iterate and the linear problem solved again (Picard iteration), starting from ``start``,
-        until c changes by less than ``rtol`` or the terms no longer change.
+        iterate and the linear problem solved again (Picard iteration), starting from ``start``, until
+        the terms no longer change, or until an iteration changes c by at most ``rtol`` relative to its
+        largest value and the residual that updating the terms adds is at most ``rtol`` relative to the
+        source terms. The linear solver's own error is left to it: in an ill-conditioned steady problem
+        it exceeds ``rtol``, and solving again with the same terms cannot reduce it.
+
+        After ``max_iterations``, an iterate within ``_SLOW_CONVERGENCE_FACTOR`` of this tolerance is
+        used with a warning; a worse one raises, with advice from the rate at which the iteration
+        converged. A non-finite iterate raises at once.
         """
         if not nonlinear:
             return self._solve_linear(base, scale, right, start, loss)
         options = self.options
+        stats = self.statistics
         previous = start
         made, lost = _evaluate(nonlinear, previous, loss)
+        history = []  # per iteration, how far from the tolerance: at most 1 is converged
         for iteration in range(1, options["max_iterations"] + 1):
             new = self._solve_linear(base, scale, right + scale * made, previous, lost)
-            change = np.max(np.abs(new - previous), initial=0.0)
+            if not np.all(np.isfinite(new)):
+                raise RuntimeError(f"pde {self.field!r}: the solver produced non-finite field values")
+            relative_change = (np.max(np.abs(new - previous), initial=0.0)
+                               / max(np.max(new, initial=0.0), 1e-300))
             previous = new
             new_made, new_lost = _evaluate(nonlinear, new, loss)
-            if (change <= options["rtol"] * max(np.max(np.abs(new), initial=0.0), 1e-300)
-                    or (np.array_equal(new_made, made) and np.array_equal(new_lost, lost))):
+            if np.array_equal(new_made, made) and np.array_equal(new_lost, lost):
+                break  # new solves the equation as well as the linear solver can
+            source = right + scale * new_made
+            # new solves the equation with the old terms: updating them adds this to its residual
+            residual = scale * ((new_lost - lost) * new - (new_made - made))
+            magnitude = max(np.max(np.abs(source), initial=0.0), 1e-300)
+            relative_residual = np.linalg.norm(residual / magnitude)
+            tolerance = options["rtol"] * np.linalg.norm(source / magnitude)
+            if tolerance > 0:
+                residual_ratio = relative_residual / tolerance
+            else:  # no source terms
+                residual_ratio = 0.0 if relative_residual == 0 else np.inf
+            history.append(max(residual_ratio, relative_change / options["rtol"]))
+            if history[-1] <= 1:
                 break
             made, lost = new_made, new_lost
         else:
+            # the rate per iteration from the last two against two three iterations earlier: an iteration
+            # that alternates between two states, the usual way it fails, has a rate near 1
+            recent = history[-5:]
+            rate = ((max(recent[-2:]) / max(recent[:2])) ** (1 / 3)
+                    if len(recent) == 5 and np.all(np.isfinite(recent)) else None)
+            if rate is None:
+                advice = "raise solver_options 'max_iterations'"
+            elif rate < 0.9:
+                needed = options["max_iterations"] + int(np.ceil(np.log(history[-1]) / -np.log(rate)))
+                advice = f"it converges slowly: set solver_options 'max_iterations' to about {needed}"
+            else:
+                advice = ("the iteration cycles or stalls, which more iterations do not cure (steep "
+                          "saturating uptake with n > 1, or a reaction whose production rises with "
+                          "the field); "
+                          + ("use solver='explicit'" if self.solver == "implicit"
+                             else "a field with solver='explicit' can approach the steady state in time"))
+            message = (f"pde {self.field!r}: the terms that depend on the field (saturating uptake, "
+                       f"reactions) did not converge in {options['max_iterations']} iterations (scaled "
+                       f"residual norm {relative_residual:.3g}, tolerance {tolerance:.3g}; relative change "
+                       f"{relative_change:.3g}, rtol {options['rtol']:.3g}); {advice}")
+            if not history[-1] <= _SLOW_CONVERGENCE_FACTOR:  # far off, or not a number
+                stats["last_tolerance_ratio"] = float(history[-1])
+                raise RuntimeError(message)
             if not self._warned:
                 self._warned = True
-                warn_user(f"pde {self.field!r}: the terms that depend on the field (saturating uptake, "
-                          f"reactions) did not converge in {options['max_iterations']} iterations; raise "
-                          "solver_options 'max_iterations'"
-                          + (" or use substeps" if self.solver == "implicit" else ""))
-        stats = self.statistics
+                warn_user(f"{message}; the last iterate is used")
         stats["max_iterations_used"] = max(stats.get("max_iterations_used", 0), iteration)
         return previous
 
@@ -570,7 +686,12 @@ class PDEOperator(FieldOperator):
 
     def _solve_constant(self, matrix, right, start):
         """Solve with a matrix that does not depend on the cells: factor it once."""
-        if self.options["backend"] not in ("auto", "direct"):
+        backend = self.options["backend"]
+        limit = _FACTOR_LIMIT[len(self._dims)]
+        if self.solver == "steady":  # (without pyamg it also factors every other matrix of up to _DIRECT_LIMIT
+            # nodes in 1D and 2D)
+            limit = max(limit, _DIRECT_LIMIT)
+        if backend not in ("auto", "direct") or (backend == "auto" and len(right) > limit):
             return self._solve(matrix, right, start)
         if self._lu_matrix is not matrix:
             try:
@@ -580,9 +701,11 @@ class PDEOperator(FieldOperator):
                                    "must remove the field (decay, uptake, a reaction's loss rate or a fixed "
                                    "boundary value)") from None
             self._lu_matrix = matrix
+        self.statistics["backend"] = "direct"
         return np.maximum(self._lu.solve(right), 0.0)
 
     def _solve(self, matrix, right, start):
+        self.statistics["backend"] = self._backend
         if self._backend == "direct":
             values = spla.spsolve(matrix.tocsc(), right)
         elif self._backend == "amg":
@@ -602,8 +725,14 @@ class PDEOperator(FieldOperator):
             # with advection the matrix is not symmetric: approximate ideal restriction (AIR), made for
             # upwinded advection, needed 2-4 iterations where smoothed aggregation needed up to 945
             pyamg = _pyamg()
-            self._amg = (pyamg.smoothed_aggregation_solver(matrix.tocsr()) if self._symmetric
-                         else pyamg.air_solver(matrix.tocsr()))
+            with _AMG_LOCK:  # pyamg draws from NumPy's global generator: seed it, so that runs repeat
+                state = np.random.get_state()
+                np.random.seed(0)
+                try:
+                    self._amg = (pyamg.smoothed_aggregation_solver(matrix.tocsr()) if self._symmetric
+                                 else pyamg.air_solver(matrix.tocsr()))
+                finally:
+                    np.random.set_state(state)
             self._amg_reference, self._amg_stale = None, False
             self.statistics["amg_setups"] = self.statistics.get("amg_setups", 0) + 1
         # an old hierarchy gets a few times its first number of iterations before it is rebuilt
@@ -800,8 +929,48 @@ def _evaluate(nonlinear, c, loss):
 
 def _hill_rate(c, K, n):
     """The Hill uptake as a loss rate: c^(n-1) / (K^n + c^n), finite at c = 0."""
+    if np.ndim(c) == 0:
+        return _hill_rate(np.array([c], dtype=float), K, n)[0]
     c = np.maximum(c, 0.0)
-    return c**(n - 1) / (K**n + c**n)
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore", under="ignore"):
+        K_n = np.float64(K) ** n
+        power = c ** (n - 1)
+        c_n = power * c
+        rate = power / (K_n + c_n)
+    if not (np.isfinite(K_n) and K_n >= _TINY):
+        return _hill_rate_log(c, K, n)
+    # where a power over- or underflows, evaluate in log space; at c = 0 the rate is exact
+    suspect = ~(np.isfinite(rate) & np.isfinite(c_n) & (((rate >= _TINY) & (power >= _TINY)) | (c == 0)))
+    if suspect.any():
+        rate[suspect] = _hill_rate_log(c[suspect], K, n)
+    return rate
+
+
+def _hill_rate_log(c, K, n):
+    """:func:`_hill_rate` in log space, for c >= 0 where c**n or K**n over- or underflow."""
+    # Evaluate each side of K in log space: c**n and K**n can overflow at finite concentrations.
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore", under="ignore"):
+        log_c, log_K = np.log(c), np.log(K)
+        ratio = log_c - log_K
+        log_rate = np.where(ratio <= 0,
+                            (n - 1) * ratio - log_K - np.logaddexp(0, n * ratio),
+                            -log_c - np.logaddexp(0, -n * ratio))
+        rate = np.exp(log_rate)
+    return np.where(c == 0, 1 / K if n == 1 else 0.0, rate)
+
+
+def _hill_derivative(c, K, n):
+    """d/dc of the Hill uptake h = c^n / (K^n + c^n): n r (1 - h), with the loss rate r = h / c."""
+    c = np.maximum(c, 0.0)
+    rate = _hill_rate(c, K, n)
+    with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
+        log_complement = -np.logaddexp(0.0, n * (np.log(c) - np.log(K)))  # 1 - h = 1 / (1 + (c/K)^n)
+        complement = np.exp(log_complement)
+        # where 1 - h underflows, the product may not: take it in log space
+        return n * np.where(complement >= _TINY, rate * complement, np.exp(np.log(rate) + log_complement))
+
+
+_TINY = np.finfo(float).tiny  # the smallest normal number
 
 
 def _krylov(method, matrix, right, *, x0, rtol, M, callback, maxiter):
@@ -888,23 +1057,30 @@ def _solver_options(solver, options):
         if merged["method"] not in _EXPLICIT_METHODS:
             raise ValueError(f"pde.solver_options method must be one of {', '.join(_EXPLICIT_METHODS)}")
         for name in ("rtol", "atol"):
-            if _non_negative(merged[name], f"pde.solver_options {name}") == 0:
+            merged[name] = _non_negative(merged[name], f"pde.solver_options {name}")
+            if merged[name] == 0:
                 raise ValueError(f"pde.solver_options {name} must be positive")
-        _positive_integer(merged["warn_evaluations"], "pde.solver_options warn_evaluations")
+        merged["warn_evaluations"] = _positive_integer(merged["warn_evaluations"],
+                                                       "pde.solver_options warn_evaluations")
     else:
         if solver == "implicit":
-            _positive_integer(merged["substeps"], "pde.solver_options substeps")
-        _positive_integer(merged["max_iterations"], "pde.solver_options max_iterations")
+            merged["substeps"] = _positive_integer(merged["substeps"], "pde.solver_options substeps")
+        merged["max_iterations"] = _positive_integer(merged["max_iterations"],
+                                                     "pde.solver_options max_iterations")
         if merged["backend"] not in _BACKENDS:
             raise ValueError(f"pde.solver_options backend must be one of {', '.join(_BACKENDS)}")
-        if _non_negative(merged["rtol"], "pde.solver_options rtol") == 0:
+        merged["rtol"] = _non_negative(merged["rtol"], "pde.solver_options rtol")
+        if merged["rtol"] == 0:
             raise ValueError("pde.solver_options rtol must be positive")
     return merged
 
 
 def _positive_integer(value, path):
-    if isinstance(value, bool) or int(value) != value or value < 1:
-        raise ValueError(f"{path} must be a positive integer")
+    """A whole number of at least 1 (also 2.0) as an int."""
+    if (isinstance(value, bool) or not isinstance(value, Real)
+            or not (isinstance(value, Integral) or isfinite(value)) or value != int(value) or value < 1):
+        raise ValueError(f"{path} must be a positive integer, got {value!r}")
+    return int(value)
 
 
 def _wrapped_axes(lgca) -> tuple[int, ...]:

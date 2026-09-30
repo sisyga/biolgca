@@ -194,7 +194,7 @@ example. Such a function runs as it is, without the checks of the rules, and
 a model with it cannot be saved as a model file.
 
 For reusable rules, write a function of the lattice state and decorate it
-with :func:`lgca.interaction`, or with :func:`lgca.reorientation_term` for a
+with :func:`lgca.interaction <lgca.rules.interaction>`, or with :func:`lgca.reorientation_term <lgca.rules.reorientation_term>` for a
 cue of the Boltzmann reorientation. The rule gets a name for model files,
 works with and without volume exclusion and for any number of species, and is
 checked against the conservation law of its kind;

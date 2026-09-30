@@ -96,14 +96,16 @@ that plotting libraries expect for curves with error bands:
 
 Time series from several measures are aligned on the column ``step`` (steps
 missing in one of them are empty), and numbers are repeated on every row of
-their run. Without ``long`` a time series is stored as one array per row.
+their run. A run that recorded nothing, e.g. one that ended before the first
+recorded step, keeps one row with an empty ``step``. Without ``long`` a time
+series is stored as one array per row.
 
 Running in parallel
 -------------------
 
 ``n_jobs`` sets how many runs happen at the same time. The results do not
 depend on it: every run has its own seed and its own copy of the model's
-observers.
+observers and operator objects.
 
 - ``backend="processes"`` (the default) runs in worker processes, one run per
   processor core at a time; on 8 cores, a sweep runs about six times faster.
@@ -111,7 +113,9 @@ observers.
   system: measures must be functions defined with ``def`` at the top level of
   a module (not lambdas or functions defined in a notebook), and your own
   rules must be registered in a module that the workers import, named with
-  ``plugins=["my_project.rules"]``.
+  ``plugins=["my_project.rules"]``. Operator objects in the model, e.g. from
+  :func:`~lgca.plugins.create_plugin`, go to the workers too: their rules are
+  sent by name, like functions.
 - ``backend="threads"`` accepts any function and the rules defined in a
   notebook, but threads run only partly in parallel (about 1.5 to 2 times
   faster).
@@ -136,8 +140,8 @@ From the command line
 ---------------------
 
 The ``biolgca`` command sweeps a model file into a directory with
-``table.csv`` and ``sweep.json`` (the model, the grid, the seeds and the
-version):
+``table.csv`` and ``sweep.json`` (the model, the grid, the seeds, the
+version and the copied files):
 
 .. code-block:: console
 
@@ -157,5 +161,11 @@ model file names them.
 Files that the model reads, such as the state of a ``from_npz`` initializer,
 are found next to the model file (from Python: ``sweep(...,
 resource_base="path/to/model_dir")``), and ``--trusted-paths`` allows paths
-outside its directory. The sweep copies such a file to ``resources/`` in the
-output directory, and the model in ``sweep.json`` refers to the copy.
+outside its directory. The sweep copies the files its runs read to
+``resources/`` in the output directory, including files given with
+``--vary``, e.g. ``--vary state.initializer.parameters.path=a.npz,b.npz``
+(copied as ``initial_state_1.npz``, ``initial_state_2.npz``, ...; the model's
+own file is then copied only if it exists, as no run reads it). The model and
+the grid in ``sweep.json`` refer to the copies, ``"resources"`` in
+``sweep.json`` names the file each copy was made from, and ``table.csv`` keeps
+the values as given.

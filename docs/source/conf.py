@@ -79,6 +79,11 @@ html_style = 'css/methods.css'
 # configured like https://github.com/JamesALeedham/Sphinx-Autosummary-Recursion/
 autosummary_generate = True  # Turn on sphinx.ext.autosummary
 autosummary_imported_members = False  # Do not include imported members
+# Classes and decorators differ only in case; Windows needs distinct filenames for their API pages.
+autosummary_filename_map = {
+    "lgca.rules.interaction": "lgca.rules.interaction-function",
+    "lgca.rules.stack": "lgca.rules.stack-function",
+}
 numpydoc_show_class_members = False
 numpydoc_class_members_toctree = False
 

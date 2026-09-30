@@ -77,7 +77,7 @@ Writing a stack
 ---------------
 
 A stack is a function of the lattice state that returns operator entries,
-decorated with :func:`lgca.stack`. This is the glioblastoma model:
+decorated with :func:`lgca.stack <lgca.rules.stack>`. This is the glioblastoma model:
 
 .. literalinclude:: ../../../lgca/research_models.py
    :pyobject: go_or_grow_glioblastoma

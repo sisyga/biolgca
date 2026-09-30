@@ -231,11 +231,11 @@ class Probability:
         total = np.zeros(len(which))
         for cue in self.cues:
             if cue.name == "trait":
-                values = np.asarray(cells[cue.parameters["trait"]][which], dtype=float)
+                values = _trait(cells, cue.parameters["trait"], which, cue)
             else:
                 values = _values(state, cue).reshape(-1)[cells.index[which]]
-            kappa = cells[cue.kappa][which] if isinstance(cue.kappa, str) else cue.kappa
-            theta = cells[cue.theta][which] if isinstance(cue.theta, str) else cue.theta
+            kappa = _trait(cells, cue.kappa, which, cue) if isinstance(cue.kappa, str) else cue.kappa
+            theta = _trait(cells, cue.theta, which, cue) if isinstance(cue.theta, str) else cue.theta
             total += self._response(cue, values, np.asarray(kappa, dtype=float), np.asarray(theta, dtype=float))
         return total
 
@@ -256,6 +256,8 @@ class Probability:
 
     def _response(self, cue, values, kappa, theta):
         """A cue's term of the drive."""
+        if not all(np.all(np.isfinite(value)) for value in (values, kappa, theta)):
+            raise ValueError(f"the values and parameters of cue {cue.name!r} must be finite")
         if not self.hill:
             return kappa * (values - theta)
         # log(c^n / (K^n + c^n)) = log σ(n (log c - log K)), which also holds for n < 0
@@ -424,6 +426,14 @@ def _cue(spec, where, boltzmann=False) -> _Cue:
     coefficient = spec.get("beta" if boltzmann else "kappa", 1.0)
     return _Cue(name, coefficient, 0.0 if boltzmann else spec.get("theta", 0.0), spec.get("sensed_species"),
                 {key: value for key, value in spec.items() if key not in _RESPONSE})
+
+
+def _trait(cells, name, which, cue):
+    """The trait ``name`` of the cells at positions ``which``, read by a cue."""
+    values = np.asarray(cells[name][which], dtype=float)
+    if not np.all(np.isfinite(values)):
+        raise ValueError(f"the trait {name!r} of cue {cue.name!r} must be finite for every cell")
+    return values
 
 
 def _values(state, cue):

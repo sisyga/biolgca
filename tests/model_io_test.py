@@ -12,6 +12,7 @@ from lgca.model import (
     SpaceSpec,
     StateSpec,
     TimeSpec,
+    build_model,
     describe_model_graph,
     migrate_model_spec_dict,
     model_spec_from_dict,
@@ -251,3 +252,39 @@ def test_time_series_go_to_a_file_only_when_asked(tmp_path, monkeypatch):
     save_model_spec(spec, tmp_path / "model.json")
     assert main(["run", str(tmp_path / "model.json"), "--output", str(tmp_path / "run")]) == 0
     assert len((tmp_path / "run" / "time_series.csv").read_text().splitlines()) == 5
+
+
+@pytest.mark.parametrize("suffix", [".json", ".yaml"])
+def test_numpy_scalars_that_the_model_accepts_are_saved_as_numbers(tmp_path, suffix):
+    """Values taken from NumPy arrays, e.g. a sweep over np.arange, save and replay like Python numbers."""
+    term = ReorientationTermSpec(name="polar_alignment", beta=np.float32(0.5), species=np.int64(0))
+    spec = ModelSpec(
+        space=SpaceSpec(geometry="square", dims=(4, 4)),
+        state=StateSpec(density=0.5, restchannels=np.int64(1), n_species=np.int64(1), capacity=np.int64(4)),
+        time=TimeSpec(steps=np.int64(3), seed=np.int64(2), timing_trace=np.int64(1)),
+        dynamics=InteractionPipelineSpec(operators=[ReorientationSpec(terms=[term])]),
+    )
+    save_model_spec(spec, tmp_path / f"model{suffix}")
+    loaded = load_model_spec(tmp_path / f"model{suffix}")
+
+    term = loaded.dynamics.operators[0].terms[0]
+    assert (loaded.time.seed, loaded.time.steps, loaded.state.capacity) == (2, 3, 4)
+    assert (term.species, term.beta) == (0, 0.5)
+    np.testing.assert_array_equal(run_model(loaded, showprogress=False).lgca.nodes,
+                                  run_model(spec, showprogress=False).lgca.nodes)
+
+
+@pytest.mark.parametrize("seed", [2.0, 1.5, -1, True, "1"])
+def test_a_seed_must_be_a_non_negative_integer(seed):
+    """NumPy takes only non-negative integers as seeds; others fail when the model is checked."""
+    message = "model.time.seed must be a non-negative integer or null"
+    space = SpaceSpec(geometry="lin", dims=5)
+    with pytest.raises(ValueError, match=message):
+        build_model(ModelSpec(space=space, time=TimeSpec(steps=1, seed=seed)))
+    data = {"schema_version": 1, "model": {"space": {"geometry": "lin", "dims": 5},
+                                           "time": {"steps": 1, "seed": seed}}}
+    with pytest.raises(ValueError, match=message):
+        model_spec_from_dict(data)
+    data["model"]["time"]["seed"] = 3
+    assert model_spec_from_dict(data).time.seed == 3
+    assert build_model(ModelSpec(space=space, time=TimeSpec(seed=np.int64(3)))).spec.time.seed == 3

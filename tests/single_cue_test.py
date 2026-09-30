@@ -12,8 +12,19 @@ tensors c cᵀ - I/2, so the comparison includes a rest channel.
 import numpy as np
 import pytest
 
-from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
+from lgca.model import (
+    ModelSpec,
+    SpaceSpec,
+    StateSpec,
+    TimeSpec,
+    build_model,
+    model_spec_from_json,
+    model_spec_to_dict,
+    model_spec_to_json,
+    run_model,
+)
 from lgca.pipeline import InteractionPipelineSpec
+from lgca.plugins import create_plugin
 
 DIMS = (60, 60)
 
@@ -135,3 +146,21 @@ def test_axis_cues_score_resting_like_the_average_direction(geometry, dims, name
     np.testing.assert_allclose(weights[..., -1], 0.0, atol=1e-12)
     np.testing.assert_allclose(weights[..., :-1].sum(-1), 0.0, atol=1e-9)
     assert np.abs(weights).max() > 0.1 or geometry == "lin"
+
+
+@pytest.mark.parametrize("name, parameters, fields", [
+    ("polar_alignment", {"beta": 4.0, "species": 0, "sensed_species": 1}, {}),
+    ("chemotaxis", {"beta": 2.0, "field": "signal"},
+     {"signal": np.linspace(0.0, 10.0, 12)[:, None] + np.zeros((12, 12))}),
+])
+def test_a_single_cue_operator_instance_saves_all_its_parameters(name, parameters, fields):
+    """A model file of a spec holding create_plugin(<cue>, ...) keeps beta and the cue's parameters."""
+    spec = ModelSpec(space=SpaceSpec(geometry="square", dims=(12, 12), boundary="periodic"),
+                     state=StateSpec(density=0.3, restchannels=1, n_species=2, fields=fields),
+                     time=TimeSpec(steps=6, seed=7),
+                     dynamics=InteractionPipelineSpec(operators=[create_plugin(name, parameters)]))
+    saved = model_spec_to_dict(spec)["model"]["dynamics"]["operators"]
+    assert saved == [{"name": name, "parameters": parameters}]
+    direct = run_model(spec, showprogress=False).lgca.nodes
+    replayed = run_model(model_spec_from_json(model_spec_to_json(spec)), showprogress=False).lgca.nodes
+    np.testing.assert_array_equal(replayed, direct)

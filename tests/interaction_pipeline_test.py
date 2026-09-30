@@ -683,6 +683,7 @@ def test_pipeline_refreshes_species_density_after_phenotype_switch():
     compiled = build_model(spec)
     compiled.pipeline.execute_step(compiled.context, 1)
 
+    reader = compiled.pipeline.operators[1]  # the model's own copy of the operator object
     assert reader.observed.reshape(-1, 2).tolist() == [[0, 1]]
     assert reader.observed_boundary.sum() == 1
 

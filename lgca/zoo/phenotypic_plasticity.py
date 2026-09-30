@@ -176,19 +176,25 @@ def radial_profiles(lgca, bins: int = 12) -> dict[str, np.ndarray]:
     The front is the distance within which 95 % of the occupied nodes lie. Returns the bin
     centres in units of the front radius (``"r"``), the cells per node, the fractions of migrating
     and resting cells, and the mean and standard deviation of κ over the cells of each ring.
+    After extinction the densities are zero and the front, radii and trait measures are NaN.
+    Radii are also NaN while the population occupies only the central node (front radius zero).
     """
     from lgca.lattice_state import LatticeState
 
     r = _distance(lgca)
     maps = node_maps(lgca)
     occupied = maps["cells"] > 0
+    if not occupied.any():
+        return {"front": np.nan, **{name: np.full(bins, np.nan) for name in
+                                    ("r", "migrating_fraction", "kappa_mean", "kappa_std")},
+                **{name: np.zeros(bins) for name in ("cells", "migrating", "resting")}}
     front = np.percentile(r[occupied], 95)
-    edges = np.linspace(0, 1.1 * front, bins + 1)
+    edges = np.linspace(0, 1.1 * (front or 1.0), bins + 1)
     ring = np.digitize(r, edges) - 1  # ring of every node; bins and beyond
     cells = LatticeState(lgca).cells
     kappa = np.asarray(cells["kappa"], dtype=float)
     cell_ring = ring[cells.node]
-    profile = {"r": 0.5 * (edges[1:] + edges[:-1]) / front, "front": front}
+    profile = {"r": 0.5 * (edges[1:] + edges[:-1]) / front if front else np.full(bins, np.nan), "front": front}
     for name in ("cells", "migrating", "resting"):
         total = np.bincount(ring.ravel(), weights=maps[name].ravel(), minlength=bins + 1)[:bins]
         nodes = np.bincount(ring.ravel(), minlength=bins + 1)[:bins]

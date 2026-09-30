@@ -311,3 +311,50 @@ def test_density_recorder_widens_unbounded_counts_instead_of_overflowing():
 
     assert lgca.dens_t.dtype == np.int64
     assert lgca.dens_t[0, 1] == np.iinfo(np.int32).max + 10
+
+
+@pytest.mark.parametrize("volume_exclusion", [True, False])
+def test_family_recorder_follows_families_founded_in_a_rule_body(volume_exclusion):
+    from lgca import interaction
+    from lgca.model import (
+        AnalysisSpec,
+        ModelSpec,
+        SpaceSpec,
+        StateSpec,
+        TimeSpec,
+        build_model,
+    )
+    from lgca.pipeline import InteractionPipelineSpec
+    from lgca.simulation import FamilyPopulationRecorder
+
+    @interaction(kind="birth_death", families=("ib", "nove_ib"), name="simulation_test.found_families")
+    def found_families(state):
+        cells = state.cells
+        cells.found_families(cells.divide(np.ones(len(cells), dtype=bool),
+                                          channels="rest" if state.volume_exclusion else "same"))
+
+    nodes = np.zeros((3, 3), dtype=bool if volume_exclusion else int)
+    nodes[:, 0] = 1
+    model = build_model(ModelSpec(
+        space=SpaceSpec(geometry="lin", dims=3), time=TimeSpec(steps=3, seed=1),
+        state=StateSpec(nodes=nodes, restchannels=1, volume_exclusion=volume_exclusion, identity_based=True),
+        dynamics=InteractionPipelineSpec(operators=[found_families()]),
+        analysis=AnalysisSpec(observers=[FamilyPopulationRecorder(), PopulationRecorder()]),
+    ))
+    model.lgca.init_families(type="homogeneous", mutation=True)
+    result = model.run(showprogress=False)
+    populations = result.data["family_population"]
+    assert model.lgca.maxfamily > 1
+    assert populations.shape == (4, model.lgca.maxfamily + 1)
+    np.testing.assert_array_equal(populations.sum(axis=1), result.data["population"])
+    np.testing.assert_array_equal(populations[-1], model.lgca.calc_family_pop_alive())
+    assert not populations[0, 2:].any()
+
+
+def test_family_recorder_on_a_model_without_cell_identities_explains_itself():
+    from lgca.model import AnalysisSpec, ModelSpec, TimeSpec, run_model
+    from lgca.simulation import FamilyPopulationRecorder
+
+    spec = ModelSpec(time=TimeSpec(steps=1, seed=1), analysis=AnalysisSpec(observers=[FamilyPopulationRecorder()]))
+    with pytest.raises(RuntimeError, match="needs an identity-based model"):
+        run_model(spec, showprogress=False)

@@ -4,10 +4,10 @@ Custom interactions
 A new interaction is a Python function of the lattice state. There are two
 forms:
 
-- :func:`lgca.interaction` for a step of its own: cells are born or die
+- :func:`lgca.interaction <lgca.rules.interaction>` for a step of its own: cells are born or die
   (``birth_death``), change species (``phenotype_switch``) or are rearranged
   over the channels of their node (``reorientation``);
-- :func:`lgca.reorientation_term` for a directional cue that joins the other
+- :func:`lgca.reorientation_term <lgca.rules.reorientation_term>` for a directional cue that joins the other
   cues of a :class:`~lgca.pipeline.ReorientationSpec` in one random decision.
 
 Both register the rule under a name, so a model refers to it like to a
@@ -323,3 +323,27 @@ the model directly (``context.lgca``); a
 same operations, and :meth:`~lgca.lattice_state.LatticeState.commit` writes
 the result back. The built-in interactions in :mod:`lgca.pipeline` are
 written this way.
+
+An operator object given in ``InteractionPipelineSpec(operators=[...])``, for
+example one made with :func:`~lgca.plugins.create_plugin`, is a template:
+every model built from the spec runs its own copy of it. ``validate`` and
+``setup`` can therefore store what they learn about a model (its capacity,
+caches) without changing the other models built from the same spec, such as
+the runs of a sweep. Read what an operator records during a run from the
+model's copy, ``model.pipeline.operators[i]`` (``result.pipeline`` after
+:func:`~lgca.model.run_model`), not from the object in the spec, which never
+runs.
+
+The copy is made with ``copy.deepcopy``, and everything the operator holds is
+copied with it: a list or dict handed to its constructor, or the object of a
+bound method, belongs to the model's copy, so an operator that appends to a
+list of yours leaves that list empty. To collect values during a run, store
+them on the operator and read them from ``model.pipeline.operators[i]``, or
+hand the operator an observer that is also in the model's
+:class:`~lgca.model.AnalysisSpec`: the observers of the model are shared, not
+copied, like the rule, its :class:`~lgca.operator_base.PluginInfo` and
+functions. The operator objects of one list are copied together, so an
+operator that refers to another one of the list refers to that operator's
+copy. An operator that holds something that cannot be copied, such as a lock
+or an open file, is rejected when the model is built; give it a
+``__deepcopy__`` method that leaves that out.

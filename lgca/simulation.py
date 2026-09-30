@@ -150,6 +150,55 @@ def _setup_sample_indices(observer, lgca, runner, step_attribute: str) -> int:
     return len(steps)
 
 
+def check_observers(observers) -> None:
+    """Check that the recorders of a run do not write the same outputs.
+
+    Recorders of one built-in type share arrays of the model, so each type may appear once, and
+    each field may be recorded by one :class:`FieldRecorder`. Two recorders may give a name of
+    ``result.data`` only if they record the same quantity, on any schedules: a
+    :class:`PopulationRecorder` and a :class:`ScalarTimeSeriesRecorder` of the default
+    population, or one metric function in two scalar recorders. :class:`SimulationRunner` checks
+    this before the first step, ``biolgca validate`` and ``biolgca run`` before they write a file.
+
+    Parameters
+    ----------
+    observers : iterable of Observer
+        The observers of the run.
+
+    Raises
+    ------
+    ValueError
+        If two recorders would write the same output.
+    """
+    observers = list(observers)
+    recorder_types = (NodeRecorder, DensityRecorder, PopulationRecorder,
+                      ChannelDensityRecorder, PerTypeRecorder, OrderParameterRecorder,
+                      FamilyPopulationRecorder)
+    seen = set()
+    for observer in observers:
+        kind = next((kind for kind in recorder_types if isinstance(observer, kind)), None)
+        if kind is not None:
+            if kind in seen:
+                raise ValueError(f"Multiple {kind.__name__} instances share LGCA output arrays; "
+                                 "use one recorder per type and select samples afterward")
+            seen.add(kind)
+    recorded_fields = [name for observer in observers if isinstance(observer, FieldRecorder)
+                       for name in observer.fields]
+    twice = sorted({name for name in recorded_fields if recorded_fields.count(name) > 1})
+    if twice:
+        raise ValueError(f"the fields {twice} are recorded by several FieldRecorders; record each "
+                         "field with one")
+    output_names = {}
+    for observer in observers:
+        names = _recorded_names(observer)
+        duplicates = {name for name in names if name in output_names
+                      and not _same_output(name, observer, output_names[name])}
+        if duplicates:
+            raise ValueError(f"Several recorders produce the same output names {sorted(duplicates)}; "
+                             "use distinct names or one recorder per output")
+        output_names.update(dict.fromkeys(names, observer))
+
+
 class SimulationRunner:
     """Run an LGCA simulation and notify observers separately from dynamics."""
 
@@ -180,23 +229,7 @@ class SimulationRunner:
     def run(self):
         self.start_step = int(getattr(self.context, "_step", 0))
         self.end_step = self.start_step + self.timesteps
-        recorder_types = (NodeRecorder, DensityRecorder, PopulationRecorder,
-                          ChannelDensityRecorder, PerTypeRecorder, OrderParameterRecorder,
-                          FamilyPopulationRecorder)
-        seen = set()
-        for observer in self.observers:
-            kind = next((kind for kind in recorder_types if isinstance(observer, kind)), None)
-            if kind is not None:
-                if kind in seen:
-                    raise ValueError(f"Multiple {kind.__name__} instances share LGCA output arrays; "
-                                     "use one recorder per type and select samples afterward")
-                seen.add(kind)
-        recorded_fields = [name for observer in self.observers if isinstance(observer, FieldRecorder)
-                           for name in observer.fields]
-        twice = sorted({name for name in recorded_fields if recorded_fields.count(name) > 1})
-        if twice:
-            raise ValueError(f"the fields {twice} are recorded by several FieldRecorders; record each "
-                             "field with one")
+        check_observers(self.observers)
         self.estimated_recording_bytes = estimate_recording_bytes(self.lgca, self.timesteps, self.observers)
         if (self.max_recording_bytes is not None
                 and self.estimated_recording_bytes > self.max_recording_bytes):
@@ -391,6 +424,9 @@ class FamilyPopulationRecorder(Observer):
     """Record family populations in ``lgca.fam_pop_t``."""
 
     def setup(self, lgca, runner: SimulationRunner) -> None:
+        if not hasattr(lgca, "props"):
+            raise RuntimeError("FamilyPopulationRecorder needs an identity-based model that tracks families "
+                               "(StateSpec(identity_based=True) and a rule that founds families)")
         if "family" not in lgca.props:
             raise RuntimeError(
                 "Interaction does not deal with families, family population can therefore not be recorded."
@@ -406,13 +442,12 @@ class FamilyPopulationRecorder(Observer):
         if self.is_mutating:
             lgca.fam_pop_t.append(lgca.calc_family_pop_alive())
         else:
-            try:
-                lgca.fam_pop_t[self._sample_indices[step], ...] = lgca.calc_family_pop_alive()
-            except ValueError as exc:
-                raise ValueError(
-                    "Number of families has increased, interaction must be included in the case "
-                    "distinction for the recordfampop keyword in the IBLGCA base timeevo function!"
-                ) from exc
+            # a rule may also found families in its body (cells.found_families, divide(new_family=True))
+            populations = lgca.calc_family_pop_alive()
+            missing = len(populations) - lgca.fam_pop_t.shape[1]
+            if missing > 0:
+                lgca.fam_pop_t = np.pad(lgca.fam_pop_t, ((0, 0), (0, missing)))
+            lgca.fam_pop_t[self._sample_indices[step], :len(populations)] = populations
 
     def finalize(self, lgca, runner: SimulationRunner) -> None:
         if self.is_mutating:
@@ -549,8 +584,8 @@ class ScalarTimeSeriesRecorder(Observer):
     Parameters
     ----------
     metrics : mapping, optional
-        Name -> function of the model that returns a number. Default: the population.
-        The values are in ``result.data`` under these names.
+        Name -> function of the model that returns a number, at least one. Default: the
+        population. The values are in ``result.data`` under these names.
     schedule : Schedule, optional
         The steps at which the metrics are recorded. Default: every step.
     output_path : str or Path, optional
@@ -566,7 +601,16 @@ class ScalarTimeSeriesRecorder(Observer):
         output_path=None,
     ):
         super().__init__(schedule=schedule)
-        self.metrics = dict(metrics or {"population": _total_population})
+        self.metrics = dict({"population": _total_population} if metrics is None else metrics)
+        if not self.metrics:
+            raise ValueError("ScalarTimeSeriesRecorder needs at least one metric; omit metrics to record "
+                             "the population")
+        for name, metric in self.metrics.items():
+            if not isinstance(name, str) or not name or name == "step" or name in _DATA_ALIASES:
+                raise ValueError(f"Metric names must be non-empty strings other than 'step' and "
+                                 f"the data aliases {list(_DATA_ALIASES)}, got {name!r}")
+            if not callable(metric):
+                raise TypeError(f"The metric {name!r} must be callable")
         self.output_path = None if output_path is None else Path(output_path)
         self.records: list[dict[str, Any]] = []
 
@@ -641,6 +685,29 @@ RECORDED = {
 _DATA_ALIASES = {"n": "population"}
 
 
+def _recorded_names(observer):
+    if isinstance(observer, FieldRecorder):
+        return set(observer.fields)
+    if isinstance(observer, ScalarTimeSeriesRecorder):
+        return set(observer.metrics)
+    return {name for name, (_, _, recorder, _) in RECORDED.items()
+            if isinstance(observer, globals()[recorder])}
+
+
+def _same_output(name, first, second):
+    """Whether two recorders record the same quantity under ``name``: PopulationRecorder and the
+    default metric of a ScalarTimeSeriesRecorder, or one metric function in two of them. Their
+    schedules may differ; ``result.data`` keeps one of them, with its own steps."""
+    def source(observer):
+        if isinstance(observer, PopulationRecorder):
+            return _total_population if name == "population" else None
+        if isinstance(observer, ScalarTimeSeriesRecorder):
+            return observer.metrics.get(name)
+        return None
+
+    return source(first) is not None and source(first) is source(second)
+
+
 class RunData(Mapping):
     """The data recorded in a run, by name, with the steps at which it was recorded.
 
@@ -676,10 +743,10 @@ class RunData(Mapping):
     @classmethod
     def from_run(cls, lgca, observers=(), **options) -> RunData:
         """The data of the recorders among ``observers`` of a run of ``lgca``."""
-        recorders = {type(observer).__name__ for observer in observers}
         values, steps = {}, {}
         for name, (attribute, steps_attribute, recorder, _) in RECORDED.items():
-            if recorder in recorders and steps_attribute in vars(lgca):
+            if (any(isinstance(observer, globals()[recorder]) for observer in observers)
+                    and steps_attribute in vars(lgca)):
                 # read lazily: the lists of labels of some identity-based models are built on demand
                 values[name] = _reader(lgca, attribute)
                 steps[name] = np.asarray(getattr(lgca, steps_attribute))
@@ -689,8 +756,8 @@ class RunData(Mapping):
                     values[name] = observer.values[name]
                     steps[name] = observer.steps
         for observer in observers:
-            if isinstance(observer, ScalarTimeSeriesRecorder) and observer.records:
-                recorded = np.array([row["step"] for row in observer.records])
+            if isinstance(observer, ScalarTimeSeriesRecorder):
+                recorded = np.array([row["step"] for row in observer.records], dtype=int)
                 for name in observer.metrics:
                     if name not in values:
                         values[name] = np.array([row[name] for row in observer.records])

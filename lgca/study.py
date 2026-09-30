@@ -28,11 +28,13 @@ A path is a sequence of names separated by dots, with ``[i]`` for the ``i``-th e
 from __future__ import annotations
 
 import difflib
+import hashlib
 import itertools
 import logging
 import multiprocessing
 import pickle
 import re
+from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from concurrent.futures.process import BrokenProcessPool
@@ -50,7 +52,7 @@ logger = logging.getLogger("lgca")
 
 _TOKEN = re.compile(r"\.?([A-Za-z_][A-Za-z0-9_]*)|\[([^\[\]]+)\]")
 def vary(spec, changes: Mapping[str, Any]):
-    """A copy of ``spec`` with the values at the given paths replaced.
+    """A new spec: ``spec`` with the values at the given paths replaced.
 
     Parameters
     ----------
@@ -62,6 +64,9 @@ def vary(spec, changes: Mapping[str, Any]):
     Returns
     -------
     ModelSpec
+        The parts that are not changed are those of ``spec``, not copies: change the
+        variant with ``vary`` again rather than in place, which would change ``spec`` too.
+        A model built from either keeps its own copy (see :func:`~lgca.model.build_model`).
 
     Examples
     --------
@@ -157,11 +162,6 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
         after its values and seed (e.g. ``kappa=2_seed=1``), inside the observer's destination,
         e.g. ``snapshots/kappa=2_seed=1/density_00010.png``.
 
-    Every run has its own copy of the model's observers. By default a sweep keeps no files:
-    observers that only draw or write files (plot snapshots, movies, CSV snapshots) do not run,
-    and the files of time series are discarded; measure what you need instead, e.g. the metrics
-    of a ``ScalarTimeSeriesRecorder`` by their names.
-
     Returns
     -------
     pandas.DataFrame
@@ -169,6 +169,15 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
         its path that tells it from the others, e.g. ``chemotaxis.beta``),
         ``seed`` and a column per measure; with ``long=True`` also ``step``. ``table.attrs`` holds
         the BioLGCA version and the paths of the varied values.
+
+    Notes
+    -----
+    Every run has its own copy of the model's observers, and runs its own copy of the operator objects
+    in the model and the grid (see :func:`~lgca.model.build_model`); a model or a value of the grid that
+    cannot be copied is reported before the first run. By default a sweep keeps no files: observers
+    that only draw or write files (plot snapshots, movies, CSV snapshots) do not run, and the files of
+    time series are discarded; measure what you need instead, e.g. the metrics of a
+    ``ScalarTimeSeriesRecorder`` by their names.
 
     Examples
     --------
@@ -199,11 +208,26 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
         raise ValueError(f"measure names conflict with sweep columns: {sorted(conflicts)}; "
                          "give these measures different names")
     spec = _with_recorders(spec, measures)
-    seeds = [spec.time.seed] if seeds is None else [int(seed) for seed in seeds]
+    from .simulation import check_observers
+
+    check_observers(spec.analysis.observers)  # once, before any run
+    from .model import _owned_spec
+
+    # every run copies the model and its operator objects: fail before any run if they cannot be copied
+    spec = _owned_spec(spec)
+    _check_grid_values(combinations, spec)
+    if seeds is None:
+        from .model import _validate_seed
+
+        _validate_seed(spec.time.seed)
+        seeds = [spec.time.seed if spec.time.seed is not None else _drawn_seed()]
+    seeds = list(seeds)
     if not seeds:
         raise ValueError("seeds is empty; give at least one seed, e.g. seeds=range(10)")
-    if seeds == [None]:
-        seeds = [_drawn_seed()]
+    bad = [seed for seed in seeds if isinstance(seed, bool) or not isinstance(seed, (int, np.integer)) or seed < 0]
+    if bad:
+        raise ValueError(f"seeds must be non-negative integers, got {bad[0]!r}")
+    seeds = [int(seed) for seed in seeds]
     jobs = [(combination, seed) for combination in combinations for seed in seeds]
     resources = {"resource_base": None if resource_base is None else str(Path(resource_base).resolve()),
                  "trusted_paths": bool(trusted_paths)}
@@ -318,6 +342,8 @@ def _get(node, tokens, where="", parent=None):
         raise KeyError(_unknown(key, names, where))
     if isinstance(node, Mapping):
         if parent in ("operators", "terms") and "name" in node and key != "name":
+            if key == "parameters" and not rest:  # all its parameters
+                return node.get("parameters") or {}
             return _parameter(node, node.get("parameters"), rest if key == "parameters" else tokens, where, parent)
         if key not in node:
             raise KeyError(_unknown(key, list(node), where))
@@ -370,9 +396,14 @@ def _places(spec, name):
     """The full paths of all places of the model with the short name ``name``."""
     places = [f"{part}.{name}" for part in ("space", "state", "time")
               if name in {f.name for f in fields(getattr(spec, part))}]
+    from .operator_base import InteractionOperator
+    from .pipeline import ReorientationSpec
+
     for index, operator in enumerate(spec.dynamics.operators):
+        if isinstance(operator, InteractionOperator):  # an operator object: vary cannot change it
+            continue
         where = f"dynamics.operators[{index}]"
-        if hasattr(operator, "terms"):  # a ReorientationSpec
+        if isinstance(operator, ReorientationSpec):
             if name in (operator.parameters or {}) or name in ("sweeps", "channels", "species"):
                 places.append(f"{where}.parameters.{name}")
             for position, term in enumerate(operator.terms):
@@ -408,17 +439,69 @@ def _term_parameters(name):
 def _combinations(spec, grid):
     if grid is None:
         return [{}], []
+    aliases = {}
+
+    def grid_path(path):
+        resolved = _grid_path(spec, path)
+        return aliases.setdefault(_canonical_path(spec, resolved), resolved)
+
     if isinstance(grid, Mapping):
-        paths = [_grid_path(spec, path) for path in grid]
+        paths = [grid_path(path) for path in grid]
+        _unique_grid_paths(spec, list(grid), paths)
         values = []
         for path, options in zip(paths, grid.values()):
             if isinstance(options, (str, bytes, Mapping)) or not isinstance(options, Iterable):
                 raise TypeError(f"grid[{path!r}] must be a list of values, got {options!r}")
             values.append(list(options))
+            if not values[-1]:
+                raise ValueError(f"grid[{path!r}] is empty; give at least one value")
         return [dict(zip(paths, point)) for point in itertools.product(*values)], paths
-    points = [{_grid_path(spec, path): value for path, value in point.items()} for point in grid]
+    points = []
+    for point in grid:
+        point_paths = [grid_path(path) for path in point]
+        _unique_grid_paths(spec, list(point), point_paths)
+        points.append(dict(zip(point_paths, point.values())))
+    if not points:
+        raise ValueError("grid is empty; give at least one combination, e.g. [{'kappa': 2}], or no grid to "
+                         "run the model as it is")
     paths = list(dict.fromkeys(path for point in points for path in point))
     return points, paths
+
+
+def _check_grid_values(combinations, spec):
+    """Fail before any run if a value of the grid cannot be copied, e.g. an operator object, also one in a
+    list of operators; every run copies its model."""
+    from .model import _copy_error, _shared_objects
+    from .pipeline import _copy_templates
+
+    shared = _shared_objects(spec)
+    checked = set()
+    for combination in combinations:
+        for path, value in combination.items():
+            if isinstance(value, (str, bytes, int, float, np.generic, type(None))) or id(value) in checked:
+                continue
+            checked.add(id(value))
+            try:
+                _copy_templates(value, dict(shared))
+            except Exception as exc:  # noqa: BLE001 - any failure of the copy: named before the first run
+                raise _copy_error(value, f"grid[{path!r}] value", shared, exc) from None
+
+
+def _unique_grid_paths(spec, keys, paths):
+    overlap = _overlap(spec, paths)
+    if overlap is not None:
+        first, second = (keys[index] for index in overlap)
+        raise ValueError(f"grid keys {first!r} and {second!r} set the same model parameter, or one sets a "
+                         "part of the other; give each parameter once")
+
+
+def _overlap(spec, paths):
+    """The indices of two paths that set the same value, or a value and a part of it; ``None`` if none do."""
+    canonical = [_canonical_tokens(spec, _tokens(path)) for path in paths]
+    for (i, first), (j, second) in itertools.combinations(enumerate(canonical), 2):
+        if first[:len(second)] == second[:len(first)]:  # one is the start of the other
+            return i, j
+    return None
 
 
 def _grid_path(spec, path):
@@ -428,6 +511,43 @@ def _grid_path(spec, path):
         raise ValueError(f"the seed cannot be varied in the grid ({path!r}); give the seeds with seeds=, "
                          f"e.g. seeds=[11, 22] (CLI: --seeds 11,22), and every combination runs once per seed")
     return resolved
+
+
+def _canonical_path(spec, path):
+    return _render(_canonical_tokens(spec, _tokens(resolve_path(spec, path))))
+
+
+def _canonical_tokens(node, tokens, where="", parent=None):
+    """Normalize named/negative indices and implicit operator parameters to their actual location."""
+    if not tokens:
+        return []
+    (kind, key), rest = tokens[0], tokens[1:]
+    if kind == "index":
+        if not isinstance(node, (list, tuple)):
+            raise KeyError(f"{where or 'the model'} is not a list; [{key}] needs a list")
+        index = _select(node, key, where)
+        entry = "entry" if parent in ("operators", "terms") else None
+        return [(kind, index), *_canonical_tokens(node[index], rest, f"{where}[{key}]", entry)]
+    here = f"{where}.{key}" if where else key
+    if is_dataclass(node) and not isinstance(node, type):
+        names = [field.name for field in fields(node)]
+        if key in names:
+            return [(kind, key), *_canonical_tokens(getattr(node, key), rest, here, key)]
+        if parent == "entry" and "parameters" in names:
+            inner = _canonical_tokens(node.parameters or {}, tokens, f"{where}.parameters", "parameters")
+            return [("name", "parameters"), *inner]
+        if parent == "entry" and key == "parameters" and rest:
+            return _canonical_tokens(node, rest, where, parent)  # PDESpec parameters are its fields
+        raise KeyError(_unknown(key, names, where))
+    if isinstance(node, Mapping):
+        if parent == "entry" and "name" in node and key != "name":
+            inner = rest if key == "parameters" else tokens
+            return [("name", "parameters"), *_canonical_tokens(node.get("parameters") or {}, inner,
+                                                               f"{where}.parameters", "parameters")]
+        if rest and key not in node:
+            raise KeyError(_unknown(key, list(node), where))
+        return [(kind, key), *_canonical_tokens(node.get(key), rest, here, key)]
+    raise KeyError(f"{where or 'the model'} has no entries; cannot set {key!r} in {type(node).__name__}")
 
 
 def _column_names(paths):
@@ -478,14 +598,15 @@ def _with_recorders(spec, measures):
     from .model import AnalysisSpec
 
     observers = list(spec.analysis.observers) if spec.analysis is not None else []
-    present = {type(observer).__name__ for observer in observers}
+    present = set().union(*(simulation._recorded_names(observer) for observer in observers))
     for what in measures.values():
         if isinstance(what, str):
             name = simulation._DATA_ALIASES.get(what, what)
             recorder = simulation.RECORDED[name][2] if name in simulation.RECORDED else None
-            if recorder is not None and recorder not in present:
-                observers.append(getattr(simulation, recorder)())
-                present.add(recorder)
+            if recorder is not None and name not in present:
+                observer = getattr(simulation, recorder)()
+                observers.append(observer)
+                present.update(simulation._recorded_names(observer))
     return replace(spec, analysis=AnalysisSpec(observers=tuple(observers)))
 
 
@@ -578,6 +699,8 @@ def _guarded(spec, job, measures, plugins, columns, backend, resources):
 def _run_one(spec, combination, seed, measures, resources, folder=None):
     from .model import AnalysisSpec, run_model
 
+    # the run's model copies the operator objects of the model and of the grid, so runs in threads do not
+    # share them (build_model)
     variant = vary(spec, combination)
     variant = replace(variant, time=replace(variant.time, seed=seed))
     # every run its own observers (they keep state), and their files in a folder of the run or nowhere
@@ -637,9 +760,12 @@ def _run_folders(jobs, columns):
     names = []
     for combination, seed in jobs:
         parts = [f"{columns[path]}={value}" for path, value in combination.items()] + [f"seed={seed}"]
-        names.append(re.sub(r"[^A-Za-z0-9=._+-]+", "-", "_".join(parts)))
-    repeated = {name for name in names if names.count(name) > 1}
-    return [f"{name}_run{index}" if name in repeated else name for index, name in enumerate(names)]
+        name = re.sub(r"[^A-Za-z0-9=._+-]+", "-", "_".join(parts))
+        if len(name) > 120:
+            name = name[:96] + "_" + hashlib.sha256(name.encode("utf-8")).hexdigest()[:16]
+        names.append(name)
+    counts = Counter(name.casefold() for name in names)  # folders on Windows and macOS ignore case
+    return [f"{name}_run{index}" if counts[name.casefold()] > 1 else name for index, name in enumerate(names)]
 
 
 class _Series:
@@ -677,6 +803,8 @@ def _rows(base, measured, long):
     if not series:
         return [{**base, **constants}]
     steps = sorted(set().union(*[value.steps.tolist() for value in series.values()]))
+    if not steps:  # nothing recorded: one row with an empty step keeps the run and its numbers
+        return [{**base, "step": np.nan, **constants, **{name: np.nan for name in series}}]
     lookup = {name: dict(zip(value.steps.tolist(), value.values)) for name, value in series.items()}
     return [{**base, "step": step, **constants, **{name: lookup[name].get(step, np.nan) for name in series}}
             for step in steps]

@@ -1,4 +1,4 @@
-"""Built-in interactions written with the :func:`lgca.interaction` decorator.
+"""Built-in interactions written with the :func:`lgca.interaction <lgca.rules.interaction>` decorator.
 
 They work with and without volume exclusion and for any number of species
 unless stated otherwise, and serve as worked examples of the decorator.
@@ -944,9 +944,12 @@ def _growth_cells(state, r_b, r_d, r_d_resting, when_full, mutation, new_family)
 
 def _per_cell(cells, value, name):
     """A parameter per cell: the named trait, or one number for all cells."""
-    if isinstance(value, str):
-        return cells[value]
-    return np.full(len(cells), _number(value, name))
+    values = np.asarray(cells[value], dtype=float) if isinstance(value, str) else np.full(
+        len(cells), _number(value, name))
+    if not np.all(np.isfinite(values)):
+        where = f"{name} (the trait {value!r})" if isinstance(value, str) else name
+        raise ValueError(f"{where} must be finite for every cell")
+    return values
 
 
 def _number(value, name):

@@ -295,7 +295,16 @@ class Cells:
                 raise ValueError(f"a mask of cells must have one entry per cell ({len(self)}), "
                                  f"got shape {which.shape}")
             return which
+        if which.ndim > 1:  # also when it selects no cell, so that the error does not depend on the data
+            raise ValueError(f"cell positions must be a 1-D array, got shape {which.shape}; use "
+                             "np.flatnonzero(mask) rather than np.argwhere")
         mask = np.zeros(len(self), dtype=bool)
+        if which.size == 0:
+            return mask
+        if not np.issubdtype(which.dtype, np.integer):
+            raise ValueError("cell positions must be integers or a boolean mask with one entry per cell")
+        if np.any(which >= len(self)) or np.any(which < -len(self)):
+            raise ValueError(f"cell positions must lie between {-len(self)} and {len(self) - 1}")
         mask[which.astype(np.int64)] = True
         return mask
 
@@ -350,13 +359,17 @@ def _inherit(lgca, mothers, daughters, founders):
     """
     if len(daughters) == 0:
         return
-    if founders.any() and "family" not in lgca.props:
-        lgca.init_families(type="homogeneous", mutation=True)
-    for name in list(lgca.props):
-        trait = trait_array(lgca, name)
+    if founders.any():
+        if "family" not in lgca.props:
+            lgca.init_families(type="homogeneous", mutation=True)
+        _require_family_tree(lgca)
+    # every trait is checked before any is extended, so a failed division leaves them all as they were
+    traits = {name: trait_array(lgca, name) for name in list(lgca.props)}
+    for name, trait in traits.items():
         if len(trait) != daughters[0]:
             raise ValueError(f"trait {name!r} has {len(trait)} values, but the next label is "
                              f"{daughters[0]}; every trait needs one value per label")
+    for name, trait in traits.items():
         values = trait.values[mothers]
         if name == "family" and founders.any():
             values = values.copy()
@@ -366,9 +379,7 @@ def _inherit(lgca, mothers, daughters, founders):
 
 def _found_families(lgca, parent_families):
     """Register one new family per daughter, descending from its mother's family."""
-    if not hasattr(lgca, "family_props"):
-        raise ValueError("new_family=True needs family tracking with mutations; the model tracks "
-                         "families without them (init_families(mutation=False))")
+    _require_family_tree(lgca)
     first = int(lgca.maxfamily) + 1
     families = np.arange(first, first + len(parent_families))
     lgca.maxfamily = int(families[-1])
@@ -378,6 +389,13 @@ def _found_families(lgca, parent_families):
         descendants[parent].append(family)
     descendants.extend([] for _ in families)
     return families
+
+
+def _require_family_tree(lgca):
+    """Refuse new families in a model that tracks families without their ancestry."""
+    if not hasattr(lgca, "family_props"):
+        raise ValueError("new_family=True needs family tracking with mutations; the model tracks "
+                         "families without them (init_families(mutation=False))")
 
 
 def slot_maps(lgca):

@@ -1,4 +1,5 @@
 from dataclasses import replace
+from functools import partial
 
 import numpy as np
 import pytest
@@ -396,6 +397,7 @@ def test_state_fields_are_attached_before_operator_setup():
 
     compiled = build_model(spec)
 
+    probe = compiled.pipeline.operators[0]  # the model's own copy of the operator object
     assert probe.signal_shape == compiled.lgca.nodes.shape[: len(compiled.lgca.dims)]
 
 
@@ -414,6 +416,269 @@ def test_vector_state_fields_are_padded_when_attached_to_lgca():
 
     assert compiled.lgca.director.shape == compiled.lgca.nodes.shape[: len(compiled.lgca.dims)] + (2,)
     np.testing.assert_allclose(compiled.lgca.director[compiled.lgca.nonborder], director)
+
+
+@pytest.mark.parametrize("shape", [(3,), (5,)])  # the lattice's nodes, and with its border nodes
+def test_the_model_keeps_its_own_copy_of_a_state_field(shape):
+    signal = np.ones(shape)
+    compiled = build_model(ModelSpec(space=SpaceSpec(geometry="lin", dims=3), time=TimeSpec(steps=0, seed=1),
+                                     state=StateSpec(fields={"signal": signal})))
+    signal[:] = -5.0
+
+    np.testing.assert_array_equal(compiled.lgca.signal, np.ones(5))
+
+
+def _edit_after_build(case):
+    """A model, and an edit of it in place: of the caller's dicts, lists, arrays or operator objects."""
+    from lgca.plugins import create_plugin
+
+    growth = {"birth_rate": 0.5, "death_rate": 0.0}
+    operators = [{"name": "birth_death", "parameters": growth}]
+    state = {"density": 1.0, "restchannels": 1, "volume_exclusion": False, "capacity": 4}
+    if case == "parameters":
+        edit = partial(growth.update, death_rate=1.0)
+    elif case == "operator object":
+        operators = [create_plugin("birth_death", growth)]
+        edit = partial(operators[0].parameters.update, death_rate=1.0)
+    elif case == "nested rates":
+        rates = [[0.0, 0.5], [0.0, 0.0]]
+        operators = [{"name": "phenotype_switch", "parameters": {"rates": rates}}]
+        state["n_species"] = 2
+
+        def edit():
+            rates[0][1], rates[1][0] = 0.0, 1.0
+    elif case == "operator list":
+        edit = partial(operators.append, {"name": "birth_death", "parameters": {"death_rate": 1.0}})
+    elif case == "nodes":
+        nodes = np.zeros((30, 3), dtype=int)
+        nodes[:10] = 1
+        state = {"nodes": nodes, "restchannels": 1, "volume_exclusion": False, "capacity": 4}
+        edit = partial(nodes.fill, 0)
+    elif case == "label lists":
+        nodes = np.empty((30, 3), dtype=object)  # identity-based without volume exclusion: lists of labels
+        for index in np.ndindex(nodes.shape):
+            nodes[index] = [3 * index[0] + index[1] + 1] if index[0] < 10 else []
+        state = {"nodes": nodes, "restchannels": 1, "identity_based": True, "volume_exclusion": False,
+                 "capacity": 4}
+        edit = partial(nodes[3, 0].extend, [98, 99])
+    elif case == "traits":
+        nodes = np.zeros((30, 3), dtype=int)
+        nodes[:10] = np.arange(1, 31).reshape(10, 3)  # labels
+        kappa = np.linspace(0.0, 1.0, 30)
+        state = {"nodes": nodes, "restchannels": 1, "identity_based": True, "traits": {"kappa": kappa}}
+        edit = partial(kappa.fill, 5.0)
+    else:
+        initializer = {"name": "region", "parameters": {"extent": 4, "density": 2}}
+        state = {"initializer": initializer, "restchannels": 1, "volume_exclusion": False, "capacity": 4}
+        edit = partial(initializer["parameters"].update, extent=20)
+    spec = ModelSpec(space=SpaceSpec(geometry="lin", dims=30), state=StateSpec(**state),
+                     time=TimeSpec(steps=10, seed=3), dynamics=InteractionPipelineSpec(operators=operators))
+    return spec, edit
+
+
+@pytest.mark.parametrize("case", ["parameters", "operator object", "nested rates", "operator list", "nodes",
+                                  "label lists", "traits", "initializer"])
+def test_changes_of_the_spec_after_the_build_reach_neither_the_model_nor_its_spec(case):
+    from copy import deepcopy
+
+    spec, edit = _edit_after_build(case)
+    reference = build_model(deepcopy(spec))
+    model = build_model(spec)
+    built = model_spec_to_json(model.spec)  # text: a dict may hold the lists of the spec
+    edit()
+    assert model_spec_to_json(model.spec) == built
+    for _ in range(10):
+        model.step()
+        reference.step()
+    np.testing.assert_array_equal(model.lgca.nodes, reference.lgca.nodes)
+
+
+@pytest.mark.parametrize("state", [{}, {"volume_exclusion": False}, {"identity_based": True},
+                                   {"identity_based": True, "volume_exclusion": False}],
+                         ids=["classical", "nove", "ib", "nove_ib"])
+@pytest.mark.parametrize("stacked", [False, True])
+def test_models_built_from_one_operator_object_do_not_affect_each_other(state, stacked):
+    from lgca import stack
+    from lgca.plugins import create_plugin
+    from lgca.rules import StackOperator
+
+    # validate stores the model's capacity on the operator: a capacity-2 model ran with the capacity of a
+    # capacity-50 model built from the same object later
+    def template():
+        growth = create_plugin("birth_death", {"birth_rate": 0.5})
+        if not stacked:
+            return growth, growth
+
+        @stack(kind="birth_death", families=("classical", "nove", "ib", "nove_ib"), register=False,
+               name="model_spec_test.growth_stack")
+        def growth_stack(state):
+            """Growth by an operator object."""
+            return [growth]
+
+        return StackOperator(growth_stack), growth  # a stack object whose rules include an operator object
+
+    def build(capacity, operator):
+        return build_model(ModelSpec(
+            space=SpaceSpec(geometry="lin", dims=30), time=TimeSpec(steps=30, seed=7),
+            state=StateSpec(density=1.0, restchannels=1, capacity=capacity, **state),
+            dynamics=InteractionPipelineSpec(operators=[operator], propagation=False)))
+
+    alone = build(2, template()[0])
+    operator, growth = template()
+    first = build(2, operator)
+    other = build(50, operator)
+    for _ in range(30):
+        alone.step()
+        first.step()
+    np.testing.assert_array_equal(first.lgca.nodes, alone.lgca.nodes)
+    running = first.pipeline.operators[0]
+    assert running is not operator and first.spec.dynamics.operators[0] is not operator
+    assert (running.operators[0] if stacked else running).capacity == 2
+    assert (other.pipeline.operators[0].operators[0] if stacked else other.pipeline.operators[0]).capacity == 50
+    # the object in the spec is a template: it never runs
+    assert growth.capacity is None and (not stacked or operator.operators == [])
+
+
+def test_operator_objects_that_cannot_be_copied_are_explained():
+    import threading
+
+    from lgca import stack
+    from lgca.plugins import create_plugin
+    from lgca.rules import StackOperator
+
+    locked = create_plugin("birth_death", {"birth_rate": 0.5})
+    locked.lock = threading.Lock()
+    with pytest.raises(ValueError, match=r"dynamics\.operators\[1\] \('birth_death'\) cannot be copied.*"
+                                         r"__deepcopy__"):
+        build_model(_square_spec(operators=[{"name": "random_walk"}, locked]))
+
+    @stack(kind="birth_death", families="classical", register=False, name="model_spec_test.locked_stack")
+    def locked_stack(state):
+        """A stack of an operator object that cannot be copied."""
+        return [{"name": "random_walk"}, locked]
+
+    with pytest.raises(ValueError, match=r"model_spec_test\.locked_stack: operators\[1\] \('birth_death'\) cannot "
+                                         r"be copied.*__deepcopy__"):
+        build_model(_square_spec(operators=[StackOperator(locked_stack)]))
+    spec = _square_spec(operators=[{"name": "random_walk"}])
+    spec = replace(spec, state=replace(spec.state, parameters={"handle": threading.Lock()}))
+    with pytest.raises(ValueError, match=r"model\.state\.parameters\.handle cannot be copied"):
+        build_model(spec)
+
+    # copies also fail with other errors, e.g. of a multiprocessing.Lock or of a wrapper that forwards attributes
+    class Inherited:
+        def __deepcopy__(self, memo):
+            raise RuntimeError("Lock objects should only be shared between processes through inheritance")
+
+    class Forwarding(type(locked)):
+        def __init__(self, helper):
+            self.__dict__.update(create_plugin("birth_death", {"birth_rate": 0.5}).__dict__)
+            self.helper = helper
+
+        def __getattr__(self, name):  # a copy is made without its attributes: this recurses
+            return getattr(self.helper, name)
+
+    unshared = create_plugin("birth_death", {"birth_rate": 0.5})
+    unshared.handle = Inherited()
+    with pytest.raises(ValueError, match=r"dynamics\.operators\[0\] \('birth_death'\) cannot be copied \(RuntimeError: "
+                                         r"Lock objects.*__deepcopy__"):
+        build_model(_square_spec(operators=[unshared]))
+    with pytest.raises(ValueError, match=r"dynamics\.operators\[0\] \('birth_death'\) cannot be copied "
+                                         r"\(RecursionError.*__getattr__.*__deepcopy__"):
+        build_model(_square_spec(operators=[Forwarding(helper=object())]))
+    spec = replace(spec, state=replace(spec.state, parameters={"handle": Inherited()}))
+    with pytest.raises(ValueError, match=r"model\.state\.parameters\.handle cannot be copied \(RuntimeError"):
+        build_model(spec)
+
+
+class _Deadly(InteractionOperator):
+    """Sets the death rate of another operator to 1 at every step: it kills the cells only if it and that
+    operator run as a pair."""
+
+    def __init__(self, target):
+        super().__init__(PluginInfo(name="model_spec_test.deadly", operator_kind="birth_death",
+                                    backend_families=("classical",)))
+        self.target = target
+
+    def apply(self, context, step):
+        self.target.parameters["death_rate"] = 1.0
+
+
+@pytest.mark.parametrize("stacked", [False, True])
+def test_operator_objects_that_refer_to_each_other_still_do_in_the_model(stacked):
+    from lgca import stack
+    from lgca.plugins import create_plugin
+    from lgca.rules import StackOperator
+
+    def pair():
+        growth = create_plugin("birth_death", {"birth_rate": 0.0, "death_rate": 0.0})
+        return [_Deadly(growth), growth]
+
+    @stack(kind="birth_death", families="classical", register=False, name="model_spec_test.deadly_pair")
+    def deadly_pair(state):
+        """An operator and the one it drives, made for every model."""
+        return pair()
+
+    operators = [StackOperator(deadly_pair)] if stacked else pair()
+    spec = replace(_square_spec(operators=operators), state=StateSpec(density=1.0, restchannels=1))
+    model = build_model(spec)
+    running = model.pipeline.operators[0].operators if stacked else model.pipeline.operators
+    assert running[0].target is running[1]  # the copies of the pair: one drives the other
+    if not stacked:
+        assert operators[0].target is operators[1] and running[1] is not operators[1]
+        assert model.spec.dynamics.operators[0].target is model.spec.dynamics.operators[1]
+    model.step()
+    assert model.lgca.cell_density[model.lgca.nonborder].sum() == 0  # the running growth killed every cell
+    if not stacked:
+        assert operators[1].parameters["death_rate"] == 0.0  # the template never ran
+
+
+def test_an_operator_object_may_report_to_an_observer_of_the_model():
+    class Events(Observer):
+        """Receives the steps from an operator."""
+
+        def __init__(self):
+            super().__init__()
+            self.steps = []
+
+        def setup(self, lgca, runner):
+            self.steps = []
+
+        def observe(self, lgca, step, runner):
+            pass
+
+    class Reporting(InteractionOperator):
+        """Changes no cells; reports every step to an observer and records it in a list of its own."""
+
+        def __init__(self, events, recorded):
+            super().__init__(PluginInfo(name="model_spec_test.reporting", operator_kind="birth_death",
+                                        backend_families=("classical",)))
+            self.events, self.recorded = events, recorded
+
+        def apply(self, context, step):
+            self.events.steps.append(step)
+            self.recorded.append(step)
+
+    events, recorded = Events(), []
+    spec = replace(_square_spec(operators=[Reporting(events, recorded)]), analysis=AnalysisSpec(observers=[events]))
+    result = run_model(spec, showprogress=False)
+    running = result.pipeline.operators[0]
+    assert running.events is events and events.steps == [1, 2, 3]  # the observer is the caller's
+    assert recorded == [] and running.recorded == [1, 2, 3]  # the rest of the operator is copied with it
+
+
+def test_the_model_does_not_change_its_spec_when_its_label_lists_change():
+    nodes = np.empty((30, 3), dtype=object)  # identity-based without volume exclusion: lists of labels
+    for index in np.ndindex(nodes.shape):
+        nodes[index] = [3 * index[0] + index[1] + 1] if index[0] < 10 else []
+    model = build_model(ModelSpec(space=SpaceSpec(geometry="lin", dims=30), time=TimeSpec(steps=5, seed=1),
+                                  state=StateSpec(nodes=nodes, restchannels=1, identity_based=True,
+                                                  volume_exclusion=False, capacity=4),
+                                  dynamics=InteractionPipelineSpec(operators=[{"name": "random_walk"}])))
+    built = model_spec_to_json(model.spec)
+    model.lgca.nodes[model.lgca.nonborder][3, 0].append(99)  # e.g. to place a cell before the run
+    assert 99 in model.lgca.nodes[model.lgca.nonborder][3, 0]  # the lattice's list, which is not model.spec's
+    assert model_spec_to_json(model.spec) == built
 
 
 def test_unknown_operator_reports_modelspec_path():

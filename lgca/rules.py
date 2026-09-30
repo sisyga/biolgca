@@ -184,6 +184,15 @@ class Interaction:
     def _repr_pretty_(self, printer, cycle) -> None:
         printer.text(str(self))
 
+    def __deepcopy__(self, memo) -> Interaction:
+        # a rule is code, like a function: the copies of its operators (one per model) share it
+        return self
+
+    def __reduce__(self):
+        # pickled by reference, like a function (its module is imported when it is loaded), so that operator
+        # objects of the rule can be sent to the worker processes of a sweep
+        return self.__name__
+
 
 class FunctionInteractionOperator(InteractionOperator):
     """Pipeline operator that runs a decorated rule on a :class:`LatticeState`."""
@@ -332,7 +341,7 @@ class StackOperator(InteractionOperator):
 
     def validate(self, context) -> None:
         from .model import _attach_traits
-        from .pipeline import _compile_operator
+        from .pipeline import _compile_operator, _template_memo
 
         state = context.spec.state
         family = ("ib" if state.volume_exclusion else "nove_ib") if state.identity_based else (
@@ -346,9 +355,10 @@ class StackOperator(InteractionOperator):
             _attach_traits(lgca, {name: values[name] for name in self.rule.traits if name not in lgca.props})
         entries = self.rule.operators(LatticeState(lgca, capacity=state.capacity), **self.parameters)
         self.operators = []
+        memo = _template_memo(context)  # operator objects of the stack that refer to each other still do
         for index, entry in enumerate(entries):
             try:
-                operator = _compile_operator(entry)
+                operator = _compile_operator(entry, memo)
                 operator.validate_parameter_contracts(context)
                 operator.validate(context)
             except (KeyError, ValueError) as exc:
@@ -358,6 +368,13 @@ class StackOperator(InteractionOperator):
     def setup(self, context) -> None:
         for operator in self.operators:
             operator.setup(context)
+
+    def attach_field(self, lgca) -> None:
+        """Initialize fields of the stacked operators, including nested stacks."""
+        for operator in self.operators:
+            attach = getattr(operator, "attach_field", None)
+            if attach is not None:
+                attach(lgca)
 
     def apply(self, context, step: int) -> None:
         lgca = context.lgca
@@ -490,8 +507,8 @@ class ReorientationCue:
     """A term of the Boltzmann reorientation defined by a field and a coupling.
 
     Created by :func:`reorientation_term`. Calling it with ``beta``,
-    optionally ``species`` or ``trait`` and the parameters of the function returns a
-    :class:`~lgca.pipeline.ReorientationTermSpec`.
+    optionally ``species``, ``trait`` or ``sensed_species`` and the parameters of the
+    function returns a :class:`~lgca.pipeline.ReorientationTermSpec`.
     """
 
     def __init__(self, function, *, coupling, name=None, aliases=()):
@@ -505,7 +522,7 @@ class ReorientationCue:
         self.aliases = (aliases,) if isinstance(aliases, str) else tuple(aliases)
         self.module = getattr(function, "__module__", None)
         parameters = _parameters(function)
-        reserved = {"beta", "species", "trait"} & set(parameters)
+        reserved = {"beta", "species", "trait", "sensed_species"} & set(parameters)
         if reserved:
             raise TypeError(f"{self.name}: {', '.join(sorted(reserved))} are set on the term, "
                             "not by the function; rename the parameter")
@@ -514,13 +531,15 @@ class ReorientationCue:
                                parameters=parameters, description=_summary(function))
         self.__doc__ = function.__doc__
         self.__name__ = function.__name__
+        self.__module__ = self.module  # where pickle finds the term (see __reduce__)
 
-    def __call__(self, beta: float = 1.0, species: int | None = None, trait: str | None = None, **parameters):
+    def __call__(self, beta: float = 1.0, species: int | None = None, trait: str | None = None,
+                 sensed_species: int | Iterable[int] | None = None, **parameters):
         from .pipeline import ReorientationTermSpec
 
         validate_plugin_parameters(self.info, parameters)
         return ReorientationTermSpec(name=self.name, beta=beta, parameters=dict(parameters), species=species,
-                                     trait=trait)
+                                     trait=trait, sensed_species=sensed_species)
 
     def __repr__(self) -> str:
         return f"<reorientation term {self.name!r} (coupling {self.coupling})>"
@@ -532,6 +551,14 @@ class ReorientationCue:
 
     def _repr_pretty_(self, printer, cycle) -> None:
         printer.text(str(self))
+
+    def __deepcopy__(self, memo) -> ReorientationCue:
+        # the definition of a term, like a rule: the copies of a reorientation operator share it
+        return self
+
+    def __reduce__(self):
+        # pickled by reference, like a rule (see Interaction.__reduce__)
+        return self.__name__
 
 
 def register_single_cue(cue: ReorientationCue, aliases: str | Iterable[str] = ()) -> None:
@@ -581,7 +608,8 @@ def register_single_cue(cue: ReorientationCue, aliases: str | Iterable[str] = ()
         sampler = {key: values.pop(key) for key in ("sweeps", "channels", "species") if key in values}
         term = ReorientationTermSpec(cue.name, beta=beta, parameters=values, trait=trait, sensed_species=sensed)
         operator = BoltzmannReorientationOperator(ReorientationSpec(terms=[term], parameters=sampler))
-        operator.info = replace(operator.info, name=cue.name, description=info.description)
+        # the single-cue contract and parameters, so that a model file saves the operator as it was created
+        operator.info, operator.parameters = info, dict(parameters or {})
         return operator
 
     factory.__module__ = cue.module

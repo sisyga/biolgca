@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import textwrap
 from collections.abc import Mapping
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -23,6 +24,11 @@ __all__ = [
     "ReorientationOperator",
     "ReorientationTerm",
 ]
+
+
+# True while operator objects are copied as templates for a new model (lgca.pipeline._copy_templates); the
+# copies may then leave out what the operator's ``setup`` computes again, such as the matrices of a field
+_COPYING_TEMPLATES: ContextVar[bool] = ContextVar("lgca_copying_templates", default=False)
 
 
 @dataclass(frozen=True)
@@ -185,6 +191,10 @@ class PluginInfo:
 
     def _repr_pretty_(self, printer, cycle) -> None:
         printer.text(str(self))
+
+    def __deepcopy__(self, memo) -> PluginInfo:
+        # a registered description: the copies of an operator (one per model) share it
+        return self
 
 
 class InteractionOperator:

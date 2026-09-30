@@ -197,7 +197,12 @@ def interaction_coverage_table() -> list[dict[str, Any]]:
 
 
 def create_plugin(name: str, parameters: Mapping[str, Any] | None = None) -> InteractionOperator:
-    """Instantiate a plugin operator by name."""
+    """Instantiate a plugin operator by name.
+
+    The operator can be given in ``InteractionPipelineSpec(operators=[...])``,
+    where it is a template: every model built from the spec runs its own copy
+    (``model.pipeline.operators[i]``), and the operator itself never runs.
+    """
 
     factory = default_registry.resolve(name)
     info = default_registry.describe(name)

@@ -47,11 +47,11 @@ class LatticeState:
         ``n_species * K`` with volume exclusion and to the model's
         ``capacity`` without it; :attr:`has_capacity` tells whether the model
         sets one.
-    kind : {None, "birth_death", "phenotype_switch", "reorientation"}
+    kind : {None, "birth_death", "phenotype_switch", "reorientation", "field"}
         Kind of the interaction that uses the state. :meth:`commit` checks its
         conservation law: a reorientation keeps the number of cells of each
         species at every node, a phenotype switch the number of cells at every
-        node.
+        node, and a field every cell in its channel.
 
     Notes
     -----
@@ -119,6 +119,9 @@ class LatticeState:
         self._initial_cells = (None if self._cells is None or kind not in ("reorientation", "phenotype_switch")
                                else (self._cells.index.copy(), self._cells.label.copy()))
         self._initial_counts = self._counts.copy() if kind == "field" else None
+        cells = self._cells  # a field keeps every cell in its channel: the whole table is compared
+        self._initial_table = (None if cells is None or kind != "field"
+                               else (cells.label.copy(), cells.index.copy(), cells.channel.copy()))
 
     def __repr__(self) -> str:
         exclusion = "with" if self._ve else "without"
@@ -164,7 +167,8 @@ class LatticeState:
             raise ValueError("counts must be non-negative integers")
         if self._ve and np.any(value > 1):
             raise ValueError("with volume exclusion a channel holds at most one cell of each species")
-        self._counts = value.astype(self._dtype, copy=False)
+        _check_representable(value)
+        self._counts = value.astype(self._dtype, copy=True)
 
     @property
     def density(self) -> np.ndarray:
@@ -295,6 +299,12 @@ class LatticeState:
             raise KeyError(f"state.fields.{name} does not exist; declare the field in StateSpec.fields")
         self.fields_read.add(name)
         values = np.asarray(getattr(self._lgca, name))
+        if name in self._fields_written:
+            new = self._fields_written[name]
+            if values.shape[:len(self._dims)] != self._dims:
+                width = [(int(self._lgca.r_int),) * 2] * len(self._dims) + [(0, 0)] * (new.ndim - len(self._dims))
+                new = np.pad(new, width, mode="edge")
+            values = new
         padded = np.shape(self._lgca.cell_density)[:len(self._dims)]
         if values.shape[:len(self._dims)] == padded:
             return values
@@ -418,6 +428,7 @@ class LatticeState:
             if self._ve:
                 raise ValueError("channels='same' needs a model without volume exclusion: "
                                  "with it, the mother's channel is occupied")
+            _check_room(self.density, daughters.sum(axis=(-2, -1)))
             self._counts += daughters
             return daughters.sum(axis=-1)
         return self.add_cells(daughters.sum(axis=-1), channels=channels)
@@ -442,6 +453,7 @@ class LatticeState:
         wanted = self._number(n, "n")
         allowed = self._channel_sets(channels)
         if not self._ve:
+            _check_room(self.density, wanted.sum(axis=-1))
             added = self._spread(wanted, allowed)
             self._counts += added
             return wanted
@@ -498,7 +510,7 @@ class LatticeState:
         """
         allowed = self._channel_sets(channels)
         selected = np.zeros(self.n_species, dtype=bool)
-        selected[slice(None) if species is None else np.atleast_1d(species)] = True
+        selected[slice(None) if species is None else _species_indices(species, self.n_species)] = True
         mask = selected[:, None] & allowed
         number = (self._counts * mask) @ np.ones(self.K, dtype=np.int64)
         cleared = self._counts * ~mask
@@ -540,6 +552,9 @@ class LatticeState:
         if self._initial_cells is not None and not _same_cells(self._initial_cells, self._cells):
             raise ValueError(f"a {self._kind} must keep the cells of every node; cells were removed "
                              "or added")
+        if self._initial_table is not None and not _same_table(self._initial_table, self._cells):
+            raise ValueError("a field must keep its cells (it changes fields only): every cell stays in its "
+                             "channel, and none is added or removed")
         lgca = self._lgca
         if self._ghost_cells is not None:
             cells, (ghost_labels, ghost_slots) = self._cells, self._ghost_cells
@@ -638,10 +653,12 @@ class LatticeState:
         if values.dtype == bool or not np.issubdtype(values.dtype, np.number):
             raise ValueError(f"{name} must contain non-negative integers")
         values = self._broadcastable(values, name, per_channel=False)
-        if np.any(values < 0) or np.any(values != np.round(values)):
+        if not np.all(np.isfinite(values)) or np.any(values < 0) or np.any(values != np.round(values)):
             raise ValueError(f"{name} must contain non-negative integers")
         shape = self._dims + (self.n_species, 1)
-        return np.broadcast_to(values, shape)[..., 0].astype(np.int64)
+        values = np.broadcast_to(values, shape)
+        _check_representable(values)
+        return values[..., 0].astype(np.int64)
 
     def _broadcastable(self, value, name, per_channel):
         """Reshape a scalar or per-node, per-species or per-channel array to broadcast
@@ -668,17 +685,23 @@ class LatticeState:
     def _channel_sets(self, channels):
         """Allowed channels per species, shape ``(n_species, K)``."""
         if isinstance(channels, dict):
-            unknown = [species for species in channels if not 0 <= int(species) < self.n_species]
-            if unknown:
-                raise ValueError(f"channels names species {unknown}, but the model has {self.n_species}")
-            return np.stack([self._channel_mask(channels.get(species, "all"))
+            normalized = {}
+            for species, selection in channels.items():
+                if isinstance(species, str) and species.isdecimal():
+                    species = int(species)  # object keys of a model file are strings
+                index = int(_species_indices(species, self.n_species)[0])
+                if np.ndim(species) != 0 or index in normalized:
+                    raise ValueError("channels must name each species by one distinct integer index")
+                normalized[index] = selection
+            return np.stack([self._channel_mask(normalized.get(species, "all"))
                              for species in range(self.n_species)])
         return np.broadcast_to(self._channel_mask(channels), (self.n_species, self.K))
 
     def _spread(self, number, allowed):
         """Distribute ``number`` cells per node and species uniformly over allowed channels."""
         number = np.asarray(number, dtype=np.int64)
-        if number.sum() > 20 * number.size:  # many cells: one multinomial draw per node and species
+        # many cells: one multinomial draw per node and species (a float sum cannot overflow)
+        if number.sum(dtype=np.float64) > 20 * number.size:
             weights = allowed / allowed.sum(axis=-1, keepdims=True)
             return self.rng.multinomial(number, weights)
         # every cell picks a channel of its species' set, and the picks are counted
@@ -867,11 +890,27 @@ def _species_indices(species, n_species):
 def _check_representable(counts):
     """Refuse cell numbers whose sum over a node does not fit the signed int64 of the rules."""
     counts = np.asarray(counts)
-    if counts.size == 0 or counts.dtype.kind != "u" or int(counts.max()) < _INT64_LIMIT // counts.shape[-1]:
+    slots = counts.shape[-2] * counts.shape[-1]
+    if counts.size == 0 or counts.max() < _INT64_LIMIT // slots:
         return
-    totals = counts.reshape(-1, counts.shape[-2] * counts.shape[-1]).astype(object).sum(axis=-1)
+    totals = counts.reshape(-1, slots).astype(object)
+    if counts.dtype.kind == "f":  # exact integers: Python floats would round the sum
+        if not np.all(np.isfinite(counts)):
+            raise ValueError("cell numbers must be finite")
+        totals = np.frompyfunc(int, 1, 1)(totals)
+    totals = totals.sum(axis=-1)
     if max(totals) >= _INT64_LIMIT:
         raise ValueError(f"a node holds {max(totals)} cells, but the samplers count the cells of a node "
+                         f"as signed int64 (below {_INT64_LIMIT})")
+
+
+def _check_room(density, added):
+    """Refuse to add cells to a node beyond the signed int64 that counts its cells."""
+    over = added > np.iinfo(np.int64).max - density
+    if np.any(over):
+        first = np.argwhere(over)[0]
+        total = int(density[tuple(first)]) + int(added[tuple(first)])
+        raise ValueError(f"a node would hold {total} cells, but the samplers count the cells of a node "
                          f"as signed int64 (below {_INT64_LIMIT})")
 
 
@@ -953,6 +992,11 @@ def _same_cells(initial, cells):
         return False
     order = np.lexsort((label, index))
     return all(np.array_equal(a, b) for a, b in zip((index[order], label[order]), _cells_per_node(cells)))
+
+
+def _same_table(initial, cells):
+    """Whether every cell keeps its label, node and channel (``initial``: labels, node indices, channels)."""
+    return all(np.array_equal(a, b) for a, b in zip(initial, (cells.label, cells.index, cells.channel)))
 
 
 def place_labels(labels, counts, channels, rng):

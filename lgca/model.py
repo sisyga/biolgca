@@ -9,7 +9,7 @@ import difflib
 import json
 from ._warnings import warn_user
 from copy import deepcopy
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields as dataclass_fields, is_dataclass, replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -194,11 +194,11 @@ class TimeSpec:
         Number of time steps to simulate. Each step applies the interactions
         and then moves the cells (propagation).
     seed : int, optional
-        Seed of the random number generator. The same seed and model give
-        the same trajectory. Without a seed, every run draws a new one and
-        records it in ``result.spec.time.seed`` and ``result.metadata["seed"]``
-        (and in ``model.resolved.json`` for command-line runs), so any run
-        can be repeated.
+        Seed of the random number generator, a non-negative integer. The
+        same seed and model give the same trajectory. Without a seed, every
+        run draws a new one and records it in ``result.spec.time.seed`` and
+        ``result.metadata["seed"]`` (and in ``model.resolved.json`` for
+        command-line runs), so any run can be repeated.
     timing_trace : int, default=0
         Number of per-operator timing records to keep in the run metadata,
         for profiling.
@@ -232,6 +232,11 @@ class ModelSpec:
 
     A model specification holds data only. Run it with :func:`run_model`, save
     it with :func:`save_model_spec` and load it with :func:`load_model_spec`.
+    A model built from a spec keeps its own copy of it: changing the spec
+    afterwards, or building further models from it, does not change a model
+    already built. Operator objects in ``dynamics`` are templates, of which
+    every model runs its own copy (``model.pipeline.operators[i]``);
+    observers are shared (they record the run for the caller).
 
     Attributes
     ----------
@@ -288,24 +293,24 @@ def model_spec_to_dict(spec: ModelSpec) -> dict[str, Any]:
             "state": {
                 "density": _to_jsonable(spec.state.density),
                 "nodes": _to_jsonable(spec.state.nodes),
-                "restchannels": spec.state.restchannels,
-                "volume_exclusion": spec.state.volume_exclusion,
-                "identity_based": spec.state.identity_based,
-                "n_species": spec.state.n_species,
-                "capacity": spec.state.capacity,
+                "restchannels": _to_jsonable(spec.state.restchannels),
+                "volume_exclusion": _to_jsonable(spec.state.volume_exclusion),
+                "identity_based": _to_jsonable(spec.state.identity_based),
+                "n_species": _to_jsonable(spec.state.n_species),
+                "capacity": _to_jsonable(spec.state.capacity),
                 "initializer": _to_jsonable(spec.state.initializer),
                 "parameters": _to_jsonable(dict(spec.state.parameters)),
                 "fields": _to_jsonable(dict(spec.state.fields)),
                 "traits": _to_jsonable(dict(spec.state.traits)),
             },
             "time": {
-                "steps": spec.time.steps,
-                "seed": spec.time.seed,
-                "timing_trace": spec.time.timing_trace,
+                "steps": _to_jsonable(spec.time.steps),
+                "seed": _to_jsonable(spec.time.seed),
+                "timing_trace": _to_jsonable(spec.time.timing_trace),
             },
             "dynamics": {
                 "operators": [_operator_to_dict(operator) for operator in spec.dynamics.operators],
-                "propagation": spec.dynamics.propagation,
+                "propagation": _to_jsonable(spec.dynamics.propagation),
             },
             "analysis": None if spec.analysis is None else {
                 "observers": [_observer_to_dict(observer) for observer in spec.analysis.observers],
@@ -579,10 +584,11 @@ def _validate_serialized_model(data: Mapping[str, Any]) -> None:
         value = state.get(key)
         if value is not None and (isinstance(value, bool) or int(value) != value):
             raise TypeError(f"model.state.{key} must be an integer")
-    for key in ("steps", "seed", "timing_trace"):
+    for key in ("steps", "timing_trace"):
         value = time_spec.get(key)
         if value is not None and (isinstance(value, bool) or int(value) != value):
             raise TypeError(f"model.time.{key} must be an integer")
+    _validate_seed(time_spec.get("seed"))
     for key in ("operators",):
         value = dynamics.get(key, ())
         if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
@@ -617,7 +623,7 @@ def _validate_serialized_operator(operator, index: int) -> None:
             term_path = f"{path}.terms[{term_index}]"
             term = _mapping_at(term, term_path)
             _reject_unknown_keys(
-                term, {"name", "beta", "parameters", "species", "trait"}, term_path
+                term, {"name", "beta", "parameters", "species", "trait", "sensed_species"}, term_path
             )
             if not isinstance(term.get("name"), str):
                 raise TypeError(f"{term_path}.name must be a string")
@@ -851,6 +857,11 @@ def _operator_to_dict(operator) -> dict[str, Any]:
                 f"'name' and 'parameters', got {sorted(unexpected)}."
             )
         return _registered_operator_to_dict(operator["name"], operator.get("parameters", {}))
+    if isinstance(operator, ReorientationTermSpec):  # saved by name, it would lose beta, species and trait
+        raise TypeError(
+            f"ModelSpec is not portable: the reorientation term {operator.name!r} is given as an operator; "
+            "put it in ReorientationSpec(terms=[...]), or give one cue by name and parameters."
+        )
     name = getattr(operator, "name", None)
     parameters = getattr(operator, "parameters", {})
     if name is not None:
@@ -893,10 +904,11 @@ def _operator_from_dict(data: Mapping[str, Any]):
 def _reorientation_term_to_dict(term: ReorientationTermSpec) -> dict[str, Any]:
     return {
         "name": term.name,
-        "beta": term.beta,
+        "beta": _to_jsonable(term.beta),
         "parameters": _to_jsonable(dict(term.parameters)),
-        "species": term.species,
-        "trait": term.trait,
+        "species": _to_jsonable(term.species),
+        "trait": _to_jsonable(term.trait),
+        "sensed_species": np.asarray(term.sensed_species).tolist(),
     }
 
 
@@ -907,6 +919,7 @@ def _reorientation_term_from_dict(data: Mapping[str, Any]) -> ReorientationTermS
         parameters=_from_jsonable(data.get("parameters", {})),
         species=data.get("species"),
         trait=data.get("trait"),
+        sensed_species=_from_jsonable(data.get("sensed_species")),
     )
 
 
@@ -1131,7 +1144,12 @@ class ModelContext:
 
 @dataclass
 class CompiledModel:
-    """Built LGCA model plus compiled interaction pipeline."""
+    """Built LGCA model plus compiled interaction pipeline.
+
+    ``spec`` is the model's own copy of the specification it was built from
+    (see :func:`build_model`), and ``pipeline.operators`` are the operators
+    that run, also the model's own copies of operator objects in the spec.
+    """
 
     lgca: Any
     spec: ModelSpec
@@ -1160,7 +1178,15 @@ class ModelRunResult:
     lgca : LGCA object
         The model in its final state.
     spec : ModelSpec
-        The specification that ran, with the seed that was used.
+        The specification that ran, with the seed that was used: the model's
+        own copy (see :func:`build_model`), whose operator objects are
+        templates that did not run.
+    context : ModelContext
+        The lattice, specification, fields and metadata the operators saw.
+    pipeline : CompiledPipeline
+        The operators that ran, ``pipeline.operators[i]``: for an operator
+        object in the spec, the model's own copy, which holds what the
+        operator stored while it ran.
     data : RunData
         The recorded data by name, e.g. ``result.data["density"]``, with
         ``result.data.steps("density")`` (see :class:`~lgca.simulation.RunData`).
@@ -1184,12 +1210,35 @@ def build_model(
 ) -> CompiledModel:
     """Build an LGCA instance and compile its interaction pipeline.
 
+    The model is built from its own copy of ``spec``, which it keeps as
+    ``model.spec``: later changes to the dicts, lists and arrays of ``spec``
+    (operator parameters, initial nodes, traits, the operator list) reach
+    neither the model nor ``model.spec``, and the model does not change
+    ``model.spec`` as it runs. This copy stays in memory as long as the model:
+    initial nodes, traits and fields given as arrays are held twice, by
+    ``model.spec`` and by the lattice.
+
+    Operator objects in ``spec.dynamics.operators`` are templates: the model
+    runs its own copy of each, ``model.pipeline.operators[i]``, so several
+    models built from one spec do not affect each other. Everything an operator
+    object holds is copied with it, e.g. a list it records into or the object
+    of a bound method; operator objects that refer to each other refer to each
+    other's copies. Not copied are the observers in ``spec.analysis``, which
+    record the run for the caller (an operator may refer to them), and rules
+    and functions.
+
     Without ``spec.time.seed``, a seed is drawn from the operating system's
     entropy and stored in the returned model's ``spec`` and ``metadata``, so the
     run can be repeated.
     """
 
-    spec = _normalize_and_validate_spec(spec)
+    return _build_owned_model(_owned_spec(_normalize_and_validate_spec(spec)), resource_base=resource_base,
+                              trusted_paths=trusted_paths)
+
+
+def _build_owned_model(spec: ModelSpec, *, resource_base=None, trusted_paths=False) -> CompiledModel:
+    """:func:`build_model` from a normalized spec that the model may keep as it is, e.g. one that
+    :func:`_owned_spec` made (the Explorer's own spec): it is not copied again."""
     seed_drawn = spec.time.seed is None
     if seed_drawn:
         spec = replace(spec, time=replace(spec.time, seed=_draw_seed()))
@@ -1261,7 +1310,11 @@ def run_model(
     resource_base: str | Path | None = None,
     trusted_paths: bool = False,
 ) -> ModelRunResult:
-    """Build and run a declarative LGCA model."""
+    """Build and run a declarative LGCA model.
+
+    The model runs its own copy of ``spec`` (see :func:`build_model`); the
+    result's ``spec`` and ``pipeline`` are that copy and the operators that ran.
+    """
 
     compiled = build_model(
         spec, resource_base=resource_base, trusted_paths=trusted_paths
@@ -1274,10 +1327,7 @@ def _validate_spec(spec: ModelSpec) -> None:
         raise ValueError("model.time.steps must be a non-negative integer")
     if spec.time.steps < 0:
         raise ValueError("model.time.steps must be a non-negative integer")
-    if spec.time.seed is not None and (
-        isinstance(spec.time.seed, bool) or int(spec.time.seed) != spec.time.seed
-    ):
-        raise ValueError("model.time.seed must be an integer or null")
+    _validate_seed(spec.time.seed)
     _validate_non_negative_integer("model.time.timing_trace", spec.time.timing_trace)
     initial_states = [
         spec.state.nodes is not None,
@@ -1386,6 +1436,93 @@ def _normalize_and_validate_spec(spec: ModelSpec) -> ModelSpec:
     return normalized
 
 
+def _owned_spec(spec: ModelSpec) -> ModelSpec:
+    """A copy of ``spec`` that belongs to the model built from it.
+
+    Later changes the caller makes to the dicts, lists and arrays of ``spec`` reach neither the model
+    nor ``model.spec``. Operator objects are copied as templates (the pipeline copies them again for
+    the model to run); observers stay the caller's objects, which record the run for the caller. The
+    spec is copied as a whole, so objects it holds twice (e.g. an operator object that refers to another
+    one of the list) are one object in the copy too.
+    """
+    from .pipeline import _copy_templates
+
+    shared = _shared_objects(spec)
+    memo = dict(shared)
+    nodes = spec.state.nodes
+    if isinstance(nodes, np.ndarray) and nodes.dtype == object:  # lists of labels
+        copied = _copied_object_array(nodes)
+        if copied is not None:
+            memo[id(nodes)] = copied
+    try:
+        return _copy_templates(spec, memo)
+    except Exception as exc:  # noqa: BLE001 - any failure of the copy, e.g. a lock or a generator: named
+        raise _copy_error(spec, "model", shared, exc) from None
+
+
+def _shared_objects(spec: ModelSpec) -> dict[int, Any]:
+    """The objects of ``spec`` that its copies share (a ``deepcopy`` memo): the observers."""
+    observers = () if spec.analysis is None else spec.analysis.observers
+    return {id(observer): observer for observer in observers}
+
+
+_COPY_LISTS = np.frompyfunc(list.copy, 1, 1)
+
+
+def _copied_object_array(values: np.ndarray):
+    """A copy of an object array of lists of labels with lists of its own, 3 times faster than pickling and
+    unpickling it; None if the array holds anything but lists (``deepcopy`` then copies it).
+
+    The labels are numbers, which need no copy: an identity-based lattice takes only lists of integers.
+    """
+    copied = np.empty(values.shape, dtype=object)
+    try:
+        _COPY_LISTS(values, out=copied)
+    except TypeError:  # "descriptor 'copy' for 'list' objects doesn't apply to a 'tuple' object"
+        return None
+    return copied
+
+
+def _copy_error(value, path: str, memo, exc: BaseException) -> ValueError:
+    """The error for ``value`` that cannot be copied; it names the innermost part that cannot, e.g.
+    ``model.state.parameters.lock``, or the operator object."""
+    from .operator_base import InteractionOperator
+    from .pipeline import _copy_failure, _template_copy
+
+    where, part = _uncopyable_part(value, path, memo)
+    if isinstance(part, InteractionOperator):
+        try:
+            _template_copy(part, dict(memo))
+        except ValueError as error:
+            return ValueError(f"{where} {error}")
+    return ValueError(f"{where} cannot be copied ({_copy_failure(exc)}); every model keeps its own copy of its "
+                      "specification. Give numbers, strings, lists, dicts and arrays, or objects that can be "
+                      "copied")
+
+
+def _uncopyable_part(value, path: str, memo) -> tuple[str, Any]:
+    """The path and the innermost part of ``value`` that cannot be copied, e.g. ``model.state.parameters.lock``;
+    an operator object counts as one part."""
+    from .operator_base import InteractionOperator
+
+    if isinstance(value, InteractionOperator):
+        return path, value
+    if is_dataclass(value) and not isinstance(value, type):
+        parts = [(f"{path}.{item.name}", getattr(value, item.name)) for item in dataclass_fields(value)]
+    elif isinstance(value, Mapping):
+        parts = [(f"{path}.{key}", item) for key, item in value.items()]
+    elif isinstance(value, (list, tuple)):
+        parts = [(f"{path}[{index}]", item) for index, item in enumerate(value)]
+    else:
+        return path, value
+    for part_path, part in parts:
+        try:
+            deepcopy(part, dict(memo))
+        except Exception:  # noqa: BLE001 - any failure of the copy
+            return _uncopyable_part(part, part_path, memo)
+    return path, value
+
+
 def _validate_dims(dims) -> None:
     if dims is None:
         return
@@ -1404,6 +1541,12 @@ def _validate_positive_integer(path, value) -> None:
 def _validate_non_negative_integer(path, value) -> None:
     if isinstance(value, bool) or int(value) != value or value < 0:
         raise ValueError(f"{path} must be a non-negative integer")
+
+
+def _validate_seed(seed) -> None:
+    # NumPy takes only integers as seeds: 2.0 is rejected here, not when the run starts
+    if seed is not None and (isinstance(seed, bool) or not isinstance(seed, (int, np.integer)) or seed < 0):
+        raise ValueError(f"model.time.seed must be a non-negative integer or null, got {seed!r}")
 
 
 def _validate_field_names(lgca, fields: Mapping[str, Any]) -> None:
@@ -1428,9 +1571,13 @@ def _build_lgca(spec: ModelSpec):
         kwargs["seed"] = spec.time.seed
     if spec.state.nodes is not None:
         try:
-            kwargs["nodes"] = np.asarray(spec.state.nodes)
+            nodes = np.asarray(spec.state.nodes)
         except (TypeError, ValueError) as exc:
             raise ValueError("model.state.nodes must be a rectangular state array") from exc
+        if nodes.dtype == object:  # lists of labels: the lattice's own, so that editing them leaves model.spec
+            copied = _copied_object_array(nodes)
+            nodes = nodes if copied is None else copied
+        kwargs["nodes"] = nodes
     elif spec.state.density is not None:
         kwargs["density"] = spec.state.density
     elif spec.state.initializer is not None:
@@ -1523,7 +1670,7 @@ def _attach_traits(lgca, traits: Mapping[str, Any]) -> dict[str, Any]:
 
 def _attach_fields(lgca, fields: Mapping[str, Any]) -> None:
     for name, value in fields.items():
-        array = np.asarray(value)
+        array = np.array(value)  # a copy, also in the padded shape: the caller's later writes do not reach it
         if array.ndim == 0:  # a number: the same value at every node
             array = np.full(tuple(lgca.dims), float(array))
         spatial_ndim = len(lgca.dims)

@@ -249,6 +249,11 @@ def scan(n0s, gammas, seeds=range(10), n_jobs: int = 1, **options):
     """
     import pandas as pd
 
+    n0s, gammas, seeds = list(n0s), list(gammas), list(seeds)
+    bad = [seed for seed in seeds
+           if isinstance(seed, bool) or not isinstance(seed, (int, np.integer)) or seed < 0]
+    if bad:  # int() would run 1.9 and True as seed 1
+        raise ValueError(f"seeds must be non-negative integers, got {bad[0]!r}")
     tasks = [(float(n0), float(gamma), int(seed), options) for n0 in n0s for gamma in gammas for seed in seeds]
     if n_jobs == 1:
         results = [_scan_one(task) for task in tasks]

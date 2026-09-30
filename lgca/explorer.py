@@ -62,7 +62,7 @@ def explore(spec, controls: Mapping[str, Any] | None = None, *, view: str = "den
         Parameters of the dynamics change the running model; other values build it again.
     view : str, default="density"
         What the lattice panel shows first: ``"density"``, ``"density: species i"`` (several
-        species), ``"flux"``, the name of a field, or, in identity-based models, ``"mean <trait>"``,
+        species), ``"flux"``, the name of a scalar field, or, in identity-based models, ``"mean <trait>"``,
         the mean trait of the cells at each node. A dropdown changes it. 1D lattices show the last
         ``window`` steps as a kymograph, time running down.
 
@@ -71,7 +71,7 @@ def explore(spec, controls: Mapping[str, Any] | None = None, *, view: str = "den
         as arrows. A slider turns the lattice.
     measure : str, list of str, mapping or None, default="population"
         Quantities plotted over time beside the lattice, evaluated after every step:
-        ``"population"``, the name of a field (its mean), a trait of an identity-based model (its
+        ``"population"``, the name of a scalar field (its mean), a trait of an identity-based model (its
         mean over the cells), or a mapping of labels to functions of the LGCA object that return a
         number. ``None`` shows the lattice only.
     steps_per_frame : int, default=1
@@ -126,7 +126,10 @@ class Explorer:
     Attributes
     ----------
     spec : ModelSpec
-        The model with the current values of the controls.
+        The model with the current values of the controls: the explorer's own
+        copy of the spec it was given, which later changes of that spec do not
+        reach. Its operator objects are templates; the operators that run are
+        ``explorer.model.pipeline.operators``.
     model : CompiledModel
         The running model; ``explorer.model.lgca`` is its LGCA object.
     step : int
@@ -159,12 +162,15 @@ class Explorer:
         self._thread = None
         self._quiet = False  # set while the explorer itself moves a widget
 
-        from .study import _column_names
+        from .study import _column_names, _overlap
 
         self._controls = [_control(spec, name, value) for name, value in (controls or {}).items()]
         paths = [control.path for control in self._controls]
-        if len(set(paths)) < len(paths):
-            raise ValueError(f"several controls set the same place of the model: {paths}")
+        overlap = _overlap(spec, paths)
+        if overlap is not None:
+            first, second = (self._controls[index].name for index in overlap)
+            raise ValueError(f"the controls {first!r} and {second!r} set the same place of the model, or one "
+                             "sets a part of the other; give each place one control")
         labels = _column_names(paths)
         for control in self._controls:
             control.widget.description = labels[control.path]  # e.g. "chemotaxis.beta"
@@ -174,9 +180,10 @@ class Explorer:
             if isinstance(start, Real) and not isinstance(start, bool) and start != control.widget.value:
                 warn_user(f"{control.name} = {start!r} lies outside its control; the explorer starts at "
                           f"{control.widget.value!r}")
+        from .model import _owned_spec
         from .study import vary
 
-        self.spec = vary(spec, values)
+        self.spec = _owned_spec(vary(spec, values))  # the caller's later changes do not reach it
 
         self._play = widgets.ToggleButton(value=False, description="Play", icon="play", tooltip="Run the model")
         self._next = widgets.Button(description="Step", icon="step-forward", tooltip="One frame")
@@ -286,9 +293,6 @@ class Explorer:
         self.pause()
         if self._thread is not None:
             self._thread.join()
-        import matplotlib.pyplot as plt
-
-        plt.close(self._figure)
         self.widget.close()
 
     def _ipython_display_(self):
@@ -303,9 +307,7 @@ class Explorer:
     # ---------------------------------------------------------------- model
 
     def _build(self, model=None):
-        from .model import build_model
-
-        self.model = model if model is not None else build_model(self.spec)
+        self.model = model if model is not None else _build_model(self.spec)
         self.step = 0
         self._series = {label: [] for label in self._measures}
         self._scales = {}
@@ -323,13 +325,13 @@ class Explorer:
             self._set_view(current)
 
     def _apply(self, control, value):
-        from .model import _normalize_and_validate_spec, build_model
+        from .model import _normalize_and_validate_spec
         from .study import vary
 
-        spec = vary(self.spec, {control.path: value})
+        spec = vary(self.spec, {control.path: value})  # the explorer's own: the parts not changed are shared
         with self._lock:
             if not control.live:
-                model = build_model(spec)
+                model = _build_model(spec)
                 _trial(model, model.spec)
                 self.spec = spec
                 self._build(model)
@@ -338,10 +340,12 @@ class Explorer:
             compiled = self.model
             spec = _normalize_and_validate_spec(spec)
             running = replace(spec, time=replace(spec.time, seed=compiled.spec.time.seed))
+            # the trial and the new pipeline run copies of operator objects: a rejected change leaves the
+            # running model as it was
             _trial(compiled, running)
-            context = compiled.context
-            context.spec = running
-            compiled.pipeline, compiled.spec, self.spec = _compile(context), running, spec
+            context = replace(compiled.context, spec=running)  # earlier results keep their context
+            pipeline = _compile(context)
+            compiled.context, compiled.pipeline, compiled.spec, self.spec = context, pipeline, running, spec
             compiled.lgca.enable_propagation = spec.dynamics.propagation not in (False, None, "none", "disabled")
             self._changes.append(self.step)
             self._update()
@@ -416,14 +420,9 @@ class Explorer:
     # ---------------------------------------------------------------- drawing
 
     def _set_view(self, view, draw=False):
-        import matplotlib.pyplot as plt
-
         with self._lock:
-            if hasattr(self, "_figure"):
-                plt.close(self._figure)
             lgca = self.model.lgca
-            self._figure = figure = plt.figure(figsize=self.figsize or _figsize(lgca, bool(self._measures)))
-            plt.close(figure)  # drawn into the widget, not shown by the notebook
+            self._figure = figure = _figure(self.figsize or _figsize(lgca, bool(self._measures)))
             grid = figure.add_gridspec(1, 2 if self._measures else 1, width_ratios=[1.3, 1][:1 + bool(self._measures)],
                                        wspace=0.45)
             if len(lgca.dims) < 3:
@@ -442,6 +441,7 @@ class Explorer:
                     self._series_axes.legend(loc="upper left", frameon=False)
                 else:
                     self._series_axes.set_ylabel(next(iter(self._measures)))
+            _release(figure)
             self._update()
         if draw:
             self._draw()
@@ -792,6 +792,14 @@ def _control(spec, name, control):
     return _Control(name=name, path=path, widget=widget, live=live)
 
 
+def _build_model(spec):
+    """The model of the explorer's own ``spec`` (a copy of the caller's), which the model keeps as it is: a
+    second copy of large initial states would only take memory."""
+    from .model import _build_owned_model, _normalize_and_validate_spec
+
+    return _build_owned_model(_normalize_and_validate_spec(spec))
+
+
 def _compile(context):
     """The pipeline of ``context.spec`` for the running lattice; a steady field is solved again."""
     from .pipeline import compile_pipeline
@@ -814,7 +822,8 @@ def _trial(compiled, spec):
     try:  # the copy leaves out the running model, whose solvers may not be copied
         lattice = deepcopy(compiled.lgca, {id(compiled): None})
         metadata = deepcopy(compiled.metadata)
-    except TypeError:
+    except TypeError as exc:
+        warn_user(f"the change could not be tried on a copy of the model ({exc}); it is applied unchecked")
         return
     context = ModelContext(lgca=lattice, spec=spec, fields=dict(compiled.context.fields), metadata=metadata)
     _compile(context).execute_step(context, compiled._step + 1)
@@ -844,7 +853,7 @@ def _measures(measure, spec) -> dict[str, Callable]:
         if name == "population":
             functions[name] = _total_population
         elif name in fields:
-            functions[f"mean {name}"] = lambda lgca, name=name: float(np.mean(_field(lgca, name)))
+            functions[f"mean {name}"] = lambda lgca, name=name: _field_mean(lgca, name)
         elif spec.state.identity_based:  # a trait; an unknown one fails when the model is built
             functions[f"mean {name}"] = lambda lgca, name=name: _cells_mean(lgca, name)
         else:
@@ -852,6 +861,14 @@ def _measures(measure, spec) -> dict[str, Callable]:
                              f"({', '.join(map(repr, fields)) or 'the model has none'}), a trait of an "
                              "identity-based model, or a mapping of labels to functions of the LGCA object")
     return functions
+
+
+def _field_mean(lgca, name):
+    """Mean of a scalar field; a vector field fails at the first measurement, when the model is built."""
+    if np.ndim(getattr(lgca, name)) != len(lgca.dims):
+        raise ValueError(f"measure {name!r} is a vector field, which has no one mean; measure a scalar field "
+                         "or give a function, e.g. {'mean speed': lambda lgca: ...}")
+    return float(np.mean(_field(lgca, name)))
 
 
 def _cells_mean(lgca, name):
@@ -871,7 +888,8 @@ def _views(lgca, spec):
     if n_species > 1:
         views += [f"density: species {index}" for index in range(n_species)]
     views.append("flux")
-    views += list(spec.state.fields or {})
+    views += [name for name in (spec.state.fields or {})
+              if np.ndim(getattr(lgca, name)) == len(lgca.dims)]
     if spec.state.identity_based:  # e.g. "mean kappa": the mean trait of the cells at each node
         from .lattice_state import LatticeState
 
@@ -983,6 +1001,28 @@ def _plane_lattice(shape):
     from .lgca_square import LGCA_Square
 
     return LGCA_Square(dims=shape, density=0, restchannels=0)
+
+
+def _figure(figsize):
+    """A figure that is drawn into the widget, not shown by the notebook or in a window.
+
+    The plots of 2D lattices make their axes current in pyplot. For a figure without a manager this fails
+    (matplotlib < 3.11) or opens a window of the backend, e.g. of TkAgg, perhaps in the thread that plays the
+    model. This manager has no window; :func:`_release` takes the figure out of pyplot again.
+    """
+    from matplotlib.backend_bases import FigureManagerBase
+    from matplotlib.figure import Figure
+
+    figure = Figure(figsize=figsize)
+    FigureManagerBase(figure.canvas, -id(figure))  # a number that no figure of pyplot has
+    return figure
+
+
+def _release(figure):
+    """Take ``figure`` out of pyplot, which the plots of 2D lattices put it in (they make their axes current)."""
+    import matplotlib.pyplot as plt
+
+    plt.close(figure)
 
 
 def _figsize(lgca, series):
