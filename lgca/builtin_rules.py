@@ -37,7 +37,13 @@ from collections.abc import Mapping
 import numpy as np
 
 from .base import channel_sum
-from .lattice_state import _species_indices, channel_mask, random_occupancy
+from .lattice_state import (
+    _species_indices,
+    channel_mask,
+    occupied_binomial,
+    occupied_multinomial,
+    random_occupancy,
+)
 from .mutations import apply_mutations, parse_mutation
 from .rules import interaction, register_single_cue, reorientation_term
 from .switching import Probability, choice_probabilities, parse_probability
@@ -357,10 +363,11 @@ def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_m
         births = (occupied & (draw < b)).view(np.uint8) @ np.ones(state.K, dtype=np.int64)
     else:
         deaths = (_by_species(rng, nodes, death, axis=-2) if death.ndim == 1
-                  else rng.binomial(nodes, death[..., None]))
-        births = _by_species(rng, counts, birth, axis=-1) if birth.ndim == 1 else rng.binomial(counts, birth)
+                  else occupied_binomial(rng, nodes, death[..., None]))
+        births = (_by_species(rng, counts, birth, axis=-1) if birth.ndim == 1
+                  else occupied_binomial(rng, counts, birth))
     if matrix is not None:
-        births = rng.multinomial(births, matrix).sum(axis=-2)
+        births = occupied_multinomial(rng, births, matrix).sum(axis=-2)
     if crowding and state.volume_exclusion:  # daughters go to distinct random channels; the empty ones hold them
         size = int(in_set.sum())
         targets = random_occupancy(rng, np.minimum(births, size), size)
@@ -770,8 +777,8 @@ def go_or_rest(state, probability=None, kappa=None, theta=None, when_full="legac
         new_moving = moving - _pick(rng, moving == 1, to_rest) + _pick(rng, moving == 0, to_move)
         new_resting = resting - _pick(rng, resting == 1, to_move) + _pick(rng, resting == 0, to_rest)
     else:
-        leaving_moving = rng.binomial(moving, rest[..., None])
-        leaving_resting = rng.binomial(resting, (1 - rest)[..., None])
+        leaving_moving = occupied_binomial(rng, moving, rest[..., None])
+        leaving_resting = occupied_binomial(rng, resting, (1 - rest)[..., None])
         new_moving = moving - leaving_moving + _spread(rng, leaving_resting.sum(-1), velocity)
         new_resting = resting - leaving_resting + _spread(rng, leaving_moving.sum(-1), state.restchannels)
     new = np.concatenate((new_moving, new_resting), axis=-1)
@@ -998,7 +1005,7 @@ def _check_mode(when_full):
 
 def _spread(rng, number, channels):
     """Spread ``number`` cells per node uniformly over ``channels`` channels."""
-    return rng.multinomial(number, np.full(channels, 1 / channels))
+    return occupied_multinomial(rng, number, np.full(channels, 1 / channels))
 
 
 def _check_layout(state):

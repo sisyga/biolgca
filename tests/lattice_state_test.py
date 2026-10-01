@@ -523,3 +523,25 @@ def test_random_occupancy_places_the_cells_uniformly(channels, cells):
         assert len(states) == comb(channels, cells)
         expected = len(chosen) / len(states)
         assert np.all(np.abs(counts - expected) < 4 * np.sqrt(expected))
+
+
+@pytest.mark.parametrize("draw", ["binomial", "multinomial"])
+def test_draws_for_the_occupied_entries_equal_the_full_draws(draw):
+    from lgca.lattice_state import occupied_binomial, occupied_multinomial
+
+    # most entries of a lattice are empty; numpy draws nothing for them, so skipping them changes nothing
+    number = np.random.default_rng(1).poisson(0.3, size=(6, 5, 3, 4))
+    if draw == "binomial":
+        p = np.random.default_rng(2).random((6, 5, 3, 1))
+        def full(rng): return rng.binomial(number, np.broadcast_to(p, number.shape))
+        def occupied(rng): return occupied_binomial(rng, number, p)
+    else:
+        pvals = np.random.default_rng(2).dirichlet(np.ones(3), size=(6, 5, 3, 1))
+        def full(rng): return rng.multinomial(number, np.broadcast_to(pvals, number.shape + (3,)))
+        def occupied(rng): return occupied_multinomial(rng, number, pvals)
+    first, second = np.random.default_rng(3), np.random.default_rng(3)
+    np.testing.assert_array_equal(occupied(second), full(first))
+    assert first.random() == second.random()  # and the random stream goes on alike
+    empty = np.random.default_rng(4)
+    assert not occupied_binomial(empty, np.zeros((3, 2), dtype=int), 0.5).any()
+    assert empty.random() == np.random.default_rng(4).random()

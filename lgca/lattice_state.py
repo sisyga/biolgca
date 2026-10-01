@@ -437,7 +437,7 @@ class LatticeState:
         if self._ve:  # a channel holds at most one cell: one random number each
             removed = self._counts * (self.rng.random(self._counts.shape) < p)
         else:
-            removed = self.rng.binomial(self._counts, p)
+            removed = occupied_binomial(self.rng, self._counts, p)
         self._counts -= removed
         return removed.sum(axis=-1)
 
@@ -461,7 +461,7 @@ class LatticeState:
             dividing = self.rng.random(len(cells)) < self._per_cell(self._probability(p, "p"))
             daughters = cells.divide(dividing, channels=channels)
             return self._per_node(cells.index[daughters])
-        daughters = self.rng.binomial(self._counts, self._probability(p, "p"))
+        daughters = occupied_binomial(self.rng, self._counts, self._probability(p, "p"))
         if isinstance(channels, str) and channels == "same":
             if self._ve:
                 raise ValueError("channels='same' needs a model without volume exclusion: "
@@ -770,7 +770,7 @@ class LatticeState:
         # many cells: one multinomial draw per node and species (a float sum cannot overflow)
         if number.sum(dtype=np.float64) > 20 * number.size:
             weights = allowed / allowed.sum(axis=-1, keepdims=True)
-            return self.rng.multinomial(number, weights)
+            return occupied_multinomial(self.rng, number, weights)
         # every cell picks a channel of its species' set, and the picks are counted
         spread = np.zeros(number.shape + (self.K,), dtype=np.int64)
         for species in range(number.shape[-1]):
@@ -812,8 +812,7 @@ class LatticeState:
 
     def _switch_nove(self, transition, allowed):
         counts = self._counts
-        pvals = np.broadcast_to(transition[..., :, None, :], counts.shape + (self.n_species,))
-        moves = self.rng.multinomial(counts, pvals)  # dims + (from, K, to)
+        moves = occupied_multinomial(self.rng, counts, transition[..., :, None, :])  # dims + (from, K, to)
         switched = moves.sum(axis=-2) * (1 - np.eye(self.n_species, dtype=np.int64))
         if allowed is None:
             self._counts = np.swapaxes(moves.sum(axis=-3), -1, -2)
@@ -912,6 +911,33 @@ def _state_table(channels):
     sizes = np.array([comb(channels, cells) for cells in range(channels + 1)])
     table = np.concatenate([occupations(channels, cells) for cells in range(channels + 1)])
     return table, np.r_[0, np.cumsum(sizes)[:-1]], sizes
+
+
+def occupied_binomial(rng, number, p):
+    """``rng.binomial(number, p)``, drawn only where ``number > 0``.
+
+    NumPy draws nothing for 0 trials, so the values and the random stream are
+    those of the full draw, at a cost that grows with the occupied entries
+    rather than with the lattice: most entries of a sparse lattice are empty.
+    """
+    number = np.asarray(number)
+    drawn = np.zeros(number.shape, dtype=np.int64)
+    trials = number > 0
+    if trials.any():
+        drawn[trials] = rng.binomial(number[trials], np.broadcast_to(p, number.shape)[trials])
+    return drawn
+
+
+def occupied_multinomial(rng, number, pvals):
+    """``rng.multinomial(number, pvals)``, drawn only where ``number > 0`` (see :func:`occupied_binomial`)."""
+    number = np.asarray(number)
+    pvals = np.asarray(pvals, dtype=float)
+    shape = number.shape + pvals.shape[-1:]
+    drawn = np.zeros(shape, dtype=np.int64)
+    trials = number > 0
+    if trials.any():
+        drawn[trials] = rng.multinomial(number[trials], np.broadcast_to(pvals, shape)[trials])
+    return drawn
 
 
 def random_occupancy(rng, number, channels):

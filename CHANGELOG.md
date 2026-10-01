@@ -435,6 +435,13 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- Models without volume exclusion draw the random numbers of switches
+  between species, `go_or_rest`, `birth_death`, killing and dividing cells
+  and the spreading of cells over channels only for the nodes and channels
+  that hold cells: the same results for the same seed, as NumPy draws
+  nothing for empty ones, but these draws take a fifth of the time on a
+  sparse lattice (a 3D Moore lattice of 32³ nodes with three species and a
+  small tumour; a step takes about a quarter less).
 - `pde` operators that follow each other update their fields
   simultaneously: each reads the other fields as they were before the first
   of them, like the equations of a Morpheus `System`, so their order no
