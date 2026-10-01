@@ -754,6 +754,13 @@ def test_mutations_beyond_the_float_range_are_clipped_to_a_finite_bound():
     [{"traits": {"other": {"value": 2.0, "operation": "set"}}}, {"traits": {"missing": 0.1}}],
     [{"traits": {"other": {"value": 2.0, "operation": "set"}}},
      {"when": {"missing": 0}, "traits": {"other": {"value": 3.0, "operation": "set"}}}],
+    # an unknown trait that only the probability of a later event reads
+    *[[{"traits": {"other": {"value": 2.0, "operation": "set"}}},
+       {"probability": probability, "traits": {"other": {"value": 3.0, "operation": "set"}}}]
+      for probability in ({"max": "missing"},
+                          {"cues": [{"name": "density", "kappa": "missing", "theta": 0.5}]},
+                          {"cues": [{"name": "density", "kappa": 1.0, "theta": "missing"}]},
+                          {"cues": [{"name": "trait", "trait": "missing", "kappa": 1.0, "theta": 0.0}]})],
 ])
 def test_rejected_mutation_events_change_no_trait(switch):
     model = _overflow_switch_model(switch)

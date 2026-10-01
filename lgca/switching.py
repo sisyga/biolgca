@@ -188,8 +188,17 @@ class Probability:
     @property
     def reads_traits(self) -> bool:
         """Whether ``max`` or a cue reads cell traits (identity-based models only)."""
-        return isinstance(self.max, str) or any(
-            isinstance(cue.kappa, str) or isinstance(cue.theta, str) or cue.name == "trait" for cue in self.cues)
+        return bool(self.traits)
+
+    @property
+    def traits(self) -> tuple[str, ...]:
+        """The cell traits that ``max`` and the cues read."""
+        names = [self.max] if isinstance(self.max, str) else []
+        for cue in self.cues:
+            if cue.name == "trait":
+                names.append(cue.parameters["trait"])
+            names.extend(value for value in (cue.kappa, cue.theta) if isinstance(value, str))
+        return tuple(names)
 
     def nodes(self, state) -> np.ndarray | float:
         """The probability at every node, shape ``state.dims`` (a number without cues)."""

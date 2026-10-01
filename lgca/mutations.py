@@ -199,8 +199,8 @@ def apply_mutations(state, daughters, mutations) -> np.ndarray:
     Also changes the traits of any other cells, e.g. all living cells for a switch of traits.
     """
     cells, rng = state.cells, state.rng
-    for mutation in mutations:  # every trait the events name, before the first one changes
-        for name in (*mutation.when, *mutation.traits):
+    for mutation in mutations:  # every trait the events name or read, before the first one changes
+        for name in (*mutation.when, *mutation.traits, *mutation.probability.traits):
             _require_trait(state, name)
     mutated = np.zeros(len(daughters), dtype=bool)
     for mutation in mutations:

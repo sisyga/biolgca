@@ -813,6 +813,11 @@ This file records notable user-facing changes. Changes remain under
 
 ### Fixed
 
+- Mutation and `trait_switch` events check the traits that their probability
+  reads (a trait as `max`, as a cue's `kappa` or `theta`, or a `trait` cue)
+  before the first event changes a trait, as they check the traits they
+  change. Before, a missing one raised a `KeyError` only after the earlier
+  events had written their traits (the step was then rolled back).
 - `biolgca validate` makes the checks that `biolgca run` makes before it
   writes: two recorders that would write the same file (e.g. two
   `ScalarTimeSeriesRecorder`s without `output_path`, both `time_series.csv`)
