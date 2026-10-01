@@ -135,7 +135,9 @@ are in `docs/development/archive/reviews/2026-09-30-architecture-proposals.md`.
   warns once per rule and model with `ContractWarning` and runs as the wider
   kind; the test suite, `check_interaction` and `strict_contracts()` make it
   an error. A stack must be at least as wide as its operators. Operators run
-  in the order they are listed, then propagation.
+  in the order they are listed, then propagation; consecutive `pde`
+  operators read each other's fields as they were before the first of them
+  (`field_updates="simultaneous"`, the default; `"sequential"` on request).
 - **Cells change only through operations.** `cells.label`, `index` and
   `channel` are read-only; reorientation terms, reactions and stack builders
   get states they can read but not change.

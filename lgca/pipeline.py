@@ -230,6 +230,16 @@ class InteractionPipelineSpec:
         ``"default"`` or ``True`` moves the cells after the interactions;
         ``False``, ``None``, ``"none"`` or ``"disabled"`` keeps them in place,
         e.g. to test an interaction on its own.
+    field_updates : {"simultaneous", "sequential"}, default="simultaneous"
+        How ``pde`` operators that follow each other in the list (or in a
+        stack) read each other's fields. ``"simultaneous"``: each reads them
+        as they were before the first of these operators, like the equations
+        of a Morpheus ``System``, so their order does not matter; steady
+        fields among them are also solved this way when the model is built.
+        A ``pde`` operator of a field that one of them already updates starts
+        a new such group. ``"sequential"``: each reads the fields as the
+        operators before it left them, as earlier versions did. Both are
+        first order in time.
     allow_custom_order : None
         Deprecated and ignored: operators always run in the listed order.
     """
@@ -237,6 +247,7 @@ class InteractionPipelineSpec:
     operators: Sequence[Any] = field(default_factory=tuple)
     propagation: str | bool = "default"
     allow_custom_order: bool | None = None
+    field_updates: str = "simultaneous"
 
     def __post_init__(self):
         if self.allow_custom_order is not None:
@@ -250,6 +261,7 @@ class CompiledPipeline:
 
     operators: list[InteractionOperator]
     propagation: str | bool = "default"
+    field_updates: str = "simultaneous"
 
     @property
     def operator_names(self) -> list[str]:
@@ -269,18 +281,23 @@ class CompiledPipeline:
             operator.setup(context)
 
     def describe_schedule(self) -> str:
+        """The operators in the order they run, ``->`` between them; fields updated together are joined
+        by ``&``."""
         parts = []
-        for operator in self.operators:
-            law = operator.conservation_law.describe()
-            suffix = f" ({operator.operator_kind}"
-            if law:
-                suffix += f"; {law}"
-            suffix += f"; backend={','.join(operator.info.backend_families)}"
-            deps = ",".join(sorted(operator.dependencies())) or "-"
-            outputs = ",".join(sorted(operator.outputs())) or "-"
-            suffix += f"; inputs={deps}; outputs={outputs}"
-            suffix += ")"
-            parts.append(f"{operator.name}{suffix}")
+        for group in _field_groups(self.operators, self.field_updates):
+            described = []
+            for operator in group:
+                law = operator.conservation_law.describe()
+                suffix = f" ({operator.operator_kind}"
+                if law:
+                    suffix += f"; {law}"
+                suffix += f"; backend={','.join(operator.info.backend_families)}"
+                deps = ",".join(sorted(operator.dependencies())) or "-"
+                outputs = ",".join(sorted(operator.outputs())) or "-"
+                suffix += f"; inputs={deps}; outputs={outputs}"
+                suffix += ")"
+                described.append(f"{operator.name}{suffix}")
+            parts.append(" & ".join(described))
         if self.propagation not in (False, None, "none", "disabled"):
             parts.append("Propagation (deterministic)")
         return " -> ".join(parts)
@@ -295,15 +312,8 @@ class CompiledPipeline:
     ) -> None:
         lgca = context.lgca
         lgca._validate_evolution()
-        for operator in self.operators:
-            if "boundary_nodes" in operator.dependencies():
-                lgca.apply_boundaries()
-                lgca.update_dynamic_fields()
-            start = time.perf_counter()
-            operator.apply(context, step)
-            if "nodes" in operator.outputs():
-                lgca.update_dynamic_fields()
-            elapsed = time.perf_counter() - start
+
+        def record(operator, elapsed):
             if timing is not None:
                 _record_timing(timing, operator.name, operator.operator_kind, elapsed)
             if timing_trace is not None and len(timing_trace) < timing_trace_limit:
@@ -311,6 +321,8 @@ class CompiledPipeline:
                     {"step": step, "name": operator.name,
                      "kind": operator.operator_kind, "elapsed_seconds": elapsed}
                 )
+
+        _apply_operators(self.operators, context, step, self.field_updates, record)
         lgca.apply_boundaries()
         if self.propagation not in (False, None, "none", "disabled") and getattr(lgca, "enable_propagation", True):
             start = time.perf_counter()
@@ -347,6 +359,74 @@ def _record_timing(timing, name: str, kind: str, elapsed: float) -> None:
     aggregate["max_seconds"] = max(aggregate["max_seconds"], elapsed)
 
 
+_FIELD_UPDATES = ("simultaneous", "sequential")
+
+
+def _field_updates(context) -> str:
+    """``field_updates`` of the model's pipeline spec."""
+    dynamics = getattr(getattr(context, "spec", None), "dynamics", None)
+    return getattr(dynamics, "field_updates", "simultaneous")
+
+
+def _field_groups(operators, field_updates) -> list[list[InteractionOperator]]:
+    """``operators`` in the groups that run together: with ``field_updates="simultaneous"`` consecutive ``pde``
+    operators of different fields, every other operator alone."""
+    from .fields import PDEOperator
+
+    groups = []
+    for operator in operators:
+        group = groups[-1] if groups else []
+        if (field_updates == "simultaneous" and isinstance(operator, PDEOperator) and group
+                and all(isinstance(other, PDEOperator) and other.field != operator.field for other in group)):
+            group.append(operator)
+        else:
+            groups.append([operator])
+    return groups
+
+
+def _apply_operators(operators, context, step: int, field_updates: str, record=None) -> None:
+    """Apply ``operators`` in order (the pipeline's, or a stack's); ``record(operator, elapsed)`` after each.
+
+    The ``pde`` operators of a group (:func:`_field_groups`) all solve from the fields as they were before the
+    first of them, then store their new values.
+    """
+    lgca = context.lgca
+    for group in _field_groups(operators, field_updates):
+        if len(group) > 1:
+            solutions = []
+            for operator in group:
+                start = time.perf_counter()
+                solutions.append(operator.solve(context, step))
+                if record is not None:
+                    record(operator, time.perf_counter() - start)
+            for operator, values in zip(group, solutions):
+                operator.store(context, values)
+            continue
+        operator = group[0]
+        if "boundary_nodes" in operator.dependencies():
+            lgca.apply_boundaries()
+            lgca.update_dynamic_fields()
+        start = time.perf_counter()
+        operator.apply(context, step)
+        if "nodes" in operator.outputs():
+            lgca.update_dynamic_fields()
+        if record is not None:
+            record(operator, time.perf_counter() - start)
+
+
+def _attach_fields(operators, lgca, field_updates: str) -> None:
+    """Let the field operators of ``operators`` own their fields, and solve the steady ones, by group."""
+    from .fields import _attach_together
+
+    for group in _field_groups(operators, field_updates):
+        if len(group) > 1:
+            _attach_together(group, lgca)
+            continue
+        attach = getattr(group[0], "attach_field", None)
+        if attach is not None:
+            attach(lgca)
+
+
 def _zoo_hint(name) -> str:
     """How to register a rule of a zoo entry, whose names start with the entry's, e.g. ``jamming.influx``."""
     from .zoo import ENTRIES
@@ -365,6 +445,8 @@ def compile_pipeline(spec: InteractionPipelineSpec | None, context) -> CompiledP
     if not (spec.propagation is None or isinstance(spec.propagation, bool)
             or isinstance(spec.propagation, str) and spec.propagation in {"default", "none", "disabled"}):
         raise ValueError("dynamics.propagation must be a boolean, null, 'default', 'none', or 'disabled'")
+    if spec.field_updates not in _FIELD_UPDATES:
+        raise ValueError(f"dynamics.field_updates must be 'simultaneous' or 'sequential', got {spec.field_updates!r}")
     operators = []
     memo = _template_memo(context)  # one for all entries: operator objects that refer to each other still do
     for index, operator_spec in enumerate(spec.operators):
@@ -378,7 +460,7 @@ def compile_pipeline(spec: InteractionPipelineSpec | None, context) -> CompiledP
             separator = "" if message.startswith(".") else " "
             raise ValueError(f"dynamics.operators[{index}]{separator}{message}") from exc
     _reject_single_species_phenotype_switch(operators, context)
-    pipeline = CompiledPipeline(operators=operators, propagation=spec.propagation)
+    pipeline = CompiledPipeline(operators=operators, propagation=spec.propagation, field_updates=spec.field_updates)
     pipeline.setup(context)
     return pipeline
 

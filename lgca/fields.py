@@ -129,9 +129,11 @@ def reaction(function=None, *, name: str | None = None):
 
     The operator uses it by name, with the parameters after ``c``:
     ``PDESpec(field="activator", reactions=[{"name": "activation", "rate": 2.0}])``.
-    Several fields that react with each other are updated one after another,
-    in the order of their operators (operator splitting, first order in
-    time).
+    Fields that react with each other are updated by operator splitting,
+    first order in time: ``pde`` operators that follow each other read each
+    other's fields as they were before the first of them, so their order does
+    not matter (``InteractionPipelineSpec.field_updates="sequential"`` makes
+    each read the fields as the operators before it left them).
 
     Examples
     --------
@@ -562,8 +564,9 @@ class PDEOperator(FieldOperator):
                              "(decay, uptake by cells, or a fixed value at the boundary); with periodic or "
                              "no-flux boundaries and no loss there is no unique steady state")
 
-    def attach_field(self, lgca) -> None:
-        """Store the field as a float array with ghost nodes filled by its boundary condition."""
+    def attach_field(self, lgca, solve: bool = True) -> None:
+        """Store the field as a float array with ghost nodes filled by its boundary condition; a steady field is
+        solved, unless ``solve`` is false (see :func:`_attach_together`)."""
         values = np.asarray(getattr(lgca, self.field), dtype=float)
         if values.shape != self._dims:
             values = values[self._interior]
@@ -572,17 +575,29 @@ class PDEOperator(FieldOperator):
         # rules that write the field pad it by this condition too (lattice_state._pad_field)
         lgca._field_sides = {**getattr(lgca, "_field_sides", {}), self.field: self._sides}
         setattr(lgca, self.field, self._pad(values))
-        if self.solver == "steady":  # the first operators see the field at equilibrium
-            self._update(lgca, step=0)
+        if solve and self.solver == "steady":  # the first operators see the field at equilibrium
+            self._store(lgca, self._new_values(lgca, step=0))
 
     def apply(self, context, step: int) -> None:
-        self._update(context.lgca, step)
+        self.store(context, self.solve(context, step))
+
+    def solve(self, context, step: int) -> np.ndarray:
+        """The field after this step, shape ``dims``, from the model as it is; the field is not changed.
+
+        ``apply`` is ``store(context, solve(context, step))``. Consecutive ``pde`` operators that update
+        their fields simultaneously (``InteractionPipelineSpec.field_updates``) all solve before any stores.
+        """
+        return self._new_values(context.lgca, step)
+
+    def store(self, context, values: np.ndarray) -> None:
+        """Write the values that :meth:`solve` returned to the field."""
+        self._store(context.lgca, values)
         self.statistics["calls"] += 1
 
-    def _update(self, lgca, step):
+    def _new_values(self, lgca, step):
         with _single_threaded_blas():
             try:
-                self._advance(lgca, step)
+                return self._advance(lgca, step)
             except RuntimeError as error:  # the solver failed; the field is unchanged
                 statistics = self.statistics
                 statistics["failures"] = statistics.get("failures", 0) + 1
@@ -590,6 +605,9 @@ class PDEOperator(FieldOperator):
                     kinds = statistics.setdefault("failure_kinds", {})
                     kinds[error.kind] = kinds.get(error.kind, 0) + 1
                 raise
+
+    def _store(self, lgca, values):
+        getattr(lgca, self.field)[...] = self._pad(values)
 
     # matrices that setup computes again for every model: a copy as a template for a new model leaves them out
     _SETUP_MATRICES: ClassVar[tuple[str, ...]] = (
@@ -610,8 +628,7 @@ class PDEOperator(FieldOperator):
     def _advance(self, lgca, step):
         if isinstance(self.advection, str) and not np.array_equal(self._read_velocity(lgca), self._velocity):
             self._assemble(lgca)  # the velocity field has changed
-        stored = getattr(lgca, self.field)
-        c = np.array(stored[self._interior], dtype=float).ravel()
+        c = np.array(getattr(lgca, self.field)[self._interior], dtype=float).ravel()
         production, loss, saturating = self._sources(lgca, step)
         if self.solver == "explicit":
             c = self._explicit(c, production, loss, saturating)
@@ -621,7 +638,7 @@ class PDEOperator(FieldOperator):
             c = self._steady(c, production, loss, saturating)
         if not np.all(np.isfinite(c)):
             raise self._non_finite()
-        stored[...] = self._pad(c.reshape(self._dims))
+        return c.reshape(self._dims)
 
     def _non_finite(self):
         return FieldSolverError(f"pde {self.field!r}: the solver produced non-finite field values", "non_finite")
@@ -1168,6 +1185,17 @@ class PDEOperator(FieldOperator):
     def _pad(self, values):
         """The interior values with ghost nodes filled according to the boundary condition."""
         return _pad_by_sides(values, self._sides, int(self._interior[0].start))
+
+
+def _attach_together(operators, lgca) -> None:
+    """Attach the fields of ``pde`` operators that update them simultaneously: the steady ones are solved from
+    the fields as they were before any of them, as at every step."""
+    for operator in operators:
+        operator.attach_field(lgca, solve=False)
+    steady = [operator for operator in operators if operator.solver == "steady"]
+    solutions = [operator._new_values(lgca, step=0) for operator in steady]
+    for operator, values in zip(steady, solutions):
+        operator._store(lgca, values)
 
 
 class _Reaction:

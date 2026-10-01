@@ -312,6 +312,7 @@ def model_spec_to_dict(spec: ModelSpec) -> dict[str, Any]:
             "dynamics": {
                 "operators": [_operator_to_dict(operator) for operator in spec.dynamics.operators],
                 "propagation": _to_jsonable(spec.dynamics.propagation),
+                "field_updates": _to_jsonable(spec.dynamics.field_updates),
             },
             "analysis": None if spec.analysis is None else {
                 "observers": [_observer_to_dict(observer) for observer in spec.analysis.observers],
@@ -368,6 +369,7 @@ def model_spec_from_dict(data: Mapping[str, Any]) -> ModelSpec:
             propagation=dynamics.get("propagation", "default"),
             # Files written before the order became free always carry the old default False.
             allow_custom_order=dynamics.get("allow_custom_order") or None,
+            field_updates=dynamics.get("field_updates", "simultaneous"),
         ),
         analysis=None if analysis is None else AnalysisSpec(
             observers=tuple(_observer_from_dict(observer) for observer in analysis.get("observers", ())),
@@ -548,7 +550,7 @@ def _validate_serialized_model(data: Mapping[str, Any]) -> None:
     )
     _reject_unknown_keys(time_spec, {"steps", "seed", "timing_trace"}, "model.time")
     _reject_unknown_keys(
-        dynamics, {"operators", "propagation", "allow_custom_order"}, "model.dynamics"
+        dynamics, {"operators", "propagation", "allow_custom_order", "field_updates"}, "model.dynamics"
     )
     if analysis is not None:
         _reject_unknown_keys(analysis, {"observers"}, "model.analysis")
@@ -601,6 +603,8 @@ def _validate_serialized_model(data: Mapping[str, Any]) -> None:
         dynamics["allow_custom_order"], bool
     ):
         raise TypeError("model.dynamics.allow_custom_order must be a boolean")
+    if dynamics.get("field_updates", "simultaneous") not in ("simultaneous", "sequential"):
+        raise ValueError("model.dynamics.field_updates must be 'simultaneous' or 'sequential'")
     if analysis is not None:
         observers = analysis.get("observers", ())
         if isinstance(observers, (str, bytes)) or not isinstance(observers, Sequence):
@@ -1434,6 +1438,7 @@ def _pipeline_metadata(metadata, spec, pipeline, lgca) -> None:
     metadata["observer_names"] = _observer_names(spec.analysis)
     metadata["schedule"] = pipeline.describe_schedule()
     metadata["propagation"] = spec.dynamics.propagation
+    metadata["field_updates"] = spec.dynamics.field_updates
     metadata["channel_capacity"] = lgca.K
     growth_capacities = [
         {"operator_index": index, "name": operator.name, "capacity": operator.capacity}
@@ -1460,12 +1465,11 @@ def _compile_running(context):
 def _attach_field_operators(lgca, pipeline):
     """Let the field operators (``pde``) own their fields: their boundary conditions fill the ghost nodes,
     also where rules write the fields; a field without one takes the lattice's."""
+    from .pipeline import _attach_fields
+
     owned = getattr(lgca, "_field_sides", {})
     lgca._field_sides = {}
-    for operator in pipeline.operators:
-        attach = getattr(operator, "attach_field", None)
-        if attach is not None:
-            attach(lgca)
+    _attach_fields(pipeline.operators, lgca, pipeline.field_updates)
     for name in set(owned) - set(lgca._field_sides):  # no longer owned: padded by the lattice
         values = np.asarray(getattr(lgca, name))
         interior = values[lgca.nonborder] if values.shape[:len(lgca.dims)] != tuple(lgca.dims) else values
@@ -1810,6 +1814,7 @@ def _metadata_from_spec(spec: ModelSpec, lgca=None) -> dict[str, Any]:
         "identity_based": spec.state.identity_based,
         "n_species": spec.state.n_species,
         "propagation": spec.dynamics.propagation,
+        "field_updates": spec.dynamics.field_updates,
         "operator_names": [],
         "reorientation_term_names": [],
         "observer_names": _observer_names(spec.analysis),

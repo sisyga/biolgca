@@ -435,6 +435,21 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- `pde` operators that follow each other update their fields
+  simultaneously: each reads the other fields as they were before the first
+  of them, like the equations of a Morpheus `System`, so their order no
+  longer matters; steady fields among them are also solved this way when the
+  model is built. The new `InteractionPipelineSpec.field_updates`
+  (`dynamics.field_updates` in model files; `vary` and `reconfigure` change
+  it) chooses between `"simultaneous"`, the default, and `"sequential"`, in
+  which each reads the fields as the operators before it left them, as
+  before. Both are first order in time. Results change only where such
+  operators read each other's fields (in a reaction, or as production or
+  advection); no model of the library, the zoo or the docs does. Before, a
+  field that a reaction copied from another got the other's new value or
+  its old one depending on which operator was listed first.
+  `metadata["schedule"]` joins fields updated together with `&`, and
+  `metadata["field_updates"]` records the choice.
 - Files that a model made in Python reads, e.g. the state of a `from_npz`
   initializer, are found as `np.load` finds them: relative to the working
   directory, or absolute (`build_model`, `run_model`, `sweep` and

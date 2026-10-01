@@ -348,8 +348,9 @@ class StackOperator(InteractionOperator):
 
     def validate(self, context) -> None:
         from .model import _attach_traits
-        from .pipeline import _compile_operator, _template_memo
+        from .pipeline import _compile_operator, _field_updates, _template_memo
 
+        self.field_updates = _field_updates(context)
         state = context.spec.state
         family = ("ib" if state.volume_exclusion else "nove_ib") if state.identity_based else (
             "classical" if state.volume_exclusion else "nove")
@@ -386,20 +387,14 @@ class StackOperator(InteractionOperator):
 
     def attach_field(self, lgca) -> None:
         """Initialize fields of the stacked operators, including nested stacks."""
-        for operator in self.operators:
-            attach = getattr(operator, "attach_field", None)
-            if attach is not None:
-                attach(lgca)
+        from .pipeline import _attach_fields
+
+        _attach_fields(self.operators, lgca, self.field_updates)
 
     def apply(self, context, step: int) -> None:
-        lgca = context.lgca
-        for operator in self.operators:
-            if "boundary_nodes" in operator.dependencies():
-                lgca.apply_boundaries()
-                lgca.update_dynamic_fields()
-            operator.apply(context, step)
-            if "nodes" in operator.outputs():
-                lgca.update_dynamic_fields()
+        from .pipeline import _apply_operators
+
+        _apply_operators(self.operators, context, step, self.field_updates)
 
     def dependencies(self) -> set[str]:
         return set().union(*(operator.dependencies() for operator in self.operators))

@@ -274,6 +274,7 @@
           }
         },
         "propagation": {"enum": [true, false, null, "default", "none", "disabled"]},
+        "field_updates": {"enum": ["simultaneous", "sequential"]},
         "allow_custom_order": {"type": "boolean"}
       }
     },

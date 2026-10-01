@@ -237,8 +237,12 @@ with its parameters:
                      reactions=[{"name": "autocatalysis", "rate": 0.5}])
 
 ``state.field("other")`` reads another field, so fields can react with each
-other. They are updated one after another, in the order of their operators
-(operator splitting, first order in time).
+other. ``pde`` operators that follow each other in the pipeline update their
+fields simultaneously, as the equations of a Morpheus ``System``: each reads
+the other fields as they were before the first of them, so their order does
+not matter (operator splitting, first order in time). With
+``InteractionPipelineSpec(..., field_updates="sequential")`` each reads the
+fields as the operators before it left them.
 
 The implicit and steady solvers solve a reaction by Newton's method, with its
 derivative taken by a finite difference, so the production and loss rate at

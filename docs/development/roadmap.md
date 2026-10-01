@@ -55,11 +55,6 @@ the 30 September review are done, apart from the items below:
   the lattice; fixed values at interior nodes (vessels); a helper for
   physical units. Not planned: irregular domains (they would need walls for
   the cells too) and VTK export.
-- Coupled fields: `pde` operators run one after another, each seeing the
-  fields as the operators before it left them, so the result depends on
-  their order (first order in time either way). Proposal: consecutive `pde`
-  operators read each other's fields as they were before the first of them,
-  as a Morpheus `System` does; waits for a decision.
 
 ### Optional engineering (when profiling or users ask)
 
@@ -105,6 +100,9 @@ the 30 September review are done, apart from the items below:
   the order they are listed; Boltzmann sampling is the default for
   reorientation, not a requirement; species are not tied to channels.
 - 3D models are explored with Matplotlib, not Mayavi.
+- Consecutive `pde` operators update their fields simultaneously, as a
+  Morpheus `System` does (`field_updates="simultaneous"`, the default);
+  `"sequential"` keeps operator splitting in the listed order.
 - Input files: a model made in Python finds them as `np.load` does; with
   `resource_base` (model files, the `biolgca` command) relative paths must
   stay inside it unless `trusted_paths=True`.

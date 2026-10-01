@@ -1143,16 +1143,92 @@ def test_logistic_growth_of_a_field(nonlinear):
     np.testing.assert_allclose(_field(compiled), 1.0, rtol=1e-9)
 
 
-def test_fields_that_react_are_updated_in_the_order_of_their_operators():
-    # u gains 1 per step; v gains u, as the first operator left it
-    compiled = _build([PDESpec(field="u", production=1.0),
-                       PDESpec(field="v", reactions=[{"name": "test_copy", "source": "u"}])],
-                      fields={"u": 2.0, "v": 0.0})
+def _coupled(operators, field_updates=None, fields=None, stacked=False):
+    """A model of the pde operators ``operators``, in the pipeline or in a stack."""
+    from lgca import stack
+    from lgca.rules import StackOperator
+
+    entries = list(operators)
+    if stacked:
+        @stack(kind="field", families=("classical", "nove", "ib", "nove_ib"), register=False,
+               name="fields_test.coupled")
+        def coupled(state):
+            """The pde operators in a stack."""
+            return list(operators)
+
+        entries = [StackOperator(coupled)]
+    dynamics = {} if field_updates is None else {"field_updates": field_updates}
+    return build_model(ModelSpec(
+        space=SpaceSpec(geometry="square", dims=(10, 8), boundary="reflecting"),
+        state=StateSpec(density=0.0, fields=fields or {"u": 2.0, "v": 0.0}), time=TimeSpec(steps=1, seed=1),
+        dynamics=InteractionPipelineSpec(operators=entries, propagation=False, **dynamics)))
+
+
+# u gains 1 per step, v gains u: as it was before the pde operators (simultaneous), or as the first left it
+_COUPLED = {"simultaneous": [2.0, 5.0], "sequential": [3.0, 7.0]}
+
+
+@pytest.mark.parametrize("stacked", [False, True])
+@pytest.mark.parametrize("field_updates", [None, "simultaneous", "sequential"])
+def test_fields_that_react_are_updated_simultaneously_or_in_the_order_of_their_operators(field_updates, stacked):
+    gain = PDESpec(field="u", production=1.0)
+    copy_u = PDESpec(field="v", reactions=[{"name": "test_copy", "source": "u"}])
+    compiled = _coupled([gain, copy_u], field_updates, stacked=stacked)
+    expected = _COUPLED[field_updates or "simultaneous"]
+    for value in expected:
+        compiled.step()
+        np.testing.assert_allclose(_field(compiled, "v"), value)
+    np.testing.assert_allclose(_field(compiled, "u"), 4.0)
+    assert compiled.metadata["fields"]["u"]["calls"] == compiled.metadata["fields"]["v"]["calls"] == 2
+    assert compiled.metadata["field_updates"] == (field_updates or "simultaneous")
+    if field_updates != "sequential":  # the order of the operators does not matter
+        swapped = _coupled([copy_u, gain], field_updates, stacked=stacked)
+        for _ in expected:
+            swapped.step()
+        np.testing.assert_array_equal(_field(swapped, "v"), _field(compiled, "v"))
+
+
+def test_a_pde_operator_of_a_field_already_updated_starts_a_new_group():
+    gain = PDESpec(field="u", production=1.0)
+    compiled = _coupled([gain, PDESpec(field="v", reactions=[{"name": "test_copy", "source": "u"}]), gain])
     compiled.step()
-    np.testing.assert_allclose(_field(compiled, "u"), 3.0)
-    np.testing.assert_allclose(_field(compiled, "v"), 3.0)
+    # v reads u from before the first group, the second gain of u reads the first one's
+    np.testing.assert_allclose(_field(compiled, "u"), 4.0)
+    np.testing.assert_allclose(_field(compiled, "v"), 2.0)
+    groups = compiled.metadata["schedule"].split(" -> ")
+    assert [group.count("pde (") for group in groups] == [2, 1]
+
+
+@pytest.mark.parametrize("field_updates, v", [("simultaneous", 3.0), ("sequential", 1.0)])
+def test_steady_fields_are_solved_together_when_the_model_is_built(field_updates, v):
+    # u is 1 at equilibrium; v equals u, as it was before the pde operators or as the first left it
+    compiled = _coupled([PDESpec(field="u", decay=1.0, production=1.0, solver="steady"),
+                         PDESpec(field="v", decay=1.0, reactions=[{"name": "test_copy", "source": "u"}],
+                                 solver="steady")], field_updates, fields={"u": 3.0, "v": 0.0})
+    np.testing.assert_allclose(_field(compiled, "u"), 1.0)
+    np.testing.assert_allclose(_field(compiled, "v"), v)
     compiled.step()
-    np.testing.assert_allclose(_field(compiled, "v"), 7.0)
+    np.testing.assert_allclose(_field(compiled, "v"), 1.0)
+    assert compiled.metadata["fields"]["v"]["calls"] == 1  # the solve when the model is built is not a call
+
+
+def test_field_updates_are_checked_and_saved_in_model_files():
+    from lgca.model import model_spec_from_dict, model_spec_to_dict
+    from lgca.study import vary
+
+    spec = ModelSpec(state=StateSpec(fields={"u": 0.0}), time=TimeSpec(seed=1),
+                     dynamics=InteractionPipelineSpec(operators=[PDESpec(field="u", decay=0.1)]))
+    data = model_spec_to_dict(spec)
+    assert data["model"]["dynamics"]["field_updates"] == "simultaneous"
+    sequential = vary(spec, {"dynamics.field_updates": "sequential"})
+    assert model_spec_from_dict(model_spec_to_dict(sequential)).dynamics.field_updates == "sequential"
+    del data["model"]["dynamics"]["field_updates"]  # a model file written before
+    assert model_spec_from_dict(data).dynamics.field_updates == "simultaneous"
+    data["model"]["dynamics"]["field_updates"] = "together"
+    with pytest.raises(ValueError, match="field_updates must be 'simultaneous' or 'sequential'"):
+        model_spec_from_dict(data)
+    with pytest.raises(ValueError, match="field_updates must be 'simultaneous' or 'sequential'"):
+        build_model(vary(spec, {"dynamics.field_updates": "together"}))
 
 
 @reaction(name="test_negative")
