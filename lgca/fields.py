@@ -45,7 +45,7 @@ import warnings
 from collections.abc import Mapping, Sequence
 from math import isfinite, prod
 from numbers import Integral, Real
-from typing import Any, ClassVar
+from typing import Any, ClassVar, NamedTuple
 
 import numpy as np
 import scipy.sparse as sp
@@ -87,6 +87,9 @@ _ARMIJO = 1e-4
 _ETA_MAX = 0.1
 _ESTIMATE_RTOL = 0.1
 _ROUNDING = 32 * np.finfo(float).eps
+# the derivative of a reaction is a forward difference with this step relative to c (floored where the reaction
+# enhances itself, see _FieldEquation.derivative)
+_DIFFERENCE_STEP = np.sqrt(np.finfo(float).eps)
 _AMG_LOCK = threading.Lock()  # multigrid setups of runs in threads take turns with np.random
 _SIDES = ("x-", "x+", "y-", "y+", "z-", "z+")
 _PER_SIDE_GEOMETRIES = ("lin", "square", "cubic")
@@ -104,8 +107,25 @@ def reaction(function=None, *, name: str | None = None):
     ``(production, loss_rate)``: numbers or arrays of shape ``state.dims``,
     both non-negative, entering the equation as ``+ production - loss_rate
     * c``. Writing every reaction this way keeps the field non-negative in
-    the implicit and steady solvers. Terms that depend on ``c`` are iterated
-    to convergence (``solver_options`` ``rtol`` and ``max_iterations``).
+    the implicit and steady solvers.
+
+    The implicit and steady solvers solve a reaction that depends on ``c``
+    by Newton's method (``solver_options`` ``rtol`` and ``max_iterations``),
+    with its derivative taken by a finite difference. This assumes that the
+    production and loss rate at a node depend on the field at that node only
+    (they may read the cells and other fields). Where the production rises
+    with ``c``, or the loss ``loss_rate * c`` falls, as in logistic growth
+    below its capacity, autocatalysis or a switch, the equation can have
+    several equilibria, and Newton's method could settle on an unstable one
+    or jump into the basin of another. There the reaction enters as in
+    Picard iteration, with its loss rate in place of its derivative (unless
+    the derivative is larger): the solver then approaches the stable
+    equilibrium that the field's dynamics reach from its current values, at
+    Picard iteration's linear rate (``"floored_iterations"`` in
+    ``model.metadata["fields"][field]`` counts these iterations). Elsewhere
+    it converges in a few iterations. ``nonlinear="picard"`` in
+    ``solver_options`` uses Picard iteration throughout, as earlier
+    versions did.
 
     The operator uses it by name, with the parameters after ``c``:
     ``PDESpec(field="activator", reactions=[{"name": "activation", "rate": 2.0}])``.
@@ -244,18 +264,18 @@ class PDESpec:
         ``"cg"``, ``"amg"``), ``rtol`` (1e-6, for the iterative solver and
         the iteration of saturating uptake and reactions), ``max_iterations``
         (20), ``nonlinear`` (``"newton"``; ``"picard"`` restores the
-        iteration of earlier versions for saturating uptake);
+        iteration of earlier versions);
         implicit also ``substeps`` (1). Explicit: ``method`` (``"RK45"``;
         also ``"RK23"``, ``"DOP853"``, ``"BDF"``, ``"Radau"``), ``rtol``
         (1e-4), ``atol`` (1e-6), ``warn_evaluations`` (200).
-        The terms that depend on the field are iterated. Saturating uptake
-        alone is solved by Newton's method, until the estimated error of
-        the field is at most ``rtol`` relative to its largest value.
-        Reactions, and ``nonlinear="picard"``, use Picard iteration (the
-        terms evaluated at the last iterate, and the linear problem solved
-        again) until an iteration changes the field by at most ``rtol``
-        relative to its largest value and the residual of the equation is
-        at most ``rtol`` relative to its source terms. An iteration still
+        The terms that depend on the field, saturating uptake and reactions,
+        are solved by Newton's method (see Notes) until the estimated error
+        of the field is at most ``rtol`` relative to its largest value.
+        ``nonlinear="picard"`` uses Picard iteration instead (the terms
+        evaluated at the last iterate, and the linear problem solved again)
+        until an iteration changes the field by at most ``rtol`` relative to
+        its largest value and the residual of the equation is at most
+        ``rtol`` relative to its source terms. An iteration still
         within a factor 1000 of its tolerance after ``max_iterations``
         converges slowly: it warns and uses the last iterate. Further off,
         it raises :class:`FieldSolverError` (kind ``"nonlinear"``) and says
@@ -265,23 +285,41 @@ class PDESpec:
 
     Notes
     -----
-    Newton's method linearizes the uptake at the current field: its matrix
-    ``J`` is that of the linear terms plus the derivative of the uptake on
-    the diagonal, an M-matrix like the matrix of the linear terms, so the
-    backends below apply. A line search halves the step from the full one,
-    keeping ``c ≥ 0``, until the residual ``F(c)`` of the equation falls (at
-    every node on its own where the nodes are independent), so the method
-    converges from any start, also for steep uptake (``n > 1``), where
-    Picard iteration may cycle. The first iteration is Picard's first. The
-    iteration stops when the error that remains, estimated as the next
-    Newton correction ``J⁻¹ F(c)`` with the matrix of the last iteration, is
-    at most ``rtol`` times the largest value of the field, or when the
+    Newton's method linearizes the terms that depend on the field at its
+    current values: its matrix ``J`` is that of the linear terms plus the
+    derivative of the loss on the diagonal, exact for saturating uptake and
+    a finite difference for reactions. A line search halves the step from
+    the full one, keeping ``c ≥ 0``, until the residual ``F(c)`` of the
+    equation falls (at every node on its own where the nodes are
+    independent), so the method converges from any start, also for steep
+    uptake (``n > 1``), where Picard iteration may cycle. The first
+    iteration is Picard's first. The iteration stops when the error that
+    remains, estimated as the next Newton correction ``J⁻¹ F(c)`` with the
+    matrix of the last iteration, is at most ``rtol`` times the largest
+    value of the field (but not less than ``rtol`` times its largest value
+    at the start, for a field that a reaction takes to 0), or when the
     residual is as small as rounding makes it; unlike a residual relative
     to the source terms, the estimate does not loosen when a fixed boundary
-    value supplies most of the field. A steady field without decay or fixed
-    boundary value has a steady state only if the cells can take up more
-    than is produced in total; the solver checks this, and starts from the
-    uniform field at which uptake and production balance.
+    value supplies most of the field.
+
+    Where the production of the reactions rises with the field, or their
+    loss falls, they enter ``J`` with their loss rate, as in Picard
+    iteration, unless their derivative is larger (``"floored_iterations"``
+    in ``model.metadata["fields"][field]`` counts the iterations in which
+    this happened somewhere): there the equation may have several equilibria,
+    and a longer step than Picard iteration's may reach an unstable one or
+    the basin of another, which in tests with random multistable reactions
+    happened in up to 2 % of the cases for every longer step tried, and
+    never with this one. The solver then approaches the equilibrium that
+    the field's dynamics reach from its current values, at Picard
+    iteration's rate. ``J`` stays an M-matrix like the matrix of the linear
+    terms, so the backends below apply. A steady field without decay or
+    fixed boundary value whose only nonlinear terms are saturating uptake
+    has a steady state only if the cells can take up more than is produced
+    in total; the solver checks this, and starts from the uniform field at
+    which uptake and production balance. With reactions it does neither,
+    as a reaction may balance the production at several uniform fields
+    (logistic growth at 0 and at its capacity).
 
     The ``"auto"`` backend factors a matrix that does not depend on the cells
     once (no uptake) on lattices of up to 1 000 000 nodes in 1D, 100 000 in
@@ -450,8 +488,7 @@ class PDEOperator(FieldOperator):
             self.statistics["backend"] = self._backend
             if self.reactions or any(term.saturation is not None for term in self.cell_terms):
                 # the iteration of the terms that depend on the field, for the record of the run
-                self.statistics["nonlinear"] = ("newton" if self.options["nonlinear"] == "newton"
-                                                and not self.reactions else "picard")
+                self.statistics["nonlinear"] = self.options["nonlinear"]
         context.metadata.setdefault("fields", {})[self.field] = self.statistics
 
     def _assemble(self, lgca):
@@ -714,12 +751,12 @@ class PDEOperator(FieldOperator):
 
         ``L`` is the loss rate of uptake by cells; the terms that depend on c (saturating uptake,
         reactions) add their loss rate ``L_c`` and production ``P_c``. Without them the problem is
-        linear. Saturating uptake alone is solved by Newton's method (:meth:`_newton`), unless
-        solver_options ``nonlinear`` is ``"picard"``; reactions by Picard iteration (:meth:`_picard`).
+        linear. With them it is solved by Newton's method (:meth:`_newton`), or by Picard iteration
+        (:meth:`_picard`) where solver_options ``nonlinear`` is ``"picard"``.
         """
         if not nonlinear:
             return self._solve_linear(base, scale, right, start, loss)
-        if self.options["nonlinear"] == "newton" and all(getattr(term, "monotone", False) for term in nonlinear):
+        if self.options["nonlinear"] == "newton":
             return self._newton(base, scale, right, start, loss, nonlinear)
         return self._picard(base, scale, right, start, loss, nonlinear)
 
@@ -774,49 +811,66 @@ class PDEOperator(FieldOperator):
         return previous
 
     def _newton(self, base, scale, right, start, loss, terms):
-        """Newton's method for the equation of :meth:`_solve_system` where every term is monotone (saturating
-        uptake): ``F(c) = base c + scale (L + Σ_k r_k(c)) c - right = 0`` with the loss rates ``r_k``.
+        """Newton's method for the equation of :meth:`_solve_system`, ``F(c) = base c + scale (L + Σ_k
+        r_k(c)) c - right - scale Σ_k p_k(c) = 0``, with the loss rates ``r_k`` of saturating uptake and of
+        reactions and the production ``p_k`` of reactions.
 
-        Newton's matrix is ``J = base + scale diag(L + Σ_k u_k'(c))`` with the derivatives of the uptake
-        ``u_k = r_k c``. The first iteration solves ``J c_new = J c - F(c)`` from c with the operator's
-        tolerance, which is Picard's first iteration where ``u' = r``; later ones solve ``J δ = -F(c)`` for
-        the correction, to a relative tolerance (Eisenstat and Walker) no tighter than the stopping test
-        needs. The line search takes ``max(c + λ δ, 0)`` with λ halved from 1 until |F| falls by the
-        fraction _ARMIJO λ, down to _MIN_STEP; every node on its own where the nodes are independent.
+        Newton's matrix is ``J = base + scale diag(d)`` with the derivative ``d`` of the loss per node,
+        ``L + Σ_k (r_k c - p_k)'`` (:meth:`_FieldEquation.derivative`: saturating uptake exactly, reactions
+        by a forward difference, floored at their loss rate where they enhance themselves, so that no step
+        is longer than Picard iteration's there). J is an M-matrix, so the backends below apply. The first
+        iteration solves ``J c_new = J c - F(c)`` from c with the operator's tolerance, which is Picard's
+        first iteration where ``d`` is the loss rate; later ones solve ``J δ = -F(c)`` for the correction,
+        to a relative tolerance (Eisenstat and Walker) no tighter than the stopping test needs. The line
+        search takes ``max(c + λ δ, 0)`` with λ halved from 1 until |F| falls by the fraction _ARMIJO λ, down
+        to _MIN_STEP; every node on its own where the nodes are independent. Where the floor is active and
+        F falls as c rises, Picard's step need not reduce |F|: such nodes take the full step, as in Picard
+        iteration, and so does a coupled problem in which there are any.
 
         The error that remains is estimated as the next correction, ``J⁻¹ F(c_new)`` with the last matrix
         (the simplified Newton correction): with its factors on the direct backend, else solved to
         _ESTIMATE_RTOL. The iteration stops after a full step whose estimate is at most ``rtol`` times the
-        largest value of c, or when F is as small as rounding makes it. The estimate is an error of c, so
-        it does not loosen when a fixed boundary value dominates ``right``, as a residual relative to
-        ``right`` does. After ``max_iterations``, see :meth:`_not_converged`.
+        largest value of c (but not less than ``rtol`` times its largest value at the start), or when F is
+        as small as rounding makes it, or after a first iteration that was Picard's (``d`` the loss rate)
+        and left the terms unchanged, so that the problem was linear. The estimate is an error of c, so it
+        does not loosen when a fixed boundary value dominates ``right``, as a residual relative to ``right``
+        does. After ``max_iterations``, see :meth:`_not_converged`.
         """
         options, stats = self.options, self.statistics
         rtol = options["rtol"]
-        if not np.any(right):  # nothing produces the field: 0 is the solution
+        equation = _FieldEquation(base, scale, right, loss, terms, self._symmetric)
+        if not equation.reactions and not np.any(right):  # nothing produces the field: 0 is the solution
             return np.zeros_like(right)
-        equation = _UptakeEquation(base, scale, right, loss, terms)
         c = np.maximum(start, 0.0)
-        if self._singular:
+        if self._singular and not equation.reactions:  # (every term is monotone: see _balance)
             c = self._balance(equation, c)
-        F, lost, rates, transport = equation.evaluate(c)
+        current = equation.evaluate(c)
+        F = current.residual
         norm = _norm(F)
+        # the error is measured against the largest value of the field, but not below rtol times its largest
+        # value at the start: a field that a reaction takes to 0 (an equilibrium) approaches it only
+        # geometrically where the solves are inexact, so that its error relative to itself does not fall
+        lowest = rtol * np.max(c, initial=0.0)
         history = []  # per iteration, the estimated error relative to the tolerance: at most 1 is converged
-        iteration = backtracks = 0
+        iteration = backtracks = floored = 0
         eta, estimate, relative_error = _ETA_MAX, None, np.inf
-        converged = equation.at_rounding(c, F, lost, transport)
+        converged = equation.at_rounding(c, current)
         while not converged:
             if iteration == options["max_iterations"]:
                 self._not_converged(
-                    history, f"pde {self.field!r}: Newton's method for the saturating uptake did not converge in "
-                    f"{iteration} iterations (estimated error {relative_error:.3g} relative to the largest value "
-                    f"of the field, rtol {rtol:.3g})", "no step along Newton's direction reduces the residual")
+                    history, f"pde {self.field!r}: Newton's method for the terms that depend on the field did not "
+                    f"converge in {iteration} iterations (estimated error {relative_error:.3g} relative to the "
+                    f"largest value of the field, rtol {rtol:.3g})",
+                    "no step along Newton's direction reduces the residual" if not floored else
+                    "a reaction that enhances itself, solved at Picard iteration's rate, next to an equilibrium "
+                    "that is nearly unstable")
                 break
             iteration += 1
-            d = equation.derivative(c, rates)
+            d, anti = equation.derivative(c, current)
+            floored += anti is not None
             matrix, solve = self._newton_solver(base, scale, d)
             if iteration == 1:  # for the new iterate, from c
-                full = np.maximum(solve(right + scale * (d - lost) * c, c, rtol), 0.0)
+                full = np.maximum(solve(current.source + scale * (d - current.lost) * c, c, rtol), 0.0)
                 delta = full - c
             else:  # for the correction, from the estimate of it
                 full, delta = None, solve(-F, -estimate, eta)
@@ -824,15 +878,16 @@ class PDEOperator(FieldOperator):
                 raise self._non_finite()
             slack = None
             if self._separable:  # a node within a tenth of the tolerance, or at rounding, needs no decrease
-                slack = np.maximum(_ROUNDING * equation.size(c, lost, transport),
+                slack = np.maximum(_ROUNDING * equation.size(c, current),
                                    0.1 * rtol * np.max(c, initial=0.0) * matrix.diagonal())
-            c_new, (F_new, lost, rates, transport), full_step, halvings = self._line_search(
-                equation, c, delta, full, F, norm, slack)
+            c_new, new, full_step, halvings = self._line_search(equation, c, delta, full, F, norm, slack, anti)
             backtracks += halvings
+            F_new = new.residual
             if not np.all(np.isfinite(F_new)):
                 raise self._non_finite()
-            norm_new, largest = _norm(F_new), np.max(c_new, initial=0.0)
-            if equation.at_rounding(c_new, F_new, lost, transport):
+            norm_new, largest = _norm(F_new), max(np.max(c_new, initial=0.0), lowest)
+            if equation.at_rounding(c_new, new) or (iteration == 1 and full_step and np.array_equal(d, current.lost)
+                                                     and equation.unchanged(current, new)):
                 converged, error = True, 0.0
             else:
                 estimate = solve(F_new, np.zeros_like(F_new), _ESTIMATE_RTOL)
@@ -845,38 +900,46 @@ class PDEOperator(FieldOperator):
             # the next correction: as accurate as the residual falls, and half the tolerance suffices
             eta = min(_ETA_MAX, max(0.9 * (norm_new / norm) ** 2 if 0 < norm < np.inf else 0.0,
                                     0.5 * rtol * largest / error if error > 0 else _ETA_MAX))
-            c, F, norm = c_new, F_new, norm_new
+            c, F, norm, current = c_new, F_new, norm_new, new
         stats["max_iterations_used"] = max(stats.get("max_iterations_used", 0), iteration)
         if backtracks:
             stats["backtracks"] = stats.get("backtracks", 0) + backtracks
+        if floored:
+            stats["floored_iterations"] = stats.get("floored_iterations", 0) + floored
         return c
 
-    def _line_search(self, equation, c, delta, full, F, norm, slack):
+    def _line_search(self, equation, c, delta, full, F, norm, slack, anti=None):
         """The projected line search of :meth:`_newton`, from c along delta (``full``: the iterate of the full
         step, if known). Returns the iterate, its evaluation, whether the step was full, and the number of
         halvings. ``slack``, given where the nodes are independent, is per node a residual that needs no
-        decrease; every node then has a step of its own."""
+        decrease; every node then has a step of its own. ``anti``, if given, marks the nodes where F falls
+        as c rises: the step, Picard's there, need not reduce |F| at them, and they take it in full, as does
+        a coupled problem in which there are any."""
         trial = np.maximum(c + delta, 0.0) if full is None else full
         evaluation = equation.evaluate(trial)
         if not np.isfinite(norm):  # the start overflowed: the full step, or fail
-            if not (np.all(np.isfinite(trial)) and np.isfinite(_norm(evaluation[0]))):
+            if not (np.all(np.isfinite(trial)) and np.isfinite(_norm(evaluation.residual))):
                 raise self._non_finite()
             return trial, evaluation, True, 0
         halvings = 0
         if slack is not None:
             step, size = np.ones_like(c), np.abs(F)
             while True:
-                decreased = np.abs(evaluation[0]) <= np.maximum((1 - _ARMIJO * step) * size, slack)
+                decreased = np.abs(evaluation.residual) <= np.maximum((1 - _ARMIJO * step) * size, slack)
                 failed = ~decreased & (step > _MIN_STEP)  # (also where the trial is not a number)
+                if anti is not None:
+                    failed &= ~anti | ~np.isfinite(evaluation.residual)
                 if not failed.any():
                     return trial, evaluation, bool(np.all(step == 1)), halvings
                 step[failed] *= 0.5
                 halvings += 1
                 trial = np.where(failed, np.maximum(c + step * delta, 0.0), trial)
                 evaluation = equation.evaluate(trial)
+        if anti is not None and anti.any() and np.isfinite(_norm(evaluation.residual)):
+            return trial, evaluation, True, 0
         step, best = 1.0, None
         while True:
-            norm_trial = _norm(evaluation[0])
+            norm_trial = _norm(evaluation.residual)
             if norm_trial <= (1 - _ARMIJO * step) * norm:
                 return trial, evaluation, step == 1, halvings
             if np.isfinite(norm_trial) and (best is None or norm_trial < best[0]):
@@ -1271,13 +1334,29 @@ class _HillUptake:
         return float(np.sum(self.weights))
 
 
-class _UptakeEquation:
-    """``F(c) = base c + scale (L + Σ_k r_k(c)) c - right``: the equation of an implicit step or of a steady
-    state, with terms of saturating uptake whose loss rates are ``r_k``, for :meth:`PDEOperator._newton`."""
+class _Evaluation(NamedTuple):
+    """The equation of :class:`_FieldEquation` at some c."""
 
-    def __init__(self, base, scale, right, loss, terms):
+    residual: np.ndarray  # F(c)
+    lost: np.ndarray  # the total loss rate
+    source: np.ndarray  # right + scale × the production of the reactions
+    outputs: list  # per term, (production, loss rate)
+    transport: np.ndarray  # base c
+
+
+class _FieldEquation:
+    """``F(c) = base c + scale (L + Σ_k r_k(c)) c - right - scale Σ_k p_k(c)``: the equation of an implicit
+    step or of a steady state for :meth:`PDEOperator._newton`, with the terms that depend on the field,
+    each called with c for its production ``p_k`` and loss rate ``r_k``: saturating uptake (``monotone``,
+    with a ``derivative``) and reactions (anything else)."""
+
+    def __init__(self, base, scale, right, loss, terms, symmetric):
         self.base, self.scale, self.right, self.loss, self.terms = base, scale, right, loss, terms
+        self.symmetric = symmetric
         self.diagonal = base.diagonal()
+        self.monotone = [getattr(term, "monotone", False) for term in terms]
+        self.uptake = [term for term, monotone in zip(terms, self.monotone) if monotone]
+        self.reactions = [term for term, monotone in zip(terms, self.monotone) if not monotone]
 
     def loss_rate(self, c):
         lost = self.loss.copy()
@@ -1286,29 +1365,97 @@ class _UptakeEquation:
         return lost
 
     def evaluate(self, c):
-        """F(c), the total loss rate, the loss rates of the terms, and ``base c``."""
-        rates = [term(c)[1] for term in self.terms]
+        """F(c) with the terms that make it, as an :class:`_Evaluation`."""
+        finite = None
+        if self.reactions and not np.all(np.isfinite(c)):  # reactions get numbers; F is not one there
+            finite = np.isfinite(c)
+            c = np.where(finite, c, 0.0)
+        outputs = [term(c) for term in self.terms]
         lost = self.loss.copy()
-        for rate in rates:
+        made = np.zeros_like(c) if self.reactions else None
+        for production, rate in outputs:  # summed in the order of Picard iteration (_evaluate)
+            if made is not None:
+                made += production
             lost += rate
+        source = self.right if made is None else self.right + self.scale * made
         transport = self.base @ c
-        return transport + self.scale * lost * c - self.right, lost, rates, transport
+        residual = transport + self.scale * lost * c - source
+        if finite is not None:
+            residual[~finite] = np.nan
+        return _Evaluation(residual, lost, source, outputs, transport)
 
-    def derivative(self, c, rates):
-        """``L + Σ_k u_k'(c)`` from the loss rates of the terms at c: the diagonal of Newton's matrix."""
+    def derivative(self, c, evaluation):
+        """The diagonal ``d`` of Newton's matrix ``base + scale diag(d)`` at c: the derivative of the loss
+        ``L c + Σ_k (r_k c - p_k)`` per node, with a floor for reactions. Also returns None where the floor
+        is nowhere active, else the nodes at which it is and F falls as c rises.
+
+        Saturating uptake has its derivative, which is non-negative. A reaction's is a forward difference
+        with the step h relative to c, of its loss, ``r + c Δr / h``, less that of its production, ``Δp / h``;
+        exactly r where the reaction does not depend on c, it assumes that a node's terms depend on the
+        field at that node only.
+
+        The floor. Where the production of the reactions rises with c, or their loss falls, the equation may
+        have several equilibria: logistic growth has 0, unstable, and its capacity; autocatalysis and
+        switches have stable equilibria separated by unstable ones. Newton's step from there may converge
+        to an unstable equilibrium, or jump past the stable one that the field's dynamics reach from c into
+        the basin of another; Picard iteration, whose matrix holds the loss rate r of the reactions instead
+        of their derivative, approaches that stable one. There the reactions enter with the larger of
+        their derivative and their loss rate, so that no step is longer than Picard iteration's, and
+        Newton's method converges at Picard's rate until the derivative is the larger. (Tried on random
+        multistable reactions, every rule that allowed longer steps there, Newton's derivative wherever
+        it is non-negative or the loss rate less a fraction of the diagonal dominance of base, ended in the
+        basin of another equilibrium in 0.4 to 2 % of 1300 to 1900 cases; this one in none of 5100, Picard
+        iteration in 7.) Elsewhere, where the loss rises and the production does not, the derivative is at
+        least 0 and Newton's method keeps its speed. The floor keeps the matrix an M-matrix.
+        """
         d = self.loss.copy()
-        for term, rate in zip(self.terms, rates):
-            d += term.derivative(c, rate)
-        return d
+        for term, (_, rate), monotone in zip(self.terms, evaluation.outputs, self.monotone):
+            if monotone:
+                d += term.derivative(c, rate)
+        if not self.reactions:
+            return d, None
+        typical = float(np.max(c, initial=0.0))
+        step = _DIFFERENCE_STEP * np.maximum(c, 1e-3 * typical if typical > 0 else 1.0)
+        shifted = c + step
+        made_slope, lost_slope, rates, independent = np.zeros_like(c), np.zeros_like(c), np.zeros_like(c), True
+        for term, (made, lost), monotone in zip(self.terms, evaluation.outputs, self.monotone):
+            if not monotone:
+                made_up, lost_up = term(shifted)
+                independent = independent and np.array_equal(made_up, made) and np.array_equal(lost_up, lost)
+                made_slope += (made_up - made) / step
+                lost_slope += lost + c * ((lost_up - lost) / step)
+                rates += lost
+        if independent and not self.uptake:  # linear at c: Newton's matrix is Picard's, also to rounding
+            return evaluation.lost.copy(), None
+        slope = lost_slope - made_slope
+        floored = ((made_slope > 0) | (lost_slope < 0)) & (slope < rates)
+        if not floored.any():
+            return d + slope, None
+        anti = floored & (self.margin + d + slope <= 0)
+        return d + np.where(floored, rates, slope), anti
 
-    def size(self, c, lost, transport):
-        """Per node, the size of the terms that make F: ``|base| c + scale L c + |right|``; base has no
-        positive entries off its diagonal, so ``|base| c = 2 diag(base) c - base c`` for c ≥ 0."""
-        return np.abs(2 * self.diagonal * c - transport) + self.scale * lost * c + np.abs(self.right)
+    @functools.cached_property
+    def margin(self):
+        """Per node, the diagonal dominance of base, ``base_ii - Σ_{j≠i} |base_ij|``, over its row or, where
+        base is not symmetric, over its column (upwinded advection is dominant over columns), divided by
+        scale: in the units of the derivative. F falls as c rises at a node where ``margin + d ≤ 0``."""
+        off = np.asarray(abs(self.base).sum(axis=1 if self.symmetric else 0)).ravel() - np.abs(self.diagonal)
+        return np.maximum(self.diagonal - off, 0.0) / self.scale
 
-    def at_rounding(self, c, F, lost, transport):
+    def unchanged(self, old, new):
+        """Whether the terms are the same in two evaluations."""
+        return all(np.array_equal(a, b) for before, after in zip(old.outputs, new.outputs)
+                   for a, b in zip(before, after))
+
+    def size(self, c, evaluation):
+        """Per node, the size of the terms that make F: ``|base| c + scale (L + Σ_k r_k) c + |source|``; base
+        has no positive entries off its diagonal, so ``|base| c = 2 diag(base) c - base c`` for c ≥ 0."""
+        return (np.abs(2 * self.diagonal * c - evaluation.transport) + self.scale * evaluation.lost * c
+                + np.abs(evaluation.source))
+
+    def at_rounding(self, c, evaluation):
         """Whether F is as small as rounding makes it, so that no iteration can reduce it."""
-        return bool(np.all(np.abs(F) <= _ROUNDING * self.size(c, lost, transport)))
+        return bool(np.all(np.abs(evaluation.residual) <= _ROUNDING * self.size(c, evaluation)))
 
 
 def _norm(x):
