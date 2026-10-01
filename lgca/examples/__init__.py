@@ -46,6 +46,7 @@ __all__ = [
     "random_walk_spec",
     "run_example",
     "save_example_spec",
+    "tumour_spheroid",
 ]
 
 
@@ -180,6 +181,7 @@ _GALLERY_ORDER = (
     "evolutionary_go_or_grow",
     "multispecies_birth_death",
     "identity_tumor_growth",
+    "tumour_spheroid",
 )
 
 _EXAMPLE_MODULE_NAMES = frozenset(_GALLERY_ORDER)

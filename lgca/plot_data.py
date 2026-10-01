@@ -161,3 +161,55 @@ def mean_trait(lgca, name):
     total = np.bincount(index, weights=np.asarray(cells[name], dtype=float), minlength=size)
     with np.errstate(invalid="ignore", divide="ignore"):
         return (total / count).reshape(tuple(lgca.dims))
+
+
+def mean_species_property(lgca, values, density=None):
+    """Mean of a property of the species over the cells at every node; NaN where no cell is.
+
+    In a model with several species, e.g. classes of cells, every species has
+    a value of the property, such as its division rate; a node shows the mean
+    over its cells, the counterpart of :func:`mean_trait` for models without
+    identities. Draw it with ``lgca.plot_scalarfield``.
+
+    Parameters
+    ----------
+    lgca
+        A model with several species.
+    values : sequence of float
+        The property of every species, one value per species.
+    density : numpy.ndarray, optional
+        The cells of every species, species last: one state, shape
+        ``lgca.dims + (n_species,)``, or a recording of
+        :class:`~lgca.simulation.DensityRecorder`, shape
+        ``(steps,) + lgca.dims + (n_species,)``. Default: the current state.
+
+    Returns
+    -------
+    numpy.ndarray
+        The mean at every node (and step), the shape of ``density`` without
+        its species axis.
+
+    Examples
+    --------
+    Proliferating, quiescent and necrotic cells, and the fraction of cells that
+    are alive at every node:
+
+    >>> import numpy as np
+    >>> density = np.array([[[2, 2, 0], [0, 1, 3], [0, 0, 0]]])  # one row of three nodes
+    >>> mean_species_property(None, [1.0, 1.0, 0.0], density)
+    array([[1.  , 0.25,  nan]])
+    """
+    values = np.asarray(values, dtype=float)
+    n_species = values.shape[0] if values.ndim == 1 else None
+    if density is None:
+        if getattr(lgca, "n_species", 1) < 2:
+            raise ValueError("mean_species_property needs a model with several species; identity-based "
+                             "models have mean_trait")
+        density = lgca.species_density[lgca.nonborder]
+    density = np.asarray(density, dtype=float)
+    if n_species is None or density.shape[-1] != n_species:
+        raise ValueError(f"values must give one number per species ({density.shape[-1]}), got shape "
+                         f"{values.shape}")
+    count = density.sum(-1)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return (density @ values) / count

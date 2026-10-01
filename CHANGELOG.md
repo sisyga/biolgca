@@ -7,6 +7,21 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- An advanced example, `lgca.examples.tumour_spheroid`, with a notebook in
+  the example gallery: a tumour spheroid of proliferating, quiescent and
+  necrotic cells (three species without volume exclusion) in the oxygen they
+  consume, on a hexagonal lattice (a cross-section) and on the 3D Moore
+  lattice. It follows Dormann & Deutsch (2002) in outline, with measured
+  parameters: oxygen diffusion and consumption, Michaelis–Menten uptake,
+  thresholds of quiescence and necrosis, doubling time, cell volume and an
+  unstirred layer of medium. Its 3D spheroid doubles in 24 h, its centre
+  runs out of oxygen at about 0.53 mm across, and after a week oxygen
+  reaches 180 µm into it, close to the measured 188–220 µm.
+- `lgca.plot_data.mean_species_property(lgca, values)`: the mean over the
+  cells of every node of a property of their species (one value per
+  species), the counterpart of `mean_trait` for models with several species;
+  also for recordings of `DensityRecorder`. Draw it with
+  `lgca.plot_scalarfield`.
 - Provenance: `model.metadata["provenance"]`, and so `metadata.json` of
   `biolgca run`, records the versions of Python and the packages, the
   platform, the operators with their parameters including defaults, the

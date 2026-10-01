@@ -770,13 +770,14 @@ _PARAMETERS_FOR_PLUGIN = {"chemotaxis": {"field": "signal"}, "directed_motion": 
 
 
 def _library_interactions():
-    """The interactions of the library outside the zoo, whose rules need the fields of their models; not the
-    legacy functions (``tests/legacy``) or the rules that tests register."""
+    """The interactions of the library outside the zoo and the examples, whose rules need the fields of their
+    models; not the legacy functions (``tests/legacy``) or the rules that tests register."""
     from lgca.plugins import default_registry
 
     modules = {plugin.name: getattr(default_registry.resolve(plugin.name), "__module__", None) or ""
                for plugin in list_plugins(kind="interaction")}
-    return [name for name, module in modules.items() if module.startswith("lgca.") and not module.startswith("lgca.zoo.")]
+    return [name for name, module in modules.items()
+            if module.startswith("lgca.") and not module.startswith(("lgca.zoo.", "lgca.examples."))]
 
 
 @pytest.mark.parametrize("plugin_name", _library_interactions())

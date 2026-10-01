@@ -12,6 +12,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+import lgca.examples
 import lgca.zoo
 from lgca.fields import _REACTIONS
 from lgca.mutations import _EFFECTS
@@ -19,10 +20,12 @@ from lgca.pipeline import _REORIENTATION_TERMS, _TERM_ALIASES
 from lgca.plugins import default_registry
 from lgca.switching import _CUES
 
-# the library's own rules, all registered before the first test (the zoo registers its rules when imported):
-# imported inside a test, they would be removed after it with the rules the test registered
-for _module in pkgutil.iter_modules(lgca.zoo.__path__, "lgca.zoo."):
-    import_module(_module.name)
+# the library's own rules, all registered before the first test (the zoo and some examples register their
+# rules when imported): imported inside a test, they would be removed after it with the rules the test
+# registered
+for _package in (lgca.zoo, lgca.examples):
+    for _module in pkgutil.iter_modules(_package.__path__, f"{_package.__name__}."):
+        import_module(_module.name)
 
 # the legacy interaction functions, registered as "legacy.<family>.<name>" for comparisons
 import tests.legacy  # noqa: F401

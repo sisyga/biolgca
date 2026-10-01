@@ -92,10 +92,10 @@ jobs:
           uv pip install nbclient ipykernel
       - name: Run tests
         run: uv run --no-sync python -m pytest -q
-      - name: Execute tutorial and zoo notebooks
+      - name: Execute tutorial, zoo and example notebooks
         working-directory: docs/source
         run: |
-          for notebook in tutorials/*.ipynb zoo/*.ipynb; do
+          for notebook in tutorials/*.ipynb zoo/*.ipynb examples/*.ipynb; do
             uv run --no-sync python -c "import sys, nbformat; from nbclient import NotebookClient; NotebookClient(nbformat.read(sys.argv[1], as_version=4), timeout=300).execute()" "$notebook"
           done
 

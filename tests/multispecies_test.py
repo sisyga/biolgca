@@ -586,3 +586,34 @@ def test_factory_builds_supported_multispecies_interactions(ve, interaction):
     lgca.timestep()
 
     assert interaction is None or interaction in lgca.interactions
+
+
+@pytest.mark.parametrize("geometry, dims", [("hex", (6, 6)), ("moore", (4, 4, 4)), ("square", (5, 4))])
+def test_the_mean_species_property_of_a_node_weights_its_species_by_their_cells(geometry, dims):
+    from lgca.model import AnalysisSpec, ModelSpec, SpaceSpec, StateSpec, TimeSpec, run_model
+    from lgca.plot_data import mean_species_property
+    from lgca.simulation import DensityRecorder
+
+    result = run_model(ModelSpec(
+        space=SpaceSpec(geometry=geometry, dims=dims, boundary="reflecting"),
+        state=StateSpec(density=0.3, n_species=3, volume_exclusion=False, capacity=4, restchannels=1),
+        time=TimeSpec(steps=2, seed=4), analysis=AnalysisSpec(observers=[DensityRecorder()])), showprogress=False)
+    lgca, values = result.lgca, [1.0, 0.5, 0.0]
+    species = lgca.species_density[lgca.nonborder]
+    occupied = species.sum(-1) > 0
+    assert occupied.any() and not occupied.all()
+    means = mean_species_property(lgca, values)
+    np.testing.assert_allclose(means[occupied], (species @ values)[occupied] / species.sum(-1)[occupied])
+    assert np.isnan(means[~occupied]).all()
+    history = mean_species_property(lgca, values, result.data["density"])  # every recorded step
+    assert history.shape == (3,) + dims
+    np.testing.assert_array_equal(history[-1], means)
+    with pytest.raises(ValueError, match="one number per species"):
+        mean_species_property(lgca, [1.0, 0.0])
+
+
+def test_the_mean_species_property_needs_several_species():
+    from lgca.plot_data import mean_species_property
+
+    with pytest.raises(ValueError, match="several species"):
+        mean_species_property(get_lgca(geometry="square", dims=(4, 4), density=0.2), [1.0])

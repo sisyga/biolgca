@@ -208,7 +208,10 @@ always work with the current code.
 | [8. Aggregation](docs/source/tutorials/08_aggregation.ipynb) | find the onset of chemotactic aggregation toward a secreted signal, and watch it live |
 
 The [example gallery](docs/source/example_gallery.rst) collects further
-ready-to-run models, one per question.
+ready-to-run models, one per question, and an advanced example: a
+[tumour spheroid](docs/source/examples/tumour_spheroid.ipynb) of proliferating,
+quiescent and necrotic cells in the oxygen they consume, in 2D and 3D, with
+parameters from measurements.
 
 ## Model types
 

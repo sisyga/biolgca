@@ -40,8 +40,8 @@ uv run pytest -q tests/x_test.py           # one test file while you work
 uv run pytest -q                           # full suite: about 2900 tests, 4 minutes
 uv run ruff check <files>                  # lint the files you changed
 uv run python docs/build.py --no-notebooks # strict docs build, notebooks not run (under a minute)
-uv run python docs/build.py                # full docs build: runs every tutorial and zoo
-                                           # notebook (about 15 minutes), as CI does
+uv run python docs/build.py                # full docs build: runs every tutorial, zoo and
+                                           # example notebook (about 18 minutes), as CI does
 uv run jupyter nbconvert --to notebook --execute --output-dir <tmp> <notebook>  # one notebook
 ```
 
@@ -54,7 +54,7 @@ runs before pushing (and in CI).
 After changing dependencies in `pyproject.toml`, run `uv lock` and commit
 `uv.lock`. CI (`.github/workflows/ci.yml`) runs the tests on Linux with
 Python 3.11 to 3.14, on Windows and macOS, with the minimum dependency
-versions and once in random order; executes the tutorial and zoo notebooks;
+versions and once in random order; executes the tutorial, zoo and example notebooks;
 smoke-tests the installed wheel and the CLI; and builds the docs. pyamg has no
 wheels for Python 3.14 yet: code paths without it are tested by
 monkeypatching `lgca.fields._pyamg`.
@@ -104,7 +104,8 @@ Practical notes:
   `lgca_hex.py`, `lgca_cubic.py`, `lgca_3dmoore.py` and `ms_*.py`.
 - Plotting: `plots.py`, `plot_data.py`, `square_plotting.py`, `plotting.py`,
   `mayavi_style.py` (optional 3D).
-- `examples/`: curated runnable models (`lgca.examples.run_example`);
+- `examples/`: curated runnable models (`lgca.examples.run_example`); the
+  advanced ones have a notebook in `docs/source/examples/`;
   `zoo/`: the model zoo (one module per paper, `_card.py` for the cards).
 
 Elsewhere:

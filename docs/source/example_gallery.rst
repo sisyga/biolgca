@@ -322,6 +322,32 @@ changes.
    :language: python
    :caption: lgca/examples/identity_tumor_growth.py
 
+tumour_spheroid
+~~~~~~~~~~~~~~~
+
+:Category: tumor growth
+:Question: How does the supply of oxygen layer a growing tumour spheroid into
+   proliferating, quiescent and necrotic cells?
+:Concepts: multispecies, fields, phenotype switch, hexagonal lattice, 3D lattice
+:Source: ``lgca/examples/tumour_spheroid.py``
+
+An advanced example with measured parameters: three classes of cells as the
+species of one model, the oxygen they consume, and switches between the
+classes that respond to it, on a hexagonal and a 3D Moore lattice. Its
+notebook, :doc:`examples/tumour_spheroid`, runs it and compares it with
+measurements.
+
+Advanced examples
+-----------------
+
+Notebooks that build larger models from the mechanisms of the gallery, with
+parameters from measurements, and compare them with experiments.
+
+.. toctree::
+   :maxdepth: 1
+
+   examples/tumour_spheroid
+
 Suggested classroom workflow
 ----------------------------
 

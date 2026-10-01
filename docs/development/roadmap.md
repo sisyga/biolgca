@@ -39,9 +39,6 @@ the 30 September review are done, apart from the items below:
 
 ### Features for later
 
-- An advanced example: multispecies tumour growth without volume exclusion on
-  hexagonal and 3D Moore lattices, nodes coloured by the local mean class
-  property.
 - Fields, each when an application needs it (compared with Morpheus 2.4.1,
   which has the first three): diffusion that varies in space or with the
   cells; a prescribed flux and boundary values that vary in space and time;
