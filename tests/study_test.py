@@ -384,6 +384,24 @@ def test_the_command_line_sweeps_into_a_table(tmp_path):
     assert len(pd.read_csv(long / "table.csv")) == 10
 
 
+def test_the_command_line_sweep_can_record_failed_runs(tmp_path):
+    import json
+
+    from lgca.cli import main
+    from lgca.model import save_model_spec
+
+    save_model_spec(_growth(steps=2), tmp_path / "model.json")
+    arguments = ["sweep", str(tmp_path / "model.json"), "--vary", "birth_rate=0.5,2", "--seeds", "0:2"]
+    assert main([*arguments, "--output", str(tmp_path / "stopped")]) == 2  # a rate of 2 is no probability
+    with pytest.warns(UserWarning, match="2 of 4 runs failed"):
+        assert main([*arguments, "--errors", "record", "--output", str(tmp_path / "recorded")]) == 0
+    table = pd.read_csv(tmp_path / "recorded" / "table.csv")
+    assert table.columns.tolist() == ["birth_rate", "seed", "error", "population"]
+    assert table.error.isna().tolist() == [True, True, False, False]
+    assert table.error.iloc[-1].startswith("ValueError")
+    assert json.loads((tmp_path / "recorded" / "sweep.json").read_text())["errors"] == "record"
+
+
 def _from_npz(directory):
     from lgca.model import save_model_spec
 

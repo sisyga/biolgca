@@ -570,6 +570,10 @@ class CellHistory:
     def __repr__(self) -> str:
         return f"<CellHistory: {len(self)} recorded times>"
 
+    def _truncate(self, length) -> None:
+        """Keep the first ``length`` snapshots (a run that failed recorded no more)."""
+        del self._snapshots[length:]
+
     def record(self, index, label, slot) -> None:
         """Store the cells with labels ``label`` in interior slots ``node * K + channel``."""
         slot = np.asarray(slot, dtype=np.int64)

@@ -242,13 +242,16 @@ class Explorer:
     def advance(self, steps: int | None = None) -> None:
         """Run ``steps`` model steps (default: the steps per frame) and draw the new frame."""
         steps = self._speed.value if steps is None else int(steps)
-        with self._lock:
-            for _ in range(steps):
-                self.model.step()
-                self.step += 1
-                self._measure()
-            self._update()
-        self._draw()
+        try:
+            with self._lock:
+                for _ in range(steps):
+                    self.model.step()  # a step that fails is rolled back: the model stays at self.step
+                    self.step += 1
+                    self._measure()
+        finally:  # also after a failed step: show the steps of the frame that were applied
+            with self._lock:
+                self._update()
+            self._draw()
 
     def set(self, **values) -> None:
         """Set controls by their names or labels, as if their sliders moved, e.g. ``explorer.set(beta=4.0)``.
@@ -1034,4 +1037,5 @@ def _figsize(lgca, series):
 def _message(exc):
     from html import escape
 
-    return f"<span style='color:#b00020'>{escape(type(exc).__name__)}: {escape(str(exc))}</span>"
+    notes = "".join(f"<br>{escape(note)}" for note in getattr(exc, "__notes__", ()))  # e.g. it was rolled back
+    return f"<span style='color:#b00020'>{escape(type(exc).__name__)}: {escape(str(exc))}{notes}</span>"

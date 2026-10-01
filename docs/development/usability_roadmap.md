@@ -92,9 +92,15 @@ until it is rebuilt (until PR1 rolls failed steps back).
 CR-A1 PR1 done (2026-10-01): a step is applied as a whole or not at all. A step
 that raises is rolled back (`lgca/transaction.py`: attributes, nodes, fields,
 traits with a journal of overwritten values, families, random stream), at no
-measurable cost; `model.rollback = False` keeps PR0's refusal instead. Next:
-CR-A1 PR3 (failed runs, sweep error policy), CR-A2 PR1 (Newton, in progress on a
-branch).
+measurable cost; `model.rollback = False` keeps PR0's refusal instead.
+
+CR-A1 PR3 done (2026-10-01): a failed run keeps its recordings up to the last
+completed step (no empty rows), writes its observers' files and records the
+failed step in its metadata; the Explorer says that a failed step was rolled
+back; `sweep(errors="record")` records failed runs in a column `error`, and the
+default `"raise"` no longer runs every other run first. Next: CR-A2 PR1 (Newton,
+in progress on a branch), then CR-A3 PR2 and PR3; CR-A1 PR2 (fingerprints of
+class-based operators under strict contracts) when third-party operators appear.
 
 ## Reference point: Morpheus
 

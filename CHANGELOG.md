@@ -448,6 +448,21 @@ This file records notable user-facing changes. Changes remain under
   interaction are rolled back too. Not rolled back: what operators keep
   themselves (e.g. the statistics and multigrid hierarchies of field solvers)
   and writes through `TraitArray.values`.
+- A run that fails keeps what it recorded up to the last completed step: the
+  recordings (`lgca.n_t` and the other arrays, field recordings, the cell
+  histories of identity-based models) no longer end in empty rows for the
+  steps that did not run, the observers write their files (e.g. the time
+  series CSV, movies), the error says where the run stopped, and
+  `model.metadata["runtime"]` has the `failed_step`. Observers of your own can
+  implement `truncate(lgca, step)`.
+- `sweep(..., errors="record")` (`biolgca sweep --errors record`) goes on when
+  a run fails: the run gets a row with its values, its seed and the error in a
+  column `error`, and a warning counts the failed runs. By default
+  (`errors="raise"`) a failed run stops the sweep, now without running the
+  other runs first: thread and process pools ran every run of the sweep before
+  they raised the error.
+- `lgca.explore` says when a failed step was rolled back, and draws the steps
+  of a frame that were applied before it.
 
 - Every model owns its configuration. `build_model` (and so `run_model`,
   `sweep`, `lgca.explore` and the command line) builds from its own copy of

@@ -1764,17 +1764,28 @@ def _run_compiled_model(compiled: CompiledModel, showprogress: bool = True,
         context=compiled,
         max_recording_bytes=max_recording_bytes,
     )
-    runner.run()
-    compiled.metadata["runtime"] = {
-        "start_step": runner.start_step,
-        "end_step": runner.end_step,
-        "sample_time_origin": "local",
-        "estimated_recording_bytes": runner.estimated_recording_bytes,
-        "elapsed_seconds": runner.elapsed_seconds,
-        "operator_timings": list(operator_timings.values()),
-        "timing_trace": timing_trace,
-    }
-    compiled.metadata["output_paths"] = _collect_output_paths(observers)
+    def record_runtime():
+        compiled.metadata["runtime"] = {
+            "start_step": runner.start_step,
+            "end_step": runner.end_step,
+            "sample_time_origin": "local",
+            "estimated_recording_bytes": runner.estimated_recording_bytes,
+            "elapsed_seconds": runner.elapsed_seconds,
+            "operator_timings": list(operator_timings.values()),
+            "timing_trace": timing_trace,
+        }
+        compiled.metadata["output_paths"] = _collect_output_paths(observers)
+
+    try:
+        runner.run()
+    except BaseException:
+        if getattr(runner, "failed_step", None) is not None:  # it failed in a step, not before the first
+            record_runtime()
+            runtime = compiled.metadata["runtime"]
+            runtime["failed_step"] = runner.start_step + runner.failed_step
+            runtime["end_step"] = runner.start_step + max(runner.completed_step or 0, 0)
+        raise
+    record_runtime()
     return ModelRunResult(
         lgca=lgca,
         spec=compiled.spec,

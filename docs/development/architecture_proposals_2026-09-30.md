@@ -1,7 +1,7 @@
 # Architecture proposals after the 30 September 2026 review
 
-Status: proposal, 2026-09-30; decisions, CR-A3 PR1 and CR-A1 PR0 and PR1 on
-2026-10-01 (see [Decisions](#decisions-for-the-maintainer)). Follow-up to [the code review](code_review_2026-09-30.md),
+Status: proposal, 2026-09-30; decisions, CR-A3 PR1 and CR-A1 PR0, PR1 and PR3
+on 2026-10-01 (see [Decisions](#decisions-for-the-maintainer)). Follow-up to [the code review](code_review_2026-09-30.md),
 whose three open architectural findings are renamed here CR-A1 to CR-A3, so that
 they no longer collide with the IDs A1 to A5 of the [usability roadmap](usability_roadmap.md).
 
@@ -258,6 +258,17 @@ says that the step was not applied. A sweep in which one run fails discards
 every result today (thread and process pools even finish all runs first): give
 `sweep` an error policy, e.g. a column with the error of each failed run, and
 cancel pending runs when it raises.
+
+Done on 2026-10-01: `Observer.truncate(lgca, step)` (built-in recorders through
+`RECORDED`, `FieldRecorder`, the cell histories of `NodeRecorder`);
+`SimulationRunner.run` truncates to the last completed step, finalizes the
+observers and adds a note where the run stopped; `metadata["runtime"]` gets
+`failed_step` and the last completed `end_step`. The Explorer shows the notes of
+an error (e.g. that the step was rolled back) and draws the applied steps of a
+frame. `sweep(errors="raise" | "record")`: "raise" cancels the runs that have
+not started (pool `shutdown(cancel_futures=True)`), "record" gives failed runs a
+row with an `error` column and warns with their number; `biolgca sweep
+--errors record` as well. Tests in `tests/failed_runs_test.py`.
 
 **PR4 (optional) Checkpoints.** `CompiledModel.checkpoint()` and `restore()` on
 the transaction's list of state, an identity-aware NPZ checkpoint, and
@@ -606,8 +617,7 @@ Effort: 3.5 to 4 days for PR1 to PR3.
 
 1. ~~**CR-A3 PR1**~~: done on 2026-10-01.
 2. ~~**CR-A1 PR0**~~: done on 2026-10-01.
-3. ~~**CR-A1 PR1**~~ (done on 2026-10-01) **and PR3**: failed-run semantics and
-   a sweep error policy.
+3. ~~**CR-A1 PR1 and PR3**~~: done on 2026-10-01.
 4. **CR-A3 PR2 and PR3**: `reconfigure`, then reading inputs once and
    provenance.
 5. **CR-A2 PR1 to PR3**, in parallel with the above: it touches only the field

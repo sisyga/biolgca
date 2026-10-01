@@ -136,6 +136,12 @@ series are discarded; measure what you need instead. With
 named after its values and seed, inside the observer's destination, e.g.
 ``snapshots/kappa=2_seed=1/density_00010.png``.
 
+A run that fails stops the sweep with its error, which names the run's values
+and seed; runs that have not started are cancelled. With ``errors="record"``
+the sweep goes on instead: a failed run gets a row with its values, its seed
+and the error in a column ``error``, and a warning says how many runs failed,
+e.g. to find the parameter values for which a model breaks down.
+
 From the command line
 ---------------------
 
@@ -152,7 +158,8 @@ version and the copied files):
 ``true``/``false``, or words); ``--seeds`` a range ``0:10`` or a list
 ``1,2,3``; ``--measure`` names recordings, and without it the table has the
 population at the end of every run. ``--keep-files`` keeps the files of the
-model's observers in a folder per run inside the output directory.
+model's observers in a folder per run inside the output directory, and
+``--errors record`` gives failed runs a row with their error.
 ``--plugins my_project.rules`` imports
 trusted modules with your own rules first; ``biolgca run`` and
 ``biolgca validate`` take it as well. Modules are never imported because a

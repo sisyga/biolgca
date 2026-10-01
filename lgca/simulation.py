@@ -107,7 +107,14 @@ class Schedule:
 
 
 class Observer:
-    """Base class for objects that observe simulation state over time."""
+    """Base class for objects that observe simulation state over time.
+
+    :class:`SimulationRunner` calls ``setup`` before the run, ``on_step`` at the
+    scheduled steps (step 0 is the initial state) and ``finalize`` at the end,
+    also of a run that failed; before that, ``truncate(lgca, step)`` asks the
+    observer to keep only what it recorded up to ``step``, the last step that
+    completed.
+    """
 
     def __init__(self, schedule: Schedule | None = None):
         self.schedule = schedule or Schedule()
@@ -117,6 +124,18 @@ class Observer:
 
     def on_step(self, lgca, step: int) -> None:
         pass
+
+    def truncate(self, lgca, step: int) -> None:
+        """Keep what was recorded up to ``step``: the run failed after it, so later rows are empty."""
+        for name in _recorded_names(self):
+            attribute, steps = RECORDED[name][:2]
+            recorded = getattr(lgca, steps, None)
+            if recorded is None or not hasattr(lgca, attribute):
+                continue
+            count = int(np.searchsorted(recorded, step, side="right"))
+            setattr(lgca, steps, recorded[:count])
+            if not (attribute == "nodes_t" and getattr(self, "_cells", False)):  # built from cells_t
+                setattr(lgca, attribute, getattr(lgca, attribute)[:count])
 
     def finalize(self, lgca, runner: "SimulationRunner") -> None:
         pass
@@ -246,20 +265,49 @@ class SimulationRunner:
             if setup is not None:
                 setup(lgca, self)
 
-        self._notify_observers(0)
-        for step in tqdm(range(1, self.timesteps + 1), disable=not self.showprogress):
-            if self.step_function is None:
-                lgca.timestep()
-            else:
-                self.step_function(lgca, step, self)
-            self._notify_observers(step)
+        self.completed_step = self.failed_step = None
+        step = 0
+        try:
+            self._notify_observers(0)
+            self.completed_step = 0
+            for step in tqdm(range(1, self.timesteps + 1), disable=not self.showprogress):
+                if self.step_function is None:
+                    lgca.timestep()
+                else:
+                    self.step_function(lgca, step, self)
+                self._notify_observers(step)
+                self.completed_step = step
+        except BaseException as exc:
+            self._stop(exc, step, start)
+            raise
+        self._finalize()
+        self.elapsed_seconds = time.perf_counter() - start
+        return lgca
 
+    def _stop(self, exc, step, start):
+        """A step failed: keep the recordings of the completed steps and write the outputs of the observers."""
+        self.failed_step = step
+        done = -1 if self.completed_step is None else self.completed_step
+        for observer in self.observers:
+            truncate = getattr(observer, "truncate", None)
+            if truncate is not None:
+                try:
+                    truncate(self.lgca, done)
+                except Exception as error:  # noqa: BLE001 - the step's error is the one raised
+                    exc.add_note(f"{type(observer).__name__} could not drop its rows after step {done}: {error}")
+        try:
+            self._finalize()
+        except Exception as error:  # noqa: BLE001
+            exc.add_note(f"the observers could not finish ({type(error).__name__}: {error})")
+        self.elapsed_seconds = time.perf_counter() - start
+        recorded = "nothing was recorded" if done < 0 else f"recordings and output files hold steps 0 to {done}"
+        exc.add_note(f"the run stopped at step {step} of {self.timesteps}; {recorded}")
+
+    def _finalize(self):
         for observer in self.observers:
             finalize = getattr(observer, "finalize", None)
             if finalize is not None:
-                finalize(lgca, self)
-        self.elapsed_seconds = time.perf_counter() - start
-        return lgca
+                finalize(self.lgca, self)
 
     def _notify_observers(self, step: int) -> None:
         for observer in self.observers:
@@ -289,6 +337,12 @@ class NodeRecorder(Observer):
             lgca.nodes_t = get_arr_of_empty_lists(shape)
         else:
             lgca.nodes_t = np.zeros(shape, dtype=lgca.nodes.dtype)
+
+    def truncate(self, lgca, step: int) -> None:
+        super().truncate(lgca, step)
+        if self._cells:
+            lgca.cells_t._truncate(len(lgca.nodes_steps))
+            lgca.nodes_t = None  # built again from the cells
 
     def on_step(self, lgca, step: int) -> None:
         index = self._sample_indices[step]
@@ -525,6 +579,11 @@ class FieldRecorder(Observer):
         index = self._sample_indices[step]
         for name in self.fields:
             self.values[name][index] = self._interior(lgca, name)
+
+    def truncate(self, lgca, step: int) -> None:
+        count = int(np.searchsorted(self.steps, step, side="right"))
+        self.steps = self.steps[:count]
+        self.values = {name: values[:count] for name, values in self.values.items()}
 
     @staticmethod
     def _interior(lgca, name):

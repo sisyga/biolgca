@@ -82,6 +82,8 @@ def _build_parser() -> argparse.ArgumentParser:
     sweep.add_argument("--keep-files", action="store_true",
                        help="keep the files of the model's observers, in a folder per run (e.g. kappa=2_seed=1)")
     sweep.add_argument("--n-jobs", type=int, default=1, help="number of runs at the same time")
+    sweep.add_argument("--errors", choices=("raise", "record"), default="raise",
+                       help="a run that fails stops the sweep (raise), or gets a row with its error (record)")
     sweep.add_argument("--overwrite", action="store_true")
     sweep.add_argument("--trusted-paths", action="store_true")
     sweep.add_argument("--show-progress", action="store_true")
@@ -276,7 +278,7 @@ def _sweep(args) -> int:
     measure = {name: name for name in args.measure} or {"population": final_population}
     table = sweep(running, grid=grid or None, seeds=seeds, measure=measure, n_jobs=args.n_jobs, long=args.long,
                   plugins=plugins, showprogress=args.show_progress, resource_base=model_path.parent,
-                  trusted_paths=args.trusted_paths, keep_files=args.keep_files)
+                  trusted_paths=args.trusted_paths, keep_files=args.keep_files, errors=args.errors)
     output_dir.mkdir(parents=True, exist_ok=True)
     table.map(_csv_cell).to_csv(output_dir / "table.csv", index=False)
     portable_spec, portable_grid, resources = _with_copied_sweep_resources(spec, grid, model_path, output_dir,
@@ -284,6 +286,7 @@ def _sweep(args) -> int:
     description = {
         "model": model_spec_to_dict(portable_spec), "grid": _json_safe(portable_grid), "paths": table.attrs["paths"],
         "seeds": _json_safe(sorted(set(table["seed"].tolist()))), "measure": list(measure), "long": args.long,
+        "errors": args.errors,
         "resources": resources, "plugins": plugins, "biolgca_version": _package_version(),
     }
     (output_dir / "sweep.json").write_text(json.dumps(_json_safe(description), indent=2), encoding="utf-8")

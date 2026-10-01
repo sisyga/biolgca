@@ -39,12 +39,14 @@ from collections.abc import Iterable, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from concurrent.futures.process import BrokenProcessPool
 from copy import deepcopy
-from dataclasses import fields, is_dataclass, replace
+from dataclasses import dataclass, fields, is_dataclass, replace
 from importlib import import_module
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+
+from ._warnings import warn_user
 
 __all__ = ["final_population", "resolve_path", "sweep", "vary"]
 
@@ -114,7 +116,7 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
           seeds: Iterable[int] | None = None, measure: Mapping[str, Any] | None = None, n_jobs: int = 1,
           backend: str = "processes", long: bool = False, plugins: Sequence[str] = (),
           showprogress: bool = True, resource_base: str | Path | None = None, trusted_paths: bool = False,
-          keep_files: bool = False):
+          keep_files: bool = False, errors: str = "raise"):
     """Run a model for every combination of parameter values and seeds; one table row per run.
 
     Parameters
@@ -161,6 +163,12 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
         Keep the files that observers write: every run writes into a folder of its own, named
         after its values and seed (e.g. ``kappa=2_seed=1``), inside the observer's destination,
         e.g. ``snapshots/kappa=2_seed=1/density_00010.png``.
+    errors : {"raise", "record"}, default="raise"
+        What a run that fails does. ``"raise"`` stops the sweep with the run's error, naming its
+        values and seed; runs that have not started are cancelled. ``"record"`` goes on: the
+        failed run gets a row with its values, its seed and the error (type and message) in a
+        column ``error``, without measures, and a warning counts the failed runs; the other
+        rows have ``None`` there. Interrupting the sweep (Ctrl-C) always stops it.
 
     Returns
     -------
@@ -202,7 +210,10 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
     combinations, paths = _combinations(spec, grid)
     columns = _column_names(paths)
     measures = _measures(measure)
-    reserved = set(columns.values()) | {"seed"} | ({"step"} if long else set())
+    if errors not in ("raise", "record"):
+        raise ValueError(f"errors must be 'raise' or 'record', got {errors!r}")
+    reserved = set(columns.values()) | {"seed"} | ({"step"} if long else set()) | (
+        {"error"} if errors == "record" else set())
     conflicts = reserved.intersection(measures)
     if conflicts:
         raise ValueError(f"measure names conflict with sweep columns: {sorted(conflicts)}; "
@@ -236,12 +247,18 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
         jobs = [(combination, seed, folder) for (combination, seed), folder in zip(jobs, _run_folders(jobs, columns))]
     else:
         jobs = [(combination, seed, None) for combination, seed in jobs]
-    results = _execute(spec, jobs, measures, n_jobs, backend, tuple(plugins), showprogress, columns, resources)
+    results = _execute(spec, jobs, measures, n_jobs, backend, tuple(plugins), showprogress, columns, resources,
+                       errors)
     rows = []
     for (combination, seed, _), measured in zip(jobs, results):
         base = {columns[path]: value for path, value in combination.items()}
         base["seed"] = seed
-        rows.extend(_rows(base, measured, long))
+        if errors == "record":
+            base["error"] = measured.message if isinstance(measured, _RunError) else None
+        rows.extend(_rows(base, {} if isinstance(measured, _RunError) else measured, long))
+    failed = sum(isinstance(measured, _RunError) for measured in results)
+    if failed:
+        warn_user(f"{failed} of {len(results)} runs failed; their errors are in the column 'error'")
     table = pd.DataFrame(rows)
     table.attrs["biolgca_version"] = _package_version()
     table.attrs["paths"] = {columns[path]: path for path in paths}
@@ -614,7 +631,7 @@ def _drawn_seed():
     return int(np.random.SeedSequence().generate_state(1, np.uint32)[0])
 
 
-def _execute(spec, jobs, measures, n_jobs, backend, plugins, showprogress, columns, resources):
+def _execute(spec, jobs, measures, n_jobs, backend, plugins, showprogress, columns, resources, errors="raise"):
     from tqdm.auto import tqdm
 
     if isinstance(n_jobs, bool) or not isinstance(n_jobs, (int, np.integer)) or n_jobs < 1:
@@ -627,7 +644,7 @@ def _execute(spec, jobs, measures, n_jobs, backend, plugins, showprogress, colum
     try:
         if n_jobs == 1 or len(jobs) == 1:
             for index, job in enumerate(jobs):
-                results[index] = _guarded(spec, job, measures, (), columns, None, resources)
+                results[index] = _guarded(spec, job, measures, (), columns, None, resources, errors)
                 progress.update()
             return results
         processes = backend == "processes"
@@ -642,10 +659,14 @@ def _execute(spec, jobs, measures, n_jobs, backend, plugins, showprogress, colum
         try:
             with pool:
                 futures = {pool.submit(_guarded, spec, job, measures, plugins if processes else (), columns,
-                                       backend, resources): index for index, job in enumerate(jobs)}
-                for future in as_completed(futures):
-                    results[futures[future]] = future.result()
-                    progress.update()
+                                       backend, resources, errors): index for index, job in enumerate(jobs)}
+                try:
+                    for future in as_completed(futures):
+                        results[futures[future]] = future.result()
+                        progress.update()
+                except BaseException:
+                    pool.shutdown(wait=False, cancel_futures=True)  # the runs that have not started do not
+                    raise
         except (BrokenProcessPool, EOFError) as exc:
             raise RuntimeError(f"the worker processes stopped ({type(exc).__name__}). {_MAIN_GUARD}") from exc
     finally:
@@ -678,8 +699,15 @@ def _check_picklable(spec, measures):
                         f"n_jobs=1") from None
 
 
-def _guarded(spec, job, measures, plugins, columns, backend, resources):
-    """One run, with the run named in errors."""
+@dataclass(frozen=True)
+class _RunError:
+    """The error of a run that failed, in a sweep that records errors."""
+
+    message: str
+
+
+def _guarded(spec, job, measures, plugins, columns, backend, resources, errors="raise"):
+    """One run, with the run named in errors; with ``errors="record"`` a failure gives a :class:`_RunError`."""
     combination, seed, folder = job
     try:
         for module in plugins:
@@ -693,6 +721,8 @@ def _guarded(spec, job, measures, plugins, columns, backend, resources):
                                        or "Can't get attribute" in text):
             hint = (" Worker processes only know the rules and functions they can import: put them in a "
                     "module and pass plugins=['my_module'], or use backend='threads'.")
+        if errors == "record":
+            return _RunError(f"{type(exc).__name__}: {exc}.{hint}")
         raise RuntimeError(f"the run with {label} failed: {type(exc).__name__}: {exc}.{hint}") from exc
 
 
