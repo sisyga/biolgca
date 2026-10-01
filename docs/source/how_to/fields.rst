@@ -136,7 +136,12 @@ Boundaries
 
 The boundary of the field is independent of that of the cells, except that a
 periodic lattice needs a periodic field. The model stores the field with its
-ghost nodes filled by the condition, so gradients at the edge are right.
+ghost nodes filled by the condition, also after a rule writes the field with
+``state.set_field``, so gradients at the edge are right. A field without a
+``pde`` takes the lattice's condition: it wraps around a periodic lattice and
+takes the values at the edge beyond walls. A ramp on a periodic lattice
+therefore falls back where the edges meet, and cells there sense a steep
+gradient the other way; give a ramp a lattice with walls.
 
 Choosing a solver
 -----------------

@@ -333,8 +333,9 @@ def test_a_field_rule_changes_a_field_and_no_cells(family, boundary):
     expected = before * (1 - 0.5 * density / capacity)
     np.testing.assert_allclose(lattice.ecm[lattice.nonborder], expected)
     assert np.array_equal(lattice.nodes, nodes) if nodes.dtype != object else True
-    # the ghost nodes take the values at the edge, as when the model is built
-    np.testing.assert_allclose(lattice.ecm[0, 1:-1], lattice.ecm[1, 1:-1])
+    # the ghost nodes follow the lattice, as when the model is built: around a periodic lattice they take
+    # the values of the opposite edge, beyond a wall the values at the edge
+    np.testing.assert_allclose(lattice.ecm[0, 1:-1], lattice.ecm[-2 if boundary == "periodic" else 1, 1:-1])
     assert describe_plugin("decay_where_cells").operator_kind == "field"
 
 

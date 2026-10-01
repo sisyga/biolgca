@@ -178,7 +178,7 @@ chemotaxis.
    signal = np.linspace(0.0, 1.0, 30)[:, None] + np.zeros((30, 30))
 
    spec = ModelSpec(
-       space=SpaceSpec(geometry="square", dims=(30, 30), boundary="periodic"),
+       space=SpaceSpec(geometry="square", dims=(30, 30), boundary="reflecting"),
        state=StateSpec(
            density=0.25,
            restchannels=1,

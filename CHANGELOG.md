@@ -785,6 +785,17 @@ This file records notable user-facing changes. Changes remain under
   and a `FieldRecorder` of a field the model does not have. `validate`
   accepted both, and `run` rejected the second only after it had written
   `model.resolved.json`.
+- Fields keep the values of their boundary condition beyond the lattice edge
+  (the ghost nodes that `state.gradient` reads at the edge nodes) where a rule
+  writes them with `set_field`. They took the values at the edge until the
+  `pde` ran again, so rules after it saw a wrong gradient at the edge nodes
+  with periodic and fixed-value boundaries (in a test, −4 became 0.5), and a
+  field without `pde` had this wrong gradient on a periodic lattice from the
+  start. A field without `pde` now wraps around where the lattice does, and
+  takes the values at the edge beyond walls as before. A ramp on a periodic
+  lattice falls back where the edges meet, which cells there now sense:
+  tutorial 3 and the composed example of the model-spec how-to put their
+  signal ramps on lattices with walls.
 - A sweep reads its input files (the arrays of a `from_npz` initializer) once
   before the first run: a file edited during a sweep changed the runs that
   started later (seeds 0 and 1 from 300 cells, 2 and 3 from 100). `biolgca

@@ -64,8 +64,8 @@ def test_current_named_fields_steer_next_step_once_per_operator(name, writer, mo
     operators.append(ReorientationSpec(terms=[ReorientationTermSpec(
         name, beta=1000, parameters={"field": "signal"},
     )]))
-    model = build_model(ModelSpec(
-        space=SpaceSpec(geometry="square", dims=(4, 4)),
+    model = build_model(ModelSpec(  # with walls: around a periodic lattice, the ramp x falls at the edge
+        space=SpaceSpec(geometry="square", dims=(4, 4), boundary="reflecting"),
         state=StateSpec(nodes=nodes, fields={"signal": field}),
         dynamics=InteractionPipelineSpec(operators=operators, propagation=False),
     ))

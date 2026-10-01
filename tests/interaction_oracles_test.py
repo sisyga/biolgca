@@ -138,7 +138,8 @@ def test_chemotaxis_follows_the_boltzmann_weight_of_the_signal_gradient(entry):
                                                                              parameters={"field": "signal"})]),
                      fields={"signal": signal})
 
-    _assert_channel_frequencies(states, _boltzmann(beta * SQUARE_C @ E_X))
+    # the slope is 1 away from the edges in x, where the periodic lattice joins x = 9 to x = 0
+    _assert_channel_frequencies(states[:, 1:-1], _boltzmann(beta * SQUARE_C @ E_X))
 
 
 @pytest.mark.parametrize("entry", REORIENTATION_ENTRIES)

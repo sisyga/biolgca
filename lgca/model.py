@@ -16,6 +16,7 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 
 from . import get_lgca
+from .lattice_state import _pad_field
 from .pipeline import (
     BirthDeathSpec,
     InteractionPipelineSpec,
@@ -1401,10 +1402,7 @@ def _build_owned_model(spec: ModelSpec, *, resource_base=None, trusted_paths=Fal
     traits = _attach_traits(lgca, spec.state.traits)
     pipeline = compile_pipeline(spec.dynamics, context)
     _attach_fields(lgca, context.fields)
-    for operator in pipeline.operators:
-        attach = getattr(operator, "attach_field", None)
-        if attach is not None:  # a field operator pads its field by its boundary condition
-            attach(lgca)
+    _attach_field_operators(lgca, pipeline)
     for name, values in traits.items():
         if lgca.props.get(name) is not values:
             warn_user(f"an interaction set the cell trait {name!r} when the model was built, so the "
@@ -1448,11 +1446,23 @@ def _pipeline_metadata(metadata, spec, pipeline, lgca) -> None:
 def _compile_running(context):
     """The pipeline of ``context.spec`` for a lattice that has run; a steady field is solved again."""
     pipeline = compile_pipeline(context.spec.dynamics, context)
+    _attach_field_operators(context.lgca, pipeline)
+    return pipeline
+
+
+def _attach_field_operators(lgca, pipeline):
+    """Let the field operators (``pde``) own their fields: their boundary conditions fill the ghost nodes,
+    also where rules write the fields; a field without one takes the lattice's."""
+    owned = getattr(lgca, "_field_sides", {})
+    lgca._field_sides = {}
     for operator in pipeline.operators:
         attach = getattr(operator, "attach_field", None)
         if attach is not None:
-            attach(context.lgca)
-    return pipeline
+            attach(lgca)
+    for name in set(owned) - set(lgca._field_sides):  # no longer owned: padded by the lattice
+        values = np.asarray(getattr(lgca, name))
+        interior = values[lgca.nonborder] if values.shape[:len(lgca.dims)] != tuple(lgca.dims) else values
+        setattr(lgca, name, _pad_field(lgca, name, interior))
 
 
 def _try_step(compiled, spec):
@@ -1849,9 +1859,7 @@ def _attach_fields(lgca, fields: Mapping[str, Any]) -> None:
         spatial_shape = tuple(lgca.dims)
         target_shape = lgca.nodes.shape[:spatial_ndim]
         if array.shape[:spatial_ndim] == spatial_shape and target_shape != spatial_shape:
-            pad_width = [(lgca.r_int, lgca.r_int)] * spatial_ndim
-            pad_width.extend([(0, 0)] * (array.ndim - spatial_ndim))
-            array = np.pad(array, pad_width=pad_width, mode="edge")
+            array = _pad_field(lgca, name, array)  # a pde that owns the field pads it again by its condition
         setattr(lgca, name, array)
 
 

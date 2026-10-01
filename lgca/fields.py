@@ -54,7 +54,7 @@ from scipy.optimize import brentq
 from scipy.sparse import linalg as spla
 
 from ._warnings import warn_user
-from .lattice_state import LatticeState, _species_indices, channel_mask
+from .lattice_state import LatticeState, _pad_by_sides, _species_indices, channel_mask
 from .operator_base import _COPYING_TEMPLATES, FieldOperator, ParameterSpec, PluginInfo
 from .plugins import _law_for_kind, register_plugin
 
@@ -569,6 +569,8 @@ class PDEOperator(FieldOperator):
             values = values[self._interior]
         if not np.all(np.isfinite(values)) or np.any(values < 0):
             raise ValueError(f"the initial values of field {self.field!r} must be finite and non-negative")
+        # rules that write the field pad it by this condition too (lattice_state._pad_field)
+        lgca._field_sides = {**getattr(lgca, "_field_sides", {}), self.field: self._sides}
         setattr(lgca, self.field, self._pad(values))
         if self.solver == "steady":  # the first operators see the field at equilibrium
             self._update(lgca, step=0)
@@ -1165,21 +1167,7 @@ class PDEOperator(FieldOperator):
 
     def _pad(self, values):
         """The interior values with ghost nodes filled according to the boundary condition."""
-        width = int(self._interior[0].start)
-        for axis, sides in enumerate(self._sides):
-            if sides[0] == "periodic":
-                pad = [(0, 0)] * values.ndim
-                pad[axis] = (width, width)
-                values = np.pad(values, pad, mode="wrap")
-                continue
-            for side, condition in enumerate(sides):
-                pad = [(0, 0)] * values.ndim
-                pad[axis] = (width, 0) if side == 0 else (0, width)
-                if condition is None:
-                    values = np.pad(values, pad, mode="edge")
-                else:
-                    values = np.pad(values, pad, mode="constant", constant_values=condition)
-        return values
+        return _pad_by_sides(values, self._sides, int(self._interior[0].start))
 
 
 class _Reaction:

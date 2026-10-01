@@ -602,6 +602,55 @@ def test_ghost_nodes_follow_the_boundary(boundary, geometry, lattice):
         compiled.step()
 
 
+def _padded(interior, boundary, lattice):
+    if boundary == "periodic" or boundary is None and lattice == "periodic":
+        return np.pad(interior, 1, mode="wrap")
+    if boundary in ("no_flux", None):  # a field without pde: the values at the edge beyond a wall
+        return np.pad(interior, 1, mode="edge")
+    return np.pad(interior, 1, mode="constant", constant_values=boundary["value"])
+
+
+@pytest.mark.parametrize("boundary,geometry,lattice", [
+    ("no_flux", "square", "reflecting"), ({"value": 3.0}, "square", "reflecting"),
+    ("periodic", "square", "periodic"), ({"value": 3.0}, "hex", "absorbing"), ("no_flux", "moore", "reflecting"),
+    (None, "square", "periodic"), (None, "hex", "periodic"), (None, "lin", "reflecting")])  # None: no pde
+def test_a_rule_that_writes_the_field_keeps_the_ghost_nodes_of_its_boundary(boundary, geometry, lattice):
+    # before, the ghost nodes took the values at the edge until the pde ran again, and so did a field
+    # without pde on a periodic lattice: the gradient at the edge that later rules saw was wrong
+    from lgca import interaction
+
+    dims = {"moore": (6, 5, 4), "lin": 8}.get(geometry, (6, 4))
+    sensed = []
+
+    @interaction(kind="field", families="classical", name="ghost_test.rewrite")
+    def rewrite(state):  # the same values: only the ghost nodes could change
+        state.set_field("u", state.field("u"))
+
+    @interaction(kind="field", families="classical", name="ghost_test.sense")
+    def sense(state):
+        sensed.append(state.gradient("u"))
+
+    pde = [] if boundary is None else [PDESpec(field="u", diffusion=0.2, boundary=boundary)]
+    compiled = _build([*pde, rewrite(), sense()], geometry=geometry, dims=dims, boundary=lattice,
+                      fields={"u": np.random.default_rng(1).random(dims)})
+    lgca = compiled.lgca
+    np.testing.assert_array_equal(lgca.u, _padded(lgca.u[lgca.nonborder], boundary, lattice))  # as built
+    for _ in range(2):
+        compiled.step()
+        expected = _padded(lgca.u[lgca.nonborder], boundary, lattice)
+        np.testing.assert_array_equal(lgca.u, expected)
+        np.testing.assert_array_equal(sensed[-1], lgca.gradient(expected)[lgca.nonborder])
+
+
+def test_a_field_whose_pde_is_removed_takes_the_ghost_nodes_of_the_lattice():
+    compiled = _build([PDESpec(field="u", diffusion=0.2, boundary={"value": 3.0})], dims=(6, 4),
+                      fields={"u": np.random.default_rng(1).random((6, 4)), "v": 1.0})
+    compiled.step()
+    compiled.reconfigure({"dynamics.operators": [PDESpec(field="v", decay=0.1)]})
+    lgca = compiled.lgca
+    np.testing.assert_array_equal(lgca.u, np.pad(lgca.u[lgca.nonborder], 1, mode="edge"))
+
+
 def test_linear_profile_between_fixed_values_gives_an_even_gradient():
     compiled = _build([PDESpec(field="u", diffusion=50.0, boundary={"x-": {"value": 1.0}, "x+": {"value": 0.0}})],
                       dims=(10, 4))

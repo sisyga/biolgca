@@ -278,8 +278,9 @@ class LatticeState:
         :meth:`field`). Differences are centred everywhere, using ghost nodes
         beyond the lattice edge: an array gets the ghost values of
         :meth:`neighbor_sum` (wrapped with periodic boundaries, zero
-        otherwise), a named field keeps the ghost values the model stores for
-        it. This is the convention of the model's own ``gradient`` method.
+        otherwise), a named field those of its boundary condition (see
+        :meth:`set_field`). This is the convention of the model's own
+        ``gradient`` method.
         """
         if isinstance(values, str):
             padded = np.asarray(self._padded_field(values), dtype=float)
@@ -305,9 +306,11 @@ class LatticeState:
         """Replace the values of the field ``name`` at every node; written into the model by :meth:`commit`.
 
         ``values`` has the shape of :meth:`field`, ``dims + (...)``. Beyond the lattice edge the
-        field takes the values at the edge, as when the model is built; a ``pde`` operator sets its
-        own boundary values when it runs next. Rules that change fields but no cells have the kind
-        ``"field"``, e.g. a matrix degraded by the cells::
+        field takes the values of its boundary condition, which later rules see in
+        :meth:`gradient`: that of the ``pde`` operator that owns the field, otherwise the
+        lattice's (the field wraps around where the lattice does, and takes the values at the edge
+        elsewhere). Rules that change fields but no cells have the kind ``"field"``, e.g. a matrix
+        degraded by the cells::
 
             @interaction(kind="field", families="classical")
             def degradation(state, rate=0.1):
@@ -336,8 +339,7 @@ class LatticeState:
         if name in self._fields_written:
             new = self._fields_written[name]
             if values.shape[:len(self._dims)] != self._dims:
-                width = [(int(self._lgca.r_int),) * 2] * len(self._dims) + [(0, 0)] * (new.ndim - len(self._dims))
-                new = np.pad(new, width, mode="edge")
+                new = _pad_field(self._lgca, name, new)
             values = new
         padded = np.shape(self._lgca.cell_density)[:len(self._dims)]
         if values.shape[:len(self._dims)] == padded:
@@ -594,9 +596,8 @@ class LatticeState:
             stored = np.asarray(getattr(lgca, name))
             if stored.shape[:len(self._dims)] == self._dims:
                 setattr(lgca, name, values)
-            else:  # stored with ghost nodes, which take the edge values
-                width = [(int(lgca.r_int),) * 2] * len(self._dims) + [(0, 0)] * (values.ndim - len(self._dims))
-                setattr(lgca, name, np.pad(values, width, mode="edge"))
+            else:  # stored with ghost nodes, filled by the field's boundary condition
+                setattr(lgca, name, _pad_field(lgca, name, values))
 
     # --------------------------------------------------------------- helpers
 
@@ -1041,6 +1042,40 @@ def _nodes_from_cells(cells, counts, dtype):
         flat[index] = labels[start:end]
         start = end
     return flat.reshape(counts.shape)
+
+
+def _pad_field(lgca, name, values):
+    """The interior ``values`` of the field ``name`` with its ghost nodes, filled by its boundary condition.
+
+    That is the condition of the ``pde`` operator that owns the field, otherwise the lattice's: the field
+    wraps around where the lattice does and takes the values at the edge elsewhere (no flux). Rules that
+    take a gradient read the ghost nodes, so a field gets them wherever it is written.
+    """
+    sides = getattr(lgca, "_field_sides", {}).get(name)
+    if sides is None:
+        ndim = len(lgca.dims)
+        wrapped = {"periodic": range(ndim), "inflow": range(1, ndim)}.get(lgca.bc, ())
+        sides = [("periodic", "periodic") if axis in wrapped else (None, None) for axis in range(ndim)]
+    return _pad_by_sides(values, sides, int(lgca.r_int))
+
+
+def _pad_by_sides(values, sides, width):
+    """``values`` with ``width`` ghost nodes on each side of the lattice axes, filled by ``sides``: per axis
+    a pair (lower, upper) of "periodic", None (the values at the edge, no flux) or a fixed value."""
+    for axis, pair in enumerate(sides):
+        if pair[0] == "periodic":
+            pad = [(0, 0)] * values.ndim
+            pad[axis] = (width, width)
+            values = np.pad(values, pad, mode="wrap")
+            continue
+        for side, condition in enumerate(pair):
+            pad = [(0, 0)] * values.ndim
+            pad[axis] = (width, 0) if side == 0 else (0, width)
+            if condition is None:
+                values = np.pad(values, pad, mode="edge")
+            else:
+                values = np.pad(values, pad, mode="constant", constant_values=condition)
+    return values
 
 
 def _conserved(values, law, ndim):

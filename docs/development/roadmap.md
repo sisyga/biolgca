@@ -73,10 +73,6 @@ the 30 September review are done, apart from the items below:
 
 ### Known small issues
 
-- A rule's `set_field` gives a field edge-valued ghost nodes also when a `pde`
-  owns the field; until the `pde` runs again this replaces its periodic or
-  fixed boundary values. Padding by the owner's boundary condition needs a
-  decision.
 - Traits named only in a mutation's probability (a trait-valued `max`,
   `kappa` or `theta`) are not checked before the first block writes.
 - `vary` on a spec that holds a single-cue operator object fails: it treats
