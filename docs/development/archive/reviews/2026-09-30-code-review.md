@@ -1,5 +1,7 @@
 # BioLGCA branch code review, 30 September 2026
 
+> Archived on 2026-10-01: its findings are fixed or listed as known issues. Open items moved to the [roadmap](../../roadmap.md); kept for reference.
+
 The review corrected 26 bounded defect groups and added 86 regression cases.
 Three architectural findings remain open: incomplete state transactions, nonlinear
 solver robustness, and ownership of a compiled model's configuration. Their
@@ -9,7 +11,7 @@ A second pass on the same day re-checked every fix, completed eleven of them, re
 F11 and F18, which rejected valid cases, and fixed further defects found along the way;
 see [Follow-up review](#follow-up-review-second-pass). The architecture findings, renamed
 CR-A1 to CR-A3, have revised plans in
-[architecture_proposals_2026-09-30.md](architecture_proposals_2026-09-30.md), which
+[architecture_proposals_2026-09-30.md](2026-09-30-architecture-proposals.md), which
 supersede the plans and the order of work below.
 
 ## Scope and method
@@ -35,7 +37,7 @@ the affected feature.
 
 ## Corrected defects
 
-The regressions are in [review_regressions_test.py](../../tests/review_regressions_test.py).
+The regressions are in [review_regressions_test.py](../../../../tests/review_regressions_test.py).
 The Windows documentation correction is verified by the strict Sphinx build.
 
 | ID | Severity | Failing behavior and correction |
@@ -76,9 +78,9 @@ earlier operators in a failed step; that is CR-A1.
 
 ### CR-A1 — P1: rule validation does not make state changes transactional
 
-Sources: [LatticeState](../../lgca/lattice_state.py),
-[Cells](../../lgca/cells.py), [pipeline execution](../../lgca/pipeline.py),
-[CompiledModel](../../lgca/model.py).
+Sources: [LatticeState](../../../../lgca/lattice_state.py),
+[Cells](../../../../lgca/cells.py), [pipeline execution](../../../../lgca/pipeline.py),
+[CompiledModel](../../../../lgca/model.py).
 
 **Reproduction.** Start an identity-based model with one cell, fitness 7 and
 family tracking. Run this invalid reorientation rule:
@@ -142,7 +144,7 @@ failed step instead of treating it as unchanged.
 ### CR-A2 — P2: nonlinear field iteration needs a robust convergence strategy
 
 Sources: `_solve_system`, `_solve_linear` and `_hill_rate` in
-[fields.py](../../lgca/fields.py).
+[fields.py](../../../../lgca/fields.py).
 
 **Reproduction.** On three periodic 1D nodes with one cell per node, use a steady
 field initially zero, diffusion 1, production 1, uptake 2, saturation 1 and Hill
@@ -189,9 +191,9 @@ remain limitations.
 ### CR-A3 — P1: a compiled model does not own an immutable configuration snapshot
 
 Sources: `ModelSpec`, `build_model` and model-file serialization in
-[model.py](../../lgca/model.py); parameter updates and archived runs in
-[study.py](../../lgca/study.py), [cli.py](../../lgca/cli.py) and
-[explorer.py](../../lgca/explorer.py).
+[model.py](../../../../lgca/model.py); parameter updates and archived runs in
+[study.py](../../../../lgca/study.py), [cli.py](../../../../lgca/cli.py) and
+[explorer.py](../../../../lgca/explorer.py).
 
 **Reproduction.** Build a three-cell model with an operator mapping that refers
 to a caller-owned dictionary:
@@ -298,7 +300,7 @@ confirmed issues were fixed in five groups of disjoint files, each checked by a
 second reviewer, and every behavioural fix has a regression test that fails on
 the tree before this pass. The architectural findings were investigated, two
 competing designs were prototyped for each and compared on each other's cases;
-the results are in [the architecture proposals](architecture_proposals_2026-09-30.md).
+the results are in [the architecture proposals](2026-09-30-architecture-proposals.md).
 
 ### Verdicts on F01 to F26
 

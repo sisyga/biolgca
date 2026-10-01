@@ -2,12 +2,10 @@
 
 Material for maintainers. It is not part of the built user documentation.
 
-- `usability_roadmap.md`: usability issues and the phased plan to address them.
-- `architecture.md`: which module owns which numerical update while legacy and
-  native interaction implementations coexist.
-- `code_review_2026-09-30.md`: the latest code review, its fixes and open
-  findings; `architecture_proposals_2026-09-30.md`: designs and phased plans for
-  the open architectural findings (CR-A1 to CR-A3) and the decisions they need.
-- `reports/`: validation and benchmark reports of past milestones. They refer
-  to scripts and result files in `benchmarks/`.
-- `archive/`: plans and design specs of completed work, kept for reference.
+- `roadmap.md`: the open work and the decisions that hold. Start here.
+- `architecture.md`: how rules, cells, the `get_lgca` front door and the
+  reorientation sampler fit together. The design rules for new code are in
+  `AGENTS.md` at the repository root.
+- `archive/`: finished plans, specs, reviews and reports, kept for reference
+  (see its README). A plan, spec or review that is being worked on lives next
+  to the roadmap and moves here when its work is done.

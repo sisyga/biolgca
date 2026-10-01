@@ -1,5 +1,7 @@
 # Fields: reaction–advection–diffusion equations coupled to the cells
 
+> Archived on 2026-10-01: the fields feature is built (phases 1 to 4 and the nonlinear solver). Open items moved to the [roadmap](../../roadmap.md); kept for reference.
+
 Status: design agreed (2026-09-26). Phases 1 and 2 implemented
 (2026-09-26, see "Phase 1 as built" and "Phase 2 as built"). The terms that
 depend on the field are solved by Newton's method since 2026-10-01 (see

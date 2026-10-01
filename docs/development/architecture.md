@@ -2,7 +2,7 @@
 
 Internal notes for maintainers, moved out of the user guide
 (`docs/source/how_to/model_specs_and_plugins.rst`). They describe which module
-owns which numerical update (see phase 2 of `usability_roadmap.md`).
+owns which numerical update (see phase 2 of the [usability roadmap](archive/plans/2026-09-23-usability-roadmap.md)).
 
 ## Rules on the lattice state
 

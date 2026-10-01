@@ -1,5 +1,7 @@
 # Usability roadmap
 
+> Archived on 2026-10-01: phases 0 to 4 are done or deferred; this is the full plan with its status notes. Open items moved to the [roadmap](../../roadmap.md); kept for reference.
+
 Status: draft, 2026-09-23. Written after a usability review of the `aidevelop`
 branch from the point of view of a Master's or early PhD student who wants to
 implement a new interaction and study it, and of a teacher who uses BioLGCA in
@@ -15,7 +17,7 @@ Review status (2026-09-28): a cross-cutting code review fixed bounded issues in
 model-file round trips, sweep columns/default lookup, PDE solvers, restricted
 reorientation, plotting, zoo measurements and wheel packaging. The remaining
 reproducibility, capacity, sweep-resource and observer-output issues are recorded
-with reproductions in [the code review](code_review_2026-09-28.md). These are
+with reproductions in the code review of 28 September (never committed). These are
 follow-up corrections to completed features; the remaining zoo and publication
 work below is still planned.
 
@@ -39,7 +41,7 @@ Review status (2026-09-30): a further cross-feature review corrected 26 bounded
 defect groups and added 86 regression cases. It covers model-file fidelity,
 cell/count validation, field numerics and rule reads, sweep/archive reproducibility,
 recorders, Explorer, zoo summaries and Windows documentation generation. See
-[the current code review](code_review_2026-09-30.md) for evidence and validation.
+[the current code review](../reviews/2026-09-30-code-review.md) for evidence and validation.
 Three architectural findings remain: incomplete state transactions and rule-kind
 contracts (CR-A1), nonlinear steady/Picard solver robustness (CR-A2), and ownership of
 compiled configuration/provenance (CR-A3). Suggested order: CR-A1, then CR-A3, then CR-A2,
@@ -55,7 +57,7 @@ sweeps, a field rule replacing a cell's identity, BDF/Radau without the Jacobian
 of nonlinear terms, and others; see the follow-up section of the review). The
 architecture findings were re-assessed with prototypes; the recommended designs,
 phased PRs and the decisions they need are in
-[architecture_proposals_2026-09-30.md](architecture_proposals_2026-09-30.md).
+[architecture_proposals_2026-09-30.md](../reviews/2026-09-30-architecture-proposals.md).
 Recommended order changed: CR-A3's first PR (models own their configuration and
 operator objects), then CR-A1 (contract checks, then step rollback), with CR-A2
 (Newton's method for saturating uptake) in parallel.

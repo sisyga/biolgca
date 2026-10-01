@@ -74,3 +74,6 @@ Thumbs.db
 
 # papers and theses for reference only, not distributed
 docs/development/papers/
+
+# git worktrees of parallel agents
+.claude/worktrees/

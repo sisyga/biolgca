@@ -1,10 +1,12 @@
 # Architecture proposals after the 30 September 2026 review
 
+> Archived on 2026-10-01: the plan is done (CR-A1 PR0, PR1, PR3; CR-A2 PR1 to PR3; CR-A3 PR1 to PR3). Open items moved to the [roadmap](../../roadmap.md); kept for reference.
+
 Status: proposal, 2026-09-30; decisions, CR-A3 PR1 to PR3, CR-A1 PR0, PR1 and
 PR3, and CR-A2 PR1 to PR3 on 2026-10-01 (see
-[Decisions](#decisions-for-the-maintainer)). Follow-up to [the code review](code_review_2026-09-30.md),
+[Decisions](#decisions-for-the-maintainer)). Follow-up to [the code review](2026-09-30-code-review.md),
 whose three open architectural findings are renamed here CR-A1 to CR-A3, so that
-they no longer collide with the IDs A1 to A5 of the [usability roadmap](usability_roadmap.md).
+they no longer collide with the IDs A1 to A5 of the [usability roadmap](../plans/2026-09-23-usability-roadmap.md).
 
 | ID | Finding | Review | Follow-up assessment | Recommended first PR |
 | --- | --- | --- | --- | --- |
