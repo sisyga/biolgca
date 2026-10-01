@@ -184,10 +184,20 @@ class LegacyInteraction:
         self._compiled = compiled
 
     def __call__(self, lgca) -> None:
+        from .transaction import StepTransaction
+
         compiled = self._compiled
-        for operator in compiled.pipeline.operators:
-            operator.apply(compiled.context, compiled._step + 1)
-            lgca.update_dynamic_fields()
+        transaction = StepTransaction.of(lgca)  # applied as a whole or not at all, like a step
+        transaction.begin()
+        try:
+            for operator in compiled.pipeline.operators:
+                operator.apply(compiled.context, compiled._step + 1)
+                lgca.update_dynamic_fields()
+        except BaseException as exc:
+            transaction.rollback()
+            exc.add_note("the interaction was rolled back: the model is in the state before it")
+            raise
+        transaction.commit()
 
     def __repr__(self) -> str:
         return f"<legacy interaction {self.__name__!r}>"

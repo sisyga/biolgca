@@ -1157,26 +1157,62 @@ class CompiledModel:
     pipeline: Any
     metadata: dict[str, Any]
     _step: int = 0
+    rollback: bool = True
     _failed: str | None = field(default=None, repr=False)
+    _transaction: Any = field(default=None, repr=False, compare=False)
 
     def step(self, **timing):
         """Advance the compiled dynamics once, retaining RNG and model time.
 
-        A step that raises (also when interrupted) may have been applied in
-        part: the operators before the failing one ran, and the random
-        numbers they drew are gone. The model then refuses further steps;
-        rebuild it, e.g. with ``build_model(model.spec)``.
+        A step is applied as a whole or not at all: if it raises (also when
+        interrupted), the model is put back in the state before the step,
+        with the same random numbers to come, and the exception says so in
+        a note. The model can then step again, e.g. after a parameter was
+        corrected. For this the model keeps a checkpoint, one copy of its
+        ``nodes`` and fields; ``model.rollback = False`` saves the memory.
+        A step that fails then may have been applied in part, and the model
+        refuses further steps until it is rebuilt, e.g. with
+        ``build_model(model.spec)``.
+
+        Not rolled back: what operators keep themselves, e.g. the statistics
+        and multigrid hierarchies of field solvers, and writes through
+        ``TraitArray.values``.
         """
         if self._failed is not None:
             raise RuntimeError(f"step {self._step + 1} of this model failed ({self._failed}) and may have "
                                "been applied in part; rebuild the model to go on, e.g. with "
                                "build_model(model.spec) (Reset in lgca.explore)")
+        transaction = self._begin() if self.rollback else None
         try:
             self.pipeline.execute_step(self.context, self._step + 1, **timing)
         except BaseException as exc:
-            self._failed = f"{type(exc).__name__}: {exc}"
+            self._undo(exc, transaction)
             raise
+        if transaction is not None:
+            transaction.commit()
         self._step += 1
+
+    def _begin(self):
+        from .transaction import StepTransaction
+
+        transaction = self._transaction
+        if transaction is None or transaction.lgca is not self.lgca:
+            transaction = self._transaction = StepTransaction(self.lgca, fields=self.context.fields)
+        transaction.begin()
+        return transaction
+
+    def _undo(self, exc, transaction):
+        """Roll the failed step back, or refuse further steps if it cannot be."""
+        step = self._step + 1
+        if transaction is not None:
+            try:
+                transaction.rollback()
+            except Exception as error:  # noqa: BLE001 - the step's own error is the one raised
+                exc.add_note(f"step {step} could not be rolled back ({type(error).__name__}: {error})")
+            else:
+                exc.add_note(f"step {step} was rolled back: the model is in the state before it")
+                return
+        self._failed = f"{type(exc).__name__}: {exc}"
 
     def run(self, showprogress: bool = True, *, max_recording_bytes=DEFAULT_RECORDING_LIMIT_BYTES):
         """Run with an explicit fixed-buffer recording budget (None disables it)."""

@@ -275,7 +275,7 @@ def test_an_interrupted_reorientation_leaves_the_labels_in_place(monkeypatch):
     np.testing.assert_array_equal(model.lgca.nodes[interior], before)
 
 
-def test_a_model_whose_step_failed_refuses_further_steps():
+def test_a_model_without_rollback_whose_step_failed_refuses_further_steps():
     steps = []
 
     @interaction(kind="birth_death", families="classical", name="fails_at_step_2")
@@ -287,6 +287,7 @@ def test_a_model_whose_step_failed_refuses_further_steps():
 
     model = build_model(ModelSpec(state=StateSpec(density=0.5), time=TimeSpec(steps=5, seed=1),
                                   dynamics=InteractionPipelineSpec(operators=[fails_at_step_2()])))
+    model.rollback = False  # with it, the failed step is undone and the model goes on (rollback_test.py)
     model.step()
     with pytest.raises(ValueError, match="broken rule"):
         model.step()

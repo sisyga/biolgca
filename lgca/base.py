@@ -850,12 +850,22 @@ class LGCA_base(ABC):
         if hasattr(self, "_compiled_model"):
             self._compiled_model.step()
             return
-        self.interaction(self)
-        self.apply_boundaries()
-        if getattr(self, "enable_propagation", True):
-            self.propagation()
+        from .transaction import StepTransaction
+
+        transaction = StepTransaction.of(self)  # a step that raises is rolled back
+        transaction.begin()
+        try:
+            self.interaction(self)
             self.apply_boundaries()
-        self.update_dynamic_fields()
+            if getattr(self, "enable_propagation", True):
+                self.propagation()
+                self.apply_boundaries()
+            self.update_dynamic_fields()
+        except BaseException as exc:
+            transaction.rollback()
+            exc.add_note("the step was rolled back: the model is in the state before it")
+            raise
+        transaction.commit()
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True,
                 recordpertype=False):

@@ -434,11 +434,20 @@ This file records notable user-facing changes. Changes remain under
   to other nodes or duplicate labels, and no check noticed.
 - Reorientation terms and stack builders get a state that they can read but
   not change: its operations raise `TypeError`.
-- A model whose step raised, or was interrupted, refuses further steps
-  (`RuntimeError`) until it is rebuilt, e.g. with `build_model(model.spec)`
-  or Reset in `lgca.explore`. The failed step may have been applied in part:
-  `step()` again applied the earlier operators a second time, and the
-  Explorer's Step and Play went on from that state.
+- A step is applied as a whole or not at all. If it raises, or is
+  interrupted, the model is put back in the state before the step (cells in
+  their order, traits, labels, families, fields, the random stream), the
+  exception says so in a note, and the model can step again: retried steps
+  give the same run as steps that never failed. Before, the operators before
+  the failing one stayed applied, so `step()` again applied them a second
+  time, and the Explorer's Step and Play went on from that state. The
+  checkpoint costs one copy of `nodes` and the fields and no measurable time;
+  `model.rollback = False` saves the memory, and a model whose step failed
+  then refuses further steps (`RuntimeError`) until it is rebuilt, e.g. with
+  `build_model(model.spec)`. Models made by `get_lgca` with a function as
+  interaction are rolled back too. Not rolled back: what operators keep
+  themselves (e.g. the statistics and multigrid hierarchies of field solvers)
+  and writes through `TraitArray.values`.
 
 - Every model owns its configuration. `build_model` (and so `run_model`,
   `sweep`, `lgca.explore` and the command line) builds from its own copy of

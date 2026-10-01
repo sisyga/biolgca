@@ -87,8 +87,14 @@ under `lgca.testing.strict_contracts()`, in `check_interaction` and in the test
 suite. The cell arrays are read-only, terms and stack builders get read-only
 states, a stack narrower than its operators warns at build, the Boltzmann paths
 write the lattice once, and a model whose step failed refuses further steps
-until it is rebuilt (until PR1 rolls failed steps back). Next: CR-A1 PR1
-(rollback), CR-A2 PR1 (Newton, in progress on a branch).
+until it is rebuilt (until PR1 rolls failed steps back).
+
+CR-A1 PR1 done (2026-10-01): a step is applied as a whole or not at all. A step
+that raises is rolled back (`lgca/transaction.py`: attributes, nodes, fields,
+traits with a journal of overwritten values, families, random stream), at no
+measurable cost; `model.rollback = False` keeps PR0's refusal instead. Next:
+CR-A1 PR3 (failed runs, sweep error policy), CR-A2 PR1 (Newton, in progress on a
+branch).
 
 ## Reference point: Morpheus
 

@@ -43,7 +43,7 @@ class TraitArray:
     3
     """
 
-    __slots__ = ("_data", "_size")
+    __slots__ = ("_data", "_journal", "_size")
 
     def __init__(self, values=(), dtype=None):
         data = np.array(list(values) if not isinstance(values, np.ndarray) else values, dtype=dtype)
@@ -54,6 +54,7 @@ class TraitArray:
             data = flat
         self._data = data
         self._size = len(data)
+        self._journal = None  # during a step: the values that writes overwrite, to roll the step back
 
     @property
     def values(self) -> np.ndarray:
@@ -77,6 +78,11 @@ class TraitArray:
         return self.values[index]
 
     def __setitem__(self, index, value) -> None:
+        journal = getattr(self, "_journal", None)  # TraitArrays pickled before it existed have none
+        if journal is not None:
+            old = self.values[index]
+            journal.append((self._data, index.copy() if isinstance(index, np.ndarray) else index,
+                            old.copy() if isinstance(old, np.ndarray) else old))
         self._fit(value)
         self.values[index] = value
 
