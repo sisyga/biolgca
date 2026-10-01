@@ -125,12 +125,17 @@ def _validate(args) -> int:
     _import_plugins(args)
     model_path = _existing_model_path(args.model)
     spec, _ = _load(model_path)
-    _validate_output_declarations(spec, trusted_paths=args.trusted_paths)
-    build_model(
+    # the checks of `biolgca run` before it writes, for a run directory that is not created
+    placed = deepcopy(spec)
+    output_dir = (Path(tempfile.gettempdir()) / "biolgca-validate").resolve()
+    _resolve_output_paths(placed, output_dir, trusted_paths=args.trusted_paths)
+    _preflight_output_namespace(placed, output_dir, trusted_paths=args.trusted_paths)
+    compiled = build_model(
         spec,
         resource_base=model_path.parent,
         trusted_paths=args.trusted_paths,
     )
+    _check_recorders(compiled)
     print(f"Valid BioLGCA model: {model_path}")
     return 0
 
@@ -162,6 +167,7 @@ def _run(args) -> int:
             resource_base=resource_base,
             trusted_paths=args.trusted_paths,
         )
+        _check_recorders(compiled)
         output_dir.mkdir(parents=True, exist_ok=True)
         _move_resources(staging, output_dir)
     portable_spec = copied
@@ -418,6 +424,13 @@ def _validate_output_declarations(spec, *, trusted_paths: bool) -> None:
             )
         elif isinstance(observer, ScalarTimeSeriesRecorder) and observer.output_path is not None:
             _validate_relative_output(observer.output_path, trusted_paths=trusted_paths)
+
+
+def _check_recorders(compiled) -> None:
+    """What the recorders check when the run starts, before anything is written."""
+    for observer in compiled.spec.analysis.observers if compiled.spec.analysis is not None else ():
+        if isinstance(observer, FieldRecorder):
+            observer._check(compiled.lgca)
 
 
 def _resolve_output_paths(spec, output_dir: Path, *, trusted_paths: bool) -> None:

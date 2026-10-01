@@ -612,6 +612,9 @@ def test_scalar_recorders_need_a_metric():
 @pytest.mark.parametrize("observers,message", [
     ([PopulationRecorder(), PopulationRecorder(Schedule(every=2))], "Multiple PopulationRecorder"),
     ([FieldRecorder("u"), FieldRecorder("u", Schedule(every=2))], "several FieldRecorders"),
+    # both write time_series.csv into the run directory
+    ([ScalarTimeSeriesRecorder(), ScalarTimeSeriesRecorder(schedule=Schedule(every=2))], "collision"),
+    ([FieldRecorder("v")], "no field 'v'"),
 ])
 def test_command_line_rejects_conflicting_recorders_in_validate_and_before_writing_a_run(observers, message,
                                                                                           tmp_path, capsys):

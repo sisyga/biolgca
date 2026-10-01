@@ -79,10 +79,6 @@ the 30 September review are done, apart from the items below:
   decision.
 - Traits named only in a mutation's probability (a trait-valued `max`,
   `kappa` or `theta`) are not checked before the first block writes.
-- `biolgca validate` accepts two `ScalarTimeSeriesRecorder`s without
-  `output_path` (both write `time_series.csv`) and a `FieldRecorder` of an
-  undeclared field; `run` rejects them, the latter after writing
-  `model.resolved.json`.
 - `vary` on a spec that holds a single-cue operator object fails: it treats
   every object with `.terms` as a `ReorientationSpec`.
 - `lgca.explore` cannot run a `from_npz` model (no `resource_base`); the

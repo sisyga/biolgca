@@ -779,6 +779,12 @@ This file records notable user-facing changes. Changes remain under
 
 ### Fixed
 
+- `biolgca validate` makes the checks that `biolgca run` makes before it
+  writes: two recorders that would write the same file (e.g. two
+  `ScalarTimeSeriesRecorder`s without `output_path`, both `time_series.csv`)
+  and a `FieldRecorder` of a field the model does not have. `validate`
+  accepted both, and `run` rejected the second only after it had written
+  `model.resolved.json`.
 - A sweep reads its input files (the arrays of a `from_npz` initializer) once
   before the first run: a file edited during a sweep changed the runs that
   started later (seeds 0 and 1 from 300 cells, 2 and 3 from 100). `biolgca

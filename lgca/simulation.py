@@ -559,17 +559,8 @@ class FieldRecorder(Observer):
         self.steps = np.zeros(0, dtype=int)
 
     def setup(self, lgca, runner: SimulationRunner) -> None:
+        self._check(lgca)
         dims = tuple(lgca.dims)
-        for name in self.fields:
-            if name in RECORDED or name in _DATA_ALIASES:
-                raise ValueError(f"the field {name!r} has the name of a recording in result.data; "
-                                 "rename the field")
-            if not hasattr(lgca, name):
-                raise ValueError(f"FieldRecorder: the model has no field {name!r}; declare it in "
-                                 "StateSpec.fields")
-            if self._interior(lgca, name).shape != dims:
-                raise ValueError(f"FieldRecorder records fields with one value per node; {name!r} has "
-                                 f"shape {np.shape(getattr(lgca, name))}")
         self.steps = np.fromiter((step for step in range(runner.timesteps + 1)
                                   if self.schedule.should_run(step)), dtype=int)
         self._sample_indices = {int(step): index for index, step in enumerate(self.steps)}
@@ -584,6 +575,21 @@ class FieldRecorder(Observer):
         count = int(np.searchsorted(self.steps, step, side="right"))
         self.steps = self.steps[:count]
         self.values = {name: values[:count] for name, values in self.values.items()}
+
+    def _check(self, lgca) -> None:
+        """Raise if the model cannot record these fields (also ``biolgca validate`` and ``run``, before they
+        write a file)."""
+        dims = tuple(lgca.dims)
+        for name in self.fields:
+            if name in RECORDED or name in _DATA_ALIASES:
+                raise ValueError(f"the field {name!r} has the name of a recording in result.data; "
+                                 "rename the field")
+            if not hasattr(lgca, name):
+                raise ValueError(f"FieldRecorder: the model has no field {name!r}; declare it in "
+                                 "StateSpec.fields")
+            if self._interior(lgca, name).shape != dims:
+                raise ValueError(f"FieldRecorder records fields with one value per node; {name!r} has "
+                                 f"shape {np.shape(getattr(lgca, name))}")
 
     @staticmethod
     def _interior(lgca, name):
