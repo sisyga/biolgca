@@ -20,7 +20,6 @@ from lgca.pipeline import (
     ReorientationSpec,
     ReorientationTermSpec,
 )
-from lgca.plugins import default_registry
 
 _FAMILIES = {  # (identity_based, volume_exclusion, n_species)
     "classical": (False, True, 1), "nove": (False, False, 1), "multispecies": (False, True, 2),
@@ -29,9 +28,8 @@ _FAIL = {"at": None, "error": RuntimeError}
 
 
 @pytest.fixture(autouse=True)
-def _rules():
-    plugins, aliases = dict(default_registry._plugins), dict(default_registry._aliases)
-    families = ("classical", "nove", "ib", "nove_ib")
+def _rules():  # removed after every test by the fixture in conftest.py
+    families =("classical", "nove", "ib", "nove_ib")
 
     @interaction(kind="birth_death", families=families, name="turnover_with_families")
     def turnover_with_families(state):
@@ -56,7 +54,6 @@ def _rules():
             raise _FAIL["error"]("injected")
 
     yield
-    default_registry._plugins, default_registry._aliases = plugins, aliases
     _FAIL["at"], _FAIL["error"] = None, RuntimeError
 
 

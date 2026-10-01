@@ -14,27 +14,14 @@ from lgca import ContractWarning, interaction, reorientation_term, stack
 from lgca.lattice_state import LatticeState
 from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
 from lgca.pipeline import (
-    _REORIENTATION_TERMS,
-    _TERM_ALIASES,
     InteractionPipelineSpec,
     ReorientationSpec,
     ReorientationTermSpec,
 )
-from lgca.plugins import default_registry
 from lgca.testing import strict_contracts
 
 _IDENTITY = ("ib", "nove_ib")
 _CLASSICAL = ("classical", "nove")
-
-
-@pytest.fixture(autouse=True)
-def _restore_registries():
-    plugins, aliases = dict(default_registry._plugins), dict(default_registry._aliases)
-    terms, term_aliases = dict(_REORIENTATION_TERMS), dict(_TERM_ALIASES)
-    yield
-    default_registry._plugins, default_registry._aliases = plugins, aliases
-    _REORIENTATION_TERMS.clear(), _REORIENTATION_TERMS.update(terms)
-    _TERM_ALIASES.clear(), _TERM_ALIASES.update(term_aliases)
 
 
 # rule bodies, with the narrowest kind that allows them; only the operations draw random numbers, so that

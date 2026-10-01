@@ -15,20 +15,11 @@ from lgca.model import (
 )
 from lgca.pipeline import (
     _REORIENTATION_TERMS,
-    _TERM_ALIASES,
     InteractionPipelineSpec,
     ReorientationSpec,
     ReorientationTermSpec,
     list_reorientation_terms,
 )
-
-
-@pytest.fixture(autouse=True)
-def _restore_terms():
-    terms, aliases = dict(_REORIENTATION_TERMS), dict(_TERM_ALIASES)
-    yield
-    _REORIENTATION_TERMS.clear(), _REORIENTATION_TERMS.update(terms)
-    _TERM_ALIASES.clear(), _TERM_ALIASES.update(aliases)
 
 
 def _drift():

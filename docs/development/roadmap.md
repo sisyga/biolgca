@@ -88,9 +88,6 @@ the 30 September review are done, apart from the items below:
 - `lgca.explore` cannot run a `from_npz` model (no `resource_base`); the
   message "Relative initializer resources require resource_base" also appears
   for an absolute path with `trusted_paths=True`.
-- Order-dependent tests: `plugin_registry_test` fails after
-  `research_models_test` or `study_test`, and two `model_spec_test` cases after
-  `zoo_test`; the suite passes in its default order.
 
 ## Decisions that hold
 

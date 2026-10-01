@@ -17,15 +17,8 @@ from lgca.model import (
     run_model,
 )
 from lgca.pipeline import InteractionPipelineSpec
-from lgca.plugins import default_registry, describe_plugin
+from lgca.plugins import describe_plugin
 from lgca.testing import InteractionCheckError, check_interaction, strict_contracts
-
-
-@pytest.fixture(autouse=True)
-def _restore_registry():
-    plugins, aliases = dict(default_registry._plugins), dict(default_registry._aliases)
-    yield
-    default_registry._plugins, default_registry._aliases = plugins, aliases
 
 
 def _crowding_death():

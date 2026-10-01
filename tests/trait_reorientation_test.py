@@ -19,29 +19,20 @@ from lgca.model import (
     model_spec_from_dict,
     model_spec_to_dict,
 )
-from lgca.pipeline import (
-    _REORIENTATION_TERMS,
-    _TERM_ALIASES,
-    InteractionPipelineSpec,
-    ReorientationSpec,
-)
+from lgca.pipeline import InteractionPipelineSpec, ReorientationSpec
 
 STRENGTHS = np.array([0.0, 1.0, 2.0, 4.0])
 DIRECTION = np.array([1.0, 0.3])
 
 
 @pytest.fixture(autouse=True)
-def drift():
-    terms, aliases = dict(_REORIENTATION_TERMS), dict(_TERM_ALIASES)
-
+def drift():  # removed after every test by the fixture in conftest.py
     @reorientation_term(coupling="flux")
     def drift(state, direction=(1.0, 0.0)):
         """Cells move in a fixed direction."""
         return np.asarray(direction, dtype=float)
 
-    yield drift
-    _REORIENTATION_TERMS.clear(), _REORIENTATION_TERMS.update(terms)
-    _TERM_ALIASES.clear(), _TERM_ALIASES.update(aliases)
+    return drift
 
 
 def _model(nodes, strength, terms, ve=True, sweeps=None, seed=5, geometry="hex"):

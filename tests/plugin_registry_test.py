@@ -79,11 +79,15 @@ def test_replacing_a_plugin_of_another_module_requires_replace():
 
 
 def test_every_builtin_parameter_is_explained():
-    from lgca.plugins import list_plugins
+    from lgca.plugins import default_registry, list_plugins
 
-    missing = [f"{plugin.name}.{name}" for plugin in list_plugins()
+    # the rules of the library, zoo included (conftest.py imports it), not those that tests register
+    library = [plugin for plugin in list_plugins()
+               if (getattr(default_registry.resolve(plugin.name), "__module__", None) or "").startswith("lgca.")]
+    missing = [f"{plugin.name}.{name}" for plugin in library
                for name, spec in plugin.parameter_specs.items() if not spec.description]
 
+    assert len(library) > 20 and any(plugin.name.startswith("jamming.") for plugin in library)
     assert missing == []
 
 

@@ -22,7 +22,6 @@ from lgca.model import (
     build_model,
 )
 from lgca.pipeline import InteractionPipelineSpec
-from lgca.plugins import default_registry
 from lgca.simulation import (
     DensityRecorder,
     FamilyPopulationRecorder,
@@ -39,9 +38,7 @@ _LOCK = threading.Lock()
 
 
 @pytest.fixture(autouse=True)
-def _rules():
-    plugins, aliases = dict(default_registry._plugins), dict(default_registry._aliases)
-
+def _rules():  # removed after every test by the fixture in conftest.py
     @interaction(kind="birth_death", families=("classical", "nove", "ib", "nove_ib"), name="breaks_at")
     def breaks_at(state, at=3, new_family=False):
         if state.step == 1:
@@ -55,8 +52,6 @@ def _rules():
             raise ValueError("broken")
 
     _STARTED.clear()
-    yield
-    default_registry._plugins, default_registry._aliases = plugins, aliases
 
 
 def _spec(family="classical", steps=6, at=3, observers=(), dims=(8, 6)):

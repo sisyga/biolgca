@@ -17,16 +17,10 @@ def readme_namespace():
     printed = []
     namespace = {"print": printed.append}
     blocks = re.findall(r"```python\n(.*?)```", README.read_text(encoding="utf-8"), re.DOTALL)
-    from lgca.plugins import default_registry
-
-    snapshot = dict(default_registry._plugins), dict(default_registry._aliases)
-    try:
-        for block in blocks:
-            exec(compile(textwrap.dedent(block), str(README), "exec"), namespace)  # noqa: S102
-            plt.close("all")
-        yield namespace, printed
-    finally:
-        default_registry._plugins, default_registry._aliases = snapshot
+    for block in blocks:  # the rules it registers are removed after the test (conftest.py)
+        exec(compile(textwrap.dedent(block), str(README), "exec"), namespace)  # noqa: S102
+        plt.close("all")
+    return namespace, printed
 
 
 def test_readme_code_runs_and_crowding_death_reduces_population(readme_namespace):

@@ -53,10 +53,11 @@ runs before pushing (and in CI).
 
 After changing dependencies in `pyproject.toml`, run `uv lock` and commit
 `uv.lock`. CI (`.github/workflows/ci.yml`) runs the tests on Linux with
-Python 3.11 to 3.14, on Windows and macOS, and with the minimum dependency
-versions; executes the tutorial and zoo notebooks; smoke-tests the installed
-wheel and the CLI; and builds the docs. pyamg has no wheels for Python 3.14
-yet: code paths without it are tested by monkeypatching `lgca.fields._pyamg`.
+Python 3.11 to 3.14, on Windows and macOS, with the minimum dependency
+versions and once in random order; executes the tutorial and zoo notebooks;
+smoke-tests the installed wheel and the CLI; and builds the docs. pyamg has no
+wheels for Python 3.14 yet: code paths without it are tested by
+monkeypatching `lgca.fields._pyamg`.
 
 Practical notes:
 
@@ -191,6 +192,12 @@ are in `docs/development/archive/reviews/2026-09-30-architecture-proposals.md`.
   derived from standard errors and fail for a wrong model.
 - `ContractWarning` is an error in every test (`filterwarnings` in
   `pyproject.toml`); test a warning with `pytest.warns`.
+- Tests do not depend on their order: `tests/conftest.py` removes the rules,
+  terms and reactions a test registers and closes its pyplot figures, and CI
+  runs the suite once in random order. After changing global state (a
+  registry, a module-level cache), run
+  `uv run --with pytest-randomly==5.0.0 pytest -q -p randomly`; it prints the
+  seed, and `--randomly-seed=<seed>` repeats the order.
 - Code in the README and in the how-to pages `custom_interactions`,
   `research_models`, `fields` and `exploring` is executed by
   `tests/readme_test.py` and `tests/docs_snippets_test.py`; keep it runnable

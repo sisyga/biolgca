@@ -61,6 +61,21 @@ jobs:
           test -f "$RUNNER_TEMP/run/model.resolved.json"
           test -f "$RUNNER_TEMP/sweep/table.csv"
 
+  random-order:
+    name: Tests in random order (Python 3.13)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - name: Install locked project and development dependencies
+        run: uv sync --locked
+      - name: Run tests in random order
+        # the seed is printed: repeat a failure with -p randomly --randomly-seed=<seed>
+        run: uv run --no-sync --with pytest-randomly==5.0.0 python -m pytest -q -p randomly
+
   lowest-versions:
     name: Tests (Python 3.11, minimum dependency versions)
     runs-on: ubuntu-latest
