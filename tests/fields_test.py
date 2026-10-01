@@ -8,6 +8,7 @@ import json
 import re
 import subprocess
 import sys
+import warnings
 
 import jsonschema
 import numpy as np
@@ -17,7 +18,7 @@ import scipy.sparse.linalg as spla
 from scipy.integrate import solve_ivp
 
 from lgca import get_lgca
-from lgca.fields import PDESpec, laplacian, reaction
+from lgca.fields import FieldSolverError, PDESpec, laplacian, reaction
 from lgca.model import (
     AnalysisSpec,
     ModelSpec,
@@ -372,7 +373,8 @@ def test_every_failed_field_update_is_counted():
     compiled = _build([PDESpec(field="u", production=1e308, decay=1e-10)], fields={"u": 1e308})
     with np.errstate(over="ignore"), pytest.raises(RuntimeError, match="non-finite"):
         compiled.step()
-    assert compiled.metadata["fields"]["u"]["failures"] == 1
+    statistics = compiled.metadata["fields"]["u"]
+    assert statistics["failures"] == 1 and statistics["failure_kinds"] == {"non_finite": 1}
 
 
 @reaction(name="test_stiff_loss")
@@ -1196,24 +1198,32 @@ def _uptake_spec(solver="implicit", size=40, extent=12, diffusion=2.0, uptake=1.
     )
 
 
-def test_slowly_converging_saturating_uptake_warns_and_publishes_an_accurate_field():
-    # Michaelis-Menten uptake converges linearly: 20 iterations end just above the tolerance, with a field
-    # far more accurate than the time step. That is a warning, not an aborted run.
+def test_slowly_converging_picard_iteration_warns_and_publishes_an_accurate_field():
+    # Picard iteration converges linearly for Michaelis-Menten uptake: 20 iterations end just above the
+    # tolerance, with a field far more accurate than the time step. That is a warning, not an aborted run.
     reference = build_model(_uptake_spec(rtol=1e-12, max_iterations=1000))
     reference.step()
-    compiled = build_model(_uptake_spec())
+    compiled = build_model(_uptake_spec(nonlinear="picard"))
     with pytest.warns(UserWarning, match="did not converge in 20 iterations.*the last iterate is used"):
         compiled.step()
     assert compiled.metadata["fields"]["u"]["calls"] == 1
     np.testing.assert_allclose(_field(compiled), _field(reference), rtol=0, atol=1e-4)
+    # Newton's method converges in a few iterations (6 from this start), to an error estimated at most rtol
+    compiled = build_model(_uptake_spec())
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        compiled.step()
+    assert compiled.metadata["fields"]["u"]["max_iterations_used"] <= 8
+    np.testing.assert_allclose(_field(compiled), _field(reference), rtol=0, atol=2e-6)
 
 
+@pytest.mark.parametrize("backend", ["direct", "cg", AMG])
 @pytest.mark.parametrize("solver", ["steady", "implicit"])
-def test_the_direct_backend_iterates_saturating_uptake_to_rtol(solver):
-    # the fixed boundary value dominates the source terms, so the residual alone would stop the iteration
-    # early; the change of the field must also fall below rtol
+def test_saturating_uptake_is_solved_to_rtol_where_a_fixed_boundary_value_dominates(solver, backend):
+    # the inflow from the boundary dominates the source terms: a residual relative to them would stop the
+    # iteration early, Newton's estimate of the error does not
     fields = []
-    for options in ({"backend": "direct", "rtol": 1e-12, "max_iterations": 1000}, {"backend": "direct"}):
+    for options in ({"backend": "direct", "rtol": 1e-12, "max_iterations": 1000}, {"backend": backend}):
         compiled = build_model(_uptake_spec(solver, size=30, extent=10, diffusion=2e4, uptake=20.0, **options))
         if solver == "implicit":
             compiled.step()
@@ -1222,47 +1232,52 @@ def test_the_direct_backend_iterates_saturating_uptake_to_rtol(solver):
 
 
 def test_slow_convergence_far_from_the_tolerance_fails_and_estimates_the_iterations_needed():
-    needed = build_model(_uptake_spec(diffusion=1.0, max_iterations=100))
+    needed = build_model(_uptake_spec(diffusion=1.0, max_iterations=100, nonlinear="picard"))
     needed.step()
     needed = needed.metadata["fields"]["u"]["max_iterations_used"]
-    compiled = build_model(_uptake_spec(diffusion=1.0, max_iterations=10))
-    with pytest.raises(RuntimeError, match="did not converge in 10 iterations") as error:
+    compiled = build_model(_uptake_spec(diffusion=1.0, max_iterations=10, nonlinear="picard"))
+    with pytest.raises(FieldSolverError, match="did not converge in 10 iterations") as error:
         compiled.step()
+    assert error.value.kind == "nonlinear"
     estimate = int(re.search(r"converges slowly: set solver_options 'max_iterations' to about (\d+)",
                              str(error.value)).group(1))
     assert abs(estimate - needed) <= needed / 4
     statistics = compiled.metadata["fields"]["u"]
     assert statistics["failures"] == 1 and statistics["last_tolerance_ratio"] > 1e3
+    assert statistics["failure_kinds"] == {"nonlinear": 1}
     np.testing.assert_array_equal(_field(compiled), 1.0)
 
 
-def test_a_cycling_iteration_fails_and_suggests_the_explicit_solver():
+def test_a_cycling_picard_iteration_fails_and_suggests_the_explicit_solver():
     nodes = np.zeros((3, 3), dtype=int)
     nodes[:, 2] = 1
     steep = [{"uptake": 4.0, "saturation": 1.0, "n": 64}]
-    compiled = _build([PDESpec(field="u", cells=steep)], geometry="lin", dims=3, fields={"u": 2.0},
-                      nodes=nodes, restchannels=1, volume_exclusion=False)
+    picard = {"nonlinear": "picard"}  # Newton's method solves both (fields_newton_test.py)
+    compiled = _build([PDESpec(field="u", cells=steep, solver_options=picard)], geometry="lin", dims=3,
+                      fields={"u": 2.0}, nodes=nodes, restchannels=1, volume_exclusion=False)
     with pytest.raises(RuntimeError, match="cycles or stalls, which more iterations do not cure.*"
                                            "use solver='explicit'"):
         compiled.step()
     with pytest.raises(RuntimeError, match="cycles or stalls.*solver='explicit' can approach the steady state"):
-        _build([PDESpec(field="u", production=1.0, decay=0.01, cells=steep, solver="steady")], geometry="lin",
-               dims=3, fields={"u": 2.0}, nodes=nodes, restchannels=1, volume_exclusion=False)
+        _build([PDESpec(field="u", production=1.0, decay=0.01, cells=steep, solver="steady",
+                        solver_options=picard)],
+               geometry="lin", dims=3, fields={"u": 2.0}, nodes=nodes, restchannels=1, volume_exclusion=False)
 
 
+@pytest.mark.parametrize("nonlinear, solve", [("newton", "_newton_solver"), ("picard", "_solve_linear")])
 @pytest.mark.parametrize("solver, decay, initial", [("implicit", 0.0, 1e308), ("steady", 1e-10, 1.0)])
-def test_a_nonfinite_iterate_fails_at_once(monkeypatch, solver, decay, initial):
+def test_a_nonfinite_iterate_fails_at_once(monkeypatch, solver, decay, initial, nonlinear, solve):
     from lgca.fields import PDEOperator
 
     solves = []
-    solve_linear = PDEOperator._solve_linear
-    monkeypatch.setattr(PDEOperator, "_solve_linear",
-                        lambda self, *args: solves.append(1) or solve_linear(self, *args))
+    original = getattr(PDEOperator, solve)  # a linear solve per iteration
+    monkeypatch.setattr(PDEOperator, solve, lambda self, *args: solves.append(1) or original(self, *args))
     nodes = np.zeros((3, 3), dtype=int)
     nodes[:, 2] = 1
     operators = [PDESpec(field="u", diffusion=1.0, decay=decay, production=1e308,
                          cells=[{"uptake": 1.0, "saturation": 1.0}], solver=solver,
-                         solver_options={"backend": "direct"})]  # the iterative solvers fail on their own
+                         # the iterative solvers fail on their own
+                         solver_options={"backend": "direct", "nonlinear": nonlinear})]
     compiled = None
     with np.errstate(over="ignore", invalid="ignore"), pytest.raises(RuntimeError, match="non-finite field"):
         compiled = _build(operators, geometry="lin", dims=3, fields={"u": initial}, nodes=nodes,
