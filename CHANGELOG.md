@@ -7,6 +7,10 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- Field solver failures raise `lgca.fields.FieldSolverError`, a
+  `RuntimeError` with a `kind` (`"no_steady_state"`, `"singular"`,
+  `"nonlinear"`, `"linear"`, `"non_finite"`, `"explicit"`); the operator's
+  statistics count them by kind (`"failure_kinds"`).
 - `CompiledModel.reconfigure(changes)` changes the dynamics of a running
   model from its next step on, with the paths of `lgca.study.vary` (e.g.
   `{"birth_rate": 0.3}` after a burn-in). The change is tried on a copy of the
@@ -439,8 +443,28 @@ This file records notable user-facing changes. Changes remain under
 - `cells.label`, `cells.index` and `cells.channel` are read-only; cells change
   through their operations. Writing them directly could lose cells, move them
   to other nodes or duplicate labels, and no check noticed.
-- Reorientation terms and stack builders get a state that they can read but
-  not change: its operations raise `TypeError`.
+- Reorientation terms, the reactions and cell terms of `pde`, and stack
+  builders get a state that they can read but not change: its operations
+  raise `TypeError`.
+- Fields: saturating (Hill) uptake in the implicit and steady solvers is
+  solved by Newton's method instead of Picard iteration. It converges where
+  Picard iteration cycled or failed (steep uptake with `n >= 2`, strong uptake
+  in implicit steps, steady fields started at zero), usually in one to three
+  linear solves per step, and 1.8 to 7 times cheaper per step in the
+  benchmarks (tutorial 7's model at 200² nodes, 3D spheroids). It stops
+  when the estimated error of the field is at most `rtol` relative to its
+  largest value, also where a fixed boundary value supplies most of the
+  field; there Picard iteration on the AMG and CG backends had stopped at
+  errors of up to 1e-4. Seeded runs with saturating uptake change within the
+  tolerance (tutorial 7: 6,186 cells after 200 steps instead of 6,211).
+  `solver_options={"nonlinear": "picard"}` restores the earlier iteration;
+  reactions still use Picard iteration. `metadata["fields"][name]["nonlinear"]`
+  records which iteration a run used.
+- Fields: a steady field that only the cells remove (no decay, no fixed
+  boundary value) now raises when production reaches the total saturable
+  uptake, where no steady state exists, instead of failing to converge or
+  publishing a meaningless field. It starts from the uniform level at which
+  production and uptake balance.
 - A step is applied as a whole or not at all. If it raises, or is
   interrupted, the model is put back in the state before the step (cells in
   their order, traits, labels, families, fields, the random stream), the

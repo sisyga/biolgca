@@ -219,6 +219,20 @@ def test_stack_builders_get_a_state_they_cannot_change():
                               dynamics=InteractionPipelineSpec(operators=[meddling_stack()])))
 
 
+def test_reactions_of_a_field_get_a_state_they_cannot_change():
+    from lgca.fields import PDESpec, reaction
+
+    @reaction(name="meddling_reaction")
+    def meddling_reaction(state, c):
+        state.remove_cells(0.5)
+        return 0.0, 0.1
+
+    model = build_model(ModelSpec(state=StateSpec(density=0.5, fields={"u": 1.0}), dynamics=InteractionPipelineSpec(
+        operators=[PDESpec(field="u", diffusion=1.0, reactions=[{"name": "meddling_reaction"}])])))
+    with pytest.raises(TypeError, match="for reading only and cannot remove cells"):
+        model.step()
+
+
 def test_a_term_that_draws_random_numbers_leaves_the_stream_alone_at_build():
     @reorientation_term(coupling="rest", name="restless")
     def restless(state):

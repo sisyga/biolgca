@@ -1,7 +1,7 @@
 # Architecture proposals after the 30 September 2026 review
 
-Status: proposal, 2026-09-30; decisions, CR-A3 PR1 and PR2 and CR-A1 PR0, PR1
-and PR3 on 2026-10-01 (see [Decisions](#decisions-for-the-maintainer)). Follow-up to [the code review](code_review_2026-09-30.md),
+Status: proposal, 2026-09-30; decisions, CR-A3 PR1 and PR2, CR-A1 PR0, PR1 and
+PR3, and CR-A2 PR1 on 2026-10-01 (see [Decisions](#decisions-for-the-maintainer)). Follow-up to [the code review](code_review_2026-09-30.md),
 whose three open architectural findings are renamed here CR-A1 to CR-A3, so that
 they no longer collide with the IDs A1 to A5 of the [usability roadmap](usability_roadmap.md).
 
@@ -422,6 +422,27 @@ monotone; `FieldSolverError(RuntimeError)` with a `kind` (`no_steady_state`,
 regression test `test_nonconvergent_nonlinear_fields_fail_without_publishing_an_inaccurate_solution`
 must then assert u = 0.98332 (keeping a `"picard"` copy that raises).
 
+Done on 2026-10-01 (decision 4), by a delegated agent on a branch, reviewed and
+merged: `_HillUptake` (`monotone`, `derivative`, `maximum`), `_newton` with the
+projected Armijo line search (per node without diffusion and advection), the
+first iteration in iterate form and later ones in correction form with
+Eisenstat-Walker tolerances. **Stopping test:** an error estimate, the
+simplified Newton correction `J^-1 F(c)` with the last matrix (one
+back-substitution with the kept factors on the direct backend, one solve to
+relative tolerance 0.1 on AMG and CG), at most `rtol * max(c)` after a full
+step, or `F` at rounding level; it does not loosen with the boundary inflow.
+Measured at 200² and D = 2e4 (field ms per step / max error against a tight
+reference): direct n = 1 271 / 3.8e-9 against Picard 1887 / 1.5e-6, AMG 53 /
+1.4e-7 against 98 / 1.6e-4; n = 2 similar. It costs about 2x the prototype's
+single iteration there, which stopped at 25 to 110 times the tolerance; a chord
+finishing step on the direct backend (about 15 lines, measured 0.9 to 1.4x the
+prototype at errors below 1e-6) is left to PR4. `FieldSolverError` has a sixth
+kind, `explicit`, for the explicit solver's failures. The existence check runs
+also with `"picard"` when every term is monotone. Linear problems and the
+`"picard"` path are bit-identical to before (35 snapshot cases). Tests in
+`tests/fields_newton_test.py` (94). Reactions and cell terms get read-only
+states (CR-A1 PR0).
+
 **PR2 [Feat] Reactions in Newton (about 1.5 days).** **PR3 [Docs] (0.5 day)**,
 including `fields_spec.md`, which describes Picard, and benchmarks for Hill
 `n = 2` and `4`. **PR4 (optional) [Perf] Direct backend (about 1 day)**: the
@@ -630,8 +651,9 @@ Effort: 3.5 to 4 days for PR1 to PR3.
 3. ~~**CR-A1 PR1 and PR3**~~: done on 2026-10-01.
 4. ~~**CR-A3 PR2**~~ (done on 2026-10-01) **and PR3**: reading inputs once and
    provenance.
-5. **CR-A2 PR1 to PR3**, in parallel with the above: it touches only the field
-   solver. PR4 (direct backend) when profiling asks for it.
+5. ~~**CR-A2 PR1**~~ (done on 2026-10-01); **PR2 and PR3** next: reactions in
+   Newton, docs and benchmarks. PR4 (direct backend, chord step) when profiling
+   asks for it.
 
 ## Decisions for the maintainer
 

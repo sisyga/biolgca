@@ -172,16 +172,25 @@ go-or-grow step on lattices of 100² to 400² nodes (``benchmarks/fields.py``).
 :class:`~lgca.fields.PDESpec`. After a run, ``result.metadata["fields"]``
 reports per field how it was solved, e.g. the number of iterations.
 
-Saturating uptake and reactions make the equation nonlinear; the implicit and
-steady solvers iterate them until an iteration changes the field by at most
-``rtol`` (1e-6) relative to its largest value and the residual of the
-equation is at most ``rtol`` relative to its source terms, which a fixed
-boundary value dominates. An iteration that is still within a factor 1000 of
-this tolerance after ``max_iterations`` (20) converges slowly: the operator
-warns once and uses the last iterate. Further off, it stops the run with an
-error that says about how many iterations would suffice, or that more do not
-help, as for steep saturating uptake with ``n > 1``; ``solver="explicit"``
-then works.
+Saturating uptake and reactions make the equation nonlinear. The implicit and
+steady solvers solve saturating uptake by Newton's method, until the
+estimated error of the field is at most ``rtol`` (1e-6) relative to its
+largest value: usually one to three linear solves per step, also for steep
+uptake with ``n > 1``. A steady field that only the cells remove (no decay,
+no fixed boundary value) has a steady state only if the cells can take up
+more than is produced; otherwise the operator says so.
+Reactions are iterated by Picard iteration, until an iteration changes the
+field by at most ``rtol`` relative to its largest value and the residual of
+the equation is at most ``rtol`` relative to its source terms;
+``solver_options={"nonlinear": "picard"}`` iterates saturating uptake in this
+way too, as earlier versions did. An iteration that is still within a factor
+1000 of its tolerance after ``max_iterations`` (20) converges slowly: the
+operator warns once and uses the last iterate. Further off, it stops the run
+with an error that says about how many iterations would suffice, or that
+more do not help; ``solver="explicit"`` then works. The solver raises
+:class:`~lgca.fields.FieldSolverError` when it fails, with a ``kind`` that
+says why, and ``result.metadata["fields"]`` counts the failures by kind and
+records which iteration a run used (``"nonlinear"``).
 
 Advection
 ---------

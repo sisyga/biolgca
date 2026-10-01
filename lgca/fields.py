@@ -50,6 +50,7 @@ from typing import Any, ClassVar
 import numpy as np
 import scipy.sparse as sp
 from scipy.integrate import solve_ivp
+from scipy.optimize import brentq
 from scipy.sparse import linalg as spla
 
 from ._warnings import warn_user
@@ -57,16 +58,17 @@ from .lattice_state import LatticeState, _species_indices, channel_mask
 from .operator_base import _COPYING_TEMPLATES, FieldOperator, ParameterSpec, PluginInfo
 from .plugins import _law_for_kind, register_plugin
 
-__all__ = ["PDEOperator", "PDESpec", "laplacian", "list_reactions", "reaction"]
+__all__ = ["FieldSolverError", "PDEOperator", "PDESpec", "laplacian", "list_reactions", "reaction"]
 
 SOLVERS = ("explicit", "implicit", "steady")
 _EXPLICIT_METHODS = ("RK23", "RK45", "DOP853", "BDF", "Radau")
 _SOLVER_OPTIONS = {
     "explicit": {"method": "RK45", "rtol": 1e-4, "atol": 1e-6, "warn_evaluations": 200},
-    "implicit": {"substeps": 1, "backend": "auto", "rtol": 1e-6, "max_iterations": 20},
-    "steady": {"backend": "auto", "rtol": 1e-6, "max_iterations": 20},
+    "implicit": {"substeps": 1, "backend": "auto", "rtol": 1e-6, "max_iterations": 20, "nonlinear": "newton"},
+    "steady": {"backend": "auto", "rtol": 1e-6, "max_iterations": 20, "nonlinear": "newton"},
 }
 _BACKENDS = ("auto", "direct", "cg", "amg")
+_NONLINEAR = ("newton", "picard")
 # without pyamg, the steady solver factors matrices of up to this many nodes (in 3D only constant ones) and
 # iterates above
 _DIRECT_LIMIT = 20_000
@@ -77,6 +79,14 @@ _DIRECT_LIMIT = 20_000
 _FACTOR_LIMIT = {1: 1_000_000, 2: 100_000, 3: 6_000}
 # a nonlinear solve that stops within this factor of its tolerance is slow, not wrong: warn and use it
 _SLOW_CONVERGENCE_FACTOR = 1e3
+# Newton's method: the line search halves the step down to _MIN_STEP until the residual falls by the fraction
+# _ARMIJO of the step; a correction is solved to a relative tolerance of at most _ETA_MAX (Eisenstat-Walker),
+# the error estimate to _ESTIMATE_RTOL; a residual within _ROUNDING of the terms that make it is rounding
+_MIN_STEP = 2.0**-10
+_ARMIJO = 1e-4
+_ETA_MAX = 0.1
+_ESTIMATE_RTOL = 0.1
+_ROUNDING = 32 * np.finfo(float).eps
 _AMG_LOCK = threading.Lock()  # multigrid setups of runs in threads take turns with np.random
 _SIDES = ("x-", "x+", "y-", "y+", "z-", "z+")
 _PER_SIDE_GEOMETRIES = ("lin", "square", "cubic")
@@ -88,7 +98,8 @@ def reaction(function=None, *, name: str | None = None):
     """Register ``function(state, c, **parameters)`` as a reaction of the ``pde`` operator.
 
     The function gets the lattice state (the cells as the previous operator
-    left them, and every field through ``state.field``) and the field's
+    left them, and every field through ``state.field``; it reads them, and
+    its operations raise ``TypeError``) and the field's
     current values ``c`` (shape ``state.dims``, read-only), and returns
     ``(production, loss_rate)``: numbers or arrays of shape ``state.dims``,
     both non-negative, entering the equation as ``+ production - loss_rate
@@ -126,6 +137,50 @@ def reaction(function=None, *, name: str | None = None):
 def list_reactions() -> tuple[str, ...]:
     """The names of the registered reactions."""
     return tuple(sorted(_REACTIONS))
+
+
+class FieldSolverError(RuntimeError):
+    """The ``pde`` operator could not update its field, which keeps its values.
+
+    A :class:`RuntimeError`, so code that catches those also catches this.
+    The operator counts its failures by kind in its statistics,
+    ``model.metadata["fields"][name]["failure_kinds"]``.
+
+    Attributes
+    ----------
+    kind : str
+        Why the update failed:
+
+        - ``"no_steady_state"``: a steady field has no steady state: nothing
+          removes what is produced, or the cells take up less than is
+          produced even when their uptake saturates;
+        - ``"singular"``: the problem has no unique solution, as nothing
+          removes the field;
+        - ``"nonlinear"``: the iteration of the terms that depend on the
+          field (saturating uptake, reactions) did not converge;
+        - ``"linear"``: an iterative linear solver did not converge;
+        - ``"non_finite"``: the solution overflowed;
+        - ``"explicit"``: the explicit solver failed or produced negative
+          values.
+
+    Examples
+    --------
+    >>> error = FieldSolverError("pde 'oxygen': no steady state exists", "no_steady_state")
+    >>> isinstance(error, RuntimeError), error.kind
+    (True, 'no_steady_state')
+    """
+
+    KINDS: ClassVar[tuple[str, ...]] = ("no_steady_state", "singular", "nonlinear", "linear", "non_finite",
+                                        "explicit")
+
+    def __init__(self, message: str, kind: str):
+        if kind not in self.KINDS:
+            raise ValueError(f"FieldSolverError kind must be one of {', '.join(self.KINDS)}, got {kind!r}")
+        super().__init__(message)
+        self.kind = kind
+
+    def __reduce__(self):  # pickled with its kind, e.g. from the worker processes of a sweep
+        return type(self), (str(self), self.kind)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -188,22 +243,46 @@ class PDESpec:
         Implicit and steady: ``backend`` (``"auto"``, ``"direct"``,
         ``"cg"``, ``"amg"``), ``rtol`` (1e-6, for the iterative solver and
         the iteration of saturating uptake and reactions), ``max_iterations``
-        (20);
+        (20), ``nonlinear`` (``"newton"``; ``"picard"`` restores the
+        iteration of earlier versions for saturating uptake);
         implicit also ``substeps`` (1). Explicit: ``method`` (``"RK45"``;
         also ``"RK23"``, ``"DOP853"``, ``"BDF"``, ``"Radau"``), ``rtol``
         (1e-4), ``atol`` (1e-6), ``warn_evaluations`` (200).
-        The terms that depend on the field (saturating uptake, reactions)
-        are iterated until an iteration changes the field by at most
-        ``rtol`` relative to its largest value and the residual of the
-        equation is at most ``rtol`` relative to its source terms (which a
-        fixed boundary value dominates). An iteration still within a factor
-        1000 of this tolerance after ``max_iterations`` converges slowly: it
-        warns and uses the last iterate. Further off, it raises an error
-        that says whether to raise ``max_iterations`` or to use the explicit
-        solver.
+        The terms that depend on the field are iterated. Saturating uptake
+        alone is solved by Newton's method, until the estimated error of
+        the field is at most ``rtol`` relative to its largest value.
+        Reactions, and ``nonlinear="picard"``, use Picard iteration (the
+        terms evaluated at the last iterate, and the linear problem solved
+        again) until an iteration changes the field by at most ``rtol``
+        relative to its largest value and the residual of the equation is
+        at most ``rtol`` relative to its source terms. An iteration still
+        within a factor 1000 of its tolerance after ``max_iterations``
+        converges slowly: it warns and uses the last iterate. Further off,
+        it raises :class:`FieldSolverError` (kind ``"nonlinear"``) and says
+        whether to raise ``max_iterations`` or to use the explicit solver.
+        ``model.metadata["fields"][field]["nonlinear"]`` records the
+        iteration that a run used.
 
     Notes
     -----
+    Newton's method linearizes the uptake at the current field: its matrix
+    ``J`` is that of the linear terms plus the derivative of the uptake on
+    the diagonal, an M-matrix like the matrix of the linear terms, so the
+    backends below apply. A line search halves the step from the full one,
+    keeping ``c ≥ 0``, until the residual ``F(c)`` of the equation falls (at
+    every node on its own where the nodes are independent), so the method
+    converges from any start, also for steep uptake (``n > 1``), where
+    Picard iteration may cycle. The first iteration is Picard's first. The
+    iteration stops when the error that remains, estimated as the next
+    Newton correction ``J⁻¹ F(c)`` with the matrix of the last iteration, is
+    at most ``rtol`` times the largest value of the field, or when the
+    residual is as small as rounding makes it; unlike a residual relative
+    to the source terms, the estimate does not loosen when a fixed boundary
+    value supplies most of the field. A steady field without decay or fixed
+    boundary value has a steady state only if the cells can take up more
+    than is produced in total; the solver checks this, and starts from the
+    uniform field at which uptake and production balance.
+
     The ``"auto"`` backend factors a matrix that does not depend on the cells
     once (no uptake) on lattices of up to 1 000 000 nodes in 1D, 100 000 in
     2D and 6 000 in 3D (the steady solver in 3D up to 20 000), where the
@@ -369,6 +448,10 @@ class PDEOperator(FieldOperator):
         self._warned = False
         if self.solver != "explicit":
             self.statistics["backend"] = self._backend
+            if self.reactions or any(term.saturation is not None for term in self.cell_terms):
+                # the iteration of the terms that depend on the field, for the record of the run
+                self.statistics["nonlinear"] = ("newton" if self.options["nonlinear"] == "newton"
+                                                and not self.reactions else "picard")
         context.metadata.setdefault("fields", {})[self.field] = self.statistics
 
     def _assemble(self, lgca):
@@ -403,6 +486,16 @@ class PDEOperator(FieldOperator):
     @property
     def _symmetric(self):
         return self.advection is None
+
+    @property
+    def _separable(self):
+        """No diffusion and no advection: every node has an equation of its own."""
+        return self.diffusion == 0 and self.advection is None
+
+    @property
+    def _singular(self):
+        """A steady problem from which only the cells remove the field: its linear part is singular."""
+        return self.solver == "steady" and self.decay == 0 and not self._fixed
 
     def _resolve_backend(self, n):
         backend = self.options.get("backend")
@@ -451,8 +544,12 @@ class PDEOperator(FieldOperator):
         with _single_threaded_blas():
             try:
                 self._advance(lgca, step)
-            except RuntimeError:  # the solver failed; the field is unchanged
-                self.statistics["failures"] = self.statistics.get("failures", 0) + 1
+            except RuntimeError as error:  # the solver failed; the field is unchanged
+                statistics = self.statistics
+                statistics["failures"] = statistics.get("failures", 0) + 1
+                if isinstance(error, FieldSolverError):
+                    kinds = statistics.setdefault("failure_kinds", {})
+                    kinds[error.kind] = kinds.get(error.kind, 0) + 1
                 raise
 
     # matrices that setup computes again for every model: a copy as a template for a new model leaves them out
@@ -484,8 +581,11 @@ class PDEOperator(FieldOperator):
         else:
             c = self._steady(c, production, loss, saturating)
         if not np.all(np.isfinite(c)):
-            raise RuntimeError(f"pde {self.field!r}: the solver produced non-finite field values")
+            raise self._non_finite()
         stored[...] = self._pad(c.reshape(self._dims))
+
+    def _non_finite(self):
+        return FieldSolverError(f"pde {self.field!r}: the solver produced non-finite field values", "non_finite")
 
     # ---------------------------------------------------------------- sources
 
@@ -502,6 +602,7 @@ class PDEOperator(FieldOperator):
         nonlinear = []
         if self.cell_terms or self.reactions:
             state = LatticeState(lgca, step=step)
+            state._read_only = True  # terms and reactions read the cells; the field is the operator's to change
             for term in self.cell_terms:
                 weights = term.weights(state)
                 if term.kind == "production":
@@ -509,7 +610,7 @@ class PDEOperator(FieldOperator):
                 elif term.saturation is None:
                     loss += weights
                 elif np.any(weights):
-                    nonlinear.append(functools.partial(_saturating_uptake, weights, term.saturation, term.n))
+                    nonlinear.append(_HillUptake(weights, term.saturation, term.n))
             for entry in self.reactions:
                 nonlinear.append(functools.partial(entry.evaluate, state, self._dims))
         return production, loss, nonlinear
@@ -543,11 +644,7 @@ class PDEOperator(FieldOperator):
                 """d(rhs)/dc: saturating uptake by its derivative, reactions by their current loss rate."""
                 rate = loss.copy()
                 for term in nonlinear:
-                    if getattr(term, "func", None) is _saturating_uptake:
-                        weights, K, n = term.args
-                        rate += weights * _hill_derivative(values, K, n)
-                    else:
-                        rate += term(values)[1]
+                    rate += term.derivative(values) if isinstance(term, _HillUptake) else term(values)[1]
                 return (A - sp.diags(rate)).tocsc()
 
             implicit = {"jac": jacobian if nonlinear else jacobian(0.0, c)}
@@ -555,8 +652,8 @@ class PDEOperator(FieldOperator):
         solution = solve_ivp(rhs, (0.0, 1.0), c, method=method, t_eval=[1.0], rtol=options["rtol"],
                              atol=options["atol"], **implicit)
         if not solution.success:
-            raise RuntimeError(f"pde {self.field!r}: the explicit solver failed ({solution.message}); "
-                               "try solver='implicit'")
+            raise FieldSolverError(f"pde {self.field!r}: the explicit solver failed ({solution.message}); "
+                                   "try solver='implicit'", "explicit")
         evaluations = int(solution.nfev)
         stats = self.statistics
         stats["method"] = method
@@ -569,8 +666,9 @@ class PDEOperator(FieldOperator):
                       "solver='implicit' is faster")
         c = solution.y[:, -1]
         if c.min() < -options["atol"]:
-            raise RuntimeError(f"pde {self.field!r}: the explicit solver produced negative values (down to "
-                               f"{c.min():.3g}); use solver='implicit', which keeps the field non-negative")
+            raise FieldSolverError(f"pde {self.field!r}: the explicit solver produced negative values (down to "
+                                   f"{c.min():.3g}); use solver='implicit', which keeps the field non-negative",
+                                   "explicit")
         return np.maximum(c, 0.0)
 
     def _implicit(self, c, production, loss, nonlinear):
@@ -583,10 +681,20 @@ class PDEOperator(FieldOperator):
         return c
 
     def _steady(self, c, production, loss, nonlinear):
-        if (self.decay == 0 and not self._fixed and not self.reactions
-                and not np.any(loss) and not nonlinear):
-            raise RuntimeError(f"pde {self.field!r}: no cells take up the field, and nothing else removes it, "
-                               "so it has no steady state; add decay or a fixed value at the boundary")
+        if self._singular and not np.any(loss):
+            if not nonlinear:
+                raise FieldSolverError(f"pde {self.field!r}: no cells take up the field, and nothing else removes "
+                                       "it, so it has no steady state; add decay or a fixed value at the boundary",
+                                       "no_steady_state" if np.any(production) else "singular")
+            if all(getattr(term, "monotone", False) for term in nonlinear):  # saturating uptake
+                # the cells must be able to take up more than is produced: their uptake is at most its rate
+                capacity, total = sum(term.maximum for term in nonlinear), float(np.sum(production))
+                if not total < capacity:
+                    raise FieldSolverError(
+                        f"pde {self.field!r}: no steady state exists: the field is produced at {total:.4g} per "
+                        f"step in total, and the cells take up at most {capacity:.4g} (the sum of their "
+                        "saturating uptake rates); add decay or a fixed value at the boundary, or lower the "
+                        "production", "no_steady_state")
         # SuperLU finds the matrix singular where nothing removes the field; other non-finite values (an
         # overflowing solution) are reported as such
         with warnings.catch_warnings():
@@ -594,27 +702,38 @@ class PDEOperator(FieldOperator):
             try:
                 return self._solve_system(self._steady_base, 1.0, production, c, loss, nonlinear)
             except spla.MatrixRankWarning:
-                raise RuntimeError(f"pde {self.field!r}: the steady problem has no unique solution; something "
-                                   "must remove the field (decay, uptake, a reaction's loss rate or a fixed "
-                                   "boundary value)") from None
+                raise self._no_unique_solution() from None
+
+    def _no_unique_solution(self):
+        return FieldSolverError(f"pde {self.field!r}: the steady problem has no unique solution; something must "
+                                "remove the field (decay, uptake, a reaction's loss rate or a fixed boundary "
+                                "value)", "singular")
 
     def _solve_system(self, base, scale, right, start, loss, nonlinear):
-        """Solve ``(base + scale diag(L)) c = right + scale P``.
+        """Solve ``base c + scale (L + L_c(c)) c = right + scale P_c(c)`` for c, starting from ``start``.
 
-        ``L`` is the loss rate of uptake by cells plus that of the terms that depend on c (saturating
-        uptake, reactions), which also add their production ``P``. These are evaluated at the current
-        iterate and the linear problem solved again (Picard iteration), starting from ``start``, until
-        the terms no longer change, or until an iteration changes c by at most ``rtol`` relative to its
-        largest value and the residual that updating the terms adds is at most ``rtol`` relative to the
-        source terms. The linear solver's own error is left to it: in an ill-conditioned steady problem
-        it exceeds ``rtol``, and solving again with the same terms cannot reduce it.
-
-        After ``max_iterations``, an iterate within ``_SLOW_CONVERGENCE_FACTOR`` of this tolerance is
-        used with a warning; a worse one raises, with advice from the rate at which the iteration
-        converged. A non-finite iterate raises at once.
+        ``L`` is the loss rate of uptake by cells; the terms that depend on c (saturating uptake,
+        reactions) add their loss rate ``L_c`` and production ``P_c``. Without them the problem is
+        linear. Saturating uptake alone is solved by Newton's method (:meth:`_newton`), unless
+        solver_options ``nonlinear`` is ``"picard"``; reactions by Picard iteration (:meth:`_picard`).
         """
         if not nonlinear:
             return self._solve_linear(base, scale, right, start, loss)
+        if self.options["nonlinear"] == "newton" and all(getattr(term, "monotone", False) for term in nonlinear):
+            return self._newton(base, scale, right, start, loss, nonlinear)
+        return self._picard(base, scale, right, start, loss, nonlinear)
+
+    def _picard(self, base, scale, right, start, loss, nonlinear):
+        """Picard iteration for the equation of :meth:`_solve_system`.
+
+        The terms that depend on c are evaluated at the current iterate and the linear problem solved
+        again, starting from ``start``, until the terms no longer change, or until an iteration changes c
+        by at most ``rtol`` relative to its largest value and the residual that updating the terms adds
+        is at most ``rtol`` relative to the source terms. The linear solver's own error is left to it: in
+        an ill-conditioned steady problem it exceeds ``rtol``, and solving again with the same terms
+        cannot reduce it. A non-finite iterate raises at once; after ``max_iterations``, see
+        :meth:`_not_converged`.
+        """
         options = self.options
         stats = self.statistics
         previous = start
@@ -623,7 +742,7 @@ class PDEOperator(FieldOperator):
         for iteration in range(1, options["max_iterations"] + 1):
             new = self._solve_linear(base, scale, right + scale * made, previous, lost)
             if not np.all(np.isfinite(new)):
-                raise RuntimeError(f"pde {self.field!r}: the solver produced non-finite field values")
+                raise self._non_finite()
             relative_change = (np.max(np.abs(new - previous), initial=0.0)
                                / max(np.max(new, initial=0.0), 1e-300))
             previous = new
@@ -645,82 +764,291 @@ class PDEOperator(FieldOperator):
                 break
             made, lost = new_made, new_lost
         else:
-            # the rate per iteration from the last two against two three iterations earlier: an iteration
-            # that alternates between two states, the usual way it fails, has a rate near 1
-            recent = history[-5:]
-            rate = ((max(recent[-2:]) / max(recent[:2])) ** (1 / 3)
-                    if len(recent) == 5 and np.all(np.isfinite(recent)) else None)
-            if rate is None:
-                advice = "raise solver_options 'max_iterations'"
-            elif rate < 0.9:
-                needed = options["max_iterations"] + int(np.ceil(np.log(history[-1]) / -np.log(rate)))
-                advice = f"it converges slowly: set solver_options 'max_iterations' to about {needed}"
-            else:
-                advice = ("the iteration cycles or stalls, which more iterations do not cure (steep "
-                          "saturating uptake with n > 1, or a reaction whose production rises with "
-                          "the field); "
-                          + ("use solver='explicit'" if self.solver == "implicit"
-                             else "a field with solver='explicit' can approach the steady state in time"))
-            message = (f"pde {self.field!r}: the terms that depend on the field (saturating uptake, "
-                       f"reactions) did not converge in {options['max_iterations']} iterations (scaled "
-                       f"residual norm {relative_residual:.3g}, tolerance {tolerance:.3g}; relative change "
-                       f"{relative_change:.3g}, rtol {options['rtol']:.3g}); {advice}")
-            if not history[-1] <= _SLOW_CONVERGENCE_FACTOR:  # far off, or not a number
-                stats["last_tolerance_ratio"] = float(history[-1])
-                raise RuntimeError(message)
-            if not self._warned:
-                self._warned = True
-                warn_user(f"{message}; the last iterate is used")
+            self._not_converged(
+                history, f"pde {self.field!r}: the terms that depend on the field (saturating uptake, reactions) "
+                f"did not converge in {options['max_iterations']} iterations (scaled residual norm "
+                f"{relative_residual:.3g}, tolerance {tolerance:.3g}; relative change {relative_change:.3g}, "
+                f"rtol {options['rtol']:.3g})",
+                "steep saturating uptake with n > 1, or a reaction whose production rises with the field")
         stats["max_iterations_used"] = max(stats.get("max_iterations_used", 0), iteration)
         return previous
 
+    def _newton(self, base, scale, right, start, loss, terms):
+        """Newton's method for the equation of :meth:`_solve_system` where every term is monotone (saturating
+        uptake): ``F(c) = base c + scale (L + Σ_k r_k(c)) c - right = 0`` with the loss rates ``r_k``.
+
+        Newton's matrix is ``J = base + scale diag(L + Σ_k u_k'(c))`` with the derivatives of the uptake
+        ``u_k = r_k c``. The first iteration solves ``J c_new = J c - F(c)`` from c with the operator's
+        tolerance, which is Picard's first iteration where ``u' = r``; later ones solve ``J δ = -F(c)`` for
+        the correction, to a relative tolerance (Eisenstat and Walker) no tighter than the stopping test
+        needs. The line search takes ``max(c + λ δ, 0)`` with λ halved from 1 until |F| falls by the
+        fraction _ARMIJO λ, down to _MIN_STEP; every node on its own where the nodes are independent.
+
+        The error that remains is estimated as the next correction, ``J⁻¹ F(c_new)`` with the last matrix
+        (the simplified Newton correction): with its factors on the direct backend, else solved to
+        _ESTIMATE_RTOL. The iteration stops after a full step whose estimate is at most ``rtol`` times the
+        largest value of c, or when F is as small as rounding makes it. The estimate is an error of c, so
+        it does not loosen when a fixed boundary value dominates ``right``, as a residual relative to
+        ``right`` does. After ``max_iterations``, see :meth:`_not_converged`.
+        """
+        options, stats = self.options, self.statistics
+        rtol = options["rtol"]
+        if not np.any(right):  # nothing produces the field: 0 is the solution
+            return np.zeros_like(right)
+        equation = _UptakeEquation(base, scale, right, loss, terms)
+        c = np.maximum(start, 0.0)
+        if self._singular:
+            c = self._balance(equation, c)
+        F, lost, rates, transport = equation.evaluate(c)
+        norm = _norm(F)
+        history = []  # per iteration, the estimated error relative to the tolerance: at most 1 is converged
+        iteration = backtracks = 0
+        eta, estimate, relative_error = _ETA_MAX, None, np.inf
+        converged = equation.at_rounding(c, F, lost, transport)
+        while not converged:
+            if iteration == options["max_iterations"]:
+                self._not_converged(
+                    history, f"pde {self.field!r}: Newton's method for the saturating uptake did not converge in "
+                    f"{iteration} iterations (estimated error {relative_error:.3g} relative to the largest value "
+                    f"of the field, rtol {rtol:.3g})", "no step along Newton's direction reduces the residual")
+                break
+            iteration += 1
+            d = equation.derivative(c, rates)
+            matrix, solve = self._newton_solver(base, scale, d)
+            if iteration == 1:  # for the new iterate, from c
+                full = np.maximum(solve(right + scale * (d - lost) * c, c, rtol), 0.0)
+                delta = full - c
+            else:  # for the correction, from the estimate of it
+                full, delta = None, solve(-F, -estimate, eta)
+            if not np.all(np.isfinite(delta)):
+                raise self._non_finite()
+            slack = None
+            if self._separable:  # a node within a tenth of the tolerance, or at rounding, needs no decrease
+                slack = np.maximum(_ROUNDING * equation.size(c, lost, transport),
+                                   0.1 * rtol * np.max(c, initial=0.0) * matrix.diagonal())
+            c_new, (F_new, lost, rates, transport), full_step, halvings = self._line_search(
+                equation, c, delta, full, F, norm, slack)
+            backtracks += halvings
+            if not np.all(np.isfinite(F_new)):
+                raise self._non_finite()
+            norm_new, largest = _norm(F_new), np.max(c_new, initial=0.0)
+            if equation.at_rounding(c_new, F_new, lost, transport):
+                converged, error = True, 0.0
+            else:
+                estimate = solve(F_new, np.zeros_like(F_new), _ESTIMATE_RTOL)
+                error = float(np.max(np.abs(estimate), initial=0.0))
+                if not np.isfinite(error):
+                    raise self._non_finite()
+                converged = full_step and error <= rtol * largest
+            relative_error = error / largest if largest > 0 else np.inf
+            history.append(relative_error / rtol)
+            # the next correction: as accurate as the residual falls, and half the tolerance suffices
+            eta = min(_ETA_MAX, max(0.9 * (norm_new / norm) ** 2 if 0 < norm < np.inf else 0.0,
+                                    0.5 * rtol * largest / error if error > 0 else _ETA_MAX))
+            c, F, norm = c_new, F_new, norm_new
+        stats["max_iterations_used"] = max(stats.get("max_iterations_used", 0), iteration)
+        if backtracks:
+            stats["backtracks"] = stats.get("backtracks", 0) + backtracks
+        return c
+
+    def _line_search(self, equation, c, delta, full, F, norm, slack):
+        """The projected line search of :meth:`_newton`, from c along delta (``full``: the iterate of the full
+        step, if known). Returns the iterate, its evaluation, whether the step was full, and the number of
+        halvings. ``slack``, given where the nodes are independent, is per node a residual that needs no
+        decrease; every node then has a step of its own."""
+        trial = np.maximum(c + delta, 0.0) if full is None else full
+        evaluation = equation.evaluate(trial)
+        if not np.isfinite(norm):  # the start overflowed: the full step, or fail
+            if not (np.all(np.isfinite(trial)) and np.isfinite(_norm(evaluation[0]))):
+                raise self._non_finite()
+            return trial, evaluation, True, 0
+        halvings = 0
+        if slack is not None:
+            step, size = np.ones_like(c), np.abs(F)
+            while True:
+                decreased = np.abs(evaluation[0]) <= np.maximum((1 - _ARMIJO * step) * size, slack)
+                failed = ~decreased & (step > _MIN_STEP)  # (also where the trial is not a number)
+                if not failed.any():
+                    return trial, evaluation, bool(np.all(step == 1)), halvings
+                step[failed] *= 0.5
+                halvings += 1
+                trial = np.where(failed, np.maximum(c + step * delta, 0.0), trial)
+                evaluation = equation.evaluate(trial)
+        step, best = 1.0, None
+        while True:
+            norm_trial = _norm(evaluation[0])
+            if norm_trial <= (1 - _ARMIJO * step) * norm:
+                return trial, evaluation, step == 1, halvings
+            if np.isfinite(norm_trial) and (best is None or norm_trial < best[0]):
+                best = (norm_trial, trial, evaluation, step == 1)
+            if step <= _MIN_STEP:
+                if best is None:
+                    raise self._non_finite()
+                return best[1], best[2], best[3], halvings  # no step decreases |F|: the best one
+            step *= 0.5
+            halvings += 1
+            trial = np.maximum(c + step * delta, 0.0)
+            evaluation = equation.evaluate(trial)
+
+    def _balance(self, equation, c):
+        """The start of Newton's method for a steady problem from which only the cells remove the field.
+
+        There ``1ᵀ base = 0``, so the uptake must balance the production in total; c is shifted uniformly
+        until it does. (At c = 0 with n > 1 Newton's first matrix would be singular.) The total uptake rises
+        with the shift, as every term is monotone, and :meth:`_steady` has checked that it can exceed the
+        production.
+        """
+        scale, right = equation.scale, equation.right
+        total = float(np.sum(right))
+
+        def excess(shift):
+            values = c + shift
+            return scale * float(np.sum(equation.loss_rate(values) * values)) - total
+
+        balance = excess(0.0)
+        if abs(balance) <= self.options["rtol"] * total:
+            return c
+        if balance > 0:  # more uptake than production: lower the field, at most until its minimum is 0
+            low, high = -float(np.min(c)), 0.0
+            if excess(low) >= 0:
+                return c + low
+        else:
+            low = 0.0
+            high = max(float(np.max(c)), float(np.max(right)) / max(float(np.max(equation.diagonal)), _TINY),
+                       1e-12)
+            for _ in range(200):
+                if excess(high) >= 0:
+                    break
+                low, high = high, 2 * high
+            else:
+                raise FieldSolverError(f"pde {self.field!r}: no uniform level of the field balances its "
+                                       "production and uptake", "no_steady_state")
+        shift = brentq(excess, low, high, xtol=1e-14 * max(abs(low), abs(high), _TINY), rtol=1e-12)
+        return np.maximum(c + shift, 0.0)
+
+    def _not_converged(self, history, state, cause):
+        """The end of an iteration that did not converge in ``max_iterations``: warn and use the last
+        iterate if it is within _SLOW_CONVERGENCE_FACTOR of the tolerance, else raise.
+
+        ``history`` holds per iteration how far from the tolerance it was (at most 1 is converged),
+        ``state`` describes the last iteration, ``cause`` what makes an iteration cycle or stall; the
+        advice comes from the rate at which the iteration converged.
+        """
+        options = self.options
+        # the rate per iteration from the last two against two three iterations earlier: an iteration that
+        # alternates between two states, the usual way it fails, has a rate near 1
+        recent = history[-5:]
+        rate = ((max(recent[-2:]) / max(recent[:2])) ** (1 / 3)
+                if len(recent) == 5 and np.all(np.isfinite(recent)) else None)
+        if rate is None:
+            advice = "raise solver_options 'max_iterations'"
+        elif rate < 0.9:
+            needed = options["max_iterations"] + int(np.ceil(np.log(history[-1]) / -np.log(rate)))
+            advice = f"it converges slowly: set solver_options 'max_iterations' to about {needed}"
+        else:
+            advice = (f"the iteration cycles or stalls, which more iterations do not cure ({cause}); "
+                      + ("use solver='explicit'" if self.solver == "implicit"
+                         else "a field with solver='explicit' can approach the steady state in time"))
+        message = f"{state}; {advice}"
+        if not history[-1] <= _SLOW_CONVERGENCE_FACTOR:  # far off, or not a number
+            self.statistics["last_tolerance_ratio"] = float(history[-1])
+            raise FieldSolverError(message, "nonlinear")
+        if not self._warned:
+            self._warned = True
+            warn_user(f"{message}; the last iterate is used")
+
+    # ------------------------------------------------------------ linear solves
+
     def _solve_linear(self, base, scale, right, start, loss):
         if not np.any(loss):  # the matrix does not depend on the cells
-            if self.solver == "steady" and self.decay == 0 and not self._fixed:
-                # nothing removes the field: -A is singular (SuperLU may miss it by rounding)
-                raise RuntimeError(f"pde {self.field!r}: the steady problem has no unique solution; something "
-                                   "must remove the field (decay, uptake, a reaction's loss rate or a fixed "
-                                   "boundary value)")
+            if self._singular:  # nothing removes the field: -A is singular (SuperLU may miss it by rounding)
+                raise self._no_unique_solution()
             return self._solve_constant(base, right, start)
         return self._solve(base + sp.diags(scale * loss), right, start)
 
-    def _solve_constant(self, matrix, right, start):
-        """Solve with a matrix that does not depend on the cells: factor it once."""
+    def _newton_solver(self, base, scale, d):
+        """Newton's matrix ``base + scale diag(d)`` and ``solve(right, start, rtol)``, which solves with it
+        (signed values; ``start`` and ``rtol`` serve the iterative backends). On the direct backend it
+        solves with the factors of the matrix, which serve the error estimates as well."""
+        if not np.any(d):  # the matrix does not depend on the cells
+            if self._singular:
+                raise self._no_unique_solution()
+            if self._factors_constant(len(d)):
+                factors = self._constant_factors(base)
+                self.statistics["backend"] = "direct"
+                return base, lambda right, start, rtol: factors.solve(right)
+            matrix = base
+        else:
+            matrix = (base + sp.diags(scale * d)).tocsr()
+        if self._backend == "direct":
+            factors = self._factor(matrix)
+            self.statistics["backend"] = "direct"
+            return matrix, lambda right, start, rtol: factors.solve(right)
+        return matrix, functools.partial(self._iterate, matrix)
+
+    def _factors_constant(self, size):
+        """Whether a matrix that does not depend on the cells is factored once, rather than iterated."""
         backend = self.options["backend"]
         limit = _FACTOR_LIMIT[len(self._dims)]
         if self.solver == "steady":  # (without pyamg it also factors every other matrix of up to _DIRECT_LIMIT
             # nodes in 1D and 2D)
             limit = max(limit, _DIRECT_LIMIT)
-        if backend not in ("auto", "direct") or (backend == "auto" and len(right) > limit):
-            return self._solve(matrix, right, start)
+        return backend == "direct" or (backend == "auto" and size <= limit)
+
+    def _constant_factors(self, matrix):
+        """The factors of a matrix that does not depend on the cells, computed once."""
         if self._lu_matrix is not matrix:
-            try:
-                self._lu = spla.splu(matrix.tocsc())
-            except RuntimeError as exc:  # SuperLU: "Factor is exactly singular"
-                raise RuntimeError(f"pde {self.field!r}: the problem has no unique solution ({exc}); something "
-                                   "must remove the field (decay, uptake, a reaction's loss rate or a fixed "
-                                   "boundary value)") from None
+            self._lu = self._factor(matrix)
             self._lu_matrix = matrix
+        return self._lu
+
+    def _factor(self, matrix):
+        """Sparse LU factors (SuperLU; the same values as spsolve)."""
+        try:
+            return spla.splu(matrix.tocsc())
+        except RuntimeError as exc:  # SuperLU: "Factor is exactly singular"
+            raise FieldSolverError(f"pde {self.field!r}: the problem has no unique solution ({exc}); something "
+                                   "must remove the field (decay, uptake, a reaction's loss rate or a fixed "
+                                   "boundary value)", "singular") from None
+
+    def _solve_constant(self, matrix, right, start):
+        """Solve with a matrix that does not depend on the cells: factor it once."""
+        if not self._factors_constant(len(right)):
+            return self._solve(matrix, right, start)
+        factors = self._constant_factors(matrix)
         self.statistics["backend"] = "direct"
-        return np.maximum(self._lu.solve(right), 0.0)
+        return np.maximum(factors.solve(right), 0.0)
 
     def _solve(self, matrix, right, start):
-        self.statistics["backend"] = self._backend
         if self._backend == "direct":
+            self.statistics["backend"] = "direct"
             values = spla.spsolve(matrix.tocsc(), right)
-        elif self._backend == "amg":
-            values = self._solve_amg(matrix, right, start)
-        else:  # conjugate gradients (BiCGSTAB with advection), Jacobi preconditioner
-            values, _ = self._cg(matrix, right, start, sp.diags(1.0 / matrix.diagonal()))
+        else:
+            values = self._iterate(matrix, right, start, self.options["rtol"])
         # the exact solution is non-negative; rounding may leave tiny negative values where c is nearly zero
         return np.maximum(values, 0.0)
 
-    def _solve_amg(self, matrix, right, start):
+    def _iterate(self, matrix, right, start, rtol):
+        """Solve with the iterative backend to the relative tolerance rtol (signed values): conjugate
+        gradients (BiCGSTAB with advection) preconditioned by multigrid, or else by Jacobi."""
+        self.statistics["backend"] = self._backend
+        if self._backend == "amg":
+            return self._solve_amg(matrix, right, start, rtol)
+        values, _ = self._cg(matrix, right, start, sp.diags(1.0 / matrix.diagonal()), rtol=rtol)
+        return values
+
+    def _solve_amg(self, matrix, right, start, rtol=None):
         """CG (BiCGSTAB with advection) preconditioned by a multigrid hierarchy of an earlier matrix.
 
         The hierarchy is rebuilt when a solve needs twice the iterations of the first solve after the
-        last rebuild, or fails to converge; the cells change the matrix only a little per step.
+        last rebuild, or fails to converge; the cells change the matrix only a little per step. Newton's
+        method also solves to other tolerances than the operator's ``rtol``: the number of iterations
+        that a solve needs, and that the first solve sets, scales with ``log(rtol)``.
         """
+        outer = self.options["rtol"]
+        rtol = outer if rtol is None else rtol
+        factor = (min(max(np.log(rtol) / np.log(outer), 0.05), 4.0)
+                  if rtol != outer and 0 < rtol < 1 and 0 < outer < 1 else 1.0)
         if self._amg is None or self._amg_stale:
             # with advection the matrix is not symmetric: approximate ideal restriction (AIR), made for
             # upwinded advection, needed 2-4 iterations where smoothed aggregation needed up to 945
@@ -736,36 +1064,38 @@ class PDEOperator(FieldOperator):
             self._amg_reference, self._amg_stale = None, False
             self.statistics["amg_setups"] = self.statistics.get("amg_setups", 0) + 1
         # an old hierarchy gets a few times its first number of iterations before it is rebuilt
-        limit = None if self._amg_reference is None else 4 * self._amg_reference + 10
+        expected = None if self._amg_reference is None else max(1, int(np.ceil(self._amg_reference * factor)))
+        limit = None if expected is None else 4 * expected + 10
         values, iterations = self._cg(matrix, right, start, self._amg.aspreconditioner(cycle="V"),
-                                      maxiter=limit)
+                                      maxiter=limit, rtol=rtol)
         if values is None:  # an old hierarchy that no longer converges: rebuild and solve again
             self._amg_stale = True
-            return self._solve_amg(matrix, right, start)
+            return self._solve_amg(matrix, right, start, rtol)
         if self._amg_reference is None:
-            self._amg_reference = max(iterations, 1)
-        elif iterations > 2 * self._amg_reference:
+            self._amg_reference = max(int(np.ceil(iterations / factor)), 1)
+        elif iterations > 2 * expected:
             self._amg_stale = True
         return values
 
-    def _cg(self, matrix, right, start, preconditioner, maxiter=None):
-        """Values and number of iterations; values None if a given ``maxiter`` was reached."""
+    def _cg(self, matrix, right, start, preconditioner, maxiter=None, rtol=None):
+        """Values and number of iterations; values None if a given ``maxiter`` was reached. The relative
+        tolerance is the operator's ``rtol`` unless given."""
         count = [0]
 
         def counted(_):
             count[0] += 1
 
         method = spla.cg if self._symmetric else spla.bicgstab
-        values, info = _krylov(method, matrix, right, x0=start, rtol=self.options["rtol"], M=preconditioner,
-                               callback=counted, maxiter=maxiter or 10 * len(right))
+        values, info = _krylov(method, matrix, right, x0=start, rtol=self.options["rtol"] if rtol is None else rtol,
+                               M=preconditioner, callback=counted, maxiter=maxiter or 10 * len(right))
         stats = self.statistics
         stats["max_linear_iterations"] = max(stats.get("max_linear_iterations", 0), count[0])
         if info != 0:
             if maxiter is not None:
                 return None, count[0]
-            raise RuntimeError(f"pde {self.field!r}: the iterative solver did not converge "
-                               f"(scipy.sparse.linalg.{method.__name__} returned {info}); try solver_options "
-                               "{'backend': 'direct'}")
+            raise FieldSolverError(f"pde {self.field!r}: the iterative solver did not converge "
+                                   f"(scipy.sparse.linalg.{method.__name__} returned {info}); try solver_options "
+                                   "{'backend': 'direct'}", "linear")
         return values, count[0]
 
     # ------------------------------------------------------------- boundaries
@@ -912,9 +1242,84 @@ class _CellTerm:
 
 # ------------------------------------------------------------------- helpers
 
-def _saturating_uptake(weights, K, n, c):
-    """Production and loss rate of saturating uptake at the field values c."""
-    return 0.0, weights * _hill_rate(c, K, n)
+class _HillUptake:
+    """Saturating uptake by the cells, ``w cⁿ / (Kⁿ + cⁿ)`` per node with ``w`` the sum of their rates: a
+    term that depends on the field, called with its values for (production, loss rate)."""
+
+    monotone = True  # the uptake rises with c: Newton's method applies, and a balance of totals is unique
+
+    def __init__(self, weights, K, n):
+        self.weights, self.K, self.n = weights, K, n
+        self._cells = np.flatnonzero(weights)  # the nodes with cells
+
+    def __call__(self, c):
+        return 0.0, self.weights * _hill_rate(c, self.K, self.n)
+
+    def derivative(self, c, rate=None):
+        """d/dc of the uptake, ``w h'(c)``; ``rate`` is its loss rate at c, if known. Evaluated only where
+        there are cells, as it takes logarithms."""
+        cells, derivative = self._cells, np.zeros(len(self.weights))
+        if rate is None:
+            derivative[cells] = self.weights[cells] * _hill_derivative(c[cells], self.K, self.n)
+        else:
+            derivative[cells] = _hill_derivative(c[cells], self.K, self.n, rate[cells])
+        return derivative
+
+    @property
+    def maximum(self):
+        """The uptake per step at saturation, in total."""
+        return float(np.sum(self.weights))
+
+
+class _UptakeEquation:
+    """``F(c) = base c + scale (L + Σ_k r_k(c)) c - right``: the equation of an implicit step or of a steady
+    state, with terms of saturating uptake whose loss rates are ``r_k``, for :meth:`PDEOperator._newton`."""
+
+    def __init__(self, base, scale, right, loss, terms):
+        self.base, self.scale, self.right, self.loss, self.terms = base, scale, right, loss, terms
+        self.diagonal = base.diagonal()
+
+    def loss_rate(self, c):
+        lost = self.loss.copy()
+        for term in self.terms:
+            lost += term(c)[1]
+        return lost
+
+    def evaluate(self, c):
+        """F(c), the total loss rate, the loss rates of the terms, and ``base c``."""
+        rates = [term(c)[1] for term in self.terms]
+        lost = self.loss.copy()
+        for rate in rates:
+            lost += rate
+        transport = self.base @ c
+        return transport + self.scale * lost * c - self.right, lost, rates, transport
+
+    def derivative(self, c, rates):
+        """``L + Σ_k u_k'(c)`` from the loss rates of the terms at c: the diagonal of Newton's matrix."""
+        d = self.loss.copy()
+        for term, rate in zip(self.terms, rates):
+            d += term.derivative(c, rate)
+        return d
+
+    def size(self, c, lost, transport):
+        """Per node, the size of the terms that make F: ``|base| c + scale L c + |right|``; base has no
+        positive entries off its diagonal, so ``|base| c = 2 diag(base) c - base c`` for c ≥ 0."""
+        return np.abs(2 * self.diagonal * c - transport) + self.scale * lost * c + np.abs(self.right)
+
+    def at_rounding(self, c, F, lost, transport):
+        """Whether F is as small as rounding makes it, so that no iteration can reduce it."""
+        return bool(np.all(np.abs(F) <= _ROUNDING * self.size(c, lost, transport)))
+
+
+def _norm(x):
+    """The 2-norm, also of vectors whose squares overflow; not finite if an entry is not."""
+    value = float(np.linalg.norm(x))
+    if np.isfinite(value):
+        return value
+    scale = float(np.max(np.abs(x), initial=0.0))
+    if scale == 0.0 or not np.isfinite(scale):
+        return scale
+    return scale * float(np.linalg.norm(x / scale))
 
 
 def _evaluate(nonlinear, c, loss):
@@ -959,10 +1364,12 @@ def _hill_rate_log(c, K, n):
     return np.where(c == 0, 1 / K if n == 1 else 0.0, rate)
 
 
-def _hill_derivative(c, K, n):
-    """d/dc of the Hill uptake h = c^n / (K^n + c^n): n r (1 - h), with the loss rate r = h / c."""
+def _hill_derivative(c, K, n, rate=None):
+    """d/dc of the Hill uptake h = c^n / (K^n + c^n): n r (1 - h), with the loss rate r = h / c; with a
+    given ``rate``, a multiple of r (e.g. by the number of cells), the same multiple of h'."""
     c = np.maximum(c, 0.0)
-    rate = _hill_rate(c, K, n)
+    if rate is None:
+        rate = _hill_rate(c, K, n)
     with np.errstate(divide="ignore", over="ignore", under="ignore", invalid="ignore"):
         log_complement = -np.logaddexp(0.0, n * (np.log(c) - np.log(K)))  # 1 - h = 1 / (1 + (c/K)^n)
         complement = np.exp(log_complement)
@@ -1069,6 +1476,9 @@ def _solver_options(solver, options):
                                                      "pde.solver_options max_iterations")
         if merged["backend"] not in _BACKENDS:
             raise ValueError(f"pde.solver_options backend must be one of {', '.join(_BACKENDS)}")
+        if not isinstance(merged["nonlinear"], str) or merged["nonlinear"] not in _NONLINEAR:
+            raise ValueError(f"pde.solver_options nonlinear must be one of {', '.join(_NONLINEAR)}, got "
+                             f"{merged['nonlinear']!r}")
         merged["rtol"] = _non_negative(merged["rtol"], "pde.solver_options rtol")
         if merged["rtol"] == 0:
             raise ValueError("pde.solver_options rtol must be positive")
@@ -1262,9 +1672,9 @@ PDE_INFO = PluginInfo(
                                             "step, for fields much faster than the cells)."),
         "solver_options": ParameterSpec(default={},
                                         description="Implicit and steady: backend ('auto', 'direct', "
-                                                    "'cg', 'amg'), rtol, max_iterations; implicit also "
-                                                    "substeps. Explicit: method, rtol, atol, "
-                                                    "warn_evaluations."),
+                                                    "'cg', 'amg'), rtol, max_iterations, nonlinear "
+                                                    "('newton' or 'picard'); implicit also substeps. "
+                                                    "Explicit: method, rtol, atol, warn_evaluations."),
     },
     conservation_law=_law_for_kind("field"),
     port_status="native",

@@ -141,18 +141,24 @@ def test_integral_solver_options_are_normalized_to_integers(option, value):
     np.testing.assert_allclose(model.lgca.u[model.lgca.nonborder], expected)
 
 
-def test_nonconvergent_nonlinear_fields_fail_without_publishing_an_inaccurate_solution():
+@pytest.mark.parametrize("options", [{}, {"nonlinear": "picard"}])
+def test_nonconvergent_nonlinear_fields_fail_without_publishing_an_inaccurate_solution(options):
     nodes = np.zeros((3, 3), dtype=int)
     nodes[:, 2] = 1
     spec = ModelSpec(
         space=SpaceSpec(geometry="lin", dims=3), time=TimeSpec(seed=1),
         state=StateSpec(nodes=nodes, restchannels=1, volume_exclusion=False, fields={"u": 2}),
         dynamics=InteractionPipelineSpec(operators=[
-            PDESpec(field="u", cells=[{"uptake": 4, "saturation": 1, "n": 64}]),
+            PDESpec(field="u", cells=[{"uptake": 4, "saturation": 1, "n": 64}], solver_options=options),
         ]),
     )
     model = build_model(spec)
-    with pytest.raises(RuntimeError, match="did not converge.*residual"):
+    if not options:  # Newton's method converges: u + 4 u^64 / (1 + u^64) = 2 (brentq: 0.98332043697)
+        model.step()
+        np.testing.assert_allclose(model.lgca.u[model.lgca.nonborder], 0.98332043697, rtol=0, atol=1e-6)
+        assert model._step == 1 and model.metadata["fields"]["u"]["nonlinear"] == "newton"
+        return
+    with pytest.raises(RuntimeError, match="did not converge.*residual"):  # Picard iteration cycles
         model.step()
     np.testing.assert_array_equal(model.lgca.u, 2)
     assert model._step == 0

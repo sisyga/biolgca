@@ -103,8 +103,18 @@ default `"raise"` no longer runs every other run first.
 CR-A3 PR2 done (2026-10-01): `CompiledModel.reconfigure(changes)` changes the
 dynamics of a running model, tried on a copy first, recorded in
 `metadata["reconfigurations"]`, with `initial_spec` for replays; the Explorer's
-sliders use it. Next: CR-A2 PR1 (Newton, in progress on a branch), then CR-A3
-PR3 (read inputs once, provenance); CR-A1 PR2 (fingerprints of class-based
+sliders use it.
+
+CR-A2 PR1 done (2026-10-01): saturating uptake is solved by projected Newton's
+method by default (`nonlinear="picard"` keeps the old iteration; reactions stay
+on Picard until PR2). It stops on an error estimate (the simplified Newton
+correction) instead of a residual relative to the sources, checks existence and
+balances the start for steady fields that only cells remove, and raises
+`FieldSolverError` with kinds counted in the statistics. Errors are at or below
+Picard's on the direct backend at 1.8 to 7 times lower cost; a chord finishing
+step (PR4) would halve the cost in boundary-dominated cases on the direct
+backend. Next: CR-A3 PR3 (read inputs once, provenance), CR-A2 PR2 (reactions in
+Newton) and PR3 (docs, benchmarks); CR-A1 PR2 (fingerprints of class-based
 operators under strict contracts) when third-party operators appear.
 
 ## Reference point: Morpheus
