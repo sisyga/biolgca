@@ -338,6 +338,15 @@ drop the duplicate shared endpoint. A result's metadata remains a snapshot after
 subsequent runs. Direct runners publish ``lgca.recording_start_step`` and
 ``lgca.recording_end_step`` for the same purpose.
 
+Between runs, ``compiled.reconfigure({"birth_rate": 0.3})`` changes the
+dynamics of the running model, e.g. a rate after a burn-in, as the sliders of
+:func:`lgca.explore` do; paths are those of :func:`lgca.study.vary`. The change
+is tried on a copy of the model first and is applied only if that works.
+``metadata["reconfigurations"]`` records the step and the old and new values,
+and ``compiled.initial_spec`` keeps the spec the model was built from, so the
+run can be repeated. A step that raises is rolled back: the model is then as
+before the step and can go on, e.g. after a reconfiguration.
+
 ``state.capacity`` supplies the crowding scale of the rules: the carrying
 capacity of models without volume exclusion and, with volume exclusion, an
 optional soft limit on all cells of a node in addition to the channels. An

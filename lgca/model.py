@@ -1146,9 +1146,11 @@ class ModelContext:
 class CompiledModel:
     """Built LGCA model plus compiled interaction pipeline.
 
-    ``spec`` is the model's own copy of the specification it was built from
-    (see :func:`build_model`), and ``pipeline.operators`` are the operators
-    that run, also the model's own copies of operator objects in the spec.
+    ``spec`` is the model's own copy of the specification it runs (see
+    :func:`build_model`), and ``pipeline.operators`` are the operators that
+    run, also the model's own copies of operator objects in the spec.
+    :meth:`reconfigure` changes the dynamics of the running model;
+    :attr:`initial_spec` is then the spec it was built from.
     """
 
     lgca: Any
@@ -1160,6 +1162,71 @@ class CompiledModel:
     rollback: bool = True
     _failed: str | None = field(default=None, repr=False)
     _transaction: Any = field(default=None, repr=False, compare=False)
+    _initial_spec: ModelSpec | None = field(default=None, repr=False, compare=False)
+
+    @property
+    def initial_spec(self) -> ModelSpec:
+        """The spec the model was built from; :attr:`spec` until :meth:`reconfigure` changes it."""
+        return self.spec if self._initial_spec is None else self._initial_spec
+
+    def reconfigure(self, changes: Mapping[str, Any]) -> None:
+        """Change the dynamics of the running model from its next step on, e.g. a rate.
+
+        The cells and fields stay as they are; the operators are compiled
+        anew from the changed spec, as :func:`build_model` does (a steady
+        field is solved again). The change is tried first: the new pipeline
+        runs one step on a copy of the model. If that fails, the error is
+        raised and the model is unchanged.
+
+        Parameters
+        ----------
+        changes : mapping
+            Path -> new value, as for :func:`lgca.study.vary`, e.g.
+            ``{"birth_rate": 0.3}`` or
+            ``{"dynamics.operators[0].parameters.birth_rate": 0.3}``. Only
+            the dynamics can change; space, state and time are set when the
+            model is built.
+
+        Notes
+        -----
+        ``metadata["reconfigurations"]`` records every change, as
+        ``{"from_step": n, "changes": {path: {"old": ..., "new": ...}}}``,
+        and the metadata describe the new operators; results of earlier runs
+        keep theirs. Building :attr:`initial_spec`, running ``n - 1`` steps
+        and reconfiguring with the new values repeats the run.
+
+        Examples
+        --------
+        >>> model = build_model(spec)                                  # doctest: +SKIP
+        >>> first = model.run(showprogress=False)                      # doctest: +SKIP
+        >>> model.reconfigure({"birth_rate": 0.3})                     # doctest: +SKIP
+        >>> second = model.run(showprogress=False)                     # doctest: +SKIP
+        """
+        from .study import _get, _tokens, resolve_path, vary
+
+        if not isinstance(changes, Mapping) or not changes:
+            raise ValueError("changes must map paths to new values, e.g. {'birth_rate': 0.3}")
+        paths = {resolve_path(self.spec, path): value for path, value in changes.items()}
+        for path in paths:
+            if not path.startswith("dynamics."):
+                raise ValueError(f"{path!r} is not part of the dynamics: space, state and time are set when "
+                                 "the model is built; build a new model, e.g. from "
+                                 "vary(model.initial_spec, changes)")
+        paths = {path: deepcopy(value) for path, value in paths.items()}  # the model's own, like its spec
+        old = {path: deepcopy(_get(self.spec, _tokens(path))) for path in paths}
+        spec = _normalize_and_validate_spec(vary(self.spec, paths))
+        _try_step(self, spec)
+        metadata = deepcopy(self.metadata)
+        metadata["reconfigurations"] = [*metadata.get("reconfigurations", []), {
+            "from_step": self._step + 1,
+            "changes": {path: {"old": old[path], "new": deepcopy(value)} for path, value in paths.items()}}]
+        context = replace(self.context, spec=spec, metadata=metadata)  # earlier results keep their context
+        pipeline = _compile_running(context)
+        _pipeline_metadata(metadata, spec, pipeline, self.lgca)
+        if self._initial_spec is None:
+            self._initial_spec = self.spec
+        self.context, self.pipeline, self.spec, self.metadata = context, pipeline, spec, metadata
+        self.lgca.enable_propagation = spec.dynamics.propagation not in (False, None, "none", "disabled")
 
     def step(self, **timing):
         """Advance the compiled dynamics once, retaining RNG and model time.
@@ -1324,19 +1391,7 @@ def _build_owned_model(spec: ModelSpec, *, resource_base=None, trusted_paths=Fal
         if lgca.props.get(name) is not values:
             warn_user(f"an interaction set the cell trait {name!r} when the model was built, so the "
                       f"values from state.traits are not used; set it in one place only")
-    metadata["operator_names"] = pipeline.operator_names
-    metadata["reorientation_term_names"] = pipeline.reorientation_term_names
-    metadata["observer_names"] = _observer_names(spec.analysis)
-    metadata["schedule"] = pipeline.describe_schedule()
-    metadata["channel_capacity"] = lgca.K
-    growth_capacities = [
-        {"operator_index": index, "name": operator.name, "capacity": operator.capacity}
-        for index, operator in enumerate(pipeline.operators)
-        if operator.name == "birth_death"
-    ]
-    metadata["growth_capacities"] = growth_capacities
-    if len(growth_capacities) == 1:
-        metadata["capacity"] = growth_capacities[0]["capacity"]
+    _pipeline_metadata(metadata, spec, pipeline, lgca)
     compiled = CompiledModel(
         lgca=lgca,
         spec=spec,
@@ -1347,6 +1402,50 @@ def _build_owned_model(spec: ModelSpec, *, resource_base=None, trusted_paths=Fal
     lgca._compiled_model = compiled
     lgca.enable_propagation = spec.dynamics.propagation not in (False, None, "none", "disabled")
     return compiled
+
+
+def _pipeline_metadata(metadata, spec, pipeline, lgca) -> None:
+    """Describe the operators of ``pipeline`` in ``metadata`` (at build, and when the model is reconfigured)."""
+    metadata["operator_names"] = pipeline.operator_names
+    metadata["reorientation_term_names"] = pipeline.reorientation_term_names
+    metadata["observer_names"] = _observer_names(spec.analysis)
+    metadata["schedule"] = pipeline.describe_schedule()
+    metadata["propagation"] = spec.dynamics.propagation
+    metadata["channel_capacity"] = lgca.K
+    growth_capacities = [
+        {"operator_index": index, "name": operator.name, "capacity": operator.capacity}
+        for index, operator in enumerate(pipeline.operators)
+        if operator.name == "birth_death"
+    ]
+    metadata["growth_capacities"] = growth_capacities
+    metadata["capacity"] = _metadata_from_spec(spec, lgca)["capacity"]
+    if len(growth_capacities) == 1:
+        metadata["capacity"] = growth_capacities[0]["capacity"]
+
+
+def _compile_running(context):
+    """The pipeline of ``context.spec`` for a lattice that has run; a steady field is solved again."""
+    pipeline = compile_pipeline(context.spec.dynamics, context)
+    for operator in pipeline.operators:
+        attach = getattr(operator, "attach_field", None)
+        if attach is not None:
+            attach(context.lgca)
+    return pipeline
+
+
+def _try_step(compiled, spec):
+    """Run one step of a copy of the model with ``spec``, so that errors show before a change is made.
+
+    Some values are checked only when the model steps, e.g. a rate that must be a probability.
+    """
+    try:  # the copy leaves out the running model, whose solvers may not be copied
+        lattice = deepcopy(compiled.lgca, {id(compiled): None})
+        metadata = deepcopy(compiled.metadata)
+    except TypeError as exc:
+        warn_user(f"the change could not be tried on a copy of the model ({exc}); it is applied unchecked")
+        return
+    context = ModelContext(lgca=lattice, spec=spec, fields=dict(compiled.context.fields), metadata=metadata)
+    _compile_running(context).execute_step(context, compiled._step + 1)
 
 
 def _draw_seed() -> int:

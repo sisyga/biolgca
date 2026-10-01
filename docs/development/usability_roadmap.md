@@ -98,9 +98,14 @@ CR-A1 PR3 done (2026-10-01): a failed run keeps its recordings up to the last
 completed step (no empty rows), writes its observers' files and records the
 failed step in its metadata; the Explorer says that a failed step was rolled
 back; `sweep(errors="record")` records failed runs in a column `error`, and the
-default `"raise"` no longer runs every other run first. Next: CR-A2 PR1 (Newton,
-in progress on a branch), then CR-A3 PR2 and PR3; CR-A1 PR2 (fingerprints of
-class-based operators under strict contracts) when third-party operators appear.
+default `"raise"` no longer runs every other run first.
+
+CR-A3 PR2 done (2026-10-01): `CompiledModel.reconfigure(changes)` changes the
+dynamics of a running model, tried on a copy first, recorded in
+`metadata["reconfigurations"]`, with `initial_spec` for replays; the Explorer's
+sliders use it. Next: CR-A2 PR1 (Newton, in progress on a branch), then CR-A3
+PR3 (read inputs once, provenance); CR-A1 PR2 (fingerprints of class-based
+operators under strict contracts) when third-party operators appear.
 
 ## Reference point: Morpheus
 

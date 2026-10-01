@@ -27,8 +27,7 @@ import threading
 import time
 import weakref
 from collections.abc import Callable, Mapping, Sequence
-from copy import deepcopy
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from numbers import Real
 from typing import Any
 
@@ -328,28 +327,21 @@ class Explorer:
             self._set_view(current)
 
     def _apply(self, control, value):
-        from .model import _normalize_and_validate_spec
+        from .model import _normalize_and_validate_spec, _try_step
         from .study import vary
 
         spec = vary(self.spec, {control.path: value})  # the explorer's own: the parts not changed are shared
         with self._lock:
             if not control.live:
                 model = _build_model(spec)
-                _trial(model, model.spec)
+                _try_step(model, model.spec)
                 self.spec = spec
                 self._build(model)
                 self._draw_locked()
                 return
-            compiled = self.model
-            spec = _normalize_and_validate_spec(spec)
-            running = replace(spec, time=replace(spec.time, seed=compiled.spec.time.seed))
-            # the trial and the new pipeline run copies of operator objects: a rejected change leaves the
-            # running model as it was
-            _trial(compiled, running)
-            context = replace(compiled.context, spec=running)  # earlier results keep their context
-            pipeline = _compile(context)
-            compiled.context, compiled.pipeline, compiled.spec, self.spec = context, pipeline, running, spec
-            compiled.lgca.enable_propagation = spec.dynamics.propagation not in (False, None, "none", "disabled")
+            # tried on a copy first: a rejected change leaves the running model as it was
+            self.model.reconfigure({control.path: value})
+            self.spec = _normalize_and_validate_spec(spec)
             self._changes.append(self.step)
             self._update()
             self._draw_locked()
@@ -801,35 +793,6 @@ def _build_model(spec):
     from .model import _build_owned_model, _normalize_and_validate_spec
 
     return _build_owned_model(_normalize_and_validate_spec(spec))
-
-
-def _compile(context):
-    """The pipeline of ``context.spec`` for the running lattice; a steady field is solved again."""
-    from .pipeline import compile_pipeline
-
-    pipeline = compile_pipeline(context.spec.dynamics, context)
-    for operator in pipeline.operators:
-        attach = getattr(operator, "attach_field", None)
-        if attach is not None:
-            attach(context.lgca)
-    return pipeline
-
-
-def _trial(compiled, spec):
-    """Run one step of a copy of the model with ``spec``, so that errors show before a change is made.
-
-    Some values are checked only when the model steps, e.g. a rate that must be a probability.
-    """
-    from .model import ModelContext
-
-    try:  # the copy leaves out the running model, whose solvers may not be copied
-        lattice = deepcopy(compiled.lgca, {id(compiled): None})
-        metadata = deepcopy(compiled.metadata)
-    except TypeError as exc:
-        warn_user(f"the change could not be tried on a copy of the model ({exc}); it is applied unchecked")
-        return
-    context = ModelContext(lgca=lattice, spec=spec, fields=dict(compiled.context.fields), metadata=metadata)
-    _compile(context).execute_step(context, compiled._step + 1)
 
 
 def _value_at(spec, path):

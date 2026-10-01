@@ -1,7 +1,7 @@
 # Architecture proposals after the 30 September 2026 review
 
-Status: proposal, 2026-09-30; decisions, CR-A3 PR1 and CR-A1 PR0, PR1 and PR3
-on 2026-10-01 (see [Decisions](#decisions-for-the-maintainer)). Follow-up to [the code review](code_review_2026-09-30.md),
+Status: proposal, 2026-09-30; decisions, CR-A3 PR1 and PR2 and CR-A1 PR0, PR1
+and PR3 on 2026-10-01 (see [Decisions](#decisions-for-the-maintainer)). Follow-up to [the code review](code_review_2026-09-30.md),
 whose three open architectural findings are renamed here CR-A1 to CR-A3, so that
 they no longer collide with the IDs A1 to A5 of the [usability roadmap](usability_roadmap.md).
 
@@ -562,6 +562,16 @@ The Explorer calls it instead of assigning private members. Replay:
 `build_model(initial_spec)`, n steps, `reconfigure(record)`, m steps equals the
 live run.
 
+Done on 2026-10-01: paths go through `resolve_path` and must lie in
+`dynamics` (space, state and time raise, pointing at a new build); the new
+values are copied; `_try_step` (moved from the Explorer) runs one step of the
+new pipeline on a deep copy; then a new context with a copy of the metadata
+(operator names, schedule, capacities refreshed by `_pipeline_metadata`, shared
+with `build_model`) is swapped in with the pipeline and spec. `from_step` is the
+first step with the new values. Tests in `tests/reconfigure_test.py` (replay in
+three families, earlier results untouched, five rejected changes leave the
+model and its random stream as they were).
+
 **PR3 [Feat] Read once; provenance (1.5 to 2 days).** The CLI copies and
 hashes its inputs before any run, and runs from the copies; `sweep` reads each
 input once. `metadata.json`, `sweep.json` and `sweep()`'s table attributes get
@@ -618,7 +628,7 @@ Effort: 3.5 to 4 days for PR1 to PR3.
 1. ~~**CR-A3 PR1**~~: done on 2026-10-01.
 2. ~~**CR-A1 PR0**~~: done on 2026-10-01.
 3. ~~**CR-A1 PR1 and PR3**~~: done on 2026-10-01.
-4. **CR-A3 PR2 and PR3**: `reconfigure`, then reading inputs once and
+4. ~~**CR-A3 PR2**~~ (done on 2026-10-01) **and PR3**: reading inputs once and
    provenance.
 5. **CR-A2 PR1 to PR3**, in parallel with the above: it touches only the field
    solver. PR4 (direct backend) when profiling asks for it.

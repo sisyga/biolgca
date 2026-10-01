@@ -7,6 +7,13 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- `CompiledModel.reconfigure(changes)` changes the dynamics of a running
+  model from its next step on, with the paths of `lgca.study.vary` (e.g.
+  `{"birth_rate": 0.3}` after a burn-in). The change is tried on a copy of the
+  model first and applied only if that works; `metadata["reconfigurations"]`
+  records the step and the old and new values, and `model.initial_spec`
+  keeps the spec the model was built from, so the run can be repeated.
+  `lgca.explore` applies its sliders this way.
 - Model zoo (`lgca.zoo`, roadmap 4.4): published LGCA models written with
   the current rules, each a module with a card (reference, question, result
   reproduced, fidelity), the paper's parameters with their spec paths,
