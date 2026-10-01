@@ -199,9 +199,9 @@ def interaction_coverage_table() -> list[dict[str, Any]]:
 def create_plugin(name: str, parameters: Mapping[str, Any] | None = None) -> InteractionOperator:
     """Instantiate a plugin operator by name.
 
-    The operator can be given in ``InteractionPipelineSpec(operators=[...])``,
-    where it is a template: every model built from the spec runs its own copy
-    (``model.pipeline.operators[i]``), and the operator itself never runs.
+    In ``InteractionPipelineSpec(operators=[...])`` the operator counts as
+    its mapping ``{"name": name, "parameters": parameters}``, which the spec
+    holds instead (see :class:`~lgca.pipeline.InteractionPipelineSpec`).
     """
 
     factory = default_registry.resolve(name)

@@ -79,12 +79,6 @@ the 30 September review are done, apart from the items below:
 
 - Traits named only in a mutation's probability (a trait-valued `max`,
   `kappa` or `theta`) are not checked before the first block writes.
-- `vary` cannot change an operator object in a spec, e.g. one from
-  `create_plugin("polar_alignment", ...)`, not even by its full path, while
-  the same operator as a mapping `{"name": ..., "parameters": ...}` works.
-  Proposal: an operator object of a registered interaction counts as its
-  mapping (as a model file already saves it), so that registered operators
-  have one form; waits for a decision.
 
 ## Decisions that hold
 
@@ -103,6 +97,10 @@ the 30 September review are done, apart from the items below:
 - Consecutive `pde` operators update their fields simultaneously, as a
   Morpheus `System` does (`field_updates="simultaneous"`, the default);
   `"sequential"` keeps operator splitting in the listed order.
+- Registered operators have one form in a spec, their mapping; operator
+  objects remain for class-based operators that are not registered, and for
+  objects that hold more than their name and parameters or that another
+  object refers to.
 - Input files: a model made in Python finds them as `np.load` does; with
   `resource_base` (model files, the `biolgca` command) relative paths must
   stay inside it unless `trusted_paths=True`.

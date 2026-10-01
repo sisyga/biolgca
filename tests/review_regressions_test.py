@@ -1150,12 +1150,15 @@ def test_short_names_skip_operator_objects_which_vary_cannot_change():
     from lgca.plugins import create_plugin
     from lgca.study import vary
 
+    aligned = create_plugin("polar_alignment", {"beta": 2.0})
+    aligned.note = "stays an object"  # without it, the object counts as its mapping
     spec = ModelSpec(space=SpaceSpec(geometry="square", dims=(6, 6)), state=StateSpec(density=0.3),
                      time=TimeSpec(steps=2, seed=2), dynamics=InteractionPipelineSpec(operators=[
-                         create_plugin("polar_alignment", {"beta": 2.0}),
-                         {"name": "birth_death", "parameters": {"birth_rate": 0.1}}]))
+                         aligned, {"name": "birth_death", "parameters": {"birth_rate": 0.1}}]))
     assert vary(spec, {"birth_rate": 0.2}).dynamics.operators[1]["parameters"]["birth_rate"] == 0.2
     assert vary(spec, {"density": 0.2}).state.density == 0.2
+    with pytest.raises(KeyError, match="no field or parameter of the model is named 'beta'"):
+        vary(spec, {"beta": 3.0})
     table = sweep(spec, grid={"birth_rate": [0.1, 0.2]}, showprogress=False)
     assert table.birth_rate.tolist() == [0.1, 0.2]
 

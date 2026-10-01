@@ -204,8 +204,8 @@ def test_a_rejected_change_leaves_the_running_model_as_it_was(live, close):
             raise ValueError("this rule needs a capacity of at most 10")
 
     def spec():
-        # the growth and the field are operator objects: a change is tried on a model built from them, and
-        # before, the objects were those of the running model
+        # a change is tried on a model built from the spec, and before, its operator objects were those of the
+        # running model; the growth and the field, objects of registered rules, count as their mappings
         return _spec("lin", 40, operators=[
             create_plugin("pde", {"field": "u", "diffusion": 0.5, "decay": 0.1, "cells": [{"production": 1.0}]}),
             create_plugin("birth_death", {"birth_rate": 0.5}),
@@ -214,12 +214,13 @@ def test_a_rejected_change_leaves_the_running_model_as_it_was(live, close):
             density=1.0, volume_exclusion=False, capacity=2, fields={"u": 0.0})
 
     reference = build_model(spec())
-    explorer = explore(spec(), {"capacity": [2, 50], "death_rate": (-1.0, 1.0)})
+    death_rate = "dynamics.operators[3].death_rate"  # the growth also has one
+    explorer = explore(spec(), {"capacity": [2, 50], death_rate: (-1.0, 1.0)})
     close(explorer)
     explorer.advance(3)
     with pytest.raises(ValueError):
         if live:
-            explorer.set(death_rate=-0.5)  # rejected when the new pipeline is set up, after the field
+            explorer.set(**{death_rate: -0.5})  # rejected when the new pipeline is set up, after the field
         else:
             explorer.set(capacity=50)  # rejected by the rule when the new model is tried for a step
     explorer.advance(10)
@@ -228,9 +229,9 @@ def test_a_rejected_change_leaves_the_running_model_as_it_was(live, close):
     np.testing.assert_array_equal(explorer.lgca.nodes, reference.lgca.nodes)
     np.testing.assert_array_equal(explorer.lgca.u, reference.lgca.u)
     assert explorer.model.metadata["fields"]["u"] == reference.metadata["fields"]["u"]
-    # the spec of the explorer holds templates: the model runs copies of them
-    template = explorer.spec.dynamics.operators[0]
-    assert template is not explorer.model.pipeline.operators[0] and template.statistics["calls"] == 0
+    # the spec of the explorer holds the mappings and templates: the model runs copies of the templates
+    assert explorer.spec.dynamics.operators[0]["name"] == "pde"
+    assert explorer.spec.dynamics.operators[2] is not explorer.model.pipeline.operators[2]
 
 
 def test_the_explorer_keeps_one_copy_of_the_initial_state(close):

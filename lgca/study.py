@@ -375,7 +375,19 @@ def _set(node, tokens, value, where, parent):
         entry = dict(node)
         entry[key] = _set(node.get(key), rest, value, here, key)
         return entry
-    raise KeyError(f"{where or 'the model'} has no entries; cannot set {key!r} in {type(node).__name__}")
+    raise KeyError(_no_entries(node, key, where, "set"))
+
+
+def _no_entries(node, key, where, verb):
+    """The message for a path that goes on into ``node``, which has no entries, e.g. an operator object."""
+    from .operator_base import InteractionOperator
+
+    if isinstance(node, InteractionOperator):
+        return (f"{where} is an operator object ({node.name!r}), which vary cannot {verb} {key!r} in; give a "
+                f"registered operator as {{'name': {node.name!r}, 'parameters': {{...}}}}. An operator object of a "
+                "registered interaction counts as that mapping, unless it holds more than its name and parameters "
+                "give (attributes set on it, or what it stored while it ran) or another operator object refers to it")
+    return f"{where or 'the model'} has no entries; cannot {verb} {key!r} in {type(node).__name__}"
 
 
 def _get(node, tokens, where="", parent=None):
@@ -408,7 +420,7 @@ def _get(node, tokens, where="", parent=None):
         if key not in node:
             raise KeyError(_unknown(key, list(node), where))
         return _get(node[key], rest, here, key)
-    raise KeyError(f"{where or 'the model'} has no entries; cannot read {key!r} in {type(node).__name__}")
+    raise KeyError(_no_entries(node, key, where, "read"))
 
 
 def _parameter(entry, parameters, tokens, where, parent):
@@ -607,7 +619,7 @@ def _canonical_tokens(node, tokens, where="", parent=None):
         if rest and key not in node:
             raise KeyError(_unknown(key, list(node), where))
         return [(kind, key), *_canonical_tokens(node.get(key), rest, here, key)]
-    raise KeyError(f"{where or 'the model'} has no entries; cannot set {key!r} in {type(node).__name__}")
+    raise KeyError(_no_entries(node, key, where, "set"))
 
 
 def _column_names(paths):

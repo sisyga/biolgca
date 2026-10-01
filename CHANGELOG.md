@@ -450,6 +450,17 @@ This file records notable user-facing changes. Changes remain under
   its old one depending on which operator was listed first.
   `metadata["schedule"]` joins fields updated together with `&`, and
   `metadata["field_updates"]` records the choice.
+- An operator object of a registered interaction, e.g. from
+  `create_plugin`, counts as its mapping `{"name": ..., "parameters": ...}`:
+  `InteractionPipelineSpec` holds the mapping, which `vary`, `sweep`,
+  `lgca.explore` and `reconfigure` can change, also by short names, and which
+  a model file saves as before. Before, `vary` could not change such an
+  object, not even by its full path, and short names skipped it. It stays an
+  object, a template as before, if it holds more than its name and
+  parameters give (attributes set on it, or what it stored while it ran in a
+  model), if another operator object of the list refers to it, or if its
+  name is deprecated; `vary` then explains this. Operator objects otherwise
+  remain for class-based operators that are not registered.
 - Files that a model made in Python reads, e.g. the state of a `from_npz`
   initializer, are found as `np.load` finds them: relative to the working
   directory, or absolute (`build_model`, `run_model`, `sweep` and

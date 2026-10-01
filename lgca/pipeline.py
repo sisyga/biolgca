@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import copy
 import difflib
+import functools
 import time
+import types
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from math import comb
@@ -217,15 +219,22 @@ class InteractionPipelineSpec:
           interaction (see :func:`lgca.plugins.list_plugins`);
         - a :class:`ReorientationSpec` combining directional cues;
         - a :class:`BirthDeathSpec` or :class:`PhenotypeSwitchSpec`;
-        - an :class:`~lgca.operator_base.InteractionOperator` instance. One of
-          a registered interaction (e.g. from :func:`lgca.plugins.create_plugin`)
-          is saved to a model file by its name and parameters; any other is
-          Python only. The object is a template: every model built from the
-          spec runs its own copy, ``model.pipeline.operators[i]``, so models
-          built from one spec do not affect each other, and what an operator
-          stores while it runs is found on that copy, not on the object.
+        - an :class:`~lgca.operator_base.InteractionOperator` instance of a
+          class-based operator, which is Python only. The object is a
+          template: every model built from the spec runs its own copy,
+          ``model.pipeline.operators[i]``, so models built from one spec do
+          not affect each other, and what an operator stores while it runs
+          is found on that copy, not on the object.
 
-        A :class:`ReorientationTermSpec` belongs in a :class:`ReorientationSpec`.
+        An operator object of a registered interaction, e.g. from
+        :func:`lgca.plugins.create_plugin`, counts as its mapping: the spec
+        holds ``{"name": ..., "parameters": ...}``, which
+        :func:`lgca.study.vary` can change and a model file saves. It stays
+        an object if it holds more than its name and parameters give
+        (attributes set on it, or what it stored while it ran in a model),
+        if another operator object of the list refers to it, so that the
+        two still run as a pair, or if its name is deprecated. A
+        :class:`ReorientationTermSpec` belongs in a :class:`ReorientationSpec`.
     propagation : bool or str, default="default"
         ``"default"`` or ``True`` moves the cells after the interactions;
         ``False``, ``None``, ``"none"`` or ``"disabled"`` keeps them in place,
@@ -253,6 +262,7 @@ class InteractionPipelineSpec:
         if self.allow_custom_order is not None:
             warn_user("allow_custom_order is deprecated and ignored: operators always run "
                       "in the order they are listed", DeprecationWarning)
+        object.__setattr__(self, "operators", _registered_as_mappings(self.operators))
 
 
 @dataclass
@@ -542,6 +552,110 @@ def _operator_name(spec) -> str:
     if isinstance(spec, Mapping):
         return str(spec.get("name", "<missing>"))
     return str(getattr(spec, "name", "<missing>"))
+
+
+def _registered_as_mappings(operators):
+    """``operators`` with every operator object of a registered interaction as its mapping, so registered
+    operators have one form.
+
+    An object stays one if it holds more than its name and parameters give, or if another operator object of
+    the list refers to it: as a mapping it would lose what it holds, or the other would drive an operator that
+    does not run.
+    """
+    if isinstance(operators, (str, bytes)) or not isinstance(operators, Sequence):
+        return operators  # the build explains what operators must be
+    objects = [entry for entry in operators if isinstance(entry, InteractionOperator)]
+    mappings = {id(entry): mapping for entry in objects if (mapping := _as_mapping(entry)) is not None}
+    if not mappings:
+        return operators
+    kept = [entry for entry in objects if id(entry) not in mappings]
+    for identity in set(_reachable(kept)) & set(mappings):
+        del mappings[identity]
+    if not mappings:
+        return operators
+    entries = [mappings.get(id(entry), entry) if isinstance(entry, InteractionOperator) else entry
+               for entry in operators]
+    return tuple(entries) if isinstance(operators, tuple) else entries
+
+
+def _as_mapping(operator: InteractionOperator) -> dict[str, Any] | None:
+    """``{"name": ..., "parameters": ...}`` of an operator object of a registered interaction that holds what a
+    new one made from them holds, and nothing that refers to other operators; otherwise None."""
+    from .plugins import default_registry
+
+    try:
+        info = default_registry.describe(operator.name)
+        fresh = default_registry.resolve(operator.name)(operator.parameters)
+    except Exception:  # noqa: BLE001 - not registered, or its parameters no longer make one: it stays an object
+        return None
+    if info.deprecated or type(fresh) is not type(operator):  # a deprecated name, e.g. of get_lgca, would warn
+        return None
+    try:
+        if not _same(vars(operator), vars(fresh)):
+            return None
+    except RecursionError:
+        return None
+    if any(isinstance(value, InteractionOperator) for value in _reachable([operator.parameters]).values()):
+        return None
+    return {"name": operator.name, "parameters": dict(operator.parameters)}
+
+
+def _same(a, b) -> bool:
+    """Whether ``a`` and ``b`` hold the same values; containers, arrays and objects without ``__eq__`` are
+    compared by their contents."""
+    if a is b:
+        return True
+    if type(a) is not type(b):
+        return False
+    if isinstance(a, np.ndarray):
+        return a.shape == b.shape and a.dtype == b.dtype and bool(np.array_equal(a, b))
+    if isinstance(a, Mapping):
+        return a.keys() == b.keys() and all(_same(a[key], b[key]) for key in a)
+    if isinstance(a, (list, tuple)):
+        return len(a) == len(b) and all(map(_same, a, b))
+    if type(a).__eq__ is object.__eq__ and hasattr(a, "__dict__"):
+        return _same(vars(a), vars(b))
+    try:
+        return bool(a == b)
+    except Exception:  # noqa: BLE001 - not comparable: not known to be the same
+        return False
+
+
+_ATOMIC = (str, bytes, int, float, complex, type(None), type, types.ModuleType, types.FunctionType,
+           types.BuiltinFunctionType)
+
+
+def _reachable(roots) -> dict[int, Any]:
+    """The objects that ``roots`` refer to, by id: through containers, attributes (their ``__getstate__``),
+    bound methods and partial functions, which a deep copy copies with them; functions and classes copy as
+    themselves."""
+    reached = {}
+    pending = list(roots)
+    while pending:
+        value = pending.pop()
+        if id(value) in reached or isinstance(value, _ATOMIC):
+            continue
+        reached[id(value)] = value
+        if isinstance(value, Mapping):
+            pending.extend(value.keys())
+            pending.extend(value.values())
+        elif isinstance(value, (list, tuple, set, frozenset)):
+            pending.extend(value)
+        elif isinstance(value, np.ndarray):
+            if value.dtype == object:
+                pending.extend(value.ravel().tolist())
+        elif isinstance(value, types.MethodType):
+            pending.append(value.__self__)
+        elif isinstance(value, functools.partial):
+            pending.extend((value.args, value.keywords))
+        else:
+            try:
+                state = value.__getstate__()
+            except Exception:  # noqa: BLE001 - e.g. an object that cannot be pickled
+                state = getattr(value, "__dict__", None)
+            if state is not None:
+                pending.append(state)
+    return reached
 
 
 def _reject_single_species_phenotype_switch(operators: Sequence[InteractionOperator], context) -> None:

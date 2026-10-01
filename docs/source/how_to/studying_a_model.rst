@@ -113,9 +113,8 @@ observers and operator objects.
   system: measures must be functions defined with ``def`` at the top level of
   a module (not lambdas or functions defined in a notebook), and your own
   rules must be registered in a module that the workers import, named with
-  ``plugins=["my_project.rules"]``. Operator objects in the model, e.g. from
-  :func:`~lgca.plugins.create_plugin`, go to the workers too: their rules are
-  sent by name, like functions.
+  ``plugins=["my_project.rules"]``. Operator objects in the model go to the
+  workers too: their rules are sent by name, like functions.
 - ``backend="threads"`` accepts any function and the rules defined in a
   notebook, but threads run only partly in parallel (about 1.5 to 2 times
   faster).

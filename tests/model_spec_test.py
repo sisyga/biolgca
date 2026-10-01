@@ -633,7 +633,45 @@ def test_operator_objects_that_refer_to_each_other_still_do_in_the_model(stacked
         assert operators[1].parameters["death_rate"] == 0.0  # the template never ran
 
 
-def test_an_operator_object_may_report_to_an_observer_of_the_model():
+def test_operator_objects_of_registered_rules_count_as_their_mappings():
+    from lgca.model import model_spec_to_dict
+    from lgca.plugins import create_plugin
+    from lgca.study import vary
+
+    operators = (create_plugin("random_walk"), create_plugin("birth_death", {"birth_rate": 0.5}))
+    spec = _square_spec(operators=operators)
+    assert spec.dynamics.operators == ({"name": "random_walk", "parameters": {}},
+                                       {"name": "birth_death", "parameters": {"birth_rate": 0.5}})
+    mapped = _square_spec(operators=[{"name": "random_walk"}, {"name": "birth_death",
+                                                                "parameters": {"birth_rate": 0.5}}])
+    np.testing.assert_array_equal(run_model(spec, showprogress=False).lgca.nodes,
+                                  run_model(mapped, showprogress=False).lgca.nodes)
+    # vary changes it, also by a short name, and a model file saves the same
+    assert vary(spec, {"birth_rate": 0.2}).dynamics.operators[1]["parameters"] == {"birth_rate": 0.2}
+    assert vary(spec, {"dynamics.operators[0]": operators[1]}).dynamics.operators[0]["name"] == "birth_death"
+    assert model_spec_to_dict(spec)["model"]["dynamics"]["operators"][1] == spec.dynamics.operators[1]
+
+
+def test_operator_objects_that_hold_more_than_their_name_and_parameters_stay_objects():
+    from lgca.plugins import create_plugin
+    from lgca.study import vary
+
+    marked = create_plugin("birth_death", {"birth_rate": 0.5})
+    marked.note = "kept with the operator"
+    changed = create_plugin("birth_death", {"birth_rate": 0.5})
+    changed.capacity = 3
+    other = create_plugin("birth_death", {"death_rate": 0.1})
+    helped = create_plugin("birth_death", {"birth_rate": 0.5, "helper": other})  # its parameters refer to one
+    ran = build_model(_square_spec(operators=[create_plugin("random_walk")])).pipeline.operators[0]
+    with pytest.warns(FutureWarning, match="deprecated"):  # a deprecated name would warn at every build
+        legacy = create_plugin("classical.random_walk")
+    given = [marked, changed, helped, other, ran, legacy]
+    spec = _square_spec(operators=given)
+    assert all(entry is operator for entry, operator in zip(spec.dynamics.operators, given))
+    with pytest.raises(KeyError, match=r"operators\[0\] is an operator object \('birth_death'\), which vary cannot "
+                                       r"set 'birth_rate' in.*\{'name': 'birth_death', 'parameters'.*attributes set "
+                                       r"on it"):
+        vary(spec, {"dynamics.operators[0].birth_rate": 0.2})
     class Events(Observer):
         """Receives the steps from an operator."""
 

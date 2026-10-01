@@ -153,7 +153,10 @@ are in `docs/development/archive/reviews/2026-09-30-architecture-proposals.md`.
 - **Models own their configuration.** `build_model` builds from its own copy
   of the spec; operator objects in a spec are templates, copied for every
   model; rules and terms are code and copy as themselves. Change a running
-  model only with `CompiledModel.reconfigure`.
+  model only with `CompiledModel.reconfigure`. Registered operators have one
+  form in a spec, their mapping: `InteractionPipelineSpec` turns an operator
+  object of a registered rule into it, unless the object holds more than its
+  name and parameters or another operator object refers to it.
 - **Validation:** where going on gives correct results, warn with a category
   of its own (strict in tests) rather than raise; raise where the result
   would be wrong; put checks that cost noticeable time behind a switch.

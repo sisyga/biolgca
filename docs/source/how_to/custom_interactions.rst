@@ -347,8 +347,15 @@ same operations, and :meth:`~lgca.lattice_state.LatticeState.commit` writes
 the result back. The built-in interactions in :mod:`lgca.pipeline` are
 written this way.
 
-An operator object given in ``InteractionPipelineSpec(operators=[...])``, for
-example one made with :func:`~lgca.plugins.create_plugin`, is a template:
+An operator object of a registered interaction, for example one made with
+:func:`~lgca.plugins.create_plugin`, counts as its mapping in
+``InteractionPipelineSpec(operators=[...])``: the spec holds ``{"name": ...,
+"parameters": {...}}``, which :func:`~lgca.study.vary` can change and a model
+file saves. It stays an object if it holds more than its name and parameters
+give (attributes set on it, or what it stored while it ran in a model), or if
+another operator object of the list refers to it.
+
+An operator object in the spec is a template:
 every model built from the spec runs its own copy of it. ``validate`` and
 ``setup`` can therefore store what they learn about a model (its capacity,
 caches) without changing the other models built from the same spec, such as
