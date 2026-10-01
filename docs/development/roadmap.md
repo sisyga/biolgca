@@ -39,12 +39,6 @@ the 30 September review are done, apart from the items below:
 
 ### Features for later
 
-- Theory next to simulation (`lgca.theory`): mean-field equations and linear
-  stability (polar and nematic alignment, aggregation, chemotaxis), compared
-  with simulations; also for cell–field models.
-- Course pack: one-semester exercises for MSc students (physics, applied
-  mathematics, computational modelling), a 45-minute exercise every second
-  week, solutions public in the repository, figures and animations.
 - An advanced example: multispecies tumour growth without volume exclusion on
   hexagonal and 3D Moore lattices, nodes coloured by the local mean class
   property.
@@ -75,11 +69,6 @@ the 30 September review are done, apart from the items below:
   transaction, an NPZ checkpoint of identity-based states, the Explorer's
   trial step as a rolled-back step instead of a deep copy.
 
-### Known small issues
-
-- Traits named only in a mutation's probability (a trait-valued `max`,
-  `kappa` or `theta`) are not checked before the first block writes.
-
 ## Decisions that hold
 
 - `get_lgca` is the quick start and runs the standard models (tutorials 1 and
@@ -94,6 +83,9 @@ the 30 September review are done, apart from the items below:
   the order they are listed; Boltzmann sampling is the default for
   reorientation, not a requirement; species are not tied to channels.
 - 3D models are explored with Matplotlib, not Mayavi.
+- Not on the active track (2026-10-01): a theory module (`lgca.theory`,
+  mean-field equations and linear stability next to simulations) and a course
+  pack of exercises.
 - Consecutive `pde` operators update their fields simultaneously, as a
   Morpheus `System` does (`field_updates="simultaneous"`, the default);
   `"sequential"` keeps operator splitting in the listed order.
