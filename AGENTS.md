@@ -158,7 +158,10 @@ are in `docs/development/archive/reviews/2026-09-30-architecture-proposals.md`.
   Error messages say what to do.
 - **Provenance:** runs record versions, rule source hashes, parameters and
   input hashes; the library compares only hashes it wrote itself and warns
-  on a mismatch. Read inputs once per run or sweep.
+  on a mismatch. Read inputs once per run or sweep. A model made in Python
+  finds its input files as `np.load` does; with `resource_base` (a model
+  file's directory, as the CLI passes it) relative paths must stay inside it
+  unless `trusted_paths=True`.
 - **Species axis:** rules see channel states as `dims + (n_species, K)`, also
   for one species. Public arrays (`lgca.nodes`, recordings, model files) of
   single-species models keep `dims + (K,)`.

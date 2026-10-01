@@ -414,11 +414,14 @@ def _from_npz(directory):
 
 
 @pytest.mark.parametrize("n_jobs, backend", [(1, "processes"), (2, "threads"), (2, "processes")])
-def test_sweeps_read_the_resources_of_the_model(tmp_path, n_jobs, backend):
+def test_sweeps_read_the_resources_of_the_model(tmp_path, monkeypatch, n_jobs, backend):
     spec = _from_npz(tmp_path)
-    with pytest.raises(RuntimeError, match="require resource_base"):
+    with pytest.raises(RuntimeError, match=r"state\.npz \(relative paths are found from"):  # as np.load does
         sweep(spec, showprogress=False)
     table = sweep(spec, seeds=[1, 2], n_jobs=n_jobs, backend=backend, resource_base=tmp_path, showprogress=False)
+    assert table.population.tolist() == [8, 8]
+    monkeypatch.chdir(tmp_path)
+    table = sweep(spec, seeds=[1, 2], n_jobs=n_jobs, backend=backend, showprogress=False)
     assert table.population.tolist() == [8, 8]
 
 

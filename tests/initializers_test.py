@@ -155,6 +155,24 @@ def test_from_npz_initializer_loads_contained_relative_state(tmp_path):
     np.testing.assert_array_equal(lgca.nodes[lgca.nonborder], nodes)
 
 
+def test_without_resource_base_files_are_found_as_numpy_finds_them(tmp_path, monkeypatch):
+    nodes = np.zeros((3, 4, 5), dtype=bool)
+    nodes[1, 2, 3] = True
+    (tmp_path / "states").mkdir()
+    np.savez(tmp_path / "states" / "initial.npz", nodes=nodes)
+    (tmp_path / "work").mkdir()
+    monkeypatch.chdir(tmp_path / "work")
+    for path in ("../states/initial.npz", str(tmp_path / "states" / "initial.npz")):  # relative, absolute
+        spec = _initializer_spec({"name": "from_npz", "parameters": {"path": path}}, dims=(3, 4))
+        lgca = build_model(spec).lgca
+        np.testing.assert_array_equal(lgca.nodes[lgca.nonborder], nodes)
+    spec = _initializer_spec({"name": "from_npz", "parameters": {"path": "initial.npz"}}, dims=(3, 4))
+    with pytest.raises(FileNotFoundError, match="from the working directory, as with np.load"):
+        build_model(spec)
+    lgca = build_model(spec, resource_base=tmp_path / "states").lgca  # as for a model file
+    np.testing.assert_array_equal(lgca.nodes[lgca.nonborder], nodes)
+
+
 @pytest.mark.parametrize(
     "path",
     ["../outside.npz", r"..\outside.npz", "C:/outside.npz", "C:outside.npz"],

@@ -29,6 +29,7 @@ import weakref
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from numbers import Real
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -43,7 +44,8 @@ _PLAYING: weakref.WeakSet = weakref.WeakSet()  # explorers whose model is runnin
 def explore(spec, controls: Mapping[str, Any] | None = None, *, view: str = "density",
             measure: str | Sequence[str] | Mapping[str, Any] | None = "population", steps_per_frame: int = 1,
             interval: float = 0.1, window: int = 100, figsize: tuple[float, float] | None = None,
-            slice: str | tuple[str, int] | None = None) -> Explorer:
+            slice: str | tuple[str, int] | None = None, resource_base: str | Path | None = None,
+            trusted_paths: bool = False) -> Explorer:
     """Run a model live in a notebook, with sliders for some of its parameters.
 
     Parameters
@@ -86,6 +88,12 @@ def explore(spec, controls: Mapping[str, Any] | None = None, *, view: str = "den
         perspective view, drawn like a square lattice, e.g. ``"z"`` for the middle plane
         ``z = lz // 2`` or ``("z", 3)`` for ``z = 3``. The flux shows its components in the plane.
         A dropdown switches between the perspective view and the planes, a slider moves the plane.
+    resource_base : str or Path, optional
+        The directory of a model file, against which the files it reads are found, e.g. the start state
+        of a ``from_npz`` initializer. Without it, files are found as :func:`numpy.load` finds them. As
+        in :func:`~lgca.model.build_model`.
+    trusted_paths : bool, default=False
+        Allow files outside ``resource_base``.
 
     Returns
     -------
@@ -108,7 +116,8 @@ def explore(spec, controls: Mapping[str, Any] | None = None, *, view: str = "den
     >>> explorer.close()
     """
     return Explorer(spec, controls, view=view, measure=measure, steps_per_frame=steps_per_frame,
-                    interval=interval, window=window, figsize=figsize, slice=slice)
+                    interval=interval, window=window, figsize=figsize, slice=slice, resource_base=resource_base,
+                    trusted_paths=trusted_paths)
 
 
 @dataclass
@@ -138,7 +147,7 @@ class Explorer:
     """
 
     def __init__(self, spec, controls=None, *, view="density", measure="population", steps_per_frame=1,
-                 interval=0.1, window=100, figsize=None, slice=None):
+                 interval=0.1, window=100, figsize=None, slice=None, resource_base=None, trusted_paths=False):
         import ipywidgets as widgets
 
         from .model import ModelSpec
@@ -155,6 +164,9 @@ class Explorer:
         self.interval = float(interval)
         self.window = int(window)
         self.figsize = figsize
+        # the files of the model, found as when the explorer was made: it builds the model again later
+        self._resources = ({"resource_base": Path.cwd(), "trusted_paths": True} if resource_base is None
+                           else {"resource_base": Path(resource_base).resolve(), "trusted_paths": bool(trusted_paths)})
         self._measures = _measures(measure, spec)
         self._lock = threading.RLock()
         self._stop = threading.Event()
@@ -309,7 +321,7 @@ class Explorer:
     # ---------------------------------------------------------------- model
 
     def _build(self, model=None):
-        self.model = model if model is not None else _build_model(self.spec)
+        self.model = model if model is not None else _build_model(self.spec, self._resources)
         self.step = 0
         self._series = {label: [] for label in self._measures}
         self._scales = {}
@@ -333,7 +345,7 @@ class Explorer:
         spec = vary(self.spec, {control.path: value})  # the explorer's own: the parts not changed are shared
         with self._lock:
             if not control.live:
-                model = _build_model(spec)
+                model = _build_model(spec, self._resources)
                 _try_step(model, model.spec)
                 self.spec = spec
                 self._build(model)
@@ -787,12 +799,12 @@ def _control(spec, name, control):
     return _Control(name=name, path=path, widget=widget, live=live)
 
 
-def _build_model(spec):
+def _build_model(spec, resources):
     """The model of the explorer's own ``spec`` (a copy of the caller's), which the model keeps as it is: a
     second copy of large initial states would only take memory."""
     from .model import _build_owned_model, _normalize_and_validate_spec
 
-    return _build_owned_model(_normalize_and_validate_spec(spec))
+    return _build_owned_model(_normalize_and_validate_spec(spec), **resources)
 
 
 def _value_at(spec, path):

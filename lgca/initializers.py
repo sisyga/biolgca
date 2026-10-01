@@ -63,15 +63,20 @@ def resolve_resource_path(
     resource_base: str | Path | None,
     trusted_paths: bool = False,
 ) -> Path:
-    """Resolve an imported resource without allowing accidental path escape."""
+    """The file of an initializer, e.g. ``from_npz``.
+
+    Without ``resource_base`` (a model made in Python), the path is found as
+    :func:`numpy.load` finds it: relative to the working directory, or
+    absolute. With ``resource_base`` (the directory of a model file, as
+    ``biolgca`` passes it), it must be relative and stay inside that
+    directory, so that a model file from elsewhere reads no other files,
+    unless ``trusted_paths=True``.
+    """
 
     raw = Path(path)
     portable_paths = (PurePosixPath(path), PureWindowsPath(path))
     if resource_base is None:
-        raise ValueError(
-            "Relative initializer resources require resource_base; pass the model "
-            "directory or use trusted_paths=True (CLI: --trusted-paths) with an explicit base."
-        )
+        return raw.resolve()
     base = Path(resource_base).resolve()
     if not trusted_paths and any(
         candidate.anchor or ".." in candidate.parts for candidate in portable_paths
@@ -159,7 +164,10 @@ def _from_npz_initializer(
     data = None if preloaded is None else preloaded.get(str(path))
     if data is None:
         if not path.is_file():
-            raise FileNotFoundError(f"Initializer NPZ file not found: {path}")
+            where = ("relative paths are found from the working directory, as with np.load; for a model "
+                     "file, pass resource_base=its directory" if resource_base is None
+                     else f"relative paths are found from {Path(resource_base).resolve()}")
+            raise FileNotFoundError(f"Initializer NPZ file not found: {path} ({where})")
         data = path.read_bytes()  # read once: the hash describes what the model starts from
     with np.load(io.BytesIO(data), allow_pickle=False) as archive:
         if key not in archive:

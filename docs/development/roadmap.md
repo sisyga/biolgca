@@ -77,9 +77,6 @@ the 30 September review are done, apart from the items below:
   `kappa` or `theta`) are not checked before the first block writes.
 - `vary` on a spec that holds a single-cue operator object fails: it treats
   every object with `.terms` as a `ReorientationSpec`.
-- `lgca.explore` cannot run a `from_npz` model (no `resource_base`); the
-  message "Relative initializer resources require resource_base" also appears
-  for an absolute path with `trusted_paths=True`.
 
 ## Decisions that hold
 
@@ -95,6 +92,9 @@ the 30 September review are done, apart from the items below:
   the order they are listed; Boltzmann sampling is the default for
   reorientation, not a requirement; species are not tied to channels.
 - 3D models are explored with Matplotlib, not Mayavi.
+- Input files: a model made in Python finds them as `np.load` does; with
+  `resource_base` (model files, the `biolgca` command) relative paths must
+  stay inside it unless `trusted_paths=True`.
 - The 30 September decisions (contracts and enforcement, rollback, templates,
   Newton, provenance) are summarized in `AGENTS.md` under "Design rules"; the
   measurements behind them are in

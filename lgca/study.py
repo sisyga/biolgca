@@ -154,11 +154,12 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
     showprogress : bool, default=True
         Show a progress bar over the runs.
     resource_base : str or Path, optional
-        Directory against which relative resource paths of the model are resolved, e.g. the file of
-        a ``from_npz`` initializer; usually the directory of the model file. As in
-        :func:`~lgca.model.run_model`.
+        The directory of a model file, against which the files it reads are found, e.g. the file of
+        a ``from_npz`` initializer; they must lie inside it. Without it, files are found as
+        :func:`numpy.load` finds them (relative to the working directory, or absolute). As in
+        :func:`~lgca.model.build_model`.
     trusted_paths : bool, default=False
-        Allow resource paths outside ``resource_base``, as in :func:`~lgca.model.run_model`.
+        Allow files outside ``resource_base``, as in :func:`~lgca.model.build_model`.
     keep_files : bool, default=False
         Keep the files that observers write: every run writes into a folder of its own, named
         after its values and seed (e.g. ``kappa=2_seed=1``), inside the observer's destination,
@@ -248,6 +249,8 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
     jobs = [(combination, seed) for combination in combinations for seed in seeds]
     resources = {"resource_base": None if resource_base is None else str(Path(resource_base).resolve()),
                  "trusted_paths": bool(trusted_paths)}
+    if resource_base is None:  # files as np.load finds them, also by workers that start in another directory
+        resources = {"resource_base": str(Path.cwd()), "trusted_paths": True}
     if keep_files:
         spec = _absolute_destinations(spec)  # workers may start in another directory
         jobs = [(combination, seed, folder) for (combination, seed), folder in zip(jobs, _run_folders(jobs, columns))]

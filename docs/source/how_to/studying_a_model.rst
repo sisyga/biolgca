@@ -174,7 +174,9 @@ model file names them.
 Files that the model reads, such as the state of a ``from_npz`` initializer,
 are found next to the model file (from Python: ``sweep(...,
 resource_base="path/to/model_dir")``), and ``--trusted-paths`` allows paths
-outside its directory. The sweep copies the files its runs read to
+outside its directory. A model made in Python, without ``resource_base``,
+finds its files as ``np.load`` does: relative to the working directory, or
+absolute. The sweep copies the files its runs read to
 ``resources/`` in the output directory, including files given with
 ``--vary``, e.g. ``--vary state.initializer.parameters.path=a.npz,b.npz``
 (copied as ``initial_state_1.npz``, ``initial_state_2.npz``, ...; the model's

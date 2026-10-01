@@ -61,6 +61,23 @@ def test_it_is_exported():
     assert lgca.explore is explore
 
 
+def test_a_model_starts_from_a_given_state_also_from_a_file(tmp_path, monkeypatch, close):
+    nodes = np.random.default_rng(1).random((12, 12, 5)) < 0.3
+    np.savez(tmp_path / "start.npz", nodes=nodes)
+    from_file = _spec(density=None, initializer={"name": "from_npz", "parameters": {"path": "start.npz"}})
+    monkeypatch.chdir(tmp_path)
+    explorers = [explore(_spec(density=None, nodes=nodes), {"seed": [3, 4]}),
+                 explore(from_file, {"seed": [3, 4]}),  # found as np.load finds it
+                 explore(from_file, {"seed": [3, 4]}, resource_base=tmp_path)]  # as for a model file
+    monkeypatch.chdir(tmp_path.parent)  # the model is built again from the file found when the explorer was made
+    for explorer in explorers:
+        close(explorer)
+        for rebuild in ("reset", "control"):
+            explorer.advance(2)
+            explorer.reset() if rebuild == "reset" else explorer.set(seed=4)
+            np.testing.assert_array_equal(explorer.model.lgca.nodes[explorer.model.lgca.nonborder], nodes)
+
+
 @pytest.mark.parametrize("geometry, dims", [("lin", 30), ("square", (12, 10)), ("hex", (12, 10))])
 @pytest.mark.parametrize("family", [
     {},

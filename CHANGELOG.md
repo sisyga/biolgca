@@ -435,6 +435,14 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- Files that a model made in Python reads, e.g. the state of a `from_npz`
+  initializer, are found as `np.load` finds them: relative to the working
+  directory, or absolute (`build_model`, `run_model`, `sweep` and
+  `lgca.explore` without `resource_base`). They needed `resource_base`, and an
+  absolute path also `trusted_paths=True`. With `resource_base`, the directory
+  of a model file as `biolgca` passes it, they must be relative and stay
+  inside it, as before. A file that is missing says where relative paths were
+  looked for.
 - Rules keep the contract of their kind. An operation that a rule's kind
   does not allow (e.g. `cells.set_trait` in a reorientation, `kill` or
   `divide` in a phenotype switch, `move` or `shuffle_cells` in a `field`
@@ -796,6 +804,10 @@ This file records notable user-facing changes. Changes remain under
   lattice falls back where the edges meet, which cells there now sense:
   tutorial 3 and the composed example of the model-spec how-to put their
   signal ramps on lattices with walls.
+- `lgca.explore` runs models that start from a file (`from_npz`): it takes
+  `resource_base` and `trusted_paths` like `build_model`, and builds the model
+  again from the same file when a control changes the lattice or the state.
+  It raised "Relative initializer resources require resource_base".
 - A sweep reads its input files (the arrays of a `from_npz` initializer) once
   before the first run: a file edited during a sweep changed the runs that
   started later (seeds 0 and 1 from 300 cells, 2 and 3 from 100). `biolgca

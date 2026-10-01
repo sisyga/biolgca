@@ -1363,6 +1363,13 @@ def build_model(
     Without ``spec.time.seed``, a seed is drawn from the operating system's
     entropy and stored in the returned model's ``spec`` and ``metadata``, so the
     run can be repeated.
+
+    Files that the model reads, e.g. the state of a ``from_npz`` initializer,
+    are found as :func:`numpy.load` finds them: relative to the working
+    directory, or absolute. For a model file, pass its directory as
+    ``resource_base``, as the ``biolgca`` command does: relative paths are then
+    found from there and must stay inside it, so that a model file from
+    someone else reads no other files, unless ``trusted_paths=True``.
     """
 
     return _build_owned_model(_owned_spec(_normalize_and_validate_spec(spec)), resource_base=resource_base,
