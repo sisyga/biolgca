@@ -444,7 +444,8 @@ def save_model_spec(
     Arrays with more than ``max_inline_array`` elements, e.g. initial nodes or
     fields, go to an array file next to the model file, ``<name>.arrays.npz``
     (``model.json`` -> ``model.arrays.npz``); the model file refers to them by
-    name, and :func:`load_model_spec` reads them from there. Keep the two files
+    name and with a hash of each array, and :func:`load_model_spec` reads them
+    from there and warns if an array changed since. Keep the two files
     together. ``max_inline_array=None`` writes every array into the model file.
     Arrays of Python objects (lists of labels) always stay in the model file.
     """
@@ -735,11 +736,15 @@ def _to_jsonable(value):
     if isinstance(value, np.ndarray):
         sink = _ARRAY_SINK.get()
         if sink is not None and value.dtype != object and sink[1] is not None and value.size > sink[1]:
+            from .provenance import array_hash
+
             filename, _, arrays = sink
             name = f"array_{len(arrays)}"
             arrays[name] = value
+            # the hash tells, when the model file is read, whether another model saved next to it (e.g. a
+            # .yaml beside the .json) has since written its own arrays to the shared file
             return {"__ndarray_file__": filename, "name": name, "dtype": str(value.dtype),
-                    "shape": list(value.shape)}
+                    "shape": list(value.shape), "sha256": array_hash(value)}
         return {
             "__ndarray__": value.tolist(),
             "dtype": str(value.dtype),
@@ -832,6 +837,15 @@ def _array_from_file(reference):
             "dtype" in reference and str(array.dtype) != reference["dtype"]):
         raise ValueError(f"the array {name!r} in {filename} does not match the model file "
                          f"(shape {list(array.shape)}, dtype {array.dtype})")
+    expected = reference.get("sha256")  # written since 2026-10; older model files have none
+    if isinstance(expected, str):
+        from .provenance import array_hash
+
+        found = array_hash(array)
+        if found != expected:
+            warn_user(f"the array {name!r} in {filename} changed after the model file was saved (sha256 "
+                      f"{found[:16]}..., the model file expects {expected[:16]}...): another model saved with "
+                      f"the same name, e.g. a .yaml next to a .json, may have overwritten it")
     return array
 
 
@@ -1360,11 +1374,14 @@ def _build_owned_model(spec: ModelSpec, *, resource_base=None, trusted_paths=Fal
     seed_drawn = spec.time.seed is None
     if seed_drawn:
         spec = replace(spec, time=replace(spec.time, seed=_draw_seed()))
+    from .provenance import environment
+
     lgca = _build_lgca(spec)
+    inputs = {}  # file as given -> hash of what was read
     if spec.state.initializer is not None:
         from .initializers import apply_initializer
 
-        apply_initializer(
+        inputs = apply_initializer(
             lgca,
             spec.state.initializer,
             resource_base=resource_base,
@@ -1373,6 +1390,7 @@ def _build_owned_model(spec: ModelSpec, *, resource_base=None, trusted_paths=Fal
     _validate_field_names(lgca, spec.state.fields)
     metadata = _metadata_from_spec(spec, lgca=lgca)
     metadata["seed_drawn"] = seed_drawn
+    metadata["provenance"] = {**environment(), "inputs": inputs}
     context = ModelContext(
         lgca=lgca,
         spec=spec,
@@ -1421,6 +1439,10 @@ def _pipeline_metadata(metadata, spec, pipeline, lgca) -> None:
     metadata["capacity"] = _metadata_from_spec(spec, lgca)["capacity"]
     if len(growth_capacities) == 1:
         metadata["capacity"] = growth_capacities[0]["capacity"]
+    from .provenance import pipeline_record
+
+    # the operators with their parameters, defaults included, and the source hashes of their rules
+    metadata.setdefault("provenance", {}).update(pipeline_record(pipeline))
 
 
 def _compile_running(context):

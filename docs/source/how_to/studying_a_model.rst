@@ -136,6 +136,12 @@ series are discarded; measure what you need instead. With
 named after its values and seed, inside the observer's destination, e.g.
 ``snapshots/kappa=2_seed=1/density_00010.png``.
 
+The files a sweep reads, e.g. the arrays of a ``from_npz`` initializer, are
+read once before the first run, so editing them during a sweep changes no run;
+``table.attrs["provenance"]`` records their hashes with the versions, the
+platform and the hashes of the rules' source code, and ``biolgca sweep`` writes
+the same into ``sweep.json``.
+
 A run that fails stops the sweep with its error, which names the run's values
 and seed; runs that have not started are cancelled. With ``errors="record"``
 the sweep goes on instead: a failed run gets a row with its values, its seed

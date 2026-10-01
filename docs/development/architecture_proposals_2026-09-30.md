@@ -1,6 +1,6 @@
 # Architecture proposals after the 30 September 2026 review
 
-Status: proposal, 2026-09-30; decisions, CR-A3 PR1 and PR2, CR-A1 PR0, PR1 and
+Status: proposal, 2026-09-30; decisions, CR-A3 PR1 to PR3, CR-A1 PR0, PR1 and
 PR3, and CR-A2 PR1 on 2026-10-01 (see [Decisions](#decisions-for-the-maintainer)). Follow-up to [the code review](code_review_2026-09-30.md),
 whose three open architectural findings are renamed here CR-A1 to CR-A3, so that
 they no longer collide with the IDs A1 to A5 of the [usability roadmap](usability_roadmap.md).
@@ -631,6 +631,23 @@ version rejects it ("unknown parameters"); `from_npz` is also a niche feature
 "Relative initializer resources require resource_base" message also appears for
 an absolute path with `trusted_paths=True`.
 
+Done on 2026-10-01 (decision 5): `lgca/provenance.py`; `build_model` records
+`metadata["provenance"]` (versions, platform, operators with effective
+parameters, source hashes of rules, terms and reactions, input hashes, which the
+`from_npz` initializer returns for the bytes it read) and `reconfigure` refreshes
+the operator part. `sweep` reads each `from_npz` file once before the runs and
+gives every run its bytes (a context variable in the initializer, passed to
+worker processes per job); `table.attrs["provenance"]`. The CLI stages its input
+copies in a temporary directory before the first run, runs from them, and moves
+them into the output only on success (a failed build or sweep leaves no output
+directory); `metadata.json` and `sweep.json` get the provenance with the model
+file's hash and the BioLGCA git commit (`git rev-parse` of the package, with a
+changed flag). Pins: array references in model files carry `sha256` of the
+array's values (not of the compressed file), checked on load with a warning;
+`metadata.json` records `archive` hashes, which `biolgca run` and `validate`
+compare when they load a model next to it. The acceptance's "an edited archive
+fails" became a warning, as decision 5 says. Tests in `tests/provenance_test.py`.
+
 **PR4 (optional)** read-only arrays and frozen containers in `model.spec`.
 
 **Acceptance.** Caller edits after the build (parameters, nested rates, nodes,
@@ -649,8 +666,7 @@ Effort: 3.5 to 4 days for PR1 to PR3.
 1. ~~**CR-A3 PR1**~~: done on 2026-10-01.
 2. ~~**CR-A1 PR0**~~: done on 2026-10-01.
 3. ~~**CR-A1 PR1 and PR3**~~: done on 2026-10-01.
-4. ~~**CR-A3 PR2**~~ (done on 2026-10-01) **and PR3**: reading inputs once and
-   provenance.
+4. ~~**CR-A3 PR2 and PR3**~~: done on 2026-10-01.
 5. ~~**CR-A2 PR1**~~ (done on 2026-10-01); **PR2 and PR3** next: reactions in
    Newton, docs and benchmarks. PR4 (direct backend, chord step) when profiling
    asks for it.

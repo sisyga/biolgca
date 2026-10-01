@@ -176,7 +176,8 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
         A column per varied value (named by its last name, e.g. ``beta``, or by the shortest end of
         its path that tells it from the others, e.g. ``chemotaxis.beta``),
         ``seed`` and a column per measure; with ``long=True`` also ``step``. ``table.attrs`` holds
-        the BioLGCA version and the paths of the varied values.
+        the BioLGCA version, the paths of the varied values and the provenance of the runs (see
+        Notes).
 
     Notes
     -----
@@ -186,6 +187,11 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
     that only draw or write files (plot snapshots, movies, CSV snapshots) do not run, and the files of
     time series are discarded; measure what you need instead, e.g. the metrics of a
     ``ScalarTimeSeriesRecorder`` by their names.
+
+    Files that the runs read, the arrays of a ``from_npz`` initializer, are read once before the
+    first run: a file that changes during the sweep changes no run. ``table.attrs["provenance"]``
+    records the versions of Python and the packages, the platform, the modules in ``plugins``, the
+    SHA-256 hashes of the rules' source code and of the files read (see :mod:`lgca.provenance`).
 
     Examples
     --------
@@ -247,22 +253,56 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
         jobs = [(combination, seed, folder) for (combination, seed), folder in zip(jobs, _run_folders(jobs, columns))]
     else:
         jobs = [(combination, seed, None) for combination, seed in jobs]
+    preloaded, inputs = _read_inputs(spec, jobs, resources)
     results = _execute(spec, jobs, measures, n_jobs, backend, tuple(plugins), showprogress, columns, resources,
-                       errors)
-    rows = []
-    for (combination, seed, _), measured in zip(jobs, results):
+                       errors, preloaded)
+    rows, rules = [], {}
+    for (combination, seed, _), outcome in zip(jobs, results):
         base = {columns[path]: value for path, value in combination.items()}
         base["seed"] = seed
         if errors == "record":
-            base["error"] = measured.message if isinstance(measured, _RunError) else None
-        rows.extend(_rows(base, {} if isinstance(measured, _RunError) else measured, long))
-    failed = sum(isinstance(measured, _RunError) for measured in results)
+            base["error"] = outcome.message if isinstance(outcome, _RunError) else None
+        measured = {}
+        if not isinstance(outcome, _RunError):
+            measured, provenance = outcome
+            for name, source in provenance.get("rules", {}).items():  # runs may vary the rules
+                rules.setdefault(name, source)
+        rows.extend(_rows(base, measured, long))
+    failed = sum(isinstance(outcome, _RunError) for outcome in results)
     if failed:
         warn_user(f"{failed} of {len(results)} runs failed; their errors are in the column 'error'")
+    from .provenance import environment
+
     table = pd.DataFrame(rows)
     table.attrs["biolgca_version"] = _package_version()
     table.attrs["paths"] = {columns[path]: path for path in paths}
+    table.attrs["provenance"] = {**environment(), "plugins": list(plugins), "rules": rules, "inputs": inputs}
     return table
+
+
+def _read_inputs(spec, jobs, resources):
+    """Read the files of the runs once: per job the bytes of its files by resolved path, and the hash of
+    every file as given. A file that cannot be read is left to the run, which reports it."""
+    from .initializers import resolve_resource_path
+    from .provenance import sha256
+
+    read, hashes, preloaded = {}, {}, []
+    for combination, _, _ in jobs:
+        initializer = vary(spec, combination).state.initializer if combination else spec.state.initializer
+        files = {}
+        if isinstance(initializer, Mapping) and initializer.get("name") == "from_npz":
+            given = (initializer.get("parameters") or {}).get("path")
+            try:
+                path = str(resolve_resource_path(given, resource_base=resources["resource_base"],
+                                                 trusted_paths=resources["trusted_paths"]))
+                if path not in read:
+                    read[path] = Path(path).read_bytes()
+                    hashes[str(given)] = sha256(read[path])
+                files[path] = read[path]
+            except (OSError, TypeError, ValueError):
+                pass
+        preloaded.append(files)
+    return preloaded, hashes
 
 
 def _tokens(path):
@@ -631,7 +671,8 @@ def _drawn_seed():
     return int(np.random.SeedSequence().generate_state(1, np.uint32)[0])
 
 
-def _execute(spec, jobs, measures, n_jobs, backend, plugins, showprogress, columns, resources, errors="raise"):
+def _execute(spec, jobs, measures, n_jobs, backend, plugins, showprogress, columns, resources, errors="raise",
+             preloaded=None):
     from tqdm.auto import tqdm
 
     if isinstance(n_jobs, bool) or not isinstance(n_jobs, (int, np.integer)) or n_jobs < 1:
@@ -644,7 +685,8 @@ def _execute(spec, jobs, measures, n_jobs, backend, plugins, showprogress, colum
     try:
         if n_jobs == 1 or len(jobs) == 1:
             for index, job in enumerate(jobs):
-                results[index] = _guarded(spec, job, measures, (), columns, None, resources, errors)
+                results[index] = _guarded(spec, job, measures, (), columns, None, resources, errors,
+                                          preloaded[index] if preloaded else None)
                 progress.update()
             return results
         processes = backend == "processes"
@@ -659,7 +701,8 @@ def _execute(spec, jobs, measures, n_jobs, backend, plugins, showprogress, colum
         try:
             with pool:
                 futures = {pool.submit(_guarded, spec, job, measures, plugins if processes else (), columns,
-                                       backend, resources, errors): index for index, job in enumerate(jobs)}
+                                       backend, resources, errors, preloaded[index] if preloaded else None): index
+                           for index, job in enumerate(jobs)}
                 try:
                     for future in as_completed(futures):
                         results[futures[future]] = future.result()
@@ -706,13 +749,19 @@ class _RunError:
     message: str
 
 
-def _guarded(spec, job, measures, plugins, columns, backend, resources, errors="raise"):
+def _guarded(spec, job, measures, plugins, columns, backend, resources, errors="raise", preloaded=None):
     """One run, with the run named in errors; with ``errors="record"`` a failure gives a :class:`_RunError`."""
     combination, seed, folder = job
     try:
         for module in plugins:
             import_module(module)
-        return _run_one(spec, combination, seed, measures, resources, folder)
+        from .initializers import _PRELOADED
+
+        token = _PRELOADED.set(preloaded or None)  # the files as the sweep read them before the first run
+        try:
+            return _run_one(spec, combination, seed, measures, resources, folder)
+        finally:
+            _PRELOADED.reset(token)
     except Exception as exc:
         label = ", ".join([f"{columns[path]}={value!r}" for path, value in combination.items()] + [f"seed={seed}"])
         hint = ""
@@ -745,7 +794,7 @@ def _run_one(spec, combination, seed, measures, resources, folder=None):
         else:
             value = what(result)
             measured[name] = _as_series(value)
-    return measured
+    return measured, {"rules": result.metadata.get("provenance", {}).get("rules", {})}
 
 
 def _redirect(observer, folder):

@@ -322,9 +322,23 @@ Explicit history data defaults to dense times when ``steps`` is omitted.
 
 The CLI archives a portable ``model.resolved.json`` with relative observer paths,
 and its large arrays in ``model.resolved.arrays.npz``.
-NPZ initializer inputs are copied to ``resources/initial_state.npz`` and the
-archived declaration points there. Move the whole run directory together, then
-validate or rerun its model into a new output directory without ``--trusted-paths``.
+NPZ initializer inputs are copied to ``resources/initial_state.npz`` before the
+run, which reads the copy, and the archived declaration points there. Move the
+whole run directory together, then validate or rerun its model into a new
+output directory without ``--trusted-paths``.
+
+``metadata["provenance"]`` of every model (and ``metadata.json``) records where
+a result came from: the versions of Python and the packages, the platform, the
+operators with their parameters including defaults, the SHA-256 hashes of the
+source code of every rule, term and reaction the model runs (rules change more
+often than versions), and of the files it read. The CLI adds the hash of the
+model file, the git commit of BioLGCA when it runs from a checkout, and the
+hashes of the archived files: ``biolgca run`` and ``biolgca validate`` warn when
+an archived model has changed since the run that wrote it, as its results then
+belong to another model. Likewise a model file records a hash of every array
+in its array file and warns when it is loaded after the array file changed,
+e.g. because a ``model.yaml`` saved next to ``model.json`` wrote its own
+arrays to the shared ``model.arrays.npz``.
 
 Objects returned by ``build_model`` and ``run_model`` retain their compiled
 dynamics. Their ``lgca.timestep()``, ``lgca.timeevo(...)`` and live animations

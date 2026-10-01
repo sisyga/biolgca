@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextvars
+import io
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Mapping
 
@@ -10,6 +12,10 @@ from .base import _validate_count_nodes
 
 
 __all__ = ["apply_initializer", "list_initializers", "resolve_resource_path"]
+
+# files that a sweep read once before its runs, by resolved path: every run starts from the same input even
+# if a file changes during the sweep (lgca.study.sweep sets it around each run)
+_PRELOADED: contextvars.ContextVar = contextvars.ContextVar("lgca_preloaded_inputs", default=None)
 
 
 def list_initializers() -> tuple[str, ...]:
@@ -24,8 +30,11 @@ def apply_initializer(
     *,
     resource_base: str | Path | None = None,
     trusted_paths: bool = False,
-) -> None:
-    """Apply one validated initializer declaration to an LGCA instance."""
+) -> dict[str, str]:
+    """Apply one validated initializer declaration to an LGCA instance.
+
+    Returns the files it read, as given, with the SHA-256 hash of what was read.
+    """
 
     if not isinstance(declaration, Mapping):
         raise ValueError("model.state.initializer must be a mapping")
@@ -40,12 +49,12 @@ def apply_initializer(
     parameters = declaration.get("parameters", {})
     if not isinstance(parameters, Mapping):
         raise ValueError("model.state.initializer.parameters must be a mapping")
-    initializer(
+    return initializer(
         lgca,
         dict(parameters),
         resource_base=resource_base,
         trusted_paths=trusted_paths,
-    )
+    ) or {}
 
 
 def resolve_resource_path(
@@ -146,9 +155,13 @@ def _from_npz_initializer(
     key = parameters.get("key", "nodes")
     if not isinstance(key, str):
         raise ValueError("from_npz key must be a string")
-    if not path.is_file():
-        raise FileNotFoundError(f"Initializer NPZ file not found: {path}")
-    with np.load(path, allow_pickle=False) as archive:
+    preloaded = _PRELOADED.get()
+    data = None if preloaded is None else preloaded.get(str(path))
+    if data is None:
+        if not path.is_file():
+            raise FileNotFoundError(f"Initializer NPZ file not found: {path}")
+        data = path.read_bytes()  # read once: the hash describes what the model starts from
+    with np.load(io.BytesIO(data), allow_pickle=False) as archive:
         if key not in archive:
             raise ValueError(f"Initializer NPZ file has no array {key!r}")
         nodes = np.asarray(archive[key])
@@ -161,6 +174,9 @@ def _from_npz_initializer(
     lgca.nodes[lgca.nonborder] = nodes.astype(lgca.nodes.dtype, copy=False)
     lgca.apply_boundaries()
     lgca.update_dynamic_fields()
+    from .provenance import sha256
+
+    return {str(parameters["path"]): sha256(data)}
 
 
 def _normalize_extent(value, dims: tuple[int, ...]) -> tuple[int, ...]:

@@ -7,6 +7,21 @@ This file records notable user-facing changes. Changes remain under
 
 ### Added
 
+- Provenance: `model.metadata["provenance"]`, and so `metadata.json` of
+  `biolgca run`, records the versions of Python and the packages, the
+  platform, the operators with their parameters including defaults, the
+  SHA-256 hashes of the source code of every rule, term and reaction the
+  model runs, and of the files it read; `reconfigure` keeps it current. The
+  command line adds the hash of the model file and the git commit of BioLGCA
+  when it runs from a checkout. `sweep` records the same in
+  `table.attrs["provenance"]`, and `biolgca sweep` in `sweep.json`.
+- Hash pins where the library writes the file: a model file records a hash
+  of every array in its array file and warns when it is loaded after the
+  array file changed (e.g. a `model.yaml` saved next to `model.json` wrote its
+  arrays to the shared `model.arrays.npz`: 200 cells became 400 without
+  notice); the archive of `biolgca run` records the hashes of its files in
+  `metadata.json`, and `biolgca run` and `validate` warn when an archived model
+  changed after the run that wrote it.
 - Field solver failures raise `lgca.fields.FieldSolverError`, a
   `RuntimeError` with a `kind` (`"no_steady_state"`, `"singular"`,
   `"nonlinear"`, `"linear"`, `"non_finite"`, `"explicit"`); the operator's
@@ -751,6 +766,11 @@ This file records notable user-facing changes. Changes remain under
 
 ### Fixed
 
+- A sweep reads its input files (the arrays of a `from_npz` initializer) once
+  before the first run: a file edited during a sweep changed the runs that
+  started later (seeds 0 and 1 from 300 cells, 2 and 3 from 100). `biolgca
+  run` and `biolgca sweep` copy their inputs before the first run and run from
+  the copies, so the archive holds what ran (it was copied afterwards).
 - Interrupting (Ctrl-C) the Boltzmann reorientation of an identity-based
   model with volume exclusion could replace every label by 1: the sampler
   wrote the occupied channels and then the labels. It now writes the lattice

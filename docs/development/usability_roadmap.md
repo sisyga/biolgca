@@ -117,6 +117,14 @@ backend. Next: CR-A3 PR3 (read inputs once, provenance), CR-A2 PR2 (reactions in
 Newton) and PR3 (docs, benchmarks); CR-A1 PR2 (fingerprints of class-based
 operators under strict contracts) when third-party operators appear.
 
+CR-A3 PR3 done (2026-10-01): models record their provenance (versions,
+platform, operators with defaults, hashes of the rules' source and of the files
+read), sweeps read their input files once, the CLI runs from the copies it
+archives, and hashes are compared only where the library wrote them (arrays of
+model files, the CLI archive), with a warning. Open from the review: CR-A2 PR2
+and PR3 (in progress on a branch), CR-A2 PR4 and CR-A1 PR2 when needed, CR-A3
+PR4 (frozen `model.spec`) optional.
+
 ## Reference point: Morpheus
 
 Morpheus (https://gitlab.com/morpheus.lab/morpheus) is a multiscale modelling

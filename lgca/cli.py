@@ -6,6 +6,7 @@ import argparse
 import json
 import shutil
 import sys
+import tempfile
 from copy import deepcopy
 from dataclasses import replace
 from importlib import import_module
@@ -13,8 +14,10 @@ from pathlib import Path, PureWindowsPath
 
 import numpy as np
 
+from ._warnings import warn_user
 from .examples import describe_example, example_names, save_example_spec
 from .model import build_model, load_model_spec, save_model_spec
+from .provenance import sha256, vcs_commit
 from .simulation import (
     RECORDED,
     CSVSnapshotObserver,
@@ -121,7 +124,7 @@ def _examples_export(args) -> int:
 def _validate(args) -> int:
     _import_plugins(args)
     model_path = _existing_model_path(args.model)
-    spec = load_model_spec(model_path)
+    spec, _ = _load(model_path)
     _validate_output_declarations(spec, trusted_paths=args.trusted_paths)
     build_model(
         spec,
@@ -141,18 +144,28 @@ def _run(args) -> int:
             f"Output directory already exists: {output_dir}. Use --overwrite to reuse it."
         )
 
-    spec = load_model_spec(model_path)
+    spec, model_hash = _load(model_path)
     portable_spec = deepcopy(spec)
     _resolve_output_paths(spec, output_dir, trusted_paths=args.trusted_paths)
     _preflight_output_namespace(spec, output_dir, trusted_paths=args.trusted_paths)
-    compiled = build_model(
-        spec,
-        resource_base=model_path.parent,
-        trusted_paths=args.trusted_paths,
-    )
+    # the inputs are copied before the run, which reads the copies: the archive holds what ran (staged until
+    # the model is built, so that a model that fails leaves no output directory)
+    with tempfile.TemporaryDirectory(prefix="biolgca-") as staging:
+        staging = Path(staging)
+        copied = _with_copied_resources(portable_spec, model_path, staging, args.trusted_paths)
+        resource_base = model_path.parent
+        if copied is not portable_spec:
+            spec = replace(spec, state=replace(spec.state, initializer=copied.state.initializer))
+            resource_base = staging
+        compiled = build_model(
+            spec,
+            resource_base=resource_base,
+            trusted_paths=args.trusted_paths,
+        )
+        output_dir.mkdir(parents=True, exist_ok=True)
+        _move_resources(staging, output_dir)
+    portable_spec = copied
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-    portable_spec = _with_copied_resources(portable_spec, model_path, output_dir, args.trusted_paths)
     # Record the seed actually used, including one drawn for an unseeded model.
     portable_spec = replace(portable_spec, time=replace(portable_spec.time, seed=compiled.spec.time.seed))
     save_model_spec(portable_spec, output_dir / "model.resolved.json")
@@ -169,6 +182,13 @@ def _run(args) -> int:
     if measurements:
         np.savez_compressed(output_dir / "measurements.npz", **measurements)
         result.metadata["measurements_file"] = "measurements.npz"
+    provenance = result.metadata.setdefault("provenance", {})
+    provenance["model_file"] = {"path": str(model_path), "sha256": model_hash}
+    provenance["vcs"] = vcs_commit()
+    # the files of the archive, which `biolgca run` and `validate` compare when the archived model is run again
+    archived = ["model.resolved.json", "model.resolved.arrays.npz", "resources/initial_state.npz"]
+    provenance["archive"] = {name: sha256((output_dir / name).read_bytes()) for name in archived
+                             if (output_dir / name).is_file()}
     metadata_path = output_dir / "metadata.json"
     metadata_path.write_text(
         json.dumps(_json_safe(result.metadata), indent=2), encoding="utf-8"
@@ -248,6 +268,52 @@ def _with_copied_sweep_resources(spec, grid, model_path, output_dir, trusted_pat
     return portable_spec, portable_grid, sources
 
 
+def _show_given_values(table, spec, grid, portable_grid) -> None:
+    """In the table, the values of the grid as given, not the paths of the copies that the runs read."""
+    from .study import resolve_path
+
+    columns = {path: column for column, path in table.attrs["paths"].items()}
+    for path, values in grid.items():
+        archived = portable_grid[path]
+        column = columns.get(resolve_path(spec, path))
+        if column is None or archived == values:
+            continue
+        table[column] = [values[archived.index(value)] if value in archived else value for value in table[column]]
+
+
+def _move_resources(staging: Path, output_dir: Path) -> None:
+    """Move the staged copies of the inputs (``resources/``) into the output directory."""
+    staged = staging / "resources"
+    if staged.is_dir():
+        target = output_dir / "resources"
+        target.mkdir(parents=True, exist_ok=True)
+        for path in staged.iterdir():
+            shutil.copyfile(path, target / path.name)
+
+
+def _load(model_path: Path):
+    """The model of a file, and the hash of the file as read; warns if it is the archived model of an
+    earlier run and its archive changed since (the run's metadata.json records the hashes)."""
+    data = model_path.read_bytes()
+    found = sha256(data)
+    metadata = model_path.parent / "metadata.json"
+    if metadata.is_file():
+        try:
+            archive = json.loads(metadata.read_text(encoding="utf-8")).get("provenance", {}).get("archive", {})
+        except (ValueError, AttributeError):
+            archive = {}
+        if isinstance(archive, dict) and model_path.name in archive:
+            changed = [name for name, recorded in archive.items() if (model_path.parent / name).is_file() and
+                       sha256(data if name == model_path.name else (model_path.parent / name).read_bytes())
+                       != recorded]
+            for name in changed:
+                current = found if name == model_path.name else sha256((model_path.parent / name).read_bytes())
+                warn_user(f"{name} changed after the run that wrote it (sha256 {current[:16]}..., its "
+                          f"metadata.json records {archive[name][:16]}...): the results in {model_path.parent} "
+                          f"do not belong to it")
+    return load_model_spec(model_path), found
+
+
 def _existing_model_path(path: Path) -> Path:
     resolved = path.resolve()
     if not resolved.is_file():
@@ -264,10 +330,7 @@ def _sweep(args) -> int:
     output_dir = args.output.resolve()
     if output_dir.exists() and not args.overwrite:
         raise ValueError(f"Output directory already exists: {output_dir}. Use --overwrite to reuse it.")
-    spec = load_model_spec(model_path)
-    running = deepcopy(spec)
-    if args.keep_files:  # the files of every run in a folder of its own in the output directory
-        _resolve_output_paths(running, output_dir, trusted_paths=args.trusted_paths)
+    spec, model_hash = _load(model_path)
     grid = {}
     for entry in args.vary:
         path, values = _parse_vary(entry)
@@ -276,18 +339,34 @@ def _sweep(args) -> int:
         grid[path] = values
     seeds = None if args.seeds is None else _parse_seeds(args.seeds)
     measure = {name: name for name in args.measure} or {"population": final_population}
-    table = sweep(running, grid=grid or None, seeds=seeds, measure=measure, n_jobs=args.n_jobs, long=args.long,
-                  plugins=plugins, showprogress=args.show_progress, resource_base=model_path.parent,
-                  trusted_paths=args.trusted_paths, keep_files=args.keep_files, errors=args.errors)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # the inputs are copied before the first run, and the runs read the copies: a file that changes during
+    # the sweep changes no run, and the archive holds what ran (staged until the sweep succeeds)
+    with tempfile.TemporaryDirectory(prefix="biolgca-") as staging:
+        staging = Path(staging)
+        portable_spec, portable_grid, resources = _with_copied_sweep_resources(spec, grid, model_path, staging,
+                                                                               args.trusted_paths)
+        copied = bool(resources)
+        running = deepcopy(portable_spec if copied else spec)
+        if args.keep_files:  # the files of every run in a folder of its own in the output directory
+            _resolve_output_paths(running, output_dir, trusted_paths=args.trusted_paths)
+        table = sweep(running, grid=(portable_grid if copied else grid) or None, seeds=seeds, measure=measure,
+                      n_jobs=args.n_jobs, long=args.long, plugins=plugins, showprogress=args.show_progress,
+                      resource_base=staging if copied else model_path.parent, trusted_paths=args.trusted_paths,
+                      keep_files=args.keep_files, errors=args.errors)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        _move_resources(staging, output_dir)
+    if copied:
+        _show_given_values(table, spec, grid, portable_grid)
     table.map(_csv_cell).to_csv(output_dir / "table.csv", index=False)
-    portable_spec, portable_grid, resources = _with_copied_sweep_resources(spec, grid, model_path, output_dir,
-                                                                           args.trusted_paths)
+    provenance = dict(table.attrs.get("provenance", {}))
+    provenance["model_file"] = {"path": str(model_path), "sha256": model_hash}
+    provenance["vcs"] = vcs_commit()
     description = {
         "model": model_spec_to_dict(portable_spec), "grid": _json_safe(portable_grid), "paths": table.attrs["paths"],
         "seeds": _json_safe(sorted(set(table["seed"].tolist()))), "measure": list(measure), "long": args.long,
         "errors": args.errors,
         "resources": resources, "plugins": plugins, "biolgca_version": _package_version(),
+        "provenance": provenance,
     }
     (output_dir / "sweep.json").write_text(json.dumps(_json_safe(description), indent=2), encoding="utf-8")
     print(output_dir)
