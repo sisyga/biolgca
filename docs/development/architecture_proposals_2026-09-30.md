@@ -1,7 +1,8 @@
 # Architecture proposals after the 30 September 2026 review
 
 Status: proposal, 2026-09-30; decisions, CR-A3 PR1 to PR3, CR-A1 PR0, PR1 and
-PR3, and CR-A2 PR1 on 2026-10-01 (see [Decisions](#decisions-for-the-maintainer)). Follow-up to [the code review](code_review_2026-09-30.md),
+PR3, and CR-A2 PR1 to PR3 on 2026-10-01 (see
+[Decisions](#decisions-for-the-maintainer)). Follow-up to [the code review](code_review_2026-09-30.md),
 whose three open architectural findings are renamed here CR-A1 to CR-A3, so that
 they no longer collide with the IDs A1 to A5 of the [usability roadmap](usability_roadmap.md).
 
@@ -443,7 +444,25 @@ also with `"picard"` when every term is monotone. Linear problems and the
 `tests/fields_newton_test.py` (94). Reactions and cell terms get read-only
 states (CR-A1 PR0).
 
-**PR2 [Feat] Reactions in Newton (about 1.5 days).** **PR3 [Docs] (0.5 day)**,
+**PR2 and PR3: done on 2026-10-01**, by a delegated agent, reviewed and merged.
+The floor differs from the one planned here: where a reaction enhances itself
+(its production rises with c or its loss falls), it enters Newton's matrix
+with the larger of its finite-difference derivative and its loss rate
+(Picard's linearization); nodes there at which F falls as c rises take the full
+step. On 5100 random multistable cases this rule ended in another equilibrium
+than the field's dynamics reach in none, against 36 of 1860 for the
+prototype's floor (loss rate less 0.9 of the diagonal dominance) and 7 of 5100
+for Picard; plain Newton missed 390. Self-enhancing reactions then converge at
+Picard's rate (logistic below capacity: 19 iterations at r = 0.8 against 20).
+Also: the stopping test's scale is at least rtol times the field's largest
+value at the start (a field a reaction takes to 0 stalled on AMG/CG), and
+c-independent reactions cost one solve. `fields_spec.md` ("Nonlinear solver as
+built") records the measurements; `benchmarks/fields.py` times Hill n = 2 and 4
+and reactions. Open: a `reaction(derivative=..., monotone=...)` declaration for
+full Newton on reactions known to be monotone; the explicit BDF/Radau Jacobian
+still uses a reaction's loss rate.
+
+**PR2 [Feat] Reactions in Newton (about 1.5 days), as planned.** **PR3 [Docs] (0.5 day)**,
 including `fields_spec.md`, which describes Picard, and benchmarks for Hill
 `n = 2` and `4`. **PR4 (optional) [Perf] Direct backend (about 1 day)**: the
 SuperLU ordering above, and a factorization kept across steps for matrices the
@@ -667,9 +686,8 @@ Effort: 3.5 to 4 days for PR1 to PR3.
 2. ~~**CR-A1 PR0**~~: done on 2026-10-01.
 3. ~~**CR-A1 PR1 and PR3**~~: done on 2026-10-01.
 4. ~~**CR-A3 PR2 and PR3**~~: done on 2026-10-01.
-5. ~~**CR-A2 PR1**~~ (done on 2026-10-01); **PR2 and PR3** next: reactions in
-   Newton, docs and benchmarks. PR4 (direct backend, chord step) when profiling
-   asks for it.
+5. ~~**CR-A2 PR1 to PR3**~~: done on 2026-10-01. PR4 (direct backend, chord
+   step) when profiling asks for it.
 
 ## Decisions for the maintainer
 

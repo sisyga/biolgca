@@ -565,7 +565,8 @@ def _cell_loss_reaction(state, c, rate=1.0):
     return 1.0, rate * state.density
 
 
-def test_a_steady_problem_is_called_singular_only_where_nothing_removes_the_field():
+@pytest.mark.parametrize("nonlinear", ["newton", "picard"])
+def test_a_steady_problem_is_called_singular_only_where_nothing_removes_the_field(nonlinear):
     # decay removes the field, but the solution, 1e308 / 1e-10, overflows
     with np.errstate(over="ignore"), pytest.raises(RuntimeError, match="non-finite field values"):
         _build([PDESpec(field="u", production=1e308, decay=1e-10, solver="steady")], geometry="lin", dims=3)
@@ -574,7 +575,7 @@ def test_a_steady_problem_is_called_singular_only_where_nothing_removes_the_fiel
     nodes[0, 2] = 1
     with pytest.raises(RuntimeError, match="no unique solution"):
         _build([PDESpec(field="u", reactions=[{"name": "test_cell_loss"}], solver="steady",
-                        solver_options={"backend": "direct"})],
+                        solver_options={"backend": "direct", "nonlinear": nonlinear})],
                geometry="lin", dims=4, nodes=nodes, restchannels=1, volume_exclusion=False)
 
 
@@ -1048,25 +1049,28 @@ def test_a_constant_reaction_is_production_and_decay(solver, options):
     np.testing.assert_allclose(fields[1], fields[0], rtol=1e-8)
 
 
-def test_a_reaction_that_does_not_depend_on_the_field_needs_one_solve():
-    compiled = _build([PDESpec(field="u", diffusion=0.5, reactions=[{"name": "test_secretion", "rate": 0.2}])],
-                      density=0.4, restchannels=1)
+@pytest.mark.parametrize("nonlinear", ["newton", "picard"])
+def test_a_reaction_that_does_not_depend_on_the_field_needs_one_solve(nonlinear):
+    compiled = _build([PDESpec(field="u", diffusion=0.5, reactions=[{"name": "test_secretion", "rate": 0.2}],
+                               solver_options={"nonlinear": nonlinear})], density=0.4, restchannels=1)
     compiled.step()
     assert compiled.metadata["fields"]["u"]["max_iterations_used"] == 1
 
 
-def test_a_reaction_can_read_the_cells():
+@pytest.mark.parametrize("nonlinear", ["newton", "picard"])
+def test_a_reaction_can_read_the_cells(nonlinear):
     fields = []
     for terms in ({"cells": [{"production": 0.2}]}, {"reactions": [{"name": "test_secretion", "rate": 0.2}]}):
-        compiled = _build([PDESpec(field="u", diffusion=0.5, decay=0.1, **terms)], density=0.4, restchannels=1,
-                          seed=4)
+        compiled = _build([PDESpec(field="u", diffusion=0.5, decay=0.1, solver_options={"nonlinear": nonlinear},
+                                   **terms)], density=0.4, restchannels=1, seed=4)
         for _ in range(2):
             compiled.step()
         fields.append(_field(compiled))
     np.testing.assert_allclose(fields[1], fields[0], rtol=1e-12)
 
 
-def test_logistic_growth_of_a_field():
+@pytest.mark.parametrize("nonlinear", ["newton", "picard"])
+def test_logistic_growth_of_a_field(nonlinear):
     r, c0 = 0.8, 0.1
     # explicit: the exact solution of dc/dt = r c (1 - c)
     compiled = _build([PDESpec(field="u", reactions=[{"name": "test_logistic", "r": r}], solver="explicit",
@@ -1075,15 +1079,18 @@ def test_logistic_growth_of_a_field():
         compiled.step()
     exact = c0 * np.exp(4 * r) / (1 - c0 + c0 * np.exp(4 * r))
     np.testing.assert_allclose(_field(compiled), exact, rtol=1e-7)
-    # implicit: backward Euler, c - c_old = r c (1 - c), iterated to its fixed point
+    # implicit: backward Euler, c - c_old = r c (1 - c), iterated to its fixed point (below the capacity both
+    # iterations converge at Picard's rate, about 40 iterations here)
     compiled = _build([PDESpec(field="u", reactions=[{"name": "test_logistic", "r": r}],
-                               solver_options={"rtol": 1e-12, "max_iterations": 200})], fields={"u": c0})
+                               solver_options={"rtol": 1e-12, "max_iterations": 200, "nonlinear": nonlinear})],
+                      fields={"u": c0})
     compiled.step()
     backward = (-(1 - r) + np.sqrt((1 - r) ** 2 + 4 * r * c0)) / (2 * r)
     np.testing.assert_allclose(_field(compiled), backward, rtol=1e-9)
     # steady: the stable state c = 1
     compiled = _build([PDESpec(field="u", diffusion=1.0, reactions=[{"name": "test_logistic", "r": r}],
-                               solver="steady", solver_options={"rtol": 1e-11})], fields={"u": c0})
+                               solver="steady", solver_options={"rtol": 1e-11, "nonlinear": nonlinear})],
+                      fields={"u": c0})
     np.testing.assert_allclose(_field(compiled), 1.0, rtol=1e-9)
 
 
@@ -1134,10 +1141,11 @@ def test_a_reaction_takes_the_state_and_the_field():
         reaction(lambda state: 0.0)
 
 
-def test_a_steady_field_that_nothing_removes_is_an_error():
+@pytest.mark.parametrize("nonlinear", ["newton", "picard"])
+def test_a_steady_field_that_nothing_removes_is_an_error(nonlinear):
     with pytest.raises(RuntimeError, match="no unique solution"):
         _build([PDESpec(field="u", diffusion=1.0, reactions=[{"name": "test_constant", "production": 1.0}],
-                        solver="steady")], boundary="periodic")
+                        solver="steady", solver_options={"nonlinear": nonlinear})], boundary="periodic")
 
 
 def test_reactions_in_a_model_file(tmp_path):
@@ -1170,14 +1178,15 @@ def _weak_loss_reaction(state, c, rate=1e-7):
     return 0.0, rate * (1 + c / (1e6 + c))
 
 
+@pytest.mark.parametrize("nonlinear", ["newton", "picard"])
 @pytest.mark.parametrize("backend", ["auto", "direct", "cg", AMG])
 @pytest.mark.parametrize("name", ["test_idle", "test_weak_loss"])
-def test_converged_reactions_are_accepted_at_the_rounding_of_ill_conditioned_steady_solves(name, backend):
+def test_converged_reactions_are_accepted_at_the_rounding_of_ill_conditioned_steady_solves(name, backend, nonlinear):
     # diffusion 2e4 against a loss rate near 1e-6: the condition number is near 1e11, so the linear solve
     # leaves a relative residual above rtol that solving again with the same terms cannot reduce
     production = np.random.default_rng(0).uniform(0.5, 1.5, (20, 20))
     compiled = _build([PDESpec(field="u", diffusion=2e4, decay=1e-6, production="production", solver="steady",
-                               reactions=[{"name": name}], solver_options={"backend": backend})],
+                               reactions=[{"name": name}], solver_options={"backend": backend, "nonlinear": nonlinear})],
                       dims=(20, 20), fields={"u": 0.0, "production": production})
     u = _field(compiled)
     loss = 1e-6 + (0.0 if name == "test_idle" else 1e-7 * (1 + u / (1e6 + u)))

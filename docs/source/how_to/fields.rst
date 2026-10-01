@@ -173,20 +173,21 @@ go-or-grow step on lattices of 100² to 400² nodes (``benchmarks/fields.py``).
 reports per field how it was solved, e.g. the number of iterations.
 
 Saturating uptake and reactions make the equation nonlinear. The implicit and
-steady solvers solve saturating uptake by Newton's method, until the
-estimated error of the field is at most ``rtol`` (1e-6) relative to its
-largest value: usually one to three linear solves per step, also for steep
-uptake with ``n > 1``. A steady field that only the cells remove (no decay,
-no fixed boundary value) has a steady state only if the cells can take up
-more than is produced; otherwise the operator says so.
-Reactions are iterated by Picard iteration, until an iteration changes the
-field by at most ``rtol`` relative to its largest value and the residual of
-the equation is at most ``rtol`` relative to its source terms;
-``solver_options={"nonlinear": "picard"}`` iterates saturating uptake in this
-way too, as earlier versions did. An iteration that is still within a factor
-1000 of its tolerance after ``max_iterations`` (20) converges slowly: the
-operator warns once and uses the last iterate. Further off, it stops the run
-with an error that says about how many iterations would suffice, or that
+steady solvers solve them by Newton's method, until the estimated error of
+the field is at most ``rtol`` (1e-6) relative to its largest value: usually
+one to three linear solves per step, also for steep uptake with ``n > 1``.
+Where a reaction enhances itself, the solver is more careful and slower (see
+`Reactions of your own`_). A steady field that only the cells remove (no
+decay, no fixed boundary value) has a steady state only if the cells can take
+up more than is produced; otherwise the operator says so.
+``solver_options={"nonlinear": "picard"}`` uses Picard iteration instead, as
+earlier versions did: the terms are evaluated at the last iterate and the
+linear problem solved again, until an iteration changes the field by at most
+``rtol`` relative to its largest value and the residual of the equation is at
+most ``rtol`` relative to its source terms. Either iteration, still within a
+factor 1000 of its tolerance after ``max_iterations`` (20), converges slowly:
+the operator warns once and uses the last iterate. Further off, it stops the
+run with an error that says about how many iterations would suffice, or that
 more do not help; ``solver="explicit"`` then works. The solver raises
 :class:`~lgca.fields.FieldSolverError` when it fails, with a ``kind`` that
 says why, and ``result.metadata["fields"]`` counts the failures by kind and
@@ -232,10 +233,24 @@ with its parameters:
 
 ``state.field("other")`` reads another field, so fields can react with each
 other. They are updated one after another, in the order of their operators
-(operator splitting, first order in time). Terms that depend on the field
-are iterated to convergence in the implicit and steady solvers. A model file
-that uses a reaction needs the module that registers it imported first:
-``biolgca run model.json --plugins my_reactions``, or ``plugins=`` of
+(operator splitting, first order in time).
+
+The implicit and steady solvers solve a reaction by Newton's method, with its
+derivative taken by a finite difference, so the production and loss rate at
+a node should depend on the field at that node only (and on anything else,
+such as the cells and other fields). A reaction enhances itself where its
+production rises with the field faster than its loss, as this autocatalysis
+does: a field can then have several stable equilibria, here 0 and a high
+one, and which one it reaches depends on where it starts. There the solver
+steps as Picard iteration does, so that it reaches the equilibrium that the
+field's dynamics reach, at Picard iteration's slower rate; if it warns that
+it converges slowly, raise ``solver_options`` ``max_iterations``.
+``result.metadata["fields"]`` counts these iterations
+(``"floored_iterations"``).
+
+A model file that uses a reaction needs the module that registers it
+imported first: ``biolgca run model.json --plugins my_reactions``, or
+``plugins=`` of
 :func:`lgca.study.sweep`.
 
 Cells that respond to fields

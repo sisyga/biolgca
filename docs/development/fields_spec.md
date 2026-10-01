@@ -1,7 +1,9 @@
 # Fields: reaction–advection–diffusion equations coupled to the cells
 
 Status: design agreed (2026-09-26). Phases 1 and 2 implemented
-(2026-09-26, see "Phase 1 as built" and "Phase 2 as built").
+(2026-09-26, see "Phase 1 as built" and "Phase 2 as built"). The terms that
+depend on the field are solved by Newton's method since 2026-10-01 (see
+"Terms that depend on the field" and "Nonlinear solver as built").
 
 ## Goal
 
@@ -45,8 +47,8 @@ For a field `c` on the nodes of the lattice:
 Every reaction is written as a production and a loss rate. This is the form
 students meet first (source minus first-order sink), and treating `L c`
 implicitly keeps `c ≥ 0` in every solver without clipping. Michaelis–Menten
-uptake `μ n c / (K_m + c)` fits it as `L = μ n / (K_m + c)` (evaluated at the
-previous iterate; see "Solvers").
+uptake `μ n c / (K_m + c)` fits it as `L = μ n / (K_m + c)` (linearized at
+the current iterate; see "Terms that depend on the field").
 
 ### Units
 
@@ -193,8 +195,9 @@ def activation(state, c, rate=1.0, other="inhibitor"):
 A reaction is a function of the lattice state and the field's current
 values returning `(production, loss_rate)`, both non-negative with one
 value per node. It is registered like `switch_cue` and used as
-`"reactions": [{"name": "activation", "rate": 2.0}]`. Nonlinear terms are
-iterated (see "Solvers"). Several fields that react with each other are
+`"reactions": [{"name": "activation", "rate": 2.0}]`. Terms that depend on
+the field are solved by Newton's method (see "Terms that depend on the
+field"). Several fields that react with each other are
 updated one after another in the order of their operators (operator
 splitting), which is first-order accurate in time; the documentation says
 so.
@@ -360,12 +363,67 @@ steps with 5 % of the colony's nodes changing per step. So the default
 `backend` can be forced (`"direct"`, `"cg"`, `"amg"`); `rtol` defaults to
 10⁻⁶, well below the noise of the cells.
 
-Nonlinear terms (saturating uptake, registered reactions): Picard
-iteration, i.e. evaluate `P` and `L` at the current iterate, solve the
-linear problem, repeat until the relative change is below `rtol` (at most
-`max_iterations`, default 20, with a warning if not converged). Starting from
-the previous step's field should make a few iterations enough; to be
-measured.
+### Terms that depend on the field
+
+Saturating uptake and registered reactions make the implicit step and the
+steady state nonlinear: `F(c) = B c + s (L + Σ r_k(c)) c − b − s Σ p_k(c) = 0`
+with `B = I − Δt A, s = Δt` (implicit) or `B = −A, s = 1` (steady), the loss
+rates `r_k` and the production `p_k` of the terms. Since 2026-10-01 (CR-A2,
+see "Nonlinear solver as built") they are solved by Newton's method; Picard
+iteration, the method of the phases below, remains as
+`solver_options={"nonlinear": "picard"}`.
+
+- **Newton's matrix** `J = B + s diag(d)` with `d` the derivative of the loss
+  per node: exact for saturating uptake (`n r (1 − h)`, in log form), a
+  forward difference for reactions (step `√ε` relative to `c`; exactly the
+  loss rate where a reaction does not depend on `c`), assuming that a node's
+  terms depend on the field at that node only.
+- **The floor for reactions.** Where the production of the reactions rises
+  with `c`, or their loss `r c` falls (self-enhancement: logistic growth
+  below its capacity, autocatalysis, switches), the equation may have several
+  equilibria. There the reactions enter `d` with the larger of their
+  derivative and their loss rate, Picard's linearization: no step is longer
+  than Picard iteration's, which approaches the equilibrium that the field's
+  dynamics reach from the start. Elsewhere (loss rising, production not)
+  they keep their derivative. `J` stays an M-matrix (symmetric positive
+  definite without advection), so the backends apply unchanged.
+- **Steps.** The first iteration solves for the new iterate, `J c₁ = J c₀ −
+  F(c₀)`, with the operator's `rtol` (Picard's first iteration where `d` is
+  the loss rate, so linear problems are solved as before); later ones solve
+  for the correction `J δ = −F` with an Eisenstat–Walker tolerance floored
+  at half the outer one. A projected Armijo line search (`max(c + λ δ, 0)`,
+  λ halved down to 2⁻¹⁰, per node where the nodes are independent) makes
+  the method converge from any start; where the floor is active and `F`
+  falls as `c` rises, the step need not reduce `|F|`, and is taken in full
+  (the whole step in a coupled problem).
+- **Stopping test.** The error estimate `J⁻¹ F(c)` with the last matrix (one
+  back substitution with the kept factors on the direct backend, one solve
+  to relative tolerance 0.1 on AMG and CG) at most `rtol` times the largest
+  value of `c` after a full step, or `F` at rounding level, or a first
+  iteration that was Picard's and left the terms unchanged (a linear
+  problem: one solve). The scale is at least `rtol` times the field's
+  largest value at the start: a field that a reaction takes to 0 approaches
+  it only geometrically with inexact solves. Unlike a residual relative to
+  `b`, the estimate does not loosen when a fixed boundary value dominates
+  `b`.
+- **Steady fields that only the cells remove** (no decay, no fixed boundary
+  value), when every term is saturating uptake: an exact existence check
+  (the total production must be below the sum of the saturable uptake
+  rates; otherwise `FieldSolverError` of kind `no_steady_state`) and a start
+  at the uniform level that balances production and uptake. Not with
+  reactions: logistic growth balances at 0 and at its capacity.
+- **Failures** raise `FieldSolverError` (a `RuntimeError`) with a `kind`:
+  `no_steady_state`, `singular`, `nonlinear`, `linear`, `non_finite`,
+  `explicit`; the field keeps its values, and `metadata["fields"][name]`
+  counts `failures` and `failure_kinds`. Within a factor 1000 of the
+  tolerance after `max_iterations` (20) the solver warns once and uses the
+  iterate; further off it raises (kind `nonlinear`) and estimates from the
+  rate of convergence how many iterations would suffice, or says that the
+  iteration cycles.
+- **Record**: `metadata["fields"][name]["nonlinear"]` (`"newton"` or
+  `"picard"`), `max_iterations_used`, `backtracks` (halvings of the line
+  search) and `floored_iterations` (iterations with the floor active
+  somewhere).
 
 ## Implementation outline
 
@@ -479,7 +537,8 @@ Choices made while implementing, beyond the text above:
   | `pde` explicit (RK45), D=20, about 350 evaluations | 19 ms | 89 ms | 377 ms |
 
 - **Defaults**: implicit `rtol` 10⁻⁶ for CG and for the Picard iteration of
-  saturating uptake (`max_iterations` 20); explicit `rtol` 10⁻⁴, `atol`
+  saturating uptake (`max_iterations` 20; Newton's method since 2026-10-01,
+  with the same defaults); explicit `rtol` 10⁻⁴, `atol`
   10⁻⁶, values in `[−atol, 0)` set to zero, below that an error.
   `solve_ivp` gets `t_eval=[1]`, so it keeps no intermediate states.
 - **`solver="steady"`** raises "not available yet" until phase 2;
@@ -521,7 +580,8 @@ Choices made while implementing, beyond the text above:
   Without pyamg: SuperLU up to 20 000 nodes, Jacobi-preconditioned CG above.
   A constant matrix (no uptake) is factored once with `"auto"` and
   `"direct"`. Saturating uptake: Picard iteration as in the implicit
-  solver (7 iterations per step in the benchmark).
+  solver (7 iterations per step in the benchmark; Newton's method since
+  2026-10-01).
 - **Dependencies**: `pyamg>=5.1; python_version < '3.14'` (5.0 imports
   `pkg_resources` and fails without setuptools), `scipy>=1.11`, and
   `threadpoolctl>=3.0` (not planned; see next point). The minimum versions
@@ -614,11 +674,12 @@ Choices made while implementing, beyond the text above:
   read-only) and returns `(production, loss_rate)`, numbers or arrays of
   shape `dims`, checked to be finite and non-negative. Parameters are
   checked against the function's signature when the operator is built.
-  Saturating uptake and reactions share one Picard iteration: the terms are
-  evaluated at the current iterate, the linear problem solved, and the
-  iteration stops when c changes by less than `rtol` or the evaluated terms
-  did not change (so a reaction that does not depend on c costs one solve,
-  tested). While no term has a loss the matrix is the constant one and
+  Saturating uptake and reactions share one Picard iteration (since
+  2026-10-01 Newton's method, see "Terms that depend on the field"): the
+  terms are evaluated at the current iterate, the linear problem solved, and
+  the iteration stops when c changes by less than `rtol` or the evaluated
+  terms did not change (so a reaction that does not depend on c costs one
+  solve, tested). While no term has a loss the matrix is the constant one and
   reuses its factorization. The explicit solver calls the reactions in
   every right-hand-side evaluation. Tested against production and decay,
   secretion by cells, the exact logistic solution (explicit), the backward
@@ -658,6 +719,103 @@ Choices made while implementing, beyond the text above:
 - **Also found and fixed**: `lgca.study.vary` could not change the
   parameters of a `PDESpec` (they are fields of the dataclass, not a
   `parameters` mapping); `go_or_rest` takes `probability=` (user request).
+
+## Nonlinear solver as built (2026-10-01)
+
+Code review follow-up CR-A2 (see
+`docs/development/architecture_proposals_2026-09-30.md`): Picard iteration
+cycled for saturating uptake with `n ≥ 3`, became arbitrarily slow for
+`n = 2`, and failed where its first linearization was singular. Newton's
+method replaced it in two steps, described in "Terms that depend on the
+field": saturating uptake (PR1), then reactions (PR2).
+
+**Reactions.** Newton's method needs the derivative of a reaction, which the
+`@reaction` API does not provide: it is a forward difference (one more call
+of each reaction per iteration). Plain Newton's method converges to the
+unstable equilibrium of autocatalytic reactions (logistic growth from below
+1/2 goes to 0), where Picard iteration finds the stable one. The floor was
+chosen by measurement. Reference cases: a hand-made set of 67 (logistic
+growth, steady from 0.1, 1.5, 3, 10⁻¹² and random starts and implicit for
+`r` = 0.8, 3 and 10; bistable autocatalysis; a reaction with three stable
+equilibria from 13 starts, with and without diffusion; an implicit step
+with three roots; saturating uptake written as a reaction; saturating
+uptake together with autocatalysis; the deciding ones are in
+`tests/fields_newton_test.py`) and random multistable reactions: production
+by one to three
+Hill switches (`K` from 0.2 to 10, `n` from 2 to 8), decay 0.1, in some sets
+a loss rate `l₀ + l₁ c`, steady and implicit (in some sets with several
+roots per step), without and with diffusion, six starts each; the reference
+is the root that the flow `dc/dt = −F(c)` reaches from the start (dense grid
+and `brentq`).
+
+| Rule where the reactions enhance themselves | random cases in another equilibrium | of the 67 hand-made: in another equilibrium, failed |
+|---|---|---|
+| none (the derivative everywhere) | 390 of 5100 | many |
+| the loss rate less 0.9 of the dominance of `B` (the earlier design) | 36 of 1860 steady | 8, 2 |
+| the derivative where the matrix keeps a fraction of the dominance of `B` (0.75, 0.5, 0.25, 0.1), else the loss rate | 8, 13, 26, 29 of 1860 steady | 0 (0.1: 2), 1 |
+| the derivative where it is at least 0, else the loss rate | 5 of 5100 | 0, 1 |
+| **the larger of derivative and loss rate (as built)** | **0 of 5100** | **0, 1** |
+| Picard iteration | 7 of 5100 | 0, 6 |
+
+(The one hand-made case that every rule fails is saturating uptake written
+as a reaction, steady without decay, from 0: no balanced start for
+reactions, and a singular first matrix, as with Picard iteration.)
+
+Every rule that allows a step longer than Picard iteration's where a
+reaction enhances itself sometimes jumps over the stable equilibrium and the
+unstable one beyond it (a step from 5.0 to 0 in the three-equilibrium case,
+whose dynamics go to 3.02). The rule as built takes Picard's step there,
+unless Newton's is shorter; Picard iteration itself was wrong in 7 cases,
+where its map is not monotone (the loss rate rising with `c`) and its step
+from far above jumped two roots. Monotone reactions (consumption such as
+Michaelis–Menten written as a reaction) keep Newton's speed. The cost:
+where a reaction enhances itself, convergence is linear at Picard's rate
+(logistic growth below its capacity: 19 iterations against Picard's 20 at
+`rtol` 10⁻⁶ in one implicit step with `r = 0.8`), and slow next to a fold,
+where the stable equilibrium nearly meets an unstable one (36 random cases
+did not converge in 50 iterations, against 30 for Picard).
+
+Iterations at `rtol` 10⁻¹⁰ (`tests/fields_newton_test.py`), Newton against
+Picard: Michaelis–Menten consumption written as a reaction, implicit 6
+against 19, steady without decay 8 against no convergence; logistic growth
+above its capacity 5 against 17, below it 19 against 20; bistable
+autocatalysis 9 to 12 against 10 to 15; steep uptake (`n = 64`) together with
+autocatalysis 10, where Picard iteration does not converge.
+
+**Benchmark** (`benchmarks/fields.py`, the disc of cells of "Phase 2 as
+built" with birth and death every step, D = 1, uptake 0.05 per cell
+saturating at K = 0.1; one BLAS thread, median of 3 fresh processes, 10
+steps; ms per step of the `pde` operator at 100², 200², 400², and the
+largest number of iterations in one update):
+
+| Route | Newton's method | Picard iteration |
+|---|---|---|
+| go-or-grow step, for comparison | 5.7, 25.0, 104 | |
+| steady amg, Hill `n = 1` | 18.4, 63.2, 303 (5) | 36.1, 120, 508 (8) |
+| steady amg, Hill `n = 2` | 21.8, 72.7, 342 (6) | fails: not converged in 20 iterations |
+| steady amg, Hill `n = 4` | 20.4, 128, 282 (8) | fails |
+| steady direct, Hill `n = 2` | 65.7, 613, 4058 (6) | fails |
+| implicit cg, Hill `n = 4` | 6.9, 22.3, 138 (5) | 16.6, 55.7, 346 (20, slow) |
+| steady amg, Hill `n = 1` written as a reaction | 18.6, 64.1, 297 (5) | 32.8, 115, 506 (8) |
+| implicit cg, a self-amplifying reaction | 6.1, 22.4, 141 (5) | 3.7, 11.8, 81.5 (5) |
+| steady amg, a self-amplifying reaction | 15.1, 57.8, 248 (4) | 12.0, 40.2, 189 (5) |
+
+(The self-amplifying reaction: every cell produces `0.05 c² / (0.25 + c²)`,
+decay 0.02.) Where the floor makes the iteration Picard's, Newton's method
+needs as many iterations but costs 1.25 to 1.9 times as much per step:
+every iteration also solves for the error estimate and calls the reactions
+twice (the difference and the trial point), and its stopping test is the
+stricter one.
+
+**A field that a reaction takes to 0** (bistable autocatalysis below its
+threshold) approaches 0 only geometrically when the linear solves are
+inexact (AMG, CG), and an error relative to its own largest value never
+falls; the error is therefore measured against at least `rtol` times the
+field's largest value at the start of the solve.
+
+**Not changed:** the existence check and balanced start apply only when
+every term is saturating uptake; the explicit solver's Jacobian for BDF and
+Radau still takes a reaction's loss rate as its derivative.
 
 ## Later
 

@@ -472,9 +472,22 @@ This file records notable user-facing changes. Changes remain under
   field; there Picard iteration on the AMG and CG backends had stopped at
   errors of up to 1e-4. Seeded runs with saturating uptake change within the
   tolerance (tutorial 7: 6,186 cells after 200 steps instead of 6,211).
-  `solver_options={"nonlinear": "picard"}` restores the earlier iteration;
-  reactions still use Picard iteration. `metadata["fields"][name]["nonlinear"]`
-  records which iteration a run used.
+  `solver_options={"nonlinear": "picard"}` restores the earlier iteration.
+  `metadata["fields"][name]["nonlinear"]` records which iteration a run used.
+- Fields: reactions (`@reaction`) are solved by Newton's method too, with
+  their derivative taken by a finite difference; a reaction's production and
+  loss rate at a node should depend on the field at that node only. Where a
+  reaction enhances itself (production rising with the field, or loss
+  falling: logistic growth below its capacity, autocatalysis, switches), it is
+  linearized as in Picard iteration, so the field reaches the stable
+  equilibrium its dynamics reach, at Picard iteration's rate. Saturating
+  uptake together with reactions, and saturating uptake written as a
+  reaction, now converge where Picard iteration did not, and a field that a
+  reaction takes to 0 converges on the iterative backends.
+  `metadata["fields"][name]["floored_iterations"]` counts the iterations that
+  used Picard's linearization. Seeded runs with reactions change within
+  `rtol`; a steady logistic field started at exactly 0 now stays 0 (an
+  equilibrium) instead of raising.
 - Fields: a steady field that only the cells remove (no decay, no fixed
   boundary value) now raises when production reaches the total saturable
   uptake, where no steady state exists, instead of failing to converge or

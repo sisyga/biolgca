@@ -121,9 +121,17 @@ CR-A3 PR3 done (2026-10-01): models record their provenance (versions,
 platform, operators with defaults, hashes of the rules' source and of the files
 read), sweeps read their input files once, the CLI runs from the copies it
 archives, and hashes are compared only where the library wrote them (arrays of
-model files, the CLI archive), with a warning. Open from the review: CR-A2 PR2
-and PR3 (in progress on a branch), CR-A2 PR4 and CR-A1 PR2 when needed, CR-A3
-PR4 (frozen `model.spec`) optional.
+model files, the CLI archive), with a warning.
+
+CR-A2 PR2 and PR3 done (2026-10-01): reactions go to Newton's method with a
+finite-difference derivative, floored at Picard's linearization where a
+reaction enhances itself (on 5100 random multistable cases none ended in
+another equilibrium, against 7 for Picard); `fields_spec.md` and the how-to
+describe the solver, `benchmarks/fields.py` times Hill n = 2 and 4 and
+reactions against `"picard"`. The architecture plan of the 30 September review
+is done except the optional parts: CR-A2 PR4 (chord step, SuperLU ordering) and
+CR-A1 PR2 (fingerprints of class-based operators) when needed, CR-A3 PR4
+(frozen `model.spec`).
 
 ## Reference point: Morpheus
 
