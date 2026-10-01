@@ -23,9 +23,24 @@ from typing import Any
 
 import numpy as np
 
-__all__ = ["LatticeState"]
+__all__ = ["ContractWarning", "LatticeState"]
 
 _KINDS = (None, "birth_death", "phenotype_switch", "reorientation", "field")
+_WIDTH = {"field": 0, "reorientation": 1, "phenotype_switch": 2, "birth_death": 3, None: 4}
+# the axes of the counts (species, channel) whose cells a kind keeps at every node
+_KEPT = {"field": 2, "reorientation": 1, "phenotype_switch": 0}
+
+
+class ContractWarning(UserWarning):
+    """A rule did what its declared kind does not allow, e.g. a reorientation that sets traits.
+
+    The step is applied as the wider kind would apply it, but the model still
+    reports the declared kind, e.g. that the rule conserves the cells. Shown
+    once per rule and model. Tests should turn it into an error, with
+    :func:`lgca.testing.strict_contracts` or
+    ``warnings.simplefilter("error", ContractWarning)``;
+    :func:`lgca.testing.check_interaction` does.
+    """
 
 
 class LatticeState:
@@ -48,13 +63,31 @@ class LatticeState:
         ``capacity`` without it; :attr:`has_capacity` tells whether the model
         sets one.
     kind : {None, "birth_death", "phenotype_switch", "reorientation", "field"}
-        Kind of the interaction that uses the state. :meth:`commit` checks its
-        conservation law: a reorientation keeps the number of cells of each
-        species at every node, a phenotype switch the number of cells at every
-        node, and a field every cell in its channel.
+        Kind of the interaction that uses the state, whose contract the
+        operations and :meth:`commit` check (see Notes). ``None``, for a
+        state used outside a step, has no contract.
 
     Notes
     -----
+    The kinds, from narrow to wide, and what a rule of each kind may do:
+
+    - ``"field"`` changes fields (:meth:`set_field`), but no cells;
+    - ``"reorientation"`` also moves cells between the channels of their
+      node (:meth:`shuffle_cells`, ``cells.move``), keeping the cells of
+      each species at every node and, in identity-based models, their traits;
+    - ``"phenotype_switch"`` also changes species (:meth:`switch_phenotype`)
+      or traits (``cells.set_trait``, ``cells.found_families``), keeping the
+      cells at every node;
+    - ``"birth_death"`` may do everything, e.g. remove, divide and add cells.
+
+    An operation that the kind does not allow, or a commit that breaks the
+    kind's conservation law (after ``counts`` was assigned), warns with
+    :class:`ContractWarning`, once per rule and model, and the step
+    goes on as with the wider kind. The model still reports the declared
+    kind, e.g. that the rule conserves cells, so declare the kind the rule
+    needs. Tests turn the warning into an error
+    (:func:`lgca.testing.strict_contracts`).
+
     Randomness comes from :attr:`rng`, the model's generator, so seeded runs
     are reproducible. Probabilities and cell numbers passed to operations
     broadcast against the lattice: a scalar, an array of shape ``dims``, one
@@ -114,14 +147,13 @@ class LatticeState:
         if isinstance(capacity, bool) or int(capacity) != capacity or capacity < 1:
             raise ValueError(f"capacity must be a positive integer, got {capacity!r}")
         self._capacity = int(capacity)
-        self._initial = (self.density if kind == "phenotype_switch"
-                         else self.species_density if kind == "reorientation" else None)
-        self._initial_cells = (None if self._cells is None or kind not in ("reorientation", "phenotype_switch")
-                               else (self._cells.index.copy(), self._cells.label.copy()))
-        self._initial_counts = self._counts.copy() if kind == "field" else None
-        cells = self._cells  # a field keeps every cell in its channel: the whole table is compared
-        self._initial_table = (None if cells is None or kind != "field"
-                               else (cells.label.copy(), cells.index.copy(), cells.channel.copy()))
+        self._law = kind  # the contract the state keeps: the kind, or a wider one after a ContractWarning
+        self._owner = None  # the operator whose rule changes the state: warnings name it, once per operator
+        self._read_only = False  # states given to reorientation terms, reactions and stack builders
+        # what commit() compares with: counts may be assigned in classical models (identity-based cells
+        # change only through operations, which check the kind before they change anything)
+        self._initial = (None if self._identity or kind not in _KEPT
+                         else _conserved(self._counts, kind, len(self._dims)).copy())
 
     def __repr__(self) -> str:
         exclusion = "with" if self._ve else "without"
@@ -146,6 +178,7 @@ class LatticeState:
 
     @counts.setter
     def counts(self, value) -> None:
+        self._allow("assign counts", "field")  # the kind's law is checked by commit()
         if self._identity:
             raise TypeError("state.counts of an identity-based model can be read but not assigned: an "
                             "array of cell numbers does not say which cell went where. Change the "
@@ -280,6 +313,7 @@ class LatticeState:
             def degradation(state, rate=0.1):
                 state.set_field("ecm", state.field("ecm") * (1 - rate * state.density / state.capacity))
         """
+        self._allow("set fields", "field")
         current = self.field(name)
         values = np.asarray(values, dtype=float)
         if values.shape != current.shape:
@@ -390,6 +424,7 @@ class LatticeState:
 
         Returns the number of removed cells per node and species.
         """
+        self._allow("remove cells", "birth_death")
         if self._identity:
             cells = self._cells
             dying = self.rng.random(len(cells)) < self._per_cell(self._probability(p, "p"))
@@ -418,6 +453,7 @@ class LatticeState:
 
         Returns the number of added cells per node and species.
         """
+        self._allow("divide cells", "birth_death")
         if self._identity:
             cells = self._cells
             dividing = self.rng.random(len(cells)) < self._per_cell(self._probability(p, "p"))
@@ -450,6 +486,7 @@ class LatticeState:
         """
         self._require_classical("add_cells", "new cells need traits; let cells divide instead "
                                 "(divide_cells or state.cells.divide)")
+        self._allow("add cells", "birth_death")
         wanted = self._number(n, "n")
         allowed = self._channel_sets(channels)
         if not self._ve:
@@ -489,6 +526,7 @@ class LatticeState:
         """
         self._require_classical("switch_phenotype", "they have one species; change the traits of "
                                 "cells with state.cells.set_trait")
+        self._allow("switch species", "phenotype_switch")
         transition = self._transition_matrix(rates)
         same = isinstance(channels, str) and channels == "same"
         allowed = None if same else self._channel_sets(channels)
@@ -508,6 +546,7 @@ class LatticeState:
         In identity-based models the cells keep their labels: the labelled
         cells in the set are placed on the new positions in random order.
         """
+        self._allow("move cells", "reorientation")
         allowed = self._channel_sets(channels)
         selected = np.zeros(self.n_species, dtype=bool)
         selected[slice(None) if species is None else _species_indices(species, self.n_species)] = True
@@ -527,34 +566,17 @@ class LatticeState:
         self._counts = cleared
 
     def commit(self) -> None:
-        """Check the state and write it into the model's interior nodes.
+        """Write the state into the model's interior nodes.
 
-        Raises ``ValueError`` if the state breaks the conservation law of its
-        kind. Ghost nodes are left to the model's boundary conditions.
+        If assigned ``counts`` break the conservation law of the kind, this
+        warns with :class:`ContractWarning` (see the class notes). Ghost
+        nodes are left to the model's boundary conditions.
         """
         if getattr(self, "_sensing_only", False):
             raise TypeError("a state from sensing() shows some species only and cannot be committed")
-        if self._kind == "reorientation":
-            changed = np.any(self.species_density != self._initial, axis=-1)
-            what = "the number of cells of each species"
-        elif self._kind == "phenotype_switch":
-            changed = self.density != self._initial
-            what = "the number of cells"
-        elif self._kind == "field":
-            changed = np.any(self._counts != self._initial_counts, axis=(-2, -1))
-            what = "its cells (it changes fields only)"
-        else:
-            changed = None
-        if changed is not None and np.any(changed):
-            first = tuple(int(index) for index in np.argwhere(changed)[0])
-            raise ValueError(f"a {self._kind} must keep {what} at every node; it changed at "
-                             f"{int(changed.sum())} nodes, first at {first}")
-        if self._initial_cells is not None and not _same_cells(self._initial_cells, self._cells):
-            raise ValueError(f"a {self._kind} must keep the cells of every node; cells were removed "
-                             "or added")
-        if self._initial_table is not None and not _same_table(self._initial_table, self._cells):
-            raise ValueError("a field must keep its cells (it changes fields only): every cell stays in its "
-                             "channel, and none is added or removed")
+        self._allow("be committed", "field")
+        if self._initial is not None:
+            self._check_law()
         lgca = self._lgca
         if self._ghost_cells is not None:
             cells, (ghost_labels, ghost_slots) = self._cells, self._ghost_cells
@@ -577,6 +599,50 @@ class LatticeState:
                 setattr(lgca, name, np.pad(values, width, mode="edge"))
 
     # --------------------------------------------------------------- helpers
+
+    def _allow(self, operation, kind):
+        """Check, before anything changes, that the rule's kind allows ``operation``.
+
+        ``kind`` is the narrowest kind that allows it. A rule of a narrower kind gets a
+        ContractWarning, and the state then keeps the law of ``kind``, as if the rule were declared so.
+        """
+        if self._read_only:
+            raise TypeError(f"this state is for reading only and cannot {operation}: reorientation terms, "
+                            "reactions and stack builders read the model; interactions change it")
+        if _WIDTH[kind] > _WIDTH[self._law]:
+            self._breach(operation, kind)
+
+    def _breach(self, operation, kind):
+        """Warn that the rule did what its kind does not allow (once per operator); keep the law of ``kind``."""
+        from ._warnings import warn_user
+
+        owner = self._owner
+        shown = None if owner is None else owner.__dict__.setdefault("_contract_breaches", set())
+        if shown is None or operation not in shown:
+            # constant text: Python shows a warning once per text and line, so it is not repeated every step
+            rule = f"{owner.name}: a {self._kind} rule" if owner is not None else f"a {self._kind} rule"
+            warn_user(f"{rule} may not {operation}. The step goes on as with kind={kind!r}, but the model "
+                      f"still reports kind {self._kind!r}, e.g. in its metadata; declare the rule with "
+                      f"kind={kind!r}", ContractWarning)
+            if shown is not None:
+                shown.add(operation)
+        self._law = kind
+
+    def _check_law(self):
+        """Compare the classical cells with the start; a breach of the law warns and widens it."""
+        if self._law not in _KEPT:
+            return
+        dims = len(self._dims)
+        for law in _KEPT:
+            if _WIDTH[law] < _WIDTH[self._law]:
+                continue
+            if np.array_equal(_conserved(self._initial, law, dims), _conserved(self._counts, law, dims)):
+                break
+        else:
+            law = "birth_death"
+        if law != self._law:
+            self._breach({"reorientation": "move cells", "phenotype_switch": "switch species",
+                          "birth_death": "change the number of cells at a node"}[law], law)
 
     def _cells_from_table(self, lgca, labels, slots):
         """Cells from the model's table (labels, padded slots); returns the counts per channel."""
@@ -622,7 +688,7 @@ class LatticeState:
         order = np.argsort(cells.index[moving] + self.rng.random(len(moving)))  # by node, random within
         channel = cells.channel.copy()
         channel[moving[order]] = slots % K
-        cells.channel = channel
+        cells._set(channel=channel)
 
     def _pad(self, values):
         """Embed interior values in the padded lattice according to the boundary."""
@@ -977,26 +1043,13 @@ def _nodes_from_cells(cells, counts, dtype):
     return flat.reshape(counts.shape)
 
 
-def _cells_per_node(cells):
-    """Node indices and labels, sorted, to compare which cells sit at which node."""
-    order = np.lexsort((cells.label, cells.index))
-    return cells.index[order], cells.label[order]
+def _conserved(values, law, ndim):
+    """What ``law`` keeps at every node, from counts or the coarser values kept by a narrower law.
 
-
-def _same_cells(initial, cells):
-    """Whether every node holds the cells it held initially (``initial``: node indices and labels)."""
-    index, label = initial
-    if np.array_equal(index, cells.index) and np.array_equal(label, cells.label):
-        return True  # the usual case: only channels changed
-    if len(index) != len(cells.index):
-        return False
-    order = np.lexsort((label, index))
-    return all(np.array_equal(a, b) for a, b in zip((index[order], label[order]), _cells_per_node(cells)))
-
-
-def _same_table(initial, cells):
-    """Whether every cell keeps its label, node and channel (``initial``: labels, node indices, channels)."""
-    return all(np.array_equal(a, b) for a, b in zip(initial, (cells.label, cells.index, cells.channel)))
+    ``values`` has ``ndim`` lattice axes, followed by species and channel axes as far as kept.
+    """
+    extra = values.ndim - ndim - _KEPT[law]
+    return values.sum(axis=tuple(range(-extra, 0))) if extra else values
 
 
 def place_labels(labels, counts, channels, rng):

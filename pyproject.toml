@@ -96,3 +96,5 @@ packages = ["lgca", "lgca.examples", "lgca.schemas", "lgca.zoo"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]  # not the ignored outputs/ (probe scripts, pytest temp folders)
+# a rule that breaks its kind's contract fails the test instead of warning once
+filterwarnings = ["error::lgca.ContractWarning"]

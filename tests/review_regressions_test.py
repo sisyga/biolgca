@@ -6,7 +6,7 @@ import jsonschema
 import numpy as np
 import pytest
 
-from lgca import get_lgca, stack
+from lgca import ContractWarning, get_lgca, stack
 from lgca.explorer import explore
 from lgca.fields import PDESpec
 from lgca.lattice_state import LatticeState
@@ -38,6 +38,7 @@ from lgca.simulation import (
     Schedule,
 )
 from lgca.study import sweep
+from lgca.testing import strict_contracts
 from lgca.zoo._clones import family_trait
 
 
@@ -912,11 +913,9 @@ def test_field_states_keep_every_cell_in_its_channel(volume_exclusion):
     ))
     before = model.lgca.nodes.copy()
     state = LatticeState(model.lgca, kind="field")
-    counts = state.counts.copy()
-    _change_identities_but_not_counts(state)
-    np.testing.assert_array_equal(state.counts, counts)  # the cells per channel are the same
-    with pytest.raises(ValueError, match="a field must keep its cells"):
-        state.commit()
+    # the operations check the kind: the cells per channel stay the same, which commit() could not tell
+    with strict_contracts(), pytest.raises(ContractWarning, match="a field rule may not"):
+        _change_identities_but_not_counts(state)
     assert model.lgca.nodes.tolist() == before.tolist()
 
 

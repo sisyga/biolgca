@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from lgca import interaction
+from lgca import ContractWarning, interaction
 from lgca.lattice_state import LatticeState
 from lgca.model import (
     Description,
@@ -18,7 +18,7 @@ from lgca.model import (
 )
 from lgca.pipeline import InteractionPipelineSpec
 from lgca.plugins import default_registry, describe_plugin
-from lgca.testing import InteractionCheckError, check_interaction
+from lgca.testing import InteractionCheckError, check_interaction, strict_contracts
 
 
 @pytest.fixture(autouse=True)
@@ -171,13 +171,22 @@ def test_a_phenotype_switch_rule_needs_several_species():
     check_interaction(swap_species, n_species=(2,))
 
 
-def test_a_rule_that_breaks_its_kind_fails_when_it_runs():
-    @interaction(kind="reorientation", families="classical", name="leaky_turn")
-    def leaky_turn(state):
+def test_a_rule_that_breaks_its_kind_warns_once_and_runs_as_the_wider_kind():
+    def leak(state):
         state.remove_cells(0.5)
 
-    with pytest.raises(ValueError, match="a reorientation must keep"):
+    leaky_turn = interaction(kind="reorientation", families="classical", name="leaky_turn")(leak)
+    leaky_death = interaction(kind="birth_death", families="classical", name="leaky_death")(leak)
+
+    with strict_contracts(), pytest.raises(ContractWarning, match="leaky_turn: a reorientation rule may not "
+                                                                  "remove cells.*kind='birth_death'"):
         run_model(_spec([leaky_turn()]), showprogress=False)
+    with pytest.warns(ContractWarning) as caught:
+        result = run_model(_spec([leaky_turn()], steps=20), showprogress=False)
+
+    assert len(caught) == 1  # once per operator, not in every step
+    wide = run_model(_spec([leaky_death()], steps=20), showprogress=False)
+    np.testing.assert_array_equal(result.lgca.nodes, wide.lgca.nodes)
 
 
 def test_hpp_collisions_turn_head_on_pairs_and_keep_momentum():
@@ -258,7 +267,7 @@ def test_check_interaction_reports_what_is_wrong():
 
     message = str(error.value)
     assert "square, classical, 1 species, periodic" in message
-    assert "a reorientation must keep" in message
+    assert "ContractWarning: sloppy: a reorientation rule may not remove cells" in message
 
 
 def test_check_interaction_detects_unseeded_randomness():
@@ -342,7 +351,7 @@ def test_a_field_rule_must_not_change_cells():
         state.remove_cells(1.0)
 
     model = _field_model([{"name": "sneaky"}], "classical")
-    with pytest.raises(ValueError, match="changes fields only"):
+    with strict_contracts(), pytest.raises(ContractWarning, match="sneaky: a field rule may not remove cells"):
         model.step()
 
 

@@ -1157,10 +1157,25 @@ class CompiledModel:
     pipeline: Any
     metadata: dict[str, Any]
     _step: int = 0
+    _failed: str | None = field(default=None, repr=False)
 
     def step(self, **timing):
-        """Advance the compiled dynamics once, retaining RNG and model time."""
-        self.pipeline.execute_step(self.context, self._step + 1, **timing)
+        """Advance the compiled dynamics once, retaining RNG and model time.
+
+        A step that raises (also when interrupted) may have been applied in
+        part: the operators before the failing one ran, and the random
+        numbers they drew are gone. The model then refuses further steps;
+        rebuild it, e.g. with ``build_model(model.spec)``.
+        """
+        if self._failed is not None:
+            raise RuntimeError(f"step {self._step + 1} of this model failed ({self._failed}) and may have "
+                               "been applied in part; rebuild the model to go on, e.g. with "
+                               "build_model(model.spec) (Reset in lgca.explore)")
+        try:
+            self.pipeline.execute_step(self.context, self._step + 1, **timing)
+        except BaseException as exc:
+            self._failed = f"{type(exc).__name__}: {exc}"
+            raise
         self._step += 1
 
     def run(self, showprogress: bool = True, *, max_recording_bytes=DEFAULT_RECORDING_LIMIT_BYTES):

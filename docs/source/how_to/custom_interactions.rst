@@ -130,9 +130,20 @@ not all five at once. ``channels`` is ``"all"``, ``"rest"``, ``"velocity"``,
 channel indices, or one of these per species, e.g. ``{0: "velocity", 1:
 "rest"}``.
 
-After the rule, the state is checked against the rule's kind: a
-reorientation must keep the number of cells of each species at every node, a
-phenotype switch the number of cells.
+The kind says what a rule may do. A ``reorientation`` moves cells between the
+channels of their node (``shuffle_cells``, or ``state.counts = new`` with the
+same cells of each species at every node); a ``phenotype_switch`` may also
+change their species (``switch_phenotype``), keeping the cells at every node;
+a ``birth_death`` rule may do everything. A rule of kind ``field`` changes
+fields only (``state.set_field``). A rule that does what its kind does not
+allow, e.g. a reorientation that removes cells, gets a
+:class:`~lgca.lattice_state.ContractWarning`, once per model, and the step goes on as with
+the wider kind; but the model still reports the declared kind, e.g. in its
+metadata, which says that a reorientation keeps the cells. Declare the kind
+the rule needs. In tests the warning is an error:
+:func:`~lgca.testing.check_interaction` and
+:func:`~lgca.testing.strict_contracts` stop the rule before the operation
+changes anything.
 
 A phenotype switch
 ------------------
@@ -189,7 +200,8 @@ terms of the ``ReorientationSpec``.
 
 Calling the term with ``beta=`` (and its parameters) gives a
 :class:`~lgca.pipeline.ReorientationTermSpec`; ``species=`` restricts it to
-one species. The built-in terms, from chemotaxis to nematic alignment, are
+one species. A term only reads the state: the reorientation moves the cells,
+so the operations of the state raise ``TypeError`` in a term. The built-in terms, from chemotaxis to nematic alignment, are
 written the same way in :mod:`lgca.builtin_rules`. Like the sampler, terms
 work for classical models with volume exclusion.
 
@@ -267,7 +279,17 @@ successful ones are chosen at random. The operations on cell numbers work as
 well: ``remove_cells``, ``divide_cells`` and ``shuffle_cells`` pick random
 cells and keep their labels. ``add_cells`` and ``switch_phenotype`` do not
 exist for identity-based models, and ``state.counts`` can be read but not
-assigned, because a number of cells does not say which cell went where.
+assigned, because a number of cells does not say which cell went where. For
+the same reason ``cells.label``, ``cells.index`` and ``cells.channel`` are
+read-only: a cell changes its channel through the operations, which keep
+every label unique and every cell in a channel.
+
+The kinds of identity-based rules: ``move`` and ``shuffle_cells`` are
+reorientations, which keep each cell at its node and its traits;
+``set_trait`` and ``found_families`` need a ``phenotype_switch``, which keeps
+the cells at every node; ``kill`` and ``divide`` need ``birth_death``. A rule
+that moves cells and also sets traits, e.g. a memory of the last heading, is
+a phenotype switch.
 
 Built-in rules take the name of a trait wherever a parameter may differ
 between cells: ``go_or_rest(kappa="kappa", theta=0.6)`` gives every cell its
@@ -291,8 +313,9 @@ Testing a rule
 :func:`~lgca.testing.check_interaction` runs the rule for a few steps on
 small seeded models of every declared geometry and family, with one and two
 species and with periodic and reflecting boundaries. It checks that states
-stay valid, that the conservation laws hold, that changes to ghost nodes do
-not leak into the lattice and that the same seed gives the same result.
+stay valid, that the rule uses only what its kind allows and keeps the
+conservation laws, that changes to ghost nodes do not leak into the lattice
+and that the same seed gives the same result.
 ``expected_growth`` compares the measured change of the number of cells per
 step with the expected one, and ``traits`` gives the cells of
 identity-based models their initial traits. It raises with a readable report, so one line

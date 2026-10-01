@@ -1,13 +1,13 @@
 # Architecture proposals after the 30 September 2026 review
 
-Status: proposal, 2026-09-30; decisions and CR-A3 PR1 on 2026-10-01 (see
-[Decisions](#decisions-for-the-maintainer)). Follow-up to [the code review](code_review_2026-09-30.md),
+Status: proposal, 2026-09-30; decisions, CR-A3 PR1 and CR-A1 PR0 on
+2026-10-01 (see [Decisions](#decisions-for-the-maintainer)). Follow-up to [the code review](code_review_2026-09-30.md),
 whose three open architectural findings are renamed here CR-A1 to CR-A3, so that
 they no longer collide with the IDs A1 to A5 of the [usability roadmap](usability_roadmap.md).
 
 | ID | Finding | Review | Follow-up assessment | Recommended first PR |
 | --- | --- | --- | --- | --- |
-| CR-A1 | State transactions and rule contracts | P1 | P1 for silent contract violations of custom rules, stacks and class-based operators; P2 for leaks on the exception path (P1 in the Explorer, which continues after a failed step) | Contract checks where each operation is called (about 1 day) |
+| CR-A1 | State transactions and rule contracts | P1 | P1 for silent contract violations of custom rules, stacks and class-based operators; P2 for leaks on the exception path (P1 in the Explorer, which continues after a failed step) | Contract checks where each operation is called (about 1 day). **Done 2026-10-01** |
 | CR-A2 | Nonlinear field solver | P2 | P2; on the pre-review code P1 (Picard published fields wrong by up to about 280x) | Newton's method for saturating uptake (2 to 2.5 days) |
 | CR-A3 | Configuration ownership and provenance | P1 | P1, but through a case the review missed: operator objects shared by every model built from a spec. The review's own reproduction is P2 | Owned copy of the spec, operator objects as templates (about 1 day). **Done 2026-10-01** |
 
@@ -189,6 +189,19 @@ one copy of `nodes`.
 
 A patch of about 115 lines was prototyped and passed 1,588 targeted tests; the
 seeded end states of seven pipelines were bit-identical.
+
+Done on 2026-10-01, with the enforcement of decision 3: `LatticeState._allow`
+(called by `Cells` too) warns with `ContractWarning` (exported as
+`lgca.ContractWarning`) once per operator and widens the law the state keeps;
+classical commits compare assigned counts with the law and warn the same way;
+`lgca.testing.strict_contracts()`, `check_interaction` and the test suite
+(`filterwarnings` in `pyproject.toml`) make it an error. The identity-based
+commit-time recounts are gone (narrow kinds 1.1 to 1.7x faster, now as fast as
+`birth_death`). Tests in `tests/contracts_test.py`: every operation x narrower
+kind x family is stopped before any change under strict contracts, and warns
+once and ends bit-identical to the rule declared `birth_death` otherwise.
+Reactions get their read-only state with CR-A2 PR1, which rewrites the code
+around them.
 
 **PR1 [Feat] A step is all or nothing (about 3 days).** A private
 `lgca/transaction.py`:
@@ -578,8 +591,7 @@ Effort: 3.5 to 4 days for PR1 to PR3.
 ## Order of work
 
 1. ~~**CR-A3 PR1**~~: done on 2026-10-01.
-2. **CR-A1 PR0** (1 to 1.5 days): closes the silent contract violations, with
-   the enforcement of decision 3.
+2. ~~**CR-A1 PR0**~~: done on 2026-10-01.
 3. **CR-A1 PR1 and PR3**: step rollback, then failed-run semantics and a sweep
    error policy.
 4. **CR-A3 PR2 and PR3**: `reconfigure`, then reading inputs once and

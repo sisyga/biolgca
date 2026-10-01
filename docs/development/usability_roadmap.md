@@ -80,6 +80,16 @@ points (git-ignored): `outputs/code-review-2026-09-30/followup-probes/round3/`,
 e.g. `newton/newton_patch.py` (validated Newton and chord prototype) and
 `contracts/entry_checks.diff` (the entry checks, adapted to the current tree).
 
+CR-A1 PR0 done (2026-10-01): rules keep the contract of their kind. Operations
+check the kind before they change anything; a violation warns once per rule and
+model with `lgca.ContractWarning` and runs as the wider kind, and is an error
+under `lgca.testing.strict_contracts()`, in `check_interaction` and in the test
+suite. The cell arrays are read-only, terms and stack builders get read-only
+states, a stack narrower than its operators warns at build, the Boltzmann paths
+write the lattice once, and a model whose step failed refuses further steps
+until it is rebuilt (until PR1 rolls failed steps back). Next: CR-A1 PR1
+(rollback), CR-A2 PR1 (Newton, in progress on a branch).
+
 ## Reference point: Morpheus
 
 Morpheus (https://gitlab.com/morpheus.lab/morpheus) is a multiscale modelling

@@ -5,8 +5,9 @@ import warnings
 import numpy as np
 import pytest
 
-from lgca import get_lgca
+from lgca import ContractWarning, get_lgca
 from lgca.lattice_state import LatticeState
+from lgca.testing import strict_contracts
 
 DIMS = {"lin": 12, "square": (6, 4), "hex": (6, 4), "cubic": (4, 3, 3), "moore": (3, 3, 3)}
 
@@ -94,16 +95,38 @@ def test_reorientations_and_switches_keep_what_their_kind_conserves(geometry, ve
         state.commit()
 
 
-@pytest.mark.parametrize("kind, operation", [
-    ("reorientation", lambda state: state.remove_cells(1.0)),
-    ("phenotype_switch", lambda state: state.add_cells(1)),
+@pytest.mark.parametrize("kind, operation, wider, what", [
+    ("reorientation", lambda state: state.remove_cells(1.0), "birth_death", "remove cells"),
+    ("phenotype_switch", lambda state: state.add_cells(1), "birth_death", "add cells"),
+    ("field", lambda state: state.shuffle_cells(), "reorientation", "move cells"),
+    # assigned counts are checked when the state is committed
+    ("reorientation", lambda state: setattr(state, "counts", np.roll(state.counts, 1, axis=0)), "birth_death",
+     "change the number of cells at a node"),
+    ("field", lambda state: setattr(state, "counts", state.counts[..., ::-1]), "reorientation", "move cells"),
 ])
-def test_commit_rejects_a_state_that_breaks_its_conservation_law(kind, operation):
-    state = LatticeState(_model(density=2), kind=kind)
-    operation(state)
-
-    with pytest.raises(ValueError, match=f"a {kind} must keep"):
+def test_a_state_that_breaks_its_kind_warns_and_commits_as_the_wider_kind(kind, operation, wider, what):
+    def apply(state):
+        operation(state)
         state.commit()
+
+    lgca, wide = _model(density=2), _model(density=2)
+    with pytest.warns(ContractWarning, match=f"a {kind} rule may not {what}.*kind='{wider}'"):
+        apply(LatticeState(lgca, kind=kind))
+    apply(LatticeState(wide, kind=wider))  # the same seed: the same draws
+
+    np.testing.assert_array_equal(lgca.nodes, wide.nodes)
+
+
+def test_strict_contracts_stop_an_operation_before_it_changes_the_state():
+    lgca = _model(density=2)
+    state = LatticeState(lgca, kind="reorientation")
+    counts, random = state.counts.copy(), lgca.rng.bit_generator.state
+
+    with strict_contracts(), pytest.raises(ContractWarning, match="may not remove cells"):
+        state.remove_cells(1.0)
+
+    np.testing.assert_array_equal(state.counts, counts)
+    assert lgca.rng.bit_generator.state == random
 
 
 @pytest.mark.parametrize("geometry", ["lin", "square", "hex", "cubic"])

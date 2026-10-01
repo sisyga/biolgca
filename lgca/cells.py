@@ -141,14 +141,27 @@ def trait_array(lgca, name: str) -> TraitArray:
     return values
 
 
+def _position(name, doc):
+    """A read-only array of :class:`Cells`: only operations change where cells are."""
+
+    def refuse(cells, values):
+        raise AttributeError(f"cells.{name} is read-only; change the cells with their operations (kill, "
+                             "divide, move), which keep labels unique and every cell in a channel")
+
+    return property(lambda cells: getattr(cells, "_" + name), refuse, doc=doc)
+
+
 class Cells:
     """The living cells of an identity-based model, one entry per cell.
 
     Created by :attr:`lgca.lattice_state.LatticeState.cells`. The arrays
-    :attr:`label`, :attr:`channel` and :attr:`node` have one entry per cell;
-    ``cells["name"]`` gives the values of a trait. Operations change the
-    cells at once and keep the lattice state up to date; the model changes
-    when the state is committed.
+    :attr:`label`, :attr:`channel` and :attr:`node` have one entry per cell
+    and are read-only; ``cells["name"]`` gives the values of a trait.
+    Operations change the cells at once and keep the lattice state up to
+    date; the model changes when the state is committed. Which operations a
+    rule may use depends on its kind: e.g. a reorientation moves cells
+    within their node and changes no traits (see
+    :class:`~lgca.lattice_state.LatticeState`).
 
     Masks select cells: a boolean array with one entry per cell, or an array
     of cell positions. With volume exclusion, a cell can only enter a free
@@ -156,12 +169,14 @@ class Cells:
     are, the successful ones are chosen at random.
     """
 
+    label = _position("label", "The label of every cell (read-only).")
+    index = _position("index", "Flat index of every cell's node in the lattice of shape ``dims`` (read-only).")
+    channel = _position("channel", "The channel of every cell (read-only).")
+
     def __init__(self, state, label, index, channel):
         self._state = state
         self._lgca = state._lgca
-        self.label = np.asarray(label, dtype=np.int64)
-        self.index = np.asarray(index, dtype=np.int64)
-        self.channel = np.asarray(channel, dtype=np.int64)
+        self._set(label=label, index=index, channel=channel)
 
     # ------------------------------------------------------------------ views
 
@@ -203,15 +218,20 @@ class Cells:
     # ------------------------------------------------------------- operations
 
     def kill(self, which) -> int:
-        """Remove the selected cells. Returns their number."""
+        """Remove the selected cells (``birth_death`` rules). Returns their number."""
+        self._state._allow("remove cells", "birth_death")
         dead = self._mask(which)
         keep = ~dead
-        self.label, self.index, self.channel = self.label[keep], self.index[keep], self.channel[keep]
+        self._set(label=self.label[keep], index=self.index[keep], channel=self.channel[keep])
         self._state._cells_changed()
         return int(dead.sum())
 
     def set_trait(self, which, name: str, values) -> None:
-        """Set the trait ``name`` of the selected cells to ``values`` (one value or one per selected cell)."""
+        """Set the trait ``name`` of the selected cells to ``values`` (one value or one per selected cell).
+
+        For ``phenotype_switch`` and ``birth_death`` rules.
+        """
+        self._state._allow("set traits", "phenotype_switch")
         trait = trait_array(self._lgca, name)
         labels = self.label[self._mask(which)]
         trait[labels] = values
@@ -221,7 +241,9 @@ class Cells:
 
         For lineage analyses such as ``lgca.muller_plot``: e.g. daughters
         that acquired a mutation. Starts family tracking if the model has none.
+        For ``phenotype_switch`` and ``birth_death`` rules.
         """
+        self._state._allow("found families", "phenotype_switch")
         selected = self._mask(which)
         if not selected.any():
             return
@@ -237,12 +259,15 @@ class Cells:
         Without volume exclusion every cell moves to a uniformly chosen channel
         of the set. With it, cells move to channels that were free before the
         call; the rest stay where they are. Returns the mask of moved cells.
+        Not for ``field`` rules.
         """
+        self._state._allow("move cells", "reorientation")
         moving = self._mask(which)
         allowed = self._state._channel_mask(channels)
-        winners, channel = self._place(moving, allowed)
-        self.channel = self.channel.copy()
-        self.channel[winners] = channel
+        winners, new = self._place(moving, allowed)
+        channel = self.channel.copy()
+        channel[winners] = new
+        self._set(channel=channel)
         self._state._cells_changed()
         return winners
 
@@ -259,8 +284,9 @@ class Cells:
         whose daughters found one.
 
         Returns the positions of the daughters in the cell arrays, e.g. to
-        mutate their traits with :meth:`set_trait`.
+        mutate their traits with :meth:`set_trait`. For ``birth_death`` rules.
         """
+        self._state._allow("divide cells", "birth_death")
         dividing = self._mask(which)
         if isinstance(channels, str) and channels == "same":
             if self._state.volume_exclusion:
@@ -280,13 +306,20 @@ class Cells:
         _inherit(lgca, self.label[mothers], labels, founders)
         lgca.maxlabel = first + len(mothers) - 1
         start = len(self)
-        self.label = np.concatenate([self.label, labels])
-        self.index = np.concatenate([self.index, self.index[mothers]])
-        self.channel = np.concatenate([self.channel, channel])
+        self._set(label=np.concatenate([self.label, labels]),
+                  index=np.concatenate([self.index, self.index[mothers]]),
+                  channel=np.concatenate([self.channel, channel]))
         self._state._cells_changed()
         return np.arange(start, len(self))
 
     # --------------------------------------------------------------- helpers
+
+    def _set(self, **arrays):
+        """Store new position arrays (label, index, channel) as read-only views."""
+        for name, values in arrays.items():
+            values = np.asarray(values, dtype=np.int64).view()
+            values.flags.writeable = False
+            setattr(self, "_" + name, values)
 
     def _mask(self, which) -> np.ndarray:
         which = np.asarray(which)

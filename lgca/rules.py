@@ -29,7 +29,8 @@ from typing import Any
 
 import numpy as np
 
-from .lattice_state import LatticeState
+from ._warnings import warn_user
+from .lattice_state import _WIDTH, ContractWarning, LatticeState
 from .operator_base import InteractionOperator, PluginInfo
 from .plugins import _law_for_kind, register_plugin, validate_plugin_parameters
 
@@ -210,6 +211,7 @@ class FunctionInteractionOperator(InteractionOperator):
         lgca = context.lgca
         if self.info.mutates_families and "family" not in lgca.props:
             lgca.init_families(type="homogeneous", mutation=True)
+        self._contract_breaches = set()  # operations its kind does not allow, warned about once per model
 
     def validate(self, context) -> None:
         state = context.spec.state
@@ -238,6 +240,7 @@ class FunctionInteractionOperator(InteractionOperator):
 
     def apply(self, context, step: int) -> None:
         state = LatticeState(context.lgca, step=step, capacity=self._capacity, kind=self.operator_kind)
+        state._owner = self
         before = state.flux if "momentum" in self.rule.conserves else None
         self.rule.function(state, **self.parameters)
         if before is not None:
@@ -263,13 +266,17 @@ def stack(
     under one name with its own parameters: e.g. a published model that
     combines a phenotype switch, growth with mutations and movement. The
     function receives the model's :class:`~lgca.lattice_state.LatticeState`
-    once, when the model is built (to read e.g. ``state.capacity``), and
-    returns operator entries as in ``InteractionPipelineSpec(operators=[...])``.
+    once, when the model is built, to read e.g. ``state.capacity`` (its
+    operations raise ``TypeError``), and returns operator entries as in
+    ``InteractionPipelineSpec(operators=[...])``.
 
     Parameters
     ----------
     kind : {"birth_death", "phenotype_switch", "reorientation"}
-        The most general kind among the stacked rules.
+        The most general kind among the stacked rules. A stack narrower than
+        one of its operators warns with :class:`~lgca.lattice_state.ContractWarning` when
+        the model is built: each operator runs by its own kind, but the model
+        reports the stack's.
     families : str or sequence of str
         Model families the stack is written for (see :func:`interaction`).
     traits : str or sequence of str
@@ -353,7 +360,9 @@ class StackOperator(InteractionOperator):
         values = {**self.rule.defaults(), **self.parameters}
         if state.identity_based:  # parameters give the initial traits that the state does not set
             _attach_traits(lgca, {name: values[name] for name in self.rule.traits if name not in lgca.props})
-        entries = self.rule.operators(LatticeState(lgca, capacity=state.capacity), **self.parameters)
+        reading = LatticeState(lgca, capacity=state.capacity)
+        reading._read_only = True  # the builder reads the model, e.g. its capacity, and changes nothing
+        entries = self.rule.operators(reading, **self.parameters)
         self.operators = []
         memo = _template_memo(context)  # operator objects of the stack that refer to each other still do
         for index, entry in enumerate(entries):
@@ -363,6 +372,12 @@ class StackOperator(InteractionOperator):
                 operator.validate(context)
             except (KeyError, ValueError) as exc:
                 raise ValueError(f"{self.rule.name}: operators[{index}] {exc}") from exc
+            if _WIDTH.get(operator.operator_kind, -1) > _WIDTH.get(self.operator_kind, 4):
+                # each operator still runs by its own kind; only what the model reports is wrong
+                warn_user(f"{self.rule.name} is a stack of kind {self.operator_kind!r}, but operators[{index}] "
+                          f"({operator.name}) has kind {operator.operator_kind!r}: the model reports the "
+                          f"stack's kind, e.g. in its metadata; declare the stack with "
+                          f"kind={operator.operator_kind!r}", ContractWarning)
             self.operators.append(operator)
 
     def setup(self, context) -> None:
@@ -434,7 +449,8 @@ def reorientation_term(
     """Turn ``function(state, **parameters)`` into a term of the Boltzmann reorientation.
 
     The function returns a field on the lattice, computed from the state
-    before the reorientation; ``coupling`` says how the field scores a
+    before the reorientation, which it reads but cannot change (its
+    operations raise ``TypeError``); ``coupling`` says how the field scores a
     candidate channel state ``s'`` of a node:
 
     ``"flux"``

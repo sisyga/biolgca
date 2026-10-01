@@ -572,13 +572,19 @@ class _FieldTerm(_ReorientationTerm):
 
     def validate(self, context) -> None:
         super().validate(context)
-        self.prepare(context.lgca)
+        rng = context.lgca.rng  # a term that draws random numbers must not move the model's stream at build
+        state = rng.bit_generator.state
+        try:
+            self.prepare(context.lgca)
+        finally:
+            rng.bit_generator.state = state
 
     def prepare(self, lgca):
         from .lattice_state import LatticeState
         from .rules import CellWeights
 
         state = LatticeState(lgca, step=self.step)
+        state._read_only = True  # a term scores the channels; the reorientation moves the cells
         if self.sensed_species is not None:
             state = state.sensing(self.sensed_species)
         try:
@@ -798,11 +804,10 @@ class BoltzmannReorientationOperator(ReorientationOperator):
                     if still is not None:  # species that stay have no cells to move: no draws for them
                         nodes = source.copy()
                         nodes[..., still, :] = False
-                    self._sample_batches(lgca, weights, nodes=nodes, mask=mask)
-                    if still is not None:
-                        interior = lgca.nodes[lgca.nonborder]
-                        interior[..., still, :] = source[..., still, :]
-                        lgca.nodes[lgca.nonborder] = interior
+                    sampled = self._sample_batches(lgca, weights, nodes=nodes, mask=mask, write=still is None)
+                    if still is not None:  # one write: an interrupt cannot leave out the species that stay
+                        sampled[..., still, :] = source[..., still, :]
+                        lgca.nodes[lgca.nonborder] = sampled
             finally:
                 del lgca._reorientation_source_nodes
         else:
@@ -876,8 +881,8 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         """Every cell picks channel ``i`` with ``P(i) ∝ exp(w_i)``: a multinomial per node and species."""
         return lgca.rng.multinomial(np.asarray(number, dtype=np.int64), _softmax_last_axis(weights))
 
-    def _sample_batches(self, lgca, weights, nodes=None, mask=None):
-        """Sample new channel states with volume exclusion and write them to the interior.
+    def _sample_batches(self, lgca, weights, nodes=None, mask=None, write=True):
+        """Sample new channel states with volume exclusion and write them to the interior (unless not ``write``).
 
         With a channel ``mask``, only the cells in these channels move, among them.
         """
@@ -886,11 +891,12 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         if mask is not None:
             sampled = nodes.copy()
             sampled[..., mask] = self._sample_states(lgca, weights[..., mask], nodes[..., mask], subset=True)
-            lgca.nodes[lgca.nonborder] = sampled
+            if write:
+                lgca.nodes[lgca.nonborder] = sampled
             return sampled
-        return self._sample_states(lgca, weights, nodes)
+        return self._sample_states(lgca, weights, nodes, write=write)
 
-    def _sample_states(self, lgca, weights, nodes, subset=False):
+    def _sample_states(self, lgca, weights, nodes, subset=False, write=True):
         """New channel states of ``nodes`` (all their channels, or a subset of the model's)."""
         counts = nodes.sum(axis=-1)
         sampled = np.zeros_like(nodes)
@@ -912,7 +918,7 @@ class BoltzmannReorientationOperator(ReorientationOperator):
                 cumulative /= cumulative[:, -1:]
                 choices = (cumulative <= draws[indices][:, None]).sum(axis=-1)
                 sampled[indices] = candidates[choices]
-        if not subset:
+        if write and not subset:
             lgca.nodes[lgca.nonborder] = sampled
         return sampled
 
@@ -921,7 +927,8 @@ class BoltzmannReorientationOperator(ReorientationOperator):
         from .lattice_state import place_labels
 
         labels = lgca.nodes[lgca.nonborder]
-        occupied = self._sample_batches(lgca, weights, nodes=labels > 0, mask=mask)
+        # sampled without writing: the labels are placed in one write, so an interrupt cannot erase them
+        occupied = self._sample_batches(lgca, weights, nodes=labels > 0, mask=mask, write=False)
         channels = np.ones(lgca.K, dtype=bool) if mask is None else mask
         lgca.nodes[lgca.nonborder] = place_labels(labels, occupied, channels, lgca.rng)
 
@@ -973,7 +980,7 @@ class BoltzmannReorientationOperator(ReorientationOperator):
             new = np.minimum((cumulative <= draws[:, None]).sum(axis=-1), len(channels) - 1)
         channel = cells.channel.copy()
         channel[moving] = channels[new]
-        cells.channel = channel
+        cells._set(channel=channel)
         state._cells_changed()
         state.commit()
 

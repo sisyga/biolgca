@@ -30,7 +30,7 @@ import logging
 from ._warnings import warn_user
 from typing import Tuple, Any
 
-from .lattice_state import LatticeState
+from .lattice_state import ContractWarning, LatticeState
 from .rules import interaction, reorientation_term, stack
 from .mutations import mutation_effect
 from .switching import switch_cue

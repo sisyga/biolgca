@@ -409,6 +409,37 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- Rules keep the contract of their kind. An operation that a rule's kind
+  does not allow (e.g. `cells.set_trait` in a reorientation, `kill` or
+  `divide` in a phenotype switch, `move` or `shuffle_cells` in a `field`
+  rule), or assigned `state.counts` that break the kind's conservation law,
+  warns with the new `lgca.ContractWarning`, once per rule and model, and the
+  step goes on as the wider kind would apply it. The model still reports the
+  declared kind (e.g. in its metadata, that the rule keeps the cells), so
+  declare the kind the rule needs. Before, broken conservation laws raised `ValueError` when
+  the state was committed, after traits, labels and families had been
+  written, and trait writes were not checked at all: a reorientation could
+  set traits, or divide and kill the daughter, which left orphan labels,
+  trait rows and families. `lgca.testing.strict_contracts()` and
+  `check_interaction` turn the warning into an error, raised before the
+  operation changes anything; the test suite does so for every test. A
+  reorientation may not set traits: a rule that moves cells and sets traits
+  (e.g. a memory of the heading) is a phenotype switch. A stack narrower than
+  one of its operators warns when the model is built. Rules of kind
+  `reorientation` and `phenotype_switch` in identity-based models became 1.1
+  to 1.7 times faster: the operations check the kind, instead of a recount of
+  the cells at every commit.
+- `cells.label`, `cells.index` and `cells.channel` are read-only; cells change
+  through their operations. Writing them directly could lose cells, move them
+  to other nodes or duplicate labels, and no check noticed.
+- Reorientation terms and stack builders get a state that they can read but
+  not change: its operations raise `TypeError`.
+- A model whose step raised, or was interrupted, refuses further steps
+  (`RuntimeError`) until it is rebuilt, e.g. with `build_model(model.spec)`
+  or Reset in `lgca.explore`. The failed step may have been applied in part:
+  `step()` again applied the earlier operators a second time, and the
+  Explorer's Step and Play went on from that state.
+
 - Every model owns its configuration. `build_model` (and so `run_model`,
   `sweep`, `lgca.explore` and the command line) builds from its own copy of
   the spec and keeps it as `model.spec` / `result.spec`: changes the caller
@@ -665,6 +696,13 @@ This file records notable user-facing changes. Changes remain under
 
 ### Fixed
 
+- Interrupting (Ctrl-C) the Boltzmann reorientation of an identity-based
+  model with volume exclusion could replace every label by 1: the sampler
+  wrote the occupied channels and then the labels. It now writes the lattice
+  once, also in multispecies models whose reorientation moves some species
+  only.
+- A reorientation term that draws random numbers moved the model's random
+  stream when the model was built.
 - Model files keep the `sensed_species` of reorientation terms, all parameters
   of single-cue operators made with `create_plugin` (beta, `sensed_species`,
   trait and the cue's own parameters), NumPy numbers in the spec (e.g. a seed

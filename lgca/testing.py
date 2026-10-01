@@ -11,6 +11,7 @@ It is meant as a one-line test::
 
 from __future__ import annotations
 
+import contextlib
 import warnings
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -18,7 +19,10 @@ from typing import Any
 
 import numpy as np
 
-__all__ = ["InteractionCheckError", "InteractionReport", "check_interaction"]
+from .lattice_state import ContractWarning
+
+__all__ = ["ContractWarning", "InteractionCheckError", "InteractionReport", "check_interaction",
+           "strict_contracts"]
 
 _DIMS = {"lin": (16,), "square": (8, 6), "hex": (8, 6), "cubic": (4, 4, 3), "moore": (4, 3, 3)}
 _LARGE_DIMS = {"lin": (4000,), "square": (60, 60), "hex": (60, 60), "cubic": (16, 16, 16), "moore": (12, 12, 12)}
@@ -30,6 +34,28 @@ _STEPS = 3
 
 class InteractionCheckError(AssertionError):
     """Raised by :func:`check_interaction` when a check fails; the message is the report."""
+
+
+@contextlib.contextmanager
+def strict_contracts():
+    """Turn :class:`~lgca.lattice_state.ContractWarning` into an error, e.g. in tests of rules.
+
+    A rule that does what its kind does not allow then raises before the
+    operation changes anything, instead of warning once and going on as the
+    wider kind. Equivalent to ``warnings.simplefilter("error", ContractWarning)``
+    within the block; a test suite can also set it for every test, e.g. with
+    ``filterwarnings = ["error::lgca.ContractWarning"]`` in pytest's
+    configuration.
+
+    Examples
+    --------
+    >>> from lgca.testing import strict_contracts
+    >>> with strict_contracts():                 # doctest: +SKIP
+    ...     model.step()
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", ContractWarning)
+        yield
 
 
 @dataclass
@@ -81,9 +107,11 @@ def check_interaction(
       reach the lattice through the boundary conditions;
     - channels hold non-negative whole numbers of cells, at most one per
       channel and species with volume exclusion;
-    - the conservation law of the kind holds at every node (a reorientation
-      keeps the cells of each species, a phenotype switch the cells), and
-      so does momentum if the rule declares it;
+    - the rule uses only operations its kind allows, under
+      :func:`strict_contracts`, and the conservation law of the kind holds
+      at every node (a reorientation keeps the cells of each species, a
+      phenotype switch the cells), and so does momentum if the rule
+      declares it;
     - the same seed gives the same result.
 
     Parameters
@@ -202,6 +230,7 @@ def _build(entry, setup, prepare=None):
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
+        warnings.simplefilter("error", ContractWarning)  # e.g. a stack narrower than its operators
         compiled = build_model(setup.spec(entry))
     if prepare is not None:
         state = LatticeState(compiled.lgca)
@@ -212,8 +241,9 @@ def _build(entry, setup, prepare=None):
 
 def _check_case(entry, setup, kind, momentum, prepare) -> list[str]:
     try:
-        first = _run(entry, setup, kind, momentum, prepare)
-        second = _run(entry, setup, kind, momentum, prepare)
+        with strict_contracts():
+            first = _run(entry, setup, kind, momentum, prepare)
+            second = _run(entry, setup, kind, momentum, prepare)
     except _Problems as problems:
         return problems.messages
     except Exception as exc:  # noqa: BLE001 - any error of the rule is reported
