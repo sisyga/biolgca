@@ -48,9 +48,18 @@ the 30 September review are done, apart from the items below:
 - An advanced example: multispecies tumour growth without volume exclusion on
   hexagonal and 3D Moore lattices, nodes coloured by the local mean class
   property.
-- Fields: systems of fields solved together, heterogeneous or field-dependent
-  diffusion, fields on a finer grid than the lattice, fixed values at interior
-  nodes (vessels), a helper for physical units.
+- Fields, each when an application needs it (compared with Morpheus 2.4.1,
+  which has the first three): diffusion that varies in space or with the
+  cells; a prescribed flux and boundary values that vary in space and time;
+  one condition per side on hexagonal lattices; fields on a finer grid than
+  the lattice; fixed values at interior nodes (vessels); a helper for
+  physical units. Not planned: irregular domains (they would need walls for
+  the cells too) and VTK export.
+- Coupled fields: `pde` operators run one after another, each seeing the
+  fields as the operators before it left them, so the result depends on
+  their order (first order in time either way). Proposal: consecutive `pde`
+  operators read each other's fields as they were before the first of them,
+  as a Morpheus `System` does; waits for a decision.
 
 ### Optional engineering (when profiling or users ask)
 
@@ -75,8 +84,12 @@ the 30 September review are done, apart from the items below:
 
 - Traits named only in a mutation's probability (a trait-valued `max`,
   `kappa` or `theta`) are not checked before the first block writes.
-- `vary` on a spec that holds a single-cue operator object fails: it treats
-  every object with `.terms` as a `ReorientationSpec`.
+- `vary` cannot change an operator object in a spec, e.g. one from
+  `create_plugin("polar_alignment", ...)`, not even by its full path, while
+  the same operator as a mapping `{"name": ..., "parameters": ...}` works.
+  Proposal: an operator object of a registered interaction counts as its
+  mapping (as a model file already saves it), so that registered operators
+  have one form; waits for a decision.
 
 ## Decisions that hold
 
