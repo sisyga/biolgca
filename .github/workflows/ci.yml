@@ -96,7 +96,7 @@ jobs:
         working-directory: docs/source
         run: |
           for notebook in tutorials/*.ipynb zoo/*.ipynb examples/*.ipynb; do
-            uv run --no-sync python -c "import sys, nbformat; from nbclient import NotebookClient; NotebookClient(nbformat.read(sys.argv[1], as_version=4), timeout=300).execute()" "$notebook"
+            uv run --no-sync python -c "import sys, nbformat; from nbclient import NotebookClient; NotebookClient(nbformat.read(sys.argv[1], as_version=4), timeout=600).execute()" "$notebook"
           done
 
   installed-package:

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "biolgca"
-version = "0.1.0"
+version = "2.0.0"
 description = "Biological lattice-gas cellular automata simulation tools"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -28,7 +28,7 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=1.24",
-    "scipy>=1.11",
+    "scipy>=1.12",
     # Multigrid preconditioner of the steady field solver (lgca.fields). 5.0 needs setuptools at import.
     # No wheels for Python 3.14 yet (2026-09-26); there the solver uses SciPy alone.
     "pyamg>=5.1; python_version < '3.14'",

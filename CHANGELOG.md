@@ -3,7 +3,7 @@
 This file records notable user-facing changes. Changes remain under
 `Unreleased` until a release version and date are selected.
 
-## Unreleased
+## 2.0.0 (Unreleased)
 
 ### Added
 
@@ -164,7 +164,9 @@ This file records notable user-facing changes. Changes remain under
 - New dependencies: `pyamg>=5.1` (not on Python 3.14, which it has no
   wheels for yet; the steady solver then uses SciPy alone) and
   `threadpoolctl>=3.0` (field solvers run with one BLAS thread, 3 to 9
-  times faster). The SciPy minimum rose from 1.9.2 to 1.11.
+  times faster). The SciPy minimum rose from 1.9.2 to 1.12: the conjugate
+  gradients of SciPy 1.11 never converge for a field whose right-hand side is
+  zero, and stall in ill-conditioned steady solves.
 - `FieldRecorder(["oxygen"])` records fields: `result.data["oxygen"]`, and
   `field_oxygen`/`field_oxygen_steps` in the `measurements.npz` of
   `biolgca run` (one pair per recorded field).
@@ -835,6 +837,10 @@ This file records notable user-facing changes. Changes remain under
 
 ### Fixed
 
+- Runs of rules defined outside a Python file (in a README or another text
+  run with `exec`) no longer fail on Python 3.12 when their provenance is
+  recorded: the source hash of such a rule is `None`, as for rules defined
+  in an interactive session.
 - Mutation and `trait_switch` events check the traits that their probability
   reads (a trait as `max`, as a cue's `kappa` or `theta`, or a `trait` cue)
   before the first event changes a trait, as they check the traits they
@@ -1129,5 +1135,5 @@ This file records notable user-facing changes. Changes remain under
   supported for interactive use; their interactions now run the rules (see
   "Changed"). Published results of earlier versions are reproduced with the
   archived versions of BioLGCA they cite.
-- This development branch still reports package version `0.1.0`; a release
-  version will be chosen as a separate release decision.
+- This release is version 2.0.0; the previous release, on the `master`
+  branch, was 1.0.

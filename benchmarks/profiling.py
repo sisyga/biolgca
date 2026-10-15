@@ -167,7 +167,7 @@ def run_scenario(scenario: BenchmarkScenario, repeats: int = 3) -> dict[str, Any
     try:
         package_version = importlib.metadata.version("biolgca")
     except importlib.metadata.PackageNotFoundError:
-        package_version = "0.1.0"
+        package_version = "2.0.0"
     return {
         "scenario": scenario.name,
         "family": scenario.family,

@@ -27,7 +27,7 @@ copyright = '2026, TUD Dresden University of Technology'
 author = 'Simon Syga, Bianca Güttner'
 
 # The full version, including alpha/beta/rc tags
-release = '0.1'
+release = '2.0'
 
 
 # -- General configuration ---------------------------------------------------
@@ -97,9 +97,10 @@ add_module_names = False # Remove namespaces from class/method signatures
 root_doc = 'index'
 
 # Execute maintained tutorial notebooks from a clean kernel during every docs
-# build. Cell exceptions are documentation build failures.
+# build. Cell exceptions are documentation build failures. The sweep of the
+# Allee zoo entry runs about two minutes in one cell on a CI runner.
 nb_execution_mode = "force"
-nb_execution_timeout = 120
+nb_execution_timeout = 600
 nb_execution_raise_on_error = True
 
 # formatting

@@ -1168,8 +1168,8 @@ class PDEOperator(FieldOperator):
             count[0] += 1
 
         method = spla.cg if self._symmetric else spla.bicgstab
-        values, info = _krylov(method, matrix, right, x0=start, rtol=self.options["rtol"] if rtol is None else rtol,
-                               M=preconditioner, callback=counted, maxiter=maxiter or 10 * len(right))
+        values, info = method(matrix, right, x0=start, rtol=self.options["rtol"] if rtol is None else rtol, atol=0.0,
+                              M=preconditioner, callback=counted, maxiter=maxiter or 10 * len(right))
         stats = self.statistics
         stats["max_linear_iterations"] = max(stats.get("max_linear_iterations", 0), count[0])
         if info != 0:
@@ -1543,13 +1543,6 @@ def _hill_derivative(c, K, n, rate=None):
 _TINY = np.finfo(float).tiny  # the smallest normal number
 
 
-def _krylov(method, matrix, right, *, x0, rtol, M, callback, maxiter):
-    """scipy.sparse.linalg.cg or bicgstab with a relative tolerance; SciPy < 1.12 calls it ``tol``."""
-    tolerance = {"rtol": rtol} if "rtol" in _CG_PARAMETERS else {"tol": rtol}
-    return method(matrix, right, x0=x0, atol=0.0, M=M, maxiter=maxiter, callback=callback, **tolerance)
-
-
-_CG_PARAMETERS = inspect.signature(spla.cg).parameters
 
 
 def _single_threaded_blas():

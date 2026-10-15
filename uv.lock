@@ -184,7 +184,7 @@ wheels = [
 
 [[package]]
 name = "biolgca"
-version = "0.1.0"
+version = "2.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "ipywidgets" },
@@ -252,7 +252,7 @@ requires-dist = [
     { name = "pyamg", marker = "python_full_version < '3.14'", specifier = ">=5.1" },
     { name = "pyside6", marker = "extra == 'plot3d'", specifier = ">=6.4" },
     { name = "pyyaml", marker = "extra == 'yaml'", specifier = ">=6" },
-    { name = "scipy", specifier = ">=1.11" },
+    { name = "scipy", specifier = ">=1.12" },
     { name = "threadpoolctl", specifier = ">=3.0" },
     { name = "tqdm", specifier = ">=4.64.1" },
 ]

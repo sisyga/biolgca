@@ -1941,7 +1941,7 @@ def _package_version() -> str:
     try:
         return importlib.metadata.version("biolgca")
     except importlib.metadata.PackageNotFoundError:
-        return "0.1.0"
+        return "2.0.0"
 
 
 def _collect_output_paths(observers) -> list[str]:

@@ -19,6 +19,7 @@ import inspect
 import platform
 import subprocess
 import sys
+import tokenize
 from pathlib import Path
 from typing import Any
 
@@ -114,7 +115,9 @@ def _source_hash(code) -> str | None:
     defined again is a new object)."""
     try:
         text = inspect.getsource(code)
-    except (OSError, TypeError):  # e.g. defined in an interactive session
+    # defined in an interactive session, or in a file that is not Python (Python 3.12 cannot tokenize
+    # the text of a README around a rule defined in it)
+    except (OSError, TypeError, SyntaxError, tokenize.TokenError):
         return None
     return sha256(text.encode("utf-8"))
 
