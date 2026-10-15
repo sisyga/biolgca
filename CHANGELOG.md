@@ -3,7 +3,9 @@
 This file records notable user-facing changes. Changes remain under
 `Unreleased` until a release version and date are selected.
 
-## 2.0.0 (Unreleased)
+## Unreleased
+
+## 2.0.0 (2026-10-15)
 
 ### Added
 
@@ -1135,5 +1137,5 @@ This file records notable user-facing changes. Changes remain under
   supported for interactive use; their interactions now run the rules (see
   "Changed"). Published results of earlier versions are reproduced with the
   archived versions of BioLGCA they cite.
-- This release is version 2.0.0; the previous release, on the `master`
-  branch, was 1.0.
+- This release is version 2.0.0; the previous release, 1.0, is kept on the
+  `v1` branch.
