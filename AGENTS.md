@@ -40,16 +40,18 @@ uv run pytest -q tests/x_test.py           # one test file while you work
 uv run pytest -q                           # full suite: about 2900 tests, 4 minutes
 uv run ruff check <files>                  # lint the files you changed
 uv run python docs/build.py --no-notebooks # strict docs build, notebooks not run (under a minute)
-uv run python docs/build.py                # full docs build: runs every tutorial, zoo and
-                                           # example notebook (about 18 minutes), as CI does
+uv run python docs/build.py                # docs build: runs the tutorials, renders the saved
+                                           # outputs of zoo and example notebooks (minutes)
+uv run python docs/execute_notebooks.py [<notebook>]  # rerun zoo/example notebooks, save outputs
 uv run jupyter nbconvert --to notebook --execute --output-dir <tmp> <notebook>  # one notebook
 ```
 
 Which checks when: the test file of your change while you work; the full
 suite and ruff before every commit, and the docs build without notebooks if
 the commit changes docstrings or docs; the notebooks you changed, or whose
-code you changed, run once by hand. The full docs build, with every notebook,
-runs before pushing (and in CI).
+code you changed, run once by hand; a zoo or example notebook whose code you
+changed is rerun with `docs/execute_notebooks.py` and committed with its
+outputs. The docs build runs before pushing (and in CI).
 
 After changing dependencies in `pyproject.toml`, run `uv lock` and commit
 `uv.lock`. CI (`.github/workflows/ci.yml`) runs the tests on Linux with
@@ -113,8 +115,9 @@ Elsewhere:
 - `tests/`: pytest files named `*_test.py`; pytest collects only `tests/`.
   `tests/legacy/` keeps the interaction functions of earlier versions,
   frozen, as a reference for comparison tests; the package never imports it.
-- `docs/source/`: Sphinx user docs (`tutorials/` and `zoo/` notebooks run in
-  the full docs build). `docs/development/`: maintainer notes, not built:
+- `docs/source/`: Sphinx user docs (`tutorials/` notebooks run in the docs
+  build; `zoo/` and `examples/` notebooks keep their outputs, saved by
+  `docs/execute_notebooks.py`). `docs/development/`: maintainer notes, not built:
   `roadmap.md` (the open work and the decisions that hold),
   `architecture.md`, and `archive/` (finished plans, specs, reviews and
   reports, kept for reference).
@@ -215,7 +218,8 @@ are in `docs/development/archive/reviews/2026-09-30-architecture-proposals.md`.
   `uv run python docs/images/readme/make_readme_images.py` when their code or
   the plotted model changes.
 - Keep examples in docstrings, docs, tutorials and zoo notebooks in sync with
-  the API. Notebooks must run top to bottom without saved outputs.
+  the API. Notebooks must run top to bottom from a clean kernel; tutorials
+  are committed without outputs, zoo and example notebooks with them.
 - Record user-facing changes in `CHANGELOG.md` under "Unreleased" (what
   changed for the user, and what was wrong before). Keep
   `docs/development/roadmap.md` current: delete items that are done (the

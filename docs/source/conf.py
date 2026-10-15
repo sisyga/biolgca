@@ -96,10 +96,14 @@ add_module_names = False # Remove namespaces from class/method signatures
 # change root document
 root_doc = 'index'
 
-# Execute maintained tutorial notebooks from a clean kernel during every docs
-# build. Cell exceptions are documentation build failures. The sweep of the
-# Allee zoo entry runs about two minutes in one cell on a CI runner.
+# Execute the tutorials (seconds each) from a clean kernel during every docs
+# build; the zoo and example notebooks run for minutes and are rendered with the
+# outputs saved by docs/execute_notebooks.py (BIOLGCA_DOCS_EXECUTE_ALL=1, as
+# docs/build.py --execute-all sets it, executes them too). Cell exceptions are
+# documentation build failures. CI executes every notebook.
 nb_execution_mode = "force"
+nb_execution_excludepatterns = ([] if os.environ.get("BIOLGCA_DOCS_EXECUTE_ALL")
+                                else ["zoo/*.ipynb", "examples/*.ipynb"])
 nb_execution_timeout = 600
 nb_execution_raise_on_error = True
 

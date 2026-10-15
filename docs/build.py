@@ -1,12 +1,14 @@
 """Build the Sphinx documentation from a clean generated state.
 
-By default every tutorial, zoo and example notebook is executed (about 18 minutes), as
-in CI: run this before pushing. ``--no-notebooks`` renders the notebooks
-without running them, which checks docstrings, pages and cross-references in
-under a minute: run this before a commit that changes documentation.
+By default the tutorial notebooks are executed (about two minutes) and the zoo and
+example notebooks are rendered with the outputs saved in them (refresh those with
+docs/execute_notebooks.py). ``--no-notebooks`` renders every notebook without running
+it, which checks docstrings, pages and cross-references in under a minute;
+``--execute-all`` executes every notebook (about 25 minutes).
 """
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -28,6 +30,8 @@ def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--no-notebooks", action="store_true",
                         help="render the tutorial, zoo and example notebooks without executing them")
+    parser.add_argument("--execute-all", action="store_true",
+                        help="execute every notebook, also those with saved outputs")
     args = parser.parse_args(argv)
     repository_root = Path(__file__).resolve().parents[1]
     source_dir = repository_root / "docs" / "source"
@@ -36,10 +40,12 @@ def main(argv=None) -> None:
     command = [sys.executable, "-m", "sphinx", "-W", "-b", "html"]
     if args.no_notebooks:
         command += ["-D", "nb_execution_mode=off"]
+    environment = dict(os.environ, BIOLGCA_DOCS_EXECUTE_ALL="1") if args.execute_all else None
     subprocess.run(
         [*command, str(source_dir), str(output_dir)],
         cwd=repository_root,
         check=True,
+        env=environment,
     )
 
 
