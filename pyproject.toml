@@ -62,7 +62,7 @@ plot3d = [
 # Contributor tooling (PEP 735). `uv sync` installs the `dev` group by default, JupyterLab included.
 [dependency-groups]
 test = [
-    "pytest>=8",
+    "pytest>=9.0.3",
     "jsonschema>=4",
     "PyYAML>=6",
 ]

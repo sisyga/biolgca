@@ -265,7 +265,7 @@ dev = [
     { name = "jsonschema", specifier = ">=4" },
     { name = "myst-nb" },
     { name = "numpydoc" },
-    { name = "pytest", specifier = ">=8" },
+    { name = "pytest", specifier = ">=9.0.3" },
     { name = "pyyaml", specifier = ">=6" },
     { name = "ruff" },
     { name = "sphinx" },
@@ -280,7 +280,7 @@ docs = [
 ]
 test = [
     { name = "jsonschema", specifier = ">=4" },
-    { name = "pytest", specifier = ">=8" },
+    { name = "pytest", specifier = ">=9.0.3" },
     { name = "pyyaml", specifier = ">=6" },
 ]
 
