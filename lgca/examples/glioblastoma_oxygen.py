@@ -29,7 +29,8 @@ One time step: oxygen (steady), clogging, the zones, death, the switch, division
 a random walk of migrating cells, and propagation. :func:`build_spec` builds the model in 1D (cells start at
 the left edge and invade to the right, as a radius) or on the hexagonal lattice (cells start at the centre);
 ``clogging=0`` gives vessels that never close (the "endless oxygen" case), a positive value the case of a
-necrotic core. :func:`resection` removes the bulk of the tumour and its vessels at a given step.
+necrotic core; ``stable`` vessels never close even then, e.g. larger vessels around which a perivascular niche
+survives. :func:`resection` removes the bulk of the tumour and its vessels at a given step.
 
 The physical parameters and their sources are those of :class:`Parameters`; several are assumptions to be
 checked against the original implementation (marked "to check").
@@ -156,7 +157,8 @@ def vessel_supply(state, c, rate=1e6, field="vessels"):
 def clogging(state, rate=0.0, field="vessels"):
     """Tumour cells clog blood vessels: an open vessel closes with probability ``rate * n / capacity`` per step.
 
-    ``n`` is the number of cells at its node. Closed vessels stay closed (no angiogenesis).
+    ``n`` is the number of cells at its node. Closed vessels stay closed (no angiogenesis); stable vessels
+    (value 2) never close.
 
     Parameters
     ----------
@@ -164,13 +166,13 @@ def clogging(state, rate=0.0, field="vessels"):
         Probability per step that an open vessel at a node with ``capacity`` cells closes; 0 keeps every
         vessel open.
     field : str
-        Name of the field that marks open vessels (1) and closed ones or none (0).
+        Name of the field that marks open vessels (1), stable ones (2) and closed ones or none (0).
     """
     if rate <= 0:
         return
     vessels = state.field(field)
     p = np.clip(rate * state.density / state.capacity, 0.0, 1.0)
-    closing = (vessels > 0) & (state.rng.random(state.dims) < p)
+    closing = (vessels == 1) & (state.rng.random(state.dims) < p)
     if closing.any():
         state.set_field(field, np.where(closing, 0.0, vessels))
 
@@ -234,14 +236,21 @@ def oxygen_zones(state, hypoxia=0.1, anoxia=0.01, division=(1.0, 0.5, 0.0), deat
     cells.set_trait(np.ones(len(cells), dtype=bool), "r_d", np.asarray(death, dtype=float)[zone])
 
 
-def build_vessels(dims, parameters: Parameters = DEFAULT, seed: int | None = 0) -> np.ndarray:
-    """A map of blood vessels: 1 at a node with a vessel, else 0, drawn with ``seed``."""
-    p = parameters.vessel_probability(len(dims))
-    return (np.random.default_rng(seed).random(dims) < p).astype(float)
+def build_vessels(dims, parameters: Parameters = DEFAULT, seed: int | None = 0, stable: int = 0) -> np.ndarray:
+    """A map of blood vessels, drawn with ``seed``: 1 at a node with a vessel that can clog, 2 at one of the
+    ``stable`` vessels that never clog (chosen at random among the vessels), 0 elsewhere."""
+    rng = np.random.default_rng(seed)
+    vessels = (rng.random(dims) < parameters.vessel_probability(len(dims))).astype(float)
+    if stable:
+        where = np.flatnonzero(vessels)
+        if stable > len(where):
+            raise ValueError(f"stable={stable} is more than the {len(where)} vessels of the lattice")
+        vessels.flat[rng.choice(where, stable, replace=False)] = 2.0
+    return vessels
 
 
 def build_spec(geometry: str = "lin", size: int | None = None, steps: int | None = None, *,
-               clogging: float = 0.0, division=(1.0, 0.5, 0.0), death=(0.1, 0.2, 0.5),
+               clogging: float = 0.0, stable: int = 0, division=(1.0, 0.5, 0.0), death=(0.1, 0.2, 0.5),
                kappa_std: float = 0.2, theta_std: float = 0.05, cells: int | None = None,
                kappa_0=KAPPA_0, theta_0=THETA_0, resect_at: int | None = None,
                parameters: Parameters = DEFAULT, seed: int | None = 1, record_every: int = 10) -> ModelSpec:
@@ -257,6 +266,8 @@ def build_spec(geometry: str = "lin", size: int | None = None, steps: int | None
         Steps to run; default 1000 in 1D, 300 on the hexagonal lattice.
     clogging : float, default=0
         Probability per step that an open vessel at a full node closes; 0 keeps every vessel open.
+    stable : int, default=0
+        Number of vessels, chosen at random, that never clog.
     division : (float, float, float), default=(1, 0.5, 0)
         Division probability of a resting cell on an empty node in normoxia, hypoxia and anoxia (to check).
     death : (float, float, float), default=(0.1, 0.2, 0.5)
@@ -294,7 +305,7 @@ def build_spec(geometry: str = "lin", size: int | None = None, steps: int | None
     nodes[origin + (channels - 1,)] = cells  # the last channel is the rest channel
     traits = {"kappa": rng.uniform(*kappa_0, cells), "theta": rng.uniform(*theta_0, cells), "r_b": 0.0,
               "r_d": 0.0}
-    vessels = build_vessels(dims, parameters, seed=rng.integers(2**32))
+    vessels = build_vessels(dims, parameters, seed=rng.integers(2**32), stable=stable)
     lattice = parameters.lattice()
     mutation = {"traits": {
         "kappa": {"distribution": "normal", "scale": kappa_std},

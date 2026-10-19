@@ -115,3 +115,17 @@ def test_cells_divide_and_die_with_the_probabilities_of_their_oxygen_zone():
         cells = LatticeState(lgca).cells
         assert (np.asarray(cells["r_b"]) == r_b).all() and (np.asarray(cells["r_d"]) == r_d).all()
     assert nodes.max() == 0
+
+
+def test_stable_vessels_never_clog():
+    vessels = go.build_vessels((200,), seed=1, stable=5)
+    assert (vessels == 2).sum() == 5 and set(np.unique(vessels)) == {0.0, 1.0, 2.0}
+    with pytest.raises(ValueError, match="more than"):
+        go.build_vessels((8,), seed=1, stable=9)
+    result = run_model(go.build_spec("lin", size=60, steps=60, clogging=1.0, stable=3, seed=4), showprogress=False)
+    vessels = np.asarray(result.data["vessels"])
+    stable = vessels[0] == 2
+    assert (vessels[:, stable] == 2).all()
+    assert ((vessels[0] == 1) & (vessels[-1] == 0)).any()  # the others clog
+    oxygen = LatticeState(result.lgca).field("oxygen")
+    assert oxygen[stable] == pytest.approx(1, abs=1e-4)

@@ -337,6 +337,21 @@ classes that respond to it, on a hexagonal and a 3D Moore lattice. Its
 notebook, :doc:`examples/tumour_spheroid`, runs it and compares it with
 measurements.
 
+glioblastoma_oxygen
+~~~~~~~~~~~~~~~~~~~
+
+:Category: evolution
+:Question: How does the oxygen supplied by blood vessels shape the evolution
+   of the go-or-grow switch in glioblastoma?
+:Concepts: identity-based LGCA, fields, go-or-grow, evolution, phenotype switch
+:Source: ``lgca/examples/glioblastoma_oxygen.py``
+
+A research model: the evolutionary go-or-grow model of Syga et al. (2024)
+with a switch that reads oxygen, which blood vessels supply, tumour cells
+consume and clog, and which sets division and death in normoxia, hypoxia and
+anoxia. Its notebook, :doc:`examples/glioblastoma_oxygen`, builds the model
+one mechanism at a time.
+
 Advanced examples
 -----------------
 
@@ -347,6 +362,7 @@ parameters from measurements, and compare them with experiments.
    :maxdepth: 1
 
    examples/tumour_spheroid
+   examples/glioblastoma_oxygen
 
 Suggested classroom workflow
 ----------------------------
