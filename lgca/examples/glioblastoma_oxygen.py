@@ -20,11 +20,12 @@ with ``n`` the cells at a node, and is supplied by blood vessels, which hold it 
 a probability that rises with the cells at its node, and stays closed. Oxygen diffuses across a node in
 milliseconds, so it is at equilibrium with the cells at every step (``solver="steady"``).
 
-Oxygen also sets division and death: resting cells divide with probability ``α_max O² / (O_h² + O²)`` times
-``1 - n / K``, which falls in hypoxia (``O < O_h``), and every cell dies with probability
-``δ + δ_a O_a⁴ / (O_a⁴ + O⁴)``, which rises in anoxia (``O < O_a``).
+Oxygen also sets division and death, as step functions of three zones: normoxia (``O ≥ O_h``), hypoxia
+(``O_a ≤ O < O_h``) and anoxia (``O < O_a``). In every zone resting cells divide with a probability of their
+own times ``1 - n / K``, and every cell dies with a probability of its own (:func:`oxygen_zones` gives every cell
+the values of the zone of its node).
 
-One time step: oxygen (steady), clogging, death, the switch, division of resting cells (daughters mutate),
+One time step: oxygen (steady), clogging, the zones, death, the switch, division of resting cells (daughters mutate),
 a random walk of migrating cells, and propagation. :func:`build_spec` builds the model in 1D (cells start at
 the left edge and invade to the right, as a radius) or on the hexagonal lattice (cells start at the centre);
 ``clogging=0`` gives vessels that never close (the "endless oxygen" case), a positive value the case of a
@@ -44,7 +45,6 @@ cores in glioblastoma: a biomathematical model and its therapeutic implications.
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -104,12 +104,13 @@ class Parameters:
         Maximal oxygen uptake of a cell in µmol/s (after Martínez-González et al. 2012).
     michaelis_constant : float, default=2.5
         Oxygen at which uptake is half its maximum (Martínez-González et al. 2012).
-    vessel_oxygen : float, default=40
-        Oxygen at a blood vessel (to check; brain tissue near capillaries 35 to 40 mmHg).
-    hypoxia : float, default=0.1
-        Relative oxygen below which division slows (hypoxia).
-    anoxia : float, default=0.01
-        Relative oxygen below which cells die (anoxia).
+    vessel_oxygen : float, default=60
+        Oxygen at a blood vessel, the oxygen to which the model's is relative: 60 mmHg in Whiteside's "high
+        oxygen" runs, 24 mmHg in her "low oxygen" ones.
+    hypoxia : float, default=7/60
+        Relative oxygen below which cells are hypoxic: 7 mmHg, the cutoff of 0.117 in Whiteside's analyses.
+    anoxia : float, default=0.7/60
+        Relative oxygen below which cells are anoxic: 0.7 mmHg (to check).
     """
 
     node_size: float = 50.0
@@ -118,9 +119,9 @@ class Parameters:
     oxygen_diffusion: float = 2000.0
     consumption: float = 1e-11
     michaelis_constant: float = 2.5
-    vessel_oxygen: float = 40.0
-    hypoxia: float = 0.1
-    anoxia: float = 0.01
+    vessel_oxygen: float = 60.0
+    hypoxia: float = 7.0 / 60.0
+    anoxia: float = 0.7 / 60.0
 
     def vessel_probability(self, dimensions: int) -> float:
         """The probability that a node holds a blood vessel."""
@@ -203,9 +204,34 @@ def resection(state, at_step=-1, fraction=0.999, threshold=0.1, field="vessels")
     state.set_field(field, np.where(tumour, 0.0, state.field(field)))
 
 
-def _oxygen(K, n):
-    """The Hill response to oxygen, rising (n > 0) or falling (n < 0) at K."""
-    return {"name": "field", "field": "oxygen", "K": K, "n": n}
+@interaction(kind="phenotype_switch", families=("ib", "nove_ib"), name="glioblastoma.oxygen_zones")
+def oxygen_zones(state, hypoxia=0.1, anoxia=0.01, division=(1.0, 0.5, 0.0), death=(0.1, 0.2, 0.5),
+                 field="oxygen"):
+    """Give every cell the division and death probabilities of the oxygen zone of its node.
+
+    The traits ``r_b`` and ``r_d`` of a cell become ``division[z]`` and ``death[z]`` of its zone ``z``: 0 normoxia
+    (oxygen at least ``hypoxia``), 1 hypoxia (at least ``anoxia``), 2 anoxia. Growth rules read them by name.
+
+    Parameters
+    ----------
+    hypoxia : float
+        Oxygen below which a node is hypoxic.
+    anoxia : float
+        Oxygen below which a node is anoxic.
+    division : (float, float, float)
+        Division probability of a resting cell on an empty node in normoxia, hypoxia and anoxia.
+    death : (float, float, float)
+        Death probability of a cell in normoxia, hypoxia and anoxia.
+    field : str
+        Name of the oxygen field.
+    """
+    cells = state.cells
+    if not len(cells):
+        return
+    oxygen = state.field(field)
+    zone = np.where(oxygen >= hypoxia, 0, np.where(oxygen >= anoxia, 1, 2))[cells.node]
+    cells.set_trait(np.ones(len(cells), dtype=bool), "r_b", np.asarray(division, dtype=float)[zone])
+    cells.set_trait(np.ones(len(cells), dtype=bool), "r_d", np.asarray(death, dtype=float)[zone])
 
 
 def build_vessels(dims, parameters: Parameters = DEFAULT, seed: int | None = 0) -> np.ndarray:
@@ -215,7 +241,7 @@ def build_vessels(dims, parameters: Parameters = DEFAULT, seed: int | None = 0) 
 
 
 def build_spec(geometry: str = "lin", size: int | None = None, steps: int | None = None, *,
-               clogging: float = 0.0, alpha: float = 1.0, delta: float = 0.0, delta_anoxic: float = 0.5,
+               clogging: float = 0.0, division=(1.0, 0.5, 0.0), death=(0.1, 0.2, 0.5),
                kappa_std: float = 0.2, theta_std: float = 0.05, cells: int | None = None,
                kappa_0=KAPPA_0, theta_0=THETA_0, resect_at: int | None = None,
                parameters: Parameters = DEFAULT, seed: int | None = 1, record_every: int = 10) -> ModelSpec:
@@ -231,12 +257,11 @@ def build_spec(geometry: str = "lin", size: int | None = None, steps: int | None
         Steps to run; default 1000 in 1D, 300 on the hexagonal lattice.
     clogging : float, default=0
         Probability per step that an open vessel at a full node closes; 0 keeps every vessel open.
-    alpha : float, default=1
-        Maximal division probability of a resting cell on an empty node with plenty of oxygen.
-    delta : float, default=0
-        Death probability of every cell, regardless of oxygen.
-    delta_anoxic : float, default=0.5
-        Maximal additional death probability in anoxia.
+    division : (float, float, float), default=(1, 0.5, 0)
+        Division probability of a resting cell on an empty node in normoxia, hypoxia and anoxia (to check).
+    death : (float, float, float), default=(0.1, 0.2, 0.5)
+        Death probability of a cell in normoxia, hypoxia and anoxia (to check; 0.1 and, in anoxia, 0.5 in
+        Whiteside's fitness analysis).
     kappa_std, theta_std : float
         Standard deviations of the changes of κ and θ from mother to daughter; θ stays in [0, 1].
     cells : int, optional
@@ -267,7 +292,8 @@ def build_spec(geometry: str = "lin", size: int | None = None, steps: int | None
     rng = np.random.default_rng(seed)
     nodes = np.zeros(dims + (channels,), dtype=np.int64)
     nodes[origin + (channels - 1,)] = cells  # the last channel is the rest channel
-    traits = {"kappa": rng.uniform(*kappa_0, cells), "theta": rng.uniform(*theta_0, cells)}
+    traits = {"kappa": rng.uniform(*kappa_0, cells), "theta": rng.uniform(*theta_0, cells), "r_b": 0.0,
+              "r_d": 0.0}
     vessels = build_vessels(dims, parameters, seed=rng.integers(2**32))
     lattice = parameters.lattice()
     mutation = {"traits": {
@@ -283,19 +309,17 @@ def build_spec(geometry: str = "lin", size: int | None = None, steps: int | None
     ]
     if resect_at is not None:
         operators.append({"name": "glioblastoma.resection", "parameters": {"at_step": resect_at}})
-    if delta > 0:
-        operators.append({"name": "birth_death", "parameters": {"death_rate": delta}})
     operators += [
-        # death in anoxia
-        {"name": "birth_death", "parameters": {
-            "death_rate": {"max": delta_anoxic, "hill": [_oxygen(parameters.anoxia, -4)]}}},
+        # division and death probabilities of the oxygen zone of each cell; death
+        {"name": "glioblastoma.oxygen_zones", "parameters": {
+            "hypoxia": parameters.hypoxia, "anoxia": parameters.anoxia, "division": list(division),
+            "death": list(death)}},
+        {"name": "birth_death", "parameters": {"death_rate": "r_d"}},
         # rest with (1 + tanh(κ (O − θ))) / 2, κ and θ of each cell
         {"name": "go_or_rest", "parameters": {"probability": {"max": 1.0, "cues": [
             {"name": "field", "field": "oxygen", "kappa": "kappa", "theta": "theta"}]}}},
-        # resting cells divide, slower in hypoxia; daughters rest and inherit κ and θ with a change
-        {"name": "birth_death", "parameters": {
-            "birth_rate": {"max": alpha, "hill": [_oxygen(parameters.hypoxia, 2)]},
-            "channels": "rest", "mutation": mutation}},
+        # resting cells divide with the probability of their zone; daughters rest and inherit κ and θ with a change
+        {"name": "birth_death", "parameters": {"birth_rate": "r_b", "channels": "rest", "mutation": mutation}},
         {"name": "random_walk", "parameters": {"channels": "velocity"}},
     ]
     regime = "clogging vessels" if clogging > 0 else "fixed vessels"
@@ -348,11 +372,6 @@ def kymographs(spec: ModelSpec, every: int = 10) -> dict[str, np.ndarray]:
 def node_size_cm(parameters: Parameters = DEFAULT) -> float:
     """The width of a node in cm, for axes in physical units."""
     return parameters.node_size * 1e-4
-
-
-def doubling_steps(alpha: float = 1.0) -> float:
-    """Steps in which a resting population with plenty of oxygen and room doubles."""
-    return math.log(2) / math.log1p(alpha)
 
 
 def run(steps: int | None = None, showprogress: bool = False):

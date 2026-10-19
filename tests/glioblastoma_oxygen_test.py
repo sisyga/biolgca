@@ -11,9 +11,9 @@ from lgca.model import build_model, run_model
 def test_the_physical_parameters_become_lattice_units():
     lattice = go.Parameters().lattice()
     assert lattice["diffusion"] == pytest.approx(2000 / 50**2)  # nodes² per s
-    # a full node of 100 cells consumes 100 x 1e-11 µmol/s from (50 µm)³ of tissue at 40 mmHg
-    assert 100 * lattice["uptake"] * (50e-4) ** 3 * 40 * go.MMHG == pytest.approx(100 * 1e-11)
-    assert lattice["michaelis_constant"] == pytest.approx(2.5 / 40)
+    # a full node of 100 cells consumes 100 x 1e-11 µmol/s from (50 µm)³ of tissue at 60 mmHg
+    assert 100 * lattice["uptake"] * (50e-4) ** 3 * 60 * go.MMHG == pytest.approx(100 * 1e-11)
+    assert lattice["michaelis_constant"] == pytest.approx(2.5 / 60)
     assert go.Parameters().vessel_probability(1) == 0.25 and go.Parameters().vessel_probability(2) == 1 / 16
 
 
@@ -63,7 +63,7 @@ def test_resection_removes_the_dense_tumour_and_its_vessels():
 def test_the_switch_reads_the_oxygen_with_each_cells_kappa_and_theta():
     # all cells at the first node, with κ = 2 and θ = 0.3: they rest with (1 + tanh(2 (O - 0.3))) / 2
     spec = go.build_spec("lin", size=100, steps=1, cells=2000, kappa_0=(2, 2), theta_0=(0.3, 0.3),
-                         alpha=0.0, delta_anoxic=0.0, parameters=go.Parameters(capacity=4000), seed=6)
+                         division=(0, 0, 0), death=(0, 0, 0), parameters=go.Parameters(capacity=4000), seed=6)
     model = build_model(spec)
     oxygen = LatticeState(model.lgca).field("oxygen")[0]
     expected = (1 + np.tanh(2 * (oxygen - 0.3))) / 2
@@ -90,3 +90,28 @@ def test_kymographs_record_cells_oxygen_and_traits():
         assert record[key].shape == (3, 80)
     assert np.all(record["migrating"] <= record["cells"])
     assert np.isnan(record["kappa"][0, 1:]).all() and np.isfinite(record["kappa"][0, 0])
+
+
+def test_cells_divide_and_die_with_the_probabilities_of_their_oxygen_zone():
+    spec = go.build_spec("lin", size=100, steps=1, seed=9)
+    model = build_model(spec)
+    lgca = model.lgca
+    oxygen = np.array([1.0, 0.05, 0.001])  # normoxic, hypoxic, anoxic
+    field = LatticeState(lgca).field("oxygen")
+    state = LatticeState(lgca, kind="phenotype_switch")
+    nodes = np.asarray(state.cells.node)
+    values = np.zeros_like(field)
+    values[0] = oxygen[0]
+    lgca.oxygen[lgca.nonborder] = values
+    go.oxygen_zones(state, hypoxia=0.1, anoxia=0.01, division=(1, 0.5, 0), death=(0.1, 0.2, 0.5))
+    state.commit()
+    cells = LatticeState(lgca).cells
+    assert (np.asarray(cells["r_b"]) == 1).all() and (np.asarray(cells["r_d"]) == 0.1).all()
+    for value, (r_b, r_d) in zip(oxygen[1:], [(0.5, 0.2), (0, 0.5)]):
+        lgca.oxygen[lgca.nonborder] = np.full_like(field, value)
+        state = LatticeState(lgca, kind="phenotype_switch")
+        go.oxygen_zones(state, hypoxia=0.1, anoxia=0.01, division=(1, 0.5, 0), death=(0.1, 0.2, 0.5))
+        state.commit()
+        cells = LatticeState(lgca).cells
+        assert (np.asarray(cells["r_b"]) == r_b).all() and (np.asarray(cells["r_d"]) == r_d).all()
+    assert nodes.max() == 0
