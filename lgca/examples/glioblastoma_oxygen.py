@@ -1,7 +1,7 @@
 """Glioblastoma with oxygen: the go-or-grow switch evolves in response to oxygen from blood vessels.
 
 The model extends the evolutionary go-or-grow model of Syga et al. (2024), :mod:`lgca.zoo.phenotypic_plasticity`,
-by explicit oxygen (Whiteside, Syga & Deutsch, in preparation). Every cell carries two traits, its genotype: the
+by explicit oxygen (Whiteside et al., in preparation). Every cell carries two traits, its genotype: the
 oxygen sensitivity κ and the critical oxygen θ. A cell rests and may divide (the proliferative phenotype) with
 probability
 
@@ -73,7 +73,7 @@ INFO = ExampleInfo(
              "glioblastoma?",
     concepts=("identity-based LGCA", "fields", "go-or-grow", "evolution", "phenotype switch"),
     source_path="lgca/examples/glioblastoma_oxygen.py",
-    source="Syga et al. (2024) with oxygen after Martínez-González et al. (2012); Whiteside, Syga & Deutsch "
+    source="Syga et al. (2024) with oxygen after Martínez-González et al. (2012); Whiteside et al. "
            "(in preparation)",
 )
 
