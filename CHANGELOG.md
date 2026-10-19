@@ -5,6 +5,18 @@ This file records notable user-facing changes. Changes remain under
 
 ## Unreleased
 
+### Added
+
+- A research example, `lgca.examples.glioblastoma_oxygen`: the evolutionary
+  go-or-grow model of Syga et al. (2024) with explicit oxygen. Oxygen
+  diffuses from blood vessels (Dirichlet point sources), cells take it up
+  with Michaelis–Menten kinetics, tumour cells clog vessels, and every cell
+  switches between migrating and resting with its own oxygen sensitivity κ
+  and critical oxygen θ, which daughters inherit with mutations. Division
+  slows in hypoxia and cells die in anoxia; `resection` removes the dense
+  tumour and its vessels at a given step. It is not yet in the curated
+  example index.
+
 ## 2.0.0 (2026-10-15)
 
 ### Added
