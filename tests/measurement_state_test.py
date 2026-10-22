@@ -53,3 +53,33 @@ def test_global_polarization_sums_species_before_norm(populations, expected, rev
                          interaction="only_propagation")
     assert model.calc_polar_alignment_parameter() == pytest.approx(expected)
     assert aggregate.calc_polar_alignment_parameter() == pytest.approx(expected)
+
+
+def _labelled_line(ve):
+    # cells 1 and 2 at node 0, cell 3 at node 1, node 2 empty; one rest channel
+    if ve:
+        nodes = np.array([[1, 2, 0], [0, 0, 3], [0, 0, 0]])
+    else:
+        nodes = np.empty((3, 3), dtype=object)
+        for index in np.ndindex(nodes.shape):
+            nodes[index] = []
+        nodes[0, 0], nodes[1, 1] = [1, 2], [3]
+    model = get_lgca(geometry="lin", ib=True, ve=ve, nodes=nodes, interaction="only_propagation")
+    model.props["r_b"] = [0., 0.2, 0.4, 0.9]
+    return model
+
+
+@pytest.mark.parametrize("ve", [True, False], ids=["ib", "nove_ib"])
+def test_mean_property_of_a_node_averages_its_cells_and_masks_empty_nodes(ve):
+    model = _labelled_line(ve)
+    mean = model.calc_prop_mean(nodes=model.nodes[model.nonborder], props=model.props, propname="r_b")
+    np.testing.assert_array_equal(np.ma.getmaskarray(mean), [False, False, True])
+    np.testing.assert_allclose(np.ma.getdata(mean)[:2], [0.3, 0.9])
+
+
+@pytest.mark.parametrize("ve", [True, pytest.param(False, marks=pytest.mark.xfail(
+    strict=True, raises=AttributeError, reason="NoVE-IB calc_prop_mean does not apply its defaults"))],
+    ids=["ib", "nove_ib"])
+def test_mean_property_defaults_to_the_current_cells(ve):
+    model = _labelled_line(ve)
+    np.testing.assert_allclose(np.ma.getdata(model.calc_prop_mean(propname="r_b"))[:2], [0.3, 0.9])
