@@ -7,6 +7,7 @@ import json
 import shutil
 import sys
 import tempfile
+import traceback
 from copy import deepcopy
 from dataclasses import replace
 from importlib import import_module
@@ -32,24 +33,52 @@ def main(argv=None) -> int:
 
     parser = _build_parser()
     args = parser.parse_args(argv)
+    search_path = list(sys.path)  # --plugins adds folders for the command, e.g. for the workers of a sweep
     try:
         return int(args.handler(args))
     except (FileNotFoundError, ImportError, KeyError, RuntimeError, TypeError, ValueError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        if _raised_outside_lgca(exc):  # a bug in the user's own rule or plugin: show where it is
+            traceback.print_exception(exc, file=sys.stderr)
+        else:  # lgca's own checks say what is wrong; the notes say which step was rolled back
+            notes = "".join(f"\n  {note}" for note in getattr(exc, "__notes__", ()))
+            print(f"error: {exc}{notes}", file=sys.stderr)
         return 2
+    finally:
+        sys.path[:] = search_path
+
+
+_PACKAGE = Path(__file__).resolve().parent
+
+
+def _raised_outside_lgca(exc) -> bool:
+    """Whether ``exc``, or an exception it was raised from, was raised by code outside lgca.
+
+    That is the innermost frame of its traceback: the user's rule, or a module given with ``--plugins``.
+    """
+    seen = set()
+    while exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        tb = exc.__traceback__
+        while tb is not None and tb.tb_next is not None:
+            tb = tb.tb_next
+        if tb is not None and not Path(tb.tb_frame.f_code.co_filename).resolve().is_relative_to(_PACKAGE):
+            return True
+        exc = exc.__cause__ or exc.__context__
+    return False
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="biolgca")
     commands = parser.add_subparsers(dest="command", required=True)
 
-    examples = commands.add_parser("examples", help="list or export curated models")
-    example_commands = examples.add_subparsers(dest="examples_command", required=True)
+    examples = commands.add_parser("examples", help="list (the default) or export curated models")
+    examples.set_defaults(handler=_examples_list)
+    example_commands = examples.add_subparsers(dest="examples_command")
     list_command = example_commands.add_parser("list", help="list curated examples")
     list_command.set_defaults(handler=_examples_list)
     export = example_commands.add_parser("export", help="export a curated model")
-    export.add_argument("name")
-    export.add_argument("path", type=Path)
+    export.add_argument("name", help="the name of an example, as `biolgca examples list` shows it")
+    export.add_argument("path", type=Path, help="the model file to write (.json, .yaml or .yml)")
     export.add_argument("--overwrite", action="store_true")
     export.set_defaults(handler=_examples_export)
 
@@ -57,13 +86,13 @@ def _build_parser() -> argparse.ArgumentParser:
                     "(comma-separated or repeated)")
 
     validate = commands.add_parser("validate", help="validate and compile a model")
-    validate.add_argument("model", type=Path)
+    validate.add_argument("model", type=Path, help="the model file (.json, .yaml or .yml)")
     validate.add_argument("--trusted-paths", action="store_true")
     validate.add_argument("--plugins", action="append", default=[], metavar="MODULE", help=plugins_help)
     validate.set_defaults(handler=_validate)
 
     run = commands.add_parser("run", help="run a model into an explicit directory")
-    run.add_argument("model", type=Path)
+    run.add_argument("model", type=Path, help="the model file (.json, .yaml or .yml)")
     run.add_argument("--output", type=Path, required=True)
     run.add_argument("--overwrite", action="store_true")
     run.add_argument("--trusted-paths", action="store_true")
@@ -72,7 +101,7 @@ def _build_parser() -> argparse.ArgumentParser:
     run.set_defaults(handler=_run)
 
     sweep = commands.add_parser("sweep", help="run a model over parameter values and seeds into a table")
-    sweep.add_argument("model", type=Path)
+    sweep.add_argument("model", type=Path, help="the model file (.json, .yaml or .yml)")
     sweep.add_argument("--output", type=Path, required=True, help="directory for table.csv and sweep.json")
     sweep.add_argument("--vary", action="append", default=[], metavar="PATH=VALUES",
                        help="values of a parameter, e.g. kappa=-4,0,4 or dynamics.operators[0].parameters.r_b=0.1,0.2;"
@@ -96,9 +125,29 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _import_plugins(args) -> list[str]:
+    """Import the modules of ``--plugins``, also from the model file's directory and the working directory.
+
+    The ``biolgca`` script, unlike ``python -m``, does not import from the working directory, so a rules
+    module next to the model file would not be found. The two directories come last on ``sys.path``
+    (until the command ends, see :func:`main`): they do not hide installed modules of the same name.
+    """
     modules = [name.strip() for entry in args.plugins for name in entry.split(",") if name.strip()]
+    if not modules:
+        return modules
+    folders = [str(folder) for folder in dict.fromkeys((args.model.resolve().parent, Path.cwd().resolve()))
+               if str(folder) not in sys.path]
+    sys.path.extend(folders)
     for module in modules:
-        import_module(module)
+        try:
+            import_module(module)
+        except ModuleNotFoundError as exc:
+            if exc.name is None or not (module == exc.name or module.startswith(exc.name + ".")):
+                raise  # the module was found; a module that it imports is missing
+            looked = ", ".join(dict.fromkeys((str(args.model.resolve().parent), str(Path.cwd().resolve()))))
+            raise ModuleNotFoundError(
+                f"--plugins {module}: no module named {exc.name!r} in the installed packages, nor in {looked}; "
+                "give the module's name as Python imports it (without .py), or add the folder that contains "
+                "it to PYTHONPATH", name=exc.name) from exc
     return modules
 
 
@@ -306,7 +355,10 @@ def _load(model_path: Path):
     if metadata.is_file():
         try:
             archive = json.loads(metadata.read_text(encoding="utf-8")).get("provenance", {}).get("archive", {})
-        except (ValueError, AttributeError):
+        except (ValueError, AttributeError) as exc:
+            if model_path.name == "model.resolved.json":  # the archived model of a run: its check is skipped
+                warn_user(f"{metadata} cannot be read ({exc}); the files of {model_path.parent} are not "
+                          "checked against the hashes of the run that wrote them")
             archive = {}
         if isinstance(archive, dict) and model_path.name in archive:
             changed = [name for name, recorded in archive.items() if (model_path.parent / name).is_file() and
