@@ -137,6 +137,77 @@ The packaged ``model-spec-v1.schema.json`` is intended for editors and
 development-time validation. Runtime loading uses BioLGCA's dependency-light
 strict parser, so ``jsonschema`` is needed only by contributors and tooling.
 
+Initial conditions
+------------------
+
+:class:`~lgca.model.StateSpec` takes at most one of three initial
+conditions; without any, cells are placed at random with a mean of 0.1 cells
+per node.
+
+``density``
+   The mean number of cells per node, everywhere. With volume exclusion each
+   channel is occupied with probability ``density / K``; without it, channel
+   populations are Poisson distributed.
+
+``initializer``
+   A named initial condition (:func:`lgca.initializers.list_initializers`):
+
+   - ``{"name": "region", "parameters": {"extent": 5, "density": 4}}`` fills
+     a block of ``extent`` nodes per axis (one number, or one per axis) with
+     ``density`` cells per node (default 1) and leaves the rest empty.
+     ``"placement"`` puts the block in the ``"center"`` (default), at the
+     ``"left"`` edge of the first axis, or in the ``"corner"`` at the
+     origin. The region fills all channels of all species at random; for
+     cells in particular channels or of one species, give ``nodes``.
+   - ``{"name": "from_npz", "parameters": {"path": "state.npz", "key":
+     "nodes"}}`` reads a ``nodes`` array (see below) from an NPZ file, found
+     relative to the model file. Not yet for identity-based models.
+
+``nodes``
+   The channels of every node, without ghost nodes:
+
+   .. list-table::
+      :header-rows: 1
+      :widths: 30 30 40
+
+      * - Model
+        - Shape
+        - Values
+      * - classical, volume exclusion
+        - ``dims + (K,)``; ``dims + (n_species, K)`` for several species
+        - 0 or 1 per channel
+      * - classical, no volume exclusion
+        - as above
+        - cells per channel
+      * - identity-based, volume exclusion
+        - ``dims + (K,)``
+        - the label of the cell, 0 for an empty channel; labels start at 1
+      * - identity-based, no volume exclusion
+        - ``dims + (K,)``, one rest channel
+        - cells per channel; the cells get labels from 0
+
+   ``K`` is the number of velocity channels of the geometry plus
+   ``restchannels``; the velocity channels come first. In the two-species
+   go-or-grow model, for example, resting cells are species 1 in the rest
+   channels:
+
+   .. code-block:: python
+
+      nodes = np.zeros((60, 60, 2, 12), dtype=int)  # hex: 6 velocity + 6 rest channels
+      nodes[30, 30, 1, 6:] = 1                       # one node of resting cells
+      StateSpec(nodes=nodes, restchannels=6, n_species=2)
+
+``traits`` gives the initial cells of identity-based models their traits, one
+number for all or one per cell in the order of their labels. Note the
+difference between the two identity-based families: with volume exclusion
+label 0 means "empty" and ``lgca.props`` holds an unused entry for it, while
+without volume exclusion label 0 is a real cell. Select living cells by the
+labels found on the lattice, not by ``label > 0``. The
+:class:`~lgca.simulation.NodeRecorder` records the labels in every channel
+(with volume exclusion an integer array, without it a list of labels per
+channel); the traits of the living cells follow as
+``lgca.props[name][labels]``.
+
 Configuration, outputs and checkpoints
 --------------------------------------
 
@@ -150,15 +221,15 @@ The command-line runner writes ``model.resolved.json`` and ``metadata.json``
 plus configured observer outputs into an explicit run directory. The resolved
 model records the configuration that was actually compiled, while metadata
 records runtime provenance and the resolved operator schedule. These files do
-not constitute a restart checkpoint. In particular, identity-based particle
-properties are not yet supported by ``from_npz`` and must not be reconstructed
-from labels alone.
+not constitute a restart checkpoint. In particular, the cell traits of
+identity-based models are not yet supported by ``from_npz`` and must not be
+reconstructed from labels alone.
 
 Composed dynamics
 -----------------
 
 Composed pipelines make the conservation laws visible. The following example
-uses a multispecies volume-exclusion model with particle turnover, phenotype
+uses a multispecies volume-exclusion model with cell turnover, phenotype
 switching and a reorientation sampler that combines nematic alignment and
 chemotaxis.
 

@@ -24,9 +24,14 @@ documentation tools. If your uv does not download Python automatically, which
 is the case for some Linux distribution packages, run ``uv python install``
 first.
 
-The installation includes NumPy, SciPy, tqdm and Matplotlib, and ``uv sync``
-adds JupyterLab, so it is sufficient for the maintained tutorials and ordinary
-one- and two-dimensional analysis. Launch JupyterLab from the repository root:
+The installation includes the runtime dependencies listed in
+``pyproject.toml``: NumPy, SciPy, pyamg (field solver; not yet on Python
+3.14, where SciPy alone is used), threadpoolctl, tqdm, Matplotlib, pandas
+(tables of parameter sweeps) and ipywidgets (notebook widgets). ``uv sync``
+adds JupyterLab and the test and documentation tools, so it is sufficient for
+the tutorials and for simulations on every lattice; only 3D rendering needs
+an extra (see `Optional dependencies`_). Launch JupyterLab from the
+repository root:
 
 .. code-block:: bash
 
@@ -38,11 +43,14 @@ reproducible student project and coupled cell–field models. Run your own scrip
 the same way, for example ``uv run python my_simulation.py``, or activate
 ``.venv`` as usual.
 
-Without uv, BioLGCA installs into any Python 3.11+ environment with
-``python -m pip install -e ".[notebooks]"``. This resolves the newest
-compatible package versions instead of the locked ones. Leave out
-``[notebooks]`` where JupyterLab is not needed, for example in Colab, on a
-cluster or in an editor that runs notebooks itself.
+Without uv, BioLGCA installs into any Python 3.11+ environment, from a clone
+with ``python -m pip install -e ".[notebooks]"`` or straight from GitHub with
+``python -m pip install "biolgca @ git+https://github.com/sisyga/biolgca"``
+(BioLGCA is not on PyPI yet). This resolves the newest compatible package
+versions instead of the locked ones. Leave out ``[notebooks]`` where
+JupyterLab is not needed, for example in Colab, on a cluster or in an editor
+that runs notebooks itself. ``biolgca examples list`` checks that the
+installation works.
 
 Your first model
 ----------------
@@ -67,6 +75,25 @@ it recorded:
 death, go-or-grow) and, for identity-based models (``ib=True``), published
 research models. Lessons 1 and 2 of the :doc:`tutorials/index` work this way;
 :doc:`reference/factory_reference` lists all options.
+
+Reading the state after a run
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``lgca.nodes`` (the channels of every node) and ``lgca.cell_density`` include
+one layer of *ghost nodes* around the lattice, which implement the boundary
+conditions: ``lgca.nodes.shape`` is ``(22, 22, 4)`` for ``dims=(20, 20)``.
+With periodic boundaries the ghosts hold copies of the cells at the opposite
+edge, so a sum over the whole array counts those cells twice. Index the
+interior with ``lgca.nonborder``:
+
+.. code-block:: python
+
+   cells = lgca.nodes[lgca.nonborder].sum()     # the number of cells
+   density = lgca.cell_density[lgca.nonborder]  # one value per node, shape dims
+
+Recorded data (``lgca.data``, and ``lgca.dens_t`` and ``lgca.nodes_t`` after
+``timeevo(record=True)``, and the recorders of a model specification) hold
+the interior only.
 
 Your first model specification
 ------------------------------
@@ -160,7 +187,10 @@ Run the test suite and strict documentation build from the repository root:
    uv run pytest -q
    uv run python docs/build.py
 
-The documentation build executes every maintained notebook from a clean kernel
-and treats cell exceptions and Sphinx warnings as failures. After changing
-dependencies in ``pyproject.toml``, run ``uv lock`` and commit the updated
-``uv.lock``.
+The documentation build executes the tutorial notebooks from a clean kernel,
+renders the zoo and example notebooks with their saved outputs, and treats
+cell exceptions and Sphinx warnings as failures; ``docs/build.py
+--no-notebooks`` checks the pages and docstrings in under a minute. After
+changing dependencies in ``pyproject.toml``, run ``uv lock`` and commit the
+updated ``uv.lock``. ``CONTRIBUTING.md`` in the repository describes the
+workflow and the conventions of the tests.
