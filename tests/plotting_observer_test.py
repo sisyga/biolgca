@@ -55,15 +55,18 @@ def test_density_facade_uses_channel_history_and_its_times(entry, moving, channe
     nodes[..., 4] = True
     nodes[..., 0] = moving
     lgca = get_lgca(geometry="square", nodes=nodes, interaction="only_propagation")
-    lgca.nodes_t = np.stack([nodes] * 3)
+    lgca.nodes_t = np.stack([np.zeros_like(nodes), ~nodes, nodes])  # every frame differs
     lgca.nodes_steps = np.array([0, 3, 20])
     lgca.dens_t = np.stack([nodes.sum(-1)] * 2)
     lgca.dens_steps = np.array([0, 20])
     render = lambda: (animate(lgca, channels=channels, cbar=False) if entry == "facade"
                       else lgca.animate_density(channels=channels, cbar=False))
     animation = render()
-    animation._func(2)
     ax = animation._fig.axes[0]
+    animation._func(0)
+    np.testing.assert_array_equal(ax.images[0].get_array(), 0)
+    assert ax.get_title() == "Time $k =$0"
+    animation._func(2)
     np.testing.assert_array_equal(ax.images[0].get_array(), 1 if expected_rest else int(moving))
     assert ax.get_title() == "Time $k =$20"
     animation._draw_was_started = True
@@ -159,16 +162,24 @@ def test_family_history_uses_paired_nonuniform_times(monkeypatch):
     np.testing.assert_array_equal(lgca.muller_plot(t_slice=slice(1, None), t_start_index=10), [10, 27])
 
 
-def test_animation_observer_collects_runner_frames_and_builds_animation():
-    lgca = make_square_lgca(seed=3)
+def test_the_animation_shows_the_density_of_each_frame():
+    # oracle: the same seeded random walk stepped by hand
+    walker = lambda: get_lgca(geometry="square", dims=(5, 6), density=0.4, restchannels=1,
+                              interaction="random_walk", bc="periodic", seed=5)
+    lgca, replay = walker(), walker()
     observer = AnimationObserver(kind="density", interval=10, cbar=False, close=True)
 
-    SimulationRunner(lgca, timesteps=2, observers=[observer], showprogress=False).run()
+    SimulationRunner(lgca, timesteps=3, observers=[observer], showprogress=False).run()
 
-    assert observer.frames == []
-    assert observer.frame_steps == [0, 1, 2]
-    assert isinstance(observer.animation, FuncAnimation)
-    # This test only verifies construction; it intentionally does not render or save.
+    assert observer.frames == []  # released once the animation holds them
+    assert observer.frame_steps == [0, 1, 2, 3]
+    shown = []
+    for frame in range(4):
+        observer.animation._func(frame)
+        shown.append(np.asarray(observer.animation._fig.axes[0].images[0].get_array()).T)
+        np.testing.assert_array_equal(shown[-1], replay.cell_density[replay.nonborder])
+        replay.timestep()
+    assert not np.array_equal(shown[0], shown[-1])  # the cells did move
     observer.animation._draw_was_started = True
     plt.close("all")
 
@@ -181,6 +192,7 @@ def test_sparse_recorded_history_uses_paired_steps_in_animation():
     animation = animate(lgca, kind="density", cbar=False)
     animation._func(2)
     assert animation._fig.axes[0].get_title() == "Time $k =$4"
+    animation._draw_was_started = True
     plt.close(animation._fig)
 
 
@@ -320,6 +332,11 @@ def test_multispecies_zero_step_animation_observer_uses_aggregate_density():
 
     assert observer.frame_steps == [0]
     assert isinstance(observer.animation, FuncAnimation)
+    np.testing.assert_array_equal(
+        np.asarray(observer.animation._fig.axes[0].images[0].get_array()).T,
+        lgca.species_density[lgca.nonborder].sum(-1),
+    )
+    assert lgca.species_density[lgca.nonborder][..., 1].any()  # the second species is there to be shown
     observer.animation._draw_was_started = True
     plt.close("all")
 
