@@ -117,3 +117,12 @@ def test_help_says_what_the_positional_arguments_are(capsys):
         _main(["examples", "export", "--help"])
     out = capsys.readouterr().out
     assert "biolgca examples list" in out and ".json" in out
+
+
+def test_version_option_names_the_installed_version(capsys):
+    from importlib.metadata import version
+
+    with pytest.raises(SystemExit) as exit_info:
+        _main(["--version"])
+    assert exit_info.value.code == 0
+    assert capsys.readouterr().out.strip() == f"biolgca {version('biolgca')}"

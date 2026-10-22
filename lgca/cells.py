@@ -343,7 +343,8 @@ class Cells:
         if which.dtype == bool:
             if which.shape != (len(self),):
                 raise ValueError(f"a mask of cells must have one entry per cell ({len(self)}), "
-                                 f"got shape {which.shape}")
+                                 f"got shape {which.shape}; if cells were killed or divided since the "
+                                 "mask was computed, compute it after these operations")
             return which
         if which.ndim > 1:  # also when it selects no cell, so that the error does not depend on the data
             raise ValueError(f"cell positions must be a 1-D array, got shape {which.shape}; use "

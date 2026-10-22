@@ -44,3 +44,18 @@ def test_set_trait_changes_the_trait_and_arithmetic_on_the_copy_works(volume_exc
     living = np.unique(labels[labels > 0]) if labels.dtype != object else \
         np.unique([label for node in labels.reshape(-1, labels.shape[-1]) for channel in node for label in channel])
     np.testing.assert_allclose(np.asarray(lgca.props["r_b"])[living], 0.4)  # 0.2 and two steps of +0.1
+
+
+def test_a_mask_computed_before_a_kill_says_to_recompute_it():
+    @interaction(kind="birth_death", families=("ib",))
+    def kill_then_reuse_mask(state):
+        old = state.cells["r_b"] > 0  # every cell
+        state.cells.kill(np.flatnonzero(old)[:1])
+        state.cells.set_trait(old, "r_b", 0.5)
+
+    with pytest.raises(ValueError, match="compute it after these operations"):
+        run_model(ModelSpec(space=SpaceSpec(geometry="lin", dims=10),
+                            state=StateSpec(density=0.5, restchannels=1, identity_based=True, traits={"r_b": 0.2}),
+                            time=TimeSpec(steps=1, seed=1),
+                            dynamics=InteractionPipelineSpec(operators=[kill_then_reuse_mask()])),
+                  showprogress=False)

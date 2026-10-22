@@ -121,3 +121,19 @@ def test_wrong_parameter_of_a_switch_cue_is_named():
 
     with pytest.raises(ValueError, match=r"cue 'student_crowded': .*'radus'"):
         run_model(_switch_spec({"name": "student_crowded", "kappa": 5, "theta": 0.5, "radus": 2}))
+
+
+def test_a_trait_name_given_as_a_resting_probability_says_how_to_write_it():
+    from lgca.pipeline import (
+        InteractionPipelineSpec,
+        ReorientationSpec,
+        ReorientationTermSpec,
+    )
+
+    term = ReorientationTermSpec("resting", parameters={"probability": "p_rest"})
+    spec = ModelSpec(space=SpaceSpec(geometry="lin", dims=10),
+                     state=StateSpec(density=0.5, restchannels=1, identity_based=True, traits={"p_rest": 0.3}),
+                     time=TimeSpec(steps=1, seed=1),
+                     dynamics=InteractionPipelineSpec(operators=[ReorientationSpec(terms=[term])]))
+    with pytest.raises(TypeError, match=r"\{'max': 'p_rest'\}"):
+        build_model(spec)

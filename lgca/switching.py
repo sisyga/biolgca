@@ -376,6 +376,9 @@ def _rate(value, where):
 
 
 def _probability(value, where):
+    if isinstance(value, str):
+        raise TypeError(f"{where} {value!r} looks like the name of a trait; for a probability per cell "
+                        f"write {{'max': {value!r}}} (identity-based models)")
     if isinstance(value, bool) or not isinstance(value, (int, float, np.integer, np.floating)):
         raise TypeError(f"{where} must be a number or a response to cues ({{'max': ..., 'cues': [...]}}), "
                         f"got {value!r}")

@@ -69,7 +69,10 @@ def _raised_outside_lgca(exc) -> bool:
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    from .model import _package_version
+
     parser = argparse.ArgumentParser(prog="biolgca")
+    parser.add_argument("--version", action="version", version=f"biolgca {_package_version()}")
     commands = parser.add_subparsers(dest="command", required=True)
 
     examples = commands.add_parser("examples", help="list (the default) or export curated models")
