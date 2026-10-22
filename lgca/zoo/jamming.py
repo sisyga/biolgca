@@ -278,11 +278,10 @@ def build_spec(full: bool = False, *, beta: float = 1.0, ecm: float = 1.0, setup
         source[:, :2] = 1.0  # the rows y = 0 and 1
     else:
         from lgca import get_lgca
+        from lgca.zoo._geometry import centre_distance
 
         coordinates = get_lgca(geometry="hex", dims=dims, density=0.0, restchannels=3)
-        x, y = coordinates.xcoords, coordinates.ycoords
-        centre = (size // 2, size // 2)
-        source = (np.hypot(x - x[centre], y - y[centre]) <= radius).astype(float)
+        source = (centre_distance(coordinates) <= radius).astype(float)
     # ρ₀ cells per source node, in random channels
     nodes = np.zeros(dims + (K,), dtype=bool)
     for index in np.argwhere(source > 0):
