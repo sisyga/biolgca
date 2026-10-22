@@ -1,69 +1,70 @@
-Planned documentation topics
-============================
+Known limitations
+=================
 
-This page records intentionally deferred work. It distinguishes supported
-release behavior from ideas that still need an implementation and tests.
+What BioLGCA does not do yet, and what is planned.
 
-Custom interactions
--------------------
+Restarting identity-based models
+--------------------------------
 
-The supported callable and registered-plugin paths are described in
-:doc:`/how_to/custom_interactions`, :doc:`interactions_summary` and
-:doc:`/how_to/model_specs_and_plugins`. A future packaging cookbook may add an
-end-to-end external distribution example. Arbitrary imports from model files
-remain intentionally unsupported.
+A run of an identity-based model cannot yet be restarted from saved data:
+the ``from_npz`` initializer reads classical states only, because the labels
+of the cells and their traits would have to be restored together. Rerun such
+a model from its model specification and seed instead, which gives the same
+run again.
+
+Initial conditions
+------------------
+
+The initial conditions are a random density, a filled region, an explicit
+array of nodes and an array read from a file (see :doc:`/how_to/model_specs_and_plugins`, "Initial
+conditions"). The region fills all channels of all species; cells in
+particular channels or of one species need an explicit ``nodes`` array.
 
 Boundary conditions
 -------------------
 
-Periodic, reflecting and absorbing behavior is covered by the core invariant
-suite. A concise user-facing matrix for periodic, reflecting, absorbing and
-inflow support by geometry and model family is still needed.
+Periodic, reflecting and absorbing boundaries are tested on every lattice. A
+table of which boundaries every geometry and model family supports, inflow
+included, is still to be written.
 
-Plotting cookbook
------------------
+Plots
+-----
 
-The observer and plotting dispatch APIs are described in
-:doc:`/how_to/observers_and_plotting`. Square scalar fields use image artists and
-multi-species density selection is shared across static and animated paths.
-Remaining work includes consistent absolute/relative normalization, scalable
-colorbar tick locators, a documented slicing matrix, property/family plots
-and publication styling of 2-D plots.
+:doc:`/how_to/observers_and_plotting` describes the plots and animations.
+Still missing: a choice between absolute and relative colour scales in all
+plots, plots of the traits and families of identity-based models beyond the
+Muller plot, and a style for publication figures.
 
-Custom initial conditions
--------------------------
+Parameter studies and the explorer
+----------------------------------
 
-Named region and numeric NPZ initializers are documented in
-:doc:`/getting_started`. A complete advanced guide should still describe raw
-``nodes`` shapes for classical, identity-based, NoVE and multi-species models
-in each geometry. Identity-based checkpoint loading remains unsupported until
-particle properties and labels can be restored atomically.
+Sweeps run in parallel on one machine (:doc:`/how_to/studying_a_model`), not
+yet on a cluster. The live explorer (:doc:`/how_to/exploring`) shows one
+window of plots at a time.
 
-Runtime control and parameter studies
--------------------------------------
+Analysing evolution
+-------------------
 
-Parameter scans, stochastic replicates and parallel workers are supported by
-``lgca.study.sweep`` and the CLI; see :doc:`/how_to/studying_a_model`.
-The notebook explorer supports pause/resume and live parameter editing; see
-:doc:`/how_to/exploring`. A distributed scan scheduler and a second live
-custom-quantity window remain future UI/runtime projects, outside the portable
-configuration contract.
+Population sizes of families and their ancestry are recorded, but there are
+no functions yet for diversity indices or the entropy of a population, nor a
+recorder of the trait distribution over time (record the nodes and read the
+traits of the cells, see :doc:`/how_to/observers_and_plotting`).
 
-Scientific observables and family workflows
--------------------------------------------
+Sharing rules as a package
+--------------------------
 
-Family population and ancestry utilities are available, but a focused
-observables API for diversity indices and entropy is still planned. Remaining
-identity-based work also includes validated family-aware initialization,
-stopping conditions and additional family visualizations.
+Rules are shared as a Python module that is imported before a model runs
+(:doc:`/how_to/custom_interactions`). A worked example of distributing rules
+as an installable package is planned. Model files will not import code
+themselves.
 
-Adhesion-driven invasion model
-------------------------------
+The removed wetting interaction
+-------------------------------
 
-The former ``wetting`` interaction and its ``classical.wetting`` port were
-removed because they relied on undocumented model attributes (``ecm``,
-``spheroid``) and silently changed the interaction radius. The model of
-cell–cell adhesion, matrix confinement and jamming in breast cancer invasion
-(Ilina et al., *Nat. Cell Biol.* 2020, https://doi.org/10.1038/s41556-020-0552-6)
-is available in :doc:`/zoo/jamming`. It composes adhesion, pressure,
-matrix confinement, degradation and influx in a ModelSpec pipeline.
+The former ``wetting`` interaction was removed because it relied on
+undocumented model attributes and silently changed the interaction radius.
+The model of cell–cell adhesion, matrix confinement and jamming in breast
+cancer invasion (Ilina et al., *Nat. Cell Biol.* 2020,
+https://doi.org/10.1038/s41556-020-0552-6) is available in
+:doc:`/zoo/jamming`, composed from adhesion, pressure, matrix confinement,
+degradation and influx rules.

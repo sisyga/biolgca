@@ -5,12 +5,10 @@ on:
     branches:
       - master
       - aidevelop
-      - kio/development
   pull_request:
     branches:
       - master
       - aidevelop
-      - kio/development
 
 jobs:
   tests:
