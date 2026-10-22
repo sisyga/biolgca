@@ -52,9 +52,14 @@ probability uses one form: ``"cues"`` with ``"max"`` (tanh), ``"cues"`` with
 The cues are values of the lattice state at every node:
 
 ``"density"``
-    cells at the node over the capacity (``K`` with volume exclusion,
-    ``StateSpec.capacity`` without); ``scope="neighbourhood"`` averages over
-    the node and its neighbours.
+    cells at the node over the capacity of the lattice state,
+    ``state.capacity``: ``StateSpec.capacity`` if the model sets one, else
+    the cells a node holds (``n_species * K`` with volume exclusion);
+    ``scope="neighbourhood"`` averages over the node and its neighbours.
+    ``kappa`` and ``theta`` of ``go_or_rest`` and go-or-grow divide by ``K``
+    with volume exclusion instead, whatever the capacity and the species: the
+    two agree without volume exclusion and for one species without
+    ``StateSpec.capacity``.
 ``"field"``
     the value of a field of ``StateSpec.fields`` (``field=`` its name).
 ``"gradient"``
@@ -77,6 +82,7 @@ trait as well, in the Hill form ``K`` and ``n``, and in the tanh and Hill forms
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -448,10 +454,12 @@ def _trait(cells, name, which, cue):
 def _values(state, cue):
     """The cue at every node, shape ``state.dims``."""
     view = state if cue.sensed_species is None else state.sensing(cue.sensed_species)
-    try:
-        values = np.asarray(_CUES[cue.name](view, **cue.parameters), dtype=float)
+    function = _CUES[cue.name]
+    try:  # only the parameters: a TypeError of the cue's own code keeps its type and traceback
+        inspect.signature(function).bind(view, **cue.parameters)
     except TypeError as exc:
         raise ValueError(f"cue {cue.name!r}: {exc}") from exc
+    values = np.asarray(function(view, **cue.parameters), dtype=float)
     if values.shape != state.dims:
         raise ValueError(f"the cue {cue.name!r} must give one value per node, shape {state.dims}, "
                          f"got {values.shape}")

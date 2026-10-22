@@ -31,9 +31,34 @@ __all__ = [
 _COPYING_TEMPLATES: ContextVar[bool] = ContextVar("lgca_copying_templates", default=False)
 
 
+# fields of ParameterSpec that nothing in lgca sets; they are deprecated
+_UNUSED_PARAMETER_FIELDS = {"shape": None, "dependencies": (), "validator": None}
+
+
 @dataclass(frozen=True)
 class ParameterSpec:
-    """Machine-readable contract for a plugin parameter."""
+    """Machine-readable contract for a plugin parameter.
+
+    Attributes
+    ----------
+    default : Any
+        Value used when the parameter is not given.
+    required : bool, default=False
+        Whether the parameter must be given.
+    type_label : str, optional
+        A type that :func:`lgca.plugins.validate_plugin_parameters` checks:
+        ``"probability"`` (values in [0, 1]), ``"finite scalar"``,
+        ``"positive integer"``, ``"non-negative integer"``, ``"string"`` or
+        ``"boolean"``. Other labels are descriptions only.
+    allowed_values : tuple, optional
+        The values the parameter may take.
+    description : str
+        Plain-language meaning, shown by :func:`lgca.plugins.describe_plugin`.
+    shape, dependencies, validator
+        Deprecated: nothing in lgca sets them, and ``validator`` and
+        ``dependencies`` are not checked. Check values in the operator's
+        ``validate`` method instead.
+    """
 
     default: Any = None
     required: bool = False
@@ -44,6 +69,14 @@ class ParameterSpec:
     validator: str | None = None
     description: str = ""
 
+    def __post_init__(self):
+        given = [name for name, unset in _UNUSED_PARAMETER_FIELDS.items() if getattr(self, name) != unset]
+        if given:
+            from ._warnings import warn_user
+
+            warn_user(f"ParameterSpec.{', '.join(given)} is deprecated and will be removed; check the "
+                      "parameter in the operator's validate method instead", DeprecationWarning)
+
     @classmethod
     def from_metadata(cls, metadata: Any) -> ParameterSpec:
         if isinstance(metadata, cls):
@@ -53,7 +86,7 @@ class ParameterSpec:
             return cls(
                 default=metadata.get("default"),
                 required=bool(metadata.get("required", "default" not in metadata)),
-                type_label=metadata.get("type_label") or _type_label_from_validator(validator),
+                type_label=metadata.get("type_label"),
                 shape=metadata.get("shape"),
                 allowed_values=_tuple_or_none(metadata.get("allowed_values")),
                 dependencies=tuple(metadata.get("dependencies", ())),
@@ -83,21 +116,6 @@ def _tuple_or_none(value):
     if value is None:
         return None
     return tuple(value)
-
-
-def _type_label_from_validator(validator: str | None) -> str | None:
-    if not validator:
-        return None
-    text = validator.lower()
-    if "probability" in text:
-        return "probability"
-    if "positive integer" in text:
-        return "positive integer"
-    if "non-negative integer" in text:
-        return "non-negative integer"
-    if "finite scalar" in text and " or " not in text:
-        return "finite scalar"
-    return None
 
 
 @dataclass(frozen=True)

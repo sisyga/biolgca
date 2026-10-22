@@ -10,6 +10,14 @@ from .operator_base import InteractionOperator, PluginInfo
 PluginFactory = Callable[[Mapping[str, Any] | None], InteractionOperator]
 
 
+class UnknownPluginError(KeyError):
+    """No plugin is registered under the name.
+
+    A subclass of ``KeyError``, so that callers can tell an unknown name from a
+    ``KeyError`` raised while a registered operator is built or validated.
+    """
+
+
 class PluginRegistry:
     """Collision-safe registry for explicitly imported simulation plugins."""
 
@@ -56,14 +64,14 @@ class PluginRegistry:
         try:
             return self._plugins[canonical][1]
         except KeyError as exc:
-            raise KeyError(f"Unknown plugin {name!r}.") from exc
+            raise UnknownPluginError(f"Unknown plugin {name!r}.") from exc
 
     def describe(self, name: str) -> PluginInfo:
         canonical = self._aliases.get(name, name)
         try:
             return self._plugins[canonical][0]
         except KeyError as exc:
-            raise KeyError(f"Unknown plugin {name!r}.") from exc
+            raise UnknownPluginError(f"Unknown plugin {name!r}.") from exc
 
     def list(self, kind: str | None = None) -> list[PluginInfo]:
         plugins = [entry[0] for entry in self._plugins.values()]

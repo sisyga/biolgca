@@ -101,6 +101,10 @@ class Schedule:
         )
 
     def should_run(self, step: int) -> bool:
+        """Whether the observer records ``step``: one of ``steps`` if given, else every ``every``-th step.
+
+        Steps count from the start of the run; step 0 is the initial state.
+        """
         if self.steps is not None:
             return step in self.steps
         return step % self.every == 0
@@ -114,16 +118,39 @@ class Observer:
     also of a run that failed; before that, ``truncate(lgca, step)`` asks the
     observer to keep only what it recorded up to ``step``, the last step that
     completed.
+
+    A recorder of one's own overrides these hooks; ``lgca`` is the model
+    object (``lgca.cell_density[lgca.nonborder]`` are the cells per node).
+    Keep what it records on the observer, which the caller reads after the
+    run.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from lgca.simulation import Observer, Schedule
+    >>> class OccupiedNodes(Observer):  # the number of nodes with at least one cell
+    ...     def setup(self, lgca, runner):
+    ...         self.values = []
+    ...     def on_step(self, lgca, step):
+    ...         self.values.append(int(np.count_nonzero(lgca.cell_density[lgca.nonborder])))
+    >>> recorder = OccupiedNodes(schedule=Schedule(every=10))
     """
 
     def __init__(self, schedule: Schedule | None = None):
         self.schedule = schedule or Schedule()
 
     def setup(self, lgca, runner: "SimulationRunner") -> None:
-        pass
+        """Prepare for a run, before step 0: e.g. allocate the arrays for the scheduled steps.
+
+        ``runner.timesteps`` is the number of steps of the run.
+        """
 
     def on_step(self, lgca, step: int) -> None:
-        pass
+        """Record ``lgca`` at a step that ``schedule.should_run(step)`` selects.
+
+        Step 0 is the initial state, step ``n`` the state after ``n`` steps
+        (interactions and propagation). Do not change the model.
+        """
 
     def truncate(self, lgca, step: int) -> None:
         """Keep what was recorded up to ``step``: the run failed after it, so later rows are empty."""
@@ -138,7 +165,7 @@ class Observer:
                 setattr(lgca, attribute, getattr(lgca, attribute)[:count])
 
     def finalize(self, lgca, runner: "SimulationRunner") -> None:
-        pass
+        """Finish after the last step, also of a run that failed: e.g. write files, close figures."""
 
 
 class CallbackObserver(Observer):
@@ -362,7 +389,7 @@ class PopulationRecorder(Observer):
         lgca.n_t = np.zeros(length, dtype=np.uint)
 
     def on_step(self, lgca, step: int) -> None:
-        lgca.n_t[self._sample_indices[step]] = lgca.cell_density[lgca.nonborder].sum()
+        lgca.n_t[self._sample_indices[step]] = _total_population(lgca)
 
 
 class DensityRecorder(Observer):
@@ -402,9 +429,7 @@ class DensityRecorder(Observer):
 
     @staticmethod
     def _density(lgca):
-        if hasattr(lgca, "species_density"):
-            return lgca.species_density[lgca.nonborder]
-        return lgca.cell_density[lgca.nonborder]
+        return _recorded_density(lgca)
 
 
 def _has_unbounded_counts(lgca) -> bool:
@@ -634,11 +659,9 @@ class CSVSnapshotObserver(Observer):
         values = _snapshot_values(lgca, self.kind)
         filename = self.filename.format(kind=self.kind, step=step)
         path = (self.output_dir / filename).resolve()
-        if self._output_root is not None:
-            windows = PureWindowsPath(filename)
-            if (Path(filename).anchor or windows.anchor or ".." in Path(filename).parts
-                    or ".." in windows.parts or not path.is_relative_to(self._output_root)):
-                raise ValueError("Snapshot output path escapes the run directory")
+        if self._output_root is not None and (_leaves_its_directory(filename)
+                                              or not path.is_relative_to(self._output_root)):
+            raise ValueError("Snapshot output path escapes the run directory")
         _write_array_csv(path, values)
         self.paths.append(path)
 
@@ -702,9 +725,7 @@ class ScalarTimeSeriesRecorder(Observer):
 def _snapshot_values(lgca, kind: str):
     key = kind.replace("_", "").lower()
     if key == "density":
-        if hasattr(lgca, "species_density"):
-            return lgca.species_density[lgca.nonborder]
-        return lgca.cell_density[lgca.nonborder]
+        return _recorded_density(lgca)
     if key in {"nodes", "config", "configuration"}:
         return lgca.nodes[lgca.nonborder]
     if key in {"channelpop", "channelpopulation"}:
@@ -721,10 +742,21 @@ def _write_array_csv(path: Path, values) -> None:
             writer.writerow([index, _scalar_value(value)])
 
 
-def _total_population(lgca):
-    if hasattr(lgca, "species_density"):
-        return lgca.species_density[lgca.nonborder].sum()
-    return lgca.cell_density[lgca.nonborder].sum()
+def _leaves_its_directory(path) -> bool:
+    """Whether a relative output path is absolute or contains '..', on POSIX or on Windows."""
+    raw, windows = Path(path), PureWindowsPath(path)
+    return bool(raw.anchor or windows.anchor or ".." in raw.parts or ".." in windows.parts)
+
+
+def _total_population(lgca) -> int:
+    """The number of cells on the lattice (``cell_density`` also counts every species)."""
+    return int(lgca.cell_density[lgca.nonborder].sum())
+
+
+def _recorded_density(lgca):
+    """The cells at every node of the lattice, per species if the model has several."""
+    density = lgca.species_density if hasattr(lgca, "species_density") else lgca.cell_density
+    return density[lgca.nonborder]
 
 
 def _scalar_value(value):
