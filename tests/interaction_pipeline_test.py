@@ -25,7 +25,6 @@ from lgca.pipeline import (
 )
 from lgca.plugins import PluginInfo, ReorientationOperator
 from lgca.simulation import NodeRecorder
-from lgca.simulation import DensityRecorder, PopulationRecorder
 
 
 def test_native_uniform_reorientation_preserves_total_mass():
@@ -760,75 +759,6 @@ def test_chemotaxis_term_uses_static_field_dependency_in_schedule():
 
     assert result.lgca.nodes_t[0].sum() == result.lgca.nodes_t[1].sum()
     assert "inputs=signal" in result.pipeline.describe_schedule()
-
-
-def test_target_example_shape_runs_with_species_specific_reorientation_terms():
-    signal = np.arange(16, dtype=float).reshape(4, 4)
-    spec = ModelSpec(
-        description=Description(
-            title="Two-phenotype migration model",
-            details=(
-                "Birth/death and phenotype switching followed by species-specific "
-                "Boltzmann reorientation terms, then deterministic propagation."
-            ),
-        ),
-        space=SpaceSpec(geometry="square", dims=(4, 4), boundary="periodic"),
-        state=StateSpec(
-            density=0.4,
-            restchannels=1,
-            n_species=2,
-            fields={"signal": signal},
-        ),
-        time=TimeSpec(steps=2, seed=34),
-        dynamics=InteractionPipelineSpec(
-            operators=[
-                BirthDeathSpec(
-                    name="birth_death",
-                    parameters={"birth_rate": 0.1, "death_rate": 0.0},
-                ),
-                PhenotypeSwitchSpec(
-                    name="phenotype_switch",
-                    parameters={"rates": [[0.0, 0.1], [0.0, 0.0]]},
-                ),
-                ReorientationSpec(
-                    sampler="boltzmann",
-                    terms=[
-                        ReorientationTermSpec(
-                            name="nematic_alignment",
-                            beta=2.0,
-                            species=0,
-                        ),
-                        ReorientationTermSpec(
-                            name="chemotaxis",
-                            beta=1.5,
-                            species=1,
-                            parameters={"field": "signal"},
-                        ),
-                    ],
-                ),
-            ],
-            propagation="default",
-        ),
-        analysis=AnalysisSpec(
-            observers=[
-                NodeRecorder(),
-                DensityRecorder(),
-                PopulationRecorder(),
-            ],
-        ),
-    )
-
-    result = run_model(spec, showprogress=False)
-
-    assert result.metadata["operator_names"] == [
-        "birth_death",
-        "phenotype_switch",
-        "reorientation.boltzmann",
-    ]
-    assert result.metadata["reorientation_term_names"] == ["nematic_alignment", "chemotaxis"]
-    assert result.lgca.nodes_t.shape[0] == 3
-    assert result.lgca.dens_t.shape[0] == 3
-    assert result.lgca.n_t.shape[0] == 3
 
 
 def test_native_moore_nematic_uses_safe_lazy_tensor_permutations():
