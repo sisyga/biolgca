@@ -200,30 +200,6 @@ class NoVE_IBLGCA_Cubic(NoVE_IBLGCA_base, LGCA_Cubic):
 
         self.nodes = newnodes
 
-    def _apply_rbc_x(self):
-        self.nodes[self.r_int, :, :, 0] = (
-            self.nodes[self.r_int, :, :, 0] + self.nodes[self.r_int - 1, :, :, 1]
-        )
-        self.nodes[-self.r_int - 1, :, :, 1] = (
-            self.nodes[-self.r_int - 1, :, :, 1] + self.nodes[-self.r_int, :, :, 0]
-        )
-
-    def _apply_rbc_y(self):
-        self.nodes[:, self.r_int, :, 2] = (
-            self.nodes[:, self.r_int, :, 2] + self.nodes[:, self.r_int - 1, :, 3]
-        )
-        self.nodes[:, -self.r_int - 1, :, 3] = (
-            self.nodes[:, -self.r_int - 1, :, 3] + self.nodes[:, -self.r_int, :, 2]
-        )
-
-    def _apply_rbc_z(self):
-        self.nodes[:, :, self.r_int, 4] = (
-            self.nodes[:, :, self.r_int, 4] + self.nodes[:, :, self.r_int - 1, 5]
-        )
-        self.nodes[:, :, -self.r_int - 1, 5] = (
-            self.nodes[:, :, -self.r_int - 1, 5] + self.nodes[:, :, -self.r_int, 4]
-        )
-
     def _apply_abc_x(self):
         """
         Apply absorbing boundary conditions in x-direction.

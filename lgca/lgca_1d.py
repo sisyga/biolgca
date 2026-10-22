@@ -865,11 +865,6 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
 
         self.nodes = newnodes
 
-    def apply_rbc(self):
-        self.nodes[self.r_int, 0] = self.nodes[self.r_int, 0] + self.nodes[self.r_int - 1, 1]
-        self.nodes[-self.r_int - 1, 1] = self.nodes[-self.r_int - 1, 1] + self.nodes[-self.r_int, 0]
-        self.apply_abc()
-
     def apply_abc(self):
         """
         Apply absorbing boundary conditions to the 1D lattice, removing all particles at the boundaries.
@@ -953,5 +948,3 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
         times = history_steps(self, len(nodes_t), "nodes_steps", sample_steps, implicit=implicit_history)
         label_history_axis(ax, times)
         return plot
-
-
