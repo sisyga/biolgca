@@ -45,6 +45,8 @@ def test_tanh_switch_is_a_sigmoid_centred_on_theta():
     assert np.all(np.diff(values) > 0)
     assert np.all((values > 0) & (values < 1))
     assert tanh_switch(0.4, kappa=20.0, theta=0.3) > tanh_switch(0.4, kappa=5.0, theta=0.3)
+    # off centre, against the documented closed form (1 + tanh(kappa (rho - theta))) / 2
+    assert tanh_switch(0.5, kappa=5.0, theta=0.3) == pytest.approx(0.5 * (1 + np.tanh(1.0)))
 
 
 def test_random_walk_moves_cells_but_keeps_every_identity():
@@ -109,7 +111,8 @@ def test_go_or_grow_switches_cells_to_rest_with_the_density_sigmoid():
     lgca.timestep()
 
     resting = int(lgca.channel_pop[lgca.nonborder][:, -1].sum())
-    _assert_binomial_mean(resting, 10 * N_NODES, tanh_switch(10 / 20, kappa=5.0, theta=0.3))
+    # (1 + tanh(kappa (rho - theta))) / 2 at rho = 10 / 20, written out: not the helper the rule calls
+    _assert_binomial_mean(resting, 10 * N_NODES, 0.5 * (1 + np.tanh(5.0 * (0.5 - 0.3))))
 
 
 @pytest.mark.parametrize("driver,sign", [(True, 1), (False, -1)])
