@@ -31,6 +31,10 @@ _WIDTH = {"field": 0, "reorientation": 1, "phenotype_switch": 2, "birth_death": 
 _KEPT = {"field": 2, "reorientation": 1, "phenotype_switch": 0}
 
 
+class UnknownFieldError(KeyError):
+    """A rule reads a field that the model does not declare in ``StateSpec.fields``."""
+
+
 class ContractWarning(UserWarning):
     """A rule did what its declared kind does not allow, e.g. a reorientation that sets traits.
 
@@ -333,7 +337,7 @@ class LatticeState:
     def _padded_field(self, name):
         """The field as the model stores it, with ghost nodes, or padded like cells."""
         if not hasattr(self._lgca, name):
-            raise KeyError(f"state.fields.{name} does not exist; declare the field in StateSpec.fields")
+            raise UnknownFieldError(f"state.fields.{name} does not exist; declare the field in StateSpec.fields")
         self.fields_read.add(name)
         values = np.asarray(getattr(self._lgca, name))
         if name in self._fields_written:

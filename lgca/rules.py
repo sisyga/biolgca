@@ -32,6 +32,7 @@ import numpy as np
 from ._warnings import warn_user
 from .lattice_state import _WIDTH, ContractWarning, LatticeState
 from .operator_base import InteractionOperator, PluginInfo
+from .operator_registry import UnknownPluginError
 from .plugins import _law_for_kind, register_plugin, validate_plugin_parameters
 
 __all__ = ["CellWeights", "Interaction", "ReorientationCue", "Stack", "interaction", "register_single_cue",
@@ -371,7 +372,7 @@ class StackOperator(InteractionOperator):
                 operator = _compile_operator(entry, memo)
                 operator.validate_parameter_contracts(context)
                 operator.validate(context)
-            except (KeyError, ValueError) as exc:
+            except (UnknownPluginError, ValueError) as exc:
                 raise ValueError(f"{self.rule.name}: operators[{index}] {exc}") from exc
             if _WIDTH.get(operator.operator_kind, -1) > _WIDTH.get(self.operator_kind, 4):
                 # each operator still runs by its own kind; only what the model reports is wrong

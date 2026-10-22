@@ -17,6 +17,7 @@ import numpy as np
 
 from . import get_lgca
 from .lattice_state import _pad_field
+from .operator_registry import UnknownPluginError
 from .pipeline import (
     BirthDeathSpec,
     InteractionPipelineSpec,
@@ -895,7 +896,7 @@ def _registered_operator_to_dict(name, parameters) -> dict[str, Any]:
 
     try:
         info = describe_plugin(str(name))
-    except KeyError as exc:
+    except UnknownPluginError as exc:
         raise TypeError(
             f"ModelSpec is not portable: operator {name!r} is not a registered plugin. "
             "Import and register it in a trusted Python launcher before saving."
