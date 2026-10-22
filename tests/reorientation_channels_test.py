@@ -117,12 +117,13 @@ def test_large_channel_subsets_are_rejected_before_enumeration(monkeypatch):
         model.step()
 
 
+@pytest.mark.parametrize("ve", [True, False], ids=["ve", "nove"])  # the two families sum neighbours apart
 @pytest.mark.parametrize("bc", ["periodic", "reflecting"])
 @pytest.mark.parametrize("geometry, dims", [("lin", (9,)), ("square", (6, 7)), ("hex", (8, 8)),
                                             ("cubic", (5, 4, 6)), ("moore", (5, 4, 6))])
-def test_neighbour_values_point_along_the_velocities(geometry, dims, bc):
+def test_neighbour_values_point_along_the_velocities(geometry, dims, bc, ve):
     model = build_model(ModelSpec(space=SpaceSpec(geometry=geometry, dims=dims, boundary=bc),
-                                  state=StateSpec(density=0.5, restchannels=1)))
+                                  state=StateSpec(density=0.5, restchannels=1, volume_exclusion=ve)))
     lgca = model.lgca
     state = LatticeState(lgca)
     values = np.random.default_rng(0).random(dims)
