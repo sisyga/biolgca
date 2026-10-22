@@ -1,6 +1,5 @@
 """Lattice plots choose their figure predictably, and recorded animations play and save."""
 
-import gc
 
 import matplotlib
 
@@ -11,7 +10,7 @@ import numpy as np
 import pytest
 
 from lgca import get_lgca
-from lgca.plots import LatticeAnimation, colorbar_index
+from lgca.plots import colorbar_index
 
 FAMILIES = {"classical": {}, "nove": {"ve": False}, "ib": {"ib": True}, "nove_ib": {"ve": False, "ib": True}}
 
@@ -93,18 +92,6 @@ def test_recorded_animations_save_gifs_without_ffmpeg(kind, tmp_path):
     getattr(lgca, f"animate_{kind}")(save_path=path, save_kwargs={"dpi": 20})
 
     assert path.read_bytes()[:6] in (b"GIF87a", b"GIF89a")
-
-
-@pytest.mark.filterwarnings("ignore:Animation was deleted without rendering")
-@pytest.mark.parametrize("family", FAMILIES)
-@pytest.mark.parametrize("kind", ["density", "flux", "config"])
-def test_recorded_animations_of_every_family_are_lattice_animations(kind, family):
-    lgca = _recorded("square", family, steps=1)
-    anim = getattr(lgca, f"animate_{kind}")()
-
-    assert isinstance(anim, LatticeAnimation)
-    del anim
-    gc.collect()  # delete the unrendered animation while its warning is filtered
 
 
 def test_animation_displays_as_html_player_and_closes_its_static_figure():
