@@ -136,11 +136,6 @@ interaction; everyone taking part follows the
 `code of conduct <https://github.com/sisyga/biolgca/blob/master/CODE_OF_CONDUCT.md>`_.
 BioLGCA is distributed under the BSD 3-clause license.
 
-BioLGCA has been developed with the help of generative AI coding assistants
-since 2025; the README of the repository describes how, and how the results
-are checked against the frozen implementations of the code before 2.0,
-analytic expectations and the published models of the zoo.
-
 .. toctree::
    :maxdepth: 4
    :hidden:

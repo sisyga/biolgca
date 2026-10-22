@@ -283,27 +283,14 @@ uv run python docs/build.py    # documentation, executes all tutorials
 
 User-facing changes are recorded in [CHANGELOG.md](CHANGELOG.md).
 
-## History and use of AI tools
+## History
 
 BioLGCA has been developed at TU Dresden since 2018. The code base before
 2.0, kept on branch [`v1`](https://github.com/sisyga/biolgca/tree/v1), grew
 from 2018 alongside the research that used it, with contributions from the
 people listed under [Acknowledgements](#acknowledgements), and was modernised
-in 2025. Version 2.0 (2026) rewrote the package around declarative model specifications, a rule contract
-and the model zoo.
-
-Since 2025 the package has been developed with the help of generative AI
-coding assistants (OpenAI Codex, GitHub Copilot and Anthropic's Claude Code),
-which wrote code, tests and documentation under the direction of the
-maintainer. Codex work was merged from `codex/` branches, Copilot work is
-authored by `copilot-swe-agent[bot]`, and commits written with Claude Code
-since September 2026 carry a `Co-Authored-By` trailer. The
-results are checked independently of the code that produced them: the test
-suite compares the new rules statistically with the frozen interaction
-functions of the code before 2.0 (`tests/legacy/`) and with analytic expectations,
-every rule is checked against the conservation laws of its kind, and each
-zoo notebook reproduces a result of its paper at reduced size and states what
-differs.
+in 2025. Version 2.0 (2026) rewrote the package around declarative model
+specifications, a rule contract and the model zoo.
 
 ## Citing
 

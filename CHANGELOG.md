@@ -83,9 +83,8 @@ This file records notable user-facing changes. Changes remain under
   not be tried on a copy; `explorer.last_error` keeps the last error shown in
   the explorer's status line.
 - CONTRIBUTING.md, CODE_OF_CONDUCT.md and GitHub issue templates; README and
-  the docs home page state who BioLGCA is for, how it relates to other
-  cell-based modelling tools, the project history and its use of AI coding
-  assistants.
+  the docs home page state who BioLGCA is for and how it relates to other
+  cell-based modelling tools; the README has a short project history.
 
 ### Docs
 
