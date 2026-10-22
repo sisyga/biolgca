@@ -90,6 +90,28 @@ def test_rules_and_legacy_code_can_take_turns():
     assert after == before
 
 
+def test_rules_see_the_cells_that_code_writing_label_lists_moved():
+    # a pure move keeps the number of cells, so only what the next rule sees shows whether it arrived
+    from lgca import interaction
+
+    seen = {}
+
+    @interaction(kind="reorientation", families=("nove_ib",), name="cell_store_test.look")
+    def look(state):
+        seen["channels"] = np.asarray(state.cells.channel).copy()
+
+    model = _model("square", (6, 6), "periodic", [{"name": "cell_store_test.look"}], density=2)
+    model.step()  # the cells now live in the table
+    lgca = model.lgca
+    for channels in lgca.nodes.reshape(-1, lgca.K):  # as legacy code or a notebook does: all cells rest
+        channels[-1] = [label for channel in channels for label in channel]
+        channels[:-1] = [[] for _ in range(lgca.K - 1)]
+    resting = lgca.cell_density[lgca.nonborder].sum()
+    model.step()
+    assert len(seen["channels"]) == resting > 0
+    assert np.all(seen["channels"] == lgca.K - 1)
+
+
 def test_changes_to_the_lists_reach_the_table():
     lgca = _model("lin", (6,), "periodic").lgca
     lgca._cell_table()
