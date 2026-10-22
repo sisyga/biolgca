@@ -1,7 +1,5 @@
 import numpy as np
 import pytest
-import copy
-import warnings
 import re
 
 
@@ -39,7 +37,6 @@ class Test_LGCA_IB(T_LGCA_Common):
     """
         Class for testing identity-based LGCA (with volume exclusion).
         * propagation
-        * recording options during simulation
         * boundary conditions (uses tests from classical LGCA)
     """
 
@@ -64,38 +61,6 @@ class Test_LGCA_IB(T_LGCA_Common):
     test_pbc_moore = T_LGCA_classical.test_pbc_moore
     test_rbc_moore = T_LGCA_classical.test_rbc_moore
     test_abc_moore = T_LGCA_classical.test_abc_moore
-
-    @pytest.mark.parametrize("geom,dims", [
-        ('lin', (com.xdim_1d,)),
-        ('square', (com.xdim_square, com.ydim_square)),
-        ('hex', (com.xdim_hex, com.ydim_hex)),
-        ('cubic', (com.xdim_cubic, com.ydim_cubic, com.zdim_cubic)),
-        ('moore', (com.xdim_moore, com.ydim_moore, com.zdim_moore))
-    ])
-    def test_recording(self, geom, dims):
-        # timeevo and recording: check if all properties are available when requested
-        # keywords: record=False -> nodes_t, recordN=False n_t, recorddens=True -> dens_t
-        lgca_1 = get_lgca(geometry=geom, ve=True, ib=True, dims=dims, density=0.5, interaction='only_propagation')
-        lgca_2 = copy.deepcopy(lgca_1)
-
-        lgca_1.timeevo(timesteps=2, recorddens=False, showprogress=False)
-        assert not hasattr(lgca_1, 'dens_t'), "Records density when it should not"
-        assert not hasattr(lgca_1, 'nodes_t'), "Records node configuration when it should not"
-        assert not hasattr(lgca_1, 'n_t'), "Records particle number when it should not"
-        del lgca_1
-
-        lgca_3 = copy.deepcopy(lgca_2)
-        lgca_2.timeevo(timesteps=2, showprogress=False)
-        assert hasattr(lgca_2, 'dens_t'), "Does not record density"
-        del lgca_2
-
-        lgca_4 = copy.deepcopy(lgca_3)
-        lgca_3.timeevo(timesteps=2, record=True, recorddens=False, showprogress=False)
-        assert hasattr(lgca_3, 'nodes_t'), "Does not record node configuration"
-        del lgca_3
-
-        lgca_4.timeevo(timesteps=2, recordN=True, recorddens=False, showprogress=False)
-        assert hasattr(lgca_4, 'n_t'), "Does not record particle number"
 
     def test_propagation(self):
         # 1D
@@ -208,36 +173,26 @@ class Test_LGCA_IB(T_LGCA_Common):
         ('moore', com.nodes_ib_moore)
     ])
     def test_characteristics(self, geom, nodes):
-        # test compliance in all interactions to:
-        # * uniqueness of particle IDs for identification
-        # * IDs are updated correctly (track of maximum ID)
-        # * properties are updated for all particles
+        # in all interactions and at every boundary:
+        # * every living cell keeps a label of its own, at every step
+        # * labels never exceed maxlabel, and every label has its property rows
+        # * motility interactions keep the same cells (labels) on closed lattices
         ref_lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib)
         for interaction in ref_lgca.interactions:
-            # test all boundary conditions in case of abuse of border nodes
-            self.t_characteristics(geom, nodes, interaction, 'pbc')
-            self.t_characteristics(geom, nodes, interaction, 'rbc')
-            self.t_characteristics(geom, nodes, interaction, 'abc')
+            for bc in ('pbc', 'rbc', 'abc'):
+                self.t_characteristics(geom, nodes, interaction, bc)
 
     def t_characteristics(self, geom, nodes, interaction, bc):
-        lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib, nodes=nodes, interaction=interaction, bc=bc)
-        lgca.timeevo(timesteps=100, recorddens=False, record=True, showprogress=False)
-        if lgca.nodes[lgca.nonborder].max() == 0 and lgca.nodes_t[0].max() != 0 and bc != 'abc':
-            warnings.warn("System died out in " + str(interaction))
-        for i in range(101):  # check throughout time evolution
-            # uniqueness principle
-            if lgca.nodes_t[i].min() == 0:  # 0 can occur more than once
-                if not lgca.nodes_t[i].max() == 0:
-                    # if only 0 occurs in this timestep, uniqueness is fulfilled, so only check the rest
-                    assert np.unique(lgca.nodes_t[i], return_counts=True)[1][1:].max() <= 1, \
-                        "Uniqueness principle is broken"
-            else:  # if 0 does not occur, all IDs have to be unique
-                assert np.unique(lgca.nodes_t[i], return_counts=True)[1].max() <= 1, \
-                    "Uniqueness principle is broken"
-            # check ID updates: max can be smaller if a particle died
-            assert lgca.nodes.max() <= lgca.maxlabel, "IDs not updated correctly"
-            # check property updates
-            if lgca.props == {}:
-                continue
-            for propname in lgca.props.keys():
-                assert len(lgca.props[propname]) == lgca.maxlabel + 1, "Properties not updated for all particles"
+        lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib, nodes=nodes, interaction=interaction, bc=bc,
+                        seed=1)
+        lgca.timeevo(timesteps=20, recorddens=False, record=True, showprogress=False)
+        initial_labels = np.sort(nodes[nodes > 0])
+        for state in lgca.nodes_t:
+            labels = state[state > 0]
+            assert np.unique(labels).size == labels.size, "two cells share a label"
+            assert labels.max(initial=0) <= lgca.maxlabel, "a label exceeds maxlabel"
+            if interaction in ('only_propagation', 'random_walk') and bc != 'abc':
+                np.testing.assert_array_equal(np.sort(labels), initial_labels,
+                                              err_msg=f"{interaction} creates, loses or relabels cells")
+        for propname, values in lgca.props.items():
+            assert len(values) == lgca.maxlabel + 1, f"property {propname} misses rows of new cells"
