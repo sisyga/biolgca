@@ -165,7 +165,7 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
         fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout, ax=ax)
 
 
-        cmap = get_cmap(density, ax=ax, cmap=cmap, cbarlabel=cbarlabel, cbar=cbar)
+        cmap = get_cmap(density, ax=ax, vmax=vmax, cmap=cmap, cbarlabel=cbarlabel, cbar=cbar)
 
 
         polygons = [RegularPolygon(xy=(x, y), numVertices=self.velocitychannels, radius=self.r_poly,

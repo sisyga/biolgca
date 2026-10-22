@@ -100,17 +100,13 @@ def test_warning_when_nodes_override_density():
         )
 
 
-def test_warning_on_nonboolean_nodes():
+def test_nonboolean_nodes_with_volume_exclusion_are_rejected():
+    # Casting 2 or 3 cells per channel to one cell would change the population silently.
     nodes = np.array([[2, 0], [3, 1]])
-    with pytest.warns(UserWarning):
-        lgca = get_lgca(
-            geometry='lin',
-            ib=False,
-            ve=True,
-            nodes=nodes,
-            interaction='only_propagation',
-        )
-    assert set(np.unique(lgca.nodes[lgca.nonborder])) <= {0, 1}
+    with pytest.raises(ValueError, match="volume_exclusion=False"):
+        get_lgca(geometry='lin', ib=False, ve=True, nodes=nodes, interaction='only_propagation')
+    lgca = get_lgca(geometry='lin', ib=False, ve=False, nodes=nodes, interaction='only_propagation')
+    assert lgca.nodes[lgca.nonborder].sum() == 6
 
 
 @pytest.mark.parametrize(

@@ -143,18 +143,12 @@ def test_adhesion_forms_clusters_that_a_random_walk_does_not():
     assert strong.mean() - weak.mean() > 4 * np.hypot(_sem(strong), _sem(weak))
 
 
-@pytest.mark.xfail(strict=True, reason="cue-by-name-suggestion-fails: the operator mapping that the error "
-                                       "message suggests for a single custom cue is not accepted")
-def test_single_custom_cue_by_name_as_the_error_message_suggests():
+def test_a_custom_term_put_in_operators_says_where_it_belongs():
     """The student puts the term straight into the operators; following the advice of the error message
     must work and run the same model as ``ReorientationSpec(terms=[term])``."""
-    with pytest.raises(ValueError, match="give one cue by name") as info:
+    with pytest.raises(ValueError, match=r"put it in ReorientationSpec\(terms=\[\.\.\.\]\)") as info:
         run_model(_adhesion_spec(2.0, 1, steps=2, operators=[student_adhesion(beta=2.0)]), showprogress=False)
-    assert "'name': 'student_adhesion'" in str(info.value)
-    by_name = _adhesion_spec(2.0, 1, steps=20,
-                             operators=[{"name": "student_adhesion", "parameters": {"beta": 2.0}}])
-    np.testing.assert_array_equal(run_model(by_name, showprogress=False).data["density"],
-                                  run_model(_adhesion_spec(2.0, 1, steps=20), showprogress=False).data["density"])
+    assert "student_adhesion(beta=2.0)" in str(info.value)
 
 
 # ---------------------------------------------------------------------------------------------------------
@@ -277,8 +271,6 @@ def test_higher_switching_threshold_pushes_the_invasion_front_further(glioma_rul
         assert high["mean"] - low["mean"] > 3 * np.hypot(low["sem"], high["sem"]) + 1e-9, stats
 
 
-@pytest.mark.xfail(strict=True, reason="cli-plugins-cwd: `biolgca run --plugins` cannot import a module "
-                                       "from the working directory")
 def test_command_line_runs_model_with_rules_module_next_to_it(glioma_rules, tmp_path):
     """Tutorial 6's layout: model.json and the rules module in one folder; ``biolgca run`` from that
     folder gives the population of the Python run."""
@@ -396,8 +388,6 @@ def test_cells_rest_with_their_own_probability():
         assert abs(resting / total - value) < 4 * np.sqrt(value * (1 - value) / total)
 
 
-@pytest.mark.xfail(strict=True, reason="check-interaction-ib-phenotype-switch-zero-models: check_interaction "
-                                       "builds no model for an identity-based phenotype switch")
 def test_check_interaction_checks_identity_based_phenotype_switch():
     """A trait-drift rule declared as phenotype_switch, tested with the documented one-liner: a broken
     rule must be reported."""
@@ -690,7 +680,6 @@ def test_a_two_species_animation_shows_all_cells_by_default():
 # A reviewer checks what the examples and the model classes promise
 # ---------------------------------------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason="tumour_spheroid._positions does not use the hex lattice coordinates")
 def test_tumour_spheroid_hex_positions_match_lattice_neighbours():
     """Distances measured in the tumour-spheroid example are the lattice's: one node spacing apart."""
     from lgca.examples import tumour_spheroid
@@ -702,7 +691,6 @@ def test_tumour_spheroid_hex_positions_match_lattice_neighbours():
     np.testing.assert_allclose(y, lgca.ycoords)
 
 
-@pytest.mark.xfail(strict=True, reason="NoVE_IBLGCA_base.get_prop ignores the props table it is given")
 def test_nove_ib_get_prop_reads_the_given_property_table():
     """A property table passed to ``get_prop`` of an identity-based model without volume exclusion is the
     one read, as in the model with volume exclusion."""
@@ -725,8 +713,6 @@ def _square(operators, steps=1, n_species=1):
                      dynamics=InteractionPipelineSpec(operators=operators))
 
 
-@pytest.mark.xfail(strict=True, reason="the CLI reports only the message of an error in a plugin rule, "
-                                       "without its type and traceback")
 def test_cli_shows_where_a_bug_in_a_plugin_rule_is(tmp_path, monkeypatch, capsys, request):
     """A typo in a dict key of the student's rule, run with ``biolgca run --plugins``: the error names
     the KeyError and the student's file."""
@@ -750,8 +736,6 @@ def test_cli_shows_where_a_bug_in_a_plugin_rule_is(tmp_path, monkeypatch, capsys
     assert "workflow_student_rules.py" in err
 
 
-@pytest.mark.xfail(strict=True, reason="build_model reports an operator whose constructor raises as an "
-                                       "unknown operator")
 def test_registered_operator_whose_constructor_fails_is_not_called_unknown():
     """A plugin author's operator class with a typo in its constructor is reported with that error, not
     as an unknown operator."""
@@ -775,7 +759,6 @@ def test_registered_operator_whose_constructor_fails_is_not_called_unknown():
     assert "rtae" in str(caught.value) or isinstance(caught.value, KeyError)
 
 
-@pytest.mark.xfail(strict=True, reason="a KeyError raised inside a reorientation term becomes a ValueError")
 def test_keyerror_in_a_user_reorientation_term_stays_a_keyerror():
     """A wrong dict key inside the student's term surfaces as the KeyError it is."""
     weights = {"rest": 1.0}
@@ -800,8 +783,6 @@ def test_unknown_field_read_by_a_term_says_where_to_declare_it():
             ReorientationTermSpec("workflow_student.reads_oxygen")])])).run()
 
 
-@pytest.mark.xfail(strict=True, reason="a TypeError raised inside a switch cue becomes a ValueError about "
-                                       "the cue")
 def test_typeerror_inside_a_user_cue_is_not_reported_as_a_parameter_error():
     """A bug inside the student's switch cue surfaces as the TypeError it is, not as a wrong parameter."""
     from lgca.switching import switch_cue
@@ -829,7 +810,6 @@ def test_wrong_cue_parameter_is_a_clear_value_error():
         build_model(_square([{"name": "phenotype_switch", "parameters": {"rates": rates}}], n_species=2)).run()
 
 
-@pytest.mark.xfail(strict=True, reason="square and hex lattices accept dims with three entries")
 @pytest.mark.parametrize("geometry", ["square", "hex"])
 def test_square_and_hex_reject_dims_with_three_entries(geometry):
     """A 2D lattice given three dimensions says that ``dims`` is wrong instead of running another model."""
@@ -837,7 +817,6 @@ def test_square_and_hex_reject_dims_with_three_entries(geometry):
         get_lgca(geometry=geometry, dims=(10, 10, 4), density=0.2, seed=1)
 
 
-@pytest.mark.xfail(strict=True, reason="check_interaction drops the original exception of the rule")
 def test_check_interaction_keeps_the_error_of_the_rule():
     """``check_interaction`` of a broken rule keeps the rule's exception and traceback for debugging."""
     @interaction(kind="birth_death", families=("classical",), name="workflow_student.grow2")

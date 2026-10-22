@@ -43,12 +43,8 @@ def _recorded_square(ib, ve, seed):
     return model
 
 
-_NOVE_DENSITY_SCALE = pytest.mark.xfail(
-    strict=True, reason="NoVE plot_density ignores vmax, so the colour scale comes from the first frame")
-
-
 @pytest.mark.parametrize("ib,ve,kind", [
-    pytest.param(ib, ve, kind, marks=_NOVE_DENSITY_SCALE if (ib, ve, kind) == (False, False, "density") else ())
+    (ib, ve, kind)
     for ib, ve in [(False, True), (True, True), (False, False), (True, False)]
     for kind in ["config", "flux", "flow", "density"]])
 @pytest.mark.parametrize("entry", ["direct", "facade"])

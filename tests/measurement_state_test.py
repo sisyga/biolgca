@@ -77,9 +77,7 @@ def test_mean_property_of_a_node_averages_its_cells_and_masks_empty_nodes(ve):
     np.testing.assert_allclose(np.ma.getdata(mean)[:2], [0.3, 0.9])
 
 
-@pytest.mark.parametrize("ve", [True, pytest.param(False, marks=pytest.mark.xfail(
-    strict=True, raises=AttributeError, reason="NoVE-IB calc_prop_mean does not apply its defaults"))],
-    ids=["ib", "nove_ib"])
+@pytest.mark.parametrize("ve", [True, False], ids=["ib", "nove_ib"])
 def test_mean_property_defaults_to_the_current_cells(ve):
     model = _labelled_line(ve)
     np.testing.assert_allclose(np.ma.getdata(model.calc_prop_mean(propname="r_b"))[:2], [0.3, 0.9])
