@@ -6,6 +6,29 @@ simulating lattice-gas cellular automata in biological contexts. It supports
 classical, identity-based, volume-exclusion-free and multi-species models on
 one-, two- and three-dimensional lattices.
 
+Who it is for
+-------------
+
+BioLGCA is for researchers and students in mathematical and theoretical
+biology who model collective cell migration, tissue growth, pattern formation
+or the evolution of cell populations, and for courses that teach these
+topics. LGCA describe cells by their numbers and directions of movement on a
+lattice, so a model is a short list of local stochastic rules that can be
+simulated on large lattices and analysed with mean-field and stability
+methods.
+
+General-purpose frameworks for cell-based models, such as Morpheus and
+CompuCell3D (cellular Potts models), PhysiCell (off-lattice agents) and
+Chaste (several cell-based model types), represent cells by their shape or
+position. They do not offer the velocity-channel state space of LGCA, in
+which alignment, chemotaxis and go-or-grow switching are rules for the
+reorientation of channel states and in which the mean-field equations of a
+model follow directly from its rules. BioLGCA provides this model class as a
+library: the rules of the BIO-LGCA literature as composable building blocks,
+a checked contract for new rules (:doc:`how_to/custom_interactions`), model
+files that rerun exactly, parameter sweeps, and a :doc:`zoo/index` that
+reproduces published LGCA models with these rules.
+
 Start with the notebooks
 ------------------------
 
@@ -75,8 +98,8 @@ published models to rerun and extend.
 Scientific background
 ---------------------
 
-LGCA are cellular automata with an extended channel state space. Particles or
-cells occupy velocity and optional rest channels, so the state records both
+LGCA are cellular automata with an extended channel state space. Cells
+occupy velocity and optional rest channels, so the state records both
 cell number and movement direction. See the
 `BIO-LGCA overview <https://en.wikipedia.org/wiki/BIO-LGCA>`_ and the method
 paper `Deutsch et al. 2021 <https://doi.org/10.1371/journal.pcbi.1009066>`_.
@@ -104,9 +127,19 @@ machine-readable form.
 Questions and contributions
 ---------------------------
 
-Issues are tracked on the
-`GitHub issue tracker <https://github.com/sisyga/biolgca/issues>`_. BioLGCA is
-distributed under the BSD 3-clause license.
+Ask questions, report bugs and propose ideas on the
+`GitHub issue tracker <https://github.com/sisyga/biolgca/issues>`_, which has
+a template for each. The
+`contributing guide <https://github.com/sisyga/biolgca/blob/master/CONTRIBUTING.md>`_
+explains the development setup, the checks and how to propose a new
+interaction; everyone taking part follows the
+`code of conduct <https://github.com/sisyga/biolgca/blob/master/CODE_OF_CONDUCT.md>`_.
+BioLGCA is distributed under the BSD 3-clause license.
+
+Version 2.0 was developed with the help of generative AI coding assistants;
+the README of the repository describes how, and how the results are checked
+against the frozen version-1.0 implementations, analytic expectations and
+the published models of the zoo.
 
 .. toctree::
    :maxdepth: 4
