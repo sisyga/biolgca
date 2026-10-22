@@ -26,7 +26,8 @@ With BioLGCA you can:
 - track individual cells with heritable traits to study evolution;
 - watch a model run in a notebook while you change its parameters with sliders;
 - run on 1D, square, hexagonal and 3D lattices; and
-- save every model as a JSON file that reruns exactly from its seed.
+- save every model as a JSON file that reruns from its seed with the same data
+  (given the same BioLGCA and dependency versions).
 
 ## Why BioLGCA
 
@@ -40,13 +41,13 @@ methods (Deutsch et al. 2021).
 
 General-purpose frameworks for cell-based models, such as Morpheus and
 CompuCell3D (cellular Potts models), PhysiCell (off-lattice agents) and Chaste
-(several cell-based model types), represent cells by their shape or position.
-They do not offer the velocity-channel state space of LGCA, in which
+(several cell-based model types, including an on-lattice cellular automaton),
+couple cells to fields in many ways but do not offer the velocity-channel state space of LGCA, in which
 alignment, chemotaxis and go-or-grow switching are rules for the
-reorientation of channel states and in which the mean-field equations of a
-model follow directly from its rules. BioLGCA provides this model class as a
+reorientation of channel states and in which mean-field equations can be
+derived systematically from the rules. BioLGCA provides this model class as a
 library: the rules of the BIO-LGCA literature as composable building blocks,
-a checked contract for new rules, model files that rerun exactly, parameter
+a checked contract for new rules, model files that rerun from their seed, parameter
 sweeps, and a [model zoo](docs/source/zoo/index.rst) that reproduces
 published LGCA models with these rules.
 
@@ -125,7 +126,8 @@ result.lgca.plot_density()
 ```
 
 Save the model with `save_model_spec(spec, "model.json")` from `lgca.model`.
-Anyone can then rerun it from the command line and get identical data:
+Anyone with the same versions of BioLGCA and its dependencies can then rerun it
+from the command line and get identical data:
 
 ```bash
 uv run biolgca run model.json --output runs/chemotaxis-001
@@ -216,7 +218,7 @@ growth rules, movement biases and a deterministic collision rule, and tutorial
 Eight notebooks take you from the first random walk to a reproducible project
 and to cells that act on the molecules around them.
 Every model is built in visible cells and the notebooks run in CI, so they
-always work with the current code.
+are checked against the current code.
 
 | Lesson | You will learn to |
 | --- | --- |
@@ -283,22 +285,25 @@ User-facing changes are recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ## History and use of AI tools
 
-BioLGCA has been developed at TU Dresden since 2018. Version 1.0 (branch
-[`v1`](https://github.com/sisyga/biolgca/tree/v1)) grew between 2018 and 2024
-alongside the research that used it, with contributions from the people
-listed under [Acknowledgements](#acknowledgements). Version 2.0 (2025–2026)
-rewrote the package around declarative model specifications, a rule contract
+BioLGCA has been developed at TU Dresden since 2018. The code base before
+2.0, kept on branch [`v1`](https://github.com/sisyga/biolgca/tree/v1), grew
+from 2018 alongside the research that used it, with contributions from the
+people listed under [Acknowledgements](#acknowledgements), and was modernised
+in 2025. Version 2.0 (2026) rewrote the package around declarative model specifications, a rule contract
 and the model zoo.
 
-Version 2.0 was developed with the help of generative AI coding assistants
-(Anthropic's Claude Code, and to a lesser extent OpenAI Codex and GitHub
-Copilot), which wrote code, tests and documentation under the direction of
-the maintainer; commits written with an assistant name it as co-author. The
+Since 2025 the package has been developed with the help of generative AI
+coding assistants (OpenAI Codex, GitHub Copilot and Anthropic's Claude Code),
+which wrote code, tests and documentation under the direction of the
+maintainer. Codex work was merged from `codex/` branches, Copilot work is
+authored by `copilot-swe-agent[bot]`, and commits written with Claude Code
+since September 2026 carry a `Co-Authored-By` trailer. The
 results are checked independently of the code that produced them: the test
 suite compares the new rules statistically with the frozen interaction
-functions of version 1.0 (`tests/legacy/`) and with analytic expectations,
-every rule is checked against the conservation laws of its kind, and the
-zoo notebooks reproduce the results of the published models.
+functions of the code before 2.0 (`tests/legacy/`) and with analytic expectations,
+every rule is checked against the conservation laws of its kind, and each
+zoo notebook reproduces a result of its paper at reduced size and states what
+differs.
 
 ## Citing
 
@@ -319,12 +324,12 @@ The BIO-LGCA modelling class is described in:
 ## Acknowledgements
 
 BioLGCA is maintained by Simon Syga. Bianca Güttner
-([@GuettnerBianca](https://github.com/GuettnerBianca)) co-authored version
-1.0. Code was also contributed by
-[@Franzi2729](https://github.com/Franzi2729) (2019–2020: identity-based
-models, the 1D lattice and analysis helpers),
-[@krelli89](https://github.com/krelli89),
-[@harishpjain](https://github.com/harishpjain) and Mateo. The models build on
+([@GuettnerBianca](https://github.com/GuettnerBianca)) co-authored the code
+before 2.0. Code was also contributed by
+[@Franzi2729](https://github.com/Franzi2729),
+Marcus Krellner ([@krelli89](https://github.com/krelli89)),
+[@harishpjain](https://github.com/harishpjain) and Mateo Larralde
+([@mateolarr](https://github.com/mateolarr)). The models build on
 the BIO-LGCA work of Andreas Deutsch, Josué Manik Nava-Sedeño, Haralampos
 Hatzikirou and colleagues.
 

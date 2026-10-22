@@ -19,14 +19,14 @@ methods.
 
 General-purpose frameworks for cell-based models, such as Morpheus and
 CompuCell3D (cellular Potts models), PhysiCell (off-lattice agents) and
-Chaste (several cell-based model types), represent cells by their shape or
-position. They do not offer the velocity-channel state space of LGCA, in
+Chaste (several cell-based model types, including an on-lattice cellular
+automaton), couple cells to fields in many ways but do not offer the velocity-channel state space of LGCA, in
 which alignment, chemotaxis and go-or-grow switching are rules for the
-reorientation of channel states and in which the mean-field equations of a
-model follow directly from its rules. BioLGCA provides this model class as a
+reorientation of channel states and in which mean-field equations can be
+derived systematically from the rules. BioLGCA provides this model class as a
 library: the rules of the BIO-LGCA literature as composable building blocks,
 a checked contract for new rules (:doc:`how_to/custom_interactions`), model
-files that rerun exactly, parameter sweeps, and a :doc:`zoo/index` that
+files that rerun from their seed, parameter sweeps, and a :doc:`zoo/index` that
 reproduces published LGCA models with these rules.
 
 Start with the notebooks
@@ -136,10 +136,10 @@ interaction; everyone taking part follows the
 `code of conduct <https://github.com/sisyga/biolgca/blob/master/CODE_OF_CONDUCT.md>`_.
 BioLGCA is distributed under the BSD 3-clause license.
 
-Version 2.0 was developed with the help of generative AI coding assistants;
-the README of the repository describes how, and how the results are checked
-against the frozen version-1.0 implementations, analytic expectations and
-the published models of the zoo.
+BioLGCA has been developed with the help of generative AI coding assistants
+since 2025; the README of the repository describes how, and how the results
+are checked against the frozen implementations of the code before 2.0,
+analytic expectations and the published models of the zoo.
 
 .. toctree::
    :maxdepth: 4

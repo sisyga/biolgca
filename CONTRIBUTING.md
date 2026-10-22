@@ -9,7 +9,7 @@ models and code are all welcome. Everyone taking part follows the
 Open an issue on the [issue tracker](https://github.com/sisyga/biolgca/issues)
 and pick the template that fits: a question about using BioLGCA, a bug
 report or a feature request. For a bug, include the BioLGCA version
-(`python -c "import importlib.metadata as m; print(m.version('biolgca'))"`),
+(`biolgca --version`),
 your Python version and operating system, and a short script or model file
 that shows the problem, with its seed.
 
@@ -26,7 +26,7 @@ uv sync          # creates .venv/ from uv.lock, with the test and docs tools
 
 Development happens on the `aidevelop` branch; `master` holds the released
 version that the documentation on Read the Docs is built from, and `v1` the
-1.0 release. Branch off `aidevelop` and open pull requests against it.
+code base before 2.0. Branch off `aidevelop` and open pull requests against it.
 
 ## Checks
 
@@ -40,8 +40,8 @@ uv run python docs/build.py --no-notebooks # strict docs build without running n
 uv run python docs/build.py                # full docs build, runs the tutorials
 ```
 
-CI runs the tests on Linux, Windows and macOS with Python 3.11 to 3.14 and
-with the minimum dependency versions, runs the suite once in random order,
+CI runs the tests on Linux with Python 3.11 to 3.14 and on Windows and macOS
+with 3.13, and with the minimum dependency versions, runs the suite once in random order,
 executes the notebooks and builds the documentation. After changing
 dependencies in `pyproject.toml`, run `uv lock` and commit `uv.lock`.
 
@@ -51,14 +51,18 @@ dependencies in `pyproject.toml`, run `uv lock` and commit `uv.lock`.
   the fix.
 - Test what a user relies on, not how a function is written: conservation of
   cell numbers, symmetries, agreement with an analytic expectation, or with
-  the frozen version-1.0 implementations in `tests/legacy/`.
+  the frozen implementations of the code before 2.0 in `tests/legacy/`
+  (do not change them).
 - Tests use fixed seeds. Statistical tests compare with a tolerance derived
   from the standard error of the estimate, so that they pass for the right
   model and fail for a wrong one.
 - Parametrize over geometries and model families where the behaviour should
   be the same.
+- `ContractWarning` is an error in every test; test a warning with
+  `pytest.warns`.
 - Tests must not depend on their order; `tests/conftest.py` removes the rules
-  a test registers.
+  a test registers. After changing global state, run
+  `uv run --with pytest-randomly==5.0.0 pytest -q -p randomly`.
 
 ## Proposing a new interaction
 
@@ -83,8 +87,10 @@ BioLGCA. To propose it as a built-in:
 - PEP 8 with lines up to about 110 characters; `ruff check` must not report
   new findings. Match the surrounding code; comments say why, not what.
 - NumPy-style docstrings for public functions and classes.
-- Code in the README and in the how-to pages is executed by the tests: keep
-  it runnable.
+- Code in the README and in the how-to pages `custom_interactions`,
+  `research_models`, `fields` and `exploring` is executed by
+  `tests/readme_test.py` and `tests/docs_snippets_test.py`: keep it runnable
+  (a new code block changes the block count in the test).
 - Tutorials are committed without outputs; zoo and example notebooks keep
   their outputs, regenerated with `uv run python docs/execute_notebooks.py`.
 - Describe user-facing changes in the pull request; the maintainer adds them
@@ -94,8 +100,9 @@ BioLGCA. To propose it as a built-in:
 
 Commit messages start with `fix:`, `feat:`, `docs:`, `test:` or `chore:` and
 a one-line summary, followed by a body that says what changed and why. A pull
-request describes the change, how it was tested, and the issues it
-addresses.
+request has a title of the form `[Fix|Feat|Docs] <one-line summary>` and a
+body that describes the change, has a "Testing Done" section, and references
+the issues it addresses.
 
 If you used an AI coding assistant, say so in the pull request (and, if you
 like, as a `Co-Authored-By` line in the commit). You are responsible for the

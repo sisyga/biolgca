@@ -193,6 +193,9 @@ per node.
 
    .. code-block:: python
 
+      import numpy as np
+      from lgca.model import StateSpec
+
       nodes = np.zeros((60, 60, 2, 12), dtype=int)  # hex: 6 velocity + 6 rest channels
       nodes[30, 30, 1, 6:] = 1                       # one node of resting cells
       StateSpec(nodes=nodes, restchannels=6, n_species=2)

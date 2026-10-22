@@ -23,7 +23,7 @@ body:
     id: version
     attributes:
       label: BioLGCA version
-      description: "Output of `python -c \"import importlib.metadata as m; print(m.version('biolgca'))\"`, or the commit."
+      description: "Output of `biolgca --version`, or the commit."
     validations:
       required: true
   - type: input

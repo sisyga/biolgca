@@ -7,8 +7,8 @@ few steps: a phenotype switch, growth with mutations, movement. These models
 are now written as *stacks* of the generic rules, in the module
 :mod:`lgca.research_models`, under the names of the legacy interactions
 without the family prefix. They work in identity-based models with and
-without volume exclusion, run up to an order of magnitude faster than the
-legacy code (4 to 18 times in the benchmark below; the factor depends on the
+without volume exclusion, run 4 to 18 times faster than the legacy code
+in the benchmark below (the factor depends on the
 machine, see `Speed`_), and show how to build a published model from the rules.
 ``get_lgca(interaction="go_or_grow_glioblastoma", ...)`` runs them as well, as
 do model files with the prefixed names (see :ref:`interaction_chapter`).
