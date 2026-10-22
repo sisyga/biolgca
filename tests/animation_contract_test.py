@@ -75,8 +75,9 @@ def test_animation_frames_show_their_recorded_step_and_time(ib, ve, kind, entry)
     assert not _same(frames[0], frames[1]), "the random walk must change the picture"
     reordered = movie([1, 0, 2])
     reordered._func(0)
-    assert _same(_shown(reordered._fig), frames[1])
+    first = _shown(reordered._fig)
     _close(reordered)
+    assert _same(first, frames[1])
 
 
 @pytest.mark.parametrize("kind", ["config", "flux", "flow", "density"])
@@ -93,8 +94,9 @@ def test_explicit_arrays_use_only_explicit_times(kind, times):
     # the frames are the given arrays: the movie that starts with the last row shows it first
     alone = animate(model, kind=kind, data=data[[2, 0, 1]], steps=times)
     alone._func(0)
-    assert _same(_shown(alone._fig), last)
+    first = _shown(alone._fig)
     _close(alone)
+    assert _same(first, last)
 
 
 @pytest.mark.parametrize("kind", ["config", "density", "flux"])
