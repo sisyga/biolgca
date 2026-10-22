@@ -11,7 +11,7 @@ import traceback
 from copy import deepcopy
 from dataclasses import replace
 from importlib import import_module
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 
 import numpy as np
 
@@ -24,6 +24,7 @@ from .simulation import (
     CSVSnapshotObserver,
     FieldRecorder,
     ScalarTimeSeriesRecorder,
+    _leaves_its_directory,
     check_observers,
 )
 
@@ -504,9 +505,7 @@ def _resolve_output_paths(spec, output_dir: Path, *, trusted_paths: bool) -> Non
 
 
 def _validate_relative_output(path, *, trusted_paths: bool) -> None:
-    raw = Path(path)
-    windows = PureWindowsPath(path)
-    if not trusted_paths and (raw.anchor or windows.anchor or ".." in raw.parts or ".." in windows.parts):
+    if not trusted_paths and _leaves_its_directory(path):
         raise ValueError(
             "Generated output paths must be relative and may not contain '..'; "
             "use --trusted-paths only for trusted local models."

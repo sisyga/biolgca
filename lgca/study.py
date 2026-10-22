@@ -47,6 +47,7 @@ from typing import Any
 import numpy as np
 
 from ._warnings import warn_user
+from .model import _draw_seed
 
 __all__ = ["final_population", "resolve_path", "sweep", "vary"]
 
@@ -100,16 +101,19 @@ def resolve_path(spec, path: str) -> str:
     if len(places) == 1:
         return places[0]
     if not places:
-        raise KeyError(f"no field or parameter of the model is named {path!r}; give a path such as "
+        known = sorted({short for short, _ in _short_names(spec)})
+        matches = difflib.get_close_matches(path, known, n=1)
+        hint = f" (did you mean {matches[0]!r}?)" if matches else ""
+        raise KeyError(f"no field or parameter of the model is named {path!r}{hint}; give a path such as "
                        f"'dynamics.operators[0].parameters.{path}'")
     raise KeyError(f"{path!r} occurs in several places: {', '.join(places)}; give one of these paths")
 
 
 def final_population(result) -> int:
     """The number of cells at the end of the run, the default measure of :func:`sweep`."""
-    lgca = result.lgca
-    density = lgca.species_density if hasattr(lgca, "species_density") else lgca.cell_density
-    return int(np.asarray(density[lgca.nonborder]).sum())
+    from .simulation import _total_population
+
+    return _total_population(result.lgca)
 
 
 def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | None = None, *,
@@ -238,7 +242,7 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
         from .model import _validate_seed
 
         _validate_seed(spec.time.seed)
-        seeds = [spec.time.seed if spec.time.seed is not None else _drawn_seed()]
+        seeds = [spec.time.seed if spec.time.seed is not None else _draw_seed()]
     seeds = list(seeds)
     if not seeds:
         raise ValueError("seeds is empty; give at least one seed, e.g. seeds=range(10)")
@@ -330,12 +334,6 @@ def _name_of(entry):
     if isinstance(entry, Mapping):
         return entry.get("name")
     return getattr(entry, "name", None)
-
-
-def _has_parameters(node):
-    if is_dataclass(node):
-        return "parameters" in {f.name for f in fields(node)}
-    return isinstance(node, Mapping) and "name" in node
 
 
 def _set(node, tokens, value, where, parent):
@@ -466,30 +464,37 @@ def _unknown(key, names, where):
 
 def _places(spec, name):
     """The full paths of all places of the model with the short name ``name``."""
-    places = [f"{part}.{name}" for part in ("space", "state", "time")
-              if name in {f.name for f in fields(getattr(spec, part))}]
+    return [path for short, path in _short_names(spec) if short == name]
+
+
+def _short_names(spec):
+    """(short name, full path) of every place of the model that a short name can select."""
     from .operator_base import InteractionOperator
     from .pipeline import ReorientationSpec
 
+    for part in ("space", "state", "time"):
+        for item in fields(getattr(spec, part)):
+            yield item.name, f"{part}.{item.name}"
     for index, operator in enumerate(spec.dynamics.operators):
         if isinstance(operator, InteractionOperator):  # an operator object: vary cannot change it
             continue
         where = f"dynamics.operators[{index}]"
         if isinstance(operator, ReorientationSpec):
-            if name in (operator.parameters or {}) or name in ("sweeps", "channels", "species"):
-                places.append(f"{where}.parameters.{name}")
+            for name in dict.fromkeys([*(operator.parameters or {}), "sweeps", "channels", "species"]):
+                yield name, f"{where}.parameters.{name}"
             for position, term in enumerate(operator.terms):
                 term_where = f"{where}.terms[{position}]"
-                if name in {f.name for f in fields(term)} - {"name", "parameters"}:
-                    places.append(f"{term_where}.{name}")
-                elif name in (term.parameters or {}) or name in _term_parameters(term.name):
-                    places.append(f"{term_where}.parameters.{name}")
+                own = [f.name for f in fields(term) if f.name not in {"name", "parameters"}]
+                for name in own:
+                    yield name, f"{term_where}.{name}"
+                for name in dict.fromkeys([*(term.parameters or {}), *sorted(_term_parameters(term.name))]):
+                    if name not in own:
+                        yield name, f"{term_where}.parameters.{name}"
             continue
         parameters = operator.get("parameters") or {} if isinstance(operator, Mapping) else \
             getattr(operator, "parameters", None) or {}
-        if name in parameters or name in _operator_parameters(_name_of(operator)):
-            places.append(f"{where}.parameters.{name}")
-    return places
+        for name in dict.fromkeys([*parameters, *sorted(_operator_parameters(_name_of(operator)))]):
+            yield name, f"{where}.parameters.{name}"
 
 
 def _operator_parameters(name):
@@ -680,10 +685,6 @@ def _with_recorders(spec, measures):
                 observers.append(observer)
                 present.update(simulation._recorded_names(observer))
     return replace(spec, analysis=AnalysisSpec(observers=tuple(observers)))
-
-
-def _drawn_seed():
-    return int(np.random.SeedSequence().generate_state(1, np.uint32)[0])
 
 
 def _execute(spec, jobs, measures, n_jobs, backend, plugins, showprogress, columns, resources, errors="raise",

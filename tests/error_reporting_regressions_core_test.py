@@ -11,7 +11,11 @@ import pytest
 
 from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model, run_model
 from lgca.operator_base import BirthDeathOperator, PluginInfo
-from lgca.pipeline import InteractionPipelineSpec, ReorientationSpec, ReorientationTermSpec
+from lgca.pipeline import (
+    InteractionPipelineSpec,
+    ReorientationSpec,
+    ReorientationTermSpec,
+)
 from lgca.plugins import register_plugin
 from lgca.rules import reorientation_term
 from lgca.switching import switch_cue
