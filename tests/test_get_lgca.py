@@ -79,26 +79,14 @@ def test_get_lgca_returns_correct_subclass(geom, ib, ve):
     assert isinstance(lgca, EXPECTED[geom][(ib, ve)])
 
 
-def test_warning_on_mismatched_dims():
+@pytest.mark.parametrize("argument, message", [({"dims": 10}, r"dimensions \(3,\) override ``dims``=10"),
+                                               ({"restchannels": 1}, "imply 2 rest channels")])
+def test_nodes_override_mismatched_dims_and_restchannels_with_a_warning(argument, message):
     nodes = np.zeros((3, 4))
-    with pytest.warns(UserWarning):
-        get_lgca(
-            geometry='lin',
-            nodes=nodes,
-            dims=10,
-            interaction='only_propagation',
-        )
+    with pytest.warns(UserWarning, match=message):
+        lgca = get_lgca(geometry='lin', nodes=nodes, interaction='only_propagation', **argument)
 
-
-def test_warning_on_mismatched_restchannels():
-    nodes = np.zeros((3, 4))
-    with pytest.warns(UserWarning):
-        get_lgca(
-            geometry='lin',
-            nodes=nodes,
-            restchannels=1,
-            interaction='only_propagation',
-        )
+    assert lgca.dims == (3,) and lgca.restchannels == 2
 
 
 def test_warning_when_nodes_override_density():
@@ -177,11 +165,14 @@ def test_too_few_rest_channels_for_go_or_grow_warn_at_the_caller():
 
 
 @pytest.mark.parametrize("geometry", ["lin", "square", "hex", "cubic", "moore"])
-def test_default_nove_model_builds_and_runs(geometry):
+def test_default_nove_model_moves_cells_without_losing_any(geometry):
     lgca = get_lgca(geometry=geometry, ve=False, seed=1)
-    lgca.timeevo(timesteps=2, record=False, showprogress=False)
+    lgca.timeevo(timesteps=2, record=True, recordN=True, showprogress=False)
 
     assert lgca.restchannels == 0
+    assert lgca.n_t[0] > 0
+    np.testing.assert_array_equal(lgca.n_t, lgca.n_t[0])  # its default interaction only moves cells
+    assert not np.array_equal(lgca.nodes_t[0], lgca.nodes_t[-1])
 
 
 def test_deprecation_warnings_point_at_the_callers_line():

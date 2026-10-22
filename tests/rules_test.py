@@ -105,11 +105,25 @@ def test_parameters_without_default_are_required():
 @pytest.mark.parametrize("ve", [True, False])
 @pytest.mark.parametrize("n_species", [1, 2])
 def test_a_rule_runs_with_and_without_volume_exclusion_and_several_species(ve, n_species):
+    # each cell dies with r_d n / capacity at a node with n cells, whatever its species: n^2 r_d / capacity
+    # cells die there on average
     rule = _crowding_death()
+    compiled = build_model(ModelSpec(
+        space=SpaceSpec(geometry="square", dims=(100, 100)),
+        state=StateSpec(density=2.0, restchannels=1, volume_exclusion=ve, n_species=n_species, capacity=8),
+        time=TimeSpec(steps=1, seed=3),
+        dynamics=InteractionPipelineSpec(operators=[rule(r_d=0.5)], propagation=False),
+    ))
+    lgca = compiled.lgca
+    before = lgca.cell_density[lgca.nonborder].copy()
 
-    result = run_model(_spec([rule(r_d=1.0)], ve=ve, n_species=n_species), showprogress=False)
+    compiled.step()
 
-    assert result.lgca.nodes.sum() < build_model(_spec([rule(r_d=1.0)], ve=ve, n_species=n_species)).lgca.nodes.sum()
+    died = before - lgca.cell_density[lgca.nonborder]
+    for n in range(1, 5):
+        at = before == n
+        error = died[at].std() / np.sqrt(at.sum())
+        assert abs(died[at].mean() - n * n * 0.5 / 8) < 4 * error, n
 
 
 def test_defaults_are_applied_by_the_framework():
@@ -232,11 +246,14 @@ def test_a_rule_can_be_applied_to_a_state_directly():
     from lgca.lattice_state import LatticeState
 
     rule = _crowding_death()
-    state = LatticeState(build_model(_spec([rule()])).lgca)
-    before = state.density.sum()
+    state = LatticeState(build_model(_spec([rule()], ve=False, density=8.0)).lgca)
+    before_per_node = state.density.copy()
+    before = before_per_node.sum()
 
     rule(state, r_d=1.0)
 
+    # every cell of a node holding the capacity or more dies
+    assert np.all(state.density[before_per_node >= state.capacity] == 0)
     assert state.density.sum() < before
 
 
@@ -381,7 +398,7 @@ def test_every_kind_of_rule_sees_the_same_capacity(volume_exclusion, identity_ba
     """Rules, reorientation terms and field reactions get their LatticeState from different places;
     all must see StateSpec.capacity, also with volume exclusion, where it is optional."""
     from lgca import reorientation_term
-    from lgca.fields import _REACTIONS, PDESpec, reaction
+    from lgca.fields import PDESpec, reaction
     from lgca.pipeline import ReorientationSpec, ReorientationTermSpec
 
     seen = {}
@@ -402,19 +419,16 @@ def test_every_kind_of_rule_sees_the_same_capacity(volume_exclusion, identity_ba
         seen["reaction"] = state.capacity, state.has_capacity
         return 0.0, 0.0
 
-    try:
-        compiled = build_model(ModelSpec(
-            space=SpaceSpec(geometry="square", dims=(4, 4)),
-            state=StateSpec(density=0.5, restchannels=1, volume_exclusion=volume_exclusion,
-                            identity_based=identity_based, capacity=capacity, fields={"u": 0.0}),
-            time=TimeSpec(steps=1, seed=1),
-            dynamics=InteractionPipelineSpec(operators=[
-                {"name": "capacity_probe"},
-                ReorientationSpec(terms=[ReorientationTermSpec("capacity_probe_term")]),
-                PDESpec(field="u", reactions=[{"name": "capacity_probe_reaction"}])])))
-        compiled.step()
-    finally:
-        _REACTIONS.pop("capacity_probe_reaction", None)
+    compiled = build_model(ModelSpec(
+        space=SpaceSpec(geometry="square", dims=(4, 4)),
+        state=StateSpec(density=0.5, restchannels=1, volume_exclusion=volume_exclusion,
+                        identity_based=identity_based, capacity=capacity, fields={"u": 0.0}),
+        time=TimeSpec(steps=1, seed=1),
+        dynamics=InteractionPipelineSpec(operators=[
+            {"name": "capacity_probe"},
+            ReorientationSpec(terms=[ReorientationTermSpec("capacity_probe_term")]),
+            PDESpec(field="u", reactions=[{"name": "capacity_probe_reaction"}])])))
+    compiled.step()
     expected = (capacity, True) if capacity is not None else (5, False) if volume_exclusion else (compiled.lgca.K, True)
     assert seen == {"interaction": expected, "term": expected, "reaction": expected}
     assert compiled.metadata["capacity"] == expected[0]
