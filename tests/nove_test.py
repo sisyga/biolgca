@@ -366,68 +366,41 @@ class Test_LGCA_NoVE(T_LGCA_Common):
         ],
     )
     def test_recording(self, geom, dims):
-        # timeevo and recording: check if all properties are available when requested
-        # keywords: record=False -> nodes_t, recordN=False n_t, recorddens=True -> dens_t, recordpertype=False -> velcells_t, restcells_t
-        # recordorderparams=False -> ent_t, normEnt_t, polAlParam_t, meanAlign_t
-        lgca_1 = get_lgca(
-            geometry=geom,
-            ve=False,
-            dims=dims,
-            density=0.5,
-            interaction="only_propagation",
-        )
-        lgca_2 = copy.deepcopy(lgca_1)
+        # each timeevo keyword records its arrays, and only those; the arrays are the run's states
+        recorded = {
+            "recorddens": ["dens_t"],
+            "record": ["nodes_t"],
+            "recordN": ["n_t"],
+            "recordpertype": ["velcells_t", "restcells_t"],
+            "recordorderparams": ["ent_t", "normEnt_t", "polAlParam_t", "meanAlign_t"],
+        }
+        every = [name for names in recorded.values() for name in names]
+        template = get_lgca(geometry=geom, ve=False, dims=dims, density=0.5,
+                            interaction="only_propagation", seed=7)
+        for keyword in [None, *recorded]:
+            lgca = copy.deepcopy(template)
+            options = {"recorddens": False} if keyword is None else {"recorddens": False, keyword: True}
+            lgca.timeevo(timesteps=2, showprogress=False, **options)
+            present = [name for name in every if hasattr(lgca, name)]
+            assert present == recorded.get(keyword, []), keyword
 
-        lgca_1.timeevo(timesteps=2, recorddens=False, showprogress=False)
-        assert not hasattr(lgca_1, "dens_t"), "Records density when it should not"
-        assert not hasattr(
-            lgca_1, "nodes_t"
-        ), "Records node configuration when it should not"
-        assert not hasattr(lgca_1, "n_t"), "Records particle number when it should not"
-        assert not hasattr(lgca_1, "restcells_t") and not hasattr(
-            lgca_1, "velcells_t"
-        ), "Records density per channel type when it should not"
-        assert (
-            not hasattr(lgca_1, "ent_t")
-            and not hasattr(lgca_1, "normEnt_t")
-            and not hasattr(lgca_1, "polAlParam_t")
-            and not hasattr(lgca_1, "meanAlign_t")
-        ), "Records order parameters when it should not"
-        del lgca_1
-
-        lgca_3 = copy.deepcopy(lgca_2)
-        lgca_2.timeevo(timesteps=2, showprogress=False)
-        assert hasattr(lgca_2, "dens_t"), "Does not record density"
-        del lgca_2
-
-        lgca_4 = copy.deepcopy(lgca_3)
-        lgca_3.timeevo(timesteps=2, record=True, recorddens=False, showprogress=False)
-        assert hasattr(lgca_3, "nodes_t"), "Does not record node configuration"
-        del lgca_3
-
-        lgca_5 = copy.deepcopy(lgca_4)
-        lgca_4.timeevo(timesteps=2, recordN=True, recorddens=False, showprogress=False)
-        assert hasattr(lgca_4, "n_t"), "Does not record particle number"
-        del lgca_4
-
-        lgca_6 = copy.deepcopy(lgca_5)
-        lgca_5.timeevo(
-            timesteps=2, recordpertype=True, recorddens=False, showprogress=False
-        )
-        assert hasattr(lgca_5, "restcells_t") and hasattr(
-            lgca_5, "velcells_t"
-        ), "Does not record density per channel type"
-        del lgca_5
-
-        lgca_6.timeevo(
-            timesteps=2, recordorderparams=True, recorddens=False, showprogress=False
-        )
-        assert (
-            hasattr(lgca_6, "ent_t")
-            and hasattr(lgca_6, "normEnt_t")
-            and hasattr(lgca_6, "polAlParam_t")
-            and hasattr(lgca_6, "meanAlign_t")
-        ), "Does not record order parameters"
+        lgca = copy.deepcopy(template)
+        initial = lgca.nodes[lgca.nonborder].copy()
+        lgca.timeevo(timesteps=2, record=True, recordN=True, recordpertype=True, recordorderparams=True,
+                     showprogress=False)
+        # the initial state, then one row per step; propagation keeps the cells (periodic boundaries)
+        assert len(lgca.nodes_t) == 3
+        np.testing.assert_array_equal(lgca.nodes_t[0], initial)
+        np.testing.assert_array_equal(lgca.nodes_t[-1], lgca.nodes[lgca.nonborder])
+        np.testing.assert_array_equal(lgca.n_t, [initial.sum()] * 3)
+        np.testing.assert_array_equal(lgca.dens_t, lgca.nodes_t.sum(-1))
+        np.testing.assert_array_equal(lgca.velcells_t, lgca.nodes_t[..., :lgca.velocitychannels].sum(-1))
+        np.testing.assert_array_equal(lgca.velcells_t + lgca.restcells_t, lgca.dens_t)
+        # the total flux is conserved too: the polar order |sum_k n_k c_k| / N keeps its initial value
+        channel_totals = initial.reshape(-1, lgca.K).sum(0)[:lgca.velocitychannels]
+        polar_order = np.linalg.norm(lgca.c @ channel_totals) / initial.sum()
+        np.testing.assert_allclose(lgca.polAlParam_t, [polar_order] * 3)
+        assert all(np.shape(getattr(lgca, name)) == (3,) for name in recorded["recordorderparams"])
 
     def test_propagation(self):
         # 1D
