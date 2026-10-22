@@ -321,6 +321,16 @@ class IBLGCA_base(LGCA_base, ABC):
         """Return channel occupancy for particle labels (0 marks an empty channel)."""
         return np.asarray(nodes) > 0
 
+    def _prop_arguments(self, nodes=None, props=None, propname=None):
+        """The defaults of the property helpers: the interior nodes, ``self.props`` and its first property."""
+        if nodes is None:
+            nodes = self.nodes[self.nonborder]
+        if props is None:
+            props = self.props
+        if propname is None:
+            propname = next(iter(props))
+        return nodes, props, propname
+
     def get_prop(self, nodes=None, props=None, propname=None):
         """
         Obtain the value of property `propname` for all particles in the lattice configuration `nodes`.
@@ -353,18 +363,7 @@ class IBLGCA_base(LGCA_base, ABC):
             lattice.
 
         """
-        # lattice configuration
-        if nodes is None:
-            nodes = self.nodes[self.nonborder]
-
-        # property dictionary to draw from
-        if props is None:
-            props = self.props
-
-        # property
-        if propname is None:
-            propname = next(iter(props))
-
+        nodes, props, propname = self._prop_arguments(nodes, props, propname)
         # get property value for each particle ID
         prop = np.array(props[propname])
         # sort property value of particles into node configuration

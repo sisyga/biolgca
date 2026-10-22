@@ -79,14 +79,8 @@ def _apply_rest_or_align(lgca, *, beta: float, alpha: float) -> None:
     coords = [axis[relevant] for axis in lgca.nonborder]
     for coord in zip(*coords):
         n_particles = int(lgca.cell_density[coord])
-        try:
-            permutations = lgca.get_permutations(n_particles)
-        except (AttributeError, KeyError, TypeError):
-            permutations = lgca.permutations[n_particles]
-        try:
-            permutation_flux = lgca.get_flux_permutations(n_particles)
-        except (AttributeError, KeyError, TypeError):
-            permutation_flux = lgca.j[n_particles]
+        permutations = lgca.get_permutations(n_particles)
+        permutation_flux = lgca.get_flux_permutations(n_particles)
         n_rest = permutations[:, lgca.velocitychannels :].sum(-1)
         weights = np.exp(
             beta * np.einsum("i,ij", flux[coord], permutation_flux)

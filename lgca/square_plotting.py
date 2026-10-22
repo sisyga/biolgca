@@ -37,7 +37,6 @@ from .plot_data import (
     select_density,
     select_density_history,
     select_scalar_field,
-    validate_species,
 )
 from .plots import (_nice_steps, colorbar_axes, estimate_figsize, freeze_layout, get_cmap, lattice_axes,
                     make_animation)
@@ -471,8 +470,8 @@ class SquarePlotMixin:
             If :py:meth:`matplotlib.figure.Figure.tight_layout` is called for padding between and around subplots.
         vmax : int, optional
             Maximum density value for the color scaling. The minimum value is zero. All density values higher than
-            `vmax` are drawn in the color at the end of the color bar. If None, `vmax` is set to the number of channels
-            ``self.K``.
+            `vmax` are drawn in the color at the end of the color bar, which then ends in an arrow. If None, `vmax` is
+            the number of channels ``self.K``, times the number of species when all species are summed.
         ax : :py:class:`matplotlib.axes.Axes`, optional
             Axes to draw into, e.g. one panel of :py:func:`matplotlib.pyplot.subplots`.
 
@@ -492,11 +491,13 @@ class SquarePlotMixin:
         if figsize is None:
             figsize = estimate_figsize(density, cbar=True, dy=self.dy)
 
-        # set limit for coloring
+        # set limit for coloring: a node holds up to K cells of every species
         if vmax is None:
-            K = self.K
+            K = self.K * (getattr(self, "n_species", 1) if species is None else 1)
         else:
             K = vmax
+        # values above the colour bar are drawn in its top colour: say so with an arrow
+        extend = 'both' if density.max() > K else 'min'
 
         # set up figure
         fig, ax = self.setup_figure(figindex=figindex, figsize=figsize, tight_layout=tight_layout, ax=ax)
@@ -518,7 +519,7 @@ class SquarePlotMixin:
             )
             if cbar:
                 cax = colorbar_axes(ax, size="5%", pad=0.1)
-                colorbar = fig.colorbar(image, extend='min', use_gridspec=True, cax=cax)
+                colorbar = fig.colorbar(image, extend=extend, use_gridspec=True, cax=cax)
                 colorbar.set_label(cbarlabel)
                 colorbar.set_ticks(np.linspace(0.0, K + 1, 2 * K + 3, endpoint=True)[3::2])
                 cax.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: int(x - 0.5)))
@@ -536,7 +537,7 @@ class SquarePlotMixin:
         # draw colorbar
         if cbar:
             cax = colorbar_axes(ax, size="5%", pad=0.1)
-            cbar = fig.colorbar(cmap, extend='min', use_gridspec=True, cax=cax)
+            cbar = fig.colorbar(cmap, extend=extend, use_gridspec=True, cax=cax)
             cbar.set_label(cbarlabel)
             cbar.set_ticks(np.linspace(0.0, K + 1, 2 * K + 3, endpoint=True)[3::2])
             cax.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: int(x - 0.5)))
@@ -544,9 +545,6 @@ class SquarePlotMixin:
             plt.sca(ax)
 
         return fig, pc, cmap
-
-    def _validate_plot_species(self, species):
-        return validate_species(self, species)
 
     def plot_vectorfield(self, x, y, vfx, vfy, figindex=None, figsize=None, tight_layout=True, cmap='viridis', ax=None):
         l = np.sqrt(vfx ** 2 + vfy ** 2)
