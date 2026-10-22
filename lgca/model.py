@@ -9,6 +9,7 @@ import difflib
 import json
 from ._warnings import warn_user
 from copy import deepcopy
+from dataclasses import MISSING as dataclass_missing
 from dataclasses import dataclass, field, fields as dataclass_fields, is_dataclass, replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -45,6 +46,7 @@ __all__ = [
     "SpaceSpec",
     "StateSpec",
     "TimeSpec",
+    "UncheckedChangeWarning",
     "build_model",
     "describe_model_graph",
     "load_model_spec",
@@ -147,9 +149,12 @@ class StateSpec:
     n_species : int, default=1
         Number of cell species (classical models only).
     capacity : int, optional
-        Carrying capacity: the number of cells per node at which birth stops.
-        Used by models without volume exclusion and by the ``birth_death``
-        interaction.
+        Crowding scale: the number of cells per node at which crowding-dependent
+        rates, such as the division probability ``birth_rate * (1 - n / capacity)``
+        of ``birth_death``, reach zero. It is not a hard limit (only volume
+        exclusion is, one cell per channel), except for ``birth_death`` with
+        ``crowding=False``. Models without volume exclusion always have one;
+        with volume exclusion it is optional.
     initializer : mapping, optional
         A named initial condition, e.g. a fully occupied square in the centre:
         ``{"name": "region", "parameters": {"extent": 5, "density": 4}}``, or
@@ -184,6 +189,31 @@ class StateSpec:
     parameters: Mapping[str, Any] = field(default_factory=dict)
     fields: Mapping[str, Any] = field(default_factory=dict)
     traits: Mapping[str, Any] = field(default_factory=dict)
+
+    def __repr__(self) -> str:
+        # arrays (an initial state, fields, traits per cell) by shape: their values would fill a notebook
+        given = [f"{item.name}={_compact_repr(getattr(self, item.name))}" for item in dataclass_fields(self)
+                 if not _is_default(getattr(self, item.name), item)]
+        return f"StateSpec({', '.join(given)})"
+
+
+def _is_default(value, item) -> bool:
+    """Whether ``value`` is the default of the dataclass field ``item``."""
+    if isinstance(value, np.ndarray):
+        return False
+    default = item.default_factory() if item.default_factory is not dataclass_missing else item.default
+    return type(value) is type(default) and value == default
+
+
+def _compact_repr(value) -> str:
+    """``repr(value)``, with arrays and long sequences shown by their shape and type."""
+    if isinstance(value, Mapping):
+        return "{" + ", ".join(f"{key!r}: {_compact_repr(item)}" for key, item in value.items()) + "}"
+    if isinstance(value, np.ndarray) and value.size > 1:
+        return f"<array of shape {value.shape}, {value.dtype}>"
+    if isinstance(value, (list, tuple)) and len(value) > 8:
+        return f"<{type(value).__name__} of {len(value)} values>"
+    return repr(value)
 
 
 @dataclass(frozen=True)
@@ -594,10 +624,9 @@ def _validate_serialized_model(data: Mapping[str, Any]) -> None:
         if value is not None and (isinstance(value, bool) or int(value) != value):
             raise TypeError(f"model.time.{key} must be an integer")
     _validate_seed(time_spec.get("seed"))
-    for key in ("operators",):
-        value = dynamics.get(key, ())
-        if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
-            raise TypeError(f"model.dynamics.{key} must be a sequence")
+    operators = dynamics.get("operators", ())
+    if isinstance(operators, (str, bytes)) or not isinstance(operators, Sequence):
+        raise TypeError("model.dynamics.operators must be a sequence")
     for index, operator in enumerate(dynamics.get("operators", ())):
         _validate_serialized_operator(operator, index)
     if dynamics.get("allow_custom_order") is not None and not isinstance(
@@ -1339,6 +1368,12 @@ class ModelRunResult:
     metadata: dict[str, Any]
     data: Any = field(default_factory=lambda: RunData())
 
+    def __repr__(self) -> str:
+        # not the dataclass repr, which shows the initial state and the metadata twice (in the context)
+        title = self.spec.description.title if self.spec.description is not None else None
+        return (f"<ModelRunResult{f' {title!r}' if title else ''}: {self.metadata.get('steps')} steps, "
+                f"seed {self.spec.time.seed}, {self.lgca!r}, {self.data!r}>")
+
 
 def build_model(
     spec: ModelSpec,
@@ -1477,6 +1512,14 @@ def _attach_field_operators(lgca, pipeline):
         setattr(lgca, name, _pad_field(lgca, name, interior))
 
 
+class UncheckedChangeWarning(UserWarning):
+    """:meth:`CompiledModel.reconfigure` applied a change without trying it on a copy of the model first.
+
+    The model could not be copied (e.g. an operator holds a lock), so an error in the new parameters
+    shows only at the next step, which is then rolled back.
+    """
+
+
 def _try_step(compiled, spec):
     """Run one step of a copy of the model with ``spec``, so that errors show before a change is made.
 
@@ -1486,7 +1529,8 @@ def _try_step(compiled, spec):
         lattice = deepcopy(compiled.lgca, {id(compiled): None})
         metadata = deepcopy(compiled.metadata)
     except TypeError as exc:
-        warn_user(f"the change could not be tried on a copy of the model ({exc}); it is applied unchecked")
+        warn_user(f"the change could not be tried on a copy of the model ({exc}); it is applied unchecked",
+                  UncheckedChangeWarning)
         return
     context = ModelContext(lgca=lattice, spec=spec, fields=dict(compiled.context.fields), metadata=metadata)
     _compile_running(context).execute_step(context, compiled._step + 1)
@@ -1941,16 +1985,14 @@ def _run_compiled_model(compiled: CompiledModel, showprogress: bool = True,
 def _package_version() -> str:
     try:
         return importlib.metadata.version("biolgca")
-    except importlib.metadata.PackageNotFoundError:
-        return "2.0.0"
+    except importlib.metadata.PackageNotFoundError:  # a source checkout that is not installed
+        return "unknown"  # provenance records the commit (vcs_commit); a release number would be made up
 
 
 def _collect_output_paths(observers) -> list[str]:
     paths: list[str] = []
     for observer in observers:
-        for attr in ("paths",):
-            for path in getattr(observer, attr, []) or []:
-                paths.append(str(path))
+        paths.extend(str(path) for path in getattr(observer, "paths", None) or [])
         for attr in ("output_path", "save_path"):
             path = getattr(observer, attr, None)
             if path is not None:

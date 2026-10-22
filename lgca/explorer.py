@@ -144,6 +144,10 @@ class Explorer:
         Steps since the model was last built.
     widget : ipywidgets.VBox
         The controls and the view.
+    last_error : Exception or None
+        The last error of the model that the explorer showed in its status
+        line, with its traceback, e.g. ``raise explorer.last_error`` in the
+        next cell; ``None`` after :meth:`reset`.
     """
 
     def __init__(self, spec, controls=None, *, view="density", measure="population", steps_per_frame=1,
@@ -330,7 +334,7 @@ class Explorer:
                            if len(self.model.lgca.dims) == 1 else {})
         self._steps = []
         self._changes = []
-        self._error = None
+        self._error = self.last_error = None
         current = self._view.value if self._view.value in options else options[0]
         self._quiet, self._view.options, self._view.value, self._quiet = True, options, current, False
         self._fit_slice_controls()
@@ -377,7 +381,7 @@ class Explorer:
                 self._apply(control, change["new"])
                 self._status.value = ""
             except Exception as exc:  # noqa: BLE001 - any error of the model: show it and put the control back
-                self._error = exc
+                self._error = self.last_error = exc
                 self._status.value = _message(exc)
                 self._quiet = True
                 try:
@@ -392,7 +396,8 @@ class Explorer:
         try:
             function(*args, **kwargs)
             self._status.value = ""
-        except Exception as exc:  # noqa: BLE001 - shown in the widget, not lost in the kernel's log
+        except Exception as exc:  # noqa: BLE001 - shown in the widget, and kept with its traceback
+            self.last_error = exc
             self._status.value = _message(exc)
             self.pause()
 
@@ -417,7 +422,8 @@ class Explorer:
             start = time.perf_counter()
             try:
                 self.advance()
-            except Exception as exc:  # noqa: BLE001 - shown in the widget; the thread ends
+            except Exception as exc:  # noqa: BLE001 - shown in the widget and kept; the thread ends
+                self.last_error = exc
                 self._status.value = _message(exc)
                 self._stop.set()
                 self._play.value = False
@@ -1013,4 +1019,5 @@ def _message(exc):
     from html import escape
 
     notes = "".join(f"<br>{escape(note)}" for note in getattr(exc, "__notes__", ()))  # e.g. it was rolled back
-    return f"<span style='color:#b00020'>{escape(type(exc).__name__)}: {escape(str(exc))}{notes}</span>"
+    return (f"<span style='color:#b00020'>{escape(type(exc).__name__)}: {escape(str(exc))}{notes}"
+            "<br>(the explorer keeps it, with its traceback, in .last_error)</span>")

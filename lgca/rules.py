@@ -57,6 +57,7 @@ def interaction(
     name: str | None = None,
     aliases: str | Iterable[str] = (),
     register: bool = True,
+    replace: bool = False,
 ):
     """Turn ``function(state, **parameters)`` into a registered interaction.
 
@@ -96,6 +97,9 @@ def interaction(
         Register the rule so that model files can refer to it by name.
         Registering again from the same module (re-running a notebook cell)
         replaces the earlier rule.
+    replace : bool, default=False
+        Replace a rule of the same name registered by another module, e.g. a
+        built-in one; without it, that name is refused.
 
     Returns
     -------
@@ -117,7 +121,7 @@ def interaction(
         rule = Interaction(function, kind=kind, families=families, geometries=geometries,
                            conserves=conserves, n_species=n_species, name=name, aliases=aliases)
         if register:
-            register_plugin(rule.info, rule._factory)
+            register_plugin(rule.info, rule._factory, replace=replace)
         return rule
 
     return decorate if function is None else decorate(function)
@@ -260,6 +264,7 @@ def stack(
     traits: str | Iterable[str] = (),
     name: str | None = None,
     register: bool = True,
+    replace: bool = False,
 ):
     """Turn ``function(state, **parameters)``, which returns a list of operators, into one operator.
 
@@ -288,6 +293,9 @@ def stack(
         Name in model files. Default: as for :func:`interaction`.
     register : bool, default=True
         Register the stack so that model files can refer to it by name.
+    replace : bool, default=False
+        Replace a rule of the same name registered by another module (see
+        :func:`interaction`).
 
     Examples
     --------
@@ -304,7 +312,7 @@ def stack(
     def decorate(function):
         rule = Stack(function, kind=kind, families=families, traits=traits, name=name)
         if register:
-            register_plugin(rule.info, rule._factory)
+            register_plugin(rule.info, rule._factory, replace=replace)
         return rule
 
     return decorate if function is None else decorate(function)
@@ -441,6 +449,7 @@ def reorientation_term(
     name: str | None = None,
     aliases: str | Iterable[str] = (),
     register: bool = True,
+    replace: bool = False,
 ):
     """Turn ``function(state, **parameters)`` into a term of the Boltzmann reorientation.
 
@@ -485,6 +494,9 @@ def reorientation_term(
         Further names.
     register : bool, default=True
         Make the term available by name in :class:`~lgca.pipeline.ReorientationTermSpec`.
+    replace : bool, default=False
+        Replace a term of the same name registered by another module, e.g. a
+        built-in one; without it, that name is refused.
 
     Returns
     -------
@@ -509,7 +521,7 @@ def reorientation_term(
         if register:
             from .pipeline import register_reorientation_term
 
-            register_reorientation_term(cue)
+            register_reorientation_term(cue, replace=replace)
         return cue
 
     return decorate if function is None else decorate(function)
