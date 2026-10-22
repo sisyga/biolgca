@@ -96,9 +96,11 @@ _OPERATIONS = [
     (_roll_counts, "birth_death", "change the number of cells at a node", _CLASSICAL),
 ]
 _WIDTH = ("field", "reorientation", "phenotype_switch", "birth_death")
+# the kind check compares widths, so the kinds at the boundary are enough: the widest kind that does not
+# allow an operation (here) and the narrowest that does (test_a_rule_may_use_what_its_kind_allows)
 _CASES = [pytest.param(body, kind, needed, what, family, id=f"{body.__name__[1:]}-{kind}-{family}")
           for body, needed, what, families in _OPERATIONS for family in families
-          for kind in _WIDTH[:_WIDTH.index(needed)]]
+          for kind in [_WIDTH[_WIDTH.index(needed) - 1]]]
 
 
 def _model(body, kind, family, steps=3):
@@ -154,13 +156,13 @@ def test_a_rule_that_breaks_its_kind_warns_once_and_runs_as_the_wider_kind(body,
         _model(body, kind, family).step()
 
 
-@pytest.mark.parametrize("body, kind, family", [
-    pytest.param(body, kind, family, id=f"{body.__name__[1:]}-{kind}-{family}")
-    for body, needed, _, families in _OPERATIONS for family in families
-    for kind in _WIDTH[_WIDTH.index(needed):]])
-def test_a_rule_may_use_what_its_kind_allows(body, kind, family):
+@pytest.mark.parametrize("body, family", [
+    pytest.param(body, family, id=f"{body.__name__[1:]}-{needed}-{family}")
+    for body, needed, _, families in _OPERATIONS for family in families])
+def test_a_rule_may_use_what_its_kind_allows(body, family):
+    needed = next(kind for operation, kind, _, _ in _OPERATIONS if operation is body)
     with strict_contracts():
-        _model(body, kind, family).run(showprogress=False)
+        _model(body, needed, family).run(showprogress=False)
 
 
 @pytest.mark.parametrize("write, error", [

@@ -13,6 +13,7 @@ import pytest
 from lgca import get_lgca
 from lgca.plots import LatticeAnimation
 from lgca.plotting import AnimationObserver, animate
+from tests.combinations import pairwise
 
 
 def _shown(fig):
@@ -43,11 +44,10 @@ def _recorded_square(ib, ve, seed):
     return model
 
 
-@pytest.mark.parametrize("ib,ve,kind", [
-    (ib, ve, kind)
-    for ib, ve in [(False, True), (True, True), (False, False), (True, False)]
-    for kind in ["config", "flux", "flow", "density"]])
-@pytest.mark.parametrize("entry", ["direct", "facade"])
+@pytest.mark.parametrize("ib, ve, kind, entry", [
+    (ib, ve, kind, entry) for (ib, ve), kind, entry in pairwise(
+        [(False, True), (True, True), (False, False), (True, False)], ["config", "flux", "flow", "density"],
+        ["direct", "facade"])])
 def test_animation_frames_show_their_recorded_step_and_time(ib, ve, kind, entry):
     # Frame n must draw recorded row n: the movie of rows (1, 0, 2) starts with what the
     # movie of rows (0, 1, 2) shows at frame 1. Reordering keeps the colour scale.

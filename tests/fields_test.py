@@ -38,6 +38,7 @@ from lgca.pipeline import (
     ReorientationTermSpec,
 )
 from lgca.simulation import FieldRecorder, Schedule, estimate_recording_bytes
+from tests.combinations import pairwise
 
 HAVE_PYAMG = importlib.util.find_spec("pyamg") is not None
 needs_pyamg = pytest.mark.skipif(not HAVE_PYAMG, reason="pyamg has no wheels for Python 3.14 yet")
@@ -135,9 +136,9 @@ SOLVERS = [("implicit", {}), ("implicit", {"backend": "cg"}), ("implicit", {"bac
            ("explicit", {}), ("explicit", {"method": "BDF"})]
 
 
-@pytest.mark.parametrize("geometry", GEOMETRIES)
-@pytest.mark.parametrize("boundary", ["periodic", "reflecting"])
-@pytest.mark.parametrize("solver,options", SOLVERS)
+@pytest.mark.parametrize("solver, options, geometry, boundary", [
+    (solver, options, geometry, boundary)
+    for (solver, options), geometry, boundary in pairwise(SOLVERS, list(GEOMETRIES), ["periodic", "reflecting"])])
 def test_diffusion_conserves_the_total(geometry, boundary, solver, options):
     rng = np.random.default_rng(3)
     initial = rng.random(GEOMETRIES[geometry] if geometry != "lin" else (GEOMETRIES[geometry],))

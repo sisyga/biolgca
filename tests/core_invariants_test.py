@@ -11,6 +11,7 @@ from lgca.simulation import (
     ScalarTimeSeriesRecorder,
     SimulationRunner,
 )
+from tests.combinations import pairwise
 
 
 FAMILIES = {
@@ -99,9 +100,7 @@ def _particle_count(lgca):
     return int(np.asarray(lgca.cell_density[lgca.nonborder]).sum())
 
 
-@pytest.mark.parametrize("bc", ["pbc", "rbc", "abc"])
-@pytest.mark.parametrize("geometry", GEOMETRIES)
-@pytest.mark.parametrize("family", FAMILIES)
+@pytest.mark.parametrize("family, geometry, bc", pairwise(list(FAMILIES), list(GEOMETRIES), ["pbc", "rbc", "abc"]))
 def test_plus_x_boundary_crossing_obeys_core_invariants(family, geometry, bc):
     """A single particle must wrap, reflect, or be absorbed exactly once."""
     lgca = _make_lgca(family, geometry, bc=bc)

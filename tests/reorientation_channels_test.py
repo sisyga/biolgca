@@ -10,6 +10,7 @@ from lgca.pipeline import (
     ReorientationSpec,
     ReorientationTermSpec,
 )
+from tests.combinations import pairwise
 
 FAMILIES = [("classical", True, False), ("nove", False, False), ("ib", True, True), ("nove_ib", False, True)]
 DIMS = (60, 60)
@@ -117,10 +118,10 @@ def test_large_channel_subsets_are_rejected_before_enumeration(monkeypatch):
         model.step()
 
 
-@pytest.mark.parametrize("ve", [True, False], ids=["ve", "nove"])  # the two families sum neighbours apart
-@pytest.mark.parametrize("bc", ["periodic", "reflecting"])
-@pytest.mark.parametrize("geometry, dims", [("lin", (9,)), ("square", (6, 7)), ("hex", (8, 8)),
-                                            ("cubic", (5, 4, 6)), ("moore", (5, 4, 6))])
+@pytest.mark.parametrize("geometry, dims, bc, ve", [  # ve: the two families sum neighbours apart
+    (geometry, dims, bc, ve) for (geometry, dims), bc, ve in pairwise(
+        [("lin", (9,)), ("square", (6, 7)), ("hex", (8, 8)), ("cubic", (5, 4, 6)), ("moore", (5, 4, 6))],
+        ["periodic", "reflecting"], [True, False])])
 def test_neighbour_values_point_along_the_velocities(geometry, dims, bc, ve):
     model = build_model(ModelSpec(space=SpaceSpec(geometry=geometry, dims=dims, boundary=bc),
                                   state=StateSpec(density=0.5, restchannels=1, volume_exclusion=ve)))

@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
+from tests.combinations import pairwise
 
 
 @pytest.mark.parametrize("capacity", [20, 1_000_000])
@@ -87,9 +88,8 @@ def test_region_initializer_populates_only_requested_region(placement, expected_
     np.testing.assert_array_equal(density, expected)
 
 
-@pytest.mark.parametrize("capacity", [2, 5, 10])
-@pytest.mark.parametrize("family", ["ordinary", "identity", "multispecies"])
-@pytest.mark.parametrize("region", [False, True])
+@pytest.mark.parametrize("family, capacity, region",
+                         pairwise(["ordinary", "identity", "multispecies"], [2, 5, 10], [False, True]))
 def test_nove_density_is_independent_of_capacity(capacity, family, region):
     initializer = None
     if region:

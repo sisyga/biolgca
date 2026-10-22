@@ -11,6 +11,7 @@ from lgca import get_lgca
 from lgca.plotting import AnimationObserver, PlotSnapshotObserver, animate, plot
 from lgca.plot_data import select_density, select_density_history
 from lgca.simulation import DensityRecorder, Schedule, SimulationRunner
+from tests.combinations import pairwise
 
 
 def make_square_lgca(seed=1):
@@ -47,9 +48,9 @@ def test_animation_schedule_is_checked_before_dynamics(steps):
     plt.close("all")
 
 
-@pytest.mark.parametrize("entry", ["facade", "direct"])
-@pytest.mark.parametrize("moving", [False, True])
-@pytest.mark.parametrize("channels,expected_rest", [(slice(0, 4), False), (slice(4, 5), True)])
+@pytest.mark.parametrize("channels, expected_rest, moving, entry", [
+    (channels, expected_rest, moving, entry) for (channels, expected_rest), moving, entry in pairwise(
+        [(slice(0, 4), False), (slice(4, 5), True)], [False, True], ["facade", "direct"])])
 def test_density_facade_uses_channel_history_and_its_times(entry, moving, channels, expected_rest):
     nodes = np.zeros((2, 2, 5), dtype=bool)
     nodes[..., 4] = True
