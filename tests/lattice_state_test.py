@@ -129,17 +129,21 @@ def test_strict_contracts_stop_an_operation_before_it_changes_the_state():
     assert lgca.rng.bit_generator.state == random
 
 
-@pytest.mark.parametrize("geometry", ["lin", "square", "hex", "cubic"])
-@pytest.mark.parametrize("bc", ["periodic", "reflecting", "absorbing"])
-def test_neighbor_sum_matches_the_model_after_its_boundary_conditions(geometry, bc):
-    lgca = _model(geometry, bc=bc)
-    lgca.apply_boundaries()
-    lgca.update_dynamic_fields()
+@pytest.mark.parametrize("geometry, dims", [("lin", (8,)), ("square", (6, 6)), ("hex", (6, 6)),
+                                            ("cubic", (5, 5, 5)), ("moore", (5, 5, 5))])
+def test_neighbor_sum_of_one_cell_marks_the_nodes_its_channels_point_to(geometry, dims):
+    lgca = get_lgca(geometry=geometry, dims=dims, density=0, restchannels=1, bc="periodic")
     state = LatticeState(lgca)
+    values = np.zeros(dims)
+    centre = tuple(d // 2 for d in dims)
+    values[centre] = 1
 
-    expected = lgca.nb_sum(lgca.cell_density)[lgca.nonborder]
-    np.testing.assert_array_equal(state.neighbor_sum(state.density), expected)
-    assert state.neighbor_sum(state.flux).shape == state.flux.shape
+    total = state.neighbor_sum(values)
+
+    # the node is a neighbour of exactly one node per velocity channel, each counted once, not of itself
+    assert total.sum() == lgca.velocitychannels and total.max() == 1 and total[centre] == 0
+    np.testing.assert_array_equal(total, state.neighbor_values(values).sum(-1))
+    np.testing.assert_array_equal(state.neighbor_sum(np.ones(dims)), lgca.velocitychannels)
 
 
 def test_neighbor_sum_wraps_only_across_periodic_boundaries():
@@ -349,10 +353,41 @@ def test_counts_are_read_only_but_can_be_replaced():
     np.testing.assert_array_equal(state.density, 1)
 
 
-@pytest.mark.parametrize("p", [0.1, np.full(DIMS["square"], 0.1), [0.1, 0.2],
-                               np.full(DIMS["square"] + (2,), 0.1), np.full(DIMS["square"] + (2, 5), 0.1)])
-def test_probabilities_broadcast_per_node_species_or_channel(p):
-    LatticeState(_model(n_species=2)).remove_cells(p)
+def test_removal_probabilities_apply_per_node_species_or_channel():
+    # probabilities of 0 and 1 make the outcome certain, so a probability on the wrong axis shows
+    def full_state():
+        lgca = get_lgca(geometry="square", dims=DIMS["square"], density=0, restchannels=1, n_species=2, seed=1)
+        lgca.nodes[lgca.nonborder] = True
+        return LatticeState(lgca)
+
+    state = full_state()
+    state.remove_cells(1.0)
+    np.testing.assert_array_equal(state.counts, 0)
+
+    state = full_state()
+    state.remove_cells([0.0, 1.0])  # per species
+    np.testing.assert_array_equal(state.counts[..., 0, :], 1)
+    np.testing.assert_array_equal(state.counts[..., 1, :], 0)
+
+    state = full_state()
+    per_node = np.zeros(DIMS["square"])
+    per_node[0] = 1.0
+    state.remove_cells(per_node)
+    np.testing.assert_array_equal(state.density, 2 * state.K * (1 - per_node))
+
+    state = full_state()
+    per_species_node = np.zeros(DIMS["square"] + (2,))
+    per_species_node[0, :, 1] = 1.0
+    state.remove_cells(per_species_node)
+    np.testing.assert_array_equal(state.counts[0, :, 1], 0)
+    assert state.counts.sum() == state.counts.size - DIMS["square"][1] * state.K
+
+    state = full_state()
+    per_channel = np.zeros(DIMS["square"] + (2, 5))
+    per_channel[..., 4] = 1.0  # only the rest channels empty
+    state.remove_cells(per_channel)
+    np.testing.assert_array_equal(state.counts[..., :4], 1)
+    np.testing.assert_array_equal(state.counts[..., 4], 0)
 
 
 @pytest.mark.parametrize("p, message", [([0.1, 0.2, 0.3], "shape"), (1.5, "between 0 and 1")])
@@ -377,7 +412,9 @@ def test_identity_based_counts_can_be_read_but_not_assigned(ve):
     lgca = get_lgca(geometry="square", dims=(4, 4), ib=True, ve=ve, density=2 if not ve else 0.5,
                     restchannels=1, seed=1)
     state = LatticeState(lgca)
-    counts = lgca._channel_counts(lgca.nodes[lgca.nonborder])
+    nodes = lgca.nodes[lgca.nonborder]
+    # a channel holds a label with volume exclusion and a list of labels without
+    counts = nodes > 0 if ve else np.vectorize(len)(nodes)
     np.testing.assert_array_equal(state.counts[..., 0, :], counts)
     assert state.volume_exclusion == ve
     np.testing.assert_allclose(state.flux, lgca.calc_flux(lgca.nodes)[lgca.nonborder])
@@ -488,14 +525,17 @@ def test_gradients_are_centred_and_take_boundary_values_from_ghost_nodes():
 
 @pytest.mark.parametrize("geometry", ["lin", "square", "hex", "cubic"])
 @pytest.mark.parametrize("bc", ["periodic", "reflecting"])
-def test_gradient_of_the_density_matches_the_model_after_its_boundary_conditions(geometry, bc):
-    lgca = _model(geometry, bc=bc, density=1.5)
-    lgca.apply_boundaries()
-    lgca.update_dynamic_fields()
+def test_gradient_of_a_linear_ramp_is_its_slope_inside_the_lattice(geometry, bc):
+    # centred differences are exact for a linear field in physical coordinates on every geometry
+    lgca = _model(geometry, bc=bc, density=0)
     state = LatticeState(lgca)
-
-    expected = lgca.gradient(lgca.cell_density)[lgca.nonborder]
-    np.testing.assert_allclose(state.gradient(state.density), expected)
+    coordinates = [getattr(lgca, name) for name in ("xcoords", "ycoords", "zcoords")[:len(state.dims)]]
+    inside = tuple(slice(1, -1) for _ in state.dims)
+    for component, coordinate in enumerate(coordinates):
+        ramp = 2.0 * np.asarray(coordinate) + 1
+        gradient = state.gradient(ramp)[inside]
+        np.testing.assert_allclose(gradient, np.broadcast_to(2 * np.eye(len(state.dims))[component],
+                                                             gradient.shape), atol=1e-12)
 
 
 @pytest.mark.parametrize("channels, cells", [(5, 2), (7, 3), (27, 3), (27, 13)])
