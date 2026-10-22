@@ -110,12 +110,14 @@ def _grown(density, kappa=4.4, seeds=range(4), steps=600):
     return [allee.final_density(run) > density for run in runs]
 
 
+@pytest.mark.slow
 def test_below_the_threshold_populations_decline_above_they_grow():
     """The simulated threshold lies near 0.25 (Fig 3), far below the mean-field 0.42."""
     assert not any(_grown(0.18))
     assert all(_grown(0.34))
 
 
+@pytest.mark.slow
 def test_with_repulsion_small_populations_grow():
     assert all(_grown(0.1, kappa=-4.4))
 
@@ -148,6 +150,7 @@ def test_plasticity_starts_with_capacity_cells_of_uniform_kappa():
         plasticity.regime(4)
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("geometry", ["hex", "lin"])
 @pytest.mark.parametrize("seed", [3, 4])
 def test_the_three_regimes_of_the_paper(geometry, seed):
@@ -259,6 +262,7 @@ def test_clonal_go_or_grow_setup_and_research_model():
         np.testing.assert_array_equal(np.sort(np.asarray(cells[0][trait])), np.sort(np.asarray(cells[1][trait])))
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("seed", [3, 4])
 def test_an_evolving_switch_turns_repulsive_and_speeds_up_growth(seed):
     runs = {evolve: clonal.core_and_rim(run_model(clonal.build_spec(size=80, steps=250, evolve_kappa=evolve,
@@ -297,6 +301,7 @@ def test_contact_inhibition_sets_the_moving_fraction_in_a_full_tissue(alpha):
     assert abs(moving - expected) < 4 * np.sqrt(expected * (1 - expected) / counts.sum())
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("seed", [1, 2])
 def test_contact_inhibition_holds_evolution_back(seed):
     """Drivers spread through a mixing tissue, but hardly beyond their gland when cells stop moving."""
@@ -391,6 +396,7 @@ def _observed(spec):
     return replace(spec, analysis=AnalysisSpec(observers=[recorder]))
 
 
+@pytest.mark.slow
 def test_the_invasion_modes(tmp_path, monkeypatch):
     """Weak adhesion and a sparse matrix release single cells; a dense matrix or strong adhesion stops
     it; only adhesion correlates the movement of neighbours (Fig 5d, e)."""
@@ -469,6 +475,7 @@ def test_the_reaction_terms_and_their_nullclines():
     assert x[2, 2] == y[2, 2] == 0
 
 
+@pytest.mark.slow
 def test_spirals_persist_in_the_lgca_and_its_mean_field():
     run = run_model(excitable_media.build_spec(size=60, steps=300, record_every=100), showprogress=False)
     x, y = excitable_media.fractions(np.asarray(run.data["nodes"])[-1])
@@ -527,6 +534,7 @@ def test_isolated_nodes_exchange_no_cells_and_passengers_lower_alpha():
     assert np.nanmean(history["alpha"][-1]) > 0.5 - 0.25 * 300 * 0.05 * 5e-4 * 3
 
 
+@pytest.mark.slow
 def test_moving_rescues_small_tumours_that_die_out_without_any_mutation():
     """At N₀ = N*/10 a node holds 18 cells: immobile tumours die out by chance, mobile ones invade."""
     table = meltdown.scan([0.1], [0.0, 16.0], seeds=range(3), p_p=0.0, p_d=0.0)

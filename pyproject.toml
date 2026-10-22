@@ -98,3 +98,4 @@ packages = ["lgca", "lgca.examples", "lgca.schemas", "lgca.zoo"]
 testpaths = ["tests"]  # not the ignored outputs/ (probe scripts, pytest temp folders)
 # a rule that breaks its kind's contract fails the test instead of warning once
 filterwarnings = ["error::lgca.ContractWarning"]
+markers = ["slow: the zoo's paper reproductions and the 3D explorer views; run only with --run-slow"]

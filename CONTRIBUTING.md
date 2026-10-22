@@ -35,14 +35,16 @@ Run from the repository root:
 ```bash
 uv run pytest -q tests/<file>_test.py      # the tests of your change, while you work
 uv run pytest -q                           # the full suite (a few minutes)
+uv run pytest -q --run-slow                # also the slow paper reproductions of the zoo
 uv run ruff check <changed files>          # lint
 uv run python docs/build.py --no-notebooks # strict docs build without running notebooks
 uv run python docs/build.py                # full docs build, runs the tutorials
 ```
 
-CI runs the tests on Linux with Python 3.11 to 3.14 and on Windows and macOS
-with 3.13, and with the minimum dependency versions, runs the suite once in random order,
-executes the notebooks and builds the documentation. After changing
+CI runs the tests, the slow ones included, on Linux with Python 3.11 to 3.14,
+on Windows and macOS with 3.13 and with the minimum dependency versions; it runs
+the suite once in random order, executes the notebooks and builds the
+documentation. After changing
 dependencies in `pyproject.toml`, run `uv lock` and commit `uv.lock`.
 
 ## Writing tests

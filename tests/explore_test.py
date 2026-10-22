@@ -369,6 +369,7 @@ def test_it_takes_a_model_spec():
         explore(lgca.get_lgca(geometry="lin", dims=10))
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("geometry, family", [("cubic", family) for family in FAMILIES] + [("moore", {})])
 def test_every_view_shows_its_values_in_3d_and_in_every_plane(geometry, family, close):
     spec = _spec(geometry, (6, 5, 4), fields={"signal": 0.5}, **family)
