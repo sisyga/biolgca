@@ -201,7 +201,7 @@ class Cells:
 
         ``cells["r_b"][daughters] = new`` would change only the copy, so the copy refuses writes;
         change traits with :meth:`set_trait`. Arithmetic, e.g. ``cells["r_b"] + noise``, gives
-        ordinary arrays.
+        ordinary arrays; for an array to edit in place, take ``cells["r_b"].copy()``.
         """
         values = trait_array(self._lgca, name).values[self.label]
         values.flags.writeable = False

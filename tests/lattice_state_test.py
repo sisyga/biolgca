@@ -158,6 +158,27 @@ def test_neighbor_sum_wraps_only_across_periodic_boundaries():
     assert reflecting[1, 0] == reflecting[0, 1] == 1
 
 
+@pytest.mark.parametrize("bc", ["reflecting", "absorbing"])
+@pytest.mark.parametrize("geometry, dims", [("lin", (8,)), ("square", (6, 6)), ("hex", (6, 6)),
+                                            ("cubic", (5, 5, 5)), ("moore", (5, 5, 5))])
+def test_a_cell_in_the_corner_has_no_neighbours_across_a_closed_boundary(geometry, dims, bc):
+    corner = (0,) * len(dims)
+    values = np.zeros(dims)
+    values[corner] = 1
+    periodic = LatticeState(get_lgca(geometry=geometry, dims=dims, density=0, restchannels=1,
+                                     bc="periodic")).neighbor_sum(values)
+    closed = LatticeState(get_lgca(geometry=geometry, dims=dims, density=0, restchannels=1,
+                                   bc=bc)).neighbor_sum(values)
+
+    far_side = np.zeros(dims, dtype=bool)
+    for axis in range(len(dims)):
+        far_side[(slice(None),) * axis + (-1,)] = True
+    assert periodic[far_side].sum() > 0  # periodic boundaries wrap around ...
+    assert closed[far_side].sum() == 0  # ... closed ones do not
+    inside = ~far_side
+    np.testing.assert_array_equal(closed[inside], periodic[inside])  # inside, the neighbours are the same
+
+
 def test_cells_without_volume_exclusion_die_one_by_one():
     # 5 cells per channel dying with probability 0.5: variance 5 * 0.25, not 25 * 0.25
     lgca = _model(ve=False, nodes=_nodes(False, 1, (60, 50), 5, 5))

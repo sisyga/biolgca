@@ -24,6 +24,11 @@ def test_direct_lgca_constructors_accept_valid_interaction_kwargs():
     lgca.timestep()
 
     assert lgca.cell_density.sum() == 0
+    # and r_b: certain birth without death adds cells
+    lgca = LGCA_1D(dims=10, density=0.5, interaction="birthdeath", r_b=1.0, r_d=0.0, seed=1)
+    before = lgca.cell_density[lgca.nonborder].sum()
+    lgca.timestep()
+    assert lgca.cell_density[lgca.nonborder].sum() > before
 
 
 def test_direct_nove_constructor_accepts_capacity_and_rejects_typo():
@@ -101,6 +106,12 @@ def test_known_constructor_and_interaction_kwargs_are_accepted():
     lgca.timestep()
 
     assert lgca.cell_density.sum() == 0  # the rates reached the rule: certain death, no births
+    grow = get_lgca(geometry="square", dims=3, density=0.5, restchannels=2, seed=1, propagation=False,
+                    interaction="go_or_grow", r_b=1.0, r_d=0.0, kappa=5.0, theta=0.75)
+    before = grow.cell_density[grow.nonborder].sum()
+    for _ in range(10):  # only resting cells divide, and without propagation few rest at first
+        grow.timestep()
+    assert grow.cell_density[grow.nonborder].sum() > before  # and r_b: certain birth adds cells
 
 
 def test_nove_1d_set_r_int_preserves_state():

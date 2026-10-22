@@ -15,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ._warnings import warn_user
+from ._warnings import is_user_code, warn_user
 from .examples import describe_example, example_names, save_example_spec
 from .model import build_model, load_model_spec, save_model_spec
 from .provenance import sha256, vcs_commit
@@ -48,13 +48,12 @@ def main(argv=None) -> int:
         sys.path[:] = search_path
 
 
-_PACKAGE = Path(__file__).resolve().parent
-
-
 def _raised_outside_lgca(exc) -> bool:
-    """Whether ``exc``, or an exception it was raised from, was raised by code outside lgca.
+    """Whether ``exc``, or an exception it was raised from, was raised by the user's own code.
 
-    That is the innermost frame of its traceback: the user's rule, or a module given with ``--plugins``.
+    That is the innermost frame of its traceback: the user's rule, or a module given with ``--plugins``;
+    lgca, the standard library and installed packages do not count (a missing module or a broken JSON
+    file is reported in one line).
     """
     seen = set()
     while exc is not None and id(exc) not in seen:
@@ -62,7 +61,7 @@ def _raised_outside_lgca(exc) -> bool:
         tb = exc.__traceback__
         while tb is not None and tb.tb_next is not None:
             tb = tb.tb_next
-        if tb is not None and not Path(tb.tb_frame.f_code.co_filename).resolve().is_relative_to(_PACKAGE):
+        if tb is not None and is_user_code(tb.tb_frame.f_code.co_filename):
             return True
         exc = exc.__cause__ or exc.__context__
     return False

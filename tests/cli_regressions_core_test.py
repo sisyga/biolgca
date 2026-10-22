@@ -70,6 +70,15 @@ def test_module_that_cannot_be_found_says_where_it_was_looked_for(project, tmp_p
     assert _main(["validate", str(project / "model.json"), "--plugins", "hypoxia_rule"]) == 2
     err = capsys.readouterr().err
     assert "hypoxia_rule" in err and str(project) in err and "PYTHONPATH" in err
+    assert err.startswith("error: ") and "Traceback" not in err  # lgca's message, not importlib's frames
+
+
+def test_broken_model_file_is_reported_in_one_line(tmp_path, capsys):
+    broken = tmp_path / "broken.json"
+    broken.write_text('{"model": ', encoding="utf-8")
+    assert _main(["validate", str(broken)]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("error: ") and "Traceback" not in err
 
 
 def test_model_without_its_plugins_says_to_import_the_module(project, capsys):

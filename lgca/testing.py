@@ -20,6 +20,7 @@ from typing import Any
 
 import numpy as np
 
+from ._warnings import is_user_code
 from .lattice_state import ContractWarning
 
 __all__ = ["ContractWarning", "InteractionCheckError", "InteractionReport", "check_interaction",
@@ -31,7 +32,6 @@ _VELOCITIES = {"lin": 2, "square": 4, "hex": 6, "cubic": 6, "moore": 26}
 _BOUNDARIES = ("periodic", "reflecting")
 _IDENTITY = ("ib", "nove_ib")
 _STEPS = 3
-_PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 class InteractionCheckError(AssertionError):
@@ -252,8 +252,7 @@ class _Setup:
         density = 0.4 * channels * self.n_species if self.density is None else self.density
         dims = (_LARGE_DIMS if self.large else _DIMS)[self.geometry]
         fields = {name: value(dims) if callable(value) else value for name, value in (self.fields or {}).items()}
-        fields = {name: value if np.ndim(value) == 0 else np.broadcast_to(value, dims)
-                  for name, value in fields.items()}
+        fields = {name: _field_on(value, dims) for name, value in fields.items()}
         name = entry["name"] if isinstance(entry, Mapping) else entry.terms[0].name
         return ModelSpec(
             description=Description(title=f"check {name}"),
@@ -304,11 +303,20 @@ def _check_case(entry, setup, kind, momentum, prepare, errors=None) -> list[str]
     return []
 
 
+def _field_on(value, dims):
+    """A field value on the lattice: a number, an array of shape ``dims``, or a 1-D profile along axis 0."""
+    if np.ndim(value) == 0:
+        return value
+    if np.ndim(value) == 1:  # the docstring's gradient: it runs along the first axis
+        value = np.reshape(value, (-1,) + (1,) * (len(dims) - 1))
+    return np.broadcast_to(value, dims)
+
+
 def _where(exc) -> str:
     """`` (file:line)`` of the innermost frame of ``exc`` outside lgca, e.g. the line of the rule."""
     found, tb = None, exc.__traceback__
     while tb is not None:
-        if not os.path.abspath(tb.tb_frame.f_code.co_filename).startswith(_PACKAGE_DIR):
+        if is_user_code(tb.tb_frame.f_code.co_filename):
             found = tb
         tb = tb.tb_next
     return "" if found is None else f" ({os.path.basename(found.tb_frame.f_code.co_filename)}:{found.tb_lineno})"

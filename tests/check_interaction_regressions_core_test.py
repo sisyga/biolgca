@@ -68,6 +68,8 @@ def test_rules_that_read_a_field_are_checked_with_the_fields_given():
     # a gradient along the first axis: a function of the lattice shape, so that every geometry has one
     check_interaction(hypoxic_death, fields={"oxygen": lambda dims: np.linspace(0, 1, dims[0])[:, None]},
                       geometries=("square", "hex"))
+    # the documented 1-D profile runs along the first axis on every geometry
+    check_interaction(hypoxic_death, fields={"oxygen": lambda dims: np.linspace(0, 1, dims[0])})
     # a constant field, with the growth of one step against the analytic value: all cells see oxygen 0.1
     check_interaction(hypoxic_death, fields={"oxygen": 0.1}, geometries=("square",), families=("nove",),
                       expected_growth=-0.3)

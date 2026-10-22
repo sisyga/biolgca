@@ -17,7 +17,8 @@ This file records notable user-facing changes. Changes remain under
   `ValueError`.
 - `state.cells[name]` is a read-only copy; writing into it
   (`cells["r_b"][mask] = x`) changed nothing without a warning. Use
-  `cells.set_trait`.
+  `cells.set_trait`; code that edited the copy in place before passing it to
+  `set_trait` takes `cells["r_b"].copy()`.
 - `biolgca run/validate/sweep --plugins MODULE` finds a module next to the
   model file or in the working directory without `PYTHONPATH`; a module that
   is not found says where it was looked for.

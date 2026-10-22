@@ -51,6 +51,15 @@ def test_misspelled_operator_name_suggests_the_registered_one():
         build_model(_spec([{"name": "birth_deth"}]))
 
 
+def test_a_stack_name_suggests_its_parts_and_the_reorientation_operator_its_spec():
+    with pytest.raises(ValueError, match=r"did you mean 'go_or_grow.growth' or 'go_or_grow.switch'\?"):
+        build_model(_spec([{"name": "go_or_grow"}]))
+    # model metadata names a ReorientationSpec 'reorientation.boltzmann'; it is not an operator to copy
+    with pytest.raises(ValueError, match=r"ReorientationSpec\(terms=\[\.\.\.\]\)") as caught:
+        build_model(_spec([{"name": "reorientation.boltzmann"}]))
+    assert "import reorientation" not in str(caught.value)
+
+
 def test_rule_of_a_module_that_was_not_imported_says_to_import_it():
     """A model file that names a rule of the user's module, loaded without importing the module."""
     with pytest.raises(ValueError, match=r"import hypoxia_rules .*--plugins hypoxia_rules"):

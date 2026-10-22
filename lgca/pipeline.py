@@ -457,9 +457,13 @@ def _unknown_operator_hint(name) -> str:
     if hint:
         return hint
     name = str(name)
-    matches = difflib.get_close_matches(name, [info.name for info in list_plugins()], n=1)
+    if name == "reorientation.boltzmann":  # the name model metadata gives a ReorientationSpec
+        return " (reorientation is written as ReorientationSpec(terms=[...]), not by its operator name)"
+    registered = [info.name for info in list_plugins()]
+    matches = [other for other in registered if other.startswith(name + ".")]
+    matches = matches or difflib.get_close_matches(name, registered, n=1)
     if matches:
-        return f" (did you mean {matches[0]!r}?)"
+        return f" (did you mean {' or '.join(map(repr, matches))}?)"
     module = name.rpartition(".")[0]
     if module:  # rules are named after their module, e.g. 'hypoxia_rules.switch'
         return (f" (if it is a rule of the module {module!r}: import {module} before loading the model; "
