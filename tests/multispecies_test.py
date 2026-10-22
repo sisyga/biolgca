@@ -2,7 +2,6 @@ import numpy as np
 import pytest
 
 from lgca import get_lgca
-from tests.legacy.ms_interactions import _sample_offspring_by_species
 
 
 GEOMS = {
@@ -253,28 +252,32 @@ def test_excitable_medium_ms_requires_rest_channel():
         )
 
 
-def test_excitable_medium_ms_keeps_species_in_expected_channel_groups():
+def test_excitable_medium_ms_follows_its_reaction_probabilities():
+    # every node holds one resting inhibitor (species 0) and one moving activator (species 1): with
+    # x = 1/4 of the velocity channels and y = 1 of the rest channel occupied, the documented rates give
+    # an inhibitor gain x and loss y, and one fast activator reaction (N=1) a gain x^2 (1 + (y + beta) / alpha)
+    # and a loss x^3 + x (y + beta) / alpha; the nodes do not interact
+    beta, alpha = 0.05, 1.0
     with pytest.warns(UserWarning, match="local interactions"):
-        lgca = get_lgca(
-            geometry="square",
-            n_species=2,
-            restchannels=1,
-            density=0,
-            interaction="excitable_medium_ms",
-            propagation=False,
-            seed=1,
-        )
-
-    center = (lgca.r_int, lgca.r_int)
-    lgca.nodes.fill(False)
-    lgca.nodes[center + (0, lgca.velocitychannels)] = True
-    lgca.nodes[center + (1, 0)] = True
+        lgca = get_lgca(geometry="square", n_species=2, restchannels=1, dims=(50, 50), density=0,
+                        interaction="excitable_medium_ms", beta=beta, alpha=alpha, N=1, propagation=False,
+                        seed=1)
+    velocity = lgca.velocitychannels
+    lgca.nodes[lgca.nonborder + (0, velocity)] = True
+    lgca.nodes[lgca.nonborder + (1, 0)] = True
     lgca.timestep()
 
-    assert lgca.nodes[..., 0, : lgca.velocitychannels].sum() == 0
-    assert lgca.nodes[..., 1, lgca.velocitychannels :].sum() == 0
-    assert lgca.nodes[..., 0, lgca.velocitychannels :].sum() >= 0
-    assert lgca.nodes[..., 1, : lgca.velocitychannels].sum() >= 0
+    nodes = lgca.nodes[lgca.nonborder]
+    assert nodes[..., 0, :velocity].sum() == 0  # inhibitors only rest
+    assert nodes[..., 1, velocity:].sum() == 0  # activators only move
+    x, y = 1 / velocity, 1.0
+    gain, loss = x * x * (1 + (y + beta) / alpha), x ** 3 + x * (y + beta) / alpha
+    # one random number decides gain and loss, independently: +1 with gain (1 - loss), -1 with loss (1 - gain)
+    expected = {"inhibitor": 1 + x * (1 - y) - y * (1 - x), "activator": 1 + gain - loss}
+    measured = {"inhibitor": nodes[..., 0, velocity:].sum(-1), "activator": nodes[..., 1, :velocity].sum(-1)}
+    for name, cells in measured.items():
+        error = cells.std() / np.sqrt(cells.size)
+        assert abs(cells.mean() - expected[name]) < 4 * error, name
 
 
 def test_multispecies_nodes_shape_warning_uses_species_axis():
@@ -304,58 +307,30 @@ def test_multispecies_random_density_is_total_density_across_species(ve):
         seed=123,
     )
 
-    achieved_density = lgca.nodes[lgca.nonborder].sum() / np.prod(lgca.dims)
-    assert achieved_density == pytest.approx(1.2, rel=0.15)
+    per_node = lgca.nodes[lgca.nonborder].sum(axis=(-2, -1))
+    error = per_node.std() / np.sqrt(per_node.size)
+    assert abs(per_node.mean() - 1.2) < 4 * error
 
 
-def test_multispecies_nove_birth_routes_offspring_through_explicit_mutation_matrix():
-    nodes = np.zeros((1, 2, 3), dtype=np.uint)
-    nodes[0, 0, 2] = 30
-    mutation_matrix = np.array([[0.0, 1.0], [0.0, 1.0]])
-
-    lgca = get_lgca(
-        geometry="lin",
-        n_species=2,
-        ve=False,
-        nodes=nodes,
-        interaction="birth",
-        r_b=[1.0, 0.0],
-        capacity=1000,
-        mutation_matrix=mutation_matrix,
-        propagation=False,
-        seed=1,
-    )
+@pytest.mark.parametrize("geom,dims", [("lin", (5000,)), ("hex", (70, 70)), ("moore", (16, 16, 16))])
+def test_multispecies_nove_birth_routes_offspring_through_the_mutation_matrix(geom, dims):
+    # two resting cells of each species per node: a cell of species s divides with r_b[s] (1 - 4 / capacity),
+    # and its daughter belongs to species t with mutation_matrix[s, t]
+    _, nove_cls = _load_ms_classes(geom)
+    nodes = np.zeros(dims + (2, nove_cls.velocitychannels + 1), dtype=np.uint)
+    nodes[..., nove_cls.velocitychannels] = 2
+    r_b, capacity = np.array([0.8, 0.2]), 100
+    mutation_matrix = np.array([[0.75, 0.25], [0.2, 0.8]])
+    lgca = get_lgca(geometry=geom, n_species=2, ve=False, nodes=nodes, interaction="birth", r_b=list(r_b),
+                    capacity=capacity, mutation_matrix=mutation_matrix, propagation=False, seed=1)
 
     lgca.timestep()
 
-    species_counts = lgca.nodes[lgca.nonborder].sum(axis=(0, 2))
-    assert species_counts[0] == 30
-    assert species_counts[1] > 0
-
-
-def test_identity_mutation_returns_parent_species_counts_without_rng_allocation():
-    births = np.array([[[2, 0, 3], [1, 4, 0]]], dtype=np.int64)
-    rng = np.random.default_rng(23)
-    expected_next_random = np.random.default_rng(23).random()
-
-    offspring = _sample_offspring_by_species(rng, births, np.eye(3))
-
-    np.testing.assert_array_equal(offspring, births)
-    assert not np.shares_memory(offspring, births)
-    assert rng.random() == expected_next_random
-
-
-def test_general_mutation_sampling_retains_multinomial_semantics():
-    births = np.array([[4, 3]], dtype=np.int64)
-    mutation_matrix = np.array([[0.75, 0.25], [0.2, 0.8]])
-    expected_rng = np.random.default_rng(29)
-    expected = expected_rng.multinomial(births, mutation_matrix).sum(axis=-2)
-
-    actual = _sample_offspring_by_species(
-        np.random.default_rng(29), births, mutation_matrix
-    )
-
-    np.testing.assert_array_equal(actual, expected)
+    daughters = lgca.nodes[lgca.nonborder].sum(-1).astype(int) - 2
+    daughters = daughters.reshape(-1, 2)
+    expected = (2 * r_b * (1 - 4 / capacity)) @ mutation_matrix
+    error = daughters.std(axis=0) / np.sqrt(len(daughters))
+    assert np.all(np.abs(daughters.mean(axis=0) - expected) < 4 * error), (daughters.mean(axis=0), expected)
 
 
 def test_multispecies_nove_birth_growth_uses_total_density_for_capacity_limit():
@@ -406,51 +381,38 @@ def test_multispecies_nove_birth_derives_mutation_matrix_from_birth_rate_bins():
     assert np.all(np.diag(mutation_matrix) > 0.99)
 
 
-def test_multispecies_nove_birthdeath_applies_death_to_all_species():
-    nodes = np.zeros((1, 2, 3), dtype=np.uint)
-    nodes[0, 0, 0] = 5
-    nodes[0, 1, 2] = 7
+@pytest.mark.parametrize("geom,dims", [("lin", (3,)), ("hex", (4, 4)), ("moore", (4, 4, 4))])
+def test_multispecies_nove_birthdeath_applies_death_to_all_species(geom, dims):
+    _, nove_cls = _load_ms_classes(geom)
+    nodes = np.zeros(dims + (2, nove_cls.velocitychannels + 1), dtype=np.uint)
+    center = tuple(dim // 2 for dim in dims)
+    nodes[center + (0, 0)] = 5
+    nodes[center + (1, nove_cls.velocitychannels)] = 7
 
-    lgca = get_lgca(
-        geometry="lin",
-        n_species=2,
-        ve=False,
-        nodes=nodes,
-        interaction="birthdeath",
-        r_b=[0.0, 0.0],
-        r_d=1.0,
-        propagation=False,
-        seed=1,
-    )
+    lgca = get_lgca(geometry=geom, n_species=2, ve=False, nodes=nodes, interaction="birthdeath",
+                    r_b=[0.0, 0.0], r_d=1.0, propagation=False, seed=1)
 
     lgca.timestep()
 
     assert lgca.nodes[lgca.nonborder].sum() == 0
 
 
-def test_multispecies_nove_go_or_grow_uses_species_specific_kappa():
-    nodes = np.zeros((1, 2, 3), dtype=np.uint)
-    nodes[0, 0, 0] = 40
-    nodes[0, 1, 0] = 40
+@pytest.mark.parametrize("geom,dims", [("lin", (3,)), ("hex", (4, 4)), ("moore", (4, 4, 4))])
+def test_multispecies_nove_go_or_grow_uses_species_specific_kappa(geom, dims):
+    # at density 0.8 > theta, kappa -100 makes every cell of species 0 move and kappa 100 every cell of
+    # species 1 rest
+    _, nove_cls = _load_ms_classes(geom)
+    nodes = np.zeros(dims + (2, nove_cls.velocitychannels + 1), dtype=np.uint)
+    center = tuple(dim // 2 for dim in dims)
+    nodes[center + (0, 0)] = 40
+    nodes[center + (1, 0)] = 40
 
-    lgca = get_lgca(
-        geometry="lin",
-        n_species=2,
-        ve=False,
-        nodes=nodes,
-        interaction="go_or_grow",
-        kappa=[-100.0, 100.0],
-        theta=0.5,
-        r_b=0.0,
-        r_d=0.0,
-        capacity=100,
-        propagation=False,
-        seed=1,
-    )
+    lgca = get_lgca(geometry=geom, n_species=2, ve=False, nodes=nodes, interaction="go_or_grow",
+                    kappa=[-100.0, 100.0], theta=0.5, r_b=0.0, r_d=0.0, capacity=100, propagation=False, seed=1)
 
     lgca.timestep()
 
-    rest_counts = lgca.nodes[lgca.nonborder][..., lgca.velocitychannels:].sum(axis=(0, 2))
+    rest_counts = lgca.nodes[lgca.nonborder][..., lgca.velocitychannels:].sum(axis=tuple(range(len(dims))) + (-1,))
     assert rest_counts[0] == 0
     assert rest_counts[1] == 40
 
@@ -474,88 +436,6 @@ def test_multispecies_nove_go_or_grow_derives_mutation_matrix_from_kappa_bins():
     assert np.all(np.diag(mutation_matrix) > 0.99)
 
 
-@pytest.mark.parametrize("geom,dims", [("hex", (4, 4)), ("moore", (4, 4, 4))])
-def test_multispecies_nove_birth_runs_on_multidimensional_lattices(geom, dims):
-    _, nove_cls = _load_ms_classes(geom)
-    nodes = np.zeros(dims + (2, nove_cls.velocitychannels + 1), dtype=np.uint)
-    center = tuple(dim // 2 for dim in dims)
-    nodes[center + (0, nove_cls.velocitychannels)] = 30
-
-    lgca = get_lgca(
-        geometry=geom,
-        n_species=2,
-        ve=False,
-        nodes=nodes,
-        interaction="birth",
-        r_b=[1.0, 0.0],
-        capacity=1000,
-        mutation_matrix=np.array([[0.0, 1.0], [0.0, 1.0]]),
-        propagation=False,
-        seed=1,
-    )
-
-    lgca.timestep()
-
-    species_counts = lgca.nodes[lgca.nonborder].sum(axis=tuple(range(len(dims))) + (-1,))
-    assert species_counts[0] == 30
-    assert species_counts[1] > 0
-
-
-@pytest.mark.parametrize("geom,dims", [("hex", (4, 4)), ("moore", (4, 4, 4))])
-def test_multispecies_nove_birthdeath_runs_on_multidimensional_lattices(geom, dims):
-    _, nove_cls = _load_ms_classes(geom)
-    nodes = np.zeros(dims + (2, nove_cls.velocitychannels + 1), dtype=np.uint)
-    center = tuple(dim // 2 for dim in dims)
-    nodes[center + (0, 0)] = 5
-    nodes[center + (1, nove_cls.velocitychannels)] = 7
-
-    lgca = get_lgca(
-        geometry=geom,
-        n_species=2,
-        ve=False,
-        nodes=nodes,
-        interaction="birthdeath",
-        r_b=[0.0, 0.0],
-        r_d=1.0,
-        propagation=False,
-        seed=1,
-    )
-
-    lgca.timestep()
-
-    assert lgca.nodes[lgca.nonborder].sum() == 0
-
-
-@pytest.mark.parametrize("geom,dims", [("hex", (4, 4)), ("moore", (4, 4, 4))])
-def test_multispecies_nove_go_or_grow_runs_on_multidimensional_lattices(geom, dims):
-    _, nove_cls = _load_ms_classes(geom)
-    nodes = np.zeros(dims + (2, nove_cls.velocitychannels + 1), dtype=np.uint)
-    center = tuple(dim // 2 for dim in dims)
-    nodes[center + (0, 0)] = 40
-    nodes[center + (1, 0)] = 40
-
-    lgca = get_lgca(
-        geometry=geom,
-        n_species=2,
-        ve=False,
-        nodes=nodes,
-        interaction="go_or_grow",
-        kappa=[-100.0, 100.0],
-        theta=0.5,
-        r_b=0.0,
-        r_d=0.0,
-        capacity=100,
-        propagation=False,
-        seed=1,
-    )
-
-    lgca.timestep()
-
-    rest_counts = lgca.nodes[lgca.nonborder][..., lgca.velocitychannels:].sum(axis=tuple(range(len(dims))) + (-1,))
-    assert rest_counts[0] == 0
-    assert rest_counts[1] == 40
-
-
 @pytest.mark.parametrize("ve,interaction", [(True, "go_or_grow_kappa"), (False, "evo_steric")])
 def test_factory_rejects_interactions_without_multispecies_implementation(ve, interaction):
     with pytest.raises(ValueError, match="Unknown interaction"):
@@ -564,28 +444,29 @@ def test_factory_rejects_interactions_without_multispecies_implementation(ve, in
 
 @pytest.mark.parametrize(
     "ve,interaction",
-    [(True, "birth"), (True, "alignment"), (False, "random_walk"), (False, "dd_alignment"), (False, None)],
+    [(True, None), (True, "only_propagation"), (True, "alignment"), (False, None), (False, "random_walk"),
+     (False, "dd_alignment")],
 )
-def test_the_rules_without_prefix_serve_several_species(ve, interaction):
+def test_the_motility_rules_keep_the_cells_of_every_species(ve, interaction):
     # the legacy multispecies classes had only a few interactions; the rules work for any number of species
     kwargs = {} if interaction is None else {"interaction": interaction}
-    lgca = get_lgca(geometry="square", dims=4, ve=ve, n_species=2, restchannels=1, seed=1, **kwargs)
-    before = lgca.cell_density[lgca.nonborder].sum()
+    lgca = get_lgca(geometry="square", dims=6, ve=ve, n_species=2, restchannels=1, density=1, seed=1, **kwargs)
+    lgca.timeevo(timesteps=3, record=True, recorddens=False, showprogress=False)
+    per_species = lgca.nodes_t.sum(axis=(1, 2, 4))
+    assert per_species[0].min() > 0
+    np.testing.assert_array_equal(per_species, np.broadcast_to(per_species[0], per_species.shape))
+
+
+def test_the_birth_rule_serves_several_species_with_volume_exclusion():
+    # one cell per node and species: its daughter goes to a random channel of its species and survives in
+    # the K - 1 empty ones, so each species grows by r_b (K - 1) / K per node
+    nodes = np.zeros((60, 60, 2, 5), dtype=bool)
+    nodes[..., 0] = True
+    lgca = get_lgca(geometry="square", n_species=2, nodes=nodes, interaction="birth", r_b=0.4, seed=1)
     lgca.timestep()
-    assert interaction in (None, "birth") or lgca.cell_density[lgca.nonborder].sum() == before
-
-
-@pytest.mark.parametrize(
-    "ve,interaction",
-    [(True, None), (True, "only_propagation"), (False, "birth"), (False, "birthdeath"), (False, "go_or_grow")],
-)
-def test_factory_builds_supported_multispecies_interactions(ve, interaction):
-    kwargs = {} if interaction is None else {"interaction": interaction}
-    lgca = get_lgca(geometry="square", dims=4, ve=ve, n_species=2, restchannels=1, seed=1, **kwargs)
-
-    lgca.timestep()
-
-    assert interaction is None or interaction in lgca.interactions
+    daughters = (lgca.nodes[lgca.nonborder].sum(-1) - 1).reshape(-1, 2)
+    error = daughters.std(axis=0) / np.sqrt(len(daughters))
+    assert np.all(np.abs(daughters.mean(axis=0) - 0.4 * 4 / 5) < 4 * error)
 
 
 @pytest.mark.parametrize("geometry, dims", [("hex", (6, 6)), ("moore", (4, 4, 4)), ("square", (5, 4))])
