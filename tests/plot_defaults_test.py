@@ -25,12 +25,6 @@ GEOMETRIES = {"lin": 12, "square": 6, "hex": (6, 6)}
 NEEDS_ARGUMENTS = {"plot_scalarfield", "animate_scalarfield", "plot_vectorfield"}
 
 
-@pytest.fixture(autouse=True)
-def close_figures():
-    yield
-    plt.close("all")
-
-
 def _run(family, geometry, steps=4, seed=2):
     lgca = get_lgca(geometry=geometry, dims=GEOMETRIES[geometry], density=0.5, seed=seed,
                     **FAMILIES[family])

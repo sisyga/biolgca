@@ -101,8 +101,6 @@ def _cells(lgca):
 def test_every_cell_rests_with_its_own_probability(ve):
     # where no channel is full, a cell rests after the switch with probability
     # (1 + tanh(kappa (rho - theta))) / 2 for its own kappa, whether it rested before or not
-    from lgca.builtin_rules import tanh_switch
-
     nodes, kappa = _initial(ve)
     model = _model(nodes, kappa, [_pipeline(0.0, 0.0)[0]], traits={"kappa": kappa})
     lgca = model.lgca
@@ -113,7 +111,7 @@ def test_every_cell_rests_with_its_own_probability(ve):
     np.testing.assert_array_equal(after_labels, labels)
     resting = channel >= lgca.velocitychannels
     cell_kappa = np.asarray(lgca.props["kappa"])[labels]
-    p = tanh_switch(density / capacity, cell_kappa, 0.5)
+    p = 0.5 * (1 + np.tanh(cell_kappa * (density / capacity - 0.5)))  # the documented switch
     sparse = density <= 3 if ve else density >= 0  # with VE: at most 3 cells, no channel set is full
     for low, high in ((-4, -1), (-1, 2), (2, 6)):
         cells = sparse & (cell_kappa >= low) & (cell_kappa < high)

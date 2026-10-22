@@ -6,27 +6,27 @@ import pytest
 from lgca.model import ModelSpec, SpaceSpec, StateSpec, TimeSpec, build_model
 
 
+@pytest.mark.parametrize("capacity", [20, 1_000_000])
 @pytest.mark.parametrize("n_species", [1, 2])
-def test_nove_initialization_memory_scales_with_state_not_capacity(n_species):
+def test_nove_initialization_memory_scales_with_state_not_capacity(n_species, capacity):
+    # every channel holds density / capacity cells on average and the rest channel the surplus capacity
+    # too, so a huge capacity costs nothing: the lattice keeps one count per channel
     from lgca import get_lgca
 
-    model = get_lgca(geometry="square", dims=(4, 4), ve=False, n_species=n_species,
-                     restchannels=1, density=0, capacity=5, interaction="only_propagation")
-    draws = []
-
-    class TrackingRng:
-        def poisson(self, lam, size):
-            draws.append((lam, tuple(size)))
-            return np.zeros(size, dtype=np.int64)
-
-    model.rng = TrackingRng()
-    model.capacity = 1_000_000
+    model = get_lgca(geometry="square", dims=(100, 100), ve=False, n_species=n_species,
+                     restchannels=1, density=0, capacity=5, interaction="only_propagation", seed=2)
+    model.capacity = capacity
     model.random_reset(2)
-    assert [shape for _, shape in draws] == [model.nodes.shape, model.nodes.shape[:-1]]
-    assert draws[0][0] == pytest.approx(2 / n_species / model.capacity)
-    assert draws[1][0] == pytest.approx(2 / n_species * (model.capacity - model.K) / model.capacity)
-    # Independent Poisson means sum to the requested total site population.
-    assert n_species * (model.K * draws[0][0] + draws[1][0]) == pytest.approx(2)
+
+    species = (n_species,) if n_species > 1 else ()
+    assert model.nodes.shape == (102, 102) + species + (model.K,)
+    cells = model.nodes[model.nonborder].reshape(-1, n_species, model.K)
+    for per_node, expected in ((cells.sum(-1), 2 / n_species), (cells.sum((-2, -1)), 2.0)):
+        error = per_node.std() / np.sqrt(per_node.size)
+        assert abs(per_node.mean() - expected) < 4 * error
+    resting = cells[..., -1].sum() / cells.sum()
+    p = (capacity - model.K + 1) / capacity
+    assert abs(resting - p) < 4 * np.sqrt(p * (1 - p) / cells.sum()) + 1e-12
 
 
 @pytest.mark.parametrize("value", [-1, .5, np.nan, np.inf, float(2**64)])
