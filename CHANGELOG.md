@@ -50,6 +50,16 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
+- `kappa` and `theta` of `go_or_rest` are the density cue: the relative
+  density is the cells at the node over `state.capacity`, as for
+  `{"name": "density"}` and the `resting` term. With volume exclusion and
+  several species a full node now has density 1 (it had `n_species`), and a
+  `StateSpec.capacity` set with volume exclusion counts (it was ignored).
+  `go_or_grow.switch`, whose migrating and resting cells share the channels
+  of a node, divides by `StateSpec.capacity` if the model sets one, else by
+  K. Models of one species without `StateSpec.capacity` and models without
+  volume exclusion are unchanged, as are the zoo, the examples and the
+  tutorials.
 - Initial `nodes` of volume-exclusion models with values other than 0 and 1
   raise a `ValueError`. Before, they were cast to booleans with a warning, so
   2 became one cell.

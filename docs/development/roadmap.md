@@ -68,10 +68,6 @@ the 30 September review are done, apart from the items below:
 
 ### From the AI-coding audit (2026-10-22)
 
-- Decide one denominator for relative density: the `density` switch cue
-  divides by `state.capacity`, `go_or_rest`'s kappa/theta by K under volume
-  exclusion; they differ with several species or a `StateSpec.capacity` under
-  volume exclusion (documented, behaviour unchanged).
 - `ModelSpec` with explicit `nodes`: check the channel count against the
   geometry and `restchannels` before building (now the nodes win silently).
 - A warning category of its own for setup adjustments that keep results
@@ -83,6 +79,11 @@ the 30 September review are done, apart from the items below:
   release).
 
 ## Decisions that hold
+
+- Relative density is the cells at a node over `state.capacity` for the
+  density cue, `resting` and `go_or_rest`; only `go_or_grow.switch` uses K
+  with volume exclusion and no `StateSpec.capacity`, because its two species
+  share the node's channels (2026-10-23).
 
 - The sole author of the software (CITATION.cff, pyproject, the JOSS paper)
   is Simon Syga; earlier contributors are named in the README's

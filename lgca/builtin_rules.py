@@ -695,10 +695,8 @@ def go_or_rest(state, probability=None, kappa=None, theta=None, when_full="legac
     scarce, ``{"max": 0.9, "hill": [{"name": "field", "field": "oxygen",
     "K": 0.1, "n": -2}]}``. The default is the go-or-grow switch, ``p =
     tanh_switch(rho, kappa, theta)`` of the relative density ``rho`` of all
-    cells at the node, for which ``kappa`` and ``theta`` are a short form
-    (the density cue divides by ``state.capacity``, the short form by ``K``
-    with volume exclusion: they differ for several species or a
-    ``StateSpec.capacity`` with volume exclusion, see :mod:`lgca.switching`).
+    cells at the node, for which ``kappa`` and ``theta`` are a short form of
+    the density cue.
 
     With volume exclusion a cell can only switch into a free channel of the
     other kind; ``when_full`` says what happens when there is none.
@@ -717,8 +715,9 @@ def go_or_rest(state, probability=None, kappa=None, theta=None, when_full="legac
     theta : float, sequence or str
         Relative density at which half of the cells rest, given like
         ``kappa``. The relative density is the number of cells at the node
-        over its capacity: the number of channels K with volume exclusion,
-        ``StateSpec.capacity`` (the crowding scale) without.
+        over ``state.capacity``, as for the density cue: ``StateSpec.capacity``
+        if the model sets one, else the cells a node holds (``K`` per species
+        with volume exclusion).
     when_full : {"legacy", "reject"}
         With volume exclusion, what happens when a switching cell finds no free
         channel. "legacy" reproduces the original rule: the number of switching
@@ -804,7 +803,9 @@ def go_or_grow_switch(state, kappa=5.0, theta=0.75, when_full="legacy", density=
         kappa < 0 they migrate.
     theta : float
         Relative density at which half of the cells rest: cells at the node
-        over K with volume exclusion, over ``StateSpec.capacity`` without.
+        over ``StateSpec.capacity``, or with volume exclusion and no capacity
+        over K, the cells a node holds when migrating and resting cells share
+        its channels.
     when_full : {"legacy", "reject"}
         With volume exclusion, what happens when a switching cell finds no free
         channel. "legacy" reproduces the original rule: the number of switching
@@ -817,7 +818,7 @@ def go_or_grow_switch(state, kappa=5.0, theta=0.75, when_full="legacy", density=
     """
     _check_layout(state)
     _check_mode(when_full)
-    rest = tanh_switch(_relative_density(state, density), kappa, theta)
+    rest = tanh_switch(_relative_density(state, density, _layout_capacity(state)), kappa, theta)
     if state.volume_exclusion and when_full == "legacy":
         counts = state.counts.copy()
         velocity = state.velocitychannels
@@ -985,20 +986,22 @@ def go_or_grow_layout(state):
     state.counts = counts
 
 
-def _relative_density(state, density):
-    """Cells over capacity at every node, or averaged over the node and its neighbours."""
+def _relative_density(state, density, capacity=None):
+    """Cells over ``capacity`` (default ``state.capacity``) at every node, or averaged over the node and its
+    neighbours."""
     if density == "node":
         cells = state.density
     elif density == "neighbourhood":
         cells = (state.density + state.neighbor_sum(state.density)) / (state.velocitychannels + 1)
     else:
         raise ValueError(f"density must be 'node' or 'neighbourhood', got {density!r}")
-    return cells / _node_capacity(state)
+    return cells / (state.capacity if capacity is None else capacity)
 
 
-def _node_capacity(state):
-    """Cells a node can hold: its channels with volume exclusion, the model capacity without."""
-    return state.K if state.volume_exclusion else state.capacity
+def _layout_capacity(state):
+    """The capacity of a node of the two-species go-or-grow layout: ``StateSpec.capacity``, or with volume
+    exclusion and none its K channels, which migrating (species 0) and resting cells (species 1) share."""
+    return state.capacity if state.has_capacity else state.K
 
 
 def _check_mode(when_full):
