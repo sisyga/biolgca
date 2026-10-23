@@ -24,8 +24,8 @@ sys.path.insert(0, os.path.abspath('../..'))
 # -- Project information -----------------------------------------------------
 
 project = 'biolgca'
-copyright = '2026, TUD Dresden University of Technology'
-author = 'Simon Syga, Bianca Güttner'
+copyright = '2018–2026, Technische Universität Dresden'
+author = 'Simon Syga'
 
 # The full version, from the installed package (uv sync installs it, also on Read the Docs)
 release = importlib.metadata.version('biolgca')

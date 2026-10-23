@@ -315,12 +315,12 @@ BioLGCA is maintained by Simon Syga. Bianca Güttner
 before 2.0. Code was also contributed by
 [@Franzi2729](https://github.com/Franzi2729),
 Marcus Krellner ([@krelli89](https://github.com/krelli89)),
-[@harishpjain](https://github.com/harishpjain) and Mateo Larralde
-([@mateolarr](https://github.com/mateolarr)). The models build on
+Harish P Jain ([@harishpjain](https://github.com/harishpjain)) and Mateo
+Larralde ([@mateolarr](https://github.com/mateolarr)). The models build on
 the BIO-LGCA work of Andreas Deutsch, Josué Manik Nava-Sedeño, Haralampos
 Hatzikirou and colleagues.
 
 ## License
 
-BSD 3-clause, see [LICENSE.txt](LICENSE.txt). Copyright (C) 2018–2026
+BSD 3-clause, see [LICENSE.txt](LICENSE.txt). Copyright (c) 2018–2026
 Technische Universität Dresden.

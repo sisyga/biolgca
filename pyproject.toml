@@ -12,7 +12,6 @@ license = "BSD-3-Clause"
 license-files = ["LICENSE.txt"]
 authors = [
     { name = "Simon Syga", email = "simon.syga@tu-dresden.de" },
-    { name = "Bianca Guettner", email = "bianca.guettner@nct-dresden.de" },
 ]
 keywords = ["cellular automata", "lattice gas", "biological modelling", "simulation"]
 classifiers = [

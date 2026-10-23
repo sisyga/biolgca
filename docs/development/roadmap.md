@@ -79,13 +79,15 @@ the 30 September review are done, apart from the items below:
 - One table of geometry aliases: `get_lgca` keeps its own copy of
   `model._GEOMETRY_ALIASES`.
 - A `TraitRecorder` for trait values or summaries per recorded step.
-- LICENSE.txt is not the verbatim SPDX BSD-3-Clause text (preamble, numbering,
-  "2018-2022"); the maintainer decides the wording.
-- JOSS: author list and ORCIDs in CITATION.cff and pyproject; condense the
-  2.0.0 CHANGELOG entry into a migration summary (its wetting line says
-  "planned", the zoo has it); a Zenodo DOI.
+- JOSS: a Zenodo DOI (the maintainer enables Zenodo and creates the
+  release).
 
 ## Decisions that hold
+
+- The sole author of the software (CITATION.cff, pyproject, the JOSS paper)
+  is Simon Syga; earlier contributors are named in the README's
+  Acknowledgements, @Franzi2729 among them, whose thesis code (2019–2020) is
+  legacy and stays off `master`, in the `archive/franzi` tag.
 
 - `get_lgca` is the quick start and runs the standard models (tutorials 1 and
   2); `ModelSpec` follows from tutorial 3. `get_lgca` gets no new names.

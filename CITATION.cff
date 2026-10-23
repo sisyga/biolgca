@@ -9,9 +9,7 @@ authors:
   - given-names: Simon
     family-names: Syga
     affiliation: Technische Universität Dresden
-  - given-names: Bianca
-    family-names: Güttner
-    affiliation: Technische Universität Dresden
+    orcid: "https://orcid.org/0000-0001-9955-9012"
 version: 2.0.0
 date-released: 2026-10-15
 repository-code: "https://github.com/sisyga/biolgca"
