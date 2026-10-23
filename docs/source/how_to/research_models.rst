@@ -7,9 +7,9 @@ few steps: a phenotype switch, growth with mutations, movement. These models
 are now written as *stacks* of the generic rules, in the module
 :mod:`lgca.research_models`, under the names of the legacy interactions
 without the family prefix. They work in identity-based models with and
-without volume exclusion, run 4 to 18 times faster than the legacy code
-in the benchmark below (the factor depends on the
-machine, see `Speed`_), and show how to build a published model from the rules.
+without volume exclusion and run 4 to 18 times faster than the legacy code in
+the benchmark below (the factor depends on the machine, see `Speed`_). They
+also show how to build a published model from the rules.
 ``get_lgca(interaction="go_or_grow_glioblastoma", ...)`` runs them as well, as
 do model files with the prefixed names (see :ref:`interaction_chapter`).
 
@@ -78,7 +78,8 @@ Writing a stack
 ---------------
 
 A stack is a function of the lattice state that returns operator entries,
-decorated with :func:`lgca.stack <lgca.rules.stack>`. This is the glioblastoma model:
+decorated with :func:`lgca.stack <lgca.rules.stack>`. This is the
+glioblastoma model:
 
 .. literalinclude:: ../../../lgca/research_models.py
    :pyobject: go_or_grow_glioblastoma
@@ -139,10 +140,11 @@ An effect is
 - a function of your own, for any other distribution of effects (below).
 
 ``"operation"`` says how the effect changes the trait: ``"add"`` (default),
-``"subtract"``, ``"multiply"`` or ``"set"`` (the effect becomes the trait). ``"bounds": [low, high]`` keeps the trait
-within limits, either of which may be ``None``: by default values beyond a
-bound are set to it (``"at_bounds": "clip"``); ``"redraw"`` draws the effect
-again, which truncates the distribution. A number instead of an effect is
+``"subtract"``, ``"multiply"`` or ``"set"`` (the effect becomes the trait).
+``"bounds": [low, high]`` keeps the trait within limits, either of which may
+be ``None``. By default, values beyond a bound are set to it (``"at_bounds":
+"clip"``); ``"redraw"`` draws the effect again, which truncates the
+distribution. A number instead of an effect is
 short for a normal change with that standard deviation, and a dict of traits
 without ``"traits"`` for a mutation with probability 1, e.g.
 ``{"kappa": 0.2}``.

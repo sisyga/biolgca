@@ -1,28 +1,27 @@
 Example gallery
 ===============
 
-The maintained :doc:`tutorials/index` teach how to construct and combine
-interactions in visible notebook cells. This gallery is the reference catalog
-to use afterward: it collects complete, tested ``ModelSpec`` examples exposed
-by :mod:`lgca.examples`.
+The maintained :doc:`tutorials/index` teach how to build and combine
+interactions in visible notebook cells. This gallery is the catalogue to use
+afterwards: complete, tested ``ModelSpec`` examples from :mod:`lgca.examples`.
 
-The gallery is inspired by the old :download:`BioLGCA.ipynb
+The gallery is inspired by the tours of the old :download:`BioLGCA.ipynb
 <../../notebooks/legacy/BioLGCA.ipynb>` and :download:`Evolutionary LGCA.ipynb
-<../../notebooks/legacy/Evolutionary LGCA.ipynb>` tours,
-and by the Morpheus habit of keeping examples discoverable by modeling question.
-Each example has its own source file under ``lgca/examples``. The source files
-are useful recipes and regression-tested starting points, but they do not
-replace the explanatory notebooks.
+<../../notebooks/legacy/Evolutionary LGCA.ipynb>` notebooks, and by Morpheus's
+habit of listing examples by the question they model. Each example has
+its own source file under ``lgca/examples``: a tested recipe and starting
+point, not a replacement for the explanatory notebooks.
 
-Published models built from these mechanisms, with the results of their
-papers reproduced, are in the :doc:`zoo/index`.
+The :doc:`zoo/index` holds published models built from these mechanisms and
+reproduces the results of their papers.
 
 Study one example file
 ----------------------
 
 Each example file declares metadata, builds a ``ModelSpec`` in ``build_spec``,
-and runs it with ``run_model``. The package-level helpers are useful for tests,
-scripts and project scaffolding once you have worked through the tutorials.
+and runs it with ``run_model``. Once you have worked through the tutorials,
+the helpers of :mod:`lgca.examples` are useful for tests, scripts and new
+projects.
 
 Use :func:`lgca.examples.example_gallery` to browse model cards:
 
@@ -69,8 +68,8 @@ that can be shared, edited and loaded again:
    spec = load_model_spec(path)
    result = run_model(spec, showprogress=False)
 
-Use :func:`lgca.examples.run_example` only when you want a quick smoke run by
-stable name:
+Use :func:`lgca.examples.run_example` only for a quick test run of an example
+by its stable name:
 
 .. code-block:: python
 
@@ -121,8 +120,8 @@ aggregation
 :Concepts: aggregation, density, rest channels
 :Source: ``lgca/examples/aggregation.py``
 
-This mirrors the notebook aggregation example with a square lattice, moderate
-density and three rest channels.
+As in the aggregation section of ``BioLGCA.ipynb``, cells move on a square
+lattice at moderate density, with three rest channels.
 
 .. literalinclude:: ../../lgca/examples/aggregation.py
    :language: python
@@ -166,7 +165,7 @@ persistent_movement
 :Concepts: persistent motion, single-cell initial state, reflecting boundary
 :Source: ``lgca/examples/persistent_movement.py``
 
-This notebook-scale example starts with one cell on a small reflecting lattice.
+As in ``BioLGCA.ipynb``, one cell starts on a small reflecting lattice.
 
 .. literalinclude:: ../../lgca/examples/persistent_movement.py
    :language: python
@@ -180,8 +179,8 @@ contact_guidance
 :Concepts: contact guidance, director field, single-cell initial state
 :Source: ``lgca/examples/contact_guidance.py``
 
-The guiding director field is built explicitly so students can see the coupling
-between state fields and movement.
+The example builds the guiding director field explicitly, so students can see
+how a state field couples to movement.
 
 .. literalinclude:: ../../lgca/examples/contact_guidance.py
    :language: python
@@ -195,8 +194,8 @@ go_and_grow
 :Concepts: birth, rest channels, tumor growth
 :Source: ``lgca/examples/go_and_grow.py``
 
-This is the classical go-and-grow notebook example expressed as a birth model
-with a seeded center cell.
+The classical go-and-grow example of ``BioLGCA.ipynb``, written as a birth
+model that starts from one cell in the centre.
 
 .. literalinclude:: ../../lgca/examples/go_and_grow.py
    :language: python
@@ -227,7 +226,7 @@ identity_go_and_grow
 :Concepts: identity-based LGCA, birth-death, lineage properties
 :Source: ``lgca/examples/identity_go_and_grow.py``
 
-This ports the notebook's one-dimensional identity-based go-and-grow setup.
+The one-dimensional identity-based go-and-grow setup of ``BioLGCA.ipynb``.
 
 .. literalinclude:: ../../lgca/examples/identity_go_and_grow.py
    :language: python
@@ -241,8 +240,8 @@ excitable_medium
 :Concepts: excitable medium, rest channels, wave propagation
 :Source: ``lgca/examples/excitable_medium.py``
 
-The initial condition marks two lattice regions, matching the notebook's
-wave-propagation demonstration.
+As in the wave-propagation demonstration of ``BioLGCA.ipynb``, the initial
+condition marks two regions of the lattice.
 
 .. literalinclude:: ../../lgca/examples/excitable_medium.py
    :language: python
@@ -256,8 +255,8 @@ custom_rest_or_align
 :Concepts: custom interaction, alignment, rest channels
 :Source: ``lgca/examples/custom_rest_or_align.py``
 
-Use this when students are ready to inspect a custom interaction function and
-see how it can still live inside the ``ModelSpec`` runtime.
+Use this when students are ready to read a custom interaction function and see
+that it still runs inside a ``ModelSpec``.
 
 .. literalinclude:: ../../lgca/examples/custom_rest_or_align.py
    :language: python
@@ -271,7 +270,7 @@ evolutionary_go_and_grow
 :Concepts: identity-based LGCA, birth-death, evolution
 :Source: ``lgca/examples/evolutionary_go_and_grow.py``
 
-This follows the proof-of-principle setup from ``Evolutionary LGCA.ipynb``.
+The proof-of-principle setup of ``Evolutionary LGCA.ipynb``.
 
 .. literalinclude:: ../../lgca/examples/evolutionary_go_and_grow.py
    :language: python
@@ -285,7 +284,7 @@ evolutionary_go_or_grow
 :Concepts: identity-based LGCA, go-or-grow, evolution
 :Source: ``lgca/examples/evolutionary_go_or_grow.py``
 
-This ports the evolutionary notebook's one-dimensional go-or-grow setup.
+The one-dimensional go-or-grow setup of ``Evolutionary LGCA.ipynb``.
 
 .. literalinclude:: ../../lgca/examples/evolutionary_go_or_grow.py
    :language: python
@@ -340,7 +339,7 @@ measurements.
 Advanced examples
 -----------------
 
-Notebooks that build larger models from the mechanisms of the gallery, with
+These notebooks build larger models from the mechanisms of the gallery, with
 parameters from measurements, and compare them with experiments.
 
 .. toctree::

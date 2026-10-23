@@ -41,10 +41,10 @@ occupancy values (0 or 1) with the channel axis last.
 LGCA without volume exclusion
 -----------------------------
 
-Without volume exclusion a channel holds a number of cells. This is useful
-for dense populations whose cells do not need to be distinguished; a
-``capacity`` (``StateSpec.capacity``) sets the number of cells per node at
-which growth rules count a node as crowded. Several of these interactions
+Without volume exclusion a channel holds a number of cells. This suits dense
+populations whose cells need not be distinguished. A ``capacity``
+(``StateSpec.capacity``) sets the number of cells per node at which growth
+rules count a node as crowded. Several of these interactions
 assume no rest channels; pass ``restchannels=0`` when using alignment rules
 such as ``dd_alignment`` or ``di_alignment``.
 
@@ -122,5 +122,6 @@ Data model summary
      - No
 
 The lattice arrays of the model object, ``lgca.nodes`` and
-``lgca.cell_density``, include one layer of ghost nodes that implement the boundary conditions; ``lgca.nodes[lgca.nonborder]``
-is the lattice itself (see :doc:`/getting_started`).
+``lgca.cell_density``, include one layer of ghost nodes that implement the
+boundary conditions; ``lgca.nodes[lgca.nonborder]`` is the lattice itself (see
+:doc:`/getting_started`).

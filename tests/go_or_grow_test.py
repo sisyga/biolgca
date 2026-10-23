@@ -147,12 +147,12 @@ def test_the_rules_need_two_species_in_their_channels():
 
 # go_or_rest with a probability that responds to cues (lgca.switching)
 
-def _rest_model(nodes, parameters, identity=False, fields=None):
+def _rest_model(nodes, parameters, identity=False, fields=None, n_species=1, capacity=None):
     ve = nodes.dtype == bool
     return build_model(ModelSpec(
         space=SpaceSpec(geometry="square", dims=nodes.shape[:2]),
         state=StateSpec(nodes=nodes, restchannels=1, volume_exclusion=ve, identity_based=identity,
-                        capacity=None if ve else 8, fields=fields or {}),
+                        n_species=n_species, capacity=capacity if ve else 8, fields=fields or {}),
         time=TimeSpec(steps=1, seed=3),
         dynamics=InteractionPipelineSpec(operators=[{"name": "go_or_rest", "parameters": parameters}],
                                          propagation=False)))
@@ -171,6 +171,42 @@ def test_kappa_and_theta_are_the_density_switch(ve, identity):
     short.step()
     cue.step()
     np.testing.assert_array_equal(cue.lgca.nodes, short.lgca.nodes)
+
+
+@pytest.mark.parametrize("n_species, capacity", [(2, None), (1, 3)])
+def test_kappa_and_theta_divide_by_the_capacity_of_the_density_cue(n_species, capacity):
+    # volume exclusion: two species (a node holds 2 K cells) or a capacity the model sets
+    rng = np.random.default_rng(7)
+    nodes = rng.random((30, 30) + (n_species,) * (n_species > 1) + (5,)) < 0.5
+    cue = {"probability": {"cues": [{"name": "density", "kappa": 4.0, "theta": 0.4}]}}
+    short = _rest_model(nodes, {"kappa": 4.0, "theta": 0.4}, n_species=n_species, capacity=capacity)
+    cue = _rest_model(nodes, cue, n_species=n_species, capacity=capacity)
+    short.step()
+    cue.step()
+    np.testing.assert_array_equal(cue.lgca.nodes, short.lgca.nodes)
+
+
+def test_theta_is_a_fraction_of_all_the_cells_a_node_holds_also_with_two_species():
+    # each species fills its rest channel and one of its four velocity channels: 4 of the 10 cells a node
+    # holds, below theta 0.6, so the resting cells start moving
+    nodes = np.zeros((10, 10, 2, 5), dtype=bool)
+    nodes[..., 0] = nodes[..., 4] = True
+    model = _rest_model(nodes, {"kappa": 50.0, "theta": 0.6}, n_species=2)
+    model.step()
+    after = model.lgca.nodes[model.lgca.nonborder]
+    assert not after[..., 4].any()
+    np.testing.assert_array_equal(after.sum(-1), nodes.sum(-1))
+
+
+def test_the_two_species_switch_divides_by_a_capacity_the_model_sets():
+    # its migrating and resting cells share the K = 12 channels of a node; over a capacity of 24 the
+    # switch with kappa 4 and theta 0.3 is the one over K with kappa 2 and theta 0.6
+    nodes = _two_species(_legacy_nodes(True, seed=4))
+    over_capacity = _step(nodes, [{"name": "go_or_grow.switch", "parameters": {"kappa": 4.0, "theta": 0.3}}],
+                          n_species=2, capacity=24)
+    over_channels = _step(nodes, [{"name": "go_or_grow.switch", "parameters": {"kappa": 2.0, "theta": 0.6}}],
+                          n_species=2)
+    np.testing.assert_array_equal(over_capacity, over_channels)
 
 
 def test_cells_rest_with_a_probability_that_responds_to_a_field():

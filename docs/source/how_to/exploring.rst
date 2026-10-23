@@ -75,9 +75,9 @@ The view
 
 The dropdown *view* chooses what the lattice panel shows: the density
 (``"density"``, and ``"density: species i"`` with several species), the flux
-(``"flux"``, coloured by its direction) or any scalar field of the model (not a
-vector field such as an advection velocity). Square
-and hexagonal lattices show the current state. 1D lattices show a kymograph
+(``"flux"``, coloured by its direction) or any scalar field of the model
+(not a vector field such as an advection velocity). Square and hexagonal
+lattices show the current state. 1D lattices show a kymograph
 of the last ``window`` steps (default 100), time running down, for every
 view at once, so switching views keeps the history.
 
@@ -121,8 +121,8 @@ step:
                            measure={"moving cells": moving}, steps_per_frame=5)
 
 ``measure`` takes ``"population"`` (the default), the name of a scalar field
-(its mean over the lattice), a list of these, a mapping of labels to functions of
-the LGCA object, or ``None`` for no time series. The explorer ignores the
+(its mean over the lattice), a list of these, a mapping of labels to functions
+of the LGCA object, or ``None`` for no time series. The explorer ignores the
 model's observers and ``time.steps``: it runs until paused.
 
 From exploring to measuring

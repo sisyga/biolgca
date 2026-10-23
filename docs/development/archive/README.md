@@ -33,6 +33,11 @@ came about and why; they are not updated. Open items from them are in the
   the nonlinear field solver, configuration ownership and provenance), and
   how each was built.
 
+## Release notes
+
+- `releases/2.0.0.md`: every change of 2.0.0, item by item; `CHANGELOG.md`
+  keeps a summary for users of 1.0.
+
 ## Reports
 
 - `reports/milestone-1-validation.md`, `reports/milestone-1-reopened-validation.md`,

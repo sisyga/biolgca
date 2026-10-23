@@ -9,16 +9,17 @@ Restarting identity-based models
 A run of an identity-based model cannot yet be restarted from saved data:
 the ``from_npz`` initializer reads classical states only, because the labels
 of the cells and their traits would have to be restored together. Rerun such
-a model from its model specification and seed instead, which gives the same
-run again.
+a model from its model specification and seed instead: the same seed gives the
+same run.
 
 Initial conditions
 ------------------
 
-The initial conditions are a random density, a filled region, an explicit
-array of nodes and an array read from a file (see :doc:`/how_to/model_specs_and_plugins`, "Initial
-conditions"). The region fills all channels of all species; cells in
-particular channels or of one species need an explicit ``nodes`` array.
+Four initial conditions are available: a random density, a filled region, an
+explicit array of nodes and an array read from a file (see
+:doc:`/how_to/model_specs_and_plugins`, "Initial conditions"). A filled region
+fills all channels of all species. To place cells in particular channels, or
+cells of one species only, pass an explicit ``nodes`` array.
 
 Boundary conditions
 -------------------
@@ -45,10 +46,10 @@ window of plots at a time.
 Analysing evolution
 -------------------
 
-Population sizes of families and their ancestry are recorded, but there are
-no functions yet for diversity indices or the entropy of a population, nor a
-recorder of the trait distribution over time (record the nodes and read the
-traits of the cells, see :doc:`/how_to/observers_and_plotting`).
+BioLGCA records the population size of each family and its ancestry. It has
+no functions yet for diversity indices or the entropy of a population, and no
+recorder of the trait distribution over time. Until then, record the nodes and
+read the traits of the cells (see :doc:`/how_to/observers_and_plotting`).
 
 Sharing rules as a package
 --------------------------

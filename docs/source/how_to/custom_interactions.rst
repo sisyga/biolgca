@@ -4,11 +4,13 @@ Custom interactions
 A new interaction is a Python function of the lattice state. There are two
 forms:
 
-- :func:`lgca.interaction <lgca.rules.interaction>` for a step of its own: cells are born or die
-  (``birth_death``), change species (``phenotype_switch``) or are rearranged
-  over the channels of their node (``reorientation``);
-- :func:`lgca.reorientation_term <lgca.rules.reorientation_term>` for a directional cue that joins the other
-  cues of a :class:`~lgca.pipeline.ReorientationSpec` in one random decision.
+- :func:`lgca.interaction <lgca.rules.interaction>` for a step of its own:
+  cells are born or die (``birth_death``), change species
+  (``phenotype_switch``) or are rearranged over the channels of their node
+  (``reorientation``);
+- :func:`lgca.reorientation_term <lgca.rules.reorientation_term>` for a
+  directional cue that joins the other cues of a
+  :class:`~lgca.pipeline.ReorientationSpec` in one random decision.
 
 Both register the rule under a name, so a model refers to it like to a
 built-in interaction. :func:`lgca.testing.check_interaction` checks a rule on
@@ -62,8 +64,8 @@ its description from the docstring, which ``print(logistic_growth)`` and
 :func:`~lgca.plugins.describe_plugin` show. Calling the rule with parameters,
 ``logistic_growth(r_b=0.3)``, gives the entry for ``operators=[...]``; in a
 model file the same entry reads ``{"name": "logistic_growth", "parameters":
-{"r_b": 0.3}}``. That is the name of a rule defined in a notebook or a
-script you run; a rule defined in an imported module is registered as
+{"r_b": 0.3}}``. This short name belongs to a rule defined in a notebook or
+in a script you run; a rule defined in an imported module is registered as
 ``<module>.<function>``, e.g. ``"interactions.logistic_growth"`` (see
 `Sharing a rule`_). Parameters without a default are required.
 
@@ -138,12 +140,14 @@ channels of their node (``shuffle_cells``, or ``state.counts = new`` with the
 same cells of each species at every node); a ``phenotype_switch`` may also
 change their species (``switch_phenotype``), keeping the cells at every node;
 a ``birth_death`` rule may do everything. A rule of kind ``field`` changes
-fields only (``state.set_field``). A rule that does what its kind does not
-allow, e.g. a reorientation that removes cells, gets a
-:class:`~lgca.lattice_state.ContractWarning`, once per model, and the step goes on as with
-the wider kind; but the model still reports the declared kind, e.g. in its
-metadata, which says that a reorientation keeps the cells. Declare the kind
-the rule needs. In tests the warning is an error:
+fields only (``state.set_field``).
+
+A rule that does what its kind does not allow, e.g. a reorientation that
+removes cells, gets a :class:`~lgca.lattice_state.ContractWarning` once per
+model, and the step goes on as with the wider kind. The model still reports
+the declared kind, though: its metadata, for example, says that a
+reorientation keeps the cells. Declare the kind the rule needs. In tests the
+warning is an error:
 :func:`~lgca.testing.check_interaction` and
 :func:`~lgca.testing.strict_contracts` stop the rule before the operation
 changes anything.
@@ -236,21 +240,24 @@ counter-clockwise from ``+x`` in steps of 60°; in 1D they are ``+x`` and
 Calling the term with ``beta=`` (and its parameters) gives a
 :class:`~lgca.pipeline.ReorientationTermSpec`; ``species=`` restricts it to
 one species. A term only reads the state: the reorientation moves the cells,
-so the operations of the state raise ``TypeError`` in a term. The built-in terms, from chemotaxis to nematic alignment, are
-written the same way in :mod:`lgca.builtin_rules`. Like the sampler, terms
-work in all four model families, with one or several species. With volume
+so the operations of the state raise ``TypeError`` in a term. The built-in
+terms, from chemotaxis to nematic alignment, are written the same way in
+:mod:`lgca.builtin_rules`.
+
+Like the sampler, terms work in all four model families, with one or several
+species. With volume
 exclusion the cells of a node choose their arrangement together; without
 it every cell chooses its channel on its own; identity-based models then
 place their cells on the chosen channels (see
 :doc:`/concepts/interactions`, "How the cues are sampled").
 
 In identity-based models, a ``"rest"`` or ``"channels"`` term may return a
-value per cell instead of per node, ``CellWeights(state.cells.label,
-values)`` from :mod:`lgca.rules`, of shape ``(cells,)`` for ``"rest"`` and
-``(cells, velocitychannels)`` or ``(cells, K)`` for ``"channels"``, e.g. a
-resting preference computed from every cell's traits. The built-in
-``resting`` term does this when its probability names a trait, written as a
-probability whose maximum is the trait: ``ReorientationTermSpec("resting",
+value per cell instead of per node, e.g. a resting preference computed from
+every cell's traits. It returns ``CellWeights(state.cells.label, values)``
+from :mod:`lgca.rules`, with ``values`` of shape ``(cells,)`` for ``"rest"``
+and ``(cells, velocitychannels)`` or ``(cells, K)`` for ``"channels"``. The
+built-in ``resting`` term does this when its probability names a trait, for
+example as its maximum: ``ReorientationTermSpec("resting",
 parameters={"probability": {"max": "p_rest"}})`` lets every cell rest with
 its own ``p_rest``.
 
@@ -314,18 +321,20 @@ density at each cell's node, and ``cells["resistance"]`` gives a trait per
 cell. The operations are ``kill``, ``divide`` (daughters inherit all traits;
 ``new_family=True`` starts a family per daughter for lineage plots such as
 ``lgca.muller_plot()``), ``found_families`` (selected cells, e.g. mutated
-daughters, found new families), ``set_trait``, ``move`` (to other channels of the
-node) and ``pick`` (at most a given number of cells per node, e.g. as many as
-there are free channels). ``kill`` and ``divide`` change the cell table:
-``kill`` removes the dead cells' entries, so the positions of the cells after
-them shift, and ``divide`` appends the daughters. Compute masks and positions
-after the last ``kill`` or ``divide`` they refer to, as ``selection`` does
-above: a mask of the old length is rejected, but positions such as
-``np.flatnonzero(mask)`` computed before a ``kill`` silently select other
-cells. With volume exclusion a cell only enters a free
-channel; when more cells compete for the free channels of a node, the
-successful ones are chosen at random. The operations on cell numbers work as
-well: ``remove_cells``, ``divide_cells`` and ``shuffle_cells`` pick random
+daughters, found new families), ``set_trait``, ``move`` (to other channels of
+the node) and ``pick`` (at most a given number of cells per node, e.g. as many
+as there are free channels).
+
+``kill`` and ``divide`` change the cell table: ``kill`` removes the dead
+cells' entries, so the positions of the cells after them shift, and
+``divide`` appends the daughters. Compute masks and positions after the last
+``kill`` or ``divide`` they refer to, as ``selection`` does above: a mask of
+the old length is rejected, but positions such as ``np.flatnonzero(mask)``
+computed before a ``kill`` silently select other cells.
+
+With volume exclusion a cell only enters a free channel; when more cells
+compete for the free channels of a node, the successful ones are chosen at
+random. The operations on cell numbers work as well: ``remove_cells``, ``divide_cells`` and ``shuffle_cells`` pick random
 cells and keep their labels. ``add_cells`` and ``switch_phenotype`` do not
 exist for identity-based models, and ``state.counts`` can be read but not
 assigned, because a number of cells does not say which cell went where. For
@@ -333,7 +342,7 @@ the same reason ``cells.label``, ``cells.index`` and ``cells.channel`` are
 read-only: a cell changes its channel through the operations, which keep
 every label unique and every cell in a channel.
 
-The kinds of identity-based rules: ``move`` and ``shuffle_cells`` are
+Each operation needs a kind: ``move`` and ``shuffle_cells`` are
 reorientations, which keep each cell at its node and its traits;
 ``set_trait`` and ``found_families`` need a ``phenotype_switch``, which keeps
 the cells at every node; ``kill`` and ``divide`` need ``birth_death``. A rule
@@ -367,8 +376,8 @@ conservation laws, that changes to ghost nodes do not leak into the lattice
 and that the same seed gives the same result.
 ``expected_growth`` compares the measured change of the number of cells per
 step with the expected one, and ``traits`` gives the cells of
-identity-based models their initial traits. It raises with a readable report, so one line
-makes a test::
+identity-based models their initial traits. It raises with a readable report,
+so one line makes a test::
 
    def test_logistic_growth():
        check_interaction(logistic_growth)
@@ -379,9 +388,10 @@ Sharing a rule
 Keep rules in a module of your project, e.g. ``interactions.py``, and import
 it before running or loading a model that uses them: model files refer to
 rules by name and never execute code. A rule defined in a module is
-registered under the module's name and its own, ``interactions.logistic_growth``,
-so rules of the same name in two modules do not collide; ``print(rule)``
-shows the name, and a model file written by hand must use it. On the command
+registered under the module's name and its own,
+``interactions.logistic_growth``, so rules of the same name in two modules do
+not collide. ``print(rule)`` shows the name, and a model file written by hand
+must use it. On the command
 line, ``biolgca run model.json --plugins interactions`` imports the module
 first. Pass ``name=`` to the decorator to choose another name. Defining a
 rule again in the same module, for example by re-running a notebook cell,
@@ -421,7 +431,9 @@ runs.
 The copy is made with ``copy.deepcopy``, and everything the operator holds is
 copied with it: a list or dict handed to its constructor, or the object of a
 bound method, belongs to the model's copy, so an operator that appends to a
-list of yours leaves that list empty. To collect values during a run, store
+list of yours leaves that list empty.
+
+To collect values during a run, store
 them on the operator and read them from ``model.pipeline.operators[i]``, or
 hand the operator an observer that is also in the model's
 :class:`~lgca.model.AnalysisSpec`: the observers of the model are shared, not

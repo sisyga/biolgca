@@ -1,6 +1,6 @@
 # biolgca is a Python package for simulating different kinds of lattice-gas
 # cellular automata (LGCA) in the biological context.
-# Copyright (C) 2018-2025 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.
+# Copyright (C) 2018-2026 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.
 # The full license notice is found in the file lgca/__init__.py.
 """
 Abstract base classes. These classes define properties and structure of the LGCA
