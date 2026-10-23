@@ -14,9 +14,13 @@
 BioLGCA implements biological lattice-gas cellular automata (BIO-LGCA). Each
 lattice site, or node, has one channel per direction of movement and optional
 rest channels, so the model tracks how many cells are at each node and where
-they are heading. The rules are local and stochastic, which makes simulations fast
-and the models accessible to mathematical analysis
-([Deutsch et al. 2021](https://doi.org/10.1371/journal.pcbi.1009066)).
+they are heading. The rules are local and stochastic, so simulations of large
+lattices are fast and the models can be analysed with mean-field and stability
+methods ([Deutsch et al. 2021](https://doi.org/10.1371/journal.pcbi.1009066)).
+
+BioLGCA is for researchers and students in mathematical and theoretical
+biology who model collective cell migration, tissue growth, pattern formation
+or the evolution of cell populations, and for courses that teach these topics.
 
 With BioLGCA you can:
 
@@ -31,14 +35,6 @@ With BioLGCA you can:
 
 ## Why BioLGCA
 
-BioLGCA is for researchers and students in mathematical and theoretical
-biology who model collective cell migration, tissue growth, pattern formation
-or the evolution of cell populations, and for courses that teach these
-topics. LGCA describe cells by their numbers and directions of movement on a
-lattice, so a model is a short list of local stochastic rules that can be
-simulated on large lattices and analysed with mean-field and stability
-methods (Deutsch et al. 2021).
-
 General-purpose frameworks for cell-based models couple cells to fields in
 many ways: Morpheus and CompuCell3D (cellular Potts models), PhysiCell
 (off-lattice agents) and Chaste (several cell-based model types, including an
@@ -47,10 +43,9 @@ space of LGCA. In this state space, alignment, chemotaxis and go-or-grow
 switching are rules for the reorientation of channel states, and mean-field
 equations can be derived systematically from the rules. BioLGCA provides this
 model class as a library: the rules of the BIO-LGCA literature as composable
-building blocks,
-a checked contract for new rules, model files that rerun from their seed, parameter
-sweeps, and a [model zoo](docs/source/zoo/index.rst) that reproduces
-published LGCA models with these rules.
+building blocks, a checked contract for new rules, model files that rerun from
+their seed, parameter sweeps, and a [model zoo](docs/source/zoo/index.rst) that
+reproduces published LGCA models with these rules.
 
 ## Quick start
 

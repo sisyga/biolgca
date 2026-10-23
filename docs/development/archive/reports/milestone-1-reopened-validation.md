@@ -1,6 +1,6 @@
 # Reopened milestone 1 validation
 
-Target: `aidevelop`; starting revision `5b9efe7` (the merged tree of #128).
+Target: `develop`; starting revision `5b9efe7` (the merged tree of #128).
 This report covers the second review's 22 new findings and reopened #113/#118.
 The original report remains historical evidence, not proof of these new contracts.
 

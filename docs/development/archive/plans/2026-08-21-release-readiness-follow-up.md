@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Close the final local release-readiness gaps, verify the resulting tree from a clean state, and publish local `aidevelop` to `origin/aidevelop`.
+**Goal:** Close the final local release-readiness gaps, verify the resulting tree from a clean state, and publish local `develop` to `origin/develop`.
 
 **Architecture:** Keep the cleanup outside the runtime package. A small Python entry point owns removal of generated Sphinx directories and invokes strict Sphinx consistently on Windows, Linux, local development, and CI. Documentation and legacy notebooks are corrected in place, while an `Unreleased` changelog records the accumulated hardening work without asserting an unchosen release version.
 
 **Tech Stack:** Python standard library, pytest, Sphinx, nbformat-compatible notebook JSON, GitHub Actions, setuptools/build.
 
-**Spec:** `docs/superpowers/plans/2026-08-21-aidevelop-review-and-hardening.md` (Task 13 and the final audit follow-up)
+**Spec:** `docs/superpowers/plans/2026-08-21-develop-review-and-hardening.md` (Task 13 and the final audit follow-up)
 
 ## Global Constraints
 
@@ -16,7 +16,7 @@
 - Add no runtime dependency and no notebook-execution dependency.
 - Keep generated autosummary and HTML output untracked.
 - Use `conda run -n biolgca` for local verification.
-- Push only after the merged `aidevelop` tree passes the release gate.
+- Push only after the merged `develop` tree passes the release gate.
 
 ---
 
@@ -69,12 +69,12 @@
 - Verify all changed files and generated artifacts; no additional production files expected.
 
 **Interfaces:**
-- Consumes: Tasks 1-2 and local `aidevelop`.
-- Produces: a clean, verified `origin/aidevelop` at the same commit as local `aidevelop`.
+- Consumes: Tasks 1-2 and local `develop`.
+- Produces: a clean, verified `origin/develop` at the same commit as local `develop`.
 
 - [ ] Run `conda run -n biolgca python -m pytest -q`.
 - [ ] Run `conda run -n biolgca python docs/build.py` twice to prove stale-output independence.
 - [ ] Run `conda run -n biolgca python -m build --no-isolation` and smoke-test the wheel/CLI outside the source tree.
 - [ ] Review `git diff --check`, tracked files, and the complete branch diff.
-- [ ] Merge the feature branch into local `aidevelop` and repeat tests/docs on the merged tree.
-- [ ] Push `aidevelop` to `origin` without force and verify local, remote-tracking, and GitHub SHAs match.
+- [ ] Merge the feature branch into local `develop` and repeat tests/docs on the merged tree.
+- [ ] Push `develop` to `origin` without force and verify local, remote-tracking, and GitHub SHAs match.

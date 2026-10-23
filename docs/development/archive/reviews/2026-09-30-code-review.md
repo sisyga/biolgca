@@ -16,7 +16,7 @@ supersede the plans and the order of work below.
 
 ## Scope and method
 
-Reviewed `aidevelop` at `ee3e492`, including changes since the earlier repaired
+Reviewed `develop` at `ee3e492`, including changes since the earlier repaired
 milestone `5978778f`. The focus was the current model API and its connections to
 rules, identity-based cell tables, switching and mutations, PDE fields, recording,
 parameter sweeps, CLI archives, Explorer, plotting, model-zoo measurements and
