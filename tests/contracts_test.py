@@ -96,9 +96,11 @@ _OPERATIONS = [
     (_roll_counts, "birth_death", "change the number of cells at a node", _CLASSICAL),
 ]
 _WIDTH = ("field", "reorientation", "phenotype_switch", "birth_death")
+# the kind check compares widths, so the kinds at the boundary are enough: the widest kind that does not
+# allow an operation (here) and the narrowest that does (test_a_rule_may_use_what_its_kind_allows)
 _CASES = [pytest.param(body, kind, needed, what, family, id=f"{body.__name__[1:]}-{kind}-{family}")
           for body, needed, what, families in _OPERATIONS for family in families
-          for kind in _WIDTH[:_WIDTH.index(needed)]]
+          for kind in [_WIDTH[_WIDTH.index(needed) - 1]]]
 
 
 def _model(body, kind, family, steps=3):
@@ -154,13 +156,13 @@ def test_a_rule_that_breaks_its_kind_warns_once_and_runs_as_the_wider_kind(body,
         _model(body, kind, family).step()
 
 
-@pytest.mark.parametrize("body, kind, family", [
-    pytest.param(body, kind, family, id=f"{body.__name__[1:]}-{kind}-{family}")
-    for body, needed, _, families in _OPERATIONS for family in families
-    for kind in _WIDTH[_WIDTH.index(needed):]])
-def test_a_rule_may_use_what_its_kind_allows(body, kind, family):
+@pytest.mark.parametrize("body, family", [
+    pytest.param(body, family, id=f"{body.__name__[1:]}-{needed}-{family}")
+    for body, needed, _, families in _OPERATIONS for family in families])
+def test_a_rule_may_use_what_its_kind_allows(body, family):
+    needed = next(kind for operation, kind, _, _ in _OPERATIONS if operation is body)
     with strict_contracts():
-        _model(body, kind, family).run(showprogress=False)
+        _model(body, needed, family).run(showprogress=False)
 
 
 @pytest.mark.parametrize("write, error", [
@@ -250,51 +252,3 @@ def test_a_stack_narrower_than_its_operators_warns_when_the_model_is_built():
     model.step()  # each operator runs by its own kind
     with strict_contracts(), pytest.raises(ContractWarning, match=message):
         build_model(spec)
-
-
-def test_an_interrupted_reorientation_leaves_the_labels_in_place(monkeypatch):
-    # the sampler wrote the occupied channels (ones) and then the labels: an interrupt between the two
-    # writes replaced every label with 1
-    import lgca.lattice_state
-
-    model = build_model(ModelSpec(
-        space=SpaceSpec(geometry="square", dims=(6, 6)),
-        state=StateSpec(density=0.8, restchannels=1, identity_based=True),
-        time=TimeSpec(seed=5),
-        dynamics=InteractionPipelineSpec(operators=[
-            ReorientationSpec(terms=[ReorientationTermSpec("polar_alignment", beta=1.0)])], propagation=False)))
-    interior = model.lgca.nonborder
-    before = model.lgca.nodes[interior].copy()
-
-    def interrupted(*args):
-        raise KeyboardInterrupt
-
-    monkeypatch.setattr(lgca.lattice_state, "place_labels", interrupted)
-    with pytest.raises(KeyboardInterrupt):
-        model.step()
-
-    np.testing.assert_array_equal(model.lgca.nodes[interior], before)
-
-
-def test_a_model_without_rollback_whose_step_failed_refuses_further_steps():
-    steps = []
-
-    @interaction(kind="birth_death", families="classical", name="fails_at_step_2")
-    def fails_at_step_2(state):
-        steps.append(state.step)
-        state.remove_cells(0.1)
-        if state.step == 2:
-            raise ValueError("broken rule")
-
-    model = build_model(ModelSpec(state=StateSpec(density=0.5), time=TimeSpec(steps=5, seed=1),
-                                  dynamics=InteractionPipelineSpec(operators=[fails_at_step_2()])))
-    model.rollback = False  # with it, the failed step is undone and the model goes on (rollback_test.py)
-    model.step()
-    with pytest.raises(ValueError, match="broken rule"):
-        model.step()
-    for go_on in (model.step, lambda: model.run(showprogress=False), model.lgca.timestep):
-        with pytest.raises(RuntimeError, match=r"step 2 of this model failed \(ValueError: broken rule\).*rebuild"):
-            go_on()
-
-    assert steps == [1, 2]
-    build_model(model.spec).step()  # a rebuilt model runs

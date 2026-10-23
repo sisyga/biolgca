@@ -10,7 +10,7 @@ import numpy as np
 
 from .list_utils import _copy_arr_of_lists, get_arr_of_empty_lists
 from .plot_data import resolve_animation_history
-from .simulation import Observer, Schedule
+from .simulation import Observer, Schedule, _recorded_density
 
 __all__ = [
     "AnimationObserver",
@@ -320,9 +320,7 @@ def _capture_frame(lgca, kind: str, channels=slice(None), field=None):
             elif hasattr(lgca, "occupied"):
                 nodes = nodes > 0
             return np.array(nodes.sum(-1), copy=True)
-        if hasattr(lgca, "species_density"):
-            return np.array(lgca.species_density[lgca.nonborder], copy=True)
-        return np.array(lgca.cell_density[lgca.nonborder], copy=True)
+        return np.array(_recorded_density(lgca), copy=True)
     if data_argument == "nodes_t":
         nodes = lgca.nodes[lgca.nonborder]
         if lgca.nodes.dtype == object:

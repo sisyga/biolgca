@@ -1,6 +1,6 @@
 # biolgca is a Python package for simulating different kinds of lattice-gas
 # cellular automata (LGCA) in the biological context.
-# Copyright (C) 2018-2025 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.
+# Copyright (C) 2018-2026 Technische Universität Dresden, contact: simon.syga@tu-dresden.de.
 # The full license notice is found in the file lgca/__init__.py.
 """
 Abstract base classes. These classes define properties and structure of the LGCA
@@ -210,7 +210,6 @@ def _validate_vector_field_shape(field, expected_shape, name):
     return arr
 
 
-
 def channel_sum(nodes):
     """``nodes.sum(-1)``, for booleans and signed integers as a matrix product (two to four times faster)."""
     if nodes.dtype == bool:
@@ -374,16 +373,6 @@ class LGCA_base(ABC):
         "only_propagation",
         "random_walk",
     }
-
-    @property
-    @abstractmethod
-    def interactions(self) -> list:
-        """(Class attribute.) List of interaction functions suitable for this type of LGCA."""
-        # This is only a helper class, it cannot simulate! Use one the following classes:
-        # LGCA_1D, LGCA_Square, LGCA_Hex
-
-        # ... notation as of https://stackoverflow.com/a/58321197
-        ...
 
     @property
     @abstractmethod
@@ -553,10 +542,18 @@ class LGCA_base(ABC):
             warn_user(f"Provided nodes have shape {nodes.shape}, expected {expected}.")
 
     def _ensure_bool_nodes(self, nodes):
-        """Return ``nodes`` as boolean array, warn if non-boolean values found."""
+        """Return ``nodes`` as boolean array; raise if a channel holds anything but 0 or 1 cell.
+
+        Casting other values to bool would change the number of cells (2 becomes 1, -1 and 0.5 become 1).
+        """
+        nodes = np.asarray(nodes)
         if not np.isin(nodes, [0, 1]).all():
-            warn_user("Provided nodes contain values other than 0 or 1. "
-                "Interpreting values as booleans.")
+            bad = np.unique(nodes[~np.isin(nodes, [0, 1])])[:5]
+            raise ValueError(
+                f"nodes contain values other than 0 or 1 (e.g. {bad.tolist()}); with volume exclusion each "
+                "channel holds 0 or 1 cell of each species: use 0/1 (or booleans), or volume_exclusion=False "
+                "(get_lgca: ve=False) for cell counts"
+            )
         return nodes.astype(bool)
 
     @classmethod
@@ -924,21 +921,19 @@ class LGCA_base(ABC):
         Initialize lazy computation structures for permutations.
         Only compute permutations when actually needed.
         """
+        # geometry-dependent and small; the nematic tensors of the states are computed on demand
+        # (get_si_permutations), as only nematic rules read them
+        self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(self.c.shape[0]))[None, ...]
+        self._si_cache = {}
         # For geometries with many channels, use lazy computation
         if self.K > 15:  # threshold for when precomputation becomes expensive
             self._permutation_cache = {}
             self._flux_cache = {}
-            self._si_cache = {}
             self.permutations = None  # Signal that we're using lazy computation
-            # Still compute cij as it's geometry-dependent and small
-            self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(self.c.shape[0]))[None, ...]
         else:
             # Precompute all permutations for smaller geometries
             self.permutations = [_generate_permutations(self.K, n) for n in range(self.K + 1)]
             self.j = [np.dot(self.c, self.permutations[n][:, :self.velocitychannels].T) for n in range(self.K + 1)]
-            self.cij = np.einsum('ij,kj->jik', self.c, self.c) - 0.5 * np.diag(np.ones(self.c.shape[0]))[None, ...]
-            self.si = [np.einsum('ij,jkl', self.permutations[n][:, :self.velocitychannels], self.cij) for n in
-                       range(self.K + 1)]
 
     def get_permutations(self, n_particles):
         """Get permutations for ``n_particles``.
@@ -1016,11 +1011,6 @@ class LGCA_base(ABC):
         n_particles = int(n_particles)
         if not 0 <= n_particles <= self.K:
             raise ValueError(f"n_particles must be between 0 and K={self.K}")
-        try:
-            return self.si[n_particles]
-        except (AttributeError, TypeError):
-            pass
-
         if not hasattr(self, "_si_cache"):
             self._si_cache = {}
         if n_particles not in self._si_cache:

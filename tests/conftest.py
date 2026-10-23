@@ -34,6 +34,20 @@ _REGISTRIES = (default_registry._plugins, default_registry._aliases, _REORIENTAT
                _REACTIONS, _EFFECTS, _CUES)
 
 
+def pytest_addoption(parser):
+    parser.addoption("--run-slow", action="store_true",
+                     help="also run the tests marked slow: the zoo's paper reproductions and the 3D explorer views")
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--run-slow"):
+        return
+    skip = pytest.mark.skip(reason="slow: run with --run-slow (CI does)")
+    for item in items:
+        if "slow" in item.keywords:
+            item.add_marker(skip)
+
+
 @pytest.fixture(autouse=True)
 def _isolated():
     """Remove what a test registers (rules, terms, reactions, effects, cues) and the pyplot figures it

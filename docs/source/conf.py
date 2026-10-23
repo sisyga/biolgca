@@ -10,6 +10,7 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+import importlib.metadata
 import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
@@ -23,11 +24,12 @@ sys.path.insert(0, os.path.abspath('../..'))
 # -- Project information -----------------------------------------------------
 
 project = 'biolgca'
-copyright = '2026, TUD Dresden University of Technology'
-author = 'Simon Syga, Bianca Güttner'
+copyright = '2018–2026, Technische Universität Dresden'
+author = 'Simon Syga'
 
-# The full version, including alpha/beta/rc tags
-release = '2.0'
+# The full version, from the installed package (uv sync installs it, also on Read the Docs)
+release = importlib.metadata.version('biolgca')
+version = '.'.join(release.split('.')[:2])
 
 
 # -- General configuration ---------------------------------------------------

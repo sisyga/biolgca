@@ -14,13 +14,14 @@ simulator class from four main switches:
    - ``"moore"``, ``"moore3d"``
 
 ``ib``
-   If ``True``, use identity-based particles with individual labels and
-   properties. Identity-based multi-species classes are not implemented.
+   If ``True``, track individual cells with labels and traits
+   (identity-based models). Identity-based multi-species classes are not
+   implemented.
 
 ``ve``
-   If ``True``, enforce volume exclusion: at most one particle can occupy each
-   channel. If ``False``, channels may contain multiple particles or particle
-   IDs depending on the LGCA family.
+   If ``True``, enforce volume exclusion: at most one cell can occupy each
+   channel. If ``False``, channels may hold several cells (a number of cells,
+   or a list of labels in identity-based models).
 
 ``n_species``
    Number of species. Values greater than one select the multi-species class

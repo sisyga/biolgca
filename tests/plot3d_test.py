@@ -67,19 +67,28 @@ def test_every_3d_plot_draws_the_lattice_for_every_model_family(family, method):
     assert drawn_pixels(fig) > 1000
 
 
-@pytest.mark.parametrize("family", ["ib", "nove_ib"])
-def test_property_plot_shows_the_mean_property_of_occupied_nodes_only(family):
-    model = make_model(family)
-    nodes = model.nodes[model.nonborder]
-    occupied = np.any(model._channel_counts(nodes), axis=-1)
-    propname = next(iter(model.props))
-    mean = np.ma.getdata(model.calc_prop_mean(propname=propname, props=model.props, nodes=nodes))
+@pytest.mark.parametrize("ve", [True, False], ids=["ib", "nove_ib"])
+def test_property_plot_shows_the_mean_property_of_occupied_nodes_only(ve):
+    # cells 1 and 2 (r_b 0.2 and 0.4) share node (0, 0, 0), cell 3 (r_b 0.9) sits at (2, 1, 0)
+    dims, channels = (3, 3, 3), 7
+    if ve:
+        nodes = np.zeros(dims + (channels,), dtype=np.uint64)
+        nodes[0, 0, 0, [0, 6]] = [1, 2]
+        nodes[2, 1, 0, 3] = 3
+    else:
+        nodes = np.empty(dims + (channels,), dtype=object)
+        for index in np.ndindex(nodes.shape):
+            nodes[index] = []
+        nodes[0, 0, 0, 0], nodes[2, 1, 0, 3] = [1, 2], [3]
+    model = get_lgca(geometry="cubic", ib=True, ve=ve, nodes=nodes, interaction="only_propagation")
+    model.props["r_b"] = [0., 0.2, 0.4, 0.9]
 
-    _, cubes, _ = model.plot_prop_spatial(propname=propname)
+    _, cubes, _ = model.plot_prop_spatial(propname="r_b")
 
-    np.testing.assert_allclose(np.sort(cubes.mlab_source.scalars), np.sort(mean[occupied]))
-    values = np.asarray(model.props[propname], dtype=float)
-    assert values.min() <= cubes.mlab_source.scalars.min() <= cubes.mlab_source.scalars.max() <= values.max()
+    source = cubes.mlab_source
+    np.testing.assert_array_equal(np.c_[source.x, source.y, source.z][np.argsort(source.scalars)],
+                                  [[0.5, 0.5, 0.5], [2.5, 1.5, 0.5]])
+    np.testing.assert_allclose(np.sort(source.scalars), [0.3, 0.9])
 
 
 def test_glyphs_sit_at_node_centres_inside_the_domain_box():

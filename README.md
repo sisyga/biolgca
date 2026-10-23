@@ -12,11 +12,15 @@
 </p>
 
 BioLGCA implements biological lattice-gas cellular automata (BIO-LGCA). Each
-lattice site has one channel per direction of movement and optional rest
-channels, so the model tracks how many cells are at each site and where they
-are heading. The rules are local and stochastic, which makes simulations fast
-and the models accessible to mathematical analysis
-([Deutsch et al. 2021](https://doi.org/10.1371/journal.pcbi.1009066)).
+lattice site, or node, has one channel per direction of movement and optional
+rest channels, so the model tracks how many cells are at each node and where
+they are heading. The rules are local and stochastic, so simulations of large
+lattices are fast and the models can be analysed with mean-field and stability
+methods ([Deutsch et al. 2021](https://doi.org/10.1371/journal.pcbi.1009066)).
+
+BioLGCA is for researchers and students in mathematical and theoretical
+biology who model collective cell migration, tissue growth, pattern formation
+or the evolution of cell populations, and for courses that teach these topics.
 
 With BioLGCA you can:
 
@@ -26,7 +30,22 @@ With BioLGCA you can:
 - track individual cells with heritable traits to study evolution;
 - watch a model run in a notebook while you change its parameters with sliders;
 - run on 1D, square, hexagonal and 3D lattices; and
-- save every model as a JSON file that reruns exactly from its seed.
+- save every model as a JSON file that reruns from its seed with the same data
+  (given the same BioLGCA and dependency versions).
+
+## Why BioLGCA
+
+General-purpose frameworks for cell-based models couple cells to fields in
+many ways: Morpheus and CompuCell3D (cellular Potts models), PhysiCell
+(off-lattice agents) and Chaste (several cell-based model types, including an
+on-lattice cellular automaton). They do not offer the velocity-channel state
+space of LGCA. In this state space, alignment, chemotaxis and go-or-grow
+switching are rules for the reorientation of channel states, and mean-field
+equations can be derived systematically from the rules. BioLGCA provides this
+model class as a library: the rules of the BIO-LGCA literature as composable
+building blocks, a checked contract for new rules, model files that rerun from
+their seed, parameter sweeps, and a [model zoo](docs/source/zoo/index.rst) that
+reproduces published LGCA models with these rules.
 
 ## Quick start
 
@@ -71,7 +90,7 @@ With BioLGCA you can:
 For a study you will want every assumption written down. A `ModelSpec`
 describes the lattice, initial state, time and seed, and the list of
 interactions. Here cells align with their neighbours and follow an attractant
-gradient; both cues enter one stochastic decision per site:
+gradient; both cues enter one stochastic decision per node:
 
 <img src="docs/images/readme/chemotaxis_density.png" width="300" align="right"
      alt="Cells accumulate where the attractant peaks, near x = 40">
@@ -103,7 +122,8 @@ result.lgca.plot_density()
 ```
 
 Save the model with `save_model_spec(spec, "model.json")` from `lgca.model`.
-Anyone can then rerun it from the command line and get identical data:
+Anyone with the same versions of BioLGCA and its dependencies can then rerun it
+from the command line and get identical data:
 
 ```bash
 uv run biolgca run model.json --output runs/chemotaxis-001
@@ -115,10 +135,10 @@ recorded densities in `measurements.npz`.
 ## Growth and phenotype switching
 
 <img src="docs/images/readme/go_or_grow_density.png" width="300" align="right"
-     alt="A dense spheroid of cells grown from one site">
+     alt="A dense spheroid of cells grown from one node">
 
 Interactions can also create and remove cells. In the go-or-grow model, cells
-either migrate or rest and divide, and crowding changes which they do. One
+either migrate or rest and divide, and crowding shifts the balance between them. One
 fully occupied node grows into a spheroid:
 
 ```python
@@ -138,10 +158,11 @@ spec = ModelSpec(
 run_model(spec).lgca.plot_density()
 ```
 
-Each step, cells switch between moving and resting, die, resting cells
-divide, and moving cells pick new directions. With `kappa=4`, crowded cells
-rest instead, and the same small colony shrinks: growth then needs a minimum
-population, an Allee effect that emerges from the switching rule.
+In each step, cells switch between moving and resting and may die; resting
+cells divide, and moving cells pick new directions. With `kappa=-4`, crowded
+cells start moving. With `kappa=4` they rest instead, and the same small colony
+shrinks: growth then needs a minimum population, an Allee effect that emerges
+from the switching rule.
 
 <br clear="right">
 
@@ -186,15 +207,15 @@ and model family it claims to support and reports what goes wrong, from lost
 cells to unseeded random numbers. Movement biases are written the same way
 with `@reorientation_term`. The
 [custom interaction guide](docs/source/how_to/custom_interactions.rst) shows
-growth rules, movement biases and a deterministic collision rule, and tutorial
-6 how to test a rule and share it together with a model.
+growth rules, movement biases and a deterministic collision rule; tutorial 6
+shows how to test a rule and share it with a model.
 
 ## Learn
 
 Eight notebooks take you from the first random walk to a reproducible project
 and to cells that act on the molecules around them.
-Every model is built in visible cells and the notebooks run in CI, so they
-always work with the current code.
+Each notebook builds its models in visible cells, and CI runs every notebook
+against the current code.
 
 | Lesson | You will learn to |
 | --- | --- |
@@ -226,20 +247,31 @@ Moore lattices. 3D rendering uses Mayavi, which is optional: install it with
 
 ## Other ways to install
 
-Without uv, install BioLGCA into any Python 3.11+ environment:
+Without uv, install BioLGCA into any Python 3.11+ environment, from a clone
+or directly from GitHub (BioLGCA is not on PyPI yet):
 
 ```bash
-python -m pip install -e ".[notebooks]"   # JupyterLab; also ".[yaml]" or ".[plot3d]"
+python -m pip install -e ".[notebooks]"   # in the clone; JupyterLab; also ".[yaml]" or ".[plot3d]"
+python -m pip install "biolgca @ git+https://github.com/sisyga/biolgca"   # without a clone
 ```
 
 This picks the newest compatible versions of the dependencies. `uv sync` instead
 installs the exact versions in `uv.lock`, which the test suite runs against.
+The runtime dependencies are NumPy, SciPy, pyamg, threadpoolctl, tqdm,
+Matplotlib, pandas and ipywidgets. To check that the installation works, run
+`biolgca examples list`.
 
-## Contributing
+## Questions and contributing
 
-Bug reports and ideas are welcome on the
-[issue tracker](https://github.com/sisyga/biolgca/issues). `uv sync` also
-installs the development tools; run the checks from the repository root:
+- **Questions** about using BioLGCA, and **bug reports** and **ideas**: open
+  an issue on the [issue tracker](https://github.com/sisyga/biolgca/issues),
+  which offers templates for each.
+- **Contributions** are welcome: [CONTRIBUTING.md](CONTRIBUTING.md) explains
+  how to set up the development environment, run the tests and the docs
+  build, and propose a new interaction.
+- Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
+
+Run the checks from the repository root after `uv sync`:
 
 ```bash
 uv run pytest -q               # test suite
@@ -247,6 +279,15 @@ uv run python docs/build.py    # documentation, executes all tutorials
 ```
 
 User-facing changes are recorded in [CHANGELOG.md](CHANGELOG.md).
+
+## History
+
+BioLGCA has been developed at TU Dresden since 2018. Until version 2.0, the
+code grew alongside the research that used it, with contributions from the
+people listed under [Acknowledgements](#acknowledgements); it was modernised
+in 2025 and is kept on branch [`v1`](https://github.com/sisyga/biolgca/tree/v1).
+Version 2.0 (2026) rewrote the package around declarative model
+specifications, a rule contract and the model zoo.
 
 ## Citing
 
@@ -264,7 +305,19 @@ The BIO-LGCA modelling class is described in:
 > *PLoS Computational Biology* 17(6): e1009066.
 > <https://doi.org/10.1371/journal.pcbi.1009066>
 
+## Acknowledgements
+
+BioLGCA is maintained by Simon Syga. Bianca Güttner
+([@GuettnerBianca](https://github.com/GuettnerBianca)) co-authored the code
+before 2.0. Code was also contributed by
+[@Franzi2729](https://github.com/Franzi2729),
+Marcus Krellner ([@krelli89](https://github.com/krelli89)),
+Harish P Jain ([@harishpjain](https://github.com/harishpjain)) and Mateo
+Larralde ([@mateolarr](https://github.com/mateolarr)). The models build on
+the BIO-LGCA work of Andreas Deutsch, Josué Manik Nava-Sedeño, Haralampos
+Hatzikirou and colleagues.
+
 ## License
 
-BSD 3-clause, see [LICENSE.txt](LICENSE.txt). Copyright (C) 2018–2026
+BSD 3-clause, see [LICENSE.txt](LICENSE.txt). Copyright (c) 2018–2026
 Technische Universität Dresden.

@@ -53,19 +53,32 @@ def test_polar_alignment_is_the_nove_density_dependent_alignment(geometry, dims)
     np.testing.assert_array_equal(_run(composed, 10), _run(legacy, 10))
 
 
-@pytest.mark.parametrize("geometry,dims", GEOMETRIES)
-def test_polar_alignment_has_the_nove_alignment_probabilities(geometry, dims):
-    # on hex, the neighbour sums differ from the legacy ones by rounding only,
-    # so seeded runs drift apart; the probabilities agree
+ALIGNMENT_GEOMETRIES = [("lin", (400,)), ("square", (20, 20)), ("hex", (20, 20)), ("cubic", (8, 8, 8)),
+                        ("moore", (6, 6, 6))]
+
+
+@pytest.mark.parametrize("geometry,dims", ALIGNMENT_GEOMETRIES)
+def test_polar_alignment_steers_cells_along_the_flux_of_their_neighbours(geometry, dims):
+    # n cells in channel 0 at every node of a periodic lattice: each of the b neighbours
+    # carries the flux n c_0, so a cell picks channel k with P(k) ∝ exp(beta b n c_k · c_0).
+    # On hex the rows alternate their neighbours, so both row parities are checked.
+    n, beta = 10, 0.06
+    channels = _model(geometry, dims, [], restchannels=0).lgca.K
+    nodes = np.zeros(dims + (channels,), dtype=int)
+    nodes[..., 0] = n
     model = _model(geometry, dims, [ReorientationSpec(terms=[ReorientationTermSpec("polar_alignment",
-                                                                                    beta=0.7)])])
-    lgca, operator = model.lgca, model.pipeline.operators[0]
-    for term in operator.terms:
-        term.prepare(lgca)
-    weights = operator._channel_weights(lgca)[..., 0, :]
-    flux = lgca.nb_sum(lgca.calc_flux(lgca.nodes))
-    expected = softmax(0.7 * np.einsum("...i,ij->...j", flux, lgca.c), axis=-1)[lgca.nonborder]
-    np.testing.assert_allclose(softmax(weights, axis=-1), expected, rtol=1e-12, atol=1e-15)
+                                                                                    beta=beta)])],
+                   nodes=nodes, propagation=False)
+    lgca = model.lgca
+    expected = softmax(beta * channels * n * (lgca.c.T @ lgca.c[:, 0]))
+    counts = _run(model, 1)[lgca.nonborder]
+    np.testing.assert_array_equal(counts.sum(-1), n)
+    rows = np.indices(dims)[1] % 2 if len(dims) > 1 else np.zeros(dims, dtype=int)
+    for parity in np.unique(rows):
+        cells = counts[rows == parity].sum(0)
+        total = cells.sum()
+        tolerance = 4 * np.sqrt(expected * (1 - expected) / total) + 1 / total
+        np.testing.assert_array_less(np.abs(cells / total - expected), tolerance, err_msg=f"rows {parity}")
 
 
 def test_cells_choose_their_channels_independently():
@@ -162,10 +175,19 @@ def test_identity_models_place_their_cells_at_random(ve):
 
 
 @pytest.mark.parametrize("ve,growth", [(True, "legacy.ib.birthdeath"), (False, "legacy.nove_ib.birthdeath")])
-def test_identity_growth_and_reorientation_run_together(ve, growth):
+def test_reorientation_keeps_the_cells_and_traits_of_a_grown_population(ve, growth):
+    # after growth (new labels, dead cells, new traits) the reorientation alone moves no cell
+    # to another node and changes no trait
     model = _model("square", (10, 10), [{"name": growth}, ReorientationSpec(terms=TERMS)],
                    density=0.5 if ve else 2, restchannels=1, ve=ve, ib=True, seed=11)
+    initial = sum(map(len, _labels_per_node(model.lgca)))
     for _ in range(10):
         model.step()
-    labels = [label for node in _labels_per_node(model.lgca) for label in node]
-    assert len(labels) == len(set(labels)) > 0
+    before = _labels_per_node(model.lgca)
+    labels = [label for node in before for label in node]
+    assert len(labels) == len(set(labels)) and len(labels) != initial
+    traits = np.array(model.lgca.props["r_b"], dtype=float)
+    model.reconfigure({"dynamics.operators": [ReorientationSpec(terms=TERMS)], "dynamics.propagation": False})
+    model.step()
+    assert _labels_per_node(model.lgca) == before
+    np.testing.assert_array_equal(model.lgca.props["r_b"], traits)

@@ -12,11 +12,10 @@ license = "BSD-3-Clause"
 license-files = ["LICENSE.txt"]
 authors = [
     { name = "Simon Syga", email = "simon.syga@tu-dresden.de" },
-    { name = "Bianca Guettner", email = "bianca.guettner@nct-dresden.de" },
 ]
 keywords = ["cellular automata", "lattice gas", "biological modelling", "simulation"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
@@ -62,7 +61,7 @@ plot3d = [
 # Contributor tooling (PEP 735). `uv sync` installs the `dev` group by default, JupyterLab included.
 [dependency-groups]
 test = [
-    "pytest>=8",
+    "pytest>=9.0.3",
     "jsonschema>=4",
     "PyYAML>=6",
 ]
@@ -98,3 +97,4 @@ packages = ["lgca", "lgca.examples", "lgca.schemas", "lgca.zoo"]
 testpaths = ["tests"]  # not the ignored outputs/ (probe scripts, pytest temp folders)
 # a rule that breaks its kind's contract fails the test instead of warning once
 filterwarnings = ["error::lgca.ContractWarning"]
+markers = ["slow: the zoo's paper reproductions and the 3D explorer views; run only with --run-slow"]

@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://biolgca.readthedocs.io/
+    about: Tutorials, how-to guides and the API reference.

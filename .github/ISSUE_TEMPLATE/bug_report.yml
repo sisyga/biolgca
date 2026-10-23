@@ -1,0 +1,35 @@
+name: Bug report
+description: Something does not work, gives a wrong result or a confusing error.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what happened instead (paste the full error message).
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: >-
+        A short script or model file that shows the problem, with its seed. The smaller the
+        lattice and the fewer the steps, the better.
+      render: python
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: BioLGCA version
+      description: "Output of `biolgca --version`, or the commit."
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Python version and operating system
+      placeholder: e.g. Python 3.12, Windows 11, installed with uv sync
+    validations:
+      required: true

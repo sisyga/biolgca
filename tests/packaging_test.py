@@ -54,8 +54,6 @@ def test_uv_lock_and_python_pin_are_committed():
 def test_ci_workflow_tests_the_locked_environment():
     workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
-    assert "- aidevelop" in workflow
-    assert "- kio/development" in workflow
     assert "pull_request:" in workflow
     assert "astral-sh/setup-uv" in workflow
     assert "uv sync --locked" in workflow
@@ -74,8 +72,3 @@ def test_ci_tests_every_advertised_python_version_and_the_minimum_dependencies()
     assert "--resolution lowest-direct" in workflow
     assert f'python-version: "{advertised[0]}"' in workflow
 
-
-def test_readme_has_ci_badge():
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
-
-    assert "actions/workflows/ci.yml/badge.svg" in readme

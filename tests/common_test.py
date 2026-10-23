@@ -23,8 +23,6 @@ class T_LGCA_Common(ABC):
     # common parameters ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # reproducible but non-uniform fixups
     rng = npr.default_rng(1)
-    # absolute tolerance for random densities
-    density_epsilon = 0.3
     # 1D
     xdim_1d = 5
     b_1d = 2
@@ -178,7 +176,6 @@ class T_LGCA_Common(ABC):
             nodes = nodes.astype(bool)
         lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib, nodes=nodes, bc=bc, interaction='only_propagation')
         lgca.timeevo(timesteps=1, recorddens=False, showprogress=False)
-        print(lgca.__class__.__name__)
 
         actual = lgca.nodes[lgca.nonborder]
         if occupancy_fixture:
@@ -260,7 +257,7 @@ class Test_LGCA_General:
         assert lgca.restchannels == restchannels, "Wrong number of rest channels defined if nodes are given"
         assert lgca.dims == nodes.shape[:-1], "Wrong dimensions defined if nodes are given"
         if ve and not ib:
-            assert np.max(lgca.nodes.astype(int)) <= 1, "Volume exclusion principle is not respected"
+            assert lgca.nodes.dtype == bool, "Volume exclusion: nodes not adopted as channel occupations"
         if ib:
             assert np.array_equal(lgca.occupied, lgca.nodes.astype(bool)), \
                 "Occupation field not updated correctly from node configuration"
@@ -291,32 +288,32 @@ class Test_LGCA_General:
     @pytest.mark.parametrize("geom,ve,ib,dims_large,restchannels,density,capacity", [
         # classical LGCA (ve, non-ib)
         # (geom,    ve,   ib,    dims_large,    restchannels,                  density,    capacity)
-        ('lin',     True, False, (400,),        com.restchannels_ve_1d,        density_ve, com.K_ve_1d),
-        ('square',  True, False, (20, 20),      com.restchannels_ve_square,    density_ve, com.K_ve_square),
-        ('hex',     True, False, (20, 20),      com.restchannels_ve_hex,       density_ve, com.K_ve_hex),
-        ('cubic',   True, False, (5, 5, 5),     com.restchannels_ve_cubic,    density_ve, com.K_ve_cubic),
-        ('moore',   True, False, (5, 5, 5),     com.restchannels_ve_moore,   density_ve, com.K_ve_moore),
+        ('lin',     True, False, (20000,),      com.restchannels_ve_1d,        density_ve, com.K_ve_1d),
+        ('square',  True, False, (100, 100),    com.restchannels_ve_square,    density_ve, com.K_ve_square),
+        ('hex',     True, False, (100, 100),    com.restchannels_ve_hex,       density_ve, com.K_ve_hex),
+        ('cubic',   True, False, (20, 20, 20),  com.restchannels_ve_cubic,    density_ve, com.K_ve_cubic),
+        ('moore',   True, False, (20, 20, 20),  com.restchannels_ve_moore,   density_ve, com.K_ve_moore),
         # IBLGCA (ve, ib)
         # (geom,    ve,   ib,   dims_large,    restchannels,                density,    capacity)
-        ('lin',     True, True, (400,),        com.restchannels_ve_1d,      density_ve, com.K_ve_1d),
-        ('square',  True, True, (20, 20),      com.restchannels_ve_square,  density_ve, com.K_ve_square),
-        ('hex',     True, True, (20, 20),      com.restchannels_ve_hex,     density_ve, com.K_ve_hex),
-        ('cubic',   True, True, (5, 5, 5),     com.restchannels_ve_cubic,   density_ve, com.K_ve_cubic),
-        ('moore',   True, True, (5, 5, 5),     com.restchannels_ve_moore,  density_ve, com.K_ve_moore),
+        ('lin',     True, True, (20000,),       com.restchannels_ve_1d,      density_ve, com.K_ve_1d),
+        ('square',  True, True, (100, 100),    com.restchannels_ve_square,  density_ve, com.K_ve_square),
+        ('hex',     True, True, (100, 100),    com.restchannels_ve_hex,     density_ve, com.K_ve_hex),
+        ('cubic',   True, True, (20, 20, 20),  com.restchannels_ve_cubic,   density_ve, com.K_ve_cubic),
+        ('moore',   True, True, (20, 20, 20),  com.restchannels_ve_moore,  density_ve, com.K_ve_moore),
         # NoVE_LGCA (nove, non-ib)
         # written assuming that capacity for nove is set to velocitychannels + restchannels
         # (geom,   ve,    ib,    dims_large,   restchannels,                 density,        capacity)
-        ('lin',    False, False, (400,),       com.restchannels_nove_1d,     density_nove_1, com.b_1d+com.restchannels_nove_1d),
-        ('square', False, False, (20, 20),     com.restchannels_nove_square, density_nove_1, com.b_square+com.restchannels_nove_square),
-        ('hex',    False, False, (20, 20),     com.restchannels_nove_hex,    density_nove_1, com.b_hex+com.restchannels_nove_hex),
-        ('cubic',  False, False, (5, 5, 5),    com.restchannels_nove_cubic, density_nove_1, com.b_cubic+com.restchannels_nove_cubic),
-        ('moore',  False, False, (5, 5, 5),    com.restchannels_nove_moore, density_nove_1, com.b_moore+com.restchannels_nove_moore),
+        ('lin',    False, False, (20000,),      com.restchannels_nove_1d,     density_nove_1, com.b_1d+com.restchannels_nove_1d),
+        ('square', False, False, (100, 100),   com.restchannels_nove_square, density_nove_1, com.b_square+com.restchannels_nove_square),
+        ('hex',    False, False, (100, 100),   com.restchannels_nove_hex,    density_nove_1, com.b_hex+com.restchannels_nove_hex),
+        ('cubic',  False, False, (20, 20, 20), com.restchannels_nove_cubic, density_nove_1, com.b_cubic+com.restchannels_nove_cubic),
+        ('moore',  False, False, (20, 20, 20), com.restchannels_nove_moore, density_nove_1, com.b_moore+com.restchannels_nove_moore),
         # (geom,   ve,    ib,    dims_large,   restchannels,                 density,        capacity)
-        ('lin',    False, False, (400,),       com.restchannels_nove_1d,     density_nove_2, com.b_1d+com.restchannels_nove_1d),
-        ('square', False, False, (20, 20),     com.restchannels_nove_square, density_nove_2, com.b_square+com.restchannels_nove_square),
-        ('hex',    False, False, (20, 20),     com.restchannels_nove_hex,    density_nove_2, com.b_hex+com.restchannels_nove_hex)
-        ,('cubic', False, False, (5, 5, 5),    com.restchannels_nove_cubic, density_nove_2, com.b_cubic+com.restchannels_nove_cubic),
-        ('moore',  False, False, (5, 5, 5),    com.restchannels_nove_moore, density_nove_2, com.b_moore+com.restchannels_nove_moore)
+        ('lin',    False, False, (20000,),      com.restchannels_nove_1d,     density_nove_2, com.b_1d+com.restchannels_nove_1d),
+        ('square', False, False, (100, 100),   com.restchannels_nove_square, density_nove_2, com.b_square+com.restchannels_nove_square),
+        ('hex',    False, False, (100, 100),   com.restchannels_nove_hex,    density_nove_2, com.b_hex+com.restchannels_nove_hex)
+        ,('cubic', False, False, (20, 20, 20), com.restchannels_nove_cubic, density_nove_2, com.b_cubic+com.restchannels_nove_cubic),
+        ('moore',  False, False, (20, 20, 20), com.restchannels_nove_moore, density_nove_2, com.b_moore+com.restchannels_nove_moore)
     ])
     def test_getlgca_lattice_setup_random(self, geom, ve, ib, dims_large, restchannels, density, capacity):
         # 'density' keyword check, random reset
@@ -347,7 +344,7 @@ class Test_LGCA_General:
                 "Node configuration is not random"
             assert lgca.nodes[lgca.nonborder].sum(-1).min() != lgca.nodes[lgca.nonborder].sum(-1).max(), \
                 "Number of particles is homogeneous when it should differ randomly"
-        assert np.abs(lgca.nodes[lgca.nonborder].sum() / lgca.cell_density[lgca.nonborder].size - density) \
-               < self.com.density_epsilon, "Wrong density reached"
-        if ve and not ib:
-            assert np.max(lgca.nodes.astype(int)) <= 1, "Volume exclusion principle is not respected"
+        # the mean cells per node, within 4 standard errors of the mean (from the sample variance)
+        per_node = lgca.nodes[lgca.nonborder].sum(-1)
+        error = per_node.std() / np.sqrt(per_node.size)
+        assert abs(per_node.mean() - density) < 4 * error, "Wrong density reached"

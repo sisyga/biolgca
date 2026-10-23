@@ -1,0 +1,17 @@
+name: Question
+description: Ask how to build, run or analyse a model with BioLGCA.
+labels: ["question"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What you are trying to model, what you tried, and where you got stuck.
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Code
+      description: The model specification or script you are working with, if it helps.
+      render: python

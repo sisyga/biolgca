@@ -20,7 +20,7 @@ from lgca.model import (
 )
 from lgca.pipeline import BirthDeathSpec, InteractionPipelineSpec, ReorientationSpec, ReorientationTermSpec
 from lgca.plugins import ConservationLaw, InteractionOperator, PluginInfo, describe_plugin, list_plugins
-from lgca.simulation import DensityRecorder, FamilyPopulationRecorder, NodeRecorder
+from lgca.simulation import DensityRecorder, FamilyPopulationRecorder, NodeRecorder, PopulationRecorder
 from lgca.simulation import Observer
 
 
@@ -154,25 +154,6 @@ def _square_spec(*, operators=(), timesteps=3, seed=17):
     )
 
 
-def _legacy_square(*, interaction, timesteps=3, seed=17):
-    lgca = get_lgca(
-        geometry="square",
-        dims=(4, 5),
-        density=0.35,
-        restchannels=1,
-        interaction=interaction,
-        bc="periodic",
-        seed=seed,
-    )
-    lgca.timeevo(
-        timesteps=timesteps,
-        record=True,
-        recorddens=True,
-        showprogress=False,
-    )
-    return lgca
-
-
 def test_registered_operator_wire_format_contains_only_stable_data_tags():
     spec = replace(
         _square_spec(),
@@ -235,76 +216,53 @@ def test_python_only_operator_and_observer_have_actionable_portability_errors():
         model_spec_to_dict(observer_spec)
 
 
-def test_model_spec_runs_propagation_as_separate_deterministic_phase():
-    result = run_model(_square_spec(operators=()), showprogress=False)
-    legacy = _legacy_square(interaction="only_propagation")
+@pytest.mark.parametrize("operators, state, parameters", [
+    ([], {}, {}),
+    ([{"name": "random_walk"}], {}, {}),
+    ([{"name": "random_walk"}], {"identity_based": True}, {}),
+    ([{"name": "excitable_medium", "parameters": {"beta": 0.04, "alpha": 1.2, "N": 3}}], {"restchannels": 2},
+     {"beta": 0.04, "alpha": 1.2, "N": 3}),
+], ids=["only_propagation", "random_walk", "ib_random_walk", "excitable_medium"])
+def test_model_spec_and_get_lgca_give_the_same_seeded_trajectory(operators, state, parameters):
+    # what the rules do is tested against analytic expectations and the frozen legacy functions
+    # (interaction_oracles_test, research_models_test); here both APIs must run the same model
+    state = {"density": 0.35, "restchannels": 1, **state}
+    spec = ModelSpec(
+        space=SpaceSpec(geometry="square", dims=(4, 5), boundary="periodic"),
+        state=StateSpec(**state),
+        time=TimeSpec(steps=3, seed=43),
+        dynamics=InteractionPipelineSpec(operators=operators),
+        analysis=AnalysisSpec(observers=[NodeRecorder(), DensityRecorder()]),
+    )
+    result = run_model(spec, showprogress=False)
+    quick = get_lgca(geometry="square", dims=(4, 5), density=0.35, restchannels=state["restchannels"],
+                     ib=state.get("identity_based", False), bc="periodic", seed=43,
+                     interaction=operators[0]["name"] if operators else "only_propagation", **parameters)
+    quick.timeevo(timesteps=3, record=True, recorddens=True, showprogress=False)
 
-    np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
-    np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
-    assert result.metadata["operator_names"] == []
-    assert result.metadata["geometry"] == "square"
+    np.testing.assert_array_equal(result.lgca.nodes_t, quick.nodes_t)
+    np.testing.assert_array_equal(result.lgca.dens_t, quick.dens_t)
+    assert not np.array_equal(result.lgca.nodes_t[0], result.lgca.nodes_t[-1])
+    assert result.metadata["operator_names"] == [operator["name"] for operator in operators]
     assert "Propagation" in result.pipeline.describe_schedule()
 
 
-def test_classical_random_walk_plugin_is_native_and_matches_legacy():
-    spec = _square_spec(operators=[{"name": "random_walk"}], timesteps=2, seed=43)
-    result = run_model(spec, showprogress=False)
-    legacy = _legacy_square(interaction="random_walk", timesteps=2, seed=43)
-    np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
-    np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
-
-
-def test_classical_excitable_medium_plugin_is_native_and_matches_legacy():
-    parameters = {"beta": 0.04, "alpha": 1.2, "N": 3}
-    spec = ModelSpec(
-        description=Description(title="native equivalence classical.excitable_medium"),
-        space=SpaceSpec(geometry="square", dims=(4, 5), boundary="periodic"),
-        state=StateSpec(density=0.35, restchannels=2),
-        time=TimeSpec(steps=2, seed=68),
-        dynamics=InteractionPipelineSpec(
-            operators=[{"name": "excitable_medium", "parameters": parameters}]
-        ),
-        analysis=AnalysisSpec(observers=[NodeRecorder(), DensityRecorder()]),
-    )
-    result = run_model(spec, showprogress=False)
-    legacy = get_lgca(
-        geometry="square",
-        dims=(4, 5),
-        density=0.35,
-        restchannels=2,
-        interaction="excitable_medium",
-        bc="periodic",
-        seed=68,
-        **parameters,
-    )
-    legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-    np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
-    np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
-
-
-def test_ib_random_walk_plugin_is_native_and_matches_legacy():
-    spec = ModelSpec(
-        description=Description(title="native equivalence ib.random_walk"),
-        space=SpaceSpec(geometry="square", dims=(4, 5), boundary="periodic"),
-        state=StateSpec(density=0.35, restchannels=1, identity_based=True),
-        time=TimeSpec(steps=2, seed=53),
-        dynamics=InteractionPipelineSpec(operators=[{"name": "random_walk"}]),
-        analysis=AnalysisSpec(observers=[NodeRecorder(), DensityRecorder()]),
-    )
-    result = run_model(spec, showprogress=False)
-    legacy = get_lgca(
-        geometry="square",
-        dims=(4, 5),
-        density=0.35,
-        restchannels=1,
-        ib=True,
-        interaction="random_walk",
-        bc="periodic",
-        seed=53,
-    )
-    legacy.timeevo(timesteps=2, record=True, recorddens=True, showprogress=False)
-    np.testing.assert_array_equal(result.lgca.nodes_t, legacy.nodes_t)
-    np.testing.assert_allclose(result.lgca.dens_t, legacy.dens_t)
+def test_identity_based_random_walk_scatters_each_cell_uniformly_over_its_channels():
+    # oracle: a random walk puts each cell in each of the K channels of its node with probability 1 / K;
+    # the cells keep their node and their label
+    nodes = np.zeros((30, 30, 5), dtype=bool)
+    nodes[..., 0] = True
+    model = build_model(ModelSpec(
+        space=SpaceSpec(geometry="square", dims=(30, 30), boundary="periodic"),
+        state=StateSpec(nodes=nodes, restchannels=1, identity_based=True), time=TimeSpec(steps=1, seed=5),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "random_walk"}], propagation=False)))
+    before = model.lgca.nodes[model.lgca.nonborder].copy()
+    model.step()
+    after = model.lgca.nodes[model.lgca.nonborder]
+    np.testing.assert_array_equal(np.sort(after, axis=-1), np.sort(before, axis=-1))
+    observed = (after > 0).reshape(-1, 5).mean(axis=0)
+    tolerance = 4 * np.sqrt(0.2 * 0.8 / 900)
+    assert np.all(np.abs(observed - 0.2) < tolerance), observed
 
 
 def test_pipeline_timing_is_aggregated_in_constant_space():
@@ -338,18 +296,23 @@ def test_pipeline_timing_trace_is_explicit_and_bounded():
     assert [entry["step"] for entry in trace] == [1, 1, 2]
 
 
-@pytest.mark.parametrize("plugin_name", ["go_and_grow_mutations", "go_or_grow_glioblastoma", "evo_steric"])
-def test_models_whose_mutants_found_families_are_recorded_as_such(plugin_name):
-    from types import SimpleNamespace
-
+@pytest.mark.parametrize("plugin_name, parameters", [
+    ("go_and_grow_mutations", {}), ("go_or_grow_glioblastoma", {"theta": 0.0}), ("evo_steric", {})])
+def test_the_families_that_mutants_found_are_recorded(plugin_name, parameters):
+    ve = plugin_name == "go_and_grow_mutations"
     model = build_model(ModelSpec(
         space=SpaceSpec(geometry="square", dims=(4, 5)),
-        state=StateSpec(density=0.35, restchannels=1, identity_based=True,
-                        volume_exclusion=plugin_name == "go_and_grow_mutations",
-                        capacity=None if plugin_name == "go_and_grow_mutations" else 8),
-        dynamics=InteractionPipelineSpec(operators=[{"name": plugin_name}])))
-    runner = SimpleNamespace(context=model)
-    assert FamilyPopulationRecorder._is_mutating_family_interaction(model.lgca, runner)
+        state=StateSpec(density=0.35, restchannels=1, identity_based=True, volume_exclusion=ve,
+                        capacity=None if ve else 8),
+        time=TimeSpec(steps=6, seed=3),
+        dynamics=InteractionPipelineSpec(operators=[{"name": plugin_name, "parameters": {"r_b": 0.5, "r_m": 0.5, **parameters}}]),
+        analysis=AnalysisSpec(observers=[FamilyPopulationRecorder(), PopulationRecorder()])))
+    result = model.run(showprogress=False)
+    populations = result.data["family_population"]
+    assert model.lgca.maxfamily > 1  # mutants founded families during the run
+    assert populations.shape == (7, model.lgca.maxfamily + 1)
+    np.testing.assert_array_equal(populations.sum(axis=1), result.data["population"])
+    np.testing.assert_array_equal(populations[-1], model.lgca.calc_family_pop_alive())
 
 
 def test_build_model_exposes_compiled_pipeline_schedule():
@@ -781,20 +744,28 @@ def _library_interactions():
 
 
 @pytest.mark.parametrize("plugin_name", _library_interactions())
-def test_all_registered_interactions_run_one_step_through_modelspec(plugin_name):
-    spec = ModelSpec(
+def test_all_registered_interactions_keep_what_their_kind_promises(plugin_name):
+    # a crash and contract check of every library rule (ContractWarning is an error in the tests), plus the
+    # conservation law of the declared kind, seen from outside the rule
+    kind = {plugin.name: plugin.operator_kind for plugin in list_plugins(kind="interaction")}[plugin_name]
+    state = _state_for_plugin(plugin_name)
+    model = build_model(ModelSpec(
         description=Description(title=f"run {plugin_name}"),
         space=SpaceSpec(geometry="square", dims=(4, 5), boundary="periodic"),
-        state=_state_for_plugin(plugin_name),
+        state=state,
         time=TimeSpec(steps=1, seed=21),
         dynamics=InteractionPipelineSpec(operators=[
-            {"name": plugin_name, "parameters": _PARAMETERS_FOR_PLUGIN.get(plugin_name, {})}]),
-    )
+            {"name": plugin_name, "parameters": _PARAMETERS_FOR_PLUGIN.get(plugin_name, {})}], propagation=False),
+    ))
+    per_node = (lambda lgca: lgca.species_density) if state.n_species > 1 else (lambda lgca: lgca.cell_density)
+    before = (per_node(model.lgca).copy(), model.lgca.cell_density.copy())
 
-    result = run_model(spec, showprogress=False)
+    model.step()
 
-    assert result.metadata["operator_names"] == [plugin_name]
-    assert result.lgca.cell_density.shape == result.lgca.nodes.shape[: len(result.lgca.dims)]
+    if kind in ("field", "reorientation"):  # the cells of each species stay at their node
+        np.testing.assert_array_equal(per_node(model.lgca), before[0])
+    elif kind == "phenotype_switch":  # cells may change species, not node
+        np.testing.assert_array_equal(model.lgca.cell_density, before[1])
 
 
 @pytest.mark.parametrize("operator", ["nove_ib.birth", "nove_ib.birthdeath", "nove_ib.birthdeath_cancerdfe",

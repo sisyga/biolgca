@@ -1,10 +1,10 @@
 Observers and plotting
 ======================
 
-Simulation, logging and plotting are now separate concerns. Existing
-``timeevo`` keyword flags still work, but internally they are implemented with
-observers. New code can pass observers explicitly through
-:class:`lgca.simulation.SimulationRunner` or through
+Running, logging and plotting a simulation are handled separately. The
+recording flags of ``timeevo`` still work; they use observers internally. New
+code can pass observers explicitly to
+:class:`lgca.simulation.SimulationRunner` or to a
 :class:`lgca.model.ModelSpec`.
 
 Recording with observers
@@ -47,8 +47,8 @@ Observers can run every step, every ``n`` steps or at an explicit set of steps.
 
 For lightweight Python callbacks, wrap a function in
 :class:`lgca.simulation.CallbackObserver`. The callback receives the LGCA and
-the local step within this run, starting at zero. Use :func:`functools.partial` or a closure for
-additional arguments:
+the step within this run, starting at zero. Use :func:`functools.partial` or a
+closure for further arguments:
 
 .. code-block:: python
 
@@ -138,13 +138,20 @@ trait of the cells at every recorded time:
    mean_kappa = [kappa[cells.label].mean() for cells in lgca.cells_t]
    density = np.bincount(lgca.cells_t[-1].index, minlength=lgca.cell_density[lgca.nonborder].size)
 
+The two identity-based families number their cells differently. With volume
+exclusion, ``lgca.nodes_t`` is an integer array of labels in which 0 marks an
+empty channel, so ``labels = nodes[nodes > 0]`` for ``nodes =
+lgca.nodes_t[t]`` gives the living cells and ``lgca.props["kappa"][labels]``
+their traits. Without volume exclusion, label 0 is a real cell: take the
+labels from ``lgca.cells_t[t].label`` as above, not by filtering ``> 0``.
+
 Dense and sparse recorder results
 ---------------------------------
 
-The default schedule records every step, including step zero, and preserves
-the familiar ``timesteps + 1`` leading dimension. A sparse schedule stores
-only the selected samples. Each array recorder publishes the corresponding
-local step vector:
+The default schedule records every step, including step zero, so the arrays
+keep their first dimension of ``timesteps + 1``. A sparse schedule stores only
+the selected samples. Each array recorder sets an array of the steps it
+recorded, counted from the start of the run:
 
 .. list-table::
    :header-rows: 1
@@ -164,44 +171,44 @@ local step vector:
    * - ``fam_pop_t``
      - ``fam_pop_steps``
 
-Always pair a sparse result with its step vector instead of interpreting its
-row index as simulation time. Both direct ``animate_config``, ``animate_flux``,
-``animate_flow`` and ``animate_density`` methods and the ``animate`` facade use
-the paired recorded times, including nonuniform schedules. Explicit arrays use
-``steps=...`` when supplied and dense indices otherwise. Renderers receive these
-times explicitly and own their title artists.
+Read a sparse result together with its steps: its row index is not the time
+step. The methods ``animate_config``, ``animate_flux``, ``animate_flow`` and
+``animate_density``, and ``lgca.plotting.animate``, use the recorded steps,
+also of irregular schedules. Arrays passed explicitly use ``steps=...`` if it
+is given, and consecutive steps otherwise. Renderers receive these steps and
+draw their own titles.
 
-Density ``channels=...`` selection uses node history and its ``nodes_steps``,
-even if a differently sampled density history also exists. Missing node history
-raises an actionable error. Explicit density arrays are already reduced: select
-their channels before passing them. AnimationObserver captures selected density
-channels directly from each observed state.
+In 1D history plots of sparse recordings, each row is labelled with its time
+step, and the distance between rows counts samples, not time. Property and
+family histories use the recorded steps too.
 
-Square/hexagonal Matplotlib renderers are exercised with configuration, flux,
-flow and density data across classical, identity and NoVE backends. Cubic and
-Moore Mayavi animations use the same resolver and
-label each frame with its recorded time. They open an interactive window and
-return the Mayavi ``Animator``; pass ``show=False`` inside an application that
-already runs a GUI event loop. With the ``plot3d`` extra installed, the test
-suite renders every 3D plot offscreen. Linear models retain their space-time
-plot methods.
+A density of some channels (``channels=...``) is computed from the node
+history and its ``nodes_steps``, even if a density history with other steps
+exists; without a node history, the plot raises an error that says what to
+record. A density array passed explicitly is already summed over the
+channels: select its channels before passing it. ``AnimationObserver`` takes
+the density of the selected channels from each state it observes.
 
-On a compiled model, the operator clock continues across runs while observer
-schedules and callbacks restart at local zero. ``result.metadata['runtime']``
-records ``start_step``, ``end_step`` and ``sample_time_origin='local'``; the CLI
-persists them in ``metadata.json``. Add ``start_step`` to a recorded step vector
-to reconstruct cumulative time, and omit the duplicate shared endpoint when
-joining consecutive histories. Copy each history before the next run replaces
-the arrays. Result metadata is a snapshot and is not changed by later runs.
-Direct runners and ``timeevo`` expose the same offset as
-``lgca.recording_start_step`` (and the endpoint as ``recording_end_step``).
+The Matplotlib renderers of square and hexagonal lattices are tested with
+configuration, flux, flow and density data of classical, identity-based and
+volume-exclusion-free models. Cubic and
+Moore Mayavi animations find their steps the same way and label each frame
+with its recorded step. They open an interactive window and return the Mayavi
+``Animator``; pass ``show=False`` inside an application that already runs a
+GUI event loop. With the ``plot3d`` extra installed, the test suite renders
+every 3D plot offscreen. 1D models keep their space-time plots.
+
+On a compiled model, the step count of the operators continues across runs,
+while observer schedules and callbacks restart at zero.
+:ref:`continuing_a_model` explains how to join the histories of consecutive
+runs.
 
 Plotting module
 ---------------
 
-The :mod:`lgca.plotting` module provides small dispatch helpers and plotting
-observers. The existing geometry-specific plotting methods remain available on
-LGCA instances.
+:mod:`lgca.plotting` provides two small helpers, ``plot`` and ``animate``,
+that call the right method of the model, and the plotting observers. The
+plotting methods of each geometry remain available on the model object.
 
 .. code-block:: python
 
@@ -227,8 +234,8 @@ Figures, panels and animations
 ------------------------------
 
 Each 1D and 2D plot opens a new figure, so consecutive plot calls in a script
-do not draw over each other. An empty current figure is used instead, which
-keeps ``plt.figure(figsize=...)`` followed by a plot call working. To combine
+do not draw over each other. An empty current figure is used instead, so
+``plt.figure(figsize=...)`` followed by a plot call still works. To combine
 plots in one figure, pass the target axes with ``ax=``:
 
 .. code-block:: python
@@ -261,8 +268,8 @@ with the ``ipympl`` package in JupyterLab.
 Snapshot and movie observers
 ----------------------------
 
-Use plotting observers when plot creation should be part of the simulation
-specification instead of a post-processing step.
+Use plotting observers when the plots should be made during the run, as part
+of the model, rather than afterwards.
 
 .. code-block:: python
 
@@ -296,9 +303,9 @@ specification instead of a post-processing step.
    print(snapshots.paths)
    print(movie.animation)
 
-The plotting observers require the optional plotting dependencies and use the
-same backend methods as ``lgca.plot_density()``, ``lgca.animate_density()`` and
-the related geometry-specific helpers. They draw these kinds, on every model
+The plotting observers use the same methods as ``lgca.plot_density()``,
+``lgca.animate_density()`` and the other plotting methods of each geometry;
+3D plots need the ``plot3d`` extra. They draw these kinds, on every model
 family:
 
 .. list-table::
@@ -382,7 +389,7 @@ pixels, set with ``size=(width, height)``. Without ``save_path``, an
 AnimationObserver on a 3D model returns a Mayavi ``Animator`` that plays after
 ``mlab.show()``.
 
-Density/species selection is shared between static plots and animations.
-Square scalar fields use image artists, so large 2D plots do not create one
-Python polygon per lattice site; hexagonal renderers retain geometry-aware
-collections.
+Static plots and animations select densities and species the same way.
+Scalar fields on square lattices are drawn as images, so large plots do not
+create one Python polygon per node; hexagonal lattices keep their collections
+of hexagons.

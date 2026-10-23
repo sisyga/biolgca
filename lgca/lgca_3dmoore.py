@@ -1,6 +1,6 @@
 # biolgca is a Python package for simulating different kinds of lattice-gas
 # cellular automata (LGCA) in the biological context.
-# Copyright (C) 2018-2025 Technische Universität Dresden, Germany.
+# Copyright (C) 2018-2026 Technische Universität Dresden, Germany.
 # The full license notice is found in the file lgca/__init__.py.
 """3D Moore lattice LGCA implementations."""
 
@@ -11,13 +11,7 @@ from lgca.cubic_ext import (
     NoVE_LGCA_Cubic,
     NoVE_IBLGCA_Cubic,
 )
-
-
-_empty_list_array = np.frompyfunc(list, 0, 1)
-
-
-def _get_arr_of_empty_lists(shape):
-    return _empty_list_array(np.empty(shape, dtype=object))
+from lgca.list_utils import get_arr_of_empty_lists
 
 
 class LGCA_3dMoore(LGCA_Cubic):
@@ -137,7 +131,7 @@ class NoVE_IBLGCA_Moore(NoVE_IBLGCA_Cubic, LGCA_3dMoore):
 
     def propagation(self):
         """Move object-list particles through all 26 Moore velocity channels."""
-        newnodes = _get_arr_of_empty_lists(self.nodes.shape)
+        newnodes = get_arr_of_empty_lists(self.nodes.shape)
         newnodes[..., self.velocitychannels :] = self.nodes[..., self.velocitychannels :]
         for k, (dx, dy, dz) in enumerate(self._vels):
             src_x = slice(max(-dx, 0), self.nodes.shape[0] - max(dx, 0))
@@ -148,39 +142,3 @@ class NoVE_IBLGCA_Moore(NoVE_IBLGCA_Cubic, LGCA_3dMoore):
             dst_z = slice(max(dz, 0), self.nodes.shape[2] - max(-dz, 0))
             newnodes[dst_x, dst_y, dst_z, ..., k] = self.nodes[src_x, src_y, src_z, ..., k]
         self.nodes = newnodes
-
-    def _apply_rbc_x(self):
-        for i, (dx, _, _) in enumerate(self._vels):
-            j = self._ref_x[i]
-            if dx == -1:
-                self.nodes[self.r_int, :, :, ..., j] = (
-                    self.nodes[self.r_int, :, :, ..., j] + self.nodes[self.r_int - 1, :, :, ..., i]
-                )
-            elif dx == 1:
-                self.nodes[-self.r_int - 1, :, :, ..., j] = (
-                    self.nodes[-self.r_int - 1, :, :, ..., j] + self.nodes[-self.r_int, :, :, ..., i]
-                )
-
-    def _apply_rbc_y(self):
-        for i, (_, dy, _) in enumerate(self._vels):
-            j = self._ref_y[i]
-            if dy == -1:
-                self.nodes[:, self.r_int, :, ..., j] = (
-                    self.nodes[:, self.r_int, :, ..., j] + self.nodes[:, self.r_int - 1, :, ..., i]
-                )
-            elif dy == 1:
-                self.nodes[:, -self.r_int - 1, :, ..., j] = (
-                    self.nodes[:, -self.r_int - 1, :, ..., j] + self.nodes[:, -self.r_int, :, ..., i]
-                )
-
-    def _apply_rbc_z(self):
-        for i, (_, _, dz) in enumerate(self._vels):
-            j = self._ref_z[i]
-            if dz == -1:
-                self.nodes[:, :, self.r_int, ..., j] = (
-                    self.nodes[:, :, self.r_int, ..., j] + self.nodes[:, :, self.r_int - 1, ..., i]
-                )
-            elif dz == 1:
-                self.nodes[:, :, -self.r_int - 1, ..., j] = (
-                    self.nodes[:, :, -self.r_int - 1, ..., j] + self.nodes[:, :, -self.r_int, ..., i]
-                )

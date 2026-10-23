@@ -31,6 +31,10 @@ _WIDTH = {"field": 0, "reorientation": 1, "phenotype_switch": 2, "birth_death": 
 _KEPT = {"field": 2, "reorientation": 1, "phenotype_switch": 0}
 
 
+class UnknownFieldError(KeyError):
+    """A rule reads a field that the model does not declare in ``StateSpec.fields``."""
+
+
 class ContractWarning(UserWarning):
     """A rule did what its declared kind does not allow, e.g. a reorientation that sets traits.
 
@@ -268,8 +272,17 @@ class LatticeState:
         """
         values = np.asarray(values, dtype=float)
         if values.shape != self._dims:
-            raise ValueError(f"values must have the lattice shape {self._dims}, got {values.shape}")
+            raise ValueError(self._not_lattice_shaped(values.shape))
         return self._lgca.channel_weight(self._pad(values))[self._interior]
+
+    def _not_lattice_shaped(self, shape) -> str:
+        """The message for values that should have one entry per node, with the usual cause."""
+        message = f"values must have the lattice shape {self._dims}, got {shape}"
+        if shape[:len(self._dims)] == self._dims and shape[len(self._dims):] in {
+                (self.n_species,), (self.n_species, self.K)}:
+            message += ("; state.counts has a species axis, dims + (n_species, K) also for one species: "
+                        "sum over it as well, state.counts.sum(axis=(-2, -1)), or use state.density")
+        return message
 
     def gradient(self, values) -> np.ndarray:
         """Gradient of a scalar field in lattice units, shape ``dims + (d,)``.
@@ -287,7 +300,7 @@ class LatticeState:
         else:
             values = np.asarray(values, dtype=float)
             if values.shape != self._dims:
-                raise ValueError(f"values must have the lattice shape {self._dims}, got {values.shape}")
+                raise ValueError(self._not_lattice_shaped(values.shape))
             padded = self._pad(values)
         if padded.shape != np.shape(self._lgca.cell_density)[:len(self._dims)]:
             raise ValueError("gradient needs a scalar field with one value per node")
@@ -333,7 +346,7 @@ class LatticeState:
     def _padded_field(self, name):
         """The field as the model stores it, with ghost nodes, or padded like cells."""
         if not hasattr(self._lgca, name):
-            raise KeyError(f"state.fields.{name} does not exist; declare the field in StateSpec.fields")
+            raise UnknownFieldError(f"state.fields.{name} does not exist; declare the field in StateSpec.fields")
         self.fields_read.add(name)
         values = np.asarray(getattr(self._lgca, name))
         if name in self._fields_written:
@@ -802,8 +815,12 @@ class LatticeState:
         pair = (n_species, n_species)
         if rates.shape not in (pair, self._dims + pair):
             raise ValueError(f"rates must have shape {pair} or {self._dims + pair}, got {rates.shape}")
-        if not np.all(np.isfinite(rates)) or np.any((rates < 0) | (rates > 1)):
-            raise ValueError("rates must contain probabilities between 0 and 1")
+        if not np.all(np.isfinite(rates)):
+            raise ValueError("rates must contain probabilities between 0 and 1, not NaN or infinity (e.g. from "
+                             "a parameter that is NaN)")
+        if np.any((rates < 0) | (rates > 1)):
+            raise ValueError(f"rates must contain probabilities between 0 and 1, got values from "
+                             f"{rates.min():.3g} to {rates.max():.3g}; clip them, np.clip(rates, 0, 1)")
         off_diagonal = rates * (1 - np.eye(n_species))
         leaving = off_diagonal.sum(axis=-1)
         if np.any(leaving > 1 + 1e-12):

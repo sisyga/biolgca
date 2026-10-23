@@ -1,6 +1,6 @@
 # biolgca is a Python package for simulating different kinds of lattice-gas
 # cellular automata (LGCA) in the biological context.
-# Copyright (C) 2018-2025 Technische Universität Dresden, Germany.
+# Copyright (C) 2018-2026 Technische Universität Dresden, Germany.
 # The full license notice is found in the file lgca/__init__.py.
 """
 Classes for two-dimensional LGCA on a square lattice. They specify
@@ -118,10 +118,12 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
 
         # set dimensions to keyword value
         if isinstance(dims, tuple):
-            try:
-                self.lx, self.ly = dims
-            except ValueError:
-                self.lx, self.ly = dims[0], dims[1]
+            if len(dims) != 2:
+                raise ValueError(
+                    f"dims must be (lx, ly) for a 2D lattice, got {dims}; give rest channels with "
+                    "restchannels=..., and use geometry='cubic' for a 3D lattice"
+                )
+            self.lx, self.ly = dims
         elif isinstance(dims, int):
             self.lx, self.ly = dims, dims
         else:
@@ -537,8 +539,8 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
         """
         if nodes is None:
             nodes = self.nodes
-        if nodes.dtype != 'bool':
-            nodes = nodes.astype('bool')
+        # cells per channel; a cast to bool would count a channel of a model without volume exclusion as one cell
+        nodes = self._channel_counts(nodes)
 
         flux = self.calc_flux(nodes)
         # dens = nodes.sum(-1)
@@ -567,8 +569,8 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
         """
         if nodes is None:
             nodes = self.nodes
-        if nodes.dtype != 'bool':
-            nodes = nodes.astype('bool')
+        # cells per channel; a cast to bool would count a channel of a model without volume exclusion as one cell
+        nodes = self._channel_counts(nodes)
 
         flux = self.calc_flux(nodes)
         flux_norm = np.linalg.norm(flux, axis=-1)
@@ -578,6 +580,7 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
         corr = np.divide(corr, flux_norm, where=flux_norm > 1e-6, out=np.zeros_like(corr))
         corr = np.divide(corr, nb_flux_norm, where=nb_flux_norm > 1e-6, out=np.zeros_like(corr))
         return corr
+
 
 def __getattr__(name):
     """Lazily expose square-lattice extension classes."""

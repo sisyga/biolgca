@@ -12,6 +12,7 @@ It is meant as a one-line test::
 from __future__ import annotations
 
 import contextlib
+import os
 import warnings
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -19,6 +20,7 @@ from typing import Any
 
 import numpy as np
 
+from ._warnings import is_user_code
 from .lattice_state import ContractWarning
 
 __all__ = ["ContractWarning", "InteractionCheckError", "InteractionReport", "check_interaction",
@@ -33,7 +35,11 @@ _STEPS = 3
 
 
 class InteractionCheckError(AssertionError):
-    """Raised by :func:`check_interaction` when a check fails; the message is the report."""
+    """Raised by :func:`check_interaction` when a check fails; the message is the report.
+
+    If the rule raised, the first of its errors is the ``__cause__``, with the traceback that leads to
+    the line of the rule.
+    """
 
 
 @contextlib.contextmanager
@@ -95,6 +101,7 @@ def check_interaction(
     expected_growth=None,
     prepare=None,
     traits: Mapping[str, Any] | None = None,
+    fields: Mapping[str, Any] | None = None,
     raise_on_failure: bool = True,
 ) -> InteractionReport:
     """Run an interaction on small models and check what every interaction must do.
@@ -114,17 +121,23 @@ def check_interaction(
       declares it;
     - the same seed gives the same result.
 
+    A reorientation term (:func:`lgca.reorientation_term <lgca.rules.reorientation_term>`) is
+    checked as the one term of a :class:`~lgca.pipeline.ReorientationSpec`, with ``beta`` and its
+    parameters from ``parameters``: as a reorientation, which must give the same result for the same
+    seed.
+
     Parameters
     ----------
-    rule : Interaction or str
-        A rule made with :func:`lgca.interaction <lgca.rules.interaction>`, or the name of a
-        registered interaction.
+    rule : Interaction, ReorientationCue or str
+        A rule made with :func:`lgca.interaction <lgca.rules.interaction>`, a reorientation term, or
+        the name of a registered interaction.
     parameters : mapping, optional
         Parameters of the rule.
     geometries, families, n_species : sequence, optional
         Restrict the models checked. Defaults: what the rule declares, and one
-        and two species (two and three for a phenotype switch; identity-based
-        models have one).
+        and two species (two and three for a classical phenotype switch;
+        identity-based models have one). Raises ``ValueError`` if no model
+        is left to check.
     density : float, optional
         Mean number of cells per node of the random initial states. Default:
         40% of the channels of all species.
@@ -143,6 +156,12 @@ def check_interaction(
     traits : mapping, optional
         Initial cell traits of identity-based models, as in
         ``StateSpec(traits=...)``, for rules that read traits.
+    fields : mapping, optional
+        Fields of the models, as in ``StateSpec(fields=...)``, for rules
+        that read fields with ``state.field``: a number (the same value at
+        every node), or a function of the lattice shape ``dims`` that returns
+        the array, e.g. ``{"oxygen": lambda dims: np.linspace(0, 1, dims[0])}``
+        for a gradient along the first axis (it broadcasts).
     raise_on_failure : bool, default=True
         Raise :class:`InteractionCheckError` if a check fails.
 
@@ -150,16 +169,26 @@ def check_interaction(
     -------
     InteractionReport
     """
+    from .pipeline import ReorientationSpec
     from .plugins import describe_plugin
-    from .rules import Interaction
+    from .rules import Interaction, ReorientationCue
 
-    if isinstance(rule, Interaction):
+    entry = None
+    if isinstance(rule, ReorientationCue):  # a term runs as the one term of a reorientation
+        info = rule.info
+        declared_geometries = tuple(_DIMS)
+        declared = [(family, count) for family in info.backend_families for count in (1, 2)
+                    if family not in _IDENTITY or count == 1]
+        entry = ReorientationSpec(terms=[rule(**dict(parameters or {}))])
+        kind, momentum = "reorientation", False
+    elif isinstance(rule, Interaction):
         info = rule.info
         declared_geometries = rule.geometries
-        species_counts = ((rule.n_species,) if rule.n_species is not None
-                          else (2, 3) if rule.kind == "phenotype_switch" else (1, 2))
-        # identity-based models have one species
-        declared = [(family, count) for family in rule.families for count in species_counts
+        # identity-based models have one species; a classical phenotype is a species, so it needs two
+        declared = [(family, count) for family in rule.families
+                    for count in ((rule.n_species,) if rule.n_species is not None
+                                  else (1,) if family in _IDENTITY
+                                  else (2, 3) if rule.kind == "phenotype_switch" else (1, 2))
                     if family not in _IDENTITY or count == 1]
     else:
         # built-in plugins name their families: "multispecies" means classical with several species
@@ -168,8 +197,10 @@ def check_interaction(
         backends = {"classical": [("classical", 1)], "nove": [("nove", 1)],
                     "multispecies": [("classical", 2)], "ib": [("ib", 1)], "nove_ib": [("nove_ib", 1)]}
         declared = [case for backend in info.backend_families for case in backends.get(backend, [])]
-    kind = info.operator_kind
-    momentum = info.conservation_law.conserves_momentum is True
+    if entry is None:
+        kind = info.operator_kind
+        momentum = info.conservation_law.conserves_momentum is True
+        entry = {"name": info.name, "parameters": dict(parameters or {})}
     geometries = tuple(declared_geometries if geometries is None else geometries)
     models = list(dict.fromkeys(declared))
     if families is not None or n_species is not None:
@@ -178,20 +209,26 @@ def check_interaction(
         n_species = dict.fromkeys(count for _, count in declared) if n_species is None else n_species
         models = [(family, count) for family in families for count in n_species
                   if explicit or family not in _IDENTITY or count == 1]
-    entry = {"name": info.name, "parameters": dict(parameters or {})}
+    if not geometries or not models:  # an empty report would pass without checking anything
+        raise ValueError(f"check_interaction({info.name!r}): no model to check; the rule declares the "
+                         f"families {', '.join(dict.fromkeys(f for f, _ in declared)) or 'none'} with "
+                         f"{', '.join(map(str, dict.fromkeys(c for _, c in declared))) or 'no'} species, "
+                         f"and the geometries {', '.join(declared_geometries) or 'none'}; choose "
+                         "families, n_species and geometries among them")
 
     report = InteractionReport(info.name)
+    errors = []  # the exceptions the rule raised: the first becomes the cause of InteractionCheckError
     for geometry in geometries:
         for family, species in models:
             for boundary in _BOUNDARIES:
                 case = f"{geometry}, {family}, {species} species, {boundary}"
-                setup = _Setup(geometry, family, species, boundary, density, seed, traits=traits)
-                report.rows.append((case, _check_case(entry, setup, kind, momentum, prepare)))
+                setup = _Setup(geometry, family, species, boundary, density, seed, traits=traits, fields=fields)
+                report.rows.append((case, _check_case(entry, setup, kind, momentum, prepare, errors)))
     if expected_growth is not None:
         report.growth = _check_growth(entry, geometries[0], models, density, seed, expected_growth,
-                                      prepare, traits)
+                                      prepare, traits, fields)
     if raise_on_failure and not report.passed:
-        raise InteractionCheckError(str(report))
+        raise InteractionCheckError(str(report)) from (errors[0] if errors else None)
     return report
 
 
@@ -205,6 +242,7 @@ class _Setup:
     seed: int
     large: bool = False
     traits: Any = None
+    fields: Any = None
 
     def spec(self, entry):
         from .model import Description, ModelSpec, SpaceSpec, StateSpec, TimeSpec
@@ -213,12 +251,15 @@ class _Setup:
         channels = _VELOCITIES[self.geometry] + 1
         density = 0.4 * channels * self.n_species if self.density is None else self.density
         dims = (_LARGE_DIMS if self.large else _DIMS)[self.geometry]
+        fields = {name: value(dims) if callable(value) else value for name, value in (self.fields or {}).items()}
+        fields = {name: _field_on(value, dims) for name, value in fields.items()}
+        name = entry["name"] if isinstance(entry, Mapping) else entry.terms[0].name
         return ModelSpec(
-            description=Description(title=f"check {entry['name']}"),
+            description=Description(title=f"check {name}"),
             space=SpaceSpec(geometry=self.geometry, dims=dims, boundary=self.boundary),
             state=StateSpec(density=density, restchannels=1, volume_exclusion=self.family in ("classical", "ib"),
                             identity_based=self.family in _IDENTITY, n_species=self.n_species,
-                            traits=dict(self.traits or {}) if self.family in _IDENTITY else {}),
+                            traits=dict(self.traits or {}) if self.family in _IDENTITY else {}, fields=fields),
             time=TimeSpec(steps=_STEPS, seed=self.seed),
             dynamics=InteractionPipelineSpec(operators=[entry], propagation=False),
         )
@@ -239,18 +280,46 @@ def _build(entry, setup, prepare=None):
     return compiled
 
 
-def _check_case(entry, setup, kind, momentum, prepare) -> list[str]:
+def _check_case(entry, setup, kind, momentum, prepare, errors=None) -> list[str]:
     try:
         with strict_contracts():
             first = _run(entry, setup, kind, momentum, prepare)
             second = _run(entry, setup, kind, momentum, prepare)
     except _Problems as problems:
         return problems.messages
-    except Exception as exc:  # noqa: BLE001 - any error of the rule is reported
-        return [f"{type(exc).__name__}: {exc}"]
+    except Exception as exc:  # noqa: BLE001 - any error of the rule is reported, and kept (see errors)
+        from .cells import UnknownTraitError
+        from .lattice_state import UnknownFieldError
+
+        if errors is not None:
+            errors.append(exc)
+        # the models are check_interaction's: what they lack is given to it, not to a StateSpec
+        hint = ("; give it with check_interaction(..., fields={...})" if isinstance(exc, UnknownFieldError)
+                else "; give it with check_interaction(..., traits={...})" if isinstance(exc, UnknownTraitError)
+                else "")
+        return [f"{type(exc).__name__}: {exc}{_where(exc)}{hint}"]
     if not np.array_equal(first, second):
         return ["the same seed gave different results; draw random numbers only from state.rng"]
     return []
+
+
+def _field_on(value, dims):
+    """A field value on the lattice: a number, an array of shape ``dims``, or a 1-D profile along axis 0."""
+    if np.ndim(value) == 0:
+        return value
+    if np.ndim(value) == 1:  # the docstring's gradient: it runs along the first axis
+        value = np.reshape(value, (-1,) + (1,) * (len(dims) - 1))
+    return np.broadcast_to(value, dims)
+
+
+def _where(exc) -> str:
+    """`` (file:line)`` of the innermost frame of ``exc`` outside lgca, e.g. the line of the rule."""
+    found, tb = None, exc.__traceback__
+    while tb is not None:
+        if is_user_code(tb.tb_frame.f_code.co_filename):
+            found = tb
+        tb = tb.tb_next
+    return "" if found is None else f" ({os.path.basename(found.tb_frame.f_code.co_filename)}:{found.tb_lineno})"
 
 
 class _Problems(Exception):
@@ -367,10 +436,11 @@ def _cells_per_species(lgca, n_species):
     return interior.reshape(-1, n_species, lgca.K).sum(axis=(0, 2))
 
 
-def _check_growth(entry, geometry, models, density, seed, expected, prepare, traits=None) -> list[str]:
+def _check_growth(entry, geometry, models, density, seed, expected, prepare, traits=None, fields=None) -> list[str]:
     problems = []
     for family, species in models:
-        setup = _Setup(geometry, family, species, "periodic", density, seed, large=True, traits=traits)
+        setup = _Setup(geometry, family, species, "periodic", density, seed, large=True, traits=traits,
+                       fields=fields)
         compiled = _build(entry, setup, prepare)
         lgca = compiled.lgca
         lgca.apply_boundaries()

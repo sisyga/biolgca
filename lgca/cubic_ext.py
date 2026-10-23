@@ -1,6 +1,6 @@
 # biolgca is a Python package for simulating different kinds of lattice-gas
 # cellular automata (LGCA) in the biological context.
-# Copyright (C) 2018-2025 Technische Universität Dresden, Germany.
+# Copyright (C) 2018-2026 Technische Universität Dresden, Germany.
 # The full license notice is found in the file lgca/__init__.py.
 """Extended 3D cubic LGCA models.
 
@@ -199,30 +199,6 @@ class NoVE_IBLGCA_Cubic(NoVE_IBLGCA_base, LGCA_Cubic):
         newnodes[:, :, :-1, 5] = self.nodes[:, :, 1:, 5]
 
         self.nodes = newnodes
-
-    def _apply_rbc_x(self):
-        self.nodes[self.r_int, :, :, 0] = (
-            self.nodes[self.r_int, :, :, 0] + self.nodes[self.r_int - 1, :, :, 1]
-        )
-        self.nodes[-self.r_int - 1, :, :, 1] = (
-            self.nodes[-self.r_int - 1, :, :, 1] + self.nodes[-self.r_int, :, :, 0]
-        )
-
-    def _apply_rbc_y(self):
-        self.nodes[:, self.r_int, :, 2] = (
-            self.nodes[:, self.r_int, :, 2] + self.nodes[:, self.r_int - 1, :, 3]
-        )
-        self.nodes[:, -self.r_int - 1, :, 3] = (
-            self.nodes[:, -self.r_int - 1, :, 3] + self.nodes[:, -self.r_int, :, 2]
-        )
-
-    def _apply_rbc_z(self):
-        self.nodes[:, :, self.r_int, 4] = (
-            self.nodes[:, :, self.r_int, 4] + self.nodes[:, :, self.r_int - 1, 5]
-        )
-        self.nodes[:, :, -self.r_int - 1, 5] = (
-            self.nodes[:, :, -self.r_int - 1, 5] + self.nodes[:, :, -self.r_int, 4]
-        )
 
     def _apply_abc_x(self):
         """

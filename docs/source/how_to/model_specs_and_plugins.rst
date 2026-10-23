@@ -1,12 +1,12 @@
 Model specs and interaction plugins
 ===================================
 
-The traditional :func:`lgca.get_lgca` API is still supported. New code can also
-describe a complete simulation with :class:`lgca.model.ModelSpec`, which keeps
-model setup, interaction dynamics, logging and plotting separate. The design is
-inspired by Morpheus-style model declarations: dynamics are named plugins with
-metadata, validation and an explicit execution order, while propagation remains
-the deterministic lattice movement phase.
+The :func:`lgca.get_lgca` API remains supported. New code can also describe
+a complete simulation with :class:`lgca.model.ModelSpec`, which keeps the
+model setup, the dynamics, logging and plotting apart. The design is inspired
+by the model declarations of Morpheus: the dynamics are named plugins with
+metadata, validation and an explicit order of execution, and propagation
+remains the deterministic phase in which cells move on the lattice.
 
 Kinds of interaction and their order
 ------------------------------------
@@ -98,17 +98,17 @@ optional authoring syntax for the same data model; install it with
 * an optional ``state.initializer`` contains a registered initializer name and
   parameters.
 
-Every portable file carries the top-level ``schema_version``. The current
-value is ``1``. Unknown future versions are rejected instead of being guessed
-at. Legacy versionless data is normalized to version 1 before validation.
-Save and archive canonical JSON for reproducibility; YAML is a convenience
-syntax and resolves to the same ModelSpec.
+Every portable file carries the top-level ``schema_version``, currently
+``1``. A file of an unknown, later version is rejected rather than guessed at;
+a file without a version, from earlier releases, is read as version 1 before
+it is validated. For reproducibility, save and archive the canonical JSON;
+YAML is a convenience and gives the same ModelSpec.
 
-Model files never contain Python import paths and never execute arbitrary
-modules. A third-party interaction may be referenced after a trusted Python
-launcher imports and registers it, but standalone model loading resolves only
-plugins shipped with BioLGCA. Custom Python observers remain Python-only and
-raise an actionable portability error if a caller tries to save them.
+Model files never contain Python import paths and never execute modules. A
+model file may name a rule of your own once a trusted Python script has
+imported and registered it; loaded on its own, a model file finds only the
+rules that come with BioLGCA. Observers written in Python stay in Python:
+saving one raises an error that says so.
 
 .. code-block:: python
 
@@ -133,32 +133,106 @@ Model files that use your own rules run from the command line with
 
    $ biolgca run model.json --plugins my_project.rules --output run/
 
-The packaged ``model-spec-v1.schema.json`` is intended for editors and
-development-time validation. Runtime loading uses BioLGCA's dependency-light
-strict parser, so ``jsonschema`` is needed only by contributors and tooling.
+The packaged ``model-spec-v1.schema.json`` is for editors and for validation
+during development. Loading a model uses BioLGCA's own strict parser, so only
+contributors and tools need ``jsonschema``.
+
+Initial conditions
+------------------
+
+:class:`~lgca.model.StateSpec` takes at most one of three initial
+conditions; without any, cells are placed at random with a mean of 0.1 cells
+per node.
+
+``density``
+   The mean number of cells per node, everywhere. With volume exclusion each
+   channel is occupied with probability ``density / K``; without it, channel
+   populations are Poisson distributed.
+
+``initializer``
+   A named initial condition (:func:`lgca.initializers.list_initializers`):
+
+   - ``{"name": "region", "parameters": {"extent": 5, "density": 4}}`` fills
+     a block of ``extent`` nodes per axis (one number, or one per axis) with
+     ``density`` cells per node (default 1) and leaves the rest empty.
+     ``"placement"`` puts the block in the ``"center"`` (default), at the
+     ``"left"`` edge of the first axis, or in the ``"corner"`` at the
+     origin. The region fills all channels of all species at random; for
+     cells in particular channels or of one species, give ``nodes``.
+   - ``{"name": "from_npz", "parameters": {"path": "state.npz", "key":
+     "nodes"}}`` reads a ``nodes`` array (see below) from an NPZ file, found
+     relative to the model file. Not yet for identity-based models.
+
+``nodes``
+   The channels of every node, without ghost nodes:
+
+   .. list-table::
+      :header-rows: 1
+      :widths: 30 30 40
+
+      * - Model
+        - Shape
+        - Values
+      * - classical, volume exclusion
+        - ``dims + (K,)``; ``dims + (n_species, K)`` for several species
+        - 0 or 1 per channel
+      * - classical, no volume exclusion
+        - as above
+        - cells per channel
+      * - identity-based, volume exclusion
+        - ``dims + (K,)``
+        - the label of the cell, 0 for an empty channel; labels start at 1
+      * - identity-based, no volume exclusion
+        - ``dims + (K,)``, one rest channel
+        - cells per channel; the cells get labels from 0
+
+   ``K`` is the number of velocity channels of the geometry plus
+   ``restchannels``; the velocity channels come first. In the two-species
+   go-or-grow model, for example, resting cells are species 1 in the rest
+   channels:
+
+   .. code-block:: python
+
+      import numpy as np
+      from lgca.model import StateSpec
+
+      nodes = np.zeros((60, 60, 2, 12), dtype=int)  # hex: 6 velocity + 6 rest channels
+      nodes[30, 30, 1, 6:] = 1                       # one node of resting cells
+      StateSpec(nodes=nodes, restchannels=6, n_species=2)
+
+``traits`` gives the initial cells of identity-based models their traits, one
+number for all or one per cell in the order of their labels. The two
+identity-based families differ here: with volume exclusion
+label 0 means "empty" and ``lgca.props`` holds an unused entry for it, while
+without volume exclusion label 0 is a real cell. Select living cells by the
+labels found on the lattice, not by ``label > 0``. The
+:class:`~lgca.simulation.NodeRecorder` records the labels in every channel
+(with volume exclusion an integer array, without it a list of labels per
+channel); the traits of the living cells follow as
+``lgca.props[name][labels]``.
 
 Configuration, outputs and checkpoints
 --------------------------------------
 
 A ModelSpec is configuration, not a serialized simulator or trajectory. Keep
-it small enough to review and version-control. Numeric initial channel states
-can live in a companion NPZ file referenced by the ``from_npz`` initializer;
-resource paths are resolved relative to the model file and cannot escape that
-directory unless trusted-path handling is explicitly enabled.
+it small enough to review and to keep under version control. Initial channel
+states can live in an NPZ file next to it, read by the ``from_npz``
+initializer. Such paths are relative to the model file and cannot leave its
+directory unless trusted paths are enabled explicitly.
 
-The command-line runner writes ``model.resolved.json`` and ``metadata.json``
-plus configured observer outputs into an explicit run directory. The resolved
-model records the configuration that was actually compiled, while metadata
-records runtime provenance and the resolved operator schedule. These files do
-not constitute a restart checkpoint. In particular, identity-based particle
-properties are not yet supported by ``from_npz`` and must not be reconstructed
-from labels alone.
+``biolgca run`` writes ``model.resolved.json``, ``metadata.json`` and the
+outputs of the observers into the run directory you name. The resolved model
+is the configuration that was compiled; the metadata hold the provenance of
+the run and the resolved schedule of operators. These files are not a
+checkpoint to restart from: in particular, ``from_npz`` cannot yet read the
+cell traits of identity-based models, and the labels alone do not give them
+back.
 
 Composed dynamics
 -----------------
 
 Composed pipelines make the conservation laws visible. The following example
-uses a multispecies volume-exclusion model with particle turnover, phenotype
+uses a multispecies volume-exclusion model with cell turnover, phenotype
 switching and a reorientation sampler that combines nematic alignment and
 chemotaxis.
 
@@ -285,25 +359,26 @@ registered interaction.
 
    rows = interaction_coverage_table()
 
-Use plugin metadata when building UIs, validation reports or model provenance
-tables.
+Use the plugin metadata to build interfaces, validation reports or
+provenance tables.
 
-See :doc:`custom_interactions` for the supported extension contract, complete
-registration example and conservation guidance. Portable model files resolve
-registered names only; importing third-party Python remains the responsibility
-of a trusted launcher, e.g. ``biolgca run --plugins my_project.rules``.
+:doc:`custom_interactions` explains how to write and register rules, with a
+complete example and the conservation laws they keep. Model files name
+registered rules only; importing your own Python modules is left to a trusted
+launcher, e.g. ``biolgca run --plugins my_project.rules``.
 
-CLI measurement files
----------------------
+What a run saves
+----------------
 
-CLI runs persist numeric recorder outputs in ``measurements.npz`` next to
-``metadata.json``. Array names match the Python attributes: ``nodes_t``,
+``biolgca run`` saves the numeric recordings in ``measurements.npz`` next to
+``metadata.json``, under the names of the Python attributes: ``nodes_t``,
 ``dens_t``, ``n_t``, ``channel_pop_t``, ``velcells_t``, ``restcells_t``,
-``fam_pop_t``, and the four order-parameter arrays. Each includes its paired
-``*_steps`` array (order parameters share ``order_parameter_steps``).
-CSV snapshot and scalar observers continue to write their declared CSV files.
-Identity-based NoVE node histories contain Python lists and are rejected before
-CLI execution; use channel-density or density recording for portable numeric data.
+``fam_pop_t``, and the four order-parameter arrays. Each comes with its
+``*_steps`` array (the order parameters share ``order_parameter_steps``).
+CSV snapshot and scalar observers write their own CSV files. Node histories
+of identity-based models without volume exclusion hold Python lists, so the
+command line rejects them before the run; record the channel density or the
+density instead.
 
 .. code-block:: python
 
@@ -315,42 +390,53 @@ CLI execution; use channel-density or density recording for portable numeric dat
    plt.xlabel("Simulation step")
    plt.ylabel("Population")
 
-Sparse 1D history images label actual times on sample rows; distances between rows
-represent samples, not elapsed time. Property/family histories and the
-``lgca.plotting.animate(..., steps=...)`` facade use paired simulation times.
-Explicit history data defaults to dense times when ``steps`` is omitted.
+Plots of sparse recordings use these step arrays (see
+:doc:`observers_and_plotting`).
 
-The CLI archives a portable ``model.resolved.json`` with relative observer paths,
-and its large arrays in ``model.resolved.arrays.npz``.
-NPZ initializer inputs are copied to ``resources/initial_state.npz`` before the
-run, which reads the copy, and the archived declaration points there. Move the
-whole run directory together, then validate or rerun its model into a new
-output directory without ``--trusted-paths``.
+The command line archives the model as ``model.resolved.json``, with relative
+observer paths, and its large arrays in ``model.resolved.arrays.npz``. It
+copies the NPZ input of an initializer to ``resources/initial_state.npz``
+before the run, runs from the copy, and points the archived model to it. Move
+the run directory as a whole; its model can then be validated or rerun into a
+new output directory without ``--trusted-paths``.
 
 ``metadata["provenance"]`` of every model (and ``metadata.json``) records where
 a result came from: the versions of Python and the packages, the platform, the
 operators with their parameters including defaults, the SHA-256 hashes of the
 source code of every rule, term and reaction the model runs (rules change more
-often than versions), and of the files it read. The CLI adds the hash of the
-model file, the git commit of BioLGCA when it runs from a checkout, and the
-hashes of the archived files: ``biolgca run`` and ``biolgca validate`` warn when
-an archived model has changed since the run that wrote it, as its results then
-belong to another model. Likewise a model file records a hash of every array
+often than versions), and of the files it read. The command line adds the hash
+of the model file, the git commit of BioLGCA when it runs from a checkout, and
+the hashes of the archived files. ``biolgca run`` and ``biolgca validate`` warn
+when an archived model has changed since the run that wrote it, as its results
+then belong to another model. Likewise a model file records a hash of every array
 in its array file and warns when it is loaded after the array file changed,
 e.g. because a ``model.yaml`` saved next to ``model.json`` wrote its own
 arrays to the shared ``model.arrays.npz``.
 
-Objects returned by ``build_model`` and ``run_model`` retain their compiled
-dynamics. Their ``lgca.timestep()``, ``lgca.timeevo(...)`` and live animations
-advance that same pipeline, preserving RNG state and cumulative operator time.
-``compiled.step()`` advances one step. Each recording run still starts its
-observer schedule at local step zero and replaces that run's history arrays.
-The cumulative interval is recorded as ``runtime.start_step`` and
-``runtime.end_step`` in result/CLI metadata, with ``sample_time_origin='local'``.
-Add the start step to each paired recorder step array to combine continuations;
-drop the duplicate shared endpoint. A result's metadata remains a snapshot after
-subsequent runs. Direct runners publish ``lgca.recording_start_step`` and
-``lgca.recording_end_step`` for the same purpose.
+.. _continuing_a_model:
+
+Running a compiled model again
+------------------------------
+
+A model returned by ``build_model`` or ``run_model`` keeps its compiled
+dynamics: ``lgca.timestep()``, ``lgca.timeevo(...)`` and live animations
+advance the same pipeline and keep its random state and the accumulated
+timings of its operators. ``compiled.step()`` advances one step.
+
+The step count of the operators continues across runs, but each run that
+records starts the schedules of its observers and callbacks at step zero
+again and replaces the history arrays of the previous run: copy a history
+before the next run if you need it. The metadata of the result record the
+steps the run covered as ``runtime.start_step`` and ``runtime.end_step``, with
+``sample_time_origin='local'``; the command line saves them in
+``metadata.json``. The metadata of a result do not change when the model runs
+on. ``lgca.recording_start_step`` and ``lgca.recording_end_step`` hold the
+same values, also after ``timeevo`` or a
+:class:`~lgca.simulation.SimulationRunner` used directly.
+
+To count steps from the start of the model, add the start step to a recorded
+step array. To join the histories of consecutive runs, also drop the endpoint
+the two runs share.
 
 Between runs, ``compiled.reconfigure({"birth_rate": 0.3})`` changes the
 dynamics of the running model, e.g. a rate after a burn-in, as the sliders of
@@ -361,25 +447,31 @@ and ``compiled.initial_spec`` keeps the spec the model was built from, so the
 run can be repeated. A step that raises is rolled back: the model is then as
 before the step and can go on, e.g. after a reconfiguration.
 
+Crowding scale
+--------------
+
 ``state.capacity`` supplies the crowding scale of the rules: the carrying
 capacity of models without volume exclusion and, with volume exclusion, an
 optional soft limit on all cells of a node in addition to the channels. An
-operator capacity that conflicts with it is rejected. VE channel occupancy
-remains limited by ``K`` per species. Metadata records ``channel_capacity``
-separately from per-operator ``growth_capacities``; with one ``birth_death``
-operator, ``capacity`` reports the capacity it uses.
+operator capacity that conflicts with it is rejected. With volume exclusion,
+a node still holds at most ``K`` cells per species. The metadata record
+the number of channels as ``channel_capacity``, apart from the capacities of
+the growth operators, ``growth_capacities``; with one ``birth_death``
+operator, ``capacity`` is the one it uses.
 
 Recording and temporary-memory budgets
 --------------------------------------
 
-``lgca.simulation.estimate_recording_bytes(lgca, timesteps, observers)`` reports
-fixed numeric buffers and sample-time arrays before allocation. Runners reject
-estimates above 512 MiB before observer setup. Reduce the horizon, use
-``Schedule(every=...)`` or explicit sample steps, select a smaller density dtype,
-or stream snapshots with ``CSVSnapshotObserver``. No samples are silently dropped.
-For a deliberate larger allocation, use
-``compiled.run(max_recording_bytes=your_budget)`` or the same keyword on
-``SimulationRunner``; ``None`` disables this guard.
+``lgca.simulation.estimate_recording_bytes(lgca, timesteps, observers)``
+estimates the memory the recordings need (their numeric buffers and arrays
+of sample times) before any of it is allocated. A run whose estimate exceeds
+512 MiB is rejected before its observers are set up. To fit, shorten the run,
+record less often (``Schedule(every=...)`` or explicit sample steps), choose a
+smaller dtype for densities, or write snapshots to files with
+``CSVSnapshotObserver``; no sample is dropped silently. To allow more
+memory on purpose, pass ``compiled.run(max_recording_bytes=your_budget)`` or
+the same keyword to ``SimulationRunner``; ``None`` turns the check off.
 
-The estimate is a lower bound: Python sample-index maps, object/list payloads,
-dynamically growing family histories, model state and renderer buffers cost extra.
+The estimate is a lower bound: Python maps of sample indices, object and list
+payloads, family histories that grow during the run, the model state and the
+buffers of renderers cost extra.

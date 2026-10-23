@@ -31,9 +31,9 @@ the 30 September review are done, apart from the items below:
 
 - PyPI release with a trusted-publishing workflow, versions from git tags.
 - Zenodo integration for a DOI per release.
-- At the merge to `master`: in the tutorial notebooks, replace `aidevelop` by
-  `master` in the Colab badges and the install cell; after a PyPI release,
-  install `biolgca` from PyPI there.
+- After a PyPI release, install `biolgca` from PyPI in the install cell of
+  the notebooks (since the 2026-10-23 merge into `master`, their Colab badges
+  and install cells point at `master`).
 - Check `lgca.explore` by hand in Colab and VS Code (so far only in a Jupyter
   kernel through nbclient).
 
@@ -66,7 +66,29 @@ the 30 September review are done, apart from the items below:
   transaction, an NPZ checkpoint of identity-based states, the Explorer's
   trial step as a rolled-back step instead of a deep copy.
 
+### From the AI-coding audit (2026-10-22)
+
+- `ModelSpec` with explicit `nodes`: check the channel count against the
+  geometry and `restchannels` before building (now the nodes win silently).
+- A warning category of its own for setup adjustments that keep results
+  correct (the NoVE-IB rest channel), so tests can make it strict.
+- One table of geometry aliases: `get_lgca` keeps its own copy of
+  `model._GEOMETRY_ALIASES`.
+- A `TraitRecorder` for trait values or summaries per recorded step.
+- JOSS: a Zenodo DOI (the maintainer enables Zenodo and creates the
+  release).
+
 ## Decisions that hold
+
+- Relative density is the cells at a node over `state.capacity` for the
+  density cue, `resting` and `go_or_rest`; only `go_or_grow.switch` uses K
+  with volume exclusion and no `StateSpec.capacity`, because its two species
+  share the node's channels (2026-10-23).
+
+- The sole author of the software (CITATION.cff, pyproject, the JOSS paper)
+  is Simon Syga; earlier contributors are named in the README's
+  Acknowledgements, @Franzi2729 among them, whose thesis code (2019–2020) is
+  legacy and stays off `master`, in the `archive/franzi` tag.
 
 - `get_lgca` is the quick start and runs the standard models (tutorials 1 and
   2); `ModelSpec` follows from tutorial 3. `get_lgca` gets no new names.

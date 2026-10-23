@@ -4,7 +4,7 @@ Built-in interactions
 =====================
 
 Interactions are the local update of a time step, applied before
-propagation. They are rules of the lattice state with a name, parameters and
+propagation. Each is a rule of the lattice state with a name, parameters and
 a kind: ``reorientation`` rearranges the cells of a node over its channels,
 ``birth_death`` changes the number of cells, and ``phenotype_switch`` moves
 cells between species (see :doc:`/concepts/interactions`). A
@@ -27,8 +27,8 @@ cells between species (see :doc:`/concepts/interactions`). A
    result = run_model(spec, showprogress=False)
 
 The rules work in every model family (classical or identity-based, with or
-without volume exclusion, one or several species) unless stated otherwise;
-a rule that does not support a model says so when the model is built. With
+without volume exclusion, one or several species) unless stated otherwise.
+A rule that does not support a model says so when the model is built. With
 several species, ``species`` chooses the species a rule acts on and
 ``sensed_species`` the species a cue senses (see
 :doc:`/concepts/interactions`, "Species").
@@ -96,9 +96,9 @@ Interaction names of get_lgca
 
 ``get_lgca(interaction=name, **parameters)`` accepts the interaction names of
 earlier versions of BioLGCA, with their parameters and defaults. Each runs a
-stack of the rules above (:mod:`lgca.legacy_names`), so seeded runs give other
-numbers than earlier versions, while the dynamics agree in distribution
-(``tests/legacy_names_test.py``):
+stack of the rules above (:mod:`lgca.legacy_names`). Seeded runs therefore give
+different numbers from earlier versions, but the dynamics agree in
+distribution (``tests/legacy_names_test.py``):
 
 .. code-block:: python
 
@@ -194,10 +194,11 @@ example. Such a function runs as it is, without the checks of the rules, and
 a model with it cannot be saved as a model file.
 
 For reusable rules, write a function of the lattice state and decorate it
-with :func:`lgca.interaction <lgca.rules.interaction>`, or with :func:`lgca.reorientation_term <lgca.rules.reorientation_term>` for a
-cue of the Boltzmann reorientation. The rule gets a name for model files,
-works with and without volume exclusion and for any number of species, and is
-checked against the conservation law of its kind;
+with :func:`lgca.interaction <lgca.rules.interaction>`, or with
+:func:`lgca.reorientation_term <lgca.rules.reorientation_term>` for a cue of
+the Boltzmann reorientation. The rule gets a name for model files, works with
+and without volume exclusion and for any number of species, and is checked
+against the conservation law of its kind.
 :func:`lgca.testing.check_interaction` tests it on every lattice and family it
 supports. :doc:`/how_to/custom_interactions` shows examples, and
 :mod:`lgca.builtin_rules` contains the built-in rules written this way.

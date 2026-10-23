@@ -3,15 +3,15 @@ Tutorials
 
 These notebooks form the maintained learning path. They start with a complete
 LGCA model and progress through collective movement, combined cues, population
-dynamics, evolution and a reproducible student project, and on to models in
-which cells and the molecules around them act on each other: growth limited
-by oxygen and aggregation toward a signal the cells secrete. Lessons 1 and 2 use
+dynamics, evolution and a reproducible student project. In the last two
+lessons, cells and the molecules around them act on each other: growth limited
+by oxygen, and aggregation toward a signal the cells secrete. Lessons 1 and 2 use
 standard models built by name with ``get_lgca``; from lesson 3 on, every model
 is written out as a ``ModelSpec`` in visible notebook cells, so that you can
 copy it, change it and sweep its parameters.
 
-Run the lessons in order the first time. Each later notebook can also serve as
-an independent project starting point.
+Run the lessons in order the first time. Afterwards, each notebook can serve
+as the starting point of a project of your own.
 
 Every lesson also runs in Google Colab without installing anything: the
 "Open in Colab" badge at its top opens it there, and its first cell installs

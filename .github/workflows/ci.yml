@@ -4,13 +4,11 @@ on:
   push:
     branches:
       - master
-      - aidevelop
-      - kio/development
+      - develop
   pull_request:
     branches:
       - master
-      - aidevelop
-      - kio/development
+      - develop
 
 jobs:
   tests:
@@ -29,7 +27,7 @@ jobs:
       - name: Install locked project and development dependencies
         run: uv sync --locked
       - name: Run tests
-        run: uv run --no-sync python -m pytest -q
+        run: uv run --no-sync python -m pytest -q --run-slow
 
   platforms:
     name: Tests (${{ matrix.os }}, Python 3.13)
@@ -49,7 +47,7 @@ jobs:
       - name: Install locked project and development dependencies
         run: uv sync --locked
       - name: Run tests
-        run: uv run --no-sync python -m pytest -q
+        run: uv run --no-sync python -m pytest -q --run-slow
       - name: Command line, including a sweep in worker processes
         shell: bash
         run: |
@@ -74,7 +72,7 @@ jobs:
         run: uv sync --locked
       - name: Run tests in random order
         # the seed is printed: repeat a failure with -p randomly --randomly-seed=<seed>
-        run: uv run --no-sync --with pytest-randomly==5.0.0 python -m pytest -q -p randomly
+        run: uv run --no-sync --with pytest-randomly==5.0.0 python -m pytest -q --run-slow -p randomly
 
   lowest-versions:
     name: Tests (Python 3.11, minimum dependency versions)
@@ -91,7 +89,7 @@ jobs:
           uv pip install --resolution lowest-direct -e ".[yaml]" --group test
           uv pip install nbclient ipykernel
       - name: Run tests
-        run: uv run --no-sync python -m pytest -q
+        run: uv run --no-sync python -m pytest -q --run-slow
       - name: Execute tutorial, zoo and example notebooks
         working-directory: docs/source
         run: |

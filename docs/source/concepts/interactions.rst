@@ -26,14 +26,15 @@ Every interaction is one of three kinds, defined by what it keeps:
    numbers is a reorientation, including deterministic ones such as the HPP
    collision rule, and moving cells between velocity and rest channels.
 
-Rules written with :func:`lgca.interaction <lgca.rules.interaction>` declare their kind and are checked
-against it after every step; see :doc:`/how_to/custom_interactions`.
+Rules written with :func:`lgca.interaction <lgca.rules.interaction>` declare
+their kind and are checked against it after every step; see
+:doc:`/how_to/custom_interactions`.
 
 Species
 -------
 
-Classical models can have several species, e.g. two cell types. With volume exclusion, each channel holds at
-most one cell of each species. Rules see the channel states as an array of
+Classical models can have several species, e.g. two cell types. With volume
+exclusion, each channel holds at most one cell of each species. Rules see the channel states as an array of
 shape ``dims + (n_species, K)``, also when there is only one species, so the
 same rule works for one and for several species. Arrays of single-species
 models keep their shape ``dims + (K,)`` outside the rules, in ``lgca.nodes``,
@@ -61,11 +62,18 @@ following a signal and species 1 aligning with its own kind:
    ]
 
 A single cue is a ``ReorientationSpec`` with that one term, so the same
-model is ``ReorientationSpec(terms=[ReorientationTermSpec("chemotaxis", beta=1.0,
-species=0, parameters={"field": "signal"}), ReorientationTermSpec("polar_alignment",
-beta=2.0, species=1, sensed_species=1)])``. The two forms agree when each cue
-senses only the species it moves; a cue that senses other species sees them
-after the operators before it (see `Order`_).
+model can be written as one reorientation:
+
+.. code-block:: python
+
+   ReorientationSpec(terms=[
+       ReorientationTermSpec("chemotaxis", beta=1.0, species=0, parameters={"field": "signal"}),
+       ReorientationTermSpec("polar_alignment", beta=2.0, species=1, sensed_species=1),
+   ])
+
+The two forms agree when each cue senses only the species it moves; a cue
+that senses other species sees them after the operators before it (see
+`Order`_).
 
 Order
 -----
@@ -73,11 +81,11 @@ Order
 The pipeline applies the interactions in the order of
 ``InteractionPipelineSpec.operators``, followed by propagation. The order is
 part of the model: division before reorientation is a different model from
-reorientation before division, and the classical go-or-grow model is the
-sequence ``go_or_rest`` (cells move between velocity and rest channels),
-``go_or_grow.growth`` (death, division of resting cells) and
-``random_walk`` over the velocity channels. The run metadata
-records the schedule as ``result.metadata["schedule"]``.
+reorientation before division. The classical go-or-grow model, for example, is
+the sequence ``go_or_rest`` (cells move between velocity and rest channels),
+``go_or_grow.growth`` (death, division of resting cells) and ``random_walk``
+over the velocity channels. The run metadata records the schedule as
+``result.metadata["schedule"]``.
 
 Each operator sees the state that the previous one left. A cue computed
 from the cells, such as ``aggregation`` or ``steric_repulsion``, therefore
@@ -94,9 +102,10 @@ Resting as a reorientation
 ``go_or_rest`` puts every cell in a rest channel with a probability ``p``
 and in a velocity channel otherwise; a random walk over the velocity channels
 then turns the moving cells. ``p`` is a switching probability
-(:mod:`lgca.switching`), by default the go-or-grow switch of the density,
-for which ``kappa`` and ``theta`` are a short form; cells that stop where a
-field is scarce, for example:
+(:mod:`lgca.switching`). By default it is the go-or-grow switch of the
+density, for which ``kappa`` and ``theta`` are a short form; any other
+response to cues works too, for example cells that stop where a field is
+scarce:
 
 .. code-block:: python
 
@@ -205,16 +214,20 @@ cell's surroundings, in the form of the go-or-grow switch:
 is ``p = max * (1 + tanh(Σ_k kappa_k (c_k - theta_k))) / 2``, with ``c_k``
 the value of cue ``k`` at the cell's node: half the maximal probability where
 the weighted cues balance their thresholds, more where cues with positive
-``kappa`` are large. The cues are the relative ``density`` (of the node or its
-neighbourhood), the value and the ``gradient`` of a ``field``, and the
-``flux`` of the cells, each for all species or the ``sensed_species``; in
-identity-based models ``kappa`` and ``theta`` may name traits (every cell with
-its own sensitivity) and ``{"name": "trait", "trait": "age"}`` is a cue per
-cell. :func:`lgca.switch_cue` registers cues of your own, functions of the
-lattice state with a value per node. With volume exclusion, a switch into
-another species succeeds only if the channel it lands in is free, which
-lowers the realised rate (see below). Migrating cells (species 0) that turn
-resting (species 1) in crowded nodes and return at a constant rate:
+``kappa`` are large.
+
+The cues are the relative ``density`` (of the node or its neighbourhood), the
+value and the ``gradient`` of a ``field``, and the ``flux`` of the cells, each
+for all species or the ``sensed_species``. In identity-based models ``kappa``
+and ``theta`` may name traits (every cell with its own sensitivity), and
+``{"name": "trait", "trait": "age"}`` is a cue per cell.
+:func:`lgca.switch_cue` registers cues of your own, functions of the lattice
+state with a value per node.
+
+With volume exclusion, a switch into another species succeeds only if the
+channel it lands in is free, which lowers the realised rate (see below).
+Migrating cells (species 0) that turn resting (species 1) in crowded nodes
+and return at a constant rate:
 
 .. code-block:: python
 
@@ -234,9 +247,11 @@ is the weight ``w = rate * exp(Σ_k beta_k c_k)``, where staying has weight 1.
 A single switch, an event of ``trait_switch`` or of a mutation, happens with
 probability ``w / (1 + w)``. A cell of species ``a`` that may become one of
 several species chooses among them and staying: it becomes ``b`` with
-probability ``w_ab / (1 + Σ_b' w_ab')``. ``rate`` is the weight where all cues
-are 0; while the weights are small it is about the probability of the
-switch, and ``beta_k`` says how strongly cue ``k`` favours the switch. The
+probability ``w_ab / (1 + Σ_b' w_ab')``.
+
+``rate`` is the weight where all cues are 0; while the weights are small it is
+about the probability of the switch, and ``beta_k`` says how strongly cue
+``k`` favours the switch. The
 weights of a row need no bound, since switching to one species takes
 probability from the others. Every switch of a row is written in the same form
 (or is 0). Species 0 that turns into species 1 in crowded nodes and into
@@ -281,9 +296,9 @@ Switching traits
 
 Cells of identity-based models can change their traits at any time, not only
 when they divide: ``trait_switch`` applies events written as mutations to all
-living cells. Every step each cell has an event with its probability, which
-changes its traits by the effects; the operation ``"set"`` switches a trait
-to a value. A cell that starts to align with probability 0.02 per step, for a
+living cells. In every step, each event happens to a cell with its
+probability and changes the cell's traits by its effects; the operation
+``"set"`` switches a trait to a value. A cell that starts to align with probability 0.02 per step, for a
 cue scaled by the trait (``ReorientationTermSpec(..., trait="alignment")``):
 
 .. code-block:: python
@@ -293,9 +308,9 @@ cue scaled by the trait (``ReorientationTermSpec(..., trait="alignment")``):
 
 A change of random size, e.g. ``{"alignment": {"distribution": "normal",
 "scale": 0.1, "bounds": [0, None]}}``, makes the strength drift. Two states
-that switch with their own rates, ``k_on`` from 0 to 2 and ``k_off`` back,
-are two events, each for the cells in one state (``"when"``), and a rate may
-respond to cues, e.g. cells that start to align in crowded nodes:
+that switch at their own rates, ``k_on`` from 0 to 2 and ``k_off`` back, are
+two events, each for the cells in one state (``"when"``). A rate may respond
+to cues; here cells start to align in crowded nodes:
 
 .. code-block:: python
 
@@ -312,11 +327,11 @@ respond to cues, e.g. cells that start to align in crowded nodes:
 Combining directional cues
 --------------------------
 
-Directional cues such as alignment and chemotaxis should normally be expressed
-as multiple :class:`lgca.pipeline.ReorientationTermSpec` objects inside one
-:class:`lgca.pipeline.ReorientationSpec`. Their weighted scores are added, and
-the sampler performs **one sampled reorientation transition** of the complete
-channel state.
+Combine directional cues such as alignment and chemotaxis as several
+:class:`lgca.pipeline.ReorientationTermSpec` objects in one
+:class:`lgca.pipeline.ReorientationSpec`. Their weighted scores add up, and
+the sampler makes **one** stochastic transition of the complete channel
+state.
 
 A single cue does not need the spec: every term in the table below is also
 an operator of its own, e.g. ``{"name": "chemotaxis", "parameters": {"beta":
@@ -324,11 +339,10 @@ an operator of its own, e.g. ``{"name": "chemotaxis", "parameters": {"beta":
 one term and works in every model family. ``random_walk`` moves cells to
 uniformly random channels (``channels`` and ``species`` restrict it).
 
-This is different from a **sequential pipeline** containing two full
-reorientation operators. Sequential operators perform two stochastic state
-transitions; the second does not simply add a bias to the first. Use sequential
-pipeline operators for different biological phases, not for combining energy
-terms that should compete in one decision.
+A **sequential pipeline** of two reorientation operators is a different
+model: it makes two stochastic transitions, and the second does not simply
+add a bias to the first. Use sequential operators for different biological
+phases, not for terms that should compete in one decision.
 
 How the cues are sampled
 ------------------------
@@ -422,6 +436,16 @@ coupling that turns it into a score; new terms are written the same way with
      - ``∇f · J(s')``: up the gradient of a field.
      - flux
      - ``parameters={"field": name}``
+   * - ``directed_motion``
+     - ``g · J(s')``: along a given vector field ``g``, e.g. a flow; its
+       length sets the strength together with ``beta``.
+     - flux
+     - ``parameters={"field": name}``, a field of shape ``dims + (d,)``
+   * - ``steric_repulsion``
+     - Minus the number of cells at the node channel ``i`` points to: cells
+       avoid crowded neighbours.
+     - channels
+     - cell density
    * - ``contact_guidance``
      - ``(n · c_i)² - |c_i|² / d`` for a cell in channel ``i``, with the unit
        director ``n``: along a director field.
@@ -443,17 +467,19 @@ field such as the chemotaxis signal keeps the ghost values stored with it,
 which repeat its edge values unless you set them, so a linear ramp has half
 its slope across the edge.
 
-Named chemotaxis and contact-guidance fields are read from their current padded
-``lgca.<field_name>`` arrays once before each reorientation operator. Update their
-physical sites via ``field[lgca.nonborder]`` between steps or in a preceding custom
-operator. Derived gradients and normalized directors refresh once per operator,
-not per site. Contact guidance is nematic: negating a director preserves its axis;
-rotating that axis changes the cue.
+Each reorientation operator reads named chemotaxis and contact-guidance
+fields once, at its start, from their current arrays ``lgca.<field_name>``
+(with ghost nodes). Change their values on the lattice through ``field[lgca.nonborder]``,
+between steps or in a custom operator listed before. Gradients and normalized
+directors are computed once per operator, not per node. Contact guidance is
+nematic: negating a director keeps its axis; rotating the axis changes the
+cue.
 
-Periodic hexagonal evolution requires an even number of rows so opposite-channel
-transport is reciprocal across the seam. Odd-row models can be constructed for
-static plotting, but stepping (including direct propagation) rejects them before
-state or random-number changes.
+A periodic hexagonal lattice needs an even number of rows to step: only then
+does a cell that crosses the seam along one channel return to its starting
+node when it moves back along the opposite channel. A model with an odd number
+of rows can be built and plotted, but stepping it (propagation alone included)
+raises an error before the state or the random numbers change.
 
 Phenotype switching with volume exclusion
 -----------------------------------------
@@ -465,11 +491,11 @@ to switch on its own: a switching cell picks a random channel of its new
 species at the node, in the set ``channels`` (all channels by default), and
 the switch fails if that channel is occupied. A cell switching with
 probability ``p`` into a species with ``n`` cells in ``C`` channels thus
-switches with probability ``p (1 - n / C)``, as a cell that divides into a
-random neighbouring site of a lattice model.
+switches with probability ``p (1 - n / C)``, as does a cell that divides into
+a random neighbouring site in lattice models.
 
 - Cells that switch into the same species at a node pick distinct channels,
-  as daughters do, so they never collide. If they are more than the channels,
+  as daughters do, so they never collide. If they outnumber the channels,
   those that pick one are chosen at random and the others fail.
 - Occupancy is judged at the start of the step: a channel vacated by a cell
   that switches away is free only in the next step. Two cells of different
@@ -484,11 +510,12 @@ switch succeeds, and a switched cell goes to a random channel of the set.
 Polar versus nematic composition
 --------------------------------
 
-``polar_alignment`` scores candidate flux dotted with the sum of neighboring
-fluxes. Opposite headings cancel. ``nematic_alignment`` instead sums squared
-velocity dot products, weighted by numeric neighboring channel counts; opposite
-headings reinforce the same axis. Both can be combined with the other cues.
-The ``alignment`` interaction of ``get_lgca`` is polar.
+``polar_alignment`` scores the dot product of a candidate state's flux with
+the sum of the neighbours' fluxes, so opposite headings cancel. ``nematic_alignment``
+instead sums squared dot products of velocities, weighted by the numbers of
+cells in the neighbours' channels, so opposite headings reinforce the same
+axis. Both can be combined with the other cues. The ``alignment`` interaction
+of ``get_lgca`` is polar.
 
 The axis cues compare traceless tensors ``c cᵀ - |c|² I / d`` (``d`` the
 spatial dimension): a cell moving along the axis scores above a resting cell,
@@ -498,8 +525,8 @@ making them rest or move more. In 2D these are the tensors of the
 ``nematic`` and ``contact_guidance`` interactions of earlier versions; in 1D
 there is only one axis and the cues have no effect.
 
-For compatibility, existing composed ``alignment`` declarations retain nematic
-semantics and emit a deprecation warning. Replace that alias with
-``nematic_alignment`` to preserve an old model, or explicitly choose
-``polar_alignment`` when directed collective motion is intended. Tutorial 3
-uses the explicit nematic name; this differs from tutorial 2's polar mechanism.
+As a term of a ``ReorientationSpec``, ``alignment`` remains an alias of
+``nematic_alignment`` for compatibility and warns that it is deprecated. To
+keep an old model, replace it with ``nematic_alignment``; for directed
+collective motion, choose ``polar_alignment``. Tutorial 3 uses the nematic
+term by its full name, tutorial 2 the polar one.

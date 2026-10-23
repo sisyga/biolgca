@@ -1,6 +1,6 @@
 # biolgca is a Python package for simulating different kinds of lattice-gas
 # cellular automata (LGCA) in the biological context.
-# Copyright (C) 2018-2025 Technische Universität Dresden, Germany.
+# Copyright (C) 2018-2026 Technische Universität Dresden, Germany.
 # The full license notice is found in the file lgca/__init__.py.
 """Extensions to the base LGCA classes.
 
@@ -284,8 +284,10 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
                             raise ValueError("nodes particle IDs must be unique on the physical lattice")
                         seen.add(int(label))
         if restchannels != 1:
+            warn_user(f"identity-based models without volume exclusion have one rest channel, which holds any "
+                      f"number of cells; restchannels={restchannels} runs with restchannels=1 (pass "
+                      "restchannels=1 to silence this warning)")
             restchannels = 1
-            warn_user("There can only be one rest channel in this LGCA class. Setting to 1 to prevent issues")
         self.set_dims(dims=dims, restchannels=restchannels, nodes=nodes, capacity=kwargs.get("capacity"))
         self._validate_model_setup(nodes=nodes)
         if nodes is None:
@@ -398,15 +400,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         Return array of property "propname" on every node, given the lattice configuration "nodes" and the property
         dictionary "props".
         """
-        if nodes is None:
-            nodes = self.nodes[self.nonborder]
-
-        if props is None:
-            props = self.props
-
-        if propname is None:
-            propname = next(iter(self.props))
-
+        nodes, props, propname = self._prop_arguments(nodes, props, propname)
         prop = np.array(props[propname])
         proparray = prop[_flatten_ids(nodes)]
         return proparray
@@ -416,6 +410,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         Calculate the mean value of a property "propname" on every node, given the node configuration "nodes" and
         the properties "props"
         """
+        nodes, props, propname = self._prop_arguments(nodes, props, propname)
         cells = nodes.sum(-1)
         mean_prop = np.ma.masked_all(cells.shape)
         proparray = np.array(props[propname])
@@ -437,15 +432,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
             nodes_t = self.nodes_t
         if props is None:
             props = self.props
-        tmax = nodes_t.shape[0]
         for key in props:
-            self.mean_prop_t[key] = np.ma.masked_all((tmax, *self.dims))
-            # self.mean_prop_vel_t[key] = np.zeros([tmax,l])
-            # self.mean_prop_rest_t[key] = np.zeros([tmax,l])
             self.mean_prop_t[key] = self.calc_prop_mean(propname=key, props=props, nodes=nodes_t)
-            # self.mean_prop_vel_t[key][t] = self.calc_prop_mean(propname=key, props=props, nodes=nodes_t[t][...,0:(self.K-1)])
-            # self.mean_prop_rest_t[key][t] = self.calc_prop_mean(propname=key, props=props, nodes=nodes_t[t][...,(self.K-1):])
-
         return self.mean_prop_t
 
 

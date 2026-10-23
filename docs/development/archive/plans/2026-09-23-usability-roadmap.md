@@ -2,7 +2,7 @@
 
 > Archived on 2026-10-01: phases 0 to 4 are done or deferred; this is the full plan with its status notes. Open items moved to the [roadmap](../../roadmap.md); kept for reference.
 
-Status: draft, 2026-09-23. Written after a usability review of the `aidevelop`
+Status: draft, 2026-09-23. Written after a usability review of the `develop`
 branch from the point of view of a Master's or early PhD student who wants to
 implement a new interaction and study it, and of a teacher who uses BioLGCA in
 a course. The goal is a tool that is easier to learn and extend than Morpheus
@@ -222,7 +222,7 @@ Independent, low-risk items, in order.
 
 **0.1 Documentation front door** (A1, A5)
 - Point `Documentation` in `pyproject.toml` to readthedocs; switch readthedocs
-  to build `aidevelop` until it is merged, then `master`. Use the uv install
+  to build `develop` until it is merged, then `master`. Use the uv install
   text in `docs/source/index.rst`.
 - Add `CITATION.cff` (software entry plus the two papers) and a citing section
   on the docs landing page. Later: Zenodo GitHub integration for a DOI per
@@ -1250,9 +1250,9 @@ Status (2026-09-25, user decisions):
 - Colab badges done (2026-09-25, user request): every tutorial has an
   "Open in Colab" badge under its title and a first cell that, only in
   Colab and only when `lgca` is missing, installs BioLGCA with pip from
-  GitHub (`biolgca @ git+https://github.com/sisyga/biolgca@aidevelop`).
-  Both point at `aidevelop` (master has no tutorials at these paths); at the
-  merge replace `aidevelop` by `master` in the tutorial notebooks (eight since
+  GitHub (`biolgca @ git+https://github.com/sisyga/biolgca@develop`).
+  Both point at `develop` (master has no tutorials at these paths); at the
+  merge replace `develop` by `master` in the tutorial notebooks (eight since
   2026-09-26), and after a
   PyPI release install `biolgca` from PyPI. The branch must be pushed for the
   badges to work. Simulated install with pip from a git URL (Python 3.13):

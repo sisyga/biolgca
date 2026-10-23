@@ -1,6 +1,6 @@
 # biolgca is a Python package for simulating different kinds of lattice-gas
 # cellular automata (LGCA) in the biological context.
-# Copyright (C) 2018-2025 Technische Universität Dresden, Germany.
+# Copyright (C) 2018-2026 Technische Universität Dresden, Germany.
 # The full license notice is found in the file lgca/__init__.py.
 """
 Classes for two-dimensional LGCA on a hexagonal arm-share lattice. They specify
@@ -93,10 +93,11 @@ class LGCA_Hex(LGCA_Square):
         array([[0.5, 0. ],
                [1.5, 1. ]])
         >>> lgca.ycoords
-        array([[0., 1.],
-               [0., 1.]])
+        array([[0.       , 0.8660254],
+               [0.       , 0.8660254]])
 
-        A column in the printout is a row in the LGCA lattice.
+        A column in the printout is a row in the LGCA lattice. Rows are ``sqrt(3)/2`` apart, so that all six
+        neighbours of a node are one node spacing away.
         :py:attr:`self.nonborder` holds the programmatical coordinates of non-border nodes, i.e. the indices of the
         :py:attr:`self.nodes` array where non-border nodes are stored. This is why it is a tuple: Because it
         is used to index a numpy array. All non-border lattice nodes can be called as ``self.nodes[self.nonborder]``.
@@ -516,33 +517,3 @@ class NoVE_IBLGCA_Hex(NoVE_IBLGCA_Square, LGCA_Hex):
 
         self.nodes = newcellnodes
         return self.nodes
-
-    def _apply_rbcx(self):
-        # left boundary
-        self.nodes[self.r_int, :, 0] = self.nodes[self.r_int - 1, :, 3] + self.nodes[self.r_int, :, 0]
-        self.nodes[self.r_int, 2:-1:2, 1] = self.nodes[self.r_int - 1, 1:-2:2, 4] + self.nodes[self.r_int, 2:-1:2, 1]
-        self.nodes[self.r_int, 2:-1:2, 5] = self.nodes[self.r_int - 1, 3::2, 2] + self.nodes[self.r_int, 2:-1:2, 5]
-
-        # right boundary
-        self.nodes[-self.r_int - 1, :, 3] = self.nodes[-self.r_int, :, 0] + self.nodes[-self.r_int - 1, :, 3]
-        self.nodes[-self.r_int - 1, 1:-1:2, 4] = self.nodes[-self.r_int, 2::2, 1] + self.nodes[-self.r_int - 1, 1:-1:2, 4]
-        self.nodes[-self.r_int - 1, 1:-1:2, 2] = self.nodes[-self.r_int, :-2:2, 5] + self.nodes[-self.r_int - 1, 1:-1:2, 2]
-
-        self._apply_abcx()
-
-    def _apply_rbcy(self):
-        lx, ly, _ = self.nodes.shape
-
-        # lower boundary
-        self.nodes[(1 - (self.r_int % 2)):, self.r_int, 1] = self.nodes[:lx - (1 - (self.r_int % 2)), self.r_int - 1,
-            4] + self.nodes[(1 - (self.r_int % 2)):, self.r_int, 1]
-        self.nodes[:lx - (self.r_int % 2), self.r_int, 2] = self.nodes[(self.r_int % 2):, self.r_int - 1,
-            5] + self.nodes[:lx - (self.r_int % 2), self.r_int, 2]
-
-        # upper boundary
-        self.nodes[:lx - ((ly - 1 - self.r_int) % 2), -self.r_int - 1, 4] = self.nodes[((ly - 1 - self.r_int) % 2):,
-            -self.r_int, 1] + self.nodes[:lx - ((ly - 1 - self.r_int) % 2), -self.r_int - 1, 4]
-        self.nodes[(1 - ((ly - 1 - self.r_int) % 2)):, -self.r_int - 1, 5] = self.nodes[:lx - (1 - ((ly - 1 - self.r_int) % 2)),
-            -self.r_int, 2] + self.nodes[(1 - ((ly - 1 - self.r_int) % 2)):, -self.r_int - 1, 5]
-        self._apply_abcy()
-
