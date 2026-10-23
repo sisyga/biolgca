@@ -6,9 +6,9 @@ came about and why; they are not updated. Open items from them are in the
 
 ## Plans
 
-- `plans/2026-08-21-aidevelop-review-and-hardening.md`,
+- `plans/2026-08-21-develop-review-and-hardening.md`,
   `plans/2026-08-21-release-readiness-follow-up.md`: hardening of the
-  `aidevelop` branch before the usability work.
+  `develop` branch before the usability work.
 - `plans/2026-08-30-teaching-notebooks.md`: the tutorial notebooks.
 - `plans/2026-09-23-usability-roadmap.md`: the usability plan (phases 0 to 4:
   rules as decorated functions, one mechanism for all model families, sweeps,

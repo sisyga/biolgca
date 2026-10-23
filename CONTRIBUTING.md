@@ -23,9 +23,9 @@ cd biolgca
 uv sync          # creates .venv/ from uv.lock, with the test and docs tools
 ```
 
-Development happens on the `aidevelop` branch. `master` holds the released
+Development happens on the `develop` branch. `master` holds the released
 version, from which Read the Docs builds the documentation, and `v1` holds the
-code base before 2.0. Branch off `aidevelop` and open pull requests against it.
+code base before 2.0. Branch off `develop` and open pull requests against it.
 
 ## Checks
 

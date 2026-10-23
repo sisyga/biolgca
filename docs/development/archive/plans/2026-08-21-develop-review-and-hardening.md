@@ -1,8 +1,8 @@
-# `aidevelop` Review and Hardening Implementation Plan
+# `develop` Review and Hardening Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement the user-selected milestone task by task. Use `superpowers:test-driven-development` for each bug fix or feature, `superpowers:using-git-worktrees` for isolated implementation, and `superpowers:verification-before-completion` before claiming a task complete. Stop at each milestone boundary for review; do not automatically execute later milestones.
 
-**Goal:** Make the `aidevelop` model/pipeline work scientifically safe, straightforward to run and share, maintainable by one person, and measurably efficient without prematurely adding a GUI or compiled backend.
+**Goal:** Make the `develop` model/pipeline work scientifically safe, straightforward to run and share, maintainable by one person, and measurably efficient without prematurely adding a GUI or compiled backend.
 
 **Architecture:** Keep the existing `get_lgca(...)` API as the interactive/compatibility layer. Make a strict, versioned, pure-data `ModelSpec` the reproducible layer, compiled through one validated registry and one simulation runner. Keep NumPy and Matplotlib as the default numerical and plotting backends; optimize measured hotspots before considering optional JIT or a different 3-D renderer.
 
@@ -12,13 +12,13 @@
 
 **Review date:** 2026-08-21
 
-**Review range:** `origin/master...aidevelop`, merge base `bace041376dba6665c8d743edba06ec138fcaad5`, reviewed head `303d8f381b6b39040292d1bc887e6324dd17b38a`.
+**Review range:** `origin/master...develop`, merge base `bace041376dba6665c8d743edba06ec138fcaad5`, reviewed head `303d8f381b6b39040292d1bc887e6324dd17b38a`.
 
 ---
 
 ## Verdict
 
-`aidevelop` is directionally strong but should not be merged as the new reproducible workflow yet. There is no P0 repository-wide failure and the existing core suite is healthy, but several P1 defects can change scientific results, report false provenance, lose particles, or make supported model combinations fail.
+`develop` is directionally strong but should not be merged as the new reproducible workflow yet. There is no P0 repository-wide failure and the existing core suite is healthy, but several P1 defects can change scientific results, report false provenance, lose particles, or make supported model combinations fail.
 
 The branch already contains most of the right foundations: a model specification, JSON/YAML persistence, a plugin registry, a phased interaction pipeline, observers, runtime metadata, curated examples, and extensive legacy-equivalence tests. The priority is to make those foundations strict and internally consistent, not to add another front end.
 
@@ -37,9 +37,9 @@ Decisions:
 ### Branch and GitHub snapshot
 
 - The branch changes 67 files with approximately 12,508 insertions and 388 deletions relative to the merge base.
-- `origin/master` is 7 commits ahead of the merge base; `aidevelop` is 15 commits ahead. Integrate `origin/master` before opening a new merge PR.
+- `origin/master` is 7 commits ahead of the merge base; `develop` is 15 commits ahead. Integrate `origin/master` before opening a new merge PR.
 - There are **0 open pull requests**.
-- The latest `aidevelop` GitHub Actions run is green: [run 27903736806](https://github.com/sisyga/biolgca/actions/runs/27903736806).
+- The latest `develop` GitHub Actions run is green: [run 27903736806](https://github.com/sisyga/biolgca/actions/runs/27903736806).
 - There are **12 open issues**, triaged later in this document.
 - Historical PR [#94](https://github.com/sisyga/biolgca/pull/94) merged the earlier cleanup into `master`; the current 15-commit branch delta is subsequent work.
 - `.github/workflows/ci.yml` runs on pushes to `master`, but pull-request CI currently excludes PRs targeting `master`.
@@ -77,7 +77,7 @@ A supplemental 90-case smoke matrix across six model families, five geometries, 
 
 Priority meanings:
 
-- **P1:** fix before merging `aidevelop` as the recommended workflow.
+- **P1:** fix before merging `develop` as the recommended workflow.
 - **P2:** fix in the first hardening/usability release after the P1 gate.
 - **P3:** measure or prototype later; do not block the merge.
 
@@ -198,7 +198,7 @@ Required fix: default density plots to aggregate `cell_density` and offer an exp
 
 #### F9. Pull requests targeting `master` do not run CI
 
-`.github/workflows/ci.yml:9-12` limits `pull_request.branches` to `aidevelop` and `kio/development`. The eventual merge PR to `master` could therefore bypass PR checks.
+`.github/workflows/ci.yml:9-12` limits `pull_request.branches` to `develop` and `kio/development`. The eventual merge PR to `master` could therefore bypass PR checks.
 
 Required fix: include `master` before opening the PR and keep the existing Python 3.10-3.13, wheel-install, and documentation jobs.
 
@@ -411,8 +411,8 @@ Create focused issues for F1-F9 before or with implementation so the correctness
 
 **Steps:**
 
-1. Use `superpowers:using-git-worktrees` to create `codex/aidevelop-hardening` from `aidevelop`.
-2. Fetch current refs and merge `origin/master` into that working branch; do not rewrite the shared `aidevelop` history.
+1. Use `superpowers:using-git-worktrees` to create `codex/develop-hardening` from `develop`.
+2. Fetch current refs and merge `origin/master` into that working branch; do not rewrite the shared `develop` history.
 3. Run the full suite before resolving any behavior changes.
 4. Add `master` to `pull_request.branches` in `.github/workflows/ci.yml`.
 5. Keep the Python 3.10-3.13 test matrix, installed-wheel smoke test, and docs build.
@@ -846,7 +846,7 @@ Stop for milestone review here. Tasks 10-12 remain in this document so prioritie
 
 ### Milestone A: merge safety
 
-Complete Tasks 0-7. This is the minimum code-correctness merge gate for `aidevelop` if `ModelSpec` remains explicitly experimental. If the merge advertises model files as the recommended shareable workflow, Task 8 is part of this gate too.
+Complete Tasks 0-7. This is the minimum code-correctness merge gate for `develop` if `ModelSpec` remains explicitly experimental. If the merge advertises model files as the recommended shareable workflow, Task 8 is part of this gate too.
 
 Success criteria:
 

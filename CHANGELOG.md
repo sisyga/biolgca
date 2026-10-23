@@ -112,6 +112,11 @@ This file records notable user-facing changes. Changes remain under
 - The README, the documentation pages and CONTRIBUTING.md are revised for
   readability: shorter sentences, the main point first, and one name per
   concept ("node", not "site").
+- The model specs guide splits its run outputs into "What a run saves",
+  "Running a compiled model again" and "Crowding scale"; continuing a
+  compiled model is explained there once.
+- The development branch is now `develop`. The Colab badges and install
+  cells of the notebooks point at `master`.
 
 ### Tests
 

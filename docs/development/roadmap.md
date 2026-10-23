@@ -31,9 +31,9 @@ the 30 September review are done, apart from the items below:
 
 - PyPI release with a trusted-publishing workflow, versions from git tags.
 - Zenodo integration for a DOI per release.
-- At the merge to `master`: in the tutorial notebooks, replace `aidevelop` by
-  `master` in the Colab badges and the install cell; after a PyPI release,
-  install `biolgca` from PyPI there.
+- After a PyPI release, install `biolgca` from PyPI in the install cell of
+  the notebooks (since the 2026-10-23 merge into `master`, their Colab badges
+  and install cells point at `master`).
 - Check `lgca.explore` by hand in Colab and VS Code (so far only in a Jupyter
   kernel through nbclient).
 

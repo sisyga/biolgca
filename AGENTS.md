@@ -235,11 +235,11 @@ are in `docs/development/archive/reviews/2026-09-30-architecture-proposals.md`.
 
 ## Git
 
-- Development happens on `aidevelop`; `master` is the released version
+- Development happens on `develop`; `master` is the released version
   (2.0.0, tag `v2.0.0`) that Read the Docs builds, and `v1` keeps the 1.0
   release. Do not push, force-push, rewrite history or touch `master` or `v1`
   unless asked.
-- **Commit each finished, tested unit of work** on `aidevelop`: one fix or
+- **Commit each finished, tested unit of work** on `develop`: one fix or
   feature, with its tests and docs, after the checks above. Do not let
   unrelated work pile up uncommitted. Stage files by name, not `git add -A`.
   Before pushing, run the full docs build.
@@ -250,7 +250,7 @@ are in `docs/development/archive/reviews/2026-09-30-architecture-proposals.md`.
 - **Parallel work in worktrees:** several agents may work at once, each in
   its own git worktree (`.claude/worktrees/`, untracked). Give each disjoint
   files; a worktree may start from `master`, so reset its branch to
-  `aidevelop` first. Shared files (`CHANGELOG.md`, the roadmap) are edited
+  `develop` first. Shared files (`CHANGELOG.md`, the roadmap) are edited
   by whoever merges: delegated work reports its entries instead. Review a branch's diff before merging it, and merge with
   `--no-ff`.
 - The stash is shared between all worktrees: do not use `git stash` while

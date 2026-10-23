@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - master
-      - aidevelop
+      - develop
   pull_request:
     branches:
       - master
-      - aidevelop
+      - develop
 
 jobs:
   tests:

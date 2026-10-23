@@ -793,8 +793,8 @@ Check each spec success criterion against files and command outputs. Run:
 
 ```bash
 git status --short
-git diff aidevelop...HEAD --check
-git diff aidevelop...HEAD --stat
+git diff develop...HEAD --check
+git diff develop...HEAD --stat
 ```
 
 Verify there are no generated docs, notebook outputs, temporary environments,

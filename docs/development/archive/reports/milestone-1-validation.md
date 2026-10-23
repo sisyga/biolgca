@@ -1,6 +1,6 @@
 # Milestone 1 scientific and workflow validation
 
-Target: `aidevelop`; starting revision `5bf6ea3`.
+Target: `develop`; starting revision `5bf6ea3`.
 
 The existing deterministic/parity tests remain in place. The additions below
 assert independent scientific expectations rather than agreement with a second
@@ -45,5 +45,5 @@ Benchmarks report diagnostic machine-specific timings, not performance gates.
 - Composed nematic/aggregation with density recording every two steps, 32x32,
   20 steps, seed 7, one diagnostic repeat: **0.864 s**, **758906 bytes** peak
   Python-tracked memory. This is not a bound on total process memory.
-- `git diff --check` passed. GitHub PR #128 targets `aidevelop` and runs the
+- `git diff --check` passed. GitHub PR #128 targets `develop` and runs the
   existing Python 3.10-3.13, installed-wheel/CLI and documentation checks.
