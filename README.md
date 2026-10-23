@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/sisyga/biolgca/actions/workflows/ci.yml/badge.svg)](https://github.com/sisyga/biolgca/actions/workflows/ci.yml)
 ![Python 3.11–3.14](https://img.shields.io/badge/python-3.11%E2%80%933.14-blue)
-[![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-green)](LICENSE.txt)
+[![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-green)](https://github.com/sisyga/biolgca/blob/master/LICENSE.txt)
 
 **Simulate how cells move, align, grow and evolve, in a few lines of Python.**
 
@@ -44,7 +44,7 @@ switching are rules for the reorientation of channel states, and mean-field
 equations can be derived systematically from the rules. BioLGCA provides this
 model class as a library: the rules of the BIO-LGCA literature as composable
 building blocks, a checked contract for new rules, model files that rerun from
-their seed, parameter sweeps, and a [model zoo](docs/source/zoo/index.rst) that
+their seed, parameter sweeps, and a [model zoo](https://github.com/sisyga/biolgca/blob/master/docs/source/zoo/index.rst) that
 reproduces published LGCA models with these rules.
 
 ## Quick start
@@ -206,7 +206,7 @@ for r_d in (0.0, 0.2, 0.5):
 and model family it claims to support and reports what goes wrong, from lost
 cells to unseeded random numbers. Movement biases are written the same way
 with `@reorientation_term`. The
-[custom interaction guide](docs/source/how_to/custom_interactions.rst) shows
+[custom interaction guide](https://github.com/sisyga/biolgca/blob/master/docs/source/how_to/custom_interactions.rst) shows
 growth rules, movement biases and a deterministic collision rule; tutorial 6
 shows how to test a rule and share it with a model.
 
@@ -219,18 +219,18 @@ against the current code.
 
 | Lesson | You will learn to |
 | --- | --- |
-| [1. Fundamentals](docs/source/tutorials/01_fundamentals.ipynb) | set up a lattice, run a random walk, compare boundaries and seeds |
-| [2. Collective movement](docs/source/tutorials/02_collective_movement.ipynb) | compare alignment mechanisms and measure order |
-| [3. Combining cues](docs/source/tutorials/03_combining_interactions.ipynb) | combine alignment, chemotaxis and contact guidance; sweep parameters |
-| [4. Population dynamics](docs/source/tutorials/04_population_dynamics.ipynb) | add birth, death and phenotype switching; go-or-grow |
-| [5. Evolutionary LGCA](docs/source/tutorials/05_evolutionary_lgca.ipynb) | track heritable traits across stochastic replicates |
-| [6. Student project](docs/source/tutorials/06_student_project.ipynb) | write, test and share your own interaction |
-| [7. Oxygen-limited growth](docs/source/tutorials/07_oxygen_limited_growth.ipynb) | couple cells to a field they take up; let consumption evolve |
-| [8. Aggregation](docs/source/tutorials/08_aggregation.ipynb) | find the onset of chemotactic aggregation toward a secreted signal, and watch it live |
+| [1. Fundamentals](https://github.com/sisyga/biolgca/blob/master/docs/source/tutorials/01_fundamentals.ipynb) | set up a lattice, run a random walk, compare boundaries and seeds |
+| [2. Collective movement](https://github.com/sisyga/biolgca/blob/master/docs/source/tutorials/02_collective_movement.ipynb) | compare alignment mechanisms and measure order |
+| [3. Combining cues](https://github.com/sisyga/biolgca/blob/master/docs/source/tutorials/03_combining_interactions.ipynb) | combine alignment, chemotaxis and contact guidance; sweep parameters |
+| [4. Population dynamics](https://github.com/sisyga/biolgca/blob/master/docs/source/tutorials/04_population_dynamics.ipynb) | add birth, death and phenotype switching; go-or-grow |
+| [5. Evolutionary LGCA](https://github.com/sisyga/biolgca/blob/master/docs/source/tutorials/05_evolutionary_lgca.ipynb) | track heritable traits across stochastic replicates |
+| [6. Student project](https://github.com/sisyga/biolgca/blob/master/docs/source/tutorials/06_student_project.ipynb) | write, test and share your own interaction |
+| [7. Oxygen-limited growth](https://github.com/sisyga/biolgca/blob/master/docs/source/tutorials/07_oxygen_limited_growth.ipynb) | couple cells to a field they take up; let consumption evolve |
+| [8. Aggregation](https://github.com/sisyga/biolgca/blob/master/docs/source/tutorials/08_aggregation.ipynb) | find the onset of chemotactic aggregation toward a secreted signal, and watch it live |
 
-The [example gallery](docs/source/example_gallery.rst) collects further
+The [example gallery](https://github.com/sisyga/biolgca/blob/master/docs/source/example_gallery.rst) collects further
 ready-to-run models, one per question, and an advanced example: a
-[tumour spheroid](docs/source/examples/tumour_spheroid.ipynb) of proliferating,
+[tumour spheroid](https://github.com/sisyga/biolgca/blob/master/docs/source/examples/tumour_spheroid.ipynb) of proliferating,
 quiescent and necrotic cells in the oxygen they consume, in 2D and 3D, with
 parameters from measurements.
 
@@ -247,12 +247,13 @@ Moore lattices. 3D rendering uses Mayavi, which is optional: install it with
 
 ## Other ways to install
 
-Without uv, install BioLGCA into any Python 3.11+ environment, from a clone
-or directly from GitHub (BioLGCA is not on PyPI yet):
+Without uv, install BioLGCA into any Python 3.11+ environment from PyPI, from a
+clone, or directly from GitHub:
 
 ```bash
-python -m pip install -e ".[notebooks]"   # in the clone; JupyterLab; also ".[yaml]" or ".[plot3d]"
-python -m pip install "biolgca @ git+https://github.com/sisyga/biolgca"   # without a clone
+python -m pip install biolgca             # from PyPI; also "biolgca[notebooks]", "[yaml]" or "[plot3d]"
+python -m pip install -e ".[notebooks]"   # in the clone
+python -m pip install "biolgca @ git+https://github.com/sisyga/biolgca"   # newest development version
 ```
 
 This picks the newest compatible versions of the dependencies. `uv sync` instead
@@ -266,10 +267,10 @@ Matplotlib, pandas and ipywidgets. To check that the installation works, run
 - **Questions** about using BioLGCA, and **bug reports** and **ideas**: open
   an issue on the [issue tracker](https://github.com/sisyga/biolgca/issues),
   which offers templates for each.
-- **Contributions** are welcome: [CONTRIBUTING.md](CONTRIBUTING.md) explains
+- **Contributions** are welcome: [CONTRIBUTING.md](https://github.com/sisyga/biolgca/blob/master/CONTRIBUTING.md) explains
   how to set up the development environment, run the tests and the docs
   build, and propose a new interaction.
-- Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
+- Everyone taking part follows the [code of conduct](https://github.com/sisyga/biolgca/blob/master/CODE_OF_CONDUCT.md).
 
 Run the checks from the repository root after `uv sync`:
 
@@ -278,7 +279,7 @@ uv run pytest -q               # test suite
 uv run python docs/build.py    # documentation, executes all tutorials
 ```
 
-User-facing changes are recorded in [CHANGELOG.md](CHANGELOG.md).
+User-facing changes are recorded in [CHANGELOG.md](https://github.com/sisyga/biolgca/blob/master/CHANGELOG.md).
 
 ## History
 
@@ -319,5 +320,5 @@ Hatzikirou and colleagues.
 
 ## License
 
-BSD 3-clause, see [LICENSE.txt](LICENSE.txt). Copyright (c) 2018–2026
+BSD 3-clause, see [LICENSE.txt](https://github.com/sisyga/biolgca/blob/master/LICENSE.txt). Copyright (c) 2018–2026
 Technische Universität Dresden.

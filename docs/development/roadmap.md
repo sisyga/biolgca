@@ -29,8 +29,7 @@ the 30 September review are done, apart from the items below:
 
 ### Release and distribution (when the user decides to publish)
 
-- PyPI release with a trusted-publishing workflow, versions from git tags.
-- Zenodo integration for a DOI per release.
+- Versions from git tags (the version is still set in `pyproject.toml`).
 - After a PyPI release, install `biolgca` from PyPI in the install cell of
   the notebooks (since the 2026-10-23 merge into `master`, their Colab badges
   and install cells point at `master`).

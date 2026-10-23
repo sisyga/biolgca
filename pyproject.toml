@@ -83,6 +83,7 @@ dev = [
 Homepage = "https://github.com/sisyga/biolgca"
 Issues = "https://github.com/sisyga/biolgca/issues"
 Documentation = "https://biolgca.readthedocs.io/"
+Changelog = "https://github.com/sisyga/biolgca/blob/master/CHANGELOG.md"
 
 [project.scripts]
 biolgca = "lgca.cli:main"
