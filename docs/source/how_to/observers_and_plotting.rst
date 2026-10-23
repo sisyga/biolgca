@@ -178,6 +178,10 @@ also of irregular schedules. Arrays passed explicitly use ``steps=...`` if it
 is given, and consecutive steps otherwise. Renderers receive these steps and
 draw their own titles.
 
+In 1D history plots of sparse recordings, each row is labelled with its time
+step, and the distance between rows counts samples, not time. Property and
+family histories use the recorded steps too.
+
 A density of some channels (``channels=...``) is computed from the node
 history and its ``nodes_steps``, even if a density history with other steps
 exists; without a node history, the plot raises an error that says what to
@@ -196,14 +200,8 @@ every 3D plot offscreen. 1D models keep their space-time plots.
 
 On a compiled model, the step count of the operators continues across runs,
 while observer schedules and callbacks restart at zero.
-``result.metadata['runtime']`` records ``start_step``, ``end_step`` and
-``sample_time_origin='local'``; the command line saves them in
-``metadata.json``. To count steps from the start of the model, add
-``start_step`` to a recorded step array; when joining consecutive histories,
-drop the endpoint they share. Copy each history before the next run replaces
-the arrays. The metadata of a result do not change in later runs. Runners
-used directly and ``timeevo`` give the same offset as
-``lgca.recording_start_step`` (and the endpoint as ``recording_end_step``).
+:ref:`continuing_a_model` explains how to join the histories of consecutive
+runs.
 
 Plotting module
 ---------------

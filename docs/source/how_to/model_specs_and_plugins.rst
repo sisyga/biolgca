@@ -367,8 +367,8 @@ complete example and the conservation laws they keep. Model files name
 registered rules only; importing your own Python modules is left to a trusted
 launcher, e.g. ``biolgca run --plugins my_project.rules``.
 
-CLI measurement files
----------------------
+What a run saves
+----------------
 
 ``biolgca run`` saves the numeric recordings in ``measurements.npz`` next to
 ``metadata.json``, under the names of the Python attributes: ``nodes_t``,
@@ -390,11 +390,8 @@ density instead.
    plt.xlabel("Simulation step")
    plt.ylabel("Population")
 
-In 1D history plots of sparse recordings, each row is labelled with its time
-step, and the distance between rows counts samples, not time. Property and
-family histories and ``lgca.plotting.animate(..., steps=...)`` use the
-recorded time steps. History data passed without ``steps`` is taken to be
-recorded at every step.
+Plots of sparse recordings use these step arrays (see
+:doc:`observers_and_plotting`).
 
 The command line archives the model as ``model.resolved.json``, with relative
 observer paths, and its large arrays in ``model.resolved.arrays.npz``. It
@@ -416,18 +413,30 @@ in its array file and warns when it is loaded after the array file changed,
 e.g. because a ``model.yaml`` saved next to ``model.json`` wrote its own
 arrays to the shared ``model.arrays.npz``.
 
+.. _continuing_a_model:
+
+Running a compiled model again
+------------------------------
+
 A model returned by ``build_model`` or ``run_model`` keeps its compiled
 dynamics: ``lgca.timestep()``, ``lgca.timeevo(...)`` and live animations
 advance the same pipeline and keep its random state and the accumulated
-timings of its operators. ``compiled.step()`` advances one step. Each run that
-records starts the schedule of its observers at step zero again and replaces
-the history arrays of the previous run. The metadata of the result (and of the
-command line) record the steps the run covered as ``runtime.start_step`` and
-``runtime.end_step``, with ``sample_time_origin='local'``. To join continued
-runs, add the start step to each recorder's step array and drop the endpoint
-the two runs share. The metadata of a result do not change when the model runs
-on. Runners used directly set ``lgca.recording_start_step`` and
-``lgca.recording_end_step`` for the same purpose.
+timings of its operators. ``compiled.step()`` advances one step.
+
+The step count of the operators continues across runs, but each run that
+records starts the schedules of its observers and callbacks at step zero
+again and replaces the history arrays of the previous run: copy a history
+before the next run if you need it. The metadata of the result record the
+steps the run covered as ``runtime.start_step`` and ``runtime.end_step``, with
+``sample_time_origin='local'``; the command line saves them in
+``metadata.json``. The metadata of a result do not change when the model runs
+on. ``lgca.recording_start_step`` and ``lgca.recording_end_step`` hold the
+same values, also after ``timeevo`` or a
+:class:`~lgca.simulation.SimulationRunner` used directly.
+
+To count steps from the start of the model, add the start step to a recorded
+step array. To join the histories of consecutive runs, also drop the endpoint
+the two runs share.
 
 Between runs, ``compiled.reconfigure({"birth_rate": 0.3})`` changes the
 dynamics of the running model, e.g. a rate after a burn-in, as the sliders of
@@ -437,6 +446,9 @@ is tried on a copy of the model first and is applied only if that works.
 and ``compiled.initial_spec`` keeps the spec the model was built from, so the
 run can be repeated. A step that raises is rolled back: the model is then as
 before the step and can go on, e.g. after a reconfiguration.
+
+Crowding scale
+--------------
 
 ``state.capacity`` supplies the crowding scale of the rules: the carrying
 capacity of models without volume exclusion and, with volume exclusion, an
