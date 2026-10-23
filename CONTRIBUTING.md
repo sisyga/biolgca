@@ -9,9 +9,8 @@ models and code are all welcome. Everyone taking part follows the
 Open an issue on the [issue tracker](https://github.com/sisyga/biolgca/issues)
 and pick the template that fits: a question about using BioLGCA, a bug
 report or a feature request. For a bug, include the BioLGCA version
-(`biolgca --version`),
-your Python version and operating system, and a short script or model file
-that shows the problem, with its seed.
+(`biolgca --version`), your Python version and operating system, and a short
+script or model file that shows the problem, with its seed.
 
 ## Setting up a development environment
 
@@ -24,8 +23,8 @@ cd biolgca
 uv sync          # creates .venv/ from uv.lock, with the test and docs tools
 ```
 
-Development happens on the `aidevelop` branch; `master` holds the released
-version that the documentation on Read the Docs is built from, and `v1` the
+Development happens on the `aidevelop` branch. `master` holds the released
+version, from which Read the Docs builds the documentation, and `v1` holds the
 code base before 2.0. Branch off `aidevelop` and open pull requests against it.
 
 ## Checks
@@ -42,15 +41,17 @@ uv run python docs/build.py                # full docs build, runs the tutorials
 ```
 
 CI runs the tests, the slow ones included, on Linux with Python 3.11 to 3.14,
-on Windows and macOS with 3.13 and with the minimum dependency versions; it runs
-the suite once in random order, executes the notebooks and builds the
-documentation. After changing
-dependencies in `pyproject.toml`, run `uv lock` and commit `uv.lock`.
+on Windows and macOS with Python 3.13, and on Python 3.11 with the minimum
+dependency versions. It also runs the suite once in random order, executes the
+notebooks and builds the documentation.
+
+After changing dependencies in `pyproject.toml`, run `uv lock` and commit
+`uv.lock`.
 
 ## Writing tests
 
-- Every change comes with tests; a bug fix with a test that fails without
-  the fix.
+- Every change comes with tests. A bug fix comes with a test that fails
+  without the fix.
 - Test what a user relies on, not how a function is written: conservation of
   cell numbers, symmetries, agreement with an analytic expectation, or with
   the frozen implementations of the code before 2.0 in `tests/legacy/`
@@ -62,7 +63,7 @@ dependencies in `pyproject.toml`, run `uv lock` and commit `uv.lock`.
   be the same.
 - `ContractWarning` is an error in every test; test a warning with
   `pytest.warns`.
-- Tests must not depend on their order; `tests/conftest.py` removes the rules
+- Tests must not depend on their order: `tests/conftest.py` removes the rules
   a test registers. After changing global state, run
   `uv run --with pytest-randomly==5.0.0 pytest -q -p randomly`.
 

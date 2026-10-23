@@ -13,14 +13,14 @@ This file records notable user-facing changes. Changes remain under
   `TypeError` inside a cue was reported as a parameter error.
 - `check_interaction` checked no model for an identity-based
   `phenotype_switch` without `n_species` and reported "0 models checked, all
-  passed"; it now checks them, and a check left with no model raises
+  passed". It now checks them, and a check left with no model raises
   `ValueError`.
-- `state.cells[name]` is a read-only copy; writing into it
-  (`cells["r_b"][mask] = x`) changed nothing without a warning. Use
+- `state.cells[name]` is a read-only copy. Before, writing into it
+  (`cells["r_b"][mask] = x`) changed nothing and gave no warning. Use
   `cells.set_trait`; code that edited the copy in place before passing it to
   `set_trait` takes `cells["r_b"].copy()`.
 - `biolgca run/validate/sweep --plugins MODULE` finds a module next to the
-  model file or in the working directory without `PYTHONPATH`; a module that
+  model file or in the working directory without `PYTHONPATH`. A module that
   is not found says where it was looked for.
 - A reorientation term of your own put in `operators` no longer suggests the
   one-cue dict form, which then failed with "unknown operator"; it says to put
@@ -50,9 +50,9 @@ This file records notable user-facing changes. Changes remain under
 
 ### Changed
 
-- `kappa` and `theta` of `go_or_rest` are the density cue: the relative
-  density is the cells at the node over `state.capacity`, as for
-  `{"name": "density"}` and the `resting` term. With volume exclusion and
+- `kappa` and `theta` of `go_or_rest` respond to the same relative density
+  as the density cue (`{"name": "density"}`) and the `resting` term: the
+  cells at the node over `state.capacity`. With volume exclusion and
   several species a full node now has density 1 (it had `n_species`), and a
   `StateSpec.capacity` set with volume exclusion counts (it was ignored).
   `go_or_grow.switch`, whose migrating and resting cells share the channels
@@ -64,8 +64,8 @@ This file records notable user-facing changes. Changes remain under
   raise a `ValueError`. Before, they were cast to booleans with a warning, so
   2 became one cell.
 - The `biolgca` command shows the traceback of errors raised in user code, the
-  notes ("step N was rolled back") of lgca's own errors, and `--version`; it
-  warns when the `metadata.json` of an archived run cannot be read;
+  notes ("step N was rolled back") of lgca's own errors, and `--version`. It
+  warns when the `metadata.json` of an archived run cannot be read, and
   `biolgca examples` lists the examples.
 - Clearer messages: an unknown operator name suggests the closest registered
   name or the module to import; an unknown plugin parameter lists the
@@ -98,15 +98,20 @@ This file records notable user-facing changes. Changes remain under
 
 ### Docs
 
-- Getting started explains ghost nodes and `lgca.nonborder`; the custom
-  interaction guide gives the return shape of every reorientation coupling,
-  the channel order per geometry, the module-qualified names of rules defined
-  in a module, and that `kill`/`divide` shift cell positions; a new "Initial
-  conditions" section covers the `region` and `from_npz` initializers and the
-  `nodes` shapes and label conventions of every family; `directed_motion` and
-  `steric_repulsion` are in the table of reorientation terms; installation
-  from GitHub without a clone; `StateSpec.capacity` is described as a crowding
-  scale; Observer hooks have docstrings.
+- Getting started explains ghost nodes and `lgca.nonborder`, and how to
+  install from GitHub without a clone.
+- The custom interaction guide gives the return shape of every reorientation
+  coupling, the channel order per geometry and the module-qualified names of
+  rules defined in a module, and says that `kill`/`divide` shift cell
+  positions.
+- A new "Initial conditions" section covers the `region` and `from_npz`
+  initializers and the `nodes` shapes and label conventions of every family.
+- `directed_motion` and `steric_repulsion` are in the table of reorientation
+  terms, `StateSpec.capacity` is described as a crowding scale, and Observer
+  hooks have docstrings.
+- The README, the documentation pages and CONTRIBUTING.md are revised for
+  readability: shorter sentences, the main point first, and one name per
+  concept ("node", not "site").
 
 ### Tests
 
@@ -125,7 +130,8 @@ This file records notable user-facing changes. Changes remain under
 Version 2.0 rebuilds BioLGCA around model specifications (`ModelSpec`) and
 rules written as functions of the lattice state. Scripts written for 1.0 with
 `get_lgca` and `timeevo` still run, but their interactions now run the new
-rules: the dynamics agree in distribution, seeded runs give other numbers.
+rules: the dynamics agree in distribution, but seeded runs give different
+numbers.
 Results published with 1.0 are reproduced with the archived version they
 cite; 1.0 is kept on the `v1` branch. Every change of 2.0.0, item by item, is
 listed in
@@ -159,7 +165,7 @@ listed in
 - Results change at the same parameters where rules were rescaled or
   corrected. `lgca.gradient` is the physical gradient (before, twice it, and
   three times on hexagonal lattices), so chemotaxis and aggregation need
-  twice (hexagonal: three times) the earlier `beta`; chemotaxis takes its
+  twice (hexagonal: three times) the earlier `beta`. Chemotaxis takes its
   gradient with the ghost nodes and defaults to `beta=2` (was 5). The Moore
   lattice's `channel_weight` read the neighbour behind each channel instead
   of the one ahead (`nove_ib.evo_steric` changes). In a phenotype switch only

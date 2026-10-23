@@ -3,8 +3,8 @@ BioLGCA
 
 `BioLGCA <https://github.com/sisyga/biolgca>`_ is a Python package for
 simulating lattice-gas cellular automata in biological contexts. It supports
-classical, identity-based, volume-exclusion-free and multi-species models on
-one-, two- and three-dimensional lattices.
+classical and identity-based models, with and without volume exclusion, and
+models of several species, on one-, two- and three-dimensional lattices.
 
 Who it is for
 -------------
@@ -17,14 +17,14 @@ lattice, so a model is a short list of local stochastic rules that can be
 simulated on large lattices and analysed with mean-field and stability
 methods.
 
-General-purpose frameworks for cell-based models, such as Morpheus and
-CompuCell3D (cellular Potts models), PhysiCell (off-lattice agents) and
-Chaste (several cell-based model types, including an on-lattice cellular
-automaton), couple cells to fields in many ways but do not offer the velocity-channel state space of LGCA, in
-which alignment, chemotaxis and go-or-grow switching are rules for the
-reorientation of channel states and in which mean-field equations can be
-derived systematically from the rules. BioLGCA provides this model class as a
-library: the rules of the BIO-LGCA literature as composable building blocks,
+General-purpose frameworks for cell-based models couple cells to fields in
+many ways: Morpheus and CompuCell3D (cellular Potts models), PhysiCell
+(off-lattice agents) and Chaste (several cell-based model types, including an
+on-lattice cellular automaton). They do not offer the velocity-channel state
+space of LGCA. In this state space, alignment, chemotaxis and go-or-grow
+switching are rules for the reorientation of channel states, and mean-field
+equations can be derived systematically from the rules. BioLGCA provides this
+model class as a library: the rules of the BIO-LGCA literature as composable building blocks,
 a checked contract for new rules (:doc:`how_to/custom_interactions`), model
 files that rerun from their seed, parameter sweeps, and a :doc:`zoo/index` that
 reproduces published LGCA models with these rules.
@@ -33,7 +33,7 @@ Start with the notebooks
 ------------------------
 
 The maintained :doc:`tutorials/index` are the primary learning path. They show
-every model specification and interaction in editable cells, beginning with a
+every model specification and interaction in editable notebook cells, beginning with a
 random walk and progressing to combined directional cues, population dynamics,
 evolution and a reproducible student project.
 
@@ -65,9 +65,9 @@ BioLGCA by name:
    lgca.timeevo(timesteps=30, showprogress=False)
    lgca.plot_density()
 
-For a study, a :class:`lgca.model.ModelSpec` writes every part of the model
-out, the lattice, state, time, rules and recorded data, so that rules can be
-combined, models saved as files and parameters swept:
+For a study, a :class:`lgca.model.ModelSpec` writes out every part of the
+model (the lattice, state, time, rules and recorded data), so that rules can
+be combined, models saved as files and parameters swept:
 
 .. code-block:: python
 
@@ -88,12 +88,15 @@ combined, models saved as files and parameters swept:
    result = run_model(spec, showprogress=False)
    result.lgca.plot_density()
 
-:doc:`getting_started` introduces both, :doc:`reference/factory_reference` lists
-the options of ``get_lgca``, :doc:`how_to/model_specs_and_plugins` explains
-shareable JSON/YAML models and composed pipelines,
-:doc:`how_to/exploring` running a model live with sliders,
-:doc:`how_to/studying_a_model` parameter sweeps, and the :doc:`zoo/index`
-published models to rerun and extend.
+Where to go next:
+
+* :doc:`getting_started` introduces both ways;
+* :doc:`reference/factory_reference` lists the options of ``get_lgca``;
+* :doc:`how_to/model_specs_and_plugins` explains shareable JSON/YAML models
+  and composed pipelines;
+* :doc:`how_to/exploring` runs a model live with sliders;
+* :doc:`how_to/studying_a_model` sweeps parameters;
+* the :doc:`zoo/index` has published models to rerun and extend.
 
 Scientific background
 ---------------------

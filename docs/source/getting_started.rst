@@ -19,19 +19,17 @@ then clone the repository and create the environment:
    uv sync
 
 ``uv sync`` creates ``.venv/`` with the Python version named in
-``.python-version``, installs BioLGCA in editable mode and adds the test and
-documentation tools. If your uv does not download Python automatically, which
-is the case for some Linux distribution packages, run ``uv python install``
-first.
+``.python-version`` and installs BioLGCA in editable mode. If your uv does not
+download Python automatically (some Linux distribution packages do not), run
+``uv python install`` first.
 
-The installation includes the runtime dependencies listed in
-``pyproject.toml``: NumPy, SciPy, pyamg (field solver; not yet on Python
-3.14, where SciPy alone is used), threadpoolctl, tqdm, Matplotlib, pandas
-(tables of parameter sweeps) and ipywidgets (notebook widgets). ``uv sync``
-adds JupyterLab and the test and documentation tools, so it is sufficient for
-the tutorials and for simulations on every lattice; only 3D rendering needs
-an extra (see `Optional dependencies`_). Launch JupyterLab from the
-repository root:
+The environment holds the runtime dependencies listed in ``pyproject.toml``:
+NumPy, SciPy, pyamg (field solver; not yet on Python 3.14, where SciPy alone
+is used), threadpoolctl, tqdm, Matplotlib, pandas (tables of parameter
+sweeps) and ipywidgets (notebook widgets). It also holds JupyterLab and the
+test and documentation tools, so it is enough for the tutorials and for
+simulations on every lattice; only 3D rendering needs an extra (see
+`Optional dependencies`_). Launch JupyterLab from the repository root:
 
 .. code-block:: bash
 
@@ -43,14 +41,14 @@ reproducible student project and coupled cell–field models. Run your own scrip
 the same way, for example ``uv run python my_simulation.py``, or activate
 ``.venv`` as usual.
 
-Without uv, BioLGCA installs into any Python 3.11+ environment, from a clone
-with ``python -m pip install -e ".[notebooks]"`` or straight from GitHub with
+Without uv, BioLGCA installs into any Python 3.11+ environment: from a clone
+with ``python -m pip install -e ".[notebooks]"``, or straight from GitHub with
 ``python -m pip install "biolgca @ git+https://github.com/sisyga/biolgca"``
-(BioLGCA is not on PyPI yet). This resolves the newest compatible package
+(BioLGCA is not on PyPI yet). pip then resolves the newest compatible package
 versions instead of the locked ones. Leave out ``[notebooks]`` where
 JupyterLab is not needed, for example in Colab, on a cluster or in an editor
-that runs notebooks itself. ``biolgca examples list`` checks that the
-installation works.
+that runs notebooks itself. To check that the installation works, run
+``biolgca examples list``.
 
 Your first model
 ----------------
@@ -91,9 +89,9 @@ interior with ``lgca.nonborder``:
    cells = lgca.nodes[lgca.nonborder].sum()     # the number of cells
    density = lgca.cell_density[lgca.nonborder]  # one value per node, shape dims
 
-Recorded data (``lgca.data``, and ``lgca.dens_t`` and ``lgca.nodes_t`` after
-``timeevo(record=True)``, and the recorders of a model specification) hold
-the interior only.
+Recorded data hold the interior only: ``lgca.data``, ``lgca.dens_t`` and
+``lgca.nodes_t`` after ``timeevo(record=True)``, and the recorders of a model
+specification.
 
 Your first model specification
 ------------------------------
@@ -127,18 +125,19 @@ systematically (lesson 3 onwards):
 
 The explicit seed makes stochastic comparisons repeatable. The rules are
 visible and can be replaced or composed; lessons 3 and 4 show the supported
-patterns, and :doc:`how_to/studying_a_model` how to sweep parameters and
-seeds.
+patterns, and :doc:`how_to/studying_a_model` shows how to sweep parameters
+and seeds.
 
 Saving and sharing a model
 --------------------------
 
-JSON is the canonical, versioned ModelSpec format. YAML is optional authoring
-syntax for the same data model. Model files contain data and registered names,
-never arbitrary import paths or Python code.
+JSON is the canonical, versioned ModelSpec format; YAML is an optional way
+to write the same data. Model files contain data and registered names, never
+arbitrary import paths or Python code.
 
-The installed command can export, validate and run curated starting points.
-Prefix each command with ``uv run`` unless ``.venv`` is activated:
+The ``biolgca`` command exports the curated examples as model files, and
+validates and runs model files. Prefix each command with ``uv run`` unless ``.venv`` is
+activated:
 
 .. code-block:: bash
 
@@ -173,8 +172,8 @@ Optional features are extras:
      - ``uv sync --extra plot3d``
 
 With pip, use ``python -m pip install -e ".[yaml]"`` and so on. Contributor
-tools are dependency groups rather than extras: ``test``, ``docs`` and ``dev``
-(both). ``uv sync`` installs ``dev`` by default; ``uv sync --no-default-groups
+tools are dependency groups rather than extras: ``test``, ``docs`` and
+``dev``, which holds both. ``uv sync`` installs ``dev`` by default; ``uv sync --no-default-groups
 --group docs`` installs only the documentation tools.
 
 Developer checks
@@ -187,9 +186,9 @@ Run the test suite and strict documentation build from the repository root:
    uv run pytest -q
    uv run python docs/build.py
 
-The documentation build executes the tutorial notebooks from a clean kernel,
-renders the zoo and example notebooks with their saved outputs, and treats
-cell exceptions and Sphinx warnings as failures; ``docs/build.py
+The documentation build executes the tutorial notebooks from a clean kernel
+and renders the zoo and example notebooks with their saved outputs. It treats
+cell exceptions and Sphinx warnings as failures. ``docs/build.py
 --no-notebooks`` checks the pages and docstrings in under a minute. After
 changing dependencies in ``pyproject.toml``, run ``uv lock`` and commit the
 updated ``uv.lock``. ``CONTRIBUTING.md`` in the repository describes the

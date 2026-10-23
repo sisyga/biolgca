@@ -1,8 +1,8 @@
 Studying a model
 ================
 
-A model is studied by running it for many parameter values and seeds and
-comparing a measurement across the runs. :mod:`lgca.study` does this with two
+To study a model, you run it for many parameter values and seeds and compare
+a measurement across the runs. :mod:`lgca.study` does this with two
 functions: :func:`~lgca.study.vary` changes values of a
 :class:`~lgca.model.ModelSpec`, and :func:`~lgca.study.sweep` runs every
 combination of values and seeds and returns a :class:`pandas.DataFrame` with one
@@ -110,10 +110,10 @@ observers and operator objects.
 - ``backend="processes"`` (the default) runs in worker processes, one run per
   processor core at a time; on 8 cores, a sweep runs about six times faster.
   The workers start fresh and import what they need, on every operating
-  system: measures must be functions defined with ``def`` at the top level of
-  a module (not lambdas or functions defined in a notebook), and your own
-  rules must be registered in a module that the workers import, named with
-  ``plugins=["my_project.rules"]``. Operator objects in the model go to the
+  system. Measures must therefore be functions defined with ``def`` at the
+  top level of a module (not lambdas or functions defined in a notebook), and
+  your own rules must be registered in a module that the workers import,
+  named with ``plugins=["my_project.rules"]``. Operator objects in the model go to the
   workers too: their rules are sent by name, like functions.
 - ``backend="threads"`` accepts any function and the rules defined in a
   notebook, but threads run only partly in parallel (about 1.5 to 2 times
@@ -136,10 +136,10 @@ named after its values and seed, inside the observer's destination, e.g.
 ``snapshots/kappa=2_seed=1/density_00010.png``.
 
 The files a sweep reads, e.g. the arrays of a ``from_npz`` initializer, are
-read once before the first run, so editing them during a sweep changes no run;
-``table.attrs["provenance"]`` records their hashes with the versions, the
-platform and the hashes of the rules' source code, and ``biolgca sweep`` writes
-the same into ``sweep.json``.
+read once before the first run, so editing them during a sweep changes no
+run. ``table.attrs["provenance"]`` records their hashes with the versions, the
+platform and the hashes of the rules' source code, and ``biolgca sweep``
+writes the same into ``sweep.json``.
 
 A run that fails stops the sweep with its error, which names the run's values
 and seed; runs that have not started are cancelled. With ``errors="record"``
@@ -165,9 +165,8 @@ version and the copied files):
 population at the end of every run. ``--keep-files`` keeps the files of the
 model's observers in a folder per run inside the output directory, and
 ``--errors record`` gives failed runs a row with their error.
-``--plugins my_project.rules`` imports
-trusted modules with your own rules first; ``biolgca run`` and
-``biolgca validate`` take it as well. Modules are never imported because a
+``--plugins my_project.rules`` imports trusted modules with your own rules
+first; ``biolgca run`` and ``biolgca validate`` take it as well. Modules are never imported because a
 model file names them.
 
 Files that the model reads, such as the state of a ``from_npz`` initializer,
@@ -175,11 +174,13 @@ are found next to the model file (from Python: ``sweep(...,
 resource_base="path/to/model_dir")``), and ``--trusted-paths`` allows paths
 outside its directory. A model made in Python, without ``resource_base``,
 finds its files as ``np.load`` does: relative to the working directory, or
-absolute. The sweep copies the files its runs read to
-``resources/`` in the output directory, including files given with
-``--vary``, e.g. ``--vary state.initializer.parameters.path=a.npz,b.npz``
-(copied as ``initial_state_1.npz``, ``initial_state_2.npz``, ...; the model's
-own file is then copied only if it exists, as no run reads it). The model and
-the grid in ``sweep.json`` refer to the copies, ``"resources"`` in
-``sweep.json`` names the file each copy was made from, and ``table.csv`` keeps
-the values as given.
+absolute.
+
+The sweep copies the files its runs read to ``resources/`` in the output
+directory, including files given with ``--vary``, e.g. ``--vary
+state.initializer.parameters.path=a.npz,b.npz`` (copied as
+``initial_state_1.npz``, ``initial_state_2.npz``, ...). The model's own file
+is then copied only if it exists, since no run reads it. The model and the
+grid in ``sweep.json`` refer to the copies, ``"resources"`` in ``sweep.json``
+names the file each copy was made from, and ``table.csv`` keeps the values as
+given.

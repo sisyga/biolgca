@@ -1,11 +1,12 @@
 Model zoo
 =========
 
-Published LGCA models, written with the rules of this version so that they
-can be read, rerun, changed and explored. Each entry is a module of
-:mod:`lgca.zoo` and a notebook that reproduces a result of its paper at a
-size that runs in about a minute, and states what differs from the paper.
-``build_spec(full=True)`` gives the paper's lattice and run length.
+The zoo holds published LGCA models, and two new ones, written with the
+rules of this version so that they can be read, rerun, changed and explored.
+Each entry is a module of :mod:`lgca.zoo` with a notebook. The notebook
+reproduces a result of the paper at a size that runs in about a minute and
+states what differs from the paper. ``build_spec(full=True)`` gives the
+paper's lattice and run length.
 
 .. code-block:: python
 
@@ -18,8 +19,8 @@ size that runs in about a minute, and states what differs from the paper.
    spec = allee.build_spec(density=0.3)  # a lgca.model.ModelSpec
    zoo.parameter_table("allee_effect")  # the paper's symbols and their paths in the spec
 
-``build_spec`` returns the model alone; what the notebooks measure, they
-add to it. Every spec can be saved as a model file. Entries that define
+``build_spec`` returns the model alone; the notebooks add what they measure.
+Every spec can be saved as a model file. Entries that define
 rules of their own (``jamming``, ``evolution_modes``) register them when
 their module is imported, so a saved model of such an entry runs in a new
 Python process after ``import lgca.zoo.jamming``, or with

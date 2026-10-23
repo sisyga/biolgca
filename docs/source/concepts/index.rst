@@ -1,8 +1,8 @@
 Concepts
 ========
 
-These pages explain the model families, lattice geometries and the semantics
-of composing interaction processes.
+These pages explain the model families, the lattice geometries and how
+interactions combine.
 
 .. toctree::
    :maxdepth: 2
