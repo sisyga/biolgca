@@ -11,7 +11,7 @@ authors:
     affiliation: Technische Universität Dresden
     orcid: "https://orcid.org/0000-0001-9955-9012"
 version: 2.0.0
-date-released: 2026-10-15
+date-released: 2026-10-23
 repository-code: "https://github.com/sisyga/biolgca"
 url: "https://biolgca.readthedocs.io/"
 license: BSD-3-Clause
