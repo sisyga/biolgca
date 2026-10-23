@@ -5,6 +5,111 @@ This file records notable user-facing changes. Changes remain under
 
 ## Unreleased
 
+### Fixed
+
+- Errors raised in your own rules, reorientation terms, switch cues and
+  operator constructors keep their type and traceback. Before, a `KeyError`
+  became "unknown operator" or a `ValueError` naming only the key, and a
+  `TypeError` inside a cue was reported as a parameter error.
+- `check_interaction` checked no model for an identity-based
+  `phenotype_switch` without `n_species` and reported "0 models checked, all
+  passed"; it now checks them, and a check left with no model raises
+  `ValueError`.
+- `state.cells[name]` is a read-only copy; writing into it
+  (`cells["r_b"][mask] = x`) changed nothing without a warning. Use
+  `cells.set_trait`; code that edited the copy in place before passing it to
+  `set_trait` takes `cells["r_b"].copy()`.
+- `biolgca run/validate/sweep --plugins MODULE` finds a module next to the
+  model file or in the working directory without `PYTHONPATH`; a module that
+  is not found says where it was looked for.
+- A reorientation term of your own put in `operators` no longer suggests the
+  one-cue dict form, which then failed with "unknown operator"; it says to put
+  the term in `ReorientationSpec(terms=[...])`.
+- Square and hexagonal lattices given a `dims` tuple with more or fewer than
+  two entries (e.g. `dims=(10, 10, 4)`) raise a `ValueError` that names
+  `restchannels=` and `geometry='cubic'`. Before, the extra entries were
+  dropped silently.
+- Initial `nodes` of the wrong rank raise an error that names the expected
+  shape, instead of "too many values to unpack". One species may be given as
+  `dims + (1, K)`.
+- `tumour_spheroid` computed hexagonal positions with the wrong rows shifted,
+  so some lattice neighbours were 1.73 node spacings apart (initial ball,
+  unstirred layer, radial rings).
+- `plot_density` of multi-species models scaled colours to the channels of one
+  species, so a full node looked like a half-full one; the default scale is
+  now `n_species * K`. Density plots and animations of models without volume
+  exclusion ignored `vmax`, so an animation took its colour scale from its
+  first frame.
+- `LGCA_Square.calc_velocity_correlation` and `calc_vorticity` counted each
+  occupied channel of a model without volume exclusion as one cell.
+- `get_prop` of identity-based models without volume exclusion ignored the
+  property table passed in, and `calc_prop_mean()` without arguments raised
+  `AttributeError`.
+- Provenance of an uninstalled source checkout records the version "unknown"
+  instead of a hard-coded "2.0.0".
+
+### Changed
+
+- Initial `nodes` of volume-exclusion models with values other than 0 and 1
+  raise a `ValueError`. Before, they were cast to booleans with a warning, so
+  2 became one cell.
+- The `biolgca` command shows the traceback of errors raised in user code, the
+  notes ("step N was rolled back") of lgca's own errors, and `--version`; it
+  warns when the `metadata.json` of an archived run cannot be read;
+  `biolgca examples` lists the examples.
+- Clearer messages: an unknown operator name suggests the closest registered
+  name or the module to import; an unknown plugin parameter lists the
+  parameters the rule takes; `vary` suggests the closest short name; NaN or
+  out-of-range `switch_phenotype` rates, a trait name given as a probability
+  (write `{"max": "p_rest"}`), a cell mask computed before `kill`/`divide`,
+  and a reorientation term that keeps the species axis say what to do.
+- `ModelRunResult` and `StateSpec` print compactly (arrays by shape and dtype).
+- The warning about the rest channel of identity-based models without volume
+  exclusion says which setting it changes and how to silence it.
+- `lgca.base_extensions` is deprecated; import the classes from
+  `lgca.ib_base`, `lgca.nove_base` and `lgca.nove_ib_base`.
+- Deprecated `ParameterSpec.shape`, `dependencies` and `validator`, which
+  nothing in lgca uses.
+
+### Added
+
+- `check_interaction` checks reorientation terms (and catches terms that draw
+  from `numpy.random`), takes `fields=` for rules that read `state.field`,
+  keeps the rule's first error as the `__cause__` of `InteractionCheckError`,
+  and names the file and line of the rule.
+- `replace=True` on `@interaction`, `@stack` and `@reorientation_term`, as the
+  name-clash message says.
+- `lgca.model.UncheckedChangeWarning` for a `reconfigure` change that could
+  not be tried on a copy; `explorer.last_error` keeps the last error shown in
+  the explorer's status line.
+- CONTRIBUTING.md, CODE_OF_CONDUCT.md and GitHub issue templates; README and
+  the docs home page state who BioLGCA is for and how it relates to other
+  cell-based modelling tools; the README has a short project history.
+
+### Docs
+
+- Getting started explains ghost nodes and `lgca.nonborder`; the custom
+  interaction guide gives the return shape of every reorientation coupling,
+  the channel order per geometry, the module-qualified names of rules defined
+  in a module, and that `kill`/`divide` shift cell positions; a new "Initial
+  conditions" section covers the `region` and `from_npz` initializers and the
+  `nodes` shapes and label conventions of every family; `directed_motion` and
+  `steric_repulsion` are in the table of reorientation terms; installation
+  from GitHub without a clone; `StateSpec.capacity` is described as a crowding
+  scale; Observer hooks have docstrings.
+
+### Tests
+
+- New end-to-end tests of what users new to the package do
+  (`tests/user_workflows_test.py`): writing an adhesion term, an
+  oxygen-dependent go-or-grow switch in a module run from the command line,
+  and a trait-evolution rule, checked against analytic expectations.
+- Tests that repeated the function under test, checked only that code runs,
+  or asserted private attributes now check results against independent
+  expectations (conservation of cells, every recorded frame, every animation
+  frame, standard-error tolerances, symmetric neighbourhoods); duplicates and
+  tests of frozen legacy helpers were removed.
+
 ## 2.0.0 (2026-10-15)
 
 ### Added

@@ -37,7 +37,9 @@ committed `uv.lock`. Run everything from the repository root:
 ```bash
 uv sync                                    # install locked dependencies
 uv run pytest -q tests/x_test.py           # one test file while you work
-uv run pytest -q                           # full suite: about 2900 tests, 4 minutes
+uv run pytest -q                           # full suite without the slow tests: about 3 minutes
+uv run pytest -q --run-slow                # also the zoo's paper reproductions and the 3D explorer
+                                           # views (marked slow; CI runs them)
 uv run ruff check <files>                  # lint the files you changed
 uv run python docs/build.py --no-notebooks # strict docs build, notebooks not run (under a minute)
 uv run python docs/build.py                # docs build: runs the tutorials, renders the saved
@@ -47,8 +49,9 @@ uv run jupyter nbconvert --to notebook --execute --output-dir <tmp> <notebook>  
 ```
 
 Which checks when: the test file of your change while you work; the full
-suite and ruff before every commit, and the docs build without notebooks if
-the commit changes docstrings or docs; the notebooks you changed, or whose
+suite and ruff before every commit (with `--run-slow` when the commit changes
+the zoo, the explorer, or a rule, sampler or field solver that the zoo uses),
+and the docs build without notebooks if the commit changes docstrings or docs; the notebooks you changed, or whose
 code you changed, run once by hand; a zoo or example notebook whose code you
 changed is rerun with `docs/execute_notebooks.py` and committed with its
 outputs. The docs build runs before pushing (and in CI).
@@ -201,7 +204,9 @@ are in `docs/development/archive/reviews/2026-09-30-architecture-proposals.md`.
 - Every change comes with tests; a fix with a test that fails without it.
   Parametrize across geometries and model families where behaviour should be
   the same. Tests use fixed seeds; statistical tests compare with tolerances
-  derived from standard errors and fail for a wrong model.
+  derived from standard errors and fail for a wrong model. Mark a test
+  `@pytest.mark.slow` only if it reproduces a published result over many
+  seconds; the default run skips it, CI runs it.
 - `ContractWarning` is an error in every test (`filterwarnings` in
   `pyproject.toml`); test a warning with `pytest.warns`.
 - Tests do not depend on their order: `tests/conftest.py` removes the rules,

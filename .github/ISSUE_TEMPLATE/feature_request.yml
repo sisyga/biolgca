@@ -1,0 +1,23 @@
+name: Feature request
+description: Propose a new interaction, model, analysis or other improvement.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you want to model or do
+      description: The biological question or the task, and what is missing or hard today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: >-
+        For a new interaction: the mechanism, the rule (e.g. a switching probability or a
+        reorientation score) and the model families it applies to.
+  - type: input
+    id: reference
+    attributes:
+      label: Reference
+      description: A paper that describes the model or the method, if any (DOI).

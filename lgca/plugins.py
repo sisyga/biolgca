@@ -99,7 +99,8 @@ def validate_plugin_parameters(
             matches = difflib.get_close_matches(name, parameter_specs, n=1)
             suggestion = f" (did you mean {matches[0]!r}?)" if matches else ""
             details.append(f"{info.name}.{name}{suggestion}")
-        raise ValueError("unknown plugin parameter(s): " + ", ".join(details))
+        accepted = ", ".join(parameter_specs) or "none"
+        raise ValueError(f"unknown plugin parameter(s): {', '.join(details)}; {info.name} takes: {accepted}")
 
     canonical_capacity = getattr(getattr(context, "spec", None), "state", None)
     canonical_capacity = getattr(canonical_capacity, "capacity", None)
@@ -148,8 +149,6 @@ def _validate_parameter_value(
     elif spec.type_label == "boolean":
         if not isinstance(value, bool):
             raise ValueError(f"{info.name}.{name} must be a boolean")
-    elif spec.type_label == "array":
-        np.asarray(value)
 
     _validate_parameter_shape(info, name, spec, value, context)
 
@@ -231,8 +230,9 @@ def _register_example_plugins() -> None:
         operator_kind="reorientation",
         backend_families=("classical",),
         parameters={
-            "beta": {"default": 2.0, "type_label": "finite scalar"},
-            "alpha": {"default": 2.0, "type_label": "finite scalar"},
+            "beta": {"default": 2.0, "type_label": "finite scalar", "description": _PARAMETER_MEANINGS["beta"]},
+            "alpha": {"default": 2.0, "type_label": "finite scalar",
+                      "description": "Preference for resting over alignment."},
         },
         conservation_law=_law_for_kind("reorientation"),
         port_status="native",
@@ -305,26 +305,16 @@ _PARAMETER_MEANINGS = {
              "that a cell of species a becomes species b. Off-diagonal row sums must be <= 1, "
              "except for rows of weights in the Boltzmann form ({'rate': r, 'cues': [...]}).",
 }
-_PLUGIN_PARAMETER_MEANINGS = {
-    ("custom.rest_or_align", "alpha"): "Preference for resting over alignment.",
-}
 
 
 def _with_parameter_meanings(info: PluginInfo) -> PluginInfo:
-    """Fill empty parameter descriptions of a built-in plugin from the glossary."""
+    """Fill empty parameter descriptions of a built-in plugin from the glossary (the legacy names)."""
     parameters = {}
     for name, spec in info.parameter_specs.items():
         if not spec.description:
-            meaning = _PLUGIN_PARAMETER_MEANINGS.get((info.name, name), _PARAMETER_MEANINGS.get(name, ""))
-            spec = replace(spec, description=meaning)
+            spec = replace(spec, description=_PARAMETER_MEANINGS.get(name, ""))
         parameters[name] = spec
     return replace(info, parameters=parameters)
 
 
-
-def _describe_builtin_plugins() -> None:
-    for name, (info, factory) in list(default_registry._plugins.items()):
-        default_registry._plugins[name] = (_with_parameter_meanings(info), factory)
-
 _register_example_plugins()
-_describe_builtin_plugins()

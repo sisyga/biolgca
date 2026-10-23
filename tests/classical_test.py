@@ -1,13 +1,16 @@
 import numpy as np
 import pytest
 import copy
-import warnings
 
 from lgca import get_lgca
 from lgca.lgca_3dmoore import LGCA_3dMoore
 from tests.common_test import T_LGCA_Common
 
 com = T_LGCA_Common
+
+# the interactions of get_lgca that only move cells between channels and nodes
+CELL_CONSERVING = {"aggregation", "alignment", "chemotaxis", "contact_guidance", "go_or_rest", "nematic",
+                   "only_propagation", "persistent_motion", "persistent_walk", "random_walk"}
 
 
 def test_legacy_moore_nematic_uses_lazy_tensor_permutations():
@@ -583,11 +586,43 @@ def out_mo_corner_xyz_abc(nodes_mo_corner_xyz):
     return expected_output
 
 
+@pytest.mark.parametrize("ib", [False, True], ids=["classical", "identity"])
+@pytest.mark.parametrize("geom,dims", [
+    ('lin', (com.xdim_1d,)),
+    ('square', (com.xdim_square, com.ydim_square)),
+    ('hex', (com.xdim_hex, com.ydim_hex)),
+    ('cubic', (com.xdim_cubic, com.ydim_cubic, com.zdim_cubic)),
+    ('moore', (com.xdim_moore, com.ydim_moore, com.zdim_moore))
+])
+def test_recordings_hold_the_state_of_every_step(geom, dims, ib):
+    lgca = get_lgca(geometry=geom, ib=ib, dims=dims, density=0.5, restchannels=1,
+                    interaction='only_propagation', seed=3)
+    initial = lgca.nodes[lgca.nonborder].copy()
+    unrecorded = copy.deepcopy(lgca)
+    unrecorded.timeevo(timesteps=2, recorddens=False, showprogress=False)
+    for name in ('dens_t', 'nodes_t', 'n_t', 'velcells_t', 'restcells_t'):
+        assert not hasattr(unrecorded, name), f"records {name} without being asked to"
+
+    per_type = {} if ib else {'recordpertype': True}
+    lgca.timeevo(timesteps=2, record=True, recordN=True, showprogress=False, **per_type)
+    occupied_t = lgca.nodes_t > 0
+    assert len(lgca.nodes_t) == 3  # the initial state and one per step
+    np.testing.assert_array_equal(lgca.nodes_t[0], initial)
+    np.testing.assert_array_equal(lgca.nodes_t[-1], lgca.nodes[lgca.nonborder])
+    np.testing.assert_array_equal(lgca.dens_t, occupied_t.sum(-1))
+    # propagation on a periodic lattice keeps every cell
+    np.testing.assert_array_equal(lgca.n_t, (initial > 0).sum())
+    if not ib:
+        resting = occupied_t[..., lgca.velocitychannels:].sum(-1)
+        np.testing.assert_array_equal(lgca.restcells_t, resting)
+        np.testing.assert_array_equal(lgca.velcells_t, lgca.dens_t - resting)
+
+
 class Test_LGCA_classical(T_LGCA_Common):
     """
     Class for testing classical LGCA (volume exclusion, not identity-based).
     * propagation
-    * recording options during simulation
+    * recordings: see test_recordings_hold_the_state_of_every_step
     * boundary conditions
     The tests for boundary conditions are more extensive than necessary so that the boundary which is causing the problem
     can be isolated more easily.
@@ -595,46 +630,6 @@ class Test_LGCA_classical(T_LGCA_Common):
     com = T_LGCA_Common
     ve = True
     ib = False
-
-    @pytest.mark.parametrize("geom,dims", [
-        ('lin', (com.xdim_1d,)),
-        ('square', (com.xdim_square, com.ydim_square)),
-        ('hex', (com.xdim_hex, com.ydim_hex)),
-        ('cubic', (com.xdim_cubic, com.ydim_cubic, com.zdim_cubic)),
-        ('moore', (com.xdim_moore, com.ydim_moore, com.zdim_moore))
-    ])
-    def test_recording(self, geom, dims):
-        # timeevo and recording: check if all properties are available when requested
-        # keywords: record=False -> nodes_t, recordN=False n_t, recorddens=True -> dens_t, recordpertype=False -> velcells_t, restcells_t
-        lgca_1 = get_lgca(geometry=geom, ve=True, dims=dims, density=0.5, interaction='only_propagation')
-        lgca_2 = copy.deepcopy(lgca_1)
-
-        lgca_1.timeevo(timesteps=2, recorddens=False, showprogress=False)
-        assert not hasattr(lgca_1, 'dens_t'), "Records density when it should not"
-        assert not hasattr(lgca_1, 'nodes_t'), "Records node configuration when it should not"
-        assert not hasattr(lgca_1, 'n_t'), "Records particle number when it should not"
-        assert not hasattr(lgca_1, 'restcells_t') and not hasattr(lgca_1,
-                                                                  'velcells_t'), "Records density per channel type when it should not"
-        del lgca_1
-
-        lgca_3 = copy.deepcopy(lgca_2)
-        lgca_2.timeevo(timesteps=2, showprogress=False)
-        assert hasattr(lgca_2, 'dens_t'), "Does not record density"
-        del lgca_2
-
-        lgca_4 = copy.deepcopy(lgca_3)
-        lgca_3.timeevo(timesteps=2, record=True, recorddens=False, showprogress=False)
-        assert hasattr(lgca_3, 'nodes_t'), "Does not record node configuration"
-        del lgca_3
-
-        lgca_5 = copy.deepcopy(lgca_4)
-        lgca_4.timeevo(timesteps=2, recordN=True, recorddens=False, showprogress=False)
-        assert hasattr(lgca_4, 'n_t'), "Does not record particle number"
-        del lgca_4
-
-        lgca_5.timeevo(timesteps=2, recordpertype=True, recorddens=False, showprogress=False)
-        assert hasattr(lgca_5, 'restcells_t') and hasattr(lgca_5,
-                                                          'velcells_t'), "Does not record density per channel type"
 
     def test_propagation(self):
         # 1D
@@ -1003,21 +998,27 @@ class Test_LGCA_classical(T_LGCA_Common):
         # ('moore', com.nodes_ve_moore)
     ])
     def test_characteristics(self, geom, nodes):
-        # test compliance in all interactions to:
-        # * volume exclusion principle
+        # every interaction runs at every boundary without a contract violation (ContractWarning is an
+        # error); with volume exclusion two cells written to one channel merge, so a motility interaction
+        # that breaks it loses cells: these keep every cell on closed lattices and cannot gain cells
+        # through absorbing boundaries
         ref_lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib)
         for interaction in ref_lgca.interactions:
-            # test all boundary conditions in case of abuse of border nodes
-            self.t_characteristics(geom, nodes, interaction, 'pbc')
-            self.t_characteristics(geom, nodes, interaction, 'rbc')
-            self.t_characteristics(geom, nodes, interaction, 'abc')
+            for bc in ('pbc', 'rbc', 'abc'):
+                self.t_characteristics(geom, nodes, interaction, bc)
 
     def t_characteristics(self, geom, nodes, interaction, bc):
-        lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib, nodes=nodes, interaction=interaction, bc=bc)
-        lgca.timeevo(timesteps=1, recorddens=False, record=True, showprogress=False)
-        assert np.max(lgca.nodes_t.astype(int)) <= 1, "Volume exclusion principle is not respected"
-        if lgca.nodes_t[-1].max() == 0 and lgca.nodes_t[0].max() != 0 and bc!='abc':
-            warnings.warn("System died out in " + str(interaction))
+        lgca = get_lgca(geometry=geom, ve=self.ve, ib=self.ib, nodes=nodes, interaction=interaction, bc=bc,
+                        seed=1)
+        lgca.timeevo(timesteps=3, recorddens=False, record=True, showprogress=False)
+        assert lgca.nodes_t.dtype == bool
+        if interaction not in CELL_CONSERVING:
+            return
+        cells = lgca.nodes_t.reshape(len(lgca.nodes_t), -1).sum(-1)
+        if bc == 'abc':
+            assert np.all(np.diff(cells) <= 0), f"{interaction} creates cells at an absorbing boundary"
+        else:
+            np.testing.assert_array_equal(cells, nodes.sum(), err_msg=f"{interaction} creates or loses cells")
 
 
 def test_legacy_and_model_spec_chemotaxis_share_the_default_sensitivity():

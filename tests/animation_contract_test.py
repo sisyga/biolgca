@@ -11,41 +11,88 @@ import numpy as np
 import pytest
 
 from lgca import get_lgca
+from lgca.plots import LatticeAnimation
 from lgca.plotting import AnimationObserver, animate
+from tests.combinations import pairwise
 
 
-@pytest.mark.parametrize("ib,ve", [(False, True), (True, True), (False, False), (True, False)])
-@pytest.mark.parametrize("kind", ["config", "flux", "flow", "density"])
-@pytest.mark.parametrize("entry", ["direct", "facade"])
-def test_direct_and_facade_renderer_times(ib, ve, kind, entry):
+def _shown(fig):
+    """What the lattice axes of `fig` show: image data, patch colours, arrows and labels."""
+    ax = fig.axes[0]
+    shown = [np.asarray(image.get_array()).copy() for image in ax.images]
+    for artist in ax.collections:
+        shown.append(np.asarray(artist.get_facecolors()).copy())
+        if hasattr(artist, "U"):  # quiver: the arrows and their colours
+            shown += [np.asarray(artist.U).copy(), np.asarray(artist.V).copy(), np.asarray(artist.get_array()).copy()]
+    shown += [(text.get_text(), text.get_visible()) for text in ax.texts]
+    return shown
+
+
+def _same(first, second):
+    return len(first) == len(second) and all(np.array_equal(a, b) for a, b in zip(first, second))
+
+
+def _close(animation):
+    animation._draw_was_started = True
+    plt.close(animation._fig)
+
+
+def _recorded_square(ib, ve, seed):
+    model = get_lgca(geometry="square", dims=(3, 3), ib=ib, ve=ve, restchannels=1,
+                     density=1, seed=seed, interaction="random_walk")
+    model.timeevo(timesteps=2, record=True, showprogress=False)
+    return model
+
+
+@pytest.mark.parametrize("ib, ve, kind, entry", [
+    (ib, ve, kind, entry) for (ib, ve), kind, entry in pairwise(
+        [(False, True), (True, True), (False, False), (True, False)], ["config", "flux", "flow", "density"],
+        ["direct", "facade"])])
+def test_animation_frames_show_their_recorded_step_and_time(ib, ve, kind, entry):
+    # Frame n must draw recorded row n: the movie of rows (1, 0, 2) starts with what the
+    # movie of rows (0, 1, 2) shows at frame 1. Reordering keeps the colour scale.
     times = [0, 1, 6]  # non-uniform sample times must appear in the frame titles
-    model = get_lgca(geometry="square", dims=(2, 2), ib=ib, ve=ve, restchannels=1,
-                     density=2, seed=113, interaction="only_propagation")
-    model.nodes_t = np.stack([model.nodes[model.nonborder]] * 3)
-    model.dens_t = np.stack([model.cell_density[model.nonborder]] * 3)
+    model = _recorded_square(ib, ve, seed=113)
+    recorded = model.nodes_t.copy(), model.dens_t.copy()
     model.nodes_steps = model.dens_steps = np.array(times)
-    animation = (animate(model, kind=kind) if entry == "facade"
-                 else getattr(model, "animate_" + kind)())
+
+    def movie(order):
+        model.nodes_t, model.dens_t = (array[order] for array in recorded)
+        return animate(model, kind=kind) if entry == "facade" else getattr(model, "animate_" + kind)()
+
+    animation = movie([0, 1, 2])
+    assert isinstance(animation, LatticeAnimation)
+    frames = []
     for row, time in enumerate(times):
         animation._func(row)
         assert animation._fig.axes[0].get_title() == f"Time $k =${time}"
-    animation._draw_was_started = True
-    plt.close(animation._fig)
+        frames.append(_shown(animation._fig))
+    _close(animation)
+    assert not _same(frames[0], frames[1]), "the random walk must change the picture"
+    reordered = movie([1, 0, 2])
+    reordered._func(0)
+    first = _shown(reordered._fig)
+    _close(reordered)
+    assert _same(first, frames[1])
 
 
 @pytest.mark.parametrize("kind", ["config", "flux", "flow", "density"])
 @pytest.mark.parametrize("times", [None, [2, 5, 9]])
 def test_explicit_arrays_use_only_explicit_times(kind, times):
-    model = get_lgca(geometry="square", dims=(2, 2), density=2, seed=148,
-                     interaction="only_propagation")
+    model = _recorded_square(False, True, seed=148)
     model.nodes_steps = model.dens_steps = np.array([100, 200, 300])
-    data = model.cell_density[model.nonborder] if kind == "density" else model.nodes[model.nonborder]
-    data = np.stack([data] * 3)
+    data = model.dens_t if kind == "density" else model.nodes_t
     animation = animate(model, kind=kind, data=data, steps=times)
     animation._func(2)
     assert animation._fig.axes[0].get_title() == f"Time $k =${2 if times is None else 9}"
-    animation._draw_was_started = True
-    plt.close(animation._fig)
+    last = _shown(animation._fig)
+    _close(animation)
+    # the frames are the given arrays: the movie that starts with the last row shows it first
+    alone = animate(model, kind=kind, data=data[[2, 0, 1]], steps=times)
+    alone._func(0)
+    first = _shown(alone._fig)
+    _close(alone)
+    assert _same(first, last)
 
 
 @pytest.mark.parametrize("kind", ["config", "density", "flux"])

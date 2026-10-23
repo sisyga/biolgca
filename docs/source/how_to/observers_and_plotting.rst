@@ -138,6 +138,13 @@ trait of the cells at every recorded time:
    mean_kappa = [kappa[cells.label].mean() for cells in lgca.cells_t]
    density = np.bincount(lgca.cells_t[-1].index, minlength=lgca.cell_density[lgca.nonborder].size)
 
+The two identity-based families number their cells differently. With volume
+exclusion, ``lgca.nodes_t`` is an integer array of labels in which 0 marks an
+empty channel, so ``labels = nodes[nodes > 0]`` for ``nodes =
+lgca.nodes_t[t]`` gives the living cells and ``lgca.props["kappa"][labels]``
+their traits. Without volume exclusion, label 0 is a real cell: take the
+labels from ``lgca.cells_t[t].label`` as above, not by filtering ``> 0``.
+
 Dense and sparse recorder results
 ---------------------------------
 

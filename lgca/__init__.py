@@ -27,6 +27,9 @@ References
 
 import difflib
 import logging
+
+import numpy as np
+
 from ._warnings import warn_user
 from typing import Tuple, Any
 
@@ -180,6 +183,31 @@ def _warn_on_node_mismatch(nodes, dims_arg, rest_arg, density_arg, geom_key, n_s
         warn_user(f"Provided nodes override ``density``={density_arg}.")
 
 
+_SPATIAL_NDIM = {'lin': 1, 'square': 2, 'hex': 2, 'cubic': 3, 'moore': 3}
+
+
+def _check_nodes_ndim(nodes, geom_key, n_species):
+    """Return ``nodes`` with the axes the lattice class expects, or raise saying which shape is expected.
+
+    One species may be given with its species axis, ``dims + (1, K)``, as rules see it; it is dropped.
+    """
+    spatial_ndim = _SPATIAL_NDIM.get(geom_key)
+    shape = np.shape(nodes)
+    if spatial_ndim is None:
+        return nodes
+    if n_species == 1 and len(shape) == spatial_ndim + 2 and shape[-2] == 1:
+        return np.asarray(nodes)[..., 0, :]
+    expected_ndim = spatial_ndim + (2 if n_species > 1 else 1)
+    if len(shape) != expected_ndim:
+        expected = ("dims + (n_species, K)" if n_species > 1
+                    else "dims + (K,) (or dims + (n_species, K) for n_species > 1)")
+        raise ValueError(
+            f"nodes must have shape {expected}, with {spatial_ndim} spatial axes for the {geom_key!r} "
+            f"lattice and K the number of velocity and rest channels; got shape {shape}"
+        )
+    return nodes
+
+
 
 
 def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, n_species: int = 1, **kwargs):
@@ -327,6 +355,9 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, n_species
     if isinstance(n_species, bool) or int(n_species) != n_species or n_species < 1:
         raise ValueError("n_species must be a positive integer.")
     n_species = int(n_species)
+    if nodes is not None:
+        nodes = _check_nodes_ndim(nodes, geom_key, n_species)
+        kwargs["nodes"] = nodes
     interaction = kwargs.get("interaction")
     interaction_name = interaction.replace(" ", "_") if isinstance(interaction, str) else interaction
 

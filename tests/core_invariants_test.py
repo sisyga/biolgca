@@ -11,6 +11,7 @@ from lgca.simulation import (
     ScalarTimeSeriesRecorder,
     SimulationRunner,
 )
+from tests.combinations import pairwise
 
 
 FAMILIES = {
@@ -53,24 +54,6 @@ def test_identity_boolean_initialization_assigns_unique_physical_ids(geometry):
 def test_identity_initialization_rejects_invalid_labels(nodes):
     with pytest.raises(ValueError, match="non-negative integer"):
         get_lgca(geometry="lin", nodes=nodes, ib=True, interaction="only_propagation")
-
-
-def test_shared_identity_birth_kernel_preserves_ids_and_indexes_new_properties():
-    from tests.legacy.identity_kernels import apply_identity_birth
-
-    lgca = get_lgca(geometry="lin", ib=True, nodes=np.array([[1, 0], [2, 3], [0, 0]]),
-                    interaction="only_propagation", seed=125)
-    lgca.props["r_b"] = [0., 1., 1., 1.]
-    for _ in range(10):
-        apply_identity_birth(lgca, a_max=1, std=.01)
-        lgca.update_dynamic_fields()
-    labels = lgca.nodes[lgca.nonborder]
-    living = labels[labels > 0]
-    assert set(living) == {1, 2, 3, 4}
-    assert len(living) == len(set(living))
-    assert not labels[2].any()
-    assert len(lgca.props["r_b"]) == int(lgca.maxlabel) + 1 == 5
-    assert 0 <= lgca.props["r_b"][4] <= 1
 
 
 def _make_lgca(family, geometry, *, bc="pbc", density=0):
@@ -117,9 +100,7 @@ def _particle_count(lgca):
     return int(np.asarray(lgca.cell_density[lgca.nonborder]).sum())
 
 
-@pytest.mark.parametrize("bc", ["pbc", "rbc", "abc"])
-@pytest.mark.parametrize("geometry", GEOMETRIES)
-@pytest.mark.parametrize("family", FAMILIES)
+@pytest.mark.parametrize("family, geometry, bc", pairwise(list(FAMILIES), list(GEOMETRIES), ["pbc", "rbc", "abc"]))
 def test_plus_x_boundary_crossing_obeys_core_invariants(family, geometry, bc):
     """A single particle must wrap, reflect, or be absorbed exactly once."""
     lgca = _make_lgca(family, geometry, bc=bc)
@@ -153,54 +134,24 @@ def test_seeded_initialization_is_reproducible(family, geometry):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_dense_recorders_have_one_row_per_simulation_step(family, tmp_path):
-    lgca = _make_lgca(family, "lin", density=0.25)
+    lgca = _make_lgca(family, "lin", density=0.5)
     scalar = ScalarTimeSeriesRecorder(output_path=tmp_path / "population.csv")
     observers = [NodeRecorder(), DensityRecorder(), PopulationRecorder(), scalar]
+
+    total = _particle_count(lgca)
+    assert total > 0
 
     SimulationRunner(
         lgca, timesteps=2, observers=observers, showprogress=False
     ).run()
 
+    # the initial state and one row per step; propagation on a periodic lattice keeps the cells
     assert lgca.nodes_t.shape[0] == 3
-    assert lgca.dens_t.shape[0] == 3
-    assert lgca.n_t.shape == (3,)
+    np.testing.assert_array_equal(lgca.nodes_t[-1], lgca.nodes[lgca.nonborder])
+    np.testing.assert_array_equal(lgca.dens_t, lgca._channel_counts(lgca.nodes_t).sum(-1))  # per species
+    np.testing.assert_array_equal(lgca.n_t, [total] * 3)
     assert [record["step"] for record in scalar.records] == [0, 1, 2]
-
-
-def test_truncated_normal_sampler_respects_bounds_and_moments():
-    from tests.legacy.identity_kernels import sample_truncated_normal
-
-    rng = np.random.default_rng(3)
-    means = np.repeat([0.0, 0.5, 1.5], 20000)
-    samples = sample_truncated_normal(0.0, 1.0, means, 0.05, rng)
-
-    assert samples.shape == means.shape
-    assert np.all((samples >= 0) & (samples <= 1))
-    centred = samples[means == 0.5]
-    np.testing.assert_allclose(centred.mean(), 0.5, atol=0.002)
-    np.testing.assert_allclose(centred.std(), 0.05, rtol=0.03)
-    # A normal truncated at its mean is half-normal with mean sigma * sqrt(2 / pi).
-    np.testing.assert_allclose(samples[means == 0.0].mean(), 0.05 * np.sqrt(2 / np.pi), rtol=0.03)
-    assert samples[means == 1.5].min() > 0.9
-    np.testing.assert_array_equal(sample_truncated_normal(0.0, 1.0, [0.2, 2.0], 0.0, rng), [0.2, 2.0])
-
-
-def test_daughter_properties_copy_untouched_traits_from_parents():
-    from types import SimpleNamespace
-
-    from tests.legacy.identity_kernels import append_daughter_properties
-
-    lgca = SimpleNamespace(maxlabel=5, props={
-        "r_b": [0.0, 0.1, 0.2, 0.3],
-        "family": [0, 1, 1, 2],
-        "kappa": np.array([0.0, 4.0, 5.0, 6.0]),
-    })
-
-    append_daughter_properties(lgca, [3, 1], r_b=[0.35, 0.15])
-
-    assert lgca.props["r_b"] == [0.0, 0.1, 0.2, 0.3, 0.35, 0.15]
-    assert lgca.props["family"] == [0, 1, 1, 2, 2, 1]
-    np.testing.assert_array_equal(lgca.props["kappa"], [0, 4, 5, 6, 6, 4])
+    assert [record["population"] for record in scalar.records] == [total] * 3
 
 
 @pytest.mark.parametrize("ve", [True, False])

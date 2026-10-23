@@ -17,16 +17,18 @@ def test_direct_lgca_constructors_reject_unknown_kwargs(cls):
 
 
 def test_direct_lgca_constructors_accept_valid_interaction_kwargs():
-    lgca = LGCA_1D(
-        dims=4,
-        density=0,
-        interaction="birthdeath",
-        r_b=0.2,
-        r_d=0.1,
-    )
+    # accepted and used: certain death empties the lattice in one step
+    lgca = LGCA_1D(dims=10, density=0.5, interaction="birthdeath", r_b=0.0, r_d=1.0, seed=1)
+    assert lgca.cell_density[lgca.nonborder].sum() > 0
 
-    assert lgca.interaction_params["r_b"] == 0.2
-    assert lgca.interaction_params["r_d"] == 0.1
+    lgca.timestep()
+
+    assert lgca.cell_density.sum() == 0
+    # and r_b: certain birth without death adds cells
+    lgca = LGCA_1D(dims=10, density=0.5, interaction="birthdeath", r_b=1.0, r_d=0.0, seed=1)
+    before = lgca.cell_density[lgca.nonborder].sum()
+    lgca.timestep()
+    assert lgca.cell_density[lgca.nonborder].sum() > before
 
 
 def test_direct_nove_constructor_accepts_capacity_and_rejects_typo():
@@ -87,19 +89,29 @@ def test_known_constructor_and_interaction_kwargs_are_accepted():
     lgca = get_lgca(
         geometry="square",
         dims=3,
-        density=0,
-        restchannels=1,
+        density=0.5,
+        restchannels=2,
         bc="periodic",
         seed=1,
         propagation=False,
         interaction="go_or_grow",
-        r_b=0.2,
-        r_d=0.01,
+        r_b=0.0,
+        r_d=1.0,
         kappa=5.0,
         theta=0.75,
     )
-
     assert lgca.dims == (3, 3)
+    assert lgca.cell_density[lgca.nonborder].sum() > 0
+
+    lgca.timestep()
+
+    assert lgca.cell_density.sum() == 0  # the rates reached the rule: certain death, no births
+    grow = get_lgca(geometry="square", dims=3, density=0.5, restchannels=2, seed=1, propagation=False,
+                    interaction="go_or_grow", r_b=1.0, r_d=0.0, kappa=5.0, theta=0.75)
+    before = grow.cell_density[grow.nonborder].sum()
+    for _ in range(10):  # only resting cells divide, and without propagation few rest at first
+        grow.timestep()
+    assert grow.cell_density[grow.nonborder].sum() > before  # and r_b: certain birth adds cells
 
 
 def test_nove_1d_set_r_int_preserves_state():
@@ -268,19 +280,19 @@ def test_chemotaxis_rejects_bad_gradient_shape():
         )
 
 
-def test_nove_ib_capacity_sets_lattice_and_interaction_capacity():
-    lgca = get_lgca(
-        geometry="lin",
-        ib=True,
-        ve=False,
-        density=0,
-        capacity=20,
-        interaction="birth",
-        seed=1,
-    )
+@pytest.mark.parametrize("capacity", [2, 20])
+def test_nove_ib_capacity_sets_lattice_and_interaction_capacity(capacity):
+    nodes = np.zeros((10, 3), dtype=int)
+    nodes[:, -1] = 2
+    lgca = get_lgca(geometry="lin", ib=True, ve=False, nodes=nodes, capacity=capacity, interaction="birth",
+                    r_b=1.0, bc="periodic", propagation=False, seed=1)
+    assert lgca.capacity == capacity
 
-    assert lgca.capacity == 20
-    assert lgca.interaction_params["capacity"] == 20
+    lgca.timestep()
+
+    # divisions scale with 1 - n / capacity: none at a full node, many when there is room
+    population = lgca.cell_density[lgca.nonborder].sum()
+    assert population == 20 if capacity == 2 else population > 30
 
 
 def _nove_ib_nodes(length=4):

@@ -41,7 +41,9 @@ def test_invalid_tree_raises_typeerror():
 
 
 def test_plot_helpers_work_without_cm_get_cmap(monkeypatch):
-    import matplotlib.cm as cm
+    # matplotlib 3.9 removed cm.get_cmap: the helpers still pick the named colormaps
+    import matplotlib
+    from matplotlib import cm
 
     monkeypatch.delattr(cm, "get_cmap", raising=False)
     children_nlist = [[1], []]
@@ -50,5 +52,10 @@ def test_plot_helpers_work_without_cm_get_cmap(monkeypatch):
     mapper = IdentityColourMapper("tab20", children_nlist, parent_list)
     scalar_mappable = get_cmap(np.array([[0, 1], [2, 0]]), cbar=False)
 
-    assert mapper.get_colour(0) is not None
-    assert hasattr(scalar_mappable, "to_rgba")
+    tab20 = matplotlib.colormaps["tab20"].colors
+    assert mapper.get_colour(0) == tab20[0] and mapper.get_colour(1) == tab20[1]
+    viridis = matplotlib.colormaps["viridis"]
+    # empty nodes are transparent, one cell gets the first colour and the maximum the last
+    np.testing.assert_allclose(scalar_mappable.to_rgba(0), (0, 0, 0, 0))
+    np.testing.assert_allclose(scalar_mappable.to_rgba(1), viridis(0))
+    np.testing.assert_allclose(scalar_mappable.to_rgba(2), viridis(viridis.N - 1))

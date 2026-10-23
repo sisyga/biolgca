@@ -133,6 +133,8 @@ def test_a_failed_step_leaves_the_model_as_before_and_retries_give_the_same_run(
 
 
 def test_an_interrupted_reorientation_is_rolled_back(monkeypatch):
+    # the sampler writes the occupied channels and then the labels: an interrupt between the two
+    # writes once replaced every label with 1
     import lgca.lattice_state
 
     model = build_model(ModelSpec(
@@ -162,15 +164,28 @@ def _snapshot_without_fields(model):
 
 
 def test_without_rollback_a_failed_step_stops_the_model():
-    model = _model("classical")
-    model.rollback = False
-    _FAIL["at"] = 1
-    with pytest.raises(RuntimeError, match="injected") as error:
-        model.step()
+    steps = []
 
-    assert not getattr(error.value, "__notes__", [])
-    with pytest.raises(RuntimeError, match="step 1 of this model failed .* rebuild"):
+    @interaction(kind="birth_death", families="classical", name="fails_at_step_2")
+    def fails_at_step_2(state):
+        steps.append(state.step)
+        state.remove_cells(0.1)
+        if state.step == 2:
+            raise ValueError("broken rule")
+
+    model = build_model(ModelSpec(state=StateSpec(density=0.5), time=TimeSpec(steps=5, seed=1),
+                                  dynamics=InteractionPipelineSpec(operators=[fails_at_step_2()])))
+    model.rollback = False  # with it, the failed step is undone and the model goes on
+    model.step()
+    with pytest.raises(ValueError, match="broken rule") as error:
         model.step()
+    assert not getattr(error.value, "__notes__", [])  # nothing was rolled back
+    for go_on in (model.step, lambda: model.run(showprogress=False), model.lgca.timestep):
+        with pytest.raises(RuntimeError, match=r"step 2 of this model failed \(ValueError: broken rule\).*rebuild"):
+            go_on()
+
+    assert steps == [1, 2]
+    build_model(model.spec).step()  # a rebuilt model runs
 
 
 def test_a_function_given_to_get_lgca_is_rolled_back_too():
@@ -193,15 +208,21 @@ def test_traits_written_and_grown_in_a_failed_step_are_restored():
     model.step()
     lgca = model.lgca
     traits = lgca.props["r_b"]
-    values, size, buffer = traits.values.copy(), len(traits), traits._data
+    values, size = traits.values.copy(), len(traits)
     _FAIL["at"] = 2
 
     with pytest.raises(RuntimeError, match="injected"):
         model.step()
 
-    assert lgca.props["r_b"] is traits and traits._data is buffer and len(traits) == size
+    # a reference the user holds sees the restored values
+    assert lgca.props["r_b"] is traits and len(traits) == size
     np.testing.assert_array_equal(traits.values, values)
-    assert traits._journal is None  # nothing is recorded between steps
+    # a trait set between steps stays, and a failed step goes back to it, not to an older value
     state = LatticeState(lgca, kind="birth_death")
-    state.cells.set_trait(np.ones(len(state.cells), dtype=bool), "r_b", 0.5)  # no journal outside a step
-    assert traits._journal is None
+    state.cells.set_trait(np.ones(len(state.cells), dtype=bool), "r_b", 0.5)
+    changed = traits.values.copy()
+    assert not np.array_equal(changed, values)
+    _FAIL["at"] = 2
+    with pytest.raises(RuntimeError, match="injected"):
+        model.step()
+    np.testing.assert_array_equal(lgca.props["r_b"].values, changed)

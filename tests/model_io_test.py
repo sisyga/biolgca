@@ -55,20 +55,32 @@ def _chemotaxis_spec():
     )
 
 
-def test_model_spec_json_and_yaml_round_trip_numpy_fields(tmp_path):
+def _save_and_load(spec, tmp_path, route):
+    if route == "json string":
+        return model_spec_from_json(model_spec_to_json(spec))
+    if route == "yaml string":
+        return model_spec_from_yaml(model_spec_to_yaml(spec))
+    path = tmp_path / f"model{route}"
+    assert save_model_spec(spec, path) == path
+    return load_model_spec(path)
+
+
+@pytest.mark.parametrize("route", [".json", ".yaml", ".yml", "json string", "yaml string"])
+def test_a_saved_model_is_the_same_model(tmp_path, route):
     spec = _chemotaxis_spec()
 
-    path = tmp_path / "model.json"
-    model_spec_to_json(spec, path)
-    loaded_json = model_spec_from_json(path)
-    loaded_yaml = model_spec_from_yaml(model_spec_to_yaml(spec))
+    loaded = _save_and_load(spec, tmp_path, route)
 
-    assert loaded_json.description.title == "serializable chemotaxis"
-    assert loaded_json.time.seed == 7
-    assert isinstance(loaded_json.dynamics.operators[0], ReorientationSpec)
-    assert isinstance(loaded_json.analysis.observers[0], DensityRecorder)
-    np.testing.assert_array_equal(loaded_json.state.fields["signal"], spec.state.fields["signal"])
-    np.testing.assert_array_equal(loaded_yaml.state.fields["signal"], spec.state.fields["signal"])
+    assert model_spec_to_dict(loaded)["model"]["dynamics"] == model_spec_to_dict(spec)["model"]["dynamics"]
+    term = loaded.dynamics.operators[0].terms[0]
+    assert (term.name, term.beta, dict(term.parameters)) == ("chemotaxis", 1.5, {"field": "signal"})
+    assert (loaded.description.title, loaded.time.seed) == ("serializable chemotaxis", 7)
+    assert isinstance(loaded.analysis.observers[0], DensityRecorder)
+    np.testing.assert_array_equal(loaded.state.fields["signal"], spec.state.fields["signal"])
+    # oracle: the same seeded model runs the same way
+    ran, reran = run_model(spec, showprogress=False).lgca, run_model(loaded, showprogress=False).lgca
+    np.testing.assert_array_equal(reran.nodes, ran.nodes)
+    np.testing.assert_array_equal(reran.dens_t, ran.dens_t)
 
 
 def test_model_spec_dict_contains_schema_version_and_migrates_current_version():
@@ -151,23 +163,6 @@ def test_describe_model_graph_exposes_fields_plugins_observers_and_outputs():
     assert ("observer:0:DensityRecorder", "output:dens_t") in edges
 
 
-def test_save_and_load_model_spec_choose_format_from_file_suffix(tmp_path):
-    spec = _chemotaxis_spec()
-    json_path = tmp_path / "model.json"
-    yaml_path = tmp_path / "model.yaml"
-
-    assert save_model_spec(spec, json_path) == json_path
-    assert save_model_spec(spec, yaml_path) == yaml_path
-
-    json_loaded = load_model_spec(json_path)
-    yaml_loaded = load_model_spec(yaml_path)
-
-    assert json_loaded.description.title == spec.description.title
-    assert yaml_loaded.description.title == spec.description.title
-    np.testing.assert_array_equal(json_loaded.state.fields["signal"], spec.state.fields["signal"])
-    np.testing.assert_array_equal(yaml_loaded.state.fields["signal"], spec.state.fields["signal"])
-
-
 def test_save_and_load_model_spec_report_friendly_format_errors(tmp_path):
     with pytest.raises(ValueError, match=r"Use a \.json, \.yaml, or \.yml file"):
         save_model_spec(_chemotaxis_spec(), tmp_path / "model.txt")
@@ -186,10 +181,15 @@ def test_example_lookup_api_lists_names_and_reports_unknown_examples():
 
 
 def test_original_get_lgca_quick_start_still_works():
-    lgca = get_lgca(seed=1)
-    lgca.timeevo(timesteps=1, showprogress=False)
+    # the default model is a random walk: it keeps its cells, and a seed repeats the run
+    lgca, again = get_lgca(seed=1), get_lgca(seed=1)
+    before = lgca.total_population()
+    lgca.timeevo(timesteps=3, showprogress=False)
+    again.timeevo(timesteps=3, showprogress=False)
 
-    assert lgca.total_population() >= 0
+    assert before > 0
+    assert lgca.total_population() == before
+    np.testing.assert_array_equal(lgca.nodes, again.nodes)
 
 
 def test_unseeded_run_records_a_seed_that_reproduces_it():

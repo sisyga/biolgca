@@ -138,19 +138,16 @@ def core_and_rim(lgca, rim: float = 0.1) -> dict[str, float]:
 
     An extinct population has zero cells and clones and NaN trait means.
     """
-    from lgca.lattice_state import LatticeState
-    from lgca.zoo.phenotypic_plasticity import _distance
+    from lgca.zoo._geometry import core_and_rim_cells
 
-    cells = LatticeState(lgca).cells
+    cells, core, outer_rim = core_and_rim_cells(lgca, rim)
     if not len(cells):
         return {"cells": 0, "clones": 0,
                 **{trait: {region: float("nan") for region in ("core", "rim", "all")}
                    for trait in ("kappa", "r_b")}}
-    distance = _distance(lgca)[cells.node]
-    inner, outer = np.quantile(distance, [0.5, 1 - rim])
     summary = {"cells": len(cells), "clones": clonal_indices(lgca)["clones"]}
     for trait in ("kappa", "r_b"):
         values = np.asarray(cells[trait], dtype=float)
-        summary[trait] = {"core": float(values[distance <= inner].mean()),
-                          "rim": float(values[distance >= outer].mean()), "all": float(values.mean())}
+        summary[trait] = {"core": float(values[core].mean()), "rim": float(values[outer_rim].mean()),
+                          "all": float(values.mean())}
     return summary

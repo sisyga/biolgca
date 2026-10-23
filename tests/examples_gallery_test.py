@@ -32,11 +32,15 @@ def test_example_gallery_lists_beginner_model_cards_by_category():
 def test_run_example_uses_stable_name_and_allows_tiny_live_runs():
     from lgca.examples import run_example
 
-    result = run_example("random_walk", steps=1, showprogress=False)
+    result = run_example("random_walk", steps=3, showprogress=False)
 
     assert result.metadata["title"] == "Random walk example"
-    assert result.metadata["steps"] == 1
-    assert result.lgca.total_population() >= 0
+    assert result.metadata["steps"] == 3
+    # the run took the requested steps, and a random walk keeps its cells
+    np.testing.assert_array_equal(result.data.steps("population"), [0, 1, 2, 3])
+    population = result.data["population"]
+    assert population[0] > 0
+    np.testing.assert_array_equal(population, [result.lgca.total_population()] * 4)
 
 
 def test_save_example_spec_writes_loadable_model_config(tmp_path):

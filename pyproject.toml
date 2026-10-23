@@ -16,7 +16,7 @@ authors = [
 ]
 keywords = ["cellular automata", "lattice gas", "biological modelling", "simulation"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
@@ -98,3 +98,4 @@ packages = ["lgca", "lgca.examples", "lgca.schemas", "lgca.zoo"]
 testpaths = ["tests"]  # not the ignored outputs/ (probe scripts, pytest temp folders)
 # a rule that breaks its kind's contract fails the test instead of warning once
 filterwarnings = ["error::lgca.ContractWarning"]
+markers = ["slow: the zoo's paper reproductions and the 3D explorer views; run only with --run-slow"]

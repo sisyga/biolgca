@@ -91,7 +91,8 @@ def select_density(lgca, density=None, channels=slice(None), species=None):
         else:
             if species is not None:
                 raise ValueError("species selection requires a multispecies LGCA")
-            density = nodes[..., channels].sum(-1)
+            # cells per channel: identity-based models store labels or label lists
+            density = lgca._channel_counts(nodes)[..., channels].sum(-1)
     else:
         density = np.asarray(density)
         if density.ndim == spatial_ndim + 1:

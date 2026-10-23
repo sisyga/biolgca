@@ -4,9 +4,22 @@ from __future__ import annotations
 
 import os
 import sys
+import sysconfig
 import warnings
 
 _PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
+# lgca, the standard library and installed packages: frames there are not the user's code
+_LIBRARY_DIRS = tuple({os.path.abspath(path) for path in (
+    _PACKAGE_DIR, *(sysconfig.get_paths().get(key) for key in ("stdlib", "platstdlib", "purelib", "platlib")))
+    if path})
+
+
+def is_user_code(filename) -> bool:
+    """Whether ``filename`` (of a frame) is the user's code: not lgca, the standard library or a package."""
+    if filename.startswith("<"):  # <frozen importlib._bootstrap>, <string>
+        return False
+    path = os.path.abspath(filename)
+    return not any(path == root or path.startswith(root + os.sep) for root in _LIBRARY_DIRS)
 
 
 def warn_user(message, category=UserWarning):

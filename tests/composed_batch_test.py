@@ -77,13 +77,20 @@ def test_rest_bias_has_hand_derived_categorical_distribution():
     assert np.all(np.abs(observed - expected) < 6 * np.sqrt(expected * (1 - expected) / len(nodes)))
 
 
-def test_composed_scores_are_bounded_and_candidates_converted_once(monkeypatch):
+def test_a_small_memory_budget_splits_the_nodes_into_batches_with_the_same_result(monkeypatch):
     from lgca import pipeline
 
-    model = build_model(ModelSpec(space=SpaceSpec(geometry="square", dims=(8, 8)),
-        state=StateSpec(nodes=np.tile([True, True, False, False], (8, 8, 1))),
-        dynamics=InteractionPipelineSpec(operators=[ReorientationSpec(terms=[
-            ReorientationTermSpec("aggregation"), ReorientationTermSpec("polar_alignment")])], propagation=False)))
+    def built():
+        return build_model(ModelSpec(space=SpaceSpec(geometry="square", dims=(8, 8)),
+            state=StateSpec(nodes=np.tile([True, True, False, False], (8, 8, 1))), time=TimeSpec(seed=5),
+            dynamics=InteractionPipelineSpec(operators=[ReorientationSpec(terms=[
+                ReorientationTermSpec("aggregation"), ReorientationTermSpec("polar_alignment")])],
+                propagation=False)))
+
+    unbatched = built()
+    unbatched.step()
+    model = built()
+    # room for the scores of two nodes' candidates at a time; the candidates are converted once
     monkeypatch.setattr(pipeline, "_MAX_CANDIDATE_BATCH_BYTES", 6 * 8 * 6 * 2)
     matrix_calls, batches = [], []
     original_matrix, original_batches = pipeline._candidate_matrix, pipeline._candidate_batches
@@ -103,6 +110,7 @@ def test_composed_scores_are_bounded_and_candidates_converted_once(monkeypatch):
     model.step()
     assert len(matrix_calls) == 1
     assert sum(batches) == 64
+    np.testing.assert_array_equal(model.lgca.nodes, unbatched.lgca.nodes)
 
 
 def test_candidate_budget_rejects_before_allocation(monkeypatch):

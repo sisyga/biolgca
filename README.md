@@ -26,7 +26,30 @@ With BioLGCA you can:
 - track individual cells with heritable traits to study evolution;
 - watch a model run in a notebook while you change its parameters with sliders;
 - run on 1D, square, hexagonal and 3D lattices; and
-- save every model as a JSON file that reruns exactly from its seed.
+- save every model as a JSON file that reruns from its seed with the same data
+  (given the same BioLGCA and dependency versions).
+
+## Why BioLGCA
+
+BioLGCA is for researchers and students in mathematical and theoretical
+biology who model collective cell migration, tissue growth, pattern formation
+or the evolution of cell populations, and for courses that teach these
+topics. LGCA describe cells by their numbers and directions of movement on a
+lattice, so a model is a short list of local stochastic rules that can be
+simulated on large lattices and analysed with mean-field and stability
+methods (Deutsch et al. 2021).
+
+General-purpose frameworks for cell-based models, such as Morpheus and
+CompuCell3D (cellular Potts models), PhysiCell (off-lattice agents) and Chaste
+(several cell-based model types, including an on-lattice cellular automaton),
+couple cells to fields in many ways but do not offer the velocity-channel state space of LGCA, in which
+alignment, chemotaxis and go-or-grow switching are rules for the
+reorientation of channel states and in which mean-field equations can be
+derived systematically from the rules. BioLGCA provides this model class as a
+library: the rules of the BIO-LGCA literature as composable building blocks,
+a checked contract for new rules, model files that rerun from their seed, parameter
+sweeps, and a [model zoo](docs/source/zoo/index.rst) that reproduces
+published LGCA models with these rules.
 
 ## Quick start
 
@@ -103,7 +126,8 @@ result.lgca.plot_density()
 ```
 
 Save the model with `save_model_spec(spec, "model.json")` from `lgca.model`.
-Anyone can then rerun it from the command line and get identical data:
+Anyone with the same versions of BioLGCA and its dependencies can then rerun it
+from the command line and get identical data:
 
 ```bash
 uv run biolgca run model.json --output runs/chemotaxis-001
@@ -194,7 +218,7 @@ growth rules, movement biases and a deterministic collision rule, and tutorial
 Eight notebooks take you from the first random walk to a reproducible project
 and to cells that act on the molecules around them.
 Every model is built in visible cells and the notebooks run in CI, so they
-always work with the current code.
+are checked against the current code.
 
 | Lesson | You will learn to |
 | --- | --- |
@@ -226,20 +250,31 @@ Moore lattices. 3D rendering uses Mayavi, which is optional: install it with
 
 ## Other ways to install
 
-Without uv, install BioLGCA into any Python 3.11+ environment:
+Without uv, install BioLGCA into any Python 3.11+ environment, from a clone
+or directly from GitHub (BioLGCA is not on PyPI yet):
 
 ```bash
-python -m pip install -e ".[notebooks]"   # JupyterLab; also ".[yaml]" or ".[plot3d]"
+python -m pip install -e ".[notebooks]"   # in the clone; JupyterLab; also ".[yaml]" or ".[plot3d]"
+python -m pip install "biolgca @ git+https://github.com/sisyga/biolgca"   # without a clone
 ```
 
 This picks the newest compatible versions of the dependencies. `uv sync` instead
 installs the exact versions in `uv.lock`, which the test suite runs against.
+The runtime dependencies are NumPy, SciPy, pyamg, threadpoolctl, tqdm,
+Matplotlib, pandas and ipywidgets; `biolgca examples list` checks that the
+installation works.
 
-## Contributing
+## Questions and contributing
 
-Bug reports and ideas are welcome on the
-[issue tracker](https://github.com/sisyga/biolgca/issues). `uv sync` also
-installs the development tools; run the checks from the repository root:
+- **Questions** about using BioLGCA, and **bug reports** and **ideas**: open
+  an issue on the [issue tracker](https://github.com/sisyga/biolgca/issues),
+  which offers templates for each.
+- **Contributions** are welcome: [CONTRIBUTING.md](CONTRIBUTING.md) explains
+  how to set up the development environment, run the tests and the docs
+  build, and propose a new interaction.
+- Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
+
+The checks, run from the repository root after `uv sync`:
 
 ```bash
 uv run pytest -q               # test suite
@@ -247,6 +282,15 @@ uv run python docs/build.py    # documentation, executes all tutorials
 ```
 
 User-facing changes are recorded in [CHANGELOG.md](CHANGELOG.md).
+
+## History
+
+BioLGCA has been developed at TU Dresden since 2018. The code base before
+2.0, kept on branch [`v1`](https://github.com/sisyga/biolgca/tree/v1), grew
+from 2018 alongside the research that used it, with contributions from the
+people listed under [Acknowledgements](#acknowledgements), and was modernised
+in 2025. Version 2.0 (2026) rewrote the package around declarative model
+specifications, a rule contract and the model zoo.
 
 ## Citing
 
@@ -263,6 +307,18 @@ The BIO-LGCA modelling class is described in:
 > automaton modelling class for analysing collective cell migration.
 > *PLoS Computational Biology* 17(6): e1009066.
 > <https://doi.org/10.1371/journal.pcbi.1009066>
+
+## Acknowledgements
+
+BioLGCA is maintained by Simon Syga. Bianca Güttner
+([@GuettnerBianca](https://github.com/GuettnerBianca)) co-authored the code
+before 2.0. Code was also contributed by
+[@Franzi2729](https://github.com/Franzi2729),
+Marcus Krellner ([@krelli89](https://github.com/krelli89)),
+[@harishpjain](https://github.com/harishpjain) and Mateo Larralde
+([@mateolarr](https://github.com/mateolarr)). The models build on
+the BIO-LGCA work of Andreas Deutsch, Josué Manik Nava-Sedeño, Haralampos
+Hatzikirou and colleagues.
 
 ## License
 

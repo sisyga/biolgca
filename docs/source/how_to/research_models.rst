@@ -8,7 +8,8 @@ are now written as *stacks* of the generic rules, in the module
 :mod:`lgca.research_models`, under the names of the legacy interactions
 without the family prefix. They work in identity-based models with and
 without volume exclusion, run 4 to 18 times faster than the legacy code
-(`Speed`_), and show how to build a published model from the rules.
+in the benchmark below (the factor depends on the
+machine, see `Speed`_), and show how to build a published model from the rules.
 ``get_lgca(interaction="go_or_grow_glioblastoma", ...)`` runs them as well, as
 do model files with the prefixed names (see :ref:`interaction_chapter`).
 
@@ -216,7 +217,10 @@ Speed
 
 ``benchmarks/research_models.py`` times every model against the legacy
 interaction function (kept in ``tests/legacy``), 20 steps on a 100 x 100
-lattice after 50 steps of warm-up, each measurement in a fresh process:
+lattice after 50 steps of warm-up, each measurement in a fresh process. The
+times depend on the machine, and so do the speed-ups: a rerun on another
+machine with single-threaded BLAS gave 12x for ``go_or_grow_kappa`` and 13x
+for ``evo_steric``. Run the benchmark to get the numbers for yours:
 
 .. code-block:: text
 

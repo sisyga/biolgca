@@ -73,62 +73,41 @@ class StepCollector:
         self.steps.append(step)
 
 
-def test_runner_records_classical_outputs():
-    lgca = get_lgca(
-        geometry="square",
-        dims=(4, 5),
-        density=0.5,
-        restchannels=1,
-        interaction="only_propagation",
-        seed=1,
-    )
-
-    runner = SimulationRunner(
-        lgca,
-        timesteps=2,
-        observers=[
-            NodeRecorder(),
-            PopulationRecorder(),
-            DensityRecorder(),
-        ],
-        showprogress=False,
-    )
-    runner.run()
-
-    assert lgca.nodes_t.shape == (3, 4, 5, lgca.K)
-    assert lgca.n_t.shape == (3,)
-    assert lgca.dens_t.shape == (3, 4, 5)
-    np.testing.assert_array_equal(lgca.nodes_t[-1], lgca.nodes[lgca.nonborder])
-    np.testing.assert_array_equal(lgca.dens_t[-1], lgca.cell_density[lgca.nonborder])
-    assert lgca.n_t[-1] == lgca.cell_density[lgca.nonborder].sum()
+def _random_walker(seed):
+    return get_lgca(geometry="square", dims=(4, 5), density=0.5, restchannels=1, interaction="random_walk",
+                    bc="periodic", seed=seed)
 
 
-def test_timeevo_uses_runner_compatible_recording():
-    lgca = get_lgca(
-        geometry="square",
-        dims=(4, 5),
-        density=0.5,
-        restchannels=1,
-        interaction="only_propagation",
-        seed=2,
-    )
+def _replay_frames(seed, steps):
+    replay, frames = _random_walker(seed), {}
+    for step in range(max(steps) + 1):
+        if step in steps:
+            frames[step] = (replay.nodes[replay.nonborder].copy(), replay.cell_density[replay.nonborder].copy())
+        replay.timestep()
+    return frames
 
-    lgca.timeevo(
-        timesteps=2,
-        record=True,
-        recordN=True,
-        recorddens=True,
-        recordpertype=True,
-        showprogress=False,
-    )
 
-    assert lgca.nodes_t.shape == (3, 4, 5, lgca.K)
-    assert lgca.n_t.shape == (3,)
-    assert lgca.dens_t.shape == (3, 4, 5)
-    assert lgca.velcells_t.shape == (3, 4, 5)
-    assert lgca.restcells_t.shape == (3, 4, 5)
-    np.testing.assert_array_equal(lgca.nodes_t[-1], lgca.nodes[lgca.nonborder])
-    np.testing.assert_array_equal(lgca.dens_t[-1], lgca.cell_density[lgca.nonborder])
+@pytest.mark.parametrize("via", ["runner", "timeevo"])
+def test_every_recorded_frame_is_the_state_at_its_step(via):
+    # oracle: the same seeded model stepped by hand
+    lgca = _random_walker(1)
+    if via == "runner":
+        SimulationRunner(lgca, timesteps=4, observers=[NodeRecorder(), PopulationRecorder(), DensityRecorder()],
+                         showprogress=False).run()
+    else:
+        lgca.timeevo(timesteps=4, record=True, recordN=True, recorddens=True, recordpertype=True,
+                     showprogress=False)
+    frames = _replay_frames(1, range(5))
+    for name in ("nodes_steps", "dens_steps", "n_steps"):
+        np.testing.assert_array_equal(getattr(lgca, name), np.arange(5))
+    for step, (nodes, density) in frames.items():
+        np.testing.assert_array_equal(lgca.nodes_t[step], nodes)
+        np.testing.assert_array_equal(lgca.dens_t[step], density)
+        assert lgca.n_t[step] == density.sum()
+    if via == "timeevo":
+        np.testing.assert_array_equal(lgca.velcells_t + lgca.restcells_t, lgca.dens_t)
+        np.testing.assert_array_equal(lgca.restcells_t, lgca.nodes_t[..., -1])
+    assert not np.array_equal(lgca.nodes_t[0], lgca.nodes_t[-1])  # the cells did move
 
 
 def test_observer_schedule_runs_at_selected_steps():
@@ -224,14 +203,7 @@ def test_schedule_rejects_invalid_explicit_steps(steps):
 
 
 def test_sparse_array_recorders_store_only_samples_and_explicit_steps():
-    lgca = get_lgca(
-        geometry="square",
-        dims=(3, 4),
-        density=0.5,
-        restchannels=1,
-        interaction="only_propagation",
-        seed=4,
-    )
+    lgca = _random_walker(4)
     schedule = Schedule(every=2)
 
     SimulationRunner(
@@ -249,27 +221,14 @@ def test_sparse_array_recorders_store_only_samples_and_explicit_steps():
     expected_steps = np.array([0, 2, 4])
     for name in ("nodes_steps", "dens_steps", "n_steps", "velcells_steps", "restcells_steps"):
         np.testing.assert_array_equal(getattr(lgca, name), expected_steps)
-    assert lgca.nodes_t.shape[0] == 3
-    assert lgca.dens_t.shape[0] == 3
-    assert lgca.n_t.shape == (3,)
-    assert lgca.velcells_t.shape[0] == 3
-    assert lgca.restcells_t.shape[0] == 3
-    assert np.all(lgca.n_t > 0)
-
-
-def test_default_dense_recorders_publish_dense_step_metadata():
-    lgca = get_lgca(
-        geometry="1d", dims=(4,), density=0.5, interaction="only_propagation", seed=5
-    )
-    SimulationRunner(
-        lgca,
-        timesteps=2,
-        observers=[NodeRecorder(), DensityRecorder(), PopulationRecorder()],
-        showprogress=False,
-    ).run()
-
-    for name in ("nodes_steps", "dens_steps", "n_steps"):
-        np.testing.assert_array_equal(getattr(lgca, name), [0, 1, 2])
+    # row i holds the state at step expected_steps[i], not at step i
+    for row, (nodes, density) in enumerate(_replay_frames(4, expected_steps).values()):
+        np.testing.assert_array_equal(lgca.nodes_t[row], nodes)
+        np.testing.assert_array_equal(lgca.dens_t[row], density)
+        assert lgca.n_t[row] == density.sum()
+        np.testing.assert_array_equal(lgca.restcells_t[row], nodes[..., -1])
+        np.testing.assert_array_equal(lgca.velcells_t[row], density - nodes[..., -1])
+    assert lgca.nodes_t.shape[0] == lgca.dens_t.shape[0] == lgca.velcells_t.shape[0] == 3
 
 
 def test_scalar_recorder_can_be_reused_without_retaining_previous_run(tmp_path):

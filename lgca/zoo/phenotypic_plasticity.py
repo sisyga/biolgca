@@ -30,6 +30,7 @@ from lgca.model import (
 from lgca.pipeline import InteractionPipelineSpec
 from lgca.simulation import PopulationRecorder
 from lgca.zoo._card import Parameter, ZooEntry
+from lgca.zoo._geometry import centre_distance, core_and_rim_cells
 
 CARD = ZooEntry(
     name="phenotypic_plasticity",
@@ -181,7 +182,7 @@ def radial_profiles(lgca, bins: int = 12) -> dict[str, np.ndarray]:
     """
     from lgca.lattice_state import LatticeState
 
-    r = _distance(lgca)
+    r = centre_distance(lgca)
     maps = node_maps(lgca)
     occupied = maps["cells"] > 0
     if not occupied.any():
@@ -214,22 +215,9 @@ def core_and_rim(lgca, rim: float = 0.1) -> dict[str, float]:
 
     All measures are NaN when the population is extinct.
     """
-    from lgca.lattice_state import LatticeState
-
-    cells = LatticeState(lgca).cells
+    cells, core, outer_rim = core_and_rim_cells(lgca, rim)
     if not len(cells):
         return {key: float("nan") for key in ("core", "rim", "all", "migrating")}
-    distance = _distance(lgca)[cells.node]
     kappa = np.asarray(cells["kappa"], dtype=float)
-    inner, outer = np.quantile(distance, [0.5, 1 - rim])
-    return {"core": float(kappa[distance <= inner].mean()), "rim": float(kappa[distance >= outer].mean()),
+    return {"core": float(kappa[core].mean()), "rim": float(kappa[outer_rim].mean()),
             "all": float(kappa.mean()), "migrating": float(cells.in_channels("velocity").mean())}
-
-
-def _distance(lgca) -> np.ndarray:
-    """Distance of every node from the central node, in lattice units."""
-    centre = tuple(size // 2 for size in lgca.dims)
-    if len(lgca.dims) == 1:
-        return np.abs(np.arange(lgca.dims[0]) - centre[0]).astype(float)
-    x, y = lgca.xcoords, lgca.ycoords
-    return np.hypot(x - x[centre], y - y[centre])

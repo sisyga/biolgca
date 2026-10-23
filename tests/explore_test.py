@@ -78,15 +78,51 @@ def test_a_model_starts_from_a_given_state_also_from_a_file(tmp_path, monkeypatc
             np.testing.assert_array_equal(explorer.model.lgca.nodes[explorer.model.lgca.nonborder], nodes)
 
 
+def _channel_counts(lgca):
+    """Cells in each channel of the interior nodes, read from the public ``lgca.nodes``."""
+    nodes = lgca.nodes[lgca.nonborder]
+    if nodes.dtype == object:  # label lists
+        return np.vectorize(len, otypes=[int])(nodes)
+    return (nodes > 0).astype(int) if nodes.dtype.kind == "u" else nodes.astype(int)  # labels or numbers
+
+
+def _expected(lgca, view):
+    """What a view shows at each node, from the public state of the model."""
+    if view == "density":
+        return lgca.cell_density[lgca.nonborder]
+    if view.startswith("density: species "):
+        return lgca.species_density[lgca.nonborder][..., int(view[-1])]
+    if view == "flux":
+        counts = _channel_counts(lgca)
+        if counts.ndim == len(lgca.dims) + 2:  # several species
+            counts = counts.sum(-2)
+        return counts[..., 0] - counts[..., 1] if len(lgca.dims) == 1 else counts.sum(-1)
+    return np.broadcast_to(getattr(lgca, view), lgca.cell_density.shape)[lgca.nonborder]
+
+
+def _assert_shows(explorer, view, plane=None):
+    """The panel shows ``view``; a plane (axis, position) of a 3D lattice is drawn like a square lattice."""
+    panel = explorer._panel
+    values = _expected(explorer.lgca, view)
+    if plane is not None:
+        values = np.take(values, plane[1], axis="xyz".index(plane[0]))
+    if len(explorer.lgca.dims) == 1:  # a kymograph: the newest row is the current step
+        np.testing.assert_allclose(panel.image.get_array()[-1], values)
+    elif view == "flux":  # coloured by direction, clear where there are no cells
+        np.testing.assert_array_equal(np.asarray(panel.artist.get_facecolor())[:, -1], np.sign(values).ravel())
+    elif hasattr(panel.artist, "set_data"):  # an image
+        np.testing.assert_allclose(panel.artist.get_array(), values.T)
+    else:  # one patch per node
+        np.testing.assert_allclose(panel.artist.get_facecolor(), panel.mappable.to_rgba(values.ravel()))
+
+
+FAMILIES = [{}, {"volume_exclusion": False}, {"identity_based": True},
+            {"identity_based": True, "volume_exclusion": False}, {"n_species": 2}]
+
+
 @pytest.mark.parametrize("geometry, dims", [("lin", 30), ("square", (12, 10)), ("hex", (12, 10))])
-@pytest.mark.parametrize("family", [
-    {},
-    {"volume_exclusion": False},
-    {"identity_based": True},
-    {"identity_based": True, "volume_exclusion": False},
-    {"n_species": 2},
-])
-def test_every_view_draws_on_every_lattice_and_family(geometry, dims, family, close):
+@pytest.mark.parametrize("family", FAMILIES)
+def test_every_view_shows_its_values_on_every_lattice_and_family(geometry, dims, family, close):
     spec = _spec(geometry, dims, operators=[{"name": "random_walk"}], fields={"signal": 0.5}, **family)
     explorer = explore(spec)
     close(explorer)
@@ -96,10 +132,13 @@ def test_every_view_draws_on_every_lattice_and_family(geometry, dims, family, cl
     for view in expected:
         explorer._view.value = view
         explorer.advance(2)
-        assert explorer.frame().startswith(PNG)
-        assert explorer._image.value == explorer.frame()
+        _assert_shows(explorer, view)
+    assert explorer.frame().startswith(PNG)
+    assert explorer._image.value == explorer.frame()
     assert explorer.step == 2 * len(expected)
     assert explorer._status.value == ""
+
+
 
 
 def test_advance_runs_the_model_as_run_model_does(close):
@@ -330,9 +369,9 @@ def test_it_takes_a_model_spec():
         explore(lgca.get_lgca(geometry="lin", dims=10))
 
 
-@pytest.mark.parametrize("geometry", ["cubic", "moore"])
-@pytest.mark.parametrize("family", [{}, {"volume_exclusion": False}, {"identity_based": True}, {"n_species": 2}])
-def test_every_view_draws_in_3d_and_in_every_plane(geometry, family, close):
+@pytest.mark.slow
+@pytest.mark.parametrize("geometry, family", [("cubic", family) for family in FAMILIES] + [("moore", {})])
+def test_every_view_shows_its_values_in_3d_and_in_every_plane(geometry, family, close):
     spec = _spec(geometry, (6, 5, 4), fields={"signal": 0.5}, **family)
     explorer = explore(spec)
     close(explorer)
@@ -341,7 +380,17 @@ def test_every_view_draws_in_3d_and_in_every_plane(geometry, family, close):
         for view in explorer._view.options:
             explorer._view.value = view
             explorer.advance(1)
-            assert explorer.frame().startswith(PNG)
+            if show != "3D":
+                _assert_shows(explorer, view, plane=(show[-1], explorer._position.value))
+            elif view.startswith("density"):  # the nodes with cells, coloured by their number
+                values = _expected(explorer.lgca, view)
+                points = np.column_stack(explorer._panel.artist._offsets3d)
+                np.testing.assert_array_equal(np.sort(points, axis=0), np.sort(np.argwhere(values > 0), axis=0))
+                np.testing.assert_array_equal(np.sort(explorer._panel.artist.get_array()),
+                                              np.sort(values[values > 0]))
+            elif view == "signal":  # uniform: nothing is high
+                assert explorer._panel.artist is None
+    assert explorer.frame().startswith(PNG)
     assert explorer._status.value == ""
 
 

@@ -422,6 +422,16 @@ coupling that turns it into a score; new terms are written the same way with
      - ``∇f · J(s')``: up the gradient of a field.
      - flux
      - ``parameters={"field": name}``
+   * - ``directed_motion``
+     - ``g · J(s')``: along a given vector field ``g``, e.g. a flow; its
+       length sets the strength together with ``beta``.
+     - flux
+     - ``parameters={"field": name}``, a field of shape ``dims + (d,)``
+   * - ``steric_repulsion``
+     - Minus the number of cells at the node channel ``i`` points to: cells
+       avoid crowded neighbours.
+     - channels
+     - cell density
    * - ``contact_guidance``
      - ``(n · c_i)² - |c_i|² / d`` for a cell in channel ``i``, with the unit
        director ``n``: along a director field.

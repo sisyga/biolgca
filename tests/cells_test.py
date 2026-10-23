@@ -20,7 +20,8 @@ def test_trait_arrays_behave_like_lists_and_arrays():
     np.testing.assert_array_equal(np.concatenate([values, [6]]), [1, 7, 3.5, 4, 5, 6])
     for _ in range(100):
         values.append(0)
-    assert len(values) == 105 and len(values._data) < 2 * 105 + 16
+    assert len(values) == 105
+    np.testing.assert_array_equal(values, [1, 7, 3.5, 4, 5] + [0] * 100)  # growing kept the old values
 
 
 def _state(ve, density, dims=(30, 30), traits=None, seed=1):

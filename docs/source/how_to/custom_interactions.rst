@@ -62,7 +62,10 @@ its description from the docstring, which ``print(logistic_growth)`` and
 :func:`~lgca.plugins.describe_plugin` show. Calling the rule with parameters,
 ``logistic_growth(r_b=0.3)``, gives the entry for ``operators=[...]``; in a
 model file the same entry reads ``{"name": "logistic_growth", "parameters":
-{"r_b": 0.3}}``. Parameters without a default are required.
+{"r_b": 0.3}}``. That is the name of a rule defined in a notebook or a
+script you run; a rule defined in an imported module is registered as
+``<module>.<function>``, e.g. ``"interactions.logistic_growth"`` (see
+`Sharing a rule`_). Parameters without a default are required.
 
 ``families`` names the model families the rule is written for:
 ``"classical"`` with volume exclusion (at most one cell per channel and
@@ -173,11 +176,43 @@ A movement bias
 
 A reorientation term returns a field computed from the state, and its
 coupling says how the field scores a candidate arrangement ``s'`` of a
-node's cells: ``"flux"`` (a vector per node; cells move along it),
-``"nematic"`` (a tensor; cells move along its axis), ``"rest"`` (a number;
-cells rest) or ``"channels"`` (a weight per channel). The sampler picks
-``s'`` with probability proportional to ``exp(Σ beta · score)`` over all
-terms of the ``ReorientationSpec``.
+node's cells. Each coupling gives one cell in channel ``i`` a score ``w_i``;
+an arrangement scores the sum over its cells, and the sampler picks ``s'``
+with probability proportional to ``exp(Σ beta · score)`` over all terms of
+the ``ReorientationSpec``. The term must return an array of the shape its
+coupling needs (or one that broadcasts to it):
+
+.. list-table::
+   :header-rows: 1
+   :widths: 14 30 56
+
+   * - Coupling
+     - Return shape
+     - Score of a cell in channel ``i``, and an example
+   * - ``"flux"``
+     - ``dims + (d,)``, a vector per node
+     - ``g · c_i``: cells move along ``g``, e.g. ``state.gradient(state.density)``.
+   * - ``"nematic"``
+     - ``dims + (d, d)``, a tensor per node
+     - ``c_i · Q c_i``: cells move along the axis of ``Q``, in either direction.
+   * - ``"rest"``
+     - ``dims``, a number per node
+     - The value for a cell in a rest channel, 0 in a velocity channel:
+       e.g. ``state.density / state.capacity`` makes crowded cells rest.
+   * - ``"channels"``
+     - ``dims + (velocitychannels,)`` (rest channels score 0) or
+       ``dims + (K,)``
+     - The value of channel ``i``: e.g. ``state.neighbor_values(state.density)``
+       makes cells move towards crowded neighbours (adhesion), its negative
+       away from them.
+
+``d`` is the spatial dimension and ``state.c`` (shape ``(d,
+velocitychannels)``) holds the velocity of every channel. The velocity
+channels come first and the rest channels after them. On the square lattice
+channel 0 points along the first array axis (``+x``), then ``+y``, ``-x``
+and ``-y``; on the hexagonal lattice the six channels go round
+counter-clockwise from ``+x`` in steps of 60°; in 1D they are ``+x`` and
+``-x``.
 
 .. code-block:: python
 
@@ -203,13 +238,21 @@ Calling the term with ``beta=`` (and its parameters) gives a
 one species. A term only reads the state: the reorientation moves the cells,
 so the operations of the state raise ``TypeError`` in a term. The built-in terms, from chemotaxis to nematic alignment, are
 written the same way in :mod:`lgca.builtin_rules`. Like the sampler, terms
-work for classical models with volume exclusion.
+work in all four model families, with one or several species. With volume
+exclusion the cells of a node choose their arrangement together; without
+it every cell chooses its channel on its own; identity-based models then
+place their cells on the chosen channels (see
+:doc:`/concepts/interactions`, "How the cues are sampled").
 
 In identity-based models, a ``"rest"`` or ``"channels"`` term may return a
 value per cell instead of per node, ``CellWeights(state.cells.label,
-values)`` from :mod:`lgca.rules`, e.g. a resting preference computed from
-every cell's traits; the built-in ``resting`` term does this when its
-probability names a trait.
+values)`` from :mod:`lgca.rules`, of shape ``(cells,)`` for ``"rest"`` and
+``(cells, velocitychannels)`` or ``(cells, K)`` for ``"channels"``, e.g. a
+resting preference computed from every cell's traits. The built-in
+``resting`` term does this when its probability names a trait, written as a
+probability whose maximum is the trait: ``ReorientationTermSpec("resting",
+parameters={"probability": {"max": "p_rest"}})`` lets every cell rest with
+its own ``p_rest``.
 
 A deterministic rearrangement
 -----------------------------
@@ -273,7 +316,13 @@ cell. The operations are ``kill``, ``divide`` (daughters inherit all traits;
 ``lgca.muller_plot()``), ``found_families`` (selected cells, e.g. mutated
 daughters, found new families), ``set_trait``, ``move`` (to other channels of the
 node) and ``pick`` (at most a given number of cells per node, e.g. as many as
-there are free channels). With volume exclusion a cell only enters a free
+there are free channels). ``kill`` and ``divide`` change the cell table:
+``kill`` removes the dead cells' entries, so the positions of the cells after
+them shift, and ``divide`` appends the daughters. Compute masks and positions
+after the last ``kill`` or ``divide`` they refer to, as ``selection`` does
+above: a mask of the old length is rejected, but positions such as
+``np.flatnonzero(mask)`` computed before a ``kill`` silently select other
+cells. With volume exclusion a cell only enters a free
 channel; when more cells compete for the free channels of a node, the
 successful ones are chosen at random. The operations on cell numbers work as
 well: ``remove_cells``, ``divide_cells`` and ``shuffle_cells`` pick random
@@ -329,9 +378,14 @@ Sharing a rule
 
 Keep rules in a module of your project, e.g. ``interactions.py``, and import
 it before running or loading a model that uses them: model files refer to
-rules by name and never execute code. Defining a rule again in the same
-module, for example by re-running a notebook cell, replaces the earlier
-definition.
+rules by name and never execute code. A rule defined in a module is
+registered under the module's name and its own, ``interactions.logistic_growth``,
+so rules of the same name in two modules do not collide; ``print(rule)``
+shows the name, and a model file written by hand must use it. On the command
+line, ``biolgca run model.json --plugins interactions`` imports the module
+first. Pass ``name=`` to the decorator to choose another name. Defining a
+rule again in the same module, for example by re-running a notebook cell,
+replaces the earlier definition.
 
 Operator classes
 ----------------

@@ -695,7 +695,10 @@ def go_or_rest(state, probability=None, kappa=None, theta=None, when_full="legac
     scarce, ``{"max": 0.9, "hill": [{"name": "field", "field": "oxygen",
     "K": 0.1, "n": -2}]}``. The default is the go-or-grow switch, ``p =
     tanh_switch(rho, kappa, theta)`` of the relative density ``rho`` of all
-    cells at the node, for which ``kappa`` and ``theta`` are a short form.
+    cells at the node, for which ``kappa`` and ``theta`` are a short form
+    (the density cue divides by ``state.capacity``, the short form by ``K``
+    with volume exclusion: they differ for several species or a
+    ``StateSpec.capacity`` with volume exclusion, see :mod:`lgca.switching`).
 
     With volume exclusion a cell can only switch into a free channel of the
     other kind; ``when_full`` says what happens when there is none.
@@ -889,7 +892,7 @@ def go_or_grow_growth(state, r_b=0.2, r_d=0.01, r_d_resting=None, when_full="leg
     else:
         raise ValueError(f"go_or_grow.growth works with one or two species, not {state.n_species}")
     resting = np.broadcast_to(resting, (state.n_species, state.K))
-    crowding = state.density / _node_capacity(state)
+    crowding = _relative_density(state, "node")
     death = np.where(resting, r_d if r_d_resting is None else r_d_resting, r_d)
     state.remove_cells(np.broadcast_to(death, state.dims + death.shape))
     if state.volume_exclusion and when_full == "legacy":
@@ -928,7 +931,7 @@ def _go_or_rest_cells(state, rest, when_full):
 def _growth_cells(state, r_b, r_d, r_d_resting, when_full, mutation, new_family):
     """go_or_grow.growth for identity-based models: death and division per cell."""
     cells, rng = state.cells, state.rng
-    crowding = state.density / _node_capacity(state)
+    crowding = _relative_density(state, "node")
     resting = cells.in_channels("rest")
     death = _per_cell(cells, r_d, "r_d")
     if r_d_resting is not None:

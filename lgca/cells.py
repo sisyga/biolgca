@@ -134,12 +134,16 @@ def _object_array(values):
     return array
 
 
+class UnknownTraitError(KeyError):
+    """A rule reads a trait that the cells of the model do not have."""
+
+
 def trait_array(lgca, name: str) -> TraitArray:
     """``lgca.props[name]`` as a :class:`TraitArray`, converting it in place if needed."""
     if name not in lgca.props:
         known = ", ".join(sorted(lgca.props)) or "none"
-        raise KeyError(f"the cells have no trait {name!r} (traits: {known}); declare it with "
-                       f"StateSpec(traits={{{name!r}: ...}})")
+        raise UnknownTraitError(f"the cells have no trait {name!r} (traits: {known}); declare it with "
+                                f"StateSpec(traits={{{name!r}: ...}})")
     values = lgca.props[name]
     if not isinstance(values, TraitArray):
         values = TraitArray(values)
@@ -193,8 +197,15 @@ class Cells:
         return f"<{len(self)} cells; traits: {', '.join(self.traits) or 'none'}>"
 
     def __getitem__(self, name: str) -> np.ndarray:
-        """Values of the trait ``name`` for every cell (a copy)."""
-        return trait_array(self._lgca, name).values[self.label]
+        """Values of the trait ``name`` for every cell, a read-only copy.
+
+        ``cells["r_b"][daughters] = new`` would change only the copy, so the copy refuses writes;
+        change traits with :meth:`set_trait`. Arithmetic, e.g. ``cells["r_b"] + noise``, gives
+        ordinary arrays; for an array to edit in place, take ``cells["r_b"].copy()``.
+        """
+        values = trait_array(self._lgca, name).values[self.label]
+        values.flags.writeable = False
+        return values
 
     @property
     def traits(self) -> tuple[str, ...]:
@@ -332,7 +343,8 @@ class Cells:
         if which.dtype == bool:
             if which.shape != (len(self),):
                 raise ValueError(f"a mask of cells must have one entry per cell ({len(self)}), "
-                                 f"got shape {which.shape}")
+                                 f"got shape {which.shape}; if cells were killed or divided since the "
+                                 "mask was computed, compute it after these operations")
             return which
         if which.ndim > 1:  # also when it selects no cell, so that the error does not depend on the data
             raise ValueError(f"cell positions must be a 1-D array, got shape {which.shape}; use "

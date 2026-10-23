@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from ._warnings import warn_user
 from typing import Any
 
 import numpy as np
-from tqdm.auto import tqdm
 
-from .nove_base import NoVE_LGCA_base, _poisson_channel_populations
+from ._warnings import warn_user
 from .base import LGCA_base, _validate_density, channel_sum
-
+from .nove_base import NoVE_LGCA_base, _poisson_channel_populations
 
 _SPATIAL_NDIMS = {
     "lin": 1,
@@ -21,9 +19,14 @@ _SPATIAL_NDIMS = {
 }
 
 
-class MultiSpeciesLGCA_base(LGCA_base):
-    """Classical LGCA supporting multiple species."""
+class _MultiSpecies:
+    """The species axis of the multi-species classes: nodes of shape ``dims + (n_species, K)``.
 
+    The volume-exclusion and the no-volume-exclusion base classes differ in the dtype of the
+    nodes (``_node_dtype``) and in how a given initial state is converted (``_initial_nodes``).
+    """
+
+    _node_dtype: type = bool
 
     def __init__(self, *, n_species: int = 1, **kwargs: Any) -> None:
         if isinstance(n_species, bool) or int(n_species) != n_species or n_species < 1:
@@ -87,11 +90,6 @@ class MultiSpeciesLGCA_base(LGCA_base):
             )
         return True
 
-    def set_dims(self, dims=None, nodes=None, restchannels=0, **kwargs) -> None:
-        if self._set_dims_from_nodes(nodes):
-            return
-        super().set_dims(dims=dims, nodes=None, restchannels=restchannels)
-
     def _warn_nodes_shape(self, nodes: np.ndarray | None) -> None:
         if nodes is None:
             return
@@ -106,6 +104,34 @@ class MultiSpeciesLGCA_base(LGCA_base):
             return nodes.sum(axis=-2)
         return nodes
 
+    def _initial_nodes(self, nodes: np.ndarray) -> np.ndarray:
+        return nodes.astype(self._node_dtype)
+
+    def init_nodes(self, density: float = 0.1, nodes: np.ndarray | None = None, **kwargs) -> None:
+        """Create the padded nodes ``dims + (n_species, K)`` and fill them with ``nodes`` or at random."""
+        shape = tuple(dim + 2 * self.r_int for dim in self.dims) + (self.n_species, self.K)
+        self.nodes = np.zeros(shape, dtype=self._node_dtype)
+        if nodes is None:
+            self.random_reset(density)
+        else:
+            self._warn_nodes_shape(nodes)
+            self.nodes[self.nonborder] = self._initial_nodes(nodes)
+            self.apply_boundaries()
+
+
+class MultiSpeciesLGCA_base(_MultiSpecies, LGCA_base):
+    """Classical LGCA supporting multiple species."""
+
+    _node_dtype = bool
+
+    def _initial_nodes(self, nodes: np.ndarray) -> np.ndarray:
+        return self._ensure_bool_nodes(nodes)
+
+    def set_dims(self, dims=None, nodes=None, restchannels=0, **kwargs) -> None:
+        if self._set_dims_from_nodes(nodes):
+            return
+        super().set_dims(dims=dims, nodes=None, restchannels=restchannels)
+
     def random_reset(self, density):
         """Randomly initialize a total density distributed over all species."""
         _validate_density(density, max_density=self.n_species * self.K)
@@ -117,54 +143,16 @@ class MultiSpeciesLGCA_base(LGCA_base):
         self.species_density = channel_sum(self.nodes)
         self.cell_density = channel_sum(self.species_density)
 
-    def timeevo(
-        self,
-        timesteps: int = 100,
-        record: bool = False,
-        recordN: bool = False,
-        recorddens: bool = True,
-        showprogress: bool = True,
-        recordpertype: bool = False,
-    ) -> None:
-        from .simulation import DensityRecorder, NodeRecorder, PerTypeRecorder, PopulationRecorder, run_timeevo
 
-        observers = []
-        if record:
-            observers.append(NodeRecorder())
-        if recordN:
-            observers.append(PopulationRecorder())
-        if recorddens:
-            observers.append(DensityRecorder())
-        if recordpertype:
-            observers.append(PerTypeRecorder())
-        run_timeevo(self, timesteps=timesteps, observers=observers, showprogress=showprogress)
-
-
-class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
+class MultiSpeciesNoVE_LGCA_base(_MultiSpecies, NoVE_LGCA_base):
     """No-volume-exclusion LGCA with multiple species."""
 
+    _node_dtype = np.uint
 
     _LOCAL_ENSEMBLE_INTERACTIONS = NoVE_LGCA_base._LOCAL_ENSEMBLE_INTERACTIONS | {
         "birth",
         "birthdeath",
     }
-
-    def __init__(self, *, n_species: int = 1, **kwargs: Any) -> None:
-        if isinstance(n_species, bool) or int(n_species) != n_species or n_species < 1:
-            raise ValueError("n_species must be a positive integer.")
-        self.n_species = int(n_species)
-        super().__init__(**kwargs)
-
-    @classmethod
-    def _get_valid_kwargs(cls):
-        valid = super()._get_valid_kwargs()
-        valid.add("n_species")
-        return valid
-
-    _spatial_ndim = MultiSpeciesLGCA_base._spatial_ndim
-    _channel_counts = MultiSpeciesLGCA_base._channel_counts
-    _set_spatial_shape = MultiSpeciesLGCA_base._set_spatial_shape
-    _set_dims_from_nodes = MultiSpeciesLGCA_base._set_dims_from_nodes
 
     def set_dims(self, dims=None, nodes=None, restchannels=None, capacity=None) -> None:
         if self._set_dims_from_nodes(nodes, allow_multiple_restchannels=False):
@@ -176,13 +164,6 @@ class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
                 self.capacity = self.K
             return
         super().set_dims(dims=dims, nodes=None, restchannels=restchannels, capacity=capacity)
-
-    def _warn_nodes_shape(self, nodes: np.ndarray | None) -> None:
-        if nodes is None:
-            return
-        expected = self.dims + (self.n_species, self.K)
-        if nodes.shape != expected:
-            warn_user(f"Provided nodes have shape {nodes.shape}, expected {expected}.")
 
     def random_reset(self, density):
         """Populate a total density distributed over all species."""
@@ -205,7 +186,13 @@ class MultiSpeciesNoVE_LGCA_base(NoVE_LGCA_base):
         showprogress: bool = True,
         recordpertype: bool = False,
     ) -> None:
-        from .simulation import DensityRecorder, NodeRecorder, PerTypeRecorder, PopulationRecorder, run_timeevo
+        from .simulation import (
+            DensityRecorder,
+            NodeRecorder,
+            PerTypeRecorder,
+            PopulationRecorder,
+            run_timeevo,
+        )
 
         observers = []
         if record:

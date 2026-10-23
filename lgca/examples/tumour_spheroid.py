@@ -370,10 +370,14 @@ def _ball(geometry, dims, radius, capacity):
 
 def _positions(geometry, dims):
     """The positions of the nodes, one array per axis, in node spacings: hexagonal rows are offset by half a
-    node and sqrt(3)/2 apart."""
+    node and sqrt(3)/2 apart.
+
+    They are ``lgca.xcoords`` and ``lgca.ycoords`` of the lattice (interaction radius 1), where the even rows
+    are the shifted ones; lattice neighbours are one node spacing apart.
+    """
     index = np.indices(dims, dtype=float)
     if geometry == "hex":
-        return [index[0] + 0.5 * (index[1] % 2), index[1] * math.sqrt(3) / 2]
+        return [index[0] + 0.5 * (1 - index[1] % 2), index[1] * math.sqrt(3) / 2]
     return list(index)
 
 

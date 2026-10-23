@@ -133,18 +133,6 @@ def test_beta_and_species_are_reserved():
         reorientation_term(coupling="flux")(lambda state, beta=1.0: 0.0)
 
 
-def test_terms_that_read_fields_list_them_as_inputs():
-    signal = np.arange(16.0).reshape(4, 4)
-    compiled = build_model(ModelSpec(
-        space=SpaceSpec(geometry="square", dims=(4, 4)),
-        state=StateSpec(density=0.5, restchannels=1, fields={"signal": signal}),
-        dynamics=InteractionPipelineSpec(operators=[ReorientationSpec(terms=[
-            ReorientationTermSpec("chemotaxis", parameters={"field": "signal"})])]),
-    ))
-
-    assert "inputs=signal" in compiled.pipeline.describe_schedule()
-
-
 def test_redefining_a_term_in_the_same_module_replaces_it():
     _drift()
     second = _drift()

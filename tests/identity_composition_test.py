@@ -44,8 +44,10 @@ def test_identity_growth_compositions_keep_all_living_property_rows(growth, reve
 
 
 def test_identity_growth_rules_without_volume_exclusion_combine():
+    # birth_death daughters change r_b and go_or_grow.growth daughters kappa, each by a normal step of
+    # the given scale; the other trait and the traits of the parents stay as they were
     model = build_model(ModelSpec(
-        space=SpaceSpec(geometry="lin", dims=4),
+        space=SpaceSpec(geometry="lin", dims=3000),
         state=StateSpec(identity_based=True, volume_exclusion=False, density=2, restchannels=1, capacity=8,
                         traits={"r_b": 0.5, "kappa": 2.0}),
         time=TimeSpec(seed=3),
@@ -55,10 +57,18 @@ def test_identity_growth_rules_without_volume_exclusion_combine():
             {"name": "go_or_grow.growth", "parameters": {"r_b": 0.3, "mutation": {"kappa": 0.1}}},
         ]),
     ))
-    for _ in range(5):
-        model.step()
+    first_daughter = int(model.lgca.maxlabel) + 1
+    model.step()
     for values in model.lgca.props.values():
         assert len(values) == int(model.lgca.maxlabel) + 1
+    r_b, kappa = (np.asarray(model.lgca.props[name], dtype=float) for name in ("r_b", "kappa"))
+    np.testing.assert_array_equal(r_b[:first_daughter], 0.5)
+    np.testing.assert_array_equal(kappa[:first_daughter], 2.0)
+    for change, scale in ((r_b[first_daughter:] - 0.5, 0.01), (kappa[first_daughter:] - 2.0, 0.1)):
+        changed = change[change != 0]
+        assert changed.size > 100
+        assert abs(changed.mean()) < 4 * scale / np.sqrt(changed.size)
+        assert abs(changed.std() - scale) < 4 * scale / np.sqrt(2 * changed.size)
 
 
 @pytest.mark.parametrize("interaction", ["birth", "birthdeath", "birthdeath_discrete",

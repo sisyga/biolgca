@@ -17,12 +17,15 @@ import numpy as np
 from ._warnings import warn_user
 from .lattice_state import channel_mask, occupations
 from .operator_base import _COPYING_TEMPLATES
+from .operator_registry import UnknownPluginError
 from .plugins import (
     ConservationLaw,
     InteractionOperator,
     PluginInfo,
     ReorientationOperator,
     create_plugin,
+    describe_plugin,
+    list_plugins,
 )
 
 
@@ -448,6 +451,26 @@ def _zoo_hint(name) -> str:
             f"on the command line --plugins lgca.zoo.{entry})")
 
 
+def _unknown_operator_hint(name) -> str:
+    """What to do about an operator name that nothing registered: import its module, or fix a typo."""
+    hint = _zoo_hint(name)
+    if hint:
+        return hint
+    name = str(name)
+    if name == "reorientation.boltzmann":  # the name model metadata gives a ReorientationSpec
+        return " (reorientation is written as ReorientationSpec(terms=[...]), not by its operator name)"
+    registered = [info.name for info in list_plugins()]
+    matches = [other for other in registered if other.startswith(name + ".")]
+    matches = matches or difflib.get_close_matches(name, registered, n=1)
+    if matches:
+        return f" (did you mean {' or '.join(map(repr, matches))}?)"
+    module = name.rpartition(".")[0]
+    if module:  # rules are named after their module, e.g. 'hypoxia_rules.switch'
+        return (f" (if it is a rule of the module {module!r}: import {module} before loading the model; "
+                f"on the command line --plugins {module})")
+    return ""
+
+
 def compile_pipeline(spec: InteractionPipelineSpec | None, context) -> CompiledPipeline:
     """Compile a pipeline spec into executable operators."""
 
@@ -462,9 +485,10 @@ def compile_pipeline(spec: InteractionPipelineSpec | None, context) -> CompiledP
     for index, operator_spec in enumerate(spec.operators):
         try:
             operators.append(_compile_operator(operator_spec, memo))
-        except KeyError as exc:
+        except UnknownPluginError as exc:  # a KeyError of a registered operator's own code is not this
             name = _operator_name(operator_spec)
-            raise ValueError(f"dynamics.operators[{index}] unknown operator {name!r}{_zoo_hint(name)}") from exc
+            raise ValueError(f"dynamics.operators[{index}] unknown operator {name!r}"
+                             f"{_unknown_operator_hint(name)}") from exc
         except ValueError as exc:
             message = str(exc)
             separator = "" if message.startswith(".") else " "
@@ -482,8 +506,13 @@ def _compile_operator(spec, memo=None) -> InteractionOperator:
     if isinstance(spec, ReorientationSpec):
         return BoltzmannReorientationOperator(spec)
     if isinstance(spec, ReorientationTermSpec):  # compiled by name, it would lose beta, species and trait
-        raise ValueError(f"is a reorientation term ({spec.name!r}); put it in ReorientationSpec(terms=[...]), "  # noqa: TRY004
-                         f"or give one cue by name, e.g. {{'name': {spec.name!r}, 'parameters': {{'beta': 2.0}}}}")
+        message = f"is a reorientation term ({spec.name!r}); put it in ReorientationSpec(terms=[...])"
+        try:  # the built-in cues are also operators of their own; a term of the user's is not
+            describe_plugin(spec.name)
+        except UnknownPluginError:
+            raise ValueError(f"{message}, e.g. ReorientationSpec(terms=[{spec.name}(beta=2.0)])") from None
+        raise ValueError(f"{message}, or give one cue by name, "  # noqa: TRY004
+                         f"e.g. {{'name': {spec.name!r}, 'parameters': {{'beta': 2.0}}}}")
     if isinstance(spec, (BirthDeathSpec, PhenotypeSwitchSpec)):
         return create_plugin(spec.name, spec.parameters)
     if isinstance(spec, Mapping):
@@ -776,7 +805,7 @@ class _FieldTerm(_ReorientationTerm):
             rng.bit_generator.state = state
 
     def prepare(self, lgca):
-        from .lattice_state import LatticeState
+        from .lattice_state import LatticeState, UnknownFieldError
         from .rules import CellWeights
 
         state = LatticeState(lgca, step=self.step)
@@ -785,7 +814,7 @@ class _FieldTerm(_ReorientationTerm):
             state = state.sensing(self.sensed_species)
         try:
             field = self.definition.function(state, **self.parameters)
-        except KeyError as exc:
+        except UnknownFieldError as exc:  # a KeyError of the term's own code stays one, with its traceback
             raise ValueError(f"{self.name}: {exc.args[0] if exc.args else exc}") from exc
         self.fields_read |= state.fields_read
         dims, velocity, d = state.dims, state.velocitychannels, state.c.shape[0]
