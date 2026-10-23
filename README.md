@@ -253,7 +253,7 @@ clone, or directly from GitHub:
 ```bash
 python -m pip install biolgca             # from PyPI; also "biolgca[notebooks]", "[yaml]" or "[plot3d]"
 python -m pip install -e ".[notebooks]"   # in the clone
-python -m pip install "biolgca @ git+https://github.com/sisyga/biolgca"   # newest development version
+python -m pip install "biolgca @ git+https://github.com/sisyga/biolgca@develop"   # newest development version
 ```
 
 This picks the newest compatible versions of the dependencies. `uv sync` instead
