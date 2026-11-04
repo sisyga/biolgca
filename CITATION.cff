@@ -11,9 +11,14 @@ authors:
     affiliation: Technische Universität Dresden
     orcid: "https://orcid.org/0000-0001-9955-9012"
 version: 2.0.0
-date-released: 2026-10-23
+doi: 10.5281/zenodo.23944994
+date-released: 2026-11-04
 repository-code: "https://github.com/sisyga/biolgca"
 url: "https://biolgca.readthedocs.io/"
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.23944994
+    description: Zenodo DOI of all versions of BioLGCA
 license: BSD-3-Clause
 keywords:
   - cellular automata

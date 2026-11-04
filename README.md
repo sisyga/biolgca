@@ -3,11 +3,13 @@
 [![CI](https://github.com/sisyga/biolgca/actions/workflows/ci.yml/badge.svg)](https://github.com/sisyga/biolgca/actions/workflows/ci.yml)
 ![Python 3.11–3.14](https://img.shields.io/badge/python-3.11%E2%80%933.14-blue)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-green)](https://github.com/sisyga/biolgca/blob/master/LICENSE.txt)
+[![PyPI](https://img.shields.io/pypi/v/biolgca)](https://pypi.org/project/biolgca/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23944994.svg)](https://doi.org/10.5281/zenodo.23944994)
 
 **Simulate how cells move, align, grow and evolve, in a few lines of Python.**
 
 <p align="center">
-  <img src="docs/images/readme/alignment_flux.gif" width="640"
+  <img src="https://raw.githubusercontent.com/sisyga/biolgca/master/docs/images/readme/alignment_flux.gif" width="640"
        alt="Cells with random headings align with their neighbours and form moving flocks">
 </p>
 
@@ -92,7 +94,7 @@ describes the lattice, initial state, time and seed, and the list of
 interactions. Here cells align with their neighbours and follow an attractant
 gradient; both cues enter one stochastic decision per node:
 
-<img src="docs/images/readme/chemotaxis_density.png" width="300" align="right"
+<img src="https://raw.githubusercontent.com/sisyga/biolgca/master/docs/images/readme/chemotaxis_density.png" width="300" align="right"
      alt="Cells accumulate where the attractant peaks, near x = 40">
 
 ```python
@@ -134,7 +136,7 @@ recorded densities in `measurements.npz`.
 
 ## Growth and phenotype switching
 
-<img src="docs/images/readme/go_or_grow_density.png" width="300" align="right"
+<img src="https://raw.githubusercontent.com/sisyga/biolgca/master/docs/images/readme/go_or_grow_density.png" width="300" align="right"
      alt="A dense spheroid of cells grown from one node">
 
 Interactions can also create and remove cells. In the go-or-grow model, cells
@@ -298,6 +300,12 @@ If you use BioLGCA in published work, please cite:
 > for modeling genotypic and phenotypic heterogeneity in cell systems.
 > *The European Physical Journal Special Topics*.
 > <https://doi.org/10.1140/epjs/s11734-026-02186-1>
+
+To cite the software itself, use its Zenodo DOI, which always resolves to the
+newest version (each release also has a DOI of its own, listed on that page):
+
+> Syga S. BioLGCA: biological lattice-gas cellular automata in Python.
+> Zenodo. <https://doi.org/10.5281/zenodo.23944994>
 
 The BIO-LGCA modelling class is described in:
 
