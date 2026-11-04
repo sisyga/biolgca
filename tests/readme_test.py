@@ -39,7 +39,10 @@ def test_readme_images_are_committed():
         pytest.skip("needs a git checkout")
     images = set(re.findall(r'src="([^"]+)"', README.read_text(encoding="utf-8")))
     images |= set(re.findall(r"!\[[^\]]*\]\(([^)\s]+)\)", README.read_text(encoding="utf-8")))
-    local = sorted(path for path in images if not path.startswith("http"))
+    # Images are linked on GitHub's raw host so that they also show on PyPI.
+    raw = "https://raw.githubusercontent.com/sisyga/biolgca/master/"
+    local = sorted(path.removeprefix(raw) for path in images
+                   if path.startswith(raw) or not path.startswith("http"))
     tracked = subprocess.run(["git", "ls-files", "--error-unmatch", *local], cwd=root,
                              capture_output=True, text=True)
 

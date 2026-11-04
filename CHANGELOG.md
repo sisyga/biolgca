@@ -7,7 +7,7 @@ This file records notable user-facing changes. Changes remain under
 
 Nothing yet.
 
-## 2.0.0 (2026-10-23)
+## 2.0.0 (2026-11-04)
 
 Version 2.0 rebuilds BioLGCA around model specifications (`ModelSpec`) and
 rules written as functions of the lattice state. Scripts written for 1.0 with
