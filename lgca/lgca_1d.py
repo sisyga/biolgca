@@ -34,6 +34,7 @@ from lgca.base import (
     colors,
     cmap_discretize,
     estimate_figsize,
+    normalize_dims,
     np,
     plt,
 )
@@ -75,8 +76,7 @@ class LGCA_1D(LGCA_base):
         Parameters
         ----------
         dims : int or tuple, default=100
-            Lattice dimensions. Must match with specified geometry, everything except the first tuple element
-            is ignored.
+            Number of nodes: an integer or a sequence with one integer.
         nodes : :py:class:`numpy.ndarray`
             Custom initial lattice configuration.
         restchannels : int, default=0
@@ -100,18 +100,8 @@ class LGCA_1D(LGCA_base):
             self.dims = self.l,
             return
 
-        # default
-        elif dims is None:
-            dims = 100
-
-        # set dimensions to keyword value
-        if isinstance(dims, int):
-            self.l = dims
-        elif isinstance(dims, tuple):
-            self.l = dims[0]
-        else:
-            raise TypeError("Keyword 'dims' must be int or tuple!")
-        self.dims = self.l,
+        self.dims = normalize_dims(dims, 1, default=(100,))
+        self.l, = self.dims
         self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels
 
@@ -717,14 +707,8 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
             else:
                 self.restchannels = self.K - self.velocitychannels
         # set instance dimensions according to required dimensions
-        elif dims is not None:
-            if isinstance(dims, int):
-                self.l = dims
-            else:
-                self.l = dims[0]
-        # set default value for dimension
         else:
-            self.l = 100
+            self.l, = normalize_dims(dims, 1, default=(100,))
         self.dims = self.l,
 
         # set number of rest channels to <= 1 because >1 cells are allowed per channel

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from lgca.base import normalize_dims
 from lgca.ib_base import IBLGCA_base
 from lgca.list_utils import get_arr_of_empty_lists
 from lgca.nove_base import NoVE_LGCA_base
@@ -111,18 +112,7 @@ class NoVE_LGCA_Cubic(LGCA_Cubic, NoVE_LGCA_base):
                 self.capacity = self.K
             self.dims = (self.lx, self.ly, self.lz)
             return
-        elif dims is not None:
-            if isinstance(dims, tuple) and len(dims) == 3:
-                self.lx, self.ly, self.lz = dims
-            elif isinstance(dims, int):
-                self.lx = self.ly = self.lz = dims
-            else:
-                raise TypeError(
-                    "Keyword 'dims' must be a tuple of three integers or an int!"
-                )
-        else:
-            self.lx = self.ly = self.lz = 50
-
+        self.lx, self.ly, self.lz = normalize_dims(dims, 3, default=(10, 10, 10))
         self.dims = (self.lx, self.ly, self.lz)
         self.restchannels = restchannels or 0
         self.K = self.velocitychannels + self.restchannels

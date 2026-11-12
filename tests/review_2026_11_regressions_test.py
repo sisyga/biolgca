@@ -119,3 +119,58 @@ def test_a_model_runs_on_after_its_interaction_radius_changed(geometry, dims, fa
     assert int(lgca.cell_density[lgca.nonborder].sum()) == cells
     if before is not None:
         np.testing.assert_array_equal(np.sort(_labels(lgca)), before)
+
+
+# ----------------------------------------------------------------------------------- lattice size
+
+
+@pytest.mark.parametrize("family", FAMILIES, ids=lambda family: "-".join(family) or "classical")
+@pytest.mark.parametrize("geometry, ndim", [("lin", 1), ("square", 2), ("hex", 2), ("cubic", 3), ("moore", 3)])
+@pytest.mark.parametrize("size", [np.int64(6), 6.0, 6, np.array(6)], ids=["numpy", "float", "int", "array"])
+def test_one_integer_of_any_kind_gives_every_axis_that_length(geometry, ndim, family, size):
+    """Without volume exclusion, a NumPy integer or a float gave a 50 x 50 lattice with a warning; with
+    it, a ``TypeError``."""
+    lgca = get_lgca(geometry=geometry, dims=size, density=0.5, interaction="only_propagation", seed=1, **family)
+    assert lgca.dims == (6,) * ndim and all(type(length) is int for length in lgca.dims)
+
+
+@pytest.mark.parametrize("family", FAMILIES, ids=lambda family: "-".join(family) or "classical")
+@pytest.mark.parametrize("geometry, sizes", [("lin", [7]), ("square", [6, 4]), ("hex", [4, 6]), ("cubic", [3, 4, 5])])
+@pytest.mark.parametrize("kind", [tuple, list, np.array])
+def test_a_sequence_of_any_kind_gives_one_length_per_axis(geometry, sizes, family, kind):
+    lgca = get_lgca(geometry=geometry, dims=kind(sizes), density=0.5, interaction="only_propagation", seed=1,
+                    **family)
+    assert lgca.dims == tuple(sizes)
+
+
+@pytest.mark.parametrize("ve", [True, False])
+@pytest.mark.parametrize("geometry, dims", [("lin", (6, 6)), ("square", (6,)), ("square", (6, 6, 6)),
+                                            ("hex", (6, 6, 2)), ("cubic", (6, 6)), ("moore", (6,))])
+def test_dims_with_another_number_of_axes_is_an_error_in_every_family(geometry, dims, ve):
+    with pytest.raises(ValueError, match="dims must be"):
+        get_lgca(geometry=geometry, dims=dims, ve=ve, density=0.5, interaction="only_propagation")
+
+
+@pytest.mark.parametrize("ve", [True, False])
+@pytest.mark.parametrize("dims, error", [(0, ValueError), (-3, ValueError), (2.5, ValueError), ((4, 0), ValueError),
+                                         ("6", TypeError), (True, TypeError), ([[4, 4]], TypeError)])
+def test_dims_that_are_not_positive_integers_are_an_error(dims, error, ve):
+    with pytest.raises(error, match="dims must"):
+        get_lgca(geometry="square", dims=dims, ve=ve, density=0.5, interaction="only_propagation")
+
+
+@pytest.mark.parametrize("volume_exclusion", [True, False])
+@pytest.mark.parametrize("dims, expected", [(np.int64(6), (6, 6)), (6.0, (6, 6)), ([6, 4], (6, 4)),
+                                            (np.array([6, 4]), (6, 4))])
+def test_a_model_spec_reads_dims_as_get_lgca_does(dims, expected, volume_exclusion):
+    spec = ModelSpec(space=SpaceSpec(geometry="square", dims=dims),
+                     state=StateSpec(volume_exclusion=volume_exclusion, density=0.5), time=TimeSpec(steps=1, seed=1))
+    result = run_model(spec, showprogress=False)
+    assert result.lgca.dims == expected
+    assert result.spec.space.dims in (expected, expected[0])
+    assert type(np.atleast_1d(result.spec.space.dims).tolist()[0]) is int
+
+
+def test_every_3d_lattice_has_the_documented_default_size():
+    for family in ({}, {"ve": False}):  # without volume exclusion the default was 50 x 50 x 50
+        assert get_lgca(geometry="cubic", density=0.1, interaction="only_propagation", **family).dims == (10, 10, 10)

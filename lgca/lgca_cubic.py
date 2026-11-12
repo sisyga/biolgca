@@ -6,7 +6,7 @@
 """
 
 
-from lgca.base import LGCA_base, np
+from lgca.base import LGCA_base, normalize_dims, np
 from lgca.mayavi_style import (
     INK,
     MUTED,
@@ -89,22 +89,7 @@ class LGCA_Cubic(LGCA_base):
             self.dims = (self.lx, self.ly, self.lz)
             return
 
-        if dims is None:
-            dims = (10, 10, 10)
-
-        # set dimensions to keyword value
-        if isinstance(dims, tuple):
-            if len(dims) != 3:
-                raise ValueError(
-                    "For 3D cubic lattice, 'dims' must be a tuple of three integers."
-                )
-            self.lx, self.ly, self.lz = dims
-
-        elif isinstance(dims, int):
-            self.lx = self.ly = self.lz = dims
-        else:
-            raise TypeError("Keyword 'dims' must be a tuple of three integers or int!")
-
+        self.lx, self.ly, self.lz = normalize_dims(dims, 3, default=(10, 10, 10))
         self.dims = (self.lx, self.ly, self.lz)
         self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels

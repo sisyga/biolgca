@@ -129,27 +129,15 @@ def _translate_dims(dims: Any, geom_key: str) -> Tuple[int, ...]:
     """
     if dims is None:
         return None
-    if isinstance(dims, tuple):
-        if geom_key == 'lin':
-            return (dims[0],)
-        if geom_key in {'square', 'hex'}:
-            return (dims[0], dims[1]) if len(dims) > 1 else (dims[0], dims[0])
-        if geom_key in {'cubic', 'moore'}:
-            if len(dims) >= 3:
-                return dims[0], dims[1], dims[2]
-            if len(dims) == 2:
-                return dims[0], dims[0], dims[1]
-            return (dims[0],) * 3
-    else:
-        if geom_key == 'lin':
-            return (int(dims),)
-        if geom_key in {'square', 'hex'}:
-            d = int(dims)
-            return (d, d)
-        if geom_key in {'cubic', 'moore'}:
-            d = int(dims)
-            return (d, d, d)
-    return tuple(dims)
+    from .base import normalize_dims
+
+    ndim = _SPATIAL_NDIM.get(geom_key)
+    if ndim is None:
+        return None
+    try:
+        return normalize_dims(dims, ndim)
+    except (TypeError, ValueError):  # the nodes give the size: dims in any other form differs from it
+        return (None,) * ndim
 
 
 def _warn_on_node_mismatch(nodes, dims_arg, rest_arg, density_arg, geom_key, n_species=1):

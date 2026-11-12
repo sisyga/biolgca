@@ -110,6 +110,60 @@ def _as_numeric_array(value, name):
     return arr
 
 
+_DIMS_SHAPE = {
+    1: "one length for a 1D lattice; use geometry='square' or 'hex' for a 2D lattice",
+    2: "(lx, ly) for a 2D lattice; give rest channels with restchannels=..., and use geometry='cubic' "
+       "for a 3D lattice",
+    3: "(lx, ly, lz) for a 3D lattice",
+}
+
+
+def normalize_dims(dims, ndim, default=None):
+    """The size of a lattice as a tuple of ``ndim`` positive Python integers.
+
+    Every lattice class and :class:`~lgca.model.ModelSpec` read ``dims`` through this function.
+
+    Parameters
+    ----------
+    dims : int or sequence of int or None
+        One integer, the length of every axis, or one integer per axis in a tuple, list or
+        array. NumPy integers and whole floats such as ``50.0`` count as integers.
+    ndim : int
+        Number of axes of the lattice.
+    default : sequence of int, optional
+        The size for ``dims=None``; without it ``None`` is returned.
+
+    Raises
+    ------
+    TypeError
+        If ``dims`` is not a number or a sequence of numbers.
+    ValueError
+        If the number of entries is not ``ndim``, or an entry is not a positive integer.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> normalize_dims(np.int64(6), 2), normalize_dims([6, 4.0], 2), normalize_dims(None, 1, default=(100,))
+    ((6, 6), (6, 4), (100,))
+    """
+    if dims is None:
+        return None if default is None else tuple(int(size) for size in default)
+    try:
+        sizes = np.asarray(dims)
+    except (TypeError, ValueError):
+        sizes = None
+    if (sizes is None or sizes.dtype.kind not in "iuf" or sizes.ndim > 1
+            or isinstance(dims, (bool, np.bool_))):
+        raise TypeError(f"dims must be an integer or a sequence of {ndim} integers, got {dims!r}")
+    if sizes.ndim == 0:
+        sizes = np.full(ndim, sizes)
+    elif len(sizes) != ndim:
+        raise ValueError(f"dims must be {_DIMS_SHAPE[ndim]}; got {dims!r}")
+    if not np.all(np.isfinite(sizes)) or np.any(sizes != np.floor(sizes)) or np.any(sizes < 1):
+        raise ValueError(f"dims must contain positive integers, got {dims!r}")
+    return tuple(int(size) for size in sizes)
+
+
 def _validate_positive_int(value, name):
     """Validate a positive integer parameter and return it as ``int``."""
     if isinstance(value, bool):

@@ -38,7 +38,7 @@ except ImportError:  # pragma: no cover - handled at runtime
 import warnings
 from copy import copy
 
-from lgca.base import IBLGCA_base, LGCA_base, NoVE_IBLGCA_base, NoVE_LGCA_base
+from lgca.base import IBLGCA_base, LGCA_base, NoVE_IBLGCA_base, NoVE_LGCA_base, normalize_dims
 
 from .square_plotting import SquarePlotMixin
 class LGCA_Square(SquarePlotMixin, LGCA_base):
@@ -112,23 +112,8 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
             self.dims = self.lx, self.ly
             return
 
-        # default
-        elif dims is None:
-            dims = (50, 50)
-
-        # set dimensions to keyword value
-        if isinstance(dims, tuple):
-            if len(dims) != 2:
-                raise ValueError(
-                    f"dims must be (lx, ly) for a 2D lattice, got {dims}; give rest channels with "
-                    "restchannels=..., and use geometry='cubic' for a 3D lattice"
-                )
-            self.lx, self.ly = dims
-        elif isinstance(dims, int):
-            self.lx, self.ly = dims, dims
-        else:
-            raise TypeError("Keyword 'dims' must be int or tuple!")
-        self.dims = self.lx, self.ly
+        self.dims = normalize_dims(dims, 2, default=(50, 50))
+        self.lx, self.ly = self.dims
         self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels
 

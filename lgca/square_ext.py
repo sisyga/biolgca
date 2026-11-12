@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 
 import numpy as np
-from lgca.base import warn_user, plt
+from lgca.base import normalize_dims, warn_user, plt
 from lgca.ib_base import IBLGCA_base
 from lgca.list_utils import get_arr_of_empty_lists
 from lgca.nove_base import NoVE_LGCA_base
@@ -105,25 +105,8 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
             else:
                 self.restchannels = self.K - self.velocitychannels
         # set instance dimensions according to required dimensions
-        elif dims is not None:
-            if isinstance(dims, tuple):
-                if len(dims) == 2:
-                    self.lx, self.ly = dims
-                elif len(dims) > 2:
-                    self.lx, self.ly = dims[0], dims[1]
-                    warn_user("Dimensions provided with too many values! " + str(dims))
-                else:
-                    self.lx, self.ly = dims[0], dims[0]
-                    warn_user("Dimensions provided as tuple " + str(dims) + ", but only one value for 2D lattice!")
-            elif isinstance(dims, int):
-                self.lx, self.ly = dims, dims
-            else:
-                self.lx, self.ly = (50, 50)
-                warn_user("Dimensions provided in wrong format, must be tuple of 2 elements or integer. Dimensions set to default 50x50.")
-        # set default for dimension
         else:
-            self.lx, self.ly = (50, 50)
-            logger.info("Dimensions set to default 50x50.")
+            self.lx, self.ly = normalize_dims(dims, 2, default=(50, 50))
         self.dims = self.lx, self.ly
 
         # set number of rest channels to <= 1 because >1 cells are allowed per channel

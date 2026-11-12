@@ -17,6 +17,7 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 
 from . import get_lgca
+from .base import normalize_dims
 from .lattice_state import _pad_field
 from .operator_registry import UnknownPluginError
 from .pipeline import (
@@ -1638,12 +1639,13 @@ def _normalize_and_validate_spec(spec: ModelSpec) -> ModelSpec:
     if not isinstance(boundary, str) or boundary.lower() not in _BOUNDARY_ALIASES:
         raise ValueError("model.space.boundary must name a supported boundary condition")
     _validate_dims(spec.space.dims)
+    dimension = {"lin": 1, "square": 2, "hex": 2, "cubic": 3, "moore": 3}[_GEOMETRY_ALIASES[geometry.lower()]]
     dims = spec.space.dims
-    if dims is not None and np.asarray(dims).ndim != 0:
-        dims = tuple(int(value) for value in dims)
-        dimension = {"lin": 1, "square": 2, "hex": 2, "cubic": 3, "moore": 3}[_GEOMETRY_ALIASES[geometry.lower()]]
-        if len(dims) != dimension:
-            raise ValueError(f"model.space.dims must contain {dimension} dimensions for {geometry}")
+    if dims is not None and np.asarray(dims).ndim != 0 and len(tuple(dims)) != dimension:
+        raise ValueError(f"model.space.dims must contain {dimension} dimensions for {geometry}")
+    if dims is not None:  # Python integers, also from NumPy integers and whole floats
+        sizes = normalize_dims(dims, dimension)
+        dims = sizes if np.asarray(dims).ndim else sizes[0]
 
     parameters = dict(spec.state.parameters)
     for name in sorted(set(parameters) & _RESERVED_STATE_PARAMETERS):
