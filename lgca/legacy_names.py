@@ -157,9 +157,8 @@ def compile_legacy_interaction(lgca, name, parameters) -> None:
         logger.info("%s: %s set to %r (default)", name, key, defaults[key])
     lgca.interaction_params = {**defaults, **given}
     capacity = None
-    if not ve:  # the crowding scale: the model's, or the default of the legacy interaction
-        own = getattr(lgca, "capacity", lgca.K)
-        capacity = own if "capacity" in parameters or legacy.capacity is None else legacy.capacity
+    if not ve:
+        capacity = _model_capacity(lgca, legacy, parameters.get("capacity"))
         lgca.interaction_params["capacity"] = capacity
     lgca._validate_interaction_params()
     spec = ModelSpec(
@@ -174,6 +173,26 @@ def compile_legacy_interaction(lgca, name, parameters) -> None:
     lgca._compiled_model = CompiledModel(lgca=lgca, spec=spec, context=context, pipeline=pipeline,
                                          metadata={"operator_names": pipeline.operator_names})
     lgca.interaction = LegacyInteraction(name, lgca._compiled_model)
+
+
+def _model_capacity(lgca, legacy, given):
+    """The crowding scale of a model without volume exclusion, which is also ``lgca.capacity``.
+
+    A capacity given to get_lgca or to ``set_interaction`` is the model's from then on. Without
+    one, an interaction with a capacity of its own in earlier versions (8 in most identity-based
+    models) brings it; the next interaction without one returns to the capacity before it.
+    """
+    brought = lgca.__dict__.pop("_legacy_capacity", None)  # (default of the last interaction, capacity before it)
+    if given is not None:
+        lgca.capacity = given
+        lgca.__dict__["_capacity_given"] = True
+    elif not lgca.__dict__.get("_capacity_given"):
+        if brought is not None and getattr(lgca, "capacity", None) == brought[0]:
+            lgca.capacity = brought[1]
+        if legacy.capacity is not None:
+            lgca.__dict__["_legacy_capacity"] = (legacy.capacity, getattr(lgca, "capacity", lgca.K))
+            lgca.capacity = legacy.capacity
+    return getattr(lgca, "capacity", lgca.K)
 
 
 class LegacyInteraction:

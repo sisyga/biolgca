@@ -174,3 +174,41 @@ def test_a_model_spec_reads_dims_as_get_lgca_does(dims, expected, volume_exclusi
 def test_every_3d_lattice_has_the_documented_default_size():
     for family in ({}, {"ve": False}):  # without volume exclusion the default was 50 x 50 x 50
         assert get_lgca(geometry="cubic", density=0.1, interaction="only_propagation", **family).dims == (10, 10, 10)
+
+
+# --------------------------------------------------------------------------------------- capacity
+
+
+def _capacities(lgca):
+    """The capacity the model reports, the one its interaction lists and the one its rules read."""
+    return lgca.capacity, lgca.interaction_params["capacity"], lgca._compiled_model.spec.state.capacity
+
+
+@pytest.mark.parametrize("interaction, default", [("birth", 8), ("birthdeath", 8), ("go_or_grow", 8),
+                                                  ("evo_steric", 512), ("random_walk", 3)])
+def test_a_model_reports_the_capacity_that_its_interaction_uses(interaction, default):
+    """``lgca.capacity`` (and ``print(lgca)``) said 3 while growth ran with the interaction's 8."""
+    lgca = get_lgca(geometry="lin", dims=10, ib=True, ve=False, interaction=interaction, seed=1)
+    assert _capacities(lgca) == (default,) * 3
+    assert f"Carrying capacity: {default}" in str(lgca)
+
+
+def test_a_capacity_given_to_the_model_stays_when_the_interaction_changes():
+    """``set_interaction`` without a capacity went back to the interaction's default of 8."""
+    lgca = get_lgca(geometry="lin", dims=10, ib=True, ve=False, interaction="random_walk", capacity=20, seed=1)
+    assert _capacities(lgca) == (20, 20, 20)
+    lgca.set_interaction(interaction="birth")
+    assert _capacities(lgca) == (20, 20, 20)
+    lgca.set_interaction(interaction="birth", capacity=30)  # was ignored
+    assert _capacities(lgca) == (30, 30, 30)
+    lgca.set_interaction(interaction="evo_steric")
+    assert _capacities(lgca) == (30, 30, 30)
+
+
+def test_the_default_capacity_of_an_interaction_leaves_with_it():
+    lgca = get_lgca(geometry="lin", dims=10, ib=True, ve=False, interaction="evo_steric", seed=1)
+    assert _capacities(lgca) == (512, 512, 512)
+    lgca.set_interaction(interaction="random_walk")
+    assert _capacities(lgca) == (lgca.K,) * 3
+    lgca.set_interaction(interaction="birth")
+    assert _capacities(lgca) == (8, 8, 8)
