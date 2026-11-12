@@ -58,7 +58,7 @@ class _MultiSpecies:
             self.lx, self.ly, self.lz = shape
             self.dims = (self.lx, self.ly, self.lz)
 
-    def _set_dims_from_nodes(self, nodes: np.ndarray, *, allow_multiple_restchannels: bool = True) -> bool:
+    def _set_dims_from_nodes(self, nodes: np.ndarray) -> bool:
         if nodes is None:
             return False
 
@@ -84,10 +84,6 @@ class _MultiSpecies:
                 f"Required: {self.velocitychannels}, provided: {self.K}"
             )
         self.restchannels = self.K - self.velocitychannels
-        if not allow_multiple_restchannels and self.restchannels > 1:
-            raise RuntimeError(
-                f"Only one resting channel allowed, but {self.restchannels} resting channels specified!"
-            )
         return True
 
     def _warn_nodes_shape(self, nodes: np.ndarray | None) -> None:
@@ -155,13 +151,8 @@ class MultiSpeciesNoVE_LGCA_base(_MultiSpecies, NoVE_LGCA_base):
     }
 
     def set_dims(self, dims=None, nodes=None, restchannels=None, capacity=None) -> None:
-        if self._set_dims_from_nodes(nodes, allow_multiple_restchannels=False):
-            if capacity is not None:
-                self.capacity = capacity
-            elif restchannels is not None and restchannels > 1:
-                self.capacity = self.velocitychannels + restchannels
-            else:
-                self.capacity = self.K
+        if self._set_dims_from_nodes(nodes):
+            self._set_channels(restchannels, capacity, from_nodes=True)
             return
         super().set_dims(dims=dims, nodes=None, restchannels=restchannels, capacity=capacity)
 

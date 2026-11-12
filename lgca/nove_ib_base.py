@@ -78,6 +78,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     of its cells, so reading ``nodes`` does not change the rest of a run.
     """
 
+    _one_rest_channel = True
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if "propagation" in cls.__dict__:

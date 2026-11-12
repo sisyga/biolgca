@@ -119,6 +119,34 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         self.update_dynamic_fields()
 
 
+    _one_rest_channel = False  # identity-based models: one rest channel, which holds any number of cells
+
+    def _set_channels(self, restchannels=None, capacity=None, from_nodes=False):
+        """Set :py:attr:`self.restchannels`, :py:attr:`self.K` and :py:attr:`self.capacity`.
+
+        Every rest channel is a channel of the state, on every lattice; ``nodes`` (``from_nodes``, with
+        :py:attr:`self.K` read from them) set their number. The capacity is ``capacity``, or one cell per channel;
+        ``restchannels`` beyond those of ``nodes`` add to it, as channels would.
+        """
+        if from_nodes:
+            if self.K < self.velocitychannels:
+                raise RuntimeError('Not enough channels specified for the chosen geometry! Required: {}, provided: {}'
+                                   .format(self.velocitychannels, self.K))
+            self.restchannels = self.K - self.velocitychannels
+        else:
+            self.restchannels = restchannels or 0
+        if self._one_rest_channel and self.restchannels > 1:
+            raise RuntimeError(f"Only one resting channel allowed, but {self.restchannels} resting channels "
+                               "specified! Identity-based models without volume exclusion have one rest channel, "
+                               f"which holds any number of cells: give nodes with {self.velocitychannels + 1} "
+                               "channels")
+        self.K = self.velocitychannels + self.restchannels
+        if capacity is None:
+            capacity = self.K
+            if from_nodes and restchannels:
+                capacity = max(capacity, self.velocitychannels + restchannels)
+        self.capacity = capacity
+
     def _channel_populations(self):
         """Cells per channel, padded like ``nodes``; measures read it instead of ``nodes``."""
         return self.nodes

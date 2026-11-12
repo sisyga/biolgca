@@ -81,6 +81,19 @@ class IBLGCA_Cubic(IBLGCA_base, LGCA_Cubic):
 
 
 
+def _set_dims_3d(lgca, dims, nodes, restchannels, capacity):
+    """Set the size, the channels and the capacity of a 3D model without volume exclusion."""
+    if nodes is not None:
+        try:
+            lgca.lx, lgca.ly, lgca.lz, lgca.K = nodes.shape
+        except ValueError as e:
+            raise ValueError("Node shape does not match the 3D geometry! Shape must be (x,y,z,channels)") from e
+    else:
+        lgca.lx, lgca.ly, lgca.lz = normalize_dims(dims, 3, default=(10, 10, 10))
+    lgca.dims = (lgca.lx, lgca.ly, lgca.lz)
+    lgca._set_channels(restchannels, capacity, from_nodes=nodes is not None)
+
+
 class NoVE_LGCA_Cubic(LGCA_Cubic, NoVE_LGCA_base):
     """
     3D cubic version of an LGCA without volume exclusion.
@@ -91,32 +104,7 @@ class NoVE_LGCA_Cubic(LGCA_Cubic, NoVE_LGCA_base):
         """
         Set the dimensions of the instance according to given values.
         """
-        if nodes is not None:
-            try:
-                self.lx, self.ly, self.lz, self.K = nodes.shape
-            except ValueError as e:
-                raise ValueError(
-                    "Node shape does not match the 3D geometry! Shape must be (x,y,z,channels)"
-                ) from e
-
-            if self.K < self.velocitychannels:
-                raise RuntimeError(
-                    f"Not enough channels specified! Required: {self.velocitychannels}, provided: {self.K}"
-                )
-            self.restchannels = self.K - self.velocitychannels
-            if capacity is not None:
-                self.capacity = capacity
-            elif restchannels is not None:
-                self.capacity = self.velocitychannels + restchannels
-            else:
-                self.capacity = self.K
-            self.dims = (self.lx, self.ly, self.lz)
-            return
-        self.lx, self.ly, self.lz = normalize_dims(dims, 3, default=(10, 10, 10))
-        self.dims = (self.lx, self.ly, self.lz)
-        self.restchannels = restchannels or 0
-        self.K = self.velocitychannels + self.restchannels
-        self.capacity = capacity if capacity is not None else self.K
+        _set_dims_3d(self, dims, nodes, restchannels, capacity)
 
     def init_nodes(self, density=4, nodes=None):
         """
@@ -148,6 +136,12 @@ class NoVE_IBLGCA_Cubic(NoVE_IBLGCA_base, LGCA_Cubic):
     """
     Identity-based LGCA without volume exclusion for a 3D cubic lattice.
     """
+
+    def set_dims(self, dims=None, nodes=None, restchannels=None, capacity=None):
+        """
+        Set the dimensions of the instance according to given values.
+        """
+        _set_dims_3d(self, dims, nodes, restchannels, capacity)
 
     def init_nodes(self, density=0.1, nodes=None):
         """

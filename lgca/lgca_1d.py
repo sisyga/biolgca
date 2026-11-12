@@ -684,10 +684,12 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
 
     def set_dims(self, dims=None, nodes=None, restchannels=None, capacity=None):
         """
-        Set the dimensions of the instance according to given values. Sets self.l, self.K, self.dims and self.restchannels
+        Set the dimensions of the instance according to given values. Sets self.l, self.K, self.dims,
+        self.restchannels and self.capacity.
         :param dims: desired lattice size (int or array-like)
         :param nodes: existing lattice to use (ndarray)
-        :param restchannels: desired number of resting channels, will be capped to 1 if >1 because of no volume exclusion
+        :param restchannels: number of resting channels; every one is a channel of the state
+        :param capacity: number of cells per node at which growth stops; default: one cell per channel
         """
         # set instance dimensions according to passed lattice
         if nodes is not None:
@@ -695,39 +697,11 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
                 self.l, self.K = nodes.shape
             except ValueError as e:
                 raise ValueError("Node shape does not match the 1D geometry! Shape must be (x,channels)") from e
-            # set number of rest channels to <= 1 because >1 cells are allowed per channel
-            # for now, raise Exception if format of nodes does no fit
-            # (To Do: just sum the cells in surplus rest channels in init_nodes and print a warning)
-            if self.K - self.velocitychannels > 1:
-                raise RuntimeError('Only one resting channel allowed, '+
-                 'but {} resting channels specified!'.format(self.K - self.velocitychannels))
-            elif self.K < self.velocitychannels:
-                raise RuntimeError('Not enough channels specified for the chosen geometry! Required: {}, provided: {}'.format(
-                    self.velocitychannels, self.K))
-            else:
-                self.restchannels = self.K - self.velocitychannels
         # set instance dimensions according to required dimensions
         else:
             self.l, = normalize_dims(dims, 1, default=(100,))
         self.dims = self.l,
-
-        # set number of rest channels to <= 1 because >1 cells are allowed per channel
-        if nodes is None and restchannels is not None:
-            if restchannels > 1:
-                self.restchannels = 1
-            elif 0 <= restchannels <= 1:
-                self.restchannels = restchannels
-        elif nodes is None:
-            self.restchannels = 0
-        self.K = self.velocitychannels + self.restchannels
-
-        # set capacity according to keyword or specified resting channels
-        if capacity is not None:
-            self.capacity = capacity
-        elif restchannels is not None and restchannels > 1:
-            self.capacity = self.velocitychannels + restchannels
-        else:
-            self.capacity = self.K
+        self._set_channels(restchannels, capacity, from_nodes=nodes is not None)
 
     def init_nodes(self, density, nodes=None):
         """

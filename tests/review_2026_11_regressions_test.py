@@ -336,3 +336,100 @@ def test_order_parameters_are_recorded_for_any_number_of_species(geometry, dims,
     for name in ("ent_t", "normEnt_t", "polAlParam_t", "meanAlign_t"):
         values = getattr(lgca, name)
         assert values.shape == (4,) and np.isfinite(values).all(), name
+
+
+# ---------------------------------------------------------- rest channels without volume exclusion
+
+VELOCITY_CHANNELS = {"lin": 2, "square": 4, "hex": 6, "cubic": 6, "moore": 26}
+
+
+@pytest.mark.parametrize("n_species", [1, 2])
+@pytest.mark.parametrize("geometry, dims", GEOMETRIES)
+def test_rest_channels_are_channels_of_the_state_on_every_lattice(geometry, dims, n_species):
+    """In 1D and 2D, ``restchannels=3`` gave one rest channel and raised the capacity instead."""
+    v = VELOCITY_CHANNELS[geometry]
+    species = (n_species,) if n_species > 1 else ()
+    lgca = get_lgca(geometry=geometry, dims=dims, ve=False, n_species=n_species, restchannels=3, density=1.0,
+                    interaction="only_propagation", seed=1)
+    assert (lgca.restchannels, lgca.K, lgca.capacity) == (3, v + 3, v + 3)
+    assert lgca.nodes[lgca.nonborder].shape == dims + species + (v + 3,)
+
+    lgca = get_lgca(geometry=geometry, dims=dims, ve=False, n_species=n_species, restchannels=3, capacity=20,
+                    density=1.0, interaction="only_propagation", seed=1)
+    assert (lgca.restchannels, lgca.K, lgca.capacity) == (3, v + 3, 20)
+
+    spec = ModelSpec(space=SpaceSpec(geometry=geometry, dims=dims),
+                     state=StateSpec(volume_exclusion=False, n_species=n_species, restchannels=3, density=1.0))
+    lgca = build_model(spec).lgca
+    assert (lgca.restchannels, lgca.K, lgca.capacity) == (3, v + 3, v + 3)
+
+
+@pytest.mark.parametrize("n_species", [1, 2])
+@pytest.mark.parametrize("geometry, dims", GEOMETRIES)
+def test_nodes_with_several_rest_channels_are_a_state_on_every_lattice(geometry, dims, n_species):
+    """In 1D and 2D, and with several species in 3D, they were refused; in 3D the capacity was that of
+    one rest channel."""
+    v = VELOCITY_CHANNELS[geometry]
+    species = (n_species,) if n_species > 1 else ()
+    nodes = np.random.default_rng(3).poisson(0.4, dims + species + (v + 3,))
+    lgca = get_lgca(geometry=geometry, ve=False, n_species=n_species, nodes=nodes, interaction="only_propagation")
+    assert (lgca.restchannels, lgca.K, lgca.capacity) == (3, v + 3, v + 3)
+    np.testing.assert_array_equal(lgca.nodes[lgca.nonborder], nodes)
+
+    lgca.timeevo(4, showprogress=False)
+
+    after = lgca.nodes[lgca.nonborder]
+    np.testing.assert_array_equal(after[..., v:], nodes[..., v:])  # resting cells stay in their channel
+    np.testing.assert_array_equal(after[..., :v].sum(axis=tuple(range(len(dims)))),
+                                  nodes[..., :v].sum(axis=tuple(range(len(dims)))))
+
+
+@pytest.mark.parametrize("n_species", [1, 2])
+@pytest.mark.parametrize("geometry, dims", GEOMETRIES)
+@pytest.mark.parametrize("interaction", ["random_walk", "go_or_rest", "go_or_grow", "di_alignment"])
+def test_interactions_run_with_several_rest_channels_on_every_lattice(geometry, dims, n_species, interaction):
+    v = VELOCITY_CHANNELS[geometry]
+    lgca = get_lgca(geometry=geometry, dims=dims, ve=False, n_species=n_species, restchannels=3, density=2.0,
+                    interaction=interaction, seed=2)
+    cells = lgca.cell_density[lgca.nonborder].sum()
+    lgca.timeevo(4, record=True, showprogress=False)
+    assert lgca.nodes_t.shape[-1] == v + 3
+    if interaction != "go_or_grow":
+        assert lgca.cell_density[lgca.nonborder].sum() == cells
+    if interaction == "random_walk":  # the cells of a node take any of its channels
+        assert (lgca.nodes_t[1:, ..., v:].sum(axis=tuple(range(lgca.nodes_t.ndim - 1))) > 0).all()
+
+
+@pytest.mark.parametrize("geometry, dims", GEOMETRIES)
+def test_identity_based_models_without_volume_exclusion_keep_their_one_rest_channel(geometry, dims):
+    v = VELOCITY_CHANNELS[geometry]
+    with pytest.warns(UserWarning, match="have one rest channel"):
+        lgca = get_lgca(geometry=geometry, dims=dims, ve=False, ib=True, restchannels=3, density=1.0,
+                        interaction="only_propagation", seed=1)
+    assert (lgca.restchannels, lgca.K, lgca.capacity) == (1, v + 1, v + 1)
+
+    counts = np.ones(dims + (v + 1,), dtype=int)  # in 3D, cell counts as nodes ended in an AttributeError
+    lgca = get_lgca(geometry=geometry, ve=False, ib=True, nodes=counts, interaction="only_propagation")
+    assert (lgca.restchannels, lgca.K, lgca.capacity) == (1, v + 1, v + 1)
+    assert _labels(lgca).size == counts.sum()
+
+    with pytest.raises(RuntimeError, match="have one rest channel"):
+        get_lgca(geometry=geometry, ve=False, ib=True, nodes=np.ones(dims + (v + 3,), dtype=int),
+                 interaction="only_propagation")
+
+
+@pytest.mark.parametrize("n_species", [1, 2])
+@pytest.mark.parametrize("geometry, dims", GEOMETRIES)
+def test_rest_channels_beyond_those_of_the_nodes_add_to_the_capacity(geometry, dims, n_species):
+    v = VELOCITY_CHANNELS[geometry]
+    species = (n_species,) if n_species > 1 else ()
+    for rest, capacity in ((1, v + 3), (3, v + 3), (4, v + 4)):
+        nodes = np.ones(dims + species + (v + rest,), dtype=int)
+        if rest == 3:
+            lgca = get_lgca(geometry=geometry, ve=False, n_species=n_species, nodes=nodes, restchannels=3,
+                            interaction="only_propagation")
+        else:
+            with pytest.warns(UserWarning, match=f"imply {rest} rest channels"):
+                lgca = get_lgca(geometry=geometry, ve=False, n_species=n_species, nodes=nodes, restchannels=3,
+                                interaction="only_propagation")
+        assert (lgca.restchannels, lgca.K, lgca.capacity) == (rest, v + rest, capacity)
