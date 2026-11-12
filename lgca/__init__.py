@@ -180,6 +180,13 @@ def _check_nodes_ndim(nodes, geom_key, n_species):
     One species may be given with its species axis, ``dims + (1, K)``, as rules see it; it is dropped.
     """
     spatial_ndim = _SPATIAL_NDIM.get(geom_key)
+    if not isinstance(nodes, np.ndarray):  # nested lists of numbers
+        try:
+            nodes = np.asarray(nodes)
+        except ValueError as exc:  # ragged: lists of labels have no rectangular shape
+            raise ValueError("nodes must be an array of shape dims + (K,); give the lists of labels of an "
+                             "identity-based model without volume exclusion as a NumPy array of lists "
+                             "(dtype=object)") from exc
     shape = np.shape(nodes)
     if spatial_ndim is None:
         return nodes
@@ -340,9 +347,12 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, n_species
     geom_spec = geometry.lower() if isinstance(geometry, str) else geometry
     geom_key = geom_map.get(geom_spec, geom_spec)
 
-    if isinstance(n_species, bool) or int(n_species) != n_species or n_species < 1:
-        raise ValueError("n_species must be a positive integer.")
-    n_species = int(n_species)
+    from .base import _validate_positive_int
+
+    try:
+        n_species = _validate_positive_int(n_species, "n_species")
+    except ValueError:
+        raise ValueError(f"n_species must be a positive integer, got {n_species!r}") from None
     if nodes is not None:
         nodes = _check_nodes_ndim(nodes, geom_key, n_species)
         kwargs["nodes"] = nodes

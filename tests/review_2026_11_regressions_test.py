@@ -550,3 +550,134 @@ def test_a_channel_holds_at_most_the_largest_signed_integer(value, n_species):
     nodes.flat[0] = 2**62
     lgca = get_lgca(geometry="lin", ve=False, n_species=n_species, nodes=nodes, interaction="only_propagation")
     assert lgca.nodes.dtype == np.int64 and lgca.nodes.max() == 2**62
+
+
+# ------------------------------------------------------------------------- errors that say what to do
+
+
+def _spec(**sections):
+    base = dict(space=SpaceSpec(geometry="lin", dims=6), state=StateSpec(density=0.3, restchannels=1),
+                time=TimeSpec(steps=2, seed=1),
+                dynamics=InteractionPipelineSpec(operators=[{"name": "random_walk"}]))
+    return ModelSpec(**{**base, **sections})
+
+
+@pytest.mark.parametrize("value", [None, "1", float("nan"), float("inf"), 1.5, True, [1]])
+@pytest.mark.parametrize("section, name", [("state", "restchannels"), ("state", "n_species"), ("state", "capacity"),
+                                           ("time", "steps"), ("time", "timing_trace")])
+def test_a_number_of_a_spec_that_is_no_integer_is_named_with_its_value(section, name, value):
+    """``None`` ended in ``TypeError: int() argument must be ...``, ``nan`` and ``inf`` in errors of ``int``."""
+    if name == "capacity" and value is None:
+        return  # no capacity
+    kind = {"state": StateSpec, "time": TimeSpec}[section]
+    with pytest.raises(ValueError) as error:
+        build_model(_spec(**{section: kind(**{name: value})}))
+    assert f"model.{section}.{name} must be a" in str(error.value) and f"got {value!r}" in str(error.value)
+
+
+@pytest.mark.parametrize("density", ["a", [0.1, 0.2], float("nan"), -1, True])
+def test_a_density_that_is_no_number_is_named_with_its_value(density):
+    with pytest.raises(ValueError, match="model.state.density must be a finite non-negative scalar, got"):
+        build_model(_spec(state=StateSpec(density=density)))
+
+
+@pytest.mark.parametrize("section, value, write", [
+    ("dynamics", [{"name": "random_walk"}], "InteractionPipelineSpec(operators="),
+    ("dynamics", {"operators": [{"name": "random_walk"}]}, "model_spec_from_dict"),
+    ("dynamics", None, "InteractionPipelineSpec(operators="),
+    ("space", {"geometry": "lin"}, "SpaceSpec("), ("state", {"density": 0.1}, "StateSpec("),
+    ("state", None, "StateSpec("), ("time", 10, "TimeSpec(steps="),
+    ("analysis", [OrderParameterRecorder()], "AnalysisSpec(observers=")])
+def test_a_section_of_a_spec_of_another_type_says_how_to_write_it(section, value, write):
+    """A list of operators as ``dynamics`` ended in ``'list' object has no attribute 'propagation'``."""
+    with pytest.raises(TypeError) as error:
+        build_model(_spec(**{section: value}))
+    assert f"model.{section} must be a" in str(error.value) and write in str(error.value)
+
+
+@pytest.mark.parametrize("operators, message", [
+    ("random_walk", "must be a list of operators.*write operators=\\[{'name': 'random_walk'}\\]"),
+    ({"name": "random_walk"}, "must be a list of operators.*write operators=\\[{'name': 'random_walk'}\\]"),
+    (["random_walk"], "operators\\[0\\] requires a 'name': write {'name': 'random_walk'}"),
+    ([None], "operators\\[0\\] requires a 'name'.*got None")])
+def test_operators_that_are_not_a_list_of_entries_say_how_to_write_them(operators, message):
+    with pytest.raises((TypeError, ValueError), match=message):
+        build_model(_spec(dynamics=InteractionPipelineSpec(operators=operators)))
+
+
+@pytest.mark.parametrize("observers, message", [
+    ([{"type": "DensityRecorder"}], "observers\\[0\\] must be an observer.*pass the object"),
+    (["DensityRecorder"], "observers\\[0\\] must be an observer.*pass the object"),
+    ([OrderParameterRecorder], "observers\\[0\\] must be an observer.*OrderParameterRecorder\\(\\)"),
+    (OrderParameterRecorder(), "observers must be a sequence of observers")])
+def test_observers_that_are_not_objects_say_what_to_pass(observers, message):
+    """A mapping ended in ``'dict' object has no attribute 'on_step'`` when the run started."""
+    with pytest.raises(TypeError, match=message):
+        build_model(_spec(analysis=AnalysisSpec(observers=observers)))
+    if isinstance(observers, list):
+        from lgca.simulation import SimulationRunner
+
+        lgca = get_lgca(geometry="lin", dims=6, density=0.3, interaction="random_walk")
+        with pytest.raises(TypeError, match=message):
+            SimulationRunner(lgca, timesteps=1, observers=observers, showprogress=False).run()
+
+
+@pytest.mark.parametrize("family", [dict(), dict(identity_based=True), dict(n_species=2)],
+                         ids=["classical", "identity", "species"])
+@pytest.mark.parametrize("recorder", ["OrderParameterRecorder", "ChannelDensityRecorder"])
+def test_recorders_of_models_without_volume_exclusion_say_so_for_other_models(recorder, family):
+    """They ended in ``AttributeError: ... has no attribute 'calc_entropy'`` (``'channel_pop'``)."""
+    import lgca.simulation as simulation
+
+    spec = _spec(state=StateSpec(density=0.3, restchannels=1, **family),
+                 analysis=AnalysisSpec(observers=[getattr(simulation, recorder)()]))
+    with pytest.raises(RuntimeError, match=f"{recorder} records .* models without volume exclusion"):
+        run_model(spec, showprogress=False)
+
+
+@pytest.mark.parametrize("family", [dict(), dict(identity_based=True), dict(n_species=2)],
+                         ids=["counts", "identity", "species"])
+@pytest.mark.parametrize("geometry, dims", GEOMETRIES)
+def test_cells_per_channel_are_recorded_for_every_model_without_volume_exclusion(geometry, dims, family):
+    """Models with one species and no identities had no ``channel_pop`` to record."""
+    from lgca.simulation import ChannelDensityRecorder, DensityRecorder
+
+    spec = ModelSpec(space=SpaceSpec(geometry=geometry, dims=dims),
+                     state=StateSpec(volume_exclusion=False, density=1.0, restchannels=1, **family),
+                     time=TimeSpec(steps=3, seed=1),
+                     dynamics=InteractionPipelineSpec(operators=[{"name": "random_walk"}]),
+                     analysis=AnalysisSpec(observers=[ChannelDensityRecorder(), DensityRecorder()]))
+    result = run_model(spec, showprogress=False)
+    channels = result.data["channel_population"]
+    assert channels.shape[0] == 4 and channels.shape[-1] == result.lgca.K
+    density = result.data["density"]
+    np.testing.assert_array_equal(channels.sum(-1), density)
+
+
+@pytest.mark.parametrize("family", FAMILIES, ids=lambda family: "-".join(family) or "classical")
+def test_get_lgca_names_arguments_that_are_no_numbers(family):
+    common = dict(geometry="lin", dims=6, density=0.3, interaction="only_propagation")
+    with pytest.raises(ValueError, match="n_species must be a positive integer, got None"):
+        get_lgca(**{**common, **family, "n_species": None})
+    with pytest.raises(ValueError, match="restchannels must be a non-negative integer"):
+        get_lgca(restchannels=float("inf"), **common, **family)
+    if family.get("ve") is False:  # "3" passed as a number until the first comparison with one
+        with pytest.raises(ValueError, match="capacity must be a positive integer, got '3'"):
+            get_lgca(capacity="3", **common, **family)
+
+
+@pytest.mark.parametrize("ve", [True, False])
+@pytest.mark.parametrize("n_species", [1, 2])
+def test_nodes_given_as_lists_are_read_as_arrays(ve, n_species):
+    """Lists ended in ``'list' object has no attribute 'shape'``."""
+    nodes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+    if n_species == 2:
+        nodes = [[site, site] for site in nodes]
+    lgca = get_lgca(geometry="lin", ve=ve, n_species=n_species, nodes=nodes, interaction="only_propagation")
+    np.testing.assert_array_equal(lgca.nodes[lgca.nonborder], np.array(nodes))
+
+
+def test_ragged_lists_as_nodes_say_how_to_give_lists_of_labels():
+    with pytest.raises(ValueError, match="NumPy array of lists"):
+        get_lgca(geometry="lin", ib=True, ve=False, nodes=[[[0], [], [1, 2]], [[], [3], []]],
+                 interaction="only_propagation")

@@ -196,6 +196,22 @@ def _setup_sample_indices(observer, lgca, runner, step_attribute: str) -> int:
     return len(steps)
 
 
+def check_observer_objects(observers, path: str = "observers") -> None:
+    """Check that every observer of a run is an object with ``on_step``, and say what to pass if one is not."""
+    for index, observer in enumerate(observers):
+        if not isinstance(observer, type) and callable(getattr(observer, "on_step", None)):
+            continue
+        if isinstance(observer, type):
+            hint = f"pass an object of the class: {observer.__name__}()"
+        elif isinstance(observer, (Mapping, str)):
+            hint = ("pass the object, such as DensityRecorder(); names and mappings are the form of model "
+                    "files (model_spec_from_dict)")
+        else:
+            hint = "pass a recorder such as DensityRecorder(), or an object of a subclass of Observer"
+        raise TypeError(f"{path}[{index}] must be an observer (an object with on_step(lgca, step)), got "
+                        f"{observer!r}; {hint}")
+
+
 def check_observers(observers) -> None:
     """Check that the recorders of a run do not write the same outputs.
 
@@ -217,6 +233,7 @@ def check_observers(observers) -> None:
         If two recorders would write the same output.
     """
     observers = list(observers)
+    check_observer_objects(observers)
     recorder_types = (NodeRecorder, DensityRecorder, PopulationRecorder,
                       ChannelDensityRecorder, PerTypeRecorder, OrderParameterRecorder,
                       FamilyPopulationRecorder)
@@ -459,12 +476,21 @@ class ChannelDensityRecorder(Observer):
     """Record channel populations in ``lgca.channel_pop_t``."""
 
     def setup(self, lgca, runner: SimulationRunner) -> None:
-        value = lgca.channel_pop[lgca.nonborder]
+        value = self._cells_per_channel(lgca)
         length = _setup_sample_indices(self, lgca, runner, "channel_pop_steps")
         lgca.channel_pop_t = np.zeros((length,) + value.shape, dtype=np.uint)
 
     def on_step(self, lgca, step: int) -> None:
-        lgca.channel_pop_t[self._sample_indices[step], ...] = lgca.channel_pop[lgca.nonborder]
+        lgca.channel_pop_t[self._sample_indices[step], ...] = self._cells_per_channel(lgca)
+
+    @staticmethod
+    def _cells_per_channel(lgca):
+        if not _has_unbounded_counts(lgca):
+            raise RuntimeError("ChannelDensityRecorder records the cells per channel of models without volume "
+                               "exclusion (StateSpec(volume_exclusion=False), get_lgca(ve=False)); with volume "
+                               "exclusion a channel holds one cell at most: record the channels with "
+                               "NodeRecorder")
+        return lgca._channel_populations()[lgca.nonborder]
 
 
 class PerTypeRecorder(Observer):
@@ -498,9 +524,15 @@ class PerTypeRecorder(Observer):
 
 
 class OrderParameterRecorder(Observer):
-    """Record NoVE order parameters."""
+    """Record the order parameters of a model without volume exclusion: its entropy, normalized entropy,
+    polar alignment parameter and mean alignment (``lgca.ent_t``, ``normEnt_t``, ``polAlParam_t``,
+    ``meanAlign_t``)."""
 
     def setup(self, lgca, runner: SimulationRunner) -> None:
+        if not _has_unbounded_counts(lgca):
+            raise RuntimeError("OrderParameterRecorder records the entropy and the alignment of models without "
+                               "volume exclusion (StateSpec(volume_exclusion=False), get_lgca(ve=False)); they "
+                               "are not defined for this model, which has volume exclusion")
         length = _setup_sample_indices(self, lgca, runner, "order_parameter_steps")
         lgca.ent_t = np.zeros(length, dtype=float)
         lgca.normEnt_t = np.zeros(length, dtype=float)

@@ -170,7 +170,7 @@ def _validate_positive_int(value, name):
         raise ValueError(f"{name} must be a positive integer.")
     try:
         int_value = int(value)
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, OverflowError) as exc:
         raise ValueError(f"{name} must be a positive integer.") from exc
     if int_value != value or int_value < 1:
         raise ValueError(f"{name} must be a positive integer.")
@@ -183,7 +183,7 @@ def _validate_nonnegative_int(value, name):
         raise ValueError(f"{name} must be a non-negative integer.")
     try:
         int_value = int(value)
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, OverflowError) as exc:
         raise ValueError(f"{name} must be a non-negative integer.") from exc
     if int_value != value or int_value < 0:
         raise ValueError(f"{name} must be a non-negative integer.")

@@ -146,6 +146,11 @@ class NoVE_LGCA_base(LGCA_base, ABC):
             capacity = self.K
             if from_nodes and restchannels:
                 capacity = max(capacity, self.velocitychannels + restchannels)
+        else:  # a number of cells per node; text that reads as a number is not one
+            try:
+                capacity = _validate_positive_int(capacity, "capacity")
+            except ValueError:
+                raise ValueError(f"capacity must be a positive integer, got {capacity!r}") from None
         self.capacity = capacity
 
     def _channel_populations(self):

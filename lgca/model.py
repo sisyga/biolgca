@@ -1562,10 +1562,7 @@ def run_model(
 
 
 def _validate_spec(spec: ModelSpec) -> None:
-    if isinstance(spec.time.steps, bool) or int(spec.time.steps) != spec.time.steps:
-        raise ValueError("model.time.steps must be a non-negative integer")
-    if spec.time.steps < 0:
-        raise ValueError("model.time.steps must be a non-negative integer")
+    _validate_non_negative_integer("model.time.steps", spec.time.steps)
     _validate_seed(spec.time.seed)
     _validate_non_negative_integer("model.time.timing_trace", spec.time.timing_trace)
     initial_states = [
@@ -1587,13 +1584,16 @@ def _validate_spec(spec: ModelSpec) -> None:
     if not isinstance(spec.state.identity_based, bool):
         raise ValueError("model.state.identity_based must be a boolean")
     if spec.state.density is not None:
+        density = np.asarray(spec.state.density)
         if (
             isinstance(spec.state.density, bool)
-            or np.asarray(spec.state.density).ndim != 0
-            or not np.isfinite(float(spec.state.density))
-            or float(spec.state.density) < 0
+            or density.ndim != 0
+            or density.dtype.kind not in "iuf"
+            or not np.isfinite(float(density))
+            or float(density) < 0
         ):
-            raise ValueError("model.state.density must be a finite non-negative scalar")
+            raise ValueError("model.state.density must be a finite non-negative scalar, "
+                             f"got {spec.state.density!r}")
     if not isinstance(spec.state.parameters, Mapping):
         raise ValueError("model.state.parameters must be a mapping")
     if not isinstance(spec.state.fields, Mapping):
@@ -1629,9 +1629,39 @@ _RESERVED_STATE_PARAMETERS = {
 }
 
 
+def _validate_sections(spec: ModelSpec) -> None:
+    """Every section of a model specification is an object of its class; say how to write the ones that are not."""
+    sections = {"space": (SpaceSpec, "SpaceSpec(geometry=..., dims=...)"),
+                "state": (StateSpec, "StateSpec(density=...)"),
+                "time": (TimeSpec, "TimeSpec(steps=...)"),
+                "dynamics": (InteractionPipelineSpec, "InteractionPipelineSpec(operators=[...])"),
+                "analysis": (AnalysisSpec, "AnalysisSpec(observers=[...])")}
+    for name, (kind, example) in sections.items():
+        value = getattr(spec, name)
+        if isinstance(value, kind) or (name == "analysis" and value is None):
+            continue
+        how = f"write {name}={example}"
+        if isinstance(value, Mapping):
+            how += ", or read the whole specification from a mapping with model_spec_from_dict"
+        got = "None" if value is None else f"{_article(type(value).__name__)} {type(value).__name__}"
+        raise TypeError(f"model.{name} must be {_article(kind.__name__)} {kind.__name__}, got {got}; {how}")
+    observers = () if spec.analysis is None else spec.analysis.observers
+    if isinstance(observers, (str, bytes, Mapping)) or not isinstance(observers, Sequence):
+        raise TypeError("model.analysis.observers must be a sequence of observers, such as "
+                        f"[DensityRecorder()], got {observers!r}")
+    from .simulation import check_observer_objects
+
+    check_observer_objects(observers, "model.analysis.observers")
+
+
+def _article(word: str) -> str:
+    return "an" if word[:1].lower() in "aeiou" else "a"
+
+
 def _normalize_and_validate_spec(spec: ModelSpec) -> ModelSpec:
     if not isinstance(spec, ModelSpec):
         raise TypeError("spec must be a ModelSpec")
+    _validate_sections(spec)
     geometry = spec.space.geometry
     if not isinstance(geometry, str) or geometry.lower() not in _GEOMETRY_ALIASES:
         raise ValueError("model.space.geometry must name a supported geometry")
@@ -1773,14 +1803,24 @@ def _validate_dims(dims) -> None:
         _validate_positive_integer("model.space.dims", value)
 
 
+def _is_whole_number(value) -> bool:
+    """Whether ``value`` is an integer of any numeric type (2, 2.0, ``np.int64(2)``), not a truth value or text."""
+    if isinstance(value, (bool, np.bool_, str, bytes)):
+        return False
+    try:
+        return int(value) == value
+    except (TypeError, ValueError, OverflowError):  # None and other objects, nan, inf
+        return False
+
+
 def _validate_positive_integer(path, value) -> None:
-    if isinstance(value, bool) or int(value) != value or value < 1:
-        raise ValueError(f"{path} must be a positive integer")
+    if not _is_whole_number(value) or value < 1:
+        raise ValueError(f"{path} must be a positive integer, got {value!r}")
 
 
 def _validate_non_negative_integer(path, value) -> None:
-    if isinstance(value, bool) or int(value) != value or value < 0:
-        raise ValueError(f"{path} must be a non-negative integer")
+    if not _is_whole_number(value) or value < 0:
+        raise ValueError(f"{path} must be a non-negative integer, got {value!r}")
 
 
 def _validate_seed(seed) -> None:
