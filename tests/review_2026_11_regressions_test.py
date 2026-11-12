@@ -93,3 +93,29 @@ def test_random_reset_of_a_model_from_a_spec_with_traits_says_to_build_a_new_one
     lgca = build_model(spec).lgca
     with pytest.raises(ValueError, match="build a new model"):
         lgca.random_reset(1.0)
+
+
+# ------------------------------------------------------------------------------ interaction radius
+
+FAMILIES = [dict(), dict(ve=False), dict(ib=True), dict(ib=True, ve=False), dict(n_species=2),
+            dict(n_species=2, ve=False)]
+
+
+@pytest.mark.parametrize("family", FAMILIES, ids=lambda family: "-".join(family) or "classical")
+@pytest.mark.parametrize("geometry, dims", GEOMETRIES)
+def test_a_model_runs_on_after_its_interaction_radius_changed(geometry, dims, family):
+    """Identity-based models without volume exclusion kept the lookup tables of the old padded shape."""
+    lgca = get_lgca(geometry=geometry, dims=dims, density=1.0, restchannels=1, interaction="random_walk",
+                    seed=4, **family)
+    lgca.timeevo(2, showprogress=False)
+    cells = int(lgca.cell_density[lgca.nonborder].sum())
+    before = np.sort(_labels(lgca)) if family.get("ib") else None
+
+    lgca.set_r_int(3)
+
+    assert lgca.cell_density.shape == tuple(size + 6 for size in lgca.dims)
+    assert int(lgca.cell_density[lgca.nonborder].sum()) == cells
+    lgca.timeevo(3, showprogress=False)
+    assert int(lgca.cell_density[lgca.nonborder].sum()) == cells
+    if before is not None:
+        np.testing.assert_array_equal(np.sort(_labels(lgca)), before)

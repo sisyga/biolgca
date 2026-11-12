@@ -139,6 +139,11 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.cells_t.record(index, labels[inside], inner[inside])
         self.__dict__["_nodes_t"] = None
 
+    def init_coords(self):
+        super().init_coords()
+        # the lookup tables of the cell table are those of one padded shape (set_r_int changes it)
+        self.__dict__["_slot_maps"] = None
+
     def set_bc(self, bc):
         super().set_bc(bc)
         self.__dict__["_slot_maps"] = None
