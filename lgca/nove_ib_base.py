@@ -32,7 +32,7 @@ from .base import (
 from .plots import muller_plot
 
 
-from .ib_base import IBLGCA_base
+from .ib_base import IBLGCA_base, _NO_FAMILIES
 from .nove_base import NoVE_LGCA_base
 from .list_utils import get_arr_of_empty_lists, _copy_arr_of_lists
 
@@ -385,16 +385,16 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         cells = int(self.maxlabel) + 1
         if type == 'homogeneous':
             self.props.update(family=[1] * cells)
+            self.maxfamily = 1
             if mutation:
                 self.family_props = {'ancestor': [0, 0], 'descendants': [[1], []]}
-                self.maxfamily = 1
         elif type == 'heterogeneous':
             families = list(range(1, cells + 1))
             self.props.update(family=families)
+            self.maxfamily = cells
             if mutation:
                 self.family_props = {'ancestor': [0] * (cells + 1),
                                      'descendants': [families] + [[] for _ in range(cells)]}
-                self.maxfamily = cells
 
     def calc_max_label(self):
         cells = _flatten_ids(self.nodes)
@@ -578,8 +578,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         :returns: np.ndarray fam_pop_array - array of family population counts indexed by family ID
         """
         if 'family' not in self.props:
-            raise RuntimeError("Family properties are not recorded by the LGCA, choose suitable interaction.")
-
+            raise RuntimeError(_NO_FAMILIES)
         cells_alive = self._labels_alive()
         cell_fam = np.array(self.props['family'])  # convert for indexing
         cell_fam_alive = cell_fam[cells_alive]  # filter family array for families of live cells
@@ -595,6 +594,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         Calculate which families are alive.
         :returns: np.ndarray - array of family IDs in ascending order
         """
+        if 'family' not in self.props:
+            raise RuntimeError(_NO_FAMILIES)
         cells_alive = self._labels_alive()
         cell_fam = np.array(self.props['family'])  # convert for indexing
         cell_fam_alive = cell_fam[cells_alive]  # filter family array for families of live cells

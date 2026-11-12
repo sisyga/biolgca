@@ -212,3 +212,90 @@ def test_the_default_capacity_of_an_interaction_leaves_with_it():
     assert _capacities(lgca) == (lgca.K,) * 3
     lgca.set_interaction(interaction="birth")
     assert _capacities(lgca) == (8, 8, 8)
+
+
+# --------------------------------------------------------------------------------------- families
+
+
+def _model_with_families(ve, geometry="lin", dims=12):
+    """A model whose every dividing cell founds a family."""
+    spec = ModelSpec(
+        space=SpaceSpec(geometry=geometry, dims=dims),
+        state=StateSpec(identity_based=True, volume_exclusion=ve, restchannels=2 if ve else 1, density=0.3),
+        time=TimeSpec(steps=4, seed=2),
+        dynamics=InteractionPipelineSpec(operators=[
+            {"name": "birth_death", "parameters": {"birth_rate": 0.6, "new_family": True}}, {"name": "random_walk"}]),
+    )
+    return run_model(spec, showprogress=False).lgca
+
+
+@pytest.mark.parametrize("ve", [True, False])
+def test_the_generation_of_a_family_is_one_more_than_that_of_its_ancestor(ve):
+    lgca = _model_with_families(ve)
+    ancestor = lgca.family_props["ancestor"]
+    assert max(ancestor) > 1  # families descend from families
+
+    generation = lgca.calc_family_generations()
+
+    assert len(generation) == lgca.num_families_total() + 1 and generation[0] == 0
+    assert all(generation[family] == generation[ancestor[family]] + 1 for family in range(1, len(ancestor)))
+    assert all(type(value) is int for value in generation)
+    assert lgca.calc_generation_pop().sum() == _labels(lgca).size
+
+
+@pytest.mark.parametrize("ve", [True, False])
+def test_a_lineage_of_thousands_of_generations_has_generations(ve):
+    """The generations were found by recursion, which Python ends after about a thousand calls."""
+    lgca = _model_with_families(ve)
+    first = lgca.num_families_total()
+    for _ in range(3000):
+        lgca.add_family(lgca.maxfamily)
+
+    generation = lgca.calc_family_generations()
+
+    assert generation[-1] == generation[first] + 3000
+    assert lgca.calc_generation_pop().sum() == _labels(lgca).size
+
+
+@pytest.mark.parametrize("ve", [True, False])
+@pytest.mark.parametrize("method, key", [("calc_family_generations", "generation"),
+                                         ("propagate_ancestor_to_descendants", "init_ancestor")])
+def test_family_tables_are_kept_until_a_family_is_founded(ve, method, key):
+    """The tables were compared with a length that they never have, so every call built them anew."""
+    lgca = _model_with_families(ve)
+    table = getattr(lgca, method)()
+    assert getattr(lgca, method)() is table and lgca.family_props[key] is table
+
+    lgca.add_family(1)
+
+    new = getattr(lgca, method)()
+    assert new is not table and len(new) == len(table) + 1
+    assert new[:-1] == table
+
+
+@pytest.mark.parametrize("ve", [True, False])
+@pytest.mark.parametrize("method", ["calc_family_generations", "calc_generation_pop", "num_families_total",
+                                    "propagate_ancestor_to_descendants", "calc_init_families_pop",
+                                    "calc_family_pop_alive", "list_families_alive", "num_families_alive",
+                                    "muller_plot"])
+def test_family_analyses_of_a_model_without_families_say_how_to_record_them(ve, method):
+    """Most of them ended in ``AttributeError: ... has no attribute 'family_props'``."""
+    lgca = get_lgca(geometry="lin", dims=8, ib=True, ve=ve, density=0.3, interaction="random_walk", seed=1)
+    with pytest.raises(RuntimeError, match="new_family=True"):
+        getattr(lgca, method)()
+
+
+@pytest.mark.parametrize("ve", [True, False])
+def test_a_model_with_families_but_no_ancestry_says_that_it_has_no_family_tree(ve):
+    if ve:
+        lgca = get_lgca(geometry="lin", dims=8, ib=True, restchannels=2, density=0.3, interaction="birthdeath",
+                        track_inheritance=True, seed=1)
+    else:
+        lgca = get_lgca(geometry="lin", dims=8, ib=True, ve=False, density=0.3, interaction="birthdeath", seed=1)
+        lgca.init_families(type="heterogeneous", mutation=False)
+    lgca.timeevo(4, recordfampop=True, showprogress=False)  # had no maxfamily: an AttributeError
+    assert lgca.calc_family_pop_alive().sum() == _labels(lgca).size
+    assert lgca.fam_pop_t[-1].sum() == _labels(lgca).size
+    for method in ("calc_family_generations", "muller_plot", "num_families_total"):
+        with pytest.raises(RuntimeError, match="no family tree"):
+            getattr(lgca, method)()

@@ -29,6 +29,10 @@ from .base import (
 )
 from .plots import muller_plot
 
+_NO_FAMILIES = ("Family properties are not recorded by the LGCA, choose suitable interaction: families are "
+                "founded by birth_death(..., new_family=True), by cells.found_families(...) in a rule of your "
+                "own, and by the get_lgca interactions with mutations or track_inheritance=True.")
+
 logger = logging.getLogger(__name__)
 
 
@@ -544,17 +548,18 @@ class IBLGCA_base(LGCA_base, ABC):
             # all cells belong to the same family
             families = [0] + [1] * self.maxlabel
             self.props.update(family=families)
+            self.maxfamily = 1
             if mutation:
                 self.family_props = {}  # properties of families
                 # family 1 is the semantic root of the tree, family 0 is the root for implementation purposes
                 self.family_props.update(ancestor=[0, 0])
                 self.family_props.update(descendants=[[1], []])
-                self.maxfamily = 1
         # each cell in the beginning of the simulation represents an own family with own properties
         elif type == 'heterogeneous':
             # each initial cell founds its own family
             families = list(np.arange(self.maxlabel+1))
             self.props.update(family=families)
+            self.maxfamily = self.maxlabel
             if mutation:
                 self.family_props = {}  # properties of families
                 # family 0 is the root for implementation purposes, all initial families descend from it
@@ -563,7 +568,6 @@ class IBLGCA_base(LGCA_base, ABC):
                 # create lists for each family's future descendants
                 for i in range(self.maxlabel):
                     self.family_props['descendants'].append([])
-                self.maxfamily = self.maxlabel
 
     def calc_family_pop_alive(self):
         """
@@ -576,7 +580,7 @@ class IBLGCA_base(LGCA_base, ABC):
 
         """
         if 'family' not in self.props:
-            raise RuntimeError("Family properties are not recorded by the LGCA, choose suitable interaction.")
+            raise RuntimeError(_NO_FAMILIES)
 
         cells_alive = self.nodes[self.nonborder][
             np.where(self.nodes[self.nonborder] > 0)]  # indices of live cells # nonborder needed for uniqueness
@@ -671,6 +675,7 @@ class IBLGCA_base(LGCA_base, ABC):
         """
         # prepare content arguments for plot function from LGCA data
         root_ID = 0
+        self._tracks_family_tree()
         parent_list = self.family_props['ancestor']
         children_nlist = self.family_props['descendants']
         # slice and adjust time axis
@@ -748,7 +753,19 @@ class IBLGCA_base(LGCA_base, ABC):
             Number of families.
 
         """
+        self._tracks_family_tree()
         return len(self.family_props['ancestor'])-1  # subtract placeholder 0 family
+
+    def _tracks_family_tree(self):
+        """Raise an error that says how to record families if the model has no family tree."""
+        if hasattr(self, 'family_props'):
+            return True
+        if 'family' in getattr(self, 'props', {}):
+            raise RuntimeError("This model records the family of every cell, but not which family descends from "
+                               "which (init_families(mutation=False)), so it has no family tree. Found families "
+                               "in the rule instead: birth_death(..., new_family=True), or "
+                               "cells.found_families(...) in a rule of your own.")
+        raise RuntimeError(_NO_FAMILIES)
 
     def num_families_total_t(self, cutoff_abs=None, cutoff_rel=None):
         """
@@ -898,6 +915,8 @@ class IBLGCA_base(LGCA_base, ABC):
             Array of family IDs in ascending order.
 
         """
+        if 'family' not in self.props:
+            raise RuntimeError(_NO_FAMILIES)
         cells_alive = self.nodes[self.nonborder][
             np.where(self.nodes[self.nonborder] > 0)]  # indices of live cells # nonborder needed for uniqueness
         cell_fam = np.array(self.props['family'])  # convert for indexing
@@ -916,35 +935,17 @@ class IBLGCA_base(LGCA_base, ABC):
             simulation = generation 1.
 
         """
-        # check if it has been calculated and is up to date
-        num_families = self.num_families_total()
-        if 'generation' in self.family_props:
-            if len(self.family_props['generation']) == num_families:
-                return self.family_props['generation']
-        # if not, initialise the property and fill it
-        self.family_props['generation'] = list(np.zeros(num_families+1))
-        self._recurse_generation(0, 0)
-        return self.family_props['generation']
-
-    def _recurse_generation(self, fam_ID, gen):
-        """
-        Utility for calculating the generation of each family. Recursively updates the entries in
-        :py:attr:`self.family_props['generation']`.
-
-        Parameters
-        ----------
-        fam_ID : int
-            Family ID to access properties in :py:attr:`self.family_props`.
-        gen : int
-            This family's generation.
-
-        """
-        # update generation for this family
-        self.family_props['generation'][fam_ID] = gen
-        # update children generations with increased counter
-        gen += 1
-        for desc in self.family_props['descendants'][fam_ID]:
-            self._recurse_generation(desc, gen)
+        # one entry per family and the helper root family; a list of another length is out of date
+        self._tracks_family_tree()
+        ancestor = self.family_props['ancestor']
+        generation = self.family_props.get('generation')
+        if generation is None or len(generation) != len(ancestor):
+            # a family is founded after its ancestor, so its ancestor's generation is known when its turn comes
+            generation = [0] * len(ancestor)
+            for fam_ID in range(1, len(ancestor)):
+                generation[fam_ID] = generation[ancestor[fam_ID]] + 1
+            self.family_props['generation'] = generation
+        return generation
 
     def calc_generation_pop(self):
         """
@@ -1027,11 +1028,10 @@ class IBLGCA_base(LGCA_base, ABC):
         """
         # check if it has been calculated and is up to date
         num_families = self.num_families_total()
-        if 'init_ancestor' in self.family_props:
-            if len(self.family_props['init_ancestor']) == num_families:
-                return self.family_props['init_ancestor']
+        if len(self.family_props.get('init_ancestor', ())) == num_families + 1:  # with the helper root family
+            return self.family_props['init_ancestor']
         # if not, initialise the property and fill it
-        self.family_props['init_ancestor'] = list(np.zeros(num_families + 1))
+        self.family_props['init_ancestor'] = [0] * (num_families + 1)
         # check each family's ancestor, going up the tree from the root
         for fam_ID, ancestor in enumerate(self.family_props['ancestor']):
             if fam_ID == 0:
