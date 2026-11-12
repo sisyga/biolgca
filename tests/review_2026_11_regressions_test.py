@@ -299,3 +299,40 @@ def test_a_model_with_families_but_no_ancestry_says_that_it_has_no_family_tree(v
     for method in ("calc_family_generations", "muller_plot", "num_families_total"):
         with pytest.raises(RuntimeError, match="no family tree"):
             getattr(lgca, method)()
+
+
+# ------------------------------------------------------------------------------- order parameters
+
+
+@pytest.mark.parametrize("geometry, dims", GEOMETRIES)
+def test_mean_alignment_of_several_species_is_that_of_all_cells(geometry, dims):
+    """``calc_mean_alignment`` could not broadcast the density to the flux of each species."""
+    one = get_lgca(geometry=geometry, dims=dims, ve=False, density=2.0, restchannels=1,
+                   interaction="only_propagation", seed=5)
+    two = get_lgca(geometry=geometry, dims=dims, ve=False, n_species=2, density=1.0, restchannels=1,
+                   interaction="only_propagation", seed=5)
+    cells = one.nodes[one.nonborder]
+    split = cells // 2  # the same cells, shared between two species
+    two.nodes[two.nonborder] = np.stack([split, cells - split], axis=-2)
+    two.apply_boundaries()
+    two.update_dynamic_fields()
+
+    assert two.calc_mean_alignment() == pytest.approx(one.calc_mean_alignment())
+    assert -1 <= two.calc_mean_alignment() <= 1
+    assert two.calc_polar_alignment_parameter() == pytest.approx(one.calc_polar_alignment_parameter())
+
+
+@pytest.mark.parametrize("n_species", [1, 2, 3])
+@pytest.mark.parametrize("geometry, dims", GEOMETRIES)
+def test_order_parameters_are_recorded_for_any_number_of_species(geometry, dims, n_species):
+    spec = ModelSpec(
+        space=SpaceSpec(geometry=geometry, dims=dims),
+        state=StateSpec(volume_exclusion=False, n_species=n_species, density=1.5, restchannels=1),
+        time=TimeSpec(steps=3, seed=6),
+        dynamics=InteractionPipelineSpec(operators=[{"name": "random_walk"}]),
+        analysis=AnalysisSpec(observers=[OrderParameterRecorder()]),
+    )
+    lgca = run_model(spec, showprogress=False).lgca
+    for name in ("ent_t", "normEnt_t", "polAlParam_t", "meanAlign_t"):
+        values = getattr(lgca, name)
+        assert values.shape == (4,) and np.isfinite(values).all(), name

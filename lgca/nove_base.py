@@ -175,7 +175,8 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         The mean alignment is a measure for local alignment of particle orientation in the lattice.
         It is calculated as the agreement in direction between the ﬂux of a lattice site and the ﬂux of the director
         field
-        summed up and normalized over all lattice sites.
+        summed up and normalized over all lattice sites. With several species, the flux of a site is that of the
+        cells of all species.
 
         Periodic neighbors wrap around the physical lattice. Reflecting and
         absorbing walls have no exterior particles and contribute zero director
@@ -192,6 +193,8 @@ class NoVE_LGCA_base(LGCA_base, ABC):
             return 0.0
         # Calculate the director field
         flux = self.calc_flux(self._channel_populations())
+        # the flux of a node is that of all its cells: sum the species, as the polar alignment parameter does
+        flux = flux.sum(axis=tuple(range(len(self.dims), flux.ndim - 1)))
         # # retrieve number of particles and reshape to combine with flux
         norm_factor = np.where(self.cell_density > 0, self.cell_density, 1)
         norm_factor = 1 / norm_factor
