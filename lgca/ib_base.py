@@ -251,6 +251,38 @@ class IBLGCA_base(LGCA_base, ABC):
         occupied = self.rng.random(self.dims + (self.K,)) < (density / self.K)
         self.nodes[self.nonborder] = self.convert_bool_to_ib(occupied)
         self.apply_boundaries()
+        self.calc_max_label()
+        self._cells_replaced()
+
+    def calc_max_label(self):
+        """Set :py:attr:`self.maxlabel` to the largest label on the lattice (0 if it is empty)."""
+        self.maxlabel = int(self.nodes.max()) if self.nodes.size else 0
+
+    def _cells_replaced(self):
+        """The lattice holds a new population: give it the traits and families of a new model.
+
+        The traits and families of a model belong to its cells. A model built with
+        :func:`lgca.get_lgca` sets its interaction again, which gives the new cells the initial
+        traits and families of the interaction. A model built from a
+        :class:`~lgca.model.ModelSpec` took them from the spec when it was built, so it is built
+        again instead.
+        """
+        self.update_dynamic_fields()
+        if not getattr(self, "props", None):  # under construction, or cells without traits
+            return
+        from .legacy_names import LegacyInteraction
+
+        interaction = getattr(self, "interaction", None)
+        compiled = self.__dict__.get("_compiled_model")
+        if isinstance(interaction, LegacyInteraction) and interaction._compiled is compiled:
+            self.props = {}
+            for name in ("family_props", "maxfamily"):
+                self.__dict__.pop(name, None)
+            self.set_interaction(interaction=interaction.__name__, **self.interaction_params)
+        elif compiled is not None:
+            raise ValueError("random_reset replaces all cells, but the traits and families of this model "
+                             "were set for its cells when it was built; build a new model with the "
+                             "density you want, StateSpec(density=...)")
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True,
                 recordfampop=False):

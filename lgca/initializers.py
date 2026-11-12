@@ -132,6 +132,11 @@ def _region_initializer(lgca, parameters, **_) -> None:
                 node[channel] = []
     else:
         lgca.nodes[outside] = 0
+        if hasattr(lgca, "props"):  # identity-based: the cells of the region get the labels 1..n
+            interior = lgca.nodes[lgca.nonborder]
+            interior[interior > 0] = np.arange(1, np.count_nonzero(interior) + 1)
+            lgca.nodes[lgca.nonborder] = interior
+            lgca.calc_max_label()
     lgca.apply_boundaries()
     lgca.update_dynamic_fields()
 
