@@ -20,6 +20,7 @@ from tqdm.auto import tqdm
 
 from .base import (
     LGCA_base,
+    COUNT_DTYPE,
     _validate_count_nodes,
     _validate_density,
     _validate_nonnegative_int,
@@ -260,8 +261,8 @@ def _poisson_channel_populations(lgca, density, shape):
         populations = lgca.rng.poisson(lam=per_channel, size=shape)
         surplus = lgca.rng.poisson(lam=per_channel * (lgca.capacity - lgca.K), size=shape[:-1])
         populations[..., -1] += surplus
-        return populations
-    return lgca.rng.poisson(lam=density / lgca.K, size=shape)
+        return populations.astype(COUNT_DTYPE, copy=False)
+    return lgca.rng.poisson(lam=density / lgca.K, size=shape).astype(COUNT_DTYPE, copy=False)
 
 
 # create a numpy universal function (ufunc) of the python function 'list'. Can be used to create an numpy array of

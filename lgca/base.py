@@ -214,16 +214,24 @@ def _validate_positive(value, name):
     return value
 
 
+COUNT_DTYPE = np.int64
+"""The type of ``nodes`` of models without volume exclusion (cells per channel), however they were filled.
+
+Signed, so that differences of counts are differences (unsigned ones wrap around, and mix with signed integers
+to floats), and the type the samplers and :func:`channel_sum` work in.
+"""
+
+
 def _validate_count_nodes(nodes):
-    """Validate numeric particle counts before conversion to unsigned state."""
+    """Validate numeric particle counts before conversion to the state (:data:`COUNT_DTYPE`)."""
     nodes = np.asarray(nodes)
     if (nodes.dtype.kind not in "biuf" or not np.all(np.isfinite(nodes))
             or np.any(nodes < 0) or np.any(nodes != np.floor(nodes))):
         raise ValueError("nodes must contain finite non-negative integer counts")
-    if nodes.dtype.kind == "f" and np.any(nodes >= 2 ** (np.dtype(np.uint).itemsize * 8)):
-        raise ValueError("nodes counts exceed the representable unsigned range")
-    if nodes.dtype.kind in "iu" and np.any(nodes > np.iinfo(np.uint).max):
-        raise ValueError("nodes counts exceed the representable unsigned range")
+    limit = np.iinfo(COUNT_DTYPE).max
+    if (nodes.dtype.kind == "f" and np.any(nodes >= 2.0 ** 63)
+            or nodes.dtype.kind in "iu" and np.any(nodes > limit)):
+        raise ValueError(f"nodes counts exceed the representable range: a channel holds at most {limit} cells")
     return nodes
 
 

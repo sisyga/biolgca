@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 
 import numpy as np
-from lgca.base import normalize_dims, warn_user, plt
+from lgca.base import COUNT_DTYPE, normalize_dims, warn_user, plt
 from lgca.ib_base import IBLGCA_base
 from lgca.list_utils import get_arr_of_empty_lists
 from lgca.nove_base import NoVE_LGCA_base
@@ -102,12 +102,12 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
         self._set_channels(restchannels, capacity, from_nodes=nodes is not None)
 
     def init_nodes(self, density=4, nodes=None):
-        self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
+        self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=COUNT_DTYPE)
         if nodes is None:
             self.random_reset(density)
         else:
             self._warn_nodes_shape(nodes)
-            self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(np.uint)
+            self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(COUNT_DTYPE)
             self.apply_boundaries()
 
     def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,

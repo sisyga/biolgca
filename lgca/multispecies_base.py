@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 
 from ._warnings import warn_user
-from .base import LGCA_base, _validate_density, channel_sum
+from .base import COUNT_DTYPE, LGCA_base, _validate_density, channel_sum
 from .nove_base import NoVE_LGCA_base, _poisson_channel_populations
 
 _SPATIAL_NDIMS = {
@@ -143,7 +143,7 @@ class MultiSpeciesLGCA_base(_MultiSpecies, LGCA_base):
 class MultiSpeciesNoVE_LGCA_base(_MultiSpecies, NoVE_LGCA_base):
     """No-volume-exclusion LGCA with multiple species."""
 
-    _node_dtype = np.uint
+    _node_dtype = COUNT_DTYPE
 
     _LOCAL_ENSEMBLE_INTERACTIONS = NoVE_LGCA_base._LOCAL_ENSEMBLE_INTERACTIONS | {
         "birth",

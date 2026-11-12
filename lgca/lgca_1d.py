@@ -34,6 +34,7 @@ from lgca.base import (
     colors,
     cmap_discretize,
     estimate_figsize,
+    COUNT_DTYPE,
     normalize_dims,
     np,
     plt,
@@ -710,14 +711,14 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         :param nodes: existing lattice to use, optionally containing particles (ndarray)
         """
         # create lattice according to size specified earlier
-        self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.uint)
+        self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=COUNT_DTYPE)
         # if no lattice given, populate randomly
         if nodes is None:
             self.random_reset(density)
         # if lattice given, populate lattice with given particles. Virtual lattice sites for boundary conditions not included
         else:
             self._warn_nodes_shape(nodes)
-            self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.uint)
+            self.nodes[self.r_int:-self.r_int, :] = nodes.astype(COUNT_DTYPE)
             self.apply_boundaries()
 
     def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='hot_r', relative_max=None, cbar=True,

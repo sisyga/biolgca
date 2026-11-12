@@ -488,3 +488,65 @@ def test_means_of_recorded_nodes_leave_with_the_recorded_nodes():
 
     assert lgca.mean_prop_t == {}
     assert not hasattr(lgca, "nodes_t") and not hasattr(lgca, "cells_t")
+
+
+# ---------------------------------------------------------- the type of nodes without volume exclusion
+
+
+def _nove_model(geometry, dims, n_species, route, tmp_path):
+    """A model without volume exclusion whose nodes were filled on the given route."""
+    v = VELOCITY_CHANNELS[geometry]
+    shape = dims + ((n_species,) if n_species > 1 else ()) + (v + 1,)
+    counts = np.random.default_rng(1).poisson(0.5, shape)
+    common = dict(geometry=geometry, ve=False, n_species=n_species, interaction="random_walk", seed=1)
+    if route == "density":
+        return get_lgca(dims=dims, density=1.0, restchannels=1, **common)
+    if route == "random_reset":
+        lgca = get_lgca(nodes=counts.astype(np.uint64), **common)
+        lgca.random_reset(1.0)
+        return lgca
+    if route in ("int64", "uint64", "int32", "float", "bool"):
+        return get_lgca(nodes=counts.astype(route.replace("float", "float64")), **common)
+    state = dict(volume_exclusion=False, n_species=n_species, restchannels=1)
+    if route == "spec nodes":
+        state["nodes"] = counts.astype(np.uint64)
+    elif route == "region":
+        state["initializer"] = {"name": "region", "parameters": {"extent": 2, "density": 3.0}}
+    elif route == "from_npz":
+        np.savez(tmp_path / "state.npz", nodes=counts.astype(np.uint64))
+        state["initializer"] = {"name": "from_npz", "parameters": {"path": "state.npz"}}
+    spec = ModelSpec(space=SpaceSpec(geometry=geometry, dims=dims), state=StateSpec(**state),
+                     time=TimeSpec(seed=1), dynamics=InteractionPipelineSpec(operators=[{"name": "random_walk"}]))
+    return build_model(spec, resource_base=tmp_path).lgca
+
+
+@pytest.mark.parametrize("route", ["density", "random_reset", "int64", "uint64", "int32", "float", "bool",
+                                   "spec nodes", "region", "from_npz"])
+@pytest.mark.parametrize("n_species", [1, 2])
+@pytest.mark.parametrize("geometry, dims", GEOMETRIES)
+def test_nodes_without_volume_exclusion_have_one_type_however_they_were_filled(geometry, dims, n_species, route,
+                                                                              tmp_path):
+    """Random nodes were ``int64`` and given ones ``uint64``, whose differences wrap around."""
+    lgca = _nove_model(geometry, dims, n_species, route, tmp_path)
+    assert lgca.nodes.dtype == np.int64
+    assert lgca.cell_density.dtype == np.int64
+
+    lgca.timeevo(2, record=True, showprogress=False)
+
+    assert lgca.nodes.dtype == lgca.nodes_t.dtype == lgca.cell_density.dtype == np.int64
+    assert lgca.dens_t.dtype.kind == "i"  # recorded in a smaller signed type while the counts fit
+    assert (lgca.nodes_t[1] - lgca.nodes_t[0]).sum() == 0  # cells are conserved: the differences cancel
+    assert (lgca.cell_density[lgca.nonborder] - 2 * lgca.cell_density[lgca.nonborder]).max() <= 0
+
+
+@pytest.mark.parametrize("n_species", [1, 2])
+@pytest.mark.parametrize("value", [np.uint64(2**63), float(2**63), np.uint64(2**64 - 1)])
+def test_a_channel_holds_at_most_the_largest_signed_integer(value, n_species):
+    shape = (3, 3) if n_species == 1 else (3, n_species, 3)
+    nodes = np.zeros(shape, dtype=np.asarray(value).dtype)
+    nodes.flat[0] = value
+    with pytest.raises(ValueError, match="nodes counts exceed the representable range"):
+        get_lgca(geometry="lin", ve=False, n_species=n_species, nodes=nodes, interaction="only_propagation")
+    nodes.flat[0] = 2**62
+    lgca = get_lgca(geometry="lin", ve=False, n_species=n_species, nodes=nodes, interaction="only_propagation")
+    assert lgca.nodes.dtype == np.int64 and lgca.nodes.max() == 2**62
