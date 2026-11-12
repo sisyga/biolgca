@@ -433,3 +433,58 @@ def test_rest_channels_beyond_those_of_the_nodes_add_to_the_capacity(geometry, d
                 lgca = get_lgca(geometry=geometry, ve=False, n_species=n_species, nodes=nodes, restchannels=3,
                                 interaction="only_propagation")
         assert (lgca.restchannels, lgca.K, lgca.capacity) == (rest, v + rest, capacity)
+
+
+# ------------------------------------------------------------------------------------- recordings
+
+RECORDINGS = ("nodes_t", "nodes_steps", "dens_t", "dens_steps", "n_t", "n_steps")
+
+
+@pytest.mark.parametrize("family", FAMILIES, ids=lambda family: "-".join(family) or "classical")
+@pytest.mark.parametrize("geometry, dims", GEOMETRIES[:3])
+def test_the_recordings_on_a_model_are_those_of_its_last_run(geometry, dims, family):
+    """A run that did not record the nodes left the nodes of the run before next to its own densities."""
+    lgca = get_lgca(geometry=geometry, dims=dims, density=0.5, restchannels=1, interaction="random_walk", seed=1,
+                    **family)
+    lgca.timeevo(5, record=True, recordN=True, showprogress=False)
+    nodes_t, n_t = lgca.nodes_t, lgca.n_t
+    assert len(nodes_t) == len(lgca.dens_t) == len(n_t) == 6
+
+    lgca.timeevo(7, showprogress=False)  # records the density
+
+    assert len(lgca.dens_t) == len(lgca.dens_steps) == 8
+    for name in ("nodes_t", "nodes_steps", "n_t", "n_steps"):
+        assert not hasattr(lgca, name), name
+    assert set(lgca.data) == {"density"}
+    assert len(nodes_t) == len(n_t) == 6  # the arrays taken from the model are the caller's
+
+    lgca.timeevo(2, record=True, recorddens=False, showprogress=False)
+
+    assert len(lgca.nodes_t) == len(lgca.nodes_steps) == 3
+    assert not hasattr(lgca, "dens_t") and not hasattr(lgca, "dens_steps")
+
+
+def test_a_run_of_a_model_from_a_spec_forgets_the_recordings_of_the_run_before():
+    from lgca.simulation import DensityRecorder, NodeRecorder, SimulationRunner
+
+    spec = ModelSpec(space=SpaceSpec(geometry="square", dims=(5, 5)), state=StateSpec(density=0.5, restchannels=1),
+                     time=TimeSpec(steps=3, seed=1),
+                     dynamics=InteractionPipelineSpec(operators=[{"name": "random_walk"}]),
+                     analysis=AnalysisSpec(observers=[NodeRecorder(), DensityRecorder()]))
+    lgca = run_model(spec, showprogress=False).lgca
+    assert len(lgca.nodes_t) == len(lgca.dens_t) == 4
+
+    SimulationRunner(lgca, timesteps=6, observers=[DensityRecorder()], showprogress=False).run()
+
+    assert len(lgca.dens_t) == 7 and not hasattr(lgca, "nodes_t")
+
+
+def test_means_of_recorded_nodes_leave_with_the_recorded_nodes():
+    lgca = get_lgca(geometry="lin", dims=10, ib=True, ve=False, density=1.0, interaction="birthdeath", seed=1)
+    lgca.timeevo(3, record=True, showprogress=False)
+    assert set(lgca.calc_prop_mean_spatiotemp()) >= {"r_b"}
+
+    lgca.timeevo(4, showprogress=False)
+
+    assert lgca.mean_prop_t == {}
+    assert not hasattr(lgca, "nodes_t") and not hasattr(lgca, "cells_t")

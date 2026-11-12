@@ -287,6 +287,7 @@ class SimulationRunner:
         lgca.recording_start_step = self.start_step
         lgca.recording_end_step = self.end_step
         lgca.update_dynamic_fields()
+        _forget_recordings(lgca)
         for observer in self.observers:
             setup = getattr(observer, "setup", None)
             if setup is not None:
@@ -341,6 +342,21 @@ class SimulationRunner:
             schedule = getattr(observer, "schedule", None)
             if schedule is None or schedule.should_run(step):
                 observer.on_step(self.lgca, step)
+
+
+def _forget_recordings(lgca) -> None:
+    """Take the recordings of earlier runs off the model: those on it are the ones of its last run.
+
+    Arrays that the caller took from the model stay as they are.
+    """
+    names = {"cells_t", "_nodes_t"}  # the cell tables of identity-based models and the nodes built from them
+    for attribute, steps_attribute, _, _ in RECORDED.values():
+        names.update((attribute, steps_attribute))
+    state = vars(lgca)
+    for name in names:
+        state.pop(name, None)
+    if "mean_prop_t" in state:  # means of the recorded nodes (calc_prop_mean_spatiotemp)
+        state["mean_prop_t"] = {}
 
 
 class NodeRecorder(Observer):
