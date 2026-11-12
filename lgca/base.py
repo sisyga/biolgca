@@ -214,7 +214,7 @@ def _validate_positive(value, name):
     return value
 
 
-COUNT_DTYPE = np.int64
+COUNT_DTYPE = np.dtype(np.int64)
 """The type of ``nodes`` of models without volume exclusion (cells per channel), however they were filled.
 
 Signed, so that differences of counts are differences (unsigned ones wrap around, and mix with signed integers

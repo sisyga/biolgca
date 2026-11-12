@@ -5,7 +5,72 @@ This file records notable user-facing changes. Changes remain under
 
 ## Unreleased
 
-Nothing yet.
+Fixes for the findings of the code review of 2.0.0 (November 2026).
+
+### Changed
+
+- Models without volume exclusion have the rest channels they are given on
+  every lattice. In 1D and on the square and hexagonal lattices,
+  `restchannels=3` gave one rest channel and a capacity raised by two, and
+  `nodes` with several rest channels were refused; now every rest channel is
+  a channel of the state, as on the 3D lattices. Runs with `restchannels > 1`
+  on these lattices have more channels than before (the same default
+  capacity). Identity-based models without volume exclusion keep their one
+  rest channel.
+- `nodes` of models without volume exclusion are `int64` however the model
+  was filled (`lgca.base.COUNT_DTYPE`). Nodes given by the caller were
+  `uint64`, random ones `int64`; differences of unsigned counts wrap around.
+  A channel holds at most 2**63 - 1 cells.
+- The recordings on a model (`lgca.nodes_t`, `lgca.dens_t`, ...) are those of
+  its last run. A run that did not record the nodes left the `nodes_t` of the
+  run before next to its own `dens_t`. Keep the arrays of an earlier run in
+  variables of your own.
+- `dims` is read in one way by every lattice class and by `ModelSpec`: one
+  integer of any numeric type (also a NumPy integer or `6.0`) for every axis,
+  or one length per axis in any sequence. Without volume exclusion, a NumPy
+  integer gave a 50 x 50 lattice with a warning. 1D lattices no longer ignore
+  further entries of `dims`, and 3D lattices without volume exclusion default
+  to 10 x 10 x 10 like the others (was 50 x 50 x 50).
+- With `nodes`, the capacity of a model without volume exclusion defaults to
+  the number of channels of the nodes; on 3D lattices it was that of the
+  `restchannels` argument, below the channels of nodes with more rest
+  channels. `restchannels` beyond those of the nodes still add to it.
+- `ChannelDensityRecorder` records every model without volume exclusion
+  (models with one species and no identities had no `channel_pop`).
+- `get_lgca` reads `nodes` given as nested lists.
+
+### Fixed
+
+- Identity-based models with volume exclusion gave daughters the labels of
+  living cells after the `region` initializer, and `random_reset` kept the
+  traits of the cells it replaced: the labels are counted again, and
+  `random_reset` sets the traits and families of a new model (a model built
+  from a `ModelSpec` with traits asks for a new model instead).
+- `set_r_int` on an identity-based model without volume exclusion kept the
+  lookup tables of the old lattice and failed at the next step.
+- `lgca.capacity` and `print(lgca)` of an identity-based model without volume
+  exclusion reported the number of channels while growth used the default
+  capacity of the interaction (8); `set_interaction(capacity=...)` was
+  ignored, and a capacity given at construction was replaced by the default
+  of the next interaction.
+- `calc_family_generations` raised `RecursionError` for lineages of about a
+  thousand generations; it and `propagate_ancestor_to_descendants` rebuilt
+  their tables on every call. Families without ancestry
+  (`track_inheritance=True`) had no `maxfamily`, so `calc_family_pop_alive`
+  and `recordfampop` failed.
+- `calc_mean_alignment` and `OrderParameterRecorder` raised a `ValueError`
+  for models without volume exclusion and several species; the flux of a node
+  is that of the cells of all its species.
+- 3D models with several species refused `nodes` with several rest channels,
+  and identity-based 3D models without volume exclusion ended in an
+  `AttributeError` for `nodes` given as cell counts.
+- Errors that named neither the value nor what to do: integers and the
+  density of a `ModelSpec` (`restchannels=None`, `steps=inf`), sections of
+  another type (a list of operators as `dynamics`), operators and observers
+  that are not objects or entries, `OrderParameterRecorder` and
+  `ChannelDensityRecorder` on models with volume exclusion, the family
+  analyses (`calc_family_generations`, `muller_plot`, ...) of models without
+  families, and `n_species` and `capacity` of `get_lgca`.
 
 ## 2.0.0 (2026-11-04)
 
