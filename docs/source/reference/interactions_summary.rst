@@ -26,7 +26,7 @@ cells between species (see :doc:`/concepts/interactions`). A
    )
    result = run_model(spec, showprogress=False)
 
-The rules work in every model family (classical or identity-based, with or
+The rules work in every model family (with or without identities, with or
 without volume exclusion, one or several species) unless stated otherwise.
 A rule that does not support a model says so when the model is built. With
 several species, ``species`` chooses the species a rule acts on and
@@ -83,7 +83,7 @@ The rules
        that may respond to cues (identity-based models).
    * - ``excitable_medium``
      - Barkley kinetics of resting inhibitors and moving activators
-       (classical models).
+       (classical models, i.e. with volume exclusion and without identities).
 
 The cues from ``polar_alignment`` to ``resting`` are terms of the
 Boltzmann reorientation; several combine into one decision in a

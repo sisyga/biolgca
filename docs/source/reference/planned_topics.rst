@@ -7,7 +7,7 @@ Restarting identity-based models
 --------------------------------
 
 A run of an identity-based model cannot yet be restarted from saved data:
-the ``from_npz`` initializer reads classical states only, because the labels
+the ``from_npz`` initializer reads states without identities only, because the labels
 of the cells and their traits would have to be restored together. Rerun such
 a model from its model specification and seed instead: the same seed gives the
 same run.

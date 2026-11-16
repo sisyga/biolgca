@@ -14,9 +14,9 @@ Every interaction is one of three kinds, defined by what it keeps:
 ``birth_death``
    changes the number of cells: birth, death, division.
 ``phenotype_switch``
-   changes what a cell is. In classical models a phenotype is a species, and a
+   changes what a cell is. In models without identities a phenotype is a species, and a
    switch moves cells from one species to another; the number of cells at
-   every node stays the same. A classical model with one species has nothing
+   every node stays the same. Such a model with one species has nothing
    to switch to, so it rejects a phenotype switch. In identity-based models a
    switch changes the parameters of individual cells.
 ``reorientation``
@@ -33,7 +33,7 @@ their kind and are checked against it after every step; see
 Species
 -------
 
-Classical models can have several species, e.g. two cell types. With volume
+Models without identities can have several species, e.g. two cell types. With volume
 exclusion, each channel holds at most one cell of each species. Rules see the channel states as an array of
 shape ``dims + (n_species, K)``, also when there is only one species, so the
 same rule works for one and for several species. Arrays of single-species
@@ -194,7 +194,7 @@ daughter mutates with some probability, and then its traits change by random
 effects drawn from any distribution; with ``new_family=True`` every mutated
 daughter founds a new family, for lineage plots. See
 :doc:`/how_to/research_models` for the options and for published models
-built this way. In classical models with several species, a
+built this way. In models without identities and with several species, a
 ``mutation_matrix`` gives the species of the daughters.
 
 Switching that responds to the surroundings

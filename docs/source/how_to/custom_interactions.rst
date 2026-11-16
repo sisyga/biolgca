@@ -155,7 +155,7 @@ changes anything.
 A phenotype switch
 ------------------
 
-In classical models a phenotype is a species. A phenotype switch moves cells
+In models without identities a phenotype is a species. A phenotype switch moves cells
 from one species to another and needs a model with several species:
 
 .. code-block:: python

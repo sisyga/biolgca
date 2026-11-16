@@ -38,6 +38,31 @@ Fixes for the findings of the code review of 2.0.0 (November 2026).
 - `ChannelDensityRecorder` records every model without volume exclusion
   (models with one species and no identities had no `channel_pop`).
 - `get_lgca` reads `nodes` given as nested lists.
+- The capacity of a model defaults to its number of channels, whatever the
+  number of species. With volume exclusion and several species it was the
+  number of species times the channels, so a density cue or a crowding
+  threshold now divides by `K` instead of `n_species * K` unless
+  `capacity` is given; such a node holds up to `n_species * K` cells, so the
+  relative density can exceed 1. Set `StateSpec(capacity=...)` to keep the
+  old denominator.
+- `nb_sum` returns floats on every lattice. Square and 3D lattices kept the
+  type of the values: sums of booleans stayed booleans and small unsigned
+  integers wrapped around.
+- A parameter that belongs to another legacy interaction warns
+  ("parameter `r_b` defined but unused") instead of being stored in silence;
+  unknown parameters are refused as before.
+- The class of the 3D Moore lattice with volume exclusion is `LGCA_Moore`,
+  like `IBLGCA_Moore` and `NoVE_LGCA_Moore`; `LGCA_3dMoore` stays as an
+  alias.
+- `plot_prop_spatial` of 1D identity-based models takes the same arguments
+  with and without volume exclusion (`cbar`, `cbarlabel`, `figkwargs=None`).
+- `lgca.__version__` gives the installed version, and `from lgca import *`
+  imports the public names only (`lgca.__all__`).
+- The documentation calls a model classical only if it has volume exclusion
+  and no identities (a boolean state); models that count cells without volume
+  exclusion are "without identities".
+- CI checks the package for unused imports and undefined names
+  (`ruff check lgca --select F`); the unused imports are removed.
 
 ### Fixed
 
@@ -71,6 +96,14 @@ Fixes for the findings of the code review of 2.0.0 (November 2026).
   `ChannelDensityRecorder` on models with volume exclusion, the family
   analyses (`calc_family_generations`, `muller_plot`, ...) of models without
   families, and `n_species` and `capacity` of `get_lgca`.
+- `lgca.interactions` and the error for an unknown interaction listed names
+  the model cannot use: those of the other number of dimensions and, for
+  several species, those written for the other volume exclusion.
+- `calc_normalized_entropy` of a model without volume exclusion on one node
+  divided by zero (`nan` and a warning); it returns 1.
+- Identity-based models without volume exclusion had empty ghost nodes until
+  the first step, so interactions of the first step saw no neighbours across
+  a periodic boundary.
 
 ## 2.0.0 (2026-11-04)
 

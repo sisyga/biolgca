@@ -16,9 +16,9 @@ Every interaction is one of three kinds, defined by what it conserves:
 ``birth_death``
    changes the number of cells (birth, death, division).
 ``phenotype_switch``
-   changes what a cell is. In classical models a phenotype is a species, and a
+   changes what a cell is. In models without identities a phenotype is a species, and a
    switch moves cells from one species to another, keeping the number of cells
-   at each node. A classical model with one species has nothing to switch to,
+   at each node. Such a model with one species has nothing to switch to,
    so a phenotype switch there is rejected. In identity-based models, a switch
    changes a cell's own parameters.
 ``reorientation``
@@ -173,10 +173,10 @@ per node.
       * - Model
         - Shape
         - Values
-      * - classical, volume exclusion
+      * - classical (volume exclusion, no identities)
         - ``dims + (K,)``; ``dims + (n_species, K)`` for several species
         - 0 or 1 per channel
-      * - classical, no volume exclusion
+      * - no identities, no volume exclusion
         - as above
         - cells per channel
       * - identity-based, volume exclusion

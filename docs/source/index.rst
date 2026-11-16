@@ -3,7 +3,7 @@ BioLGCA
 
 `BioLGCA <https://github.com/sisyga/biolgca>`_ is a Python package for
 simulating lattice-gas cellular automata in biological contexts. It supports
-classical and identity-based models, with and without volume exclusion, and
+models with and without identities, with and without volume exclusion, and
 models of several species, on one-, two- and three-dimensional lattices.
 
 Who it is for

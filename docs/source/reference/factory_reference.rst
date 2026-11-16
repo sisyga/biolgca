@@ -25,7 +25,7 @@ simulator class from four main switches:
 
 ``n_species``
    Number of species. Values greater than one select the multi-species class
-   family. Multi-species classes are currently classical, not identity-based.
+   family. Multi-species classes have no identities.
    They accept every interaction name whose rules work with several species,
    e.g. ``random_walk`` (the default), ``alignment``, ``birthdeath`` or
    ``excitable_medium_ms``; unknown names raise ``ValueError`` at
@@ -43,19 +43,19 @@ Model class matrix
      - Hexagonal
      - Cubic
      - Moore
-   * - Classical, volume exclusion
+   * - Classical (volume exclusion, no identities)
      - ``LGCA_1D``
      - ``LGCA_Square``
      - ``LGCA_Hex``
      - ``LGCA_Cubic``
-     - ``LGCA_3dMoore``
+     - ``LGCA_Moore``
    * - Identity-based, volume exclusion
      - ``IBLGCA_1D``
      - ``IBLGCA_Square``
      - ``IBLGCA_Hex``
      - ``IBLGCA_Cubic``
      - ``IBLGCA_Moore``
-   * - Classical, no volume exclusion
+   * - No identities, no volume exclusion
      - ``NoVE_LGCA_1D``
      - ``NoVE_LGCA_Square``
      - ``NoVE_LGCA_Hex``

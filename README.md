@@ -238,9 +238,9 @@ parameters from measurements.
 
 ## Model types
 
-| | Classical | Identity-based (individual cell traits) |
+| | Without identities (cells are counted) | Identity-based (individual cell traits) |
 | --- | --- | --- |
-| **Volume exclusion** (at most one cell per channel) | ✓, also with several species | ✓ |
+| **Volume exclusion** (at most one cell per channel) | ✓ classical LGCA, also with several species | ✓ |
 | **No volume exclusion** (many cells per channel) | ✓, also with several species | ✓ |
 
 All model types run on 1D, square and hexagonal lattices, and on cubic and 3D
