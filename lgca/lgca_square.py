@@ -471,7 +471,7 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
         nodes can only be done after the sum calculation in order to preserve boundary conditions.
 
         """
-        sum = np.zeros_like(qty)
+        sum = np.zeros(qty.shape)  # floats on every lattice, also for integers and booleans
         sum[:-1, ...] += qty[1:, ...]
         sum[1:, ...] += qty[:-1, ...]
         sum[:, :-1, ...] += qty[:, 1:, ...]

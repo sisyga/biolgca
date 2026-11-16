@@ -783,3 +783,21 @@ def test_every_model_has_a_capacity_of_its_channels_whatever_its_species(geometr
     assert build_model(ModelSpec(space=spec.space, state=StateSpec(
         density=0.3, restchannels=2, n_species=family.get("n_species", 1),
         identity_based=family.get("ib", False)))).metadata["capacity"] == v + 2
+
+
+@pytest.mark.parametrize("dtype", [bool, np.int64, np.uint8, float])
+@pytest.mark.parametrize("geometry, dims", GEOMETRIES)
+def test_neighbour_sums_are_floats_on_every_lattice(geometry, dims, dtype):
+    """Square and 3D lattices kept the type of the values: sums of booleans stayed booleans (no counts)
+    and small unsigned integers wrapped around; 1D and hexagonal lattices returned floats."""
+    from lgca.lattice_state import LatticeState
+
+    lgca = get_lgca(geometry=geometry, dims=dims, density=0.3, interaction="only_propagation")
+    ones = np.ones(lgca.cell_density.shape, dtype=dtype)
+    padded = lgca.nb_sum(ones)
+    assert padded.dtype == np.float64
+    np.testing.assert_array_equal(padded[lgca.nonborder], lgca.velocitychannels)
+    values = (300 * np.ones(dims)).astype(dtype)  # beyond uint8 when summed
+    total = LatticeState(lgca).neighbor_sum(values)
+    assert total.dtype == np.float64
+    np.testing.assert_array_equal(total, lgca.velocitychannels * float(values.flat[0]))

@@ -248,7 +248,7 @@ class LGCA_Cubic(LGCA_base):
             Sum of the content of `qty` in each node's neighborhood, shape: ``qty.shape``. Lattice positions can be
             indexed the same way as in ``self.nodes``.
         """
-        sum = np.zeros_like(qty)
+        sum = np.zeros(qty.shape)  # floats on every lattice, also for integers and booleans
         sum[:-1, :, :, ...] += qty[1:, :, :, ...]
         sum[1:, :, :, ...] += qty[:-1, :, :, ...]
         sum[:, :-1, :, ...] += qty[:, 1:, :, ...]

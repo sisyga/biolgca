@@ -56,7 +56,7 @@ class LGCA_3dMoore(LGCA_Cubic):
 
     def nb_sum(self, qty):
         """Sum values of ``qty`` in the 26-neighbourhood of each node."""
-        s = np.zeros_like(qty)
+        s = np.zeros(qty.shape)  # floats on every lattice, also for integers and booleans
         for dx, dy, dz in self._vels:
             src_x = slice(max(-dx, 0), qty.shape[0] - max(dx, 0))
             dst_x = slice(max(dx, 0), qty.shape[0] - max(-dx, 0))
