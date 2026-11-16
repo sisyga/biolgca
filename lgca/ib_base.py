@@ -250,6 +250,7 @@ class IBLGCA_base(LGCA_base, ABC):
             ``density = total_number_of_particles / number_of_nodes``.
         """
         _validate_density(density, max_density=self.K)
+        self._check_cells_replaceable()
         occupied = self.rng.random(self.dims + (self.K,)) < (density / self.K)
         self.nodes[self.nonborder] = self.convert_bool_to_ib(occupied)
         self.apply_boundaries()
@@ -259,6 +260,22 @@ class IBLGCA_base(LGCA_base, ABC):
     def calc_max_label(self):
         """Set :py:attr:`self.maxlabel` to the largest label on the lattice (0 if it is empty)."""
         self.maxlabel = int(self.nodes.max()) if self.nodes.size else 0
+
+    def _legacy_traits(self):
+        """Whether the traits of the cells are those of a get_lgca interaction, which can set them again."""
+        from .legacy_names import LegacyInteraction
+
+        interaction = getattr(self, "interaction", None)
+        return (isinstance(interaction, LegacyInteraction)
+                and interaction._compiled is self.__dict__.get("_compiled_model"))
+
+    def _check_cells_replaceable(self):
+        """Refuse to replace the cells of a model whose traits cannot be set again, before anything changes."""
+        if (getattr(self, "props", None) and not self._legacy_traits()
+                and self.__dict__.get("_compiled_model") is not None):
+            raise ValueError("random_reset replaces all cells, but the traits and families of this model "
+                             "were set for its cells when it was built; build a new model with the "
+                             "density you want, StateSpec(density=...)")
 
     def _cells_replaced(self):
         """The lattice holds a new population: give it the traits and families of a new model.
@@ -272,19 +289,11 @@ class IBLGCA_base(LGCA_base, ABC):
         self.update_dynamic_fields()
         if not getattr(self, "props", None):  # under construction, or cells without traits
             return
-        from .legacy_names import LegacyInteraction
-
-        interaction = getattr(self, "interaction", None)
-        compiled = self.__dict__.get("_compiled_model")
-        if isinstance(interaction, LegacyInteraction) and interaction._compiled is compiled:
+        if self._legacy_traits():
             self.props = {}
             for name in ("family_props", "maxfamily"):
                 self.__dict__.pop(name, None)
-            self.set_interaction(interaction=interaction.__name__, **self.interaction_params)
-        elif compiled is not None:
-            raise ValueError("random_reset replaces all cells, but the traits and families of this model "
-                             "were set for its cells when it was built; build a new model with the "
-                             "density you want, StateSpec(density=...)")
+            self.set_interaction(interaction=self.interaction.__name__, **self.interaction_params)
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True,
                 recordfampop=False):

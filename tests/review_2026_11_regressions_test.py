@@ -87,12 +87,22 @@ def test_random_reset_gives_the_new_cells_the_traits_of_a_new_model(ve, interact
     assert np.unique(labels).size == labels.size
 
 
-def test_random_reset_of_a_model_from_a_spec_with_traits_says_to_build_a_new_one():
+@pytest.mark.parametrize("volume_exclusion", [True, False])
+def test_random_reset_of_a_model_from_a_spec_with_traits_says_to_build_a_new_one(volume_exclusion):
+    """The refusal comes before anything changes: the model keeps its cells, labels and random numbers."""
+    import copy
+
     spec = ModelSpec(space=SpaceSpec(geometry="lin", dims=10),
-                     state=StateSpec(identity_based=True, density=0.5, traits={"r_b": 0.2}))
+                     state=StateSpec(identity_based=True, volume_exclusion=volume_exclusion, density=0.5,
+                                     restchannels=1, traits={"r_b": 0.2}))
     lgca = build_model(spec).lgca
+    nodes, maxlabel = copy.deepcopy(lgca.nodes), lgca.maxlabel
+    rng_state = copy.deepcopy(lgca.rng.bit_generator.state)
     with pytest.raises(ValueError, match="build a new model"):
         lgca.random_reset(1.0)
+    assert lgca.maxlabel == maxlabel
+    assert lgca.rng.bit_generator.state == rng_state
+    assert all(np.array_equal(a, b) for a, b in zip(lgca.nodes.flat, nodes.flat))
 
 
 # ------------------------------------------------------------------------------ interaction radius

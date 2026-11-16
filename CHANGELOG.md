@@ -82,7 +82,8 @@ models without volume exclusion and of models with several species; see
   living cells after the `region` initializer, and `random_reset` kept the
   traits of the cells it replaced: the labels are counted again, and
   `random_reset` sets the traits and families of a new model (a model built
-  from a `ModelSpec` with traits asks for a new model instead).
+  from a `ModelSpec` with traits asks for a new model instead, before
+  anything changes).
 - `set_r_int` on an identity-based model without volume exclusion kept the
   lookup tables of the old lattice and failed at the next step.
 - `lgca.capacity` and `print(lgca)` of an identity-based model without volume
