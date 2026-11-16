@@ -119,6 +119,24 @@ def legacy_names(family: str, ndim: int | None = None, ve: bool = True) -> list[
     return sorted(names)
 
 
+def legacy_names_table() -> dict[str, dict[str, bool]]:
+    """Which models accept which get_lgca interaction name: ``{name: {model: accepted}}``.
+
+    The models are the four families and the models with several species, with and without volume
+    exclusion. The documentation builds its table of names from this, so the table cannot go out of date.
+    """
+    columns = {
+        "classical": legacy_names("classical"),
+        "nove": legacy_names("nove"),
+        "ib": legacy_names("ib"),
+        "nove_ib": legacy_names("nove_ib"),
+        "several species": legacy_names("multispecies", ve=True),
+        "several species, nove": legacy_names("multispecies", ve=False),
+    }
+    names = sorted({name for accepted in columns.values() for name in accepted})
+    return {name: {column: name in accepted for column, accepted in columns.items()} for name in names}
+
+
 def legacy_interaction(family: str, name: str | None, ve: bool = True):
     """The translation of a get_lgca interaction name, its stack and legacy defaults."""
     name = _DEFAULTS[family] if name is None else str(name).replace(" ", "_")

@@ -1,7 +1,7 @@
-BioLGCA
+biolgca
 *******
 
-`BioLGCA <https://github.com/sisyga/biolgca>`_ is a Python package for
+`biolgca <https://github.com/sisyga/biolgca>`_ is a Python package for
 simulating lattice-gas cellular automata in biological contexts. It supports
 models with and without identities, with and without volume exclusion, and
 models of several species, on one-, two- and three-dimensional lattices.
@@ -9,7 +9,7 @@ models of several species, on one-, two- and three-dimensional lattices.
 Who it is for
 -------------
 
-BioLGCA is for researchers and students in mathematical and theoretical
+biolgca is for researchers and students in mathematical and theoretical
 biology who model collective cell migration, tissue growth, pattern formation
 or the evolution of cell populations, and for courses that teach these
 topics. LGCA describe cells by their numbers and directions of movement on a
@@ -23,7 +23,7 @@ many ways: Morpheus and CompuCell3D (cellular Potts models), PhysiCell
 on-lattice cellular automaton). They do not offer the velocity-channel state
 space of LGCA. In this state space, alignment, chemotaxis and go-or-grow
 switching are rules for the reorientation of channel states, and mean-field
-equations can be derived systematically from the rules. BioLGCA provides this
+equations can be derived systematically from the rules. biolgca provides this
 model class as a library: the rules of the BIO-LGCA literature as composable building blocks,
 a checked contract for new rules (:doc:`how_to/custom_interactions`), model
 files that rerun from their seed, parameter sweeps, and a :doc:`zoo/index` that
@@ -38,7 +38,7 @@ random walk and progressing to combined directional cues, population dynamics,
 evolution and a reproducible student project.
 
 Install `uv <https://docs.astral.sh/uv/getting-started/installation/>`_, then
-get BioLGCA and launch JupyterLab:
+get biolgca and launch JupyterLab:
 
 .. code-block:: bash
 
@@ -54,7 +54,7 @@ A first model in Python
 -----------------------
 
 :func:`lgca.get_lgca` builds one of the standard models that come with
-BioLGCA by name:
+biolgca by name:
 
 .. code-block:: python
 
@@ -107,15 +107,21 @@ cell number and movement direction. See the
 `BIO-LGCA overview <https://en.wikipedia.org/wiki/BIO-LGCA>`_ and the method
 paper `Deutsch et al. 2021 <https://doi.org/10.1371/journal.pcbi.1009066>`_.
 
-Citing BioLGCA
+Citing biolgca
 --------------
 
-If you use BioLGCA in published work, please cite:
+If you use biolgca in published work, please cite:
 
 * Syga S, Nava-Sedeño JM, Deutsch A (2026). A novel cellular automaton approach
   for modeling genotypic and phenotypic heterogeneity in cell systems.
   *The European Physical Journal Special Topics*.
   `doi:10.1140/epjs/s11734-026-02186-1 <https://doi.org/10.1140/epjs/s11734-026-02186-1>`_
+
+To cite the software itself, use its Zenodo DOI, which always resolves to the
+newest version (each release also has a DOI of its own, listed on that page):
+
+* Syga S. biolgca: biological lattice-gas cellular automata in Python. Zenodo.
+  `doi:10.5281/zenodo.23944994 <https://doi.org/10.5281/zenodo.23944994>`_
 
 The BIO-LGCA modelling class is described in:
 
@@ -137,7 +143,7 @@ a template for each. The
 explains the development setup, the checks and how to propose a new
 interaction; everyone taking part follows the
 `code of conduct <https://github.com/sisyga/biolgca/blob/master/CODE_OF_CONDUCT.md>`_.
-BioLGCA is distributed under the BSD 3-clause license.
+biolgca is distributed under the BSD 3-clause license.
 
 .. toctree::
    :maxdepth: 4

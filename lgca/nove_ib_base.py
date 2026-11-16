@@ -441,14 +441,29 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
 
     def plot_prop_timecourse(self, nodes_t=None, props=None, propname=None, figindex=None, figsize=None, **kwargs):
         """
-        Plot the time evolution of the cell property 'propname'
-        :param nodes_t:
-        :param props:
-        :param propname:
-        :param figindex:
-        :param figsize:
-        :param kwargs: keyword arguments for the matplotlib.plot command
-        :return:
+        Plot the time course of the mean of the cell property `propname`, with its standard error as a band.
+
+        Parameters
+        ----------
+        nodes_t : :py:class:`numpy.ndarray`, optional
+            Recorded nodes. Default: those of the last run (``lgca.nodes_t``).
+        props : dict, optional
+            Cell properties. Default: ``lgca.props``.
+        propname : str, optional
+            Name of the property. Default: the first one.
+        figindex : int or str, optional
+            Identifier of the figure. Default: the current figure.
+        figsize : tuple of float, optional
+            Figure size in inches.
+        **kwargs
+            Passed to :py:func:`matplotlib.pyplot.plot`.
+
+        Returns
+        -------
+        line : :py:class:`matplotlib.lines.Line2D`
+            The mean of the property over time.
+        errors : :py:class:`matplotlib.collections.PolyCollection`
+            The band of one standard error of the mean (standard deviation / sqrt(number of cells)) on both sides.
         """
 
         implicit = nodes_t is None

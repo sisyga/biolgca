@@ -1,5 +1,5 @@
 name: Question
-description: Ask how to build, run or analyse a model with BioLGCA.
+description: Ask how to build, run or analyse a model with biolgca.
 labels: ["question"]
 body:
   - type: textarea

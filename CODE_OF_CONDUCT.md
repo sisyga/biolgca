@@ -1,12 +1,12 @@
 # Code of conduct
 
-BioLGCA adopts the [Contributor Covenant, version
+biolgca adopts the [Contributor Covenant, version
 2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/) as
 its code of conduct. It applies to everyone who takes part in the project:
 in issues, pull requests, reviews and any other project space, and when
 representing the project elsewhere.
 
-In short, we pledge to make taking part in BioLGCA a harassment-free
+In short, we pledge to make taking part in biolgca a harassment-free
 experience for everyone, regardless of age, body size, visible or invisible
 disability, ethnicity, sex characteristics, gender identity and expression,
 level of experience, education, socio-economic status, nationality, personal

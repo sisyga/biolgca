@@ -25,7 +25,7 @@ from math import comb
 class _MissingPlotLib:
     """Placeholder object for an optional plotting library."""
 
-    def __init__(self, name: str, install: str = "Reinstall BioLGCA with 'uv sync' or 'python -m pip install -e .'."):
+    def __init__(self, name: str, install: str = "Reinstall biolgca with 'uv sync' or 'python -m pip install -e .'."):
         self._name = name
         self._install = install
 
@@ -334,7 +334,8 @@ class LGCA_base(ABC):
     Parameters
     ----------
     bc : {'absorbing', 'reflecting', 'periodic', 'inflow'}, default='periodic'
-        Boundary conditions. Not all bc are supported in all geometries (yet).
+        Boundary conditions; :py:meth:`set_bc` lists the aliases. ``'inflow'`` exists on square and hexagonal
+        lattices only.
 
         Aliases: absorbing: ``'absorb', 'abs', 'abc'``; reflecting: ``'reflect', 'refl', 'rbc'``;
         periodic: ``'pbc'``.
@@ -363,7 +364,7 @@ class LGCA_base(ABC):
     cij : :py:class:`numpy.ndarray`
         Nematic tensor. Element-wise multiplication of neighborhood vectors with themselves. Computed from the geometry.
         Dimensions:
-        ``(lgca.c.shape[1], lgca.c.shape[0], lgca.c.shape[0})``. First dimension: neighborhood vector, second and
+        ``(lgca.c.shape[1], lgca.c.shape[0], lgca.c.shape[0])``. First dimension: neighborhood vector, second and
         third dimension: combination of x and y components of the vector as
         ``[[cix*cix, cix*ciy], [ciy*cix, ciy*ciy]]``.
     concentration
@@ -796,10 +797,10 @@ class LGCA_base(ABC):
         Parameters
         ----------
         bc : {'absorbing', 'reflecting', 'periodic', 'inflow'}
-            Boundary conditions. Not all bc are supported in all geometries (yet).
+            Boundary conditions. ``'inflow'`` exists on square and hexagonal lattices only.
 
-            Aliases: absorbing: ``'absorb', 'abs', 'abc'``; reflecting: ``'reflect', 'refl', 'rbc'``;
-            periodic: ``'pbc'``.
+            Aliases: absorbing: ``'absorb', 'abs', 'abc', 'fixed'``; reflecting: ``'reflect', 'refl', 'rbc',
+            'no_flux', 'noflux'``; periodic: ``'pbc'``.
 
         """
         if bc in ['absorbing', 'absorb', 'abs', 'abc', 'fixed']:
@@ -839,7 +840,6 @@ class LGCA_base(ABC):
             Array of flux vectors at each lattice site. Dimensions: ``nodes.shape[:-1] + (len(self.c),)``.
 
         """
-        # Todo: add example using the flux
         # 1st+ dim: lattice sites, last dim: channels
         # dot product between c vectors and actual configuration of site
         return np.einsum('ij,...j', self.c, nodes[..., :self.velocitychannels])

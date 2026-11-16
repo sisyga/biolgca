@@ -82,12 +82,21 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
 
     def set_dims(self, dims=None, nodes=None, restchannels=None, capacity=None):
         """
-        Set the dimensions of the instance according to given values. Sets self.lx, self.ly, self.K, self.dims,
-        self.restchannels and self.capacity.
-        :param dims: desired lattice size (int or array-like)
-        :param nodes: existing lattice to use (ndarray)
-        :param restchannels: number of resting channels; every one is a channel of the state
-        :param capacity: number of cells per node at which growth stops; default: one cell per channel
+        Set the lattice dimensions.
+
+        Sets :py:attr:`self.lx`, :py:attr:`self.ly`, :py:attr:`self.K`, :py:attr:`self.dims`, :py:attr:`self.restchannels` and
+        :py:attr:`self.capacity`.
+
+        Parameters
+        ----------
+        dims : int or sequence of int, optional
+            Lattice size.
+        nodes : :py:class:`numpy.ndarray`, optional
+            Initial lattice configuration; its shape then sets the dimensions.
+        restchannels : int, optional
+            Number of rest channels; every one is a channel of the state.
+        capacity : int, optional
+            Number of cells per node at which growth stops. Default: one cell per channel.
         """
         # set instance dimensions according to passed lattice
         if nodes is not None:

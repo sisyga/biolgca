@@ -1,1 +1,1 @@
-"""Packaged schemas for portable BioLGCA model files."""
+"""Packaged schemas for portable biolgca model files."""

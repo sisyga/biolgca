@@ -1,4 +1,4 @@
-"""Command-line interface for portable BioLGCA model workflows."""
+"""Command-line interface for portable biolgca model workflows."""
 
 from __future__ import annotations
 
@@ -188,7 +188,7 @@ def _validate(args) -> int:
         trusted_paths=args.trusted_paths,
     )
     _check_recorders(compiled)
-    print(f"Valid BioLGCA model: {model_path}")
+    print(f"Valid biolgca model: {model_path}")
     return 0
 
 

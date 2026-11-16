@@ -41,7 +41,7 @@ def array_hash(array: np.ndarray) -> str:
 
 
 def environment() -> dict[str, Any]:
-    """Versions of Python, BioLGCA and its main dependencies, and the platform."""
+    """Versions of Python, biolgca and its main dependencies, and the platform."""
     import scipy
 
     from .model import _package_version
@@ -55,7 +55,7 @@ def environment() -> dict[str, Any]:
 
 
 def vcs_commit() -> dict[str, Any] | None:
-    """The git commit of the BioLGCA source, if it runs from a git checkout, and whether files changed."""
+    """The git commit of the biolgca source, if it runs from a git checkout, and whether files changed."""
     package = Path(__file__).resolve().parent
 
     def git(*arguments):

@@ -5,17 +5,22 @@
 # Copyright (C) 2018-2026 Technische Universität Dresden, Germany.
 # Contact: simon.syga@tu-dresden.de.
 """
-biolgca is a Python package for simulating different types of lattice-gas
-cellular automata (LGCA) in the biological context. It is under active development.
+biolgca is a Python package for simulating lattice-gas cellular automata
+(LGCA) in the biological context, following the BIO-LGCA modelling class of
+Deutsch et al. [1]_.
 
-It is tightly coupled to the theoretical method presented by Deutsch et al. [1]_.
-The get_lgca function returns an LGCA object of the requested type with the
-given initial conditions. It can simulate for a given number of timesteps and has
-different plotting functions for analysis, depending on the geometry. The
-interaction function can be chosen from built-in ones or defined by the user.
-Classical LGCA (volume exclusion, no identities), LGCA without volume
-exclusion and identity-based LGCA with and without volume exclusion are supported on 1D, 2D square, 2D hexagonal,
-3D cubic and 3D Moore lattices.
+:func:`get_lgca` returns an LGCA object of the requested type, which runs for
+a number of time steps and has plotting functions for its geometry. A
+:class:`~lgca.model.ModelSpec` describes a whole model as data (lattice,
+state, rules, time, analysis), which :func:`~lgca.model.run_model` runs and
+which can be saved as a file. The dynamics are composed from built-in rules
+(:mod:`lgca.builtin_rules`) or rules of your own, written with
+:func:`interaction`.
+
+Supported are classical LGCA (volume exclusion, no identities), LGCA without
+volume exclusion and identity-based LGCA with and without volume exclusion,
+models with several species, and 1D, 2D square, 2D hexagonal, 3D cubic and 3D
+Moore lattices.
 
 References
 ----------

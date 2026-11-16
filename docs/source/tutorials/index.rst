@@ -15,7 +15,7 @@ as the starting point of a project of your own.
 
 Every lesson also runs in Google Colab without installing anything: the
 "Open in Colab" badge at its top opens it there, and its first cell installs
-BioLGCA (about a minute).
+biolgca (about a minute).
 
 .. toctree::
    :maxdepth: 1

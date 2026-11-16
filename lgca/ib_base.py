@@ -448,9 +448,10 @@ class IBLGCA_base(LGCA_base, ABC):
 
     def plot_prop_timecourse(self, nodes_t=None, props=None, propname=None, figindex=None, figsize=None, **kwargs):
         """
-        Plot the time course of the mean and standard deviation of particle property `propname` across the lattice.
+        Plot the time course of the mean of the particle property `propname` across the lattice.
 
-        The mean is plotted as a line with the standard deviation shadowed in both directions.
+        The mean is plotted as a line with a band of one standard error of the mean (standard deviation /
+        sqrt(number of cells)) on both sides.
 
         Parameters
         ----------
@@ -476,7 +477,7 @@ class IBLGCA_base(LGCA_base, ABC):
         line : :py:class:`matplotlib.lines.Line2D`
             Plot of the mean property over time.
         errors : :py:class:`matplotlib.collections.PolyCollection`
-            Polygons representing the standard deviation of the property over time, in both directions.
+            Polygons of the standard error of the mean over time, in both directions.
 
         """
         # set lattice configuration over time
@@ -485,7 +486,7 @@ class IBLGCA_base(LGCA_base, ABC):
         if nodes_t is None:
             nodes_t = self.nodes_t
 
-        # get particle property values and calculate mean and standard deviation
+        # get particle property values and calculate their mean and its standard error
         prop = self.get_prop(nodes=nodes_t, props=props, propname=propname)
         occupied = nodes_t.astype(bool)
         mask = 1 - occupied

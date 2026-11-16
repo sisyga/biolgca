@@ -852,3 +852,24 @@ def test_plot_prop_spatial_takes_the_same_arguments_in_both_identity_based_famil
         assert with_bar.colorbar.ax.get_ylabel() == "switch"
     finally:
         plt.close("all")
+
+
+# ------------------------------------------------------------------ third bundle: documentation
+
+
+def test_the_table_of_interaction_names_in_the_docs_is_what_get_lgca_accepts():
+    """The table was written by hand: ``diffusion`` stood there for every model, three names were missing."""
+    from lgca.legacy_names import legacy_names_table
+
+    table = legacy_names_table()
+    families = {"classical": {}, "nove": {"ve": False}, "ib": {"ib": True}, "nove_ib": {"ib": True, "ve": False},
+                "several species": {"n_species": 2}, "several species, nove": {"n_species": 2, "ve": False}}
+    assert set(next(iter(table.values()))) == set(families)
+    for column, family in families.items():
+        lgca = get_lgca(geometry="square", dims=(4, 4), density=0.2, interaction="only_propagation", **family)
+        assert {name for name, accepted in table.items() if accepted[column]} == set(lgca.interactions), column
+    assert table["diffusion"] == {column: column == "nove_ib" for column in families}
+    for name in ("evo_steric", "go_or_grow_kappa_chemo", "persistent_walk"):
+        assert any(table[name].values())
+    page = open("docs/source/reference/interactions_summary.rst", encoding="utf-8").read()
+    assert ".. legacy-names-table::" in page

@@ -142,10 +142,3 @@ afterwards, so the function may act on the whole ``lgca.nodes`` array:
 
 Keyword arguments are not checked for typos when ``interaction`` is a
 function, because the factory cannot know which parameters the function reads.
-
-Placeholders
-------------
-
-Detailed shape diagrams for custom ``nodes`` arrays and boundary-condition
-tables are still missing. The current authoritative reference is the class API
-documentation and the geometry-specific ``set_dims`` implementations.

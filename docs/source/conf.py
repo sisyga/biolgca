@@ -17,6 +17,9 @@ import os
 
 #import pathlib
 import sys
+
+from docutils.parsers.rst import Directive
+
 sys.path.insert(0, os.path.abspath('../..'))
 #sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
 
@@ -124,6 +127,27 @@ html_theme_options = {
 html_logo = '../images/biolgca_v2.png'
 
 
+class LegacyNamesTable(Directive):
+    """The interaction names of get_lgca and the models that accept them, read from the package."""
+
+    def run(self):
+        from docutils import nodes
+        from docutils.statemachine import StringList
+
+        from lgca.legacy_names import legacy_names_table
+
+        table = legacy_names_table()
+        columns = list(next(iter(table.values())))
+        lines = [".. list-table::", "   :header-rows: 1", "", "   * - Name"]
+        lines += [f"     - {column}" for column in columns]
+        for name, accepted in table.items():
+            lines.append(f"   * - ``{name}``")
+            lines += [f"     - {'✓' if accepted[column] else ''}" for column in columns]
+        container = nodes.container()
+        self.state.nested_parse(StringList(lines, source="legacy-names-table"), self.content_offset, container)
+        return container.children
+
+
 def setup(app):
     # Matplotlib docstrings inherited by lgca classes (e.g. LatticeAnimation)
     # use Matplotlib's :rc: role for rcParams; render it as literal text.
@@ -131,3 +155,4 @@ def setup(app):
     from docutils.parsers.rst import roles
 
     roles.register_generic_role("rc", nodes.literal)
+    app.add_directive("legacy-names-table", LegacyNamesTable)

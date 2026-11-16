@@ -63,6 +63,16 @@ Fixes for the findings of the code review of 2.0.0 (November 2026).
   exclusion are "without identities".
 - CI checks the package for unused imports and undefined names
   (`ruff check lgca --select F`); the unused imports are removed.
+- Documentation: the installation page names PyPI and the front page the
+  Zenodo DOI; the table of `get_lgca` interaction names per model family is
+  read from the package when the docs are built
+  (`lgca.legacy_names.legacy_names_table`); ghost nodes come in `r_int`
+  layers; the `inflow` boundary is documented as existing on square and
+  hexagonal lattices only; `plot_prop_timecourse` documents its band as the
+  standard error of the mean, which it is; the boundary aliases `fixed`,
+  `no_flux` and `noflux` are listed; leftover placeholder notes are removed.
+- The package is written "biolgca" throughout the README, the documentation
+  and the messages (BIO-LGCA remains the name of the modelling class).
 
 ### Fixed
 
@@ -107,7 +117,7 @@ Fixes for the findings of the code review of 2.0.0 (November 2026).
 
 ## 2.0.0 (2026-11-04)
 
-Version 2.0 rebuilds BioLGCA around model specifications (`ModelSpec`) and
+Version 2.0 rebuilds biolgca around model specifications (`ModelSpec`) and
 rules written as functions of the lattice state. Scripts written for 1.0 with
 `get_lgca` and `timeevo` still run, but their interactions now run the new
 rules: the dynamics agree in distribution, but seeded runs give different

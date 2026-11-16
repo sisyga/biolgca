@@ -1,7 +1,7 @@
 Types of LGCA
 =============
 
-BioLGCA models differ along two axes: whether channels obey volume exclusion
+biolgca models differ along two axes: whether channels obey volume exclusion
 (at most one cell per channel) and whether cells are counted (no identities)
 or tracked individually with labels and traits (identity-based). That gives
 four model families. Classical LGCA are the models with volume exclusion and
@@ -126,6 +126,6 @@ Data model summary
      - No
 
 The lattice arrays of the model object, ``lgca.nodes`` and
-``lgca.cell_density``, include one layer of ghost nodes that implement the
-boundary conditions; ``lgca.nodes[lgca.nonborder]`` is the lattice itself (see
+``lgca.cell_density``, include ghost nodes that implement the boundary
+conditions (``r_int`` layers, one by default); ``lgca.nodes[lgca.nonborder]`` is the lattice itself (see
 :doc:`/getting_started`).

@@ -709,12 +709,21 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
 
     def set_dims(self, dims=None, nodes=None, restchannels=None, capacity=None):
         """
-        Set the dimensions of the instance according to given values. Sets self.l, self.K, self.dims,
-        self.restchannels and self.capacity.
-        :param dims: desired lattice size (int or array-like)
-        :param nodes: existing lattice to use (ndarray)
-        :param restchannels: number of resting channels; every one is a channel of the state
-        :param capacity: number of cells per node at which growth stops; default: one cell per channel
+        Set the lattice dimensions.
+
+        Sets :py:attr:`self.l`, :py:attr:`self.K`, :py:attr:`self.dims`, :py:attr:`self.restchannels` and
+        :py:attr:`self.capacity`.
+
+        Parameters
+        ----------
+        dims : int or sequence of int, optional
+            Lattice size.
+        nodes : :py:class:`numpy.ndarray`, optional
+            Initial lattice configuration; its shape then sets the dimensions.
+        restchannels : int, optional
+            Number of rest channels; every one is a channel of the state.
+        capacity : int, optional
+            Number of cells per node at which growth stops. Default: one cell per channel.
         """
         # set instance dimensions according to passed lattice
         if nodes is not None:
@@ -896,15 +905,26 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
     def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', cbarlabel=None, cbar=True,
                           figkwargs=None, **kwargs):
         """
-        Plot the spatial distribution of a cell property 'propname'. At each node, for each time step the mean value in
-        the node is shown. Empty nodes are masked.
-        :param nodes_t:
-        :param props:
-        :param propname:
-        :param cmap:
-        :param cbarlabel:
-        :param kwargs:
-        :return:
+        Plot the mean of the cell property `propname` at every node and recorded time step. Empty nodes are masked.
+
+        Parameters
+        ----------
+        nodes_t : :py:class:`numpy.ndarray`, optional
+            Recorded nodes. Default: those of the last run (``lgca.nodes_t``).
+        props : dict, optional
+            Cell properties. Default: ``lgca.props``.
+        propname : str, optional
+            Name of the property. Default: the first one.
+        cmap : str
+            Matplotlib colour map.
+        cbarlabel : str, optional
+            Label of the colour bar. Default: the name of the property.
+        cbar : bool
+            Whether to draw a colour bar.
+        figkwargs : dict, optional
+            Keyword arguments for the figure (``setup_figure``).
+        **kwargs
+            Passed to ``imshow``; ``steps`` gives the time steps of `nodes_t`.
         """
         implicit_history = nodes_t is None
         sample_steps = kwargs.pop("steps", None)

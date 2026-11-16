@@ -107,7 +107,7 @@ YAML is a convenience and gives the same ModelSpec.
 Model files never contain Python import paths and never execute modules. A
 model file may name a rule of your own once a trusted Python script has
 imported and registered it; loaded on its own, a model file finds only the
-rules that come with BioLGCA. Observers written in Python stay in Python:
+rules that come with biolgca. Observers written in Python stay in Python:
 saving one raises an error that says so.
 
 .. code-block:: python
@@ -134,7 +134,7 @@ Model files that use your own rules run from the command line with
    $ biolgca run model.json --plugins my_project.rules --output run/
 
 The packaged ``model-spec-v1.schema.json`` is for editors and for validation
-during development. Loading a model uses BioLGCA's own strict parser, so only
+during development. Loading a model uses biolgca's own strict parser, so only
 contributors and tools need ``jsonschema``.
 
 Initial conditions
@@ -405,7 +405,7 @@ a result came from: the versions of Python and the packages, the platform, the
 operators with their parameters including defaults, the SHA-256 hashes of the
 source code of every rule, term and reaction the model runs (rules change more
 often than versions), and of the files it read. The command line adds the hash
-of the model file, the git commit of BioLGCA when it runs from a checkout, and
+of the model file, the git commit of biolgca when it runs from a checkout, and
 the hashes of the archived files. ``biolgca run`` and ``biolgca validate`` warn
 when an archived model has changed since the run that wrote it, as its results
 then belong to another model. Likewise a model file records a hash of every array

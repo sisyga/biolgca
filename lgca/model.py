@@ -157,7 +157,8 @@ class StateSpec:
         ``crowding=False``. Models without volume exclusion always have one;
         with volume exclusion it is optional.
     initializer : mapping, optional
-        A named initial condition, e.g. a fully occupied square in the centre:
+        A named initial condition, e.g. a region in the centre with 4 cells
+        per node (on a square lattice without rest channels, every channel):
         ``{"name": "region", "parameters": {"extent": 5, "density": 4}}``, or
         ``{"name": "from_npz", "parameters": {"path": "state.npz"}}``.
     parameters : mapping, default={}

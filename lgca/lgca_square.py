@@ -432,7 +432,7 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
 
     def nb_sum(self, qty):
         """
-        For each node, sum up the contents of `qty` for the 4 nodes in the von Neumann neughborhood, excluding the
+        For each node, sum up the contents of `qty` for the 4 nearest neighbours of the node (its von Neumann neighbourhood), excluding the
         center.
 
         `qty` is assumed to contain the value of a calculated quantity for each node in the lattice. `nb_sum` calculates
