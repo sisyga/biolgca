@@ -106,11 +106,14 @@ def legacy_family(lgca) -> str:
     return "classical" if ve else "nove"
 
 
-def legacy_names(family: str, ndim: int | None = None) -> list[str]:
-    """The interaction names get_lgca accepts for a family, and a lattice of ``ndim`` dimensions."""
+def legacy_names(family: str, ndim: int | None = None, ve: bool = True) -> list[str]:
+    """The interaction names get_lgca accepts for a family, with or without volume exclusion (several
+    species), and a lattice of ``ndim`` dimensions."""
     names = set(_NAMES[family])
-    if family == "multispecies":
-        names |= set(_NAMES["classical"]) | set(_NAMES["nove"])
+    if family == "multispecies":  # as legacy_interaction: its own and the rules that work for several species
+        written_for = "classical" if ve else "nove"
+        names = {name for table in (_NAMES[family], _NAMES[written_for]) for name, entry in table.items()
+                 if written_for in entry.stack.families}
     if ndim == 1:
         names.discard("contact_guidance")
     return sorted(names)
@@ -127,7 +130,7 @@ def legacy_interaction(family: str, name: str | None, ve: bool = True):
         if name in table and (family != "multispecies" or written_for in table[name].stack.families):
             return table[name]
     raise ValueError(f"Unknown interaction {name!r}. Implemented interactions: "
-                     f"{', '.join(legacy_names(family))}")
+                     f"{', '.join(legacy_names(family, ve=ve))}")
 
 
 def compile_legacy_interaction(lgca, name, parameters) -> None:
@@ -150,6 +153,9 @@ def compile_legacy_interaction(lgca, name, parameters) -> None:
     # the capacity is the model's (StateSpec.capacity below), not a parameter of the stack
     given = {key: value for key, value in parameters.items()
              if key in legacy.stack.parameters and key != "capacity"}
+    known = {key for table in _NAMES.values() for entry in table.values() for key in entry.stack.parameters}
+    for key in sorted(known.intersection(parameters) - set(legacy.stack.parameters) - {"capacity"}):
+        warn_user(f"parameter `{key}` defined but unused")  # a parameter of other interactions
     # defaults of None stand for values derived from other parameters
     defaults = {key: value for key, value in legacy.stack.defaults().items()
                 if key != "capacity" and value is not None}

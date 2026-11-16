@@ -1885,7 +1885,7 @@ def _metadata_from_spec(spec: ModelSpec, lgca=None) -> dict[str, Any]:
     restchannels = getattr(lgca, "restchannels", spec.state.restchannels)
     capacity = spec.state.capacity  # the crowding scale of all rules (see LatticeState)
     if capacity is None and lgca is not None:
-        capacity = spec.state.n_species * lgca.K if spec.state.volume_exclusion else lgca.capacity
+        capacity = lgca.capacity
     return {
         "title": spec.description.title,
         "biolgca_version": _package_version(),

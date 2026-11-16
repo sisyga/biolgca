@@ -181,6 +181,8 @@ class NoVE_LGCA_base(LGCA_base, ABC):
             base = 2
         # calculate maximal entropy, self.cell_density[self.nonborder].size = number of nodes
         smax = - np.divide(np.log(1/self.cell_density[self.nonborder].size), np.log(base))
+        if smax == 0:  # one node: its density is the only one there is, which is full order
+            return 1.0
         return 1 - self.calc_entropy(base=base)/smax
 
     def calc_polar_alignment_parameter(self):

@@ -302,6 +302,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.init_coords()
         self.init_nodes(density, nodes=nodes)
         self.calc_max_label()
+        self.apply_boundaries()  # the ghost nodes of the initial state, as in the other models
         self.update_dynamic_fields()
         self.mean_prop_t = {}
         self.set_interaction(**kwargs)

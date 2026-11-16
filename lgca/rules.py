@@ -238,8 +238,6 @@ class FunctionInteractionOperator(InteractionOperator):
         self._capacity = state.capacity  # None: the LatticeState default
         if state.capacity is not None:
             self.capacity = state.capacity
-        elif state.volume_exclusion:
-            self.capacity = state.n_species * lgca.K
         else:
             self.capacity = getattr(lgca, "capacity", lgca.K)
 

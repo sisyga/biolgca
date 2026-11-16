@@ -58,7 +58,7 @@ class LGCA_Cubic(LGCA_base):
     ciz = np.array([0, 0, 0, 0, 1, -1], dtype=float)
     c = np.array([cix, ciy, ciz])
 
-    def set_dims(self, dims=None, nodes=None, restchannels=0, capacity=None):
+    def set_dims(self, dims=None, nodes=None, restchannels=0):
         """
         Set LGCA dimensions.
 
@@ -93,7 +93,6 @@ class LGCA_Cubic(LGCA_base):
         self.dims = (self.lx, self.ly, self.lz)
         self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels
-        self.capacity = capacity if capacity is not None else self.K
 
     def init_nodes(self, density=0.1, nodes=None, **kwargs):
         """

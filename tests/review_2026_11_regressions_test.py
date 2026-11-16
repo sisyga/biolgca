@@ -681,3 +681,105 @@ def test_ragged_lists_as_nodes_say_how_to_give_lists_of_labels():
     with pytest.raises(ValueError, match="NumPy array of lists"):
         get_lgca(geometry="lin", ib=True, ve=False, nodes=[[[0], [], [1, 2]], [[], [3], []]],
                  interaction="only_propagation")
+
+
+# ------------------------------------------------------------- second bundle: parameters and names
+
+
+@pytest.mark.parametrize("family, interaction, unused", [
+    (dict(), "random_walk", "beta"), (dict(), "alignment", "r_b"), (dict(ve=False), "go_or_grow", "beta"),
+    (dict(ib=True), "birthdeath", "kappa"), (dict(ib=True, ve=False), "birthdeath", "track_inheritance"),
+    (dict(n_species=2), "random_walk", "r_d")])
+def test_a_parameter_of_another_interaction_is_reported_as_unused(family, interaction, unused):
+    """``get_lgca(interaction="random_walk", beta=5)`` dropped ``beta`` without a word."""
+    with pytest.warns(UserWarning, match=f"parameter `{unused}` defined but unused"):
+        lgca = get_lgca(geometry="lin", dims=6, density=0.3, restchannels=1, interaction=interaction,
+                        **{unused: 0.5}, **family)
+    assert unused not in lgca.interaction_params
+    with pytest.warns(UserWarning, match=f"parameter `{unused}` defined but unused"):
+        lgca.set_interaction(interaction=interaction, **{unused: 0.5})
+
+
+def test_the_parameters_of_an_interaction_are_not_reported(recwarn):
+    lgca = get_lgca(geometry="lin", dims=6, density=0.3, restchannels=1, interaction="alignment", beta=3.0)
+    get_lgca(geometry="lin", dims=6, density=0.3, restchannels=1, ve=False, interaction="go_or_grow", r_b=0.3,
+             capacity=12)
+    assert lgca.interaction_params == {"beta": 3.0}
+    assert not [warning for warning in recwarn if "unused" in str(warning.message)]
+
+
+@pytest.mark.parametrize("ve", [True, False])
+@pytest.mark.parametrize("geometry, dims", GEOMETRIES)
+def test_a_model_with_several_species_lists_the_interactions_it_accepts(geometry, dims, ve):
+    """The list held the names for models with and without volume exclusion, and so did the error for a
+    name of the other kind: "Unknown interaction 'dd_alignment'. Implemented interactions: ..., dd_alignment"."""
+    lgca = get_lgca(geometry=geometry, dims=dims, n_species=2, ve=ve, density=0.3, restchannels=2,
+                    interaction="only_propagation")
+    assert ("dd_alignment" in lgca.interactions) is (not ve) and ("alignment" in lgca.interactions) is ve
+    for name in lgca.interactions:
+        if name == "excitable_medium_ms" and geometry in ("cubic", "moore"):
+            continue
+        get_lgca(geometry=geometry, dims=dims, n_species=2, ve=ve, density=0.3, restchannels=2, interaction=name)
+    other = "dd_alignment" if ve else "alignment"
+    with pytest.raises(ValueError) as error:
+        get_lgca(geometry=geometry, dims=dims, n_species=2, ve=ve, density=0.3, restchannels=2, interaction=other)
+    assert f"'{other}'" not in str(error.value).split("Implemented interactions:")[1].replace(", ", "' '")
+    assert other not in str(error.value).split("Implemented interactions: ")[1].split(", ")
+
+
+# ------------------------------------------------------------------ second bundle: state and measures
+
+
+@pytest.mark.parametrize("n_species", [1, 2])
+def test_the_normalized_entropy_of_one_node_is_that_of_full_order(n_species):
+    """It was nan: the largest entropy of one node is 0."""
+    lgca = get_lgca(geometry="lin", dims=1, ve=False, n_species=n_species, density=2.0, restchannels=1,
+                    interaction="only_propagation")
+    assert lgca.calc_entropy() == 0 and lgca.calc_normalized_entropy() == 1.0
+    from lgca.simulation import SimulationRunner
+
+    SimulationRunner(lgca, timesteps=2, observers=[OrderParameterRecorder()], showprogress=False).run()
+    assert np.isfinite(lgca.normEnt_t).all()
+
+
+@pytest.mark.parametrize("bc", ["periodic", "reflecting", "absorbing"])
+@pytest.mark.parametrize("geometry, dims", GEOMETRIES)
+def test_a_new_identity_based_model_has_its_ghost_nodes(geometry, dims, bc):
+    """Without volume exclusion, the ghost nodes were empty until the first step."""
+    lgca = get_lgca(geometry=geometry, dims=dims, ib=True, ve=False, density=2.0, bc=bc,
+                    interaction="only_propagation", seed=1)
+    labels = np.sort(_labels(lgca))
+    np.testing.assert_array_equal(labels, np.arange(labels.size))
+    counts = lgca.cell_density
+    reference = get_lgca(geometry=geometry, ve=False, nodes=lgca.channel_pop[lgca.nonborder].astype(int), bc=bc,
+                         interaction="only_propagation")
+    np.testing.assert_array_equal(counts, reference.cell_density)  # as a model of cell counts pads them
+    if bc == "periodic":
+        assert counts.sum() > counts[lgca.nonborder].sum()
+
+
+@pytest.mark.parametrize("family", [dict(), dict(ib=True), dict(n_species=2), dict(n_species=3)],
+                         ids=["classical", "identity", "two species", "three species"])
+@pytest.mark.parametrize("geometry, dims", GEOMETRIES)
+def test_every_model_has_a_capacity_of_its_channels_whatever_its_species(geometry, dims, family):
+    """Only 3D models with volume exclusion had the attribute, and rules read ``n_species * K``."""
+    from lgca.lattice_state import LatticeState
+
+    v = VELOCITY_CHANNELS[geometry]
+    lgca = get_lgca(geometry=geometry, dims=dims, density=0.3, restchannels=2, interaction="only_propagation",
+                    **family)
+    assert lgca.capacity == lgca.K == v + 2
+    state = LatticeState(lgca)
+    assert state.capacity == v + 2 and not state.has_capacity
+    nodes = lgca.nodes[lgca.nonborder]
+    assert get_lgca(geometry=geometry, nodes=nodes, interaction="only_propagation", **family).capacity == v + 2
+
+    spec = ModelSpec(space=SpaceSpec(geometry=geometry, dims=dims),
+                     state=StateSpec(density=0.3, restchannels=2, n_species=family.get("n_species", 1),
+                                     identity_based=family.get("ib", False), capacity=3))
+    model = build_model(spec)
+    assert LatticeState(model.lgca, capacity=3).capacity == 3
+    assert model.metadata["capacity"] == 3
+    assert build_model(ModelSpec(space=spec.space, state=StateSpec(
+        density=0.3, restchannels=2, n_species=family.get("n_species", 1),
+        identity_based=family.get("ib", False)))).metadata["capacity"] == v + 2

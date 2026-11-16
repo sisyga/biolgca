@@ -701,8 +701,9 @@ class LGCA_base(ABC):
             raise ValueError(
                 f"channels must be at least the velocity channel count ({self.velocitychannels})."
             )
-        if hasattr(self, "capacity"):
-            _validate_positive(self.capacity, "capacity")
+        if not hasattr(self, "capacity"):  # volume exclusion: the channels of a node, for any number of species
+            self.capacity = self.K
+        _validate_positive(self.capacity, "capacity")
         if nodes is not None:
             self._warn_nodes_shape(nodes)
 
@@ -859,7 +860,9 @@ class LGCA_base(ABC):
         """The names of the interactions ``get_lgca`` accepts for this LGCA type."""
         from .legacy_names import legacy_family, legacy_names
 
-        return legacy_names(legacy_family(self), len(self.dims))
+        from .nove_base import NoVE_LGCA_base
+
+        return legacy_names(legacy_family(self), len(self.dims), ve=not isinstance(self, NoVE_LGCA_base))
 
     def print_interactions(self):
         """Print the names of the interactions ``get_lgca`` accepts for this LGCA type."""

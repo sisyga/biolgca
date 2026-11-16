@@ -62,10 +62,10 @@ class LatticeState:
         Cells per node at which a node counts as crowded, the scale that rules
         use in e.g. ``density / capacity``. It is not enforced: the only hard
         limit is volume exclusion, one cell per channel and species. Defaults
-        to ``StateSpec.capacity`` of a model built from a spec, else to
-        ``n_species * K`` with volume exclusion and to the model's
-        ``capacity`` without it; :attr:`has_capacity` tells whether the model
-        sets one.
+        to ``StateSpec.capacity`` of a model built from a spec, else to the
+        model's ``capacity``, which is its ``K`` channels unless it was given
+        one, for any number of species; :attr:`has_capacity` tells whether
+        the model sets one.
     kind : {None, "birth_death", "phenotype_switch", "reorientation", "field"}
         Kind of the interaction that uses the state, whose contract the
         operations and :meth:`commit` check (see Notes). ``None``, for a
@@ -147,7 +147,7 @@ class LatticeState:
             capacity = getattr(lgca, "_state_capacity", None)
         self._capacity_set = capacity is not None or not self._ve
         if capacity is None:
-            capacity = n_species * channels if self._ve else getattr(lgca, "capacity", channels)
+            capacity = getattr(lgca, "capacity", channels)  # K channels, whatever the number of species
         if isinstance(capacity, bool) or int(capacity) != capacity or capacity < 1:
             raise ValueError(f"capacity must be a positive integer, got {capacity!r}")
         self._capacity = int(capacity)

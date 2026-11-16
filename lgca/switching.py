@@ -54,12 +54,10 @@ The cues are values of the lattice state at every node:
 ``"density"``
     cells at the node over the capacity of the lattice state,
     ``state.capacity``: ``StateSpec.capacity`` if the model sets one, else
-    the cells a node holds (``n_species * K`` with volume exclusion);
-    ``scope="neighbourhood"`` averages over the node and its neighbours.
-    ``kappa`` and ``theta`` of ``go_or_rest`` are this cue. The two-species
-    form of go-or-grow, ``go_or_grow.switch``, divides by ``K`` with volume
-    exclusion if the model sets no capacity: its migrating and resting cells
-    share the channels of a node.
+    its ``K`` channels, for any number of species (with volume exclusion and
+    several species a node holds up to ``n_species * K`` cells, so the cue
+    can exceed 1); ``scope="neighbourhood"`` averages over the node and its
+    neighbours. ``kappa`` and ``theta`` of ``go_or_rest`` are this cue.
 ``"field"``
     the value of a field of ``StateSpec.fields`` (``field=`` its name).
 ``"gradient"``
