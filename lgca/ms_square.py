@@ -8,7 +8,7 @@ from .square_ext import NoVE_LGCA_Square
 
 
 class MSLGCA_Square(MultiSpeciesLGCA_base, LGCA_Square):
-    """Classical multi-species LGCA on a square lattice."""
+    """Multi-species LGCA without identities on a square lattice."""
 
     geometry = "square"
 

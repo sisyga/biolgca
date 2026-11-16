@@ -1,7 +1,7 @@
 """The lattice as an interaction sees it, and the operations it may apply.
 
 A :class:`LatticeState` hides ghost nodes, dtypes and the differences between
-classical model families. Its channel states always have a species axis,
+the model families without identities. Its channel states always have a species axis,
 ``dims + (n_species, K)``, so a rule written for one species works unchanged
 for several, with or without volume exclusion.
 
@@ -48,12 +48,12 @@ class ContractWarning(UserWarning):
 
 
 class LatticeState:
-    """Interior channel states of a classical LGCA with a species axis.
+    """Interior channel states of an LGCA without identities, with a species axis.
 
     Parameters
     ----------
     lgca : LGCA object
-        A classical model with or without volume exclusion and with one or
+        A model without identities, with or without volume exclusion and with one or
         several species. The state of an identity-based model can be read
         (``counts`` are its cells per channel) but not changed.
     step : int, default=0
@@ -247,7 +247,7 @@ class LatticeState:
         individual cells (``kill``, ``divide``, ``move``, ``set_trait``).
         """
         if self._cells is None:
-            raise TypeError("state.cells exists in identity-based models; in classical models, cells "
+            raise TypeError("state.cells exists in identity-based models; in models without identities, cells "
                             "have no labels, so rules use state.counts and the operations")
         return self._cells
 

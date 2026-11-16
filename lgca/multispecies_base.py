@@ -116,7 +116,7 @@ class _MultiSpecies:
 
 
 class MultiSpeciesLGCA_base(_MultiSpecies, LGCA_base):
-    """Classical LGCA supporting multiple species."""
+    """LGCA without identities supporting multiple species."""
 
     _node_dtype = bool
 

@@ -148,7 +148,7 @@ class StateSpec:
         Track individual cells with labels and heritable properties (e.g. a
         birth rate that mutates), as needed for evolutionary models.
     n_species : int, default=1
-        Number of cell species (classical models only).
+        Number of cell species (models without identities only).
     capacity : int, optional
         Crowding scale: the number of cells per node at which crowding-dependent
         rates, such as the division probability ``birth_rate * (1 - n / capacity)``
@@ -1602,7 +1602,7 @@ def _validate_spec(spec: ModelSpec) -> None:
         raise ValueError("model.state.traits must be a mapping")
     if spec.state.traits and not spec.state.identity_based:
         raise ValueError("model.state.traits needs an identity-based model (state.identity_based=True); "
-                         "classical cells have no individual traits")
+                         "cells without identities have no individual traits")
     for name in spec.state.traits:
         if not isinstance(name, str) or not name:
             raise ValueError("model.state.traits keys must be non-empty strings")

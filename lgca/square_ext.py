@@ -196,8 +196,6 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
     def plot_config(self, nodes=None, figsize=None, grid=False, ec='none', rel_arrowlen=0.6, cmap='viridis', cbar=True,
                     cbarlabel='Particle number $n$', vmax=None, **kwargs):
         r_circle = self.r_poly * 0.25
-        # bbox_props = dict(boxstyle="Circle,pad=0.3", fc="white", ec="k", lw=1.5)
-        bbox_props = None
         if nodes is None:
             nodes = self.nodes[self.nonborder]
         nodes = self._channel_counts(nodes)

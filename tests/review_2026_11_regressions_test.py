@@ -801,3 +801,54 @@ def test_neighbour_sums_are_floats_on_every_lattice(geometry, dims, dtype):
     total = LatticeState(lgca).neighbor_sum(values)
     assert total.dtype == np.float64
     np.testing.assert_array_equal(total, lgca.velocitychannels * float(values.flat[0]))
+
+
+# ------------------------------------------------------------------ second bundle: names of the package
+
+
+def test_the_moore_class_is_named_like_the_others():
+    """The class of the Moore lattice with volume exclusion was ``LGCA_3dMoore`` next to ``IBLGCA_Moore``,
+    ``NoVE_LGCA_Moore`` and ``NoVE_IBLGCA_Moore``; the old name stays as an alias."""
+    from lgca.lgca_3dmoore import LGCA_3dMoore, LGCA_Moore
+
+    assert LGCA_3dMoore is LGCA_Moore
+    lgca = get_lgca(geometry="moore", dims=(4, 4, 4), density=0.3, interaction="only_propagation")
+    assert type(lgca) is LGCA_Moore
+    assert type(lgca).__name__ == "LGCA_Moore"
+
+
+def test_the_package_tells_its_version_and_its_public_names():
+    """``lgca.__version__`` did not exist, and ``from lgca import *`` brought the submodules along."""
+    import importlib.metadata
+
+    import lgca
+
+    assert lgca.__version__ == importlib.metadata.version("biolgca")
+    assert "get_lgca" in lgca.__all__ and "__version__" in lgca.__all__
+    for name in lgca.__all__:
+        assert hasattr(lgca, name), name
+    namespace = {}
+    exec("from lgca import *", namespace)
+    assert set(namespace) - {"__builtins__"} == set(lgca.__all__)
+
+
+@pytest.mark.parametrize("volume_exclusion", [True, False])
+def test_plot_prop_spatial_takes_the_same_arguments_in_both_identity_based_families(volume_exclusion):
+    """With volume exclusion, ``plot_prop_spatial`` had no ``cbar`` and needed a dict for ``figkwargs``."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    lgca = get_lgca(geometry="lin", dims=20, density=0.5, ib=True, ve=volume_exclusion, restchannels=2 if volume_exclusion else 1,
+                    interaction="go_or_grow", seed=1)
+    lgca.timeevo(timesteps=5, record=True, showprogress=False)
+    try:
+        without_bar = lgca.plot_prop_spatial(cbar=False, figkwargs=None)
+        assert without_bar.colorbar is None
+        with_bar = lgca.plot_prop_spatial(propname="kappa", cbarlabel="switch", cbar=True,
+                                          figkwargs={"figsize": (4, 3)})
+        assert tuple(plt.gcf().get_size_inches()) == (4, 3)
+        assert with_bar.colorbar.ax.get_ylabel() == "switch"
+    finally:
+        plt.close("all")

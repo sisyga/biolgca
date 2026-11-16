@@ -11,30 +11,24 @@ volume exclusion.
 
 import logging
 from abc import ABC
-from copy import copy, deepcopy
 from itertools import chain
 
 import numpy as np
 from .plot_data import history_steps
 from numpy import random as npr
-from tqdm.auto import tqdm
 
 from .base import (
     warn_user,
     plt,
-    LGCA_base,
     _validate_count_nodes,
     _validate_density,
     _validate_nonnegative_int,
-    _validate_positive,
     _validate_positive_int,
 )
-from .plots import muller_plot
 
 
 from .ib_base import IBLGCA_base, _NO_FAMILIES
 from .nove_base import NoVE_LGCA_base
-from .list_utils import get_arr_of_empty_lists, _copy_arr_of_lists
 
 logger = logging.getLogger(__name__)
 

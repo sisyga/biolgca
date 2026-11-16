@@ -13,8 +13,8 @@ The get_lgca function returns an LGCA object of the requested type with the
 given initial conditions. It can simulate for a given number of timesteps and has
 different plotting functions for analysis, depending on the geometry. The
 interaction function can be chosen from built-in ones or defined by the user.
-Currently, classical LGCA and identity-based LGCA with and without volume
-exclusion, respectively, are supported on 1D, 2D square, 2D hexagonal,
+Classical LGCA (volume exclusion, no identities), LGCA without volume
+exclusion and identity-based LGCA with and without volume exclusion are supported on 1D, 2D square, 2D hexagonal,
 3D cubic and 3D Moore lattices.
 
 References
@@ -26,6 +26,7 @@ References
 """
 
 import difflib
+import importlib.metadata
 import logging
 
 import numpy as np
@@ -39,10 +40,30 @@ from .mutations import mutation_effect
 from .switching import switch_cue
 from .fields import reaction
 from .explorer import explore
-from . import builtin_rules as _builtin_rules  # registers the decorated built-in interactions
-from . import fields as _fields  # registers the pde operator
-from . import research_models as _research_models  # registers the research models as stacks
-from . import legacy_names as _legacy_names  # registers the legacy interaction names
+from . import builtin_rules as _builtin_rules  # noqa: F401 - registers the decorated built-in interactions
+from . import fields as _fields  # noqa: F401 - registers the pde operator
+from . import research_models as _research_models  # noqa: F401 - registers the research models as stacks
+from . import legacy_names as _legacy_names  # noqa: F401 - registers the legacy interaction names
+
+try:
+    __version__ = importlib.metadata.version("biolgca")
+except importlib.metadata.PackageNotFoundError:  # a source checkout that is not installed
+    __version__ = "unknown"
+
+# the names of ``from lgca import *``; the submodules (lgca.model, lgca.simulation, ...) are imported by name
+__all__ = [
+    "ContractWarning",
+    "LatticeState",
+    "__version__",
+    "explore",
+    "get_lgca",
+    "interaction",
+    "mutation_effect",
+    "reaction",
+    "reorientation_term",
+    "stack",
+    "switch_cue",
+]
 
 # Library loggers stay silent unless the application configures logging.
 logging.getLogger(__name__).addHandler(logging.NullHandler())
@@ -253,14 +274,14 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, n_species
         - :py:class:`lgca.lgca_square.LGCA_Square`
         - :py:class:`lgca.lgca_hex.LGCA_Hex`
         - :py:class:`lgca.lgca_cubic.LGCA_Cubic`
-        - :py:class:`lgca.lgca_3dmoore.LGCA_3dMoore`
+        - :py:class:`lgca.lgca_3dmoore.LGCA_Moore`
     - :py:class:`lgca.ib_base.IBLGCA_base`: identity-based LGCA with volume exclusion
         - :py:class:`lgca.lgca_1d.IBLGCA_1D`
         - :py:class:`lgca.square_ext.IBLGCA_Square`
         - :py:class:`lgca.lgca_hex.IBLGCA_Hex`
         - :py:class:`lgca.cubic_ext.IBLGCA_Cubic`
         - :py:class:`lgca.lgca_3dmoore.IBLGCA_Moore`
-    - :py:class:`lgca.nove_base.NoVE_LGCA_base`: classical LGCA without volume exclusion
+    - :py:class:`lgca.nove_base.NoVE_LGCA_base`: LGCA without volume exclusion and without identities
         - :py:class:`lgca.lgca_1d.NoVE_LGCA_1D`
         - :py:class:`lgca.square_ext.NoVE_LGCA_Square`
         - :py:class:`lgca.lgca_hex.NoVE_LGCA_Hex`
@@ -272,7 +293,7 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, n_species
         - :py:class:`lgca.lgca_hex.NoVE_IBLGCA_Hex`
         - :py:class:`lgca.cubic_ext.NoVE_IBLGCA_Cubic`
         - :py:class:`lgca.lgca_3dmoore.NoVE_IBLGCA_Moore`
-    - :py:class:`lgca.multispecies_base.MultiSpeciesLGCA_base`: multi-species classical LGCA
+    - :py:class:`lgca.multispecies_base.MultiSpeciesLGCA_base`: LGCA with several species, without identities
         - :py:class:`lgca.ms_1d.MSLGCA_1D`
         - :py:class:`lgca.ms_square.MSLGCA_Square`
         - :py:class:`lgca.ms_hex.MSLGCA_Hex`
@@ -461,7 +482,7 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, n_species
         elif geom_key == 'cubic':
             from lgca.lgca_cubic import LGCA_Cubic as _Cls
         elif geom_key == 'moore':
-            from lgca.lgca_3dmoore import LGCA_3dMoore as _Cls
+            from lgca.lgca_3dmoore import LGCA_Moore as _Cls
         else:
             raise ValueError(
                 "Geometry specification is unknown. Try: '1d', 'lin', 'linear', 'square', 'sq', "

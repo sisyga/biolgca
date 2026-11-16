@@ -26,6 +26,8 @@ jobs:
           enable-cache: true
       - name: Install locked project and development dependencies
         run: uv sync --locked
+      - name: Unused imports and undefined names
+        run: uv run --no-sync ruff check lgca --select F
       - name: Run tests
         run: uv run --no-sync python -m pytest -q --run-slow
 

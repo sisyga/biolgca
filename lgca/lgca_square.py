@@ -12,7 +12,7 @@ Supported LGCA types:
 
 - classical LGCA (:py:class:`LGCA_Square`)
 - identity-based LGCA (:py:class:`IBLGCA_Square`)
-- classical LGCA without volume exclusion (:py:class:`NoVE_LGCA_Square`)
+- LGCA without volume exclusion and without identities (:py:class:`NoVE_LGCA_Square`)
 - identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_Square`)
 """
 
@@ -35,10 +35,7 @@ except ImportError:  # pragma: no cover - handled at runtime
     ) = Circle = FancyArrowPatch = cm = make_axes_locatable = _MissingPlotLib(
         "matplotlib"
     )
-import warnings
-from copy import copy
-
-from lgca.base import IBLGCA_base, LGCA_base, NoVE_IBLGCA_base, NoVE_LGCA_base, normalize_dims
+from lgca.base import LGCA_base, normalize_dims
 
 from .square_plotting import SquarePlotMixin
 class LGCA_Square(SquarePlotMixin, LGCA_base):

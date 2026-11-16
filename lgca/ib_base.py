@@ -16,7 +16,6 @@ from copy import copy, deepcopy
 import numpy as np
 from .plot_data import history_steps
 from numpy import random as npr
-from tqdm.auto import tqdm
 
 from .base import (
     warn_user,
@@ -24,7 +23,6 @@ from .base import (
     LGCA_base,
     _validate_density,
     _validate_nonnegative_int,
-    _validate_positive,
     _validate_positive_int,
 )
 from .plots import muller_plot

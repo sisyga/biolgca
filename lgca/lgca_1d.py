@@ -11,7 +11,7 @@ Supported LGCA types:
 
 - classical LGCA (:py:class:`LGCA_1D`)
 - identity-based LGCA (:py:class:`IBLGCA_1D`)
-- classical LGCA without volume exclusion (:py:class:`NoVE_LGCA_1D`)
+- LGCA without volume exclusion and without identities (:py:class:`NoVE_LGCA_1D`)
 - identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_1D`)
 """
 
@@ -651,7 +651,30 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
 
         return LGCA_1D.plot_flux(self, self._channel_counts(nodes_t), **kwargs)
 
-    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', figkwargs={}, **kwargs):
+    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', cbarlabel=None, cbar=True,
+                          figkwargs=None, **kwargs):
+        """
+        Plot the mean of the cell property `propname` at every node and recorded time step.
+
+        Parameters
+        ----------
+        nodes_t : :py:class:`numpy.ndarray`, optional
+            Recorded nodes. Default: those of the last run (``lgca.nodes_t``).
+        props : dict, optional
+            Cell properties. Default: ``lgca.props``.
+        propname : str, optional
+            Name of the property. Default: the first one.
+        cmap : str
+            Matplotlib colour map.
+        cbarlabel : str, optional
+            Label of the colour bar. Default: the name of the property.
+        cbar : bool
+            Whether to draw a colour bar.
+        figkwargs : dict, optional
+            Keyword arguments for the figure (``setup_figure``).
+        **kwargs
+            Passed to ``imshow``; ``steps`` gives the time steps of `nodes_t`.
+        """
         implicit_history = nodes_t is None
         sample_steps = kwargs.pop("steps", None)
         if nodes_t is None:
@@ -664,13 +687,14 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             propname = next(iter(props))
 
         tmax, l, _ = nodes_t.shape
-        fig, ax = self.setup_figure(tmax, **figkwargs)
+        fig, ax = self.setup_figure(tmax, **(figkwargs or {}))
         mean_prop_t = self.calc_prop_mean(propname=propname, props=props, nodes=nodes_t)
 
         plot = plt.imshow(mean_prop_t, interpolation='none', aspect='equal', cmap=cmap, **kwargs)
-        cax = colorbar_axes(ax, size=0.3, pad=0.1)
-        cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
-        cbar.set_label(r'Property ${}$'.format(propname))
+        if cbar:
+            cax = colorbar_axes(ax, size=0.3, pad=0.1)
+            cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
+            cbar.set_label(r'Property ${}$'.format(propname) if cbarlabel is None else cbarlabel)
         plt.sca(ax)
         times = history_steps(self, len(nodes_t), "nodes_steps", sample_steps, implicit=implicit_history)
         label_history_axis(ax, times)
@@ -870,7 +894,7 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
         return LGCA_1D.plot_flux(self, self._channel_counts(nodes_t), **kwargs)
 
     def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', cbarlabel=None, cbar=True,
-                          figkwargs={}, **kwargs):
+                          figkwargs=None, **kwargs):
         """
         Plot the spatial distribution of a cell property 'propname'. At each node, for each time step the mean value in
         the node is shown. Empty nodes are masked.
@@ -892,7 +916,7 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
             propname = next(iter(props))
 
         tmax, l, _ = nodes_t.shape
-        fig, ax = self.setup_figure(tmax, **figkwargs)
+        fig, ax = self.setup_figure(tmax, **(figkwargs or {}))
         mean_prop_t = self.calc_prop_mean(propname=propname, props=props, nodes=nodes_t)
 
         plot = plt.imshow(mean_prop_t, interpolation='none', cmap=cmap, aspect='equal', **kwargs)

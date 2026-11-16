@@ -8,7 +8,7 @@ from .multispecies_base import MultiSpeciesLGCA_base, MultiSpeciesNoVE_LGCA_base
 
 
 class MSLGCA_Cubic(MultiSpeciesLGCA_base, LGCA_Cubic):
-    """Classical multi-species LGCA on a cubic lattice."""
+    """Multi-species LGCA without identities on a cubic lattice."""
 
     geometry = "cubic"
 

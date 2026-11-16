@@ -10,13 +10,10 @@ volume exclusion.
 
 
 import logging
-import warnings
 from abc import ABC
-from copy import copy, deepcopy
 
 import numpy as np
 from numpy import random as npr
-from tqdm.auto import tqdm
 
 from .base import (
     LGCA_base,
@@ -24,10 +21,8 @@ from .base import (
     _validate_count_nodes,
     _validate_density,
     _validate_nonnegative_int,
-    _validate_positive,
     _validate_positive_int,
 )
-from .plots import muller_plot
 
 logger = logging.getLogger(__name__)
 

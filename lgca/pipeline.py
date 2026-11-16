@@ -708,7 +708,7 @@ def _reject_single_species_phenotype_switch(operators: Sequence[InteractionOpera
         if operator.operator_kind == "phenotype_switch":
             raise ValueError(
                 f"dynamics.operators[{index}] {operator.name!r} is a phenotype switch, which "
-                "moves cells between species; this classical model has one species. Set "
+                "moves cells between species; this model has one species. Set "
                 "state.n_species to the number of phenotypes, or use an identity-based model "
                 "to change individual cell parameters."
             )

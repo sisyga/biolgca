@@ -17,7 +17,7 @@ Supported LGCA types:
 
 import logging
 from abc import ABC, abstractmethod
-from copy import copy, deepcopy
+from copy import deepcopy
 import difflib
 from math import comb
 
@@ -51,7 +51,6 @@ except ImportError:  # pragma: no cover - handled at runtime
     )
 from numpy import random as npr
 from itertools import combinations
-from tqdm.auto import tqdm
 
 from lgca.plots import muller_plot, colorbar_index, cmap_discretize, estimate_figsize, get_cmap
 
@@ -849,7 +848,7 @@ class LGCA_base(ABC):
         """Return the number of particles in each channel of ``nodes`` for plotting.
 
         ``nodes`` is one lattice state or, with ``history=True``, a time series of
-        states. Classical states already store occupancy or counts. Identity-based
+        states. States without identities already store occupancy or counts. Identity-based
         classes convert labels or label lists and multi-species classes sum over
         species. Arrays that already hold counts are returned unchanged.
         """
@@ -1178,9 +1177,9 @@ def __getattr__(name):
 
 __all__ = [
     "LGCA_base",
-    "IBLGCA_base",
-    "NoVE_LGCA_base",
-    "NoVE_IBLGCA_base",
+    "IBLGCA_base",  # noqa: F822 - this and the next two are provided by the module __getattr__
+    "NoVE_LGCA_base",  # noqa: F822
+    "NoVE_IBLGCA_base",  # noqa: F822
     "calc_nematic_tensor",
     "colorbar_index",
     "cmap_discretize",
