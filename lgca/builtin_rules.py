@@ -292,7 +292,7 @@ def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_m
         daughters take free channels, and ``state.capacity`` is a hard limit
         on the cells per node. Divisions beyond either fail, chosen at random.
     mutation_matrix : array_like or None
-        Classical models with several species: entry ``[a][b]`` is the
+        Models without identities and with several species: entry ``[a][b]`` is the
         probability that a daughter of species ``a`` belongs to species ``b``
         (rows sum to 1). Default: daughters have their mother's species.
     mutation : dict, list or None
@@ -308,7 +308,7 @@ def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_m
         The channels whose cells die and divide, and where daughters go:
         ``"all"``, ``"velocity"``, ``"rest"`` or channel indices.
     species : int, list of int or None
-        Classical models with several species: the species whose cells die
+        Models without identities and with several species: the species whose cells die
         and divide; the others are left as they are (but count for crowding).
         Default: all.
 
@@ -326,7 +326,7 @@ def birth_death(state, birth_rate=0.0, death_rate=0.0, crowding=True, mutation_m
         if species is not None:
             _species_indices(species, 1)
         if mutation_matrix is not None and not np.array_equal(np.asarray(mutation_matrix), [[1]]):
-            raise ValueError("mutation_matrix needs a classical model with several species; identity-based "
+            raise ValueError("mutation_matrix needs a model without identities and with several species; identity-based "
                              "models have one species and change traits with mutation=")
         _birth_death_cells(state, birth_rate, death_rate, crowding, mutation, new_family, channels)
         return
@@ -728,7 +728,7 @@ def go_or_rest(state, probability=None, kappa=None, theta=None, when_full="legac
         those at the node, or the mean over the node and its neighbours (for
         ``probability``, the density cue's ``scope``).
     species : int, list of int or None
-        Classical models with several species: the species whose cells switch;
+        Models without identities and with several species: the species whose cells switch;
         the others keep their channels (but count for the density). Default:
         all.
     """

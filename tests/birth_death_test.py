@@ -278,7 +278,7 @@ def test_the_rule_passes_the_interaction_checks():
     ({"mutation": {"r_b": 0.1}}, False, "only identity-based models"),
     ({"birth_rate": [0.1, 0.2, 0.3]}, False, "one per species"),
     ({"mutation_matrix": [[0.5, 0.4], [0, 1]]}, False, "sum to 1"),
-    ({"mutation_matrix": [[0, 1], [1, 0]]}, True, "classical model with several species"),
+    ({"mutation_matrix": [[0, 1], [1, 0]]}, True, "model without identities and with several species"),
     ({"mutation": {"r_b": {"distribution": "normal", "value": 0.1}}}, True, "exactly one of"),
     ({"mutation": {"r_b": {"distribution": "bit_generator"}}}, True, "must name a distribution"),
     ({"mutation": {"r_b": {"function": "nowhere"}}}, True, "is not registered"),

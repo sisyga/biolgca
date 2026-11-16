@@ -22,7 +22,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: BioLGCA version
+      label: biolgca version
       description: "Output of `biolgca --version`, or the commit."
     validations:
       required: true

@@ -190,8 +190,8 @@ channels: select its channels before passing it. ``AnimationObserver`` takes
 the density of the selected channels from each state it observes.
 
 The Matplotlib renderers of square and hexagonal lattices are tested with
-configuration, flux, flow and density data of classical, identity-based and
-volume-exclusion-free models. Cubic and
+configuration, flux, flow and density data of classical and identity-based models and
+of models without volume exclusion. Cubic and
 Moore Mayavi animations find their steps the same way and label each frame
 with its recorded step. They open an interactive window and return the Mayavi
 ``Animator``; pass ``show=False`` inside an application that already runs a

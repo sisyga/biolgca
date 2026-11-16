@@ -7,7 +7,7 @@ from .multispecies_base import MultiSpeciesLGCA_base, MultiSpeciesNoVE_LGCA_base
 
 
 class MSLGCA_1D(MultiSpeciesLGCA_base, LGCA_1D):
-    """Classical multi-species LGCA on a 1D lattice."""
+    """Multi-species LGCA without identities on a 1D lattice."""
 
     geometry = "lin"
 

@@ -11,7 +11,7 @@ Supported LGCA types:
 
 - classical LGCA (:py:class:`LGCA_1D`)
 - identity-based LGCA (:py:class:`IBLGCA_1D`)
-- classical LGCA without volume exclusion (:py:class:`NoVE_LGCA_1D`)
+- LGCA without volume exclusion and without identities (:py:class:`NoVE_LGCA_1D`)
 - identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_1D`)
 """
 
@@ -34,6 +34,8 @@ from lgca.base import (
     colors,
     cmap_discretize,
     estimate_figsize,
+    COUNT_DTYPE,
+    normalize_dims,
     np,
     plt,
 )
@@ -75,8 +77,7 @@ class LGCA_1D(LGCA_base):
         Parameters
         ----------
         dims : int or tuple, default=100
-            Lattice dimensions. Must match with specified geometry, everything except the first tuple element
-            is ignored.
+            Number of nodes: an integer or a sequence with one integer.
         nodes : :py:class:`numpy.ndarray`
             Custom initial lattice configuration.
         restchannels : int, default=0
@@ -100,18 +101,8 @@ class LGCA_1D(LGCA_base):
             self.dims = self.l,
             return
 
-        # default
-        elif dims is None:
-            dims = 100
-
-        # set dimensions to keyword value
-        if isinstance(dims, int):
-            self.l = dims
-        elif isinstance(dims, tuple):
-            self.l = dims[0]
-        else:
-            raise TypeError("Keyword 'dims' must be int or tuple!")
-        self.dims = self.l,
+        self.dims = normalize_dims(dims, 1, default=(100,))
+        self.l, = self.dims
         self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels
 
@@ -660,7 +651,30 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
 
         return LGCA_1D.plot_flux(self, self._channel_counts(nodes_t), **kwargs)
 
-    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', figkwargs={}, **kwargs):
+    def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', cbarlabel=None, cbar=True,
+                          figkwargs=None, **kwargs):
+        """
+        Plot the mean of the cell property `propname` at every node and recorded time step.
+
+        Parameters
+        ----------
+        nodes_t : :py:class:`numpy.ndarray`, optional
+            Recorded nodes. Default: those of the last run (``lgca.nodes_t``).
+        props : dict, optional
+            Cell properties. Default: ``lgca.props``.
+        propname : str, optional
+            Name of the property. Default: the first one.
+        cmap : str
+            Matplotlib colour map.
+        cbarlabel : str, optional
+            Label of the colour bar. Default: the name of the property.
+        cbar : bool
+            Whether to draw a colour bar.
+        figkwargs : dict, optional
+            Keyword arguments for the figure (``setup_figure``).
+        **kwargs
+            Passed to ``imshow``; ``steps`` gives the time steps of `nodes_t`.
+        """
         implicit_history = nodes_t is None
         sample_steps = kwargs.pop("steps", None)
         if nodes_t is None:
@@ -673,13 +687,14 @@ class IBLGCA_1D(IBLGCA_base, LGCA_1D):
             propname = next(iter(props))
 
         tmax, l, _ = nodes_t.shape
-        fig, ax = self.setup_figure(tmax, **figkwargs)
+        fig, ax = self.setup_figure(tmax, **(figkwargs or {}))
         mean_prop_t = self.calc_prop_mean(propname=propname, props=props, nodes=nodes_t)
 
         plot = plt.imshow(mean_prop_t, interpolation='none', aspect='equal', cmap=cmap, **kwargs)
-        cax = colorbar_axes(ax, size=0.3, pad=0.1)
-        cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
-        cbar.set_label(r'Property ${}$'.format(propname))
+        if cbar:
+            cax = colorbar_axes(ax, size=0.3, pad=0.1)
+            cbar = fig.colorbar(plot, use_gridspec=True, cax=cax)
+            cbar.set_label(r'Property ${}$'.format(propname) if cbarlabel is None else cbarlabel)
         plt.sca(ax)
         times = history_steps(self, len(nodes_t), "nodes_steps", sample_steps, implicit=implicit_history)
         label_history_axis(ax, times)
@@ -694,10 +709,21 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
 
     def set_dims(self, dims=None, nodes=None, restchannels=None, capacity=None):
         """
-        Set the dimensions of the instance according to given values. Sets self.l, self.K, self.dims and self.restchannels
-        :param dims: desired lattice size (int or array-like)
-        :param nodes: existing lattice to use (ndarray)
-        :param restchannels: desired number of resting channels, will be capped to 1 if >1 because of no volume exclusion
+        Set the lattice dimensions.
+
+        Sets :py:attr:`self.l`, :py:attr:`self.K`, :py:attr:`self.dims`, :py:attr:`self.restchannels` and
+        :py:attr:`self.capacity`.
+
+        Parameters
+        ----------
+        dims : int or sequence of int, optional
+            Lattice size.
+        nodes : :py:class:`numpy.ndarray`, optional
+            Initial lattice configuration; its shape then sets the dimensions.
+        restchannels : int, optional
+            Number of rest channels; every one is a channel of the state.
+        capacity : int, optional
+            Number of cells per node at which growth stops. Default: one cell per channel.
         """
         # set instance dimensions according to passed lattice
         if nodes is not None:
@@ -705,45 +731,11 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
                 self.l, self.K = nodes.shape
             except ValueError as e:
                 raise ValueError("Node shape does not match the 1D geometry! Shape must be (x,channels)") from e
-            # set number of rest channels to <= 1 because >1 cells are allowed per channel
-            # for now, raise Exception if format of nodes does no fit
-            # (To Do: just sum the cells in surplus rest channels in init_nodes and print a warning)
-            if self.K - self.velocitychannels > 1:
-                raise RuntimeError('Only one resting channel allowed, '+
-                 'but {} resting channels specified!'.format(self.K - self.velocitychannels))
-            elif self.K < self.velocitychannels:
-                raise RuntimeError('Not enough channels specified for the chosen geometry! Required: {}, provided: {}'.format(
-                    self.velocitychannels, self.K))
-            else:
-                self.restchannels = self.K - self.velocitychannels
         # set instance dimensions according to required dimensions
-        elif dims is not None:
-            if isinstance(dims, int):
-                self.l = dims
-            else:
-                self.l = dims[0]
-        # set default value for dimension
         else:
-            self.l = 100
+            self.l, = normalize_dims(dims, 1, default=(100,))
         self.dims = self.l,
-
-        # set number of rest channels to <= 1 because >1 cells are allowed per channel
-        if nodes is None and restchannels is not None:
-            if restchannels > 1:
-                self.restchannels = 1
-            elif 0 <= restchannels <= 1:
-                self.restchannels = restchannels
-        elif nodes is None:
-            self.restchannels = 0
-        self.K = self.velocitychannels + self.restchannels
-
-        # set capacity according to keyword or specified resting channels
-        if capacity is not None:
-            self.capacity = capacity
-        elif restchannels is not None and restchannels > 1:
-            self.capacity = self.velocitychannels + restchannels
-        else:
-            self.capacity = self.K
+        self._set_channels(restchannels, capacity, from_nodes=nodes is not None)
 
     def init_nodes(self, density, nodes=None):
         """
@@ -752,14 +744,14 @@ class NoVE_LGCA_1D(LGCA_1D, NoVE_LGCA_base):
         :param nodes: existing lattice to use, optionally containing particles (ndarray)
         """
         # create lattice according to size specified earlier
-        self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=np.uint)
+        self.nodes = np.zeros((self.l + 2 * self.r_int, self.K), dtype=COUNT_DTYPE)
         # if no lattice given, populate randomly
         if nodes is None:
             self.random_reset(density)
         # if lattice given, populate lattice with given particles. Virtual lattice sites for boundary conditions not included
         else:
             self._warn_nodes_shape(nodes)
-            self.nodes[self.r_int:-self.r_int, :] = nodes.astype(np.uint)
+            self.nodes[self.r_int:-self.r_int, :] = nodes.astype(COUNT_DTYPE)
             self.apply_boundaries()
 
     def plot_density(self, density_t=None, figindex=None, figsize=None, cmap='hot_r', relative_max=None, cbar=True,
@@ -911,17 +903,28 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
         return LGCA_1D.plot_flux(self, self._channel_counts(nodes_t), **kwargs)
 
     def plot_prop_spatial(self, nodes_t=None, props=None, propname=None, cmap='cividis', cbarlabel=None, cbar=True,
-                          figkwargs={}, **kwargs):
+                          figkwargs=None, **kwargs):
         """
-        Plot the spatial distribution of a cell property 'propname'. At each node, for each time step the mean value in
-        the node is shown. Empty nodes are masked.
-        :param nodes_t:
-        :param props:
-        :param propname:
-        :param cmap:
-        :param cbarlabel:
-        :param kwargs:
-        :return:
+        Plot the mean of the cell property `propname` at every node and recorded time step. Empty nodes are masked.
+
+        Parameters
+        ----------
+        nodes_t : :py:class:`numpy.ndarray`, optional
+            Recorded nodes. Default: those of the last run (``lgca.nodes_t``).
+        props : dict, optional
+            Cell properties. Default: ``lgca.props``.
+        propname : str, optional
+            Name of the property. Default: the first one.
+        cmap : str
+            Matplotlib colour map.
+        cbarlabel : str, optional
+            Label of the colour bar. Default: the name of the property.
+        cbar : bool
+            Whether to draw a colour bar.
+        figkwargs : dict, optional
+            Keyword arguments for the figure (``setup_figure``).
+        **kwargs
+            Passed to ``imshow``; ``steps`` gives the time steps of `nodes_t`.
         """
         implicit_history = nodes_t is None
         sample_steps = kwargs.pop("steps", None)
@@ -933,7 +936,7 @@ class NoVE_IBLGCA_1D(NoVE_IBLGCA_base, NoVE_LGCA_1D):
             propname = next(iter(props))
 
         tmax, l, _ = nodes_t.shape
-        fig, ax = self.setup_figure(tmax, **figkwargs)
+        fig, ax = self.setup_figure(tmax, **(figkwargs or {}))
         mean_prop_t = self.calc_prop_mean(propname=propname, props=props, nodes=nodes_t)
 
         plot = plt.imshow(mean_prop_t, interpolation='none', cmap=cmap, aspect='equal', **kwargs)

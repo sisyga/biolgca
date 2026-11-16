@@ -106,14 +106,35 @@ def legacy_family(lgca) -> str:
     return "classical" if ve else "nove"
 
 
-def legacy_names(family: str, ndim: int | None = None) -> list[str]:
-    """The interaction names get_lgca accepts for a family, and a lattice of ``ndim`` dimensions."""
+def legacy_names(family: str, ndim: int | None = None, ve: bool = True) -> list[str]:
+    """The interaction names get_lgca accepts for a family, with or without volume exclusion (several
+    species), and a lattice of ``ndim`` dimensions."""
     names = set(_NAMES[family])
-    if family == "multispecies":
-        names |= set(_NAMES["classical"]) | set(_NAMES["nove"])
+    if family == "multispecies":  # as legacy_interaction: its own and the rules that work for several species
+        written_for = "classical" if ve else "nove"
+        names = {name for table in (_NAMES[family], _NAMES[written_for]) for name, entry in table.items()
+                 if written_for in entry.stack.families}
     if ndim == 1:
         names.discard("contact_guidance")
     return sorted(names)
+
+
+def legacy_names_table() -> dict[str, dict[str, bool]]:
+    """Which models accept which get_lgca interaction name: ``{name: {model: accepted}}``.
+
+    The models are the four families and the models with several species, with and without volume
+    exclusion. The documentation builds its table of names from this, so the table cannot go out of date.
+    """
+    columns = {
+        "classical": legacy_names("classical"),
+        "nove": legacy_names("nove"),
+        "ib": legacy_names("ib"),
+        "nove_ib": legacy_names("nove_ib"),
+        "several species": legacy_names("multispecies", ve=True),
+        "several species, nove": legacy_names("multispecies", ve=False),
+    }
+    names = sorted({name for accepted in columns.values() for name in accepted})
+    return {name: {column: name in accepted for column, accepted in columns.items()} for name in names}
 
 
 def legacy_interaction(family: str, name: str | None, ve: bool = True):
@@ -127,7 +148,7 @@ def legacy_interaction(family: str, name: str | None, ve: bool = True):
         if name in table and (family != "multispecies" or written_for in table[name].stack.families):
             return table[name]
     raise ValueError(f"Unknown interaction {name!r}. Implemented interactions: "
-                     f"{', '.join(legacy_names(family))}")
+                     f"{', '.join(legacy_names(family, ve=ve))}")
 
 
 def compile_legacy_interaction(lgca, name, parameters) -> None:
@@ -150,6 +171,9 @@ def compile_legacy_interaction(lgca, name, parameters) -> None:
     # the capacity is the model's (StateSpec.capacity below), not a parameter of the stack
     given = {key: value for key, value in parameters.items()
              if key in legacy.stack.parameters and key != "capacity"}
+    known = {key for table in _NAMES.values() for entry in table.values() for key in entry.stack.parameters}
+    for key in sorted(known.intersection(parameters) - set(legacy.stack.parameters) - {"capacity"}):
+        warn_user(f"parameter `{key}` defined but unused")  # a parameter of other interactions
     # defaults of None stand for values derived from other parameters
     defaults = {key: value for key, value in legacy.stack.defaults().items()
                 if key != "capacity" and value is not None}
@@ -157,9 +181,8 @@ def compile_legacy_interaction(lgca, name, parameters) -> None:
         logger.info("%s: %s set to %r (default)", name, key, defaults[key])
     lgca.interaction_params = {**defaults, **given}
     capacity = None
-    if not ve:  # the crowding scale: the model's, or the default of the legacy interaction
-        own = getattr(lgca, "capacity", lgca.K)
-        capacity = own if "capacity" in parameters or legacy.capacity is None else legacy.capacity
+    if not ve:
+        capacity = _model_capacity(lgca, legacy, parameters.get("capacity"))
         lgca.interaction_params["capacity"] = capacity
     lgca._validate_interaction_params()
     spec = ModelSpec(
@@ -174,6 +197,26 @@ def compile_legacy_interaction(lgca, name, parameters) -> None:
     lgca._compiled_model = CompiledModel(lgca=lgca, spec=spec, context=context, pipeline=pipeline,
                                          metadata={"operator_names": pipeline.operator_names})
     lgca.interaction = LegacyInteraction(name, lgca._compiled_model)
+
+
+def _model_capacity(lgca, legacy, given):
+    """The crowding scale of a model without volume exclusion, which is also ``lgca.capacity``.
+
+    A capacity given to get_lgca or to ``set_interaction`` is the model's from then on. Without
+    one, an interaction with a capacity of its own in earlier versions (8 in most identity-based
+    models) brings it; the next interaction without one returns to the capacity before it.
+    """
+    brought = lgca.__dict__.pop("_legacy_capacity", None)  # (default of the last interaction, capacity before it)
+    if given is not None:
+        lgca.capacity = given
+        lgca.__dict__["_capacity_given"] = True
+    elif not lgca.__dict__.get("_capacity_given"):
+        if brought is not None and getattr(lgca, "capacity", None) == brought[0]:
+            lgca.capacity = brought[1]
+        if legacy.capacity is not None:
+            lgca.__dict__["_legacy_capacity"] = (legacy.capacity, getattr(lgca, "capacity", lgca.K))
+            lgca.capacity = legacy.capacity
+    return getattr(lgca, "capacity", lgca.K)
 
 
 class LegacyInteraction:

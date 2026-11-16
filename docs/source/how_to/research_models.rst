@@ -1,7 +1,7 @@
 Research models from generic rules
 ==================================
 
-Earlier versions of BioLGCA had one interaction function per published
+Earlier versions of biolgca had one interaction function per published
 model, such as ``nove_ib.go_or_grow_glioblastoma``. Each of them combined a
 few steps: a phenotype switch, growth with mutations, movement. These models
 are now written as *stacks* of the generic rules, in the module

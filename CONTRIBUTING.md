@@ -1,20 +1,20 @@
-# Contributing to BioLGCA
+# Contributing to biolgca
 
-Thank you for your interest in BioLGCA. Questions, bug reports, ideas for
+Thank you for your interest in biolgca. Questions, bug reports, ideas for
 models and code are all welcome. Everyone taking part follows the
 [code of conduct](CODE_OF_CONDUCT.md).
 
 ## Asking questions and reporting problems
 
 Open an issue on the [issue tracker](https://github.com/sisyga/biolgca/issues)
-and pick the template that fits: a question about using BioLGCA, a bug
-report or a feature request. For a bug, include the BioLGCA version
+and pick the template that fits: a question about using biolgca, a bug
+report or a feature request. For a bug, include the biolgca version
 (`biolgca --version`), your Python version and operating system, and a short
 script or model file that shows the problem, with its seed.
 
 ## Setting up a development environment
 
-BioLGCA uses [uv](https://docs.astral.sh/uv/). From a fork or clone of the
+biolgca uses [uv](https://docs.astral.sh/uv/). From a fork or clone of the
 repository:
 
 ```bash
@@ -73,7 +73,7 @@ A new rule is a function of the lattice state registered with
 `@interaction` or `@reorientation_term` (see the
 [custom interaction guide](docs/source/how_to/custom_interactions.rst)). You
 can use and share such a rule from your own module without changing
-BioLGCA. To propose it as a built-in:
+biolgca. To propose it as a built-in:
 
 1. Open a feature request describing the biological mechanism, the rule and
    a reference, if it comes from a paper.

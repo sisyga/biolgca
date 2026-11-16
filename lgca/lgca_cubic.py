@@ -6,7 +6,7 @@
 """
 
 
-from lgca.base import LGCA_base, np
+from lgca.base import LGCA_base, normalize_dims, np
 from lgca.mayavi_style import (
     INK,
     MUTED,
@@ -58,7 +58,7 @@ class LGCA_Cubic(LGCA_base):
     ciz = np.array([0, 0, 0, 0, 1, -1], dtype=float)
     c = np.array([cix, ciy, ciz])
 
-    def set_dims(self, dims=None, nodes=None, restchannels=0, capacity=None):
+    def set_dims(self, dims=None, nodes=None, restchannels=0):
         """
         Set LGCA dimensions.
 
@@ -89,26 +89,10 @@ class LGCA_Cubic(LGCA_base):
             self.dims = (self.lx, self.ly, self.lz)
             return
 
-        if dims is None:
-            dims = (10, 10, 10)
-
-        # set dimensions to keyword value
-        if isinstance(dims, tuple):
-            if len(dims) != 3:
-                raise ValueError(
-                    "For 3D cubic lattice, 'dims' must be a tuple of three integers."
-                )
-            self.lx, self.ly, self.lz = dims
-
-        elif isinstance(dims, int):
-            self.lx = self.ly = self.lz = dims
-        else:
-            raise TypeError("Keyword 'dims' must be a tuple of three integers or int!")
-
+        self.lx, self.ly, self.lz = normalize_dims(dims, 3, default=(10, 10, 10))
         self.dims = (self.lx, self.ly, self.lz)
         self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels
-        self.capacity = capacity if capacity is not None else self.K
 
     def init_nodes(self, density=0.1, nodes=None, **kwargs):
         """
@@ -264,7 +248,7 @@ class LGCA_Cubic(LGCA_base):
             Sum of the content of `qty` in each node's neighborhood, shape: ``qty.shape``. Lattice positions can be
             indexed the same way as in ``self.nodes``.
         """
-        sum = np.zeros_like(qty)
+        sum = np.zeros(qty.shape)  # floats on every lattice, also for integers and booleans
         sum[:-1, :, :, ...] += qty[1:, :, :, ...]
         sum[1:, :, :, ...] += qty[:-1, :, :, ...]
         sum[:, :-1, :, ...] += qty[:, 1:, :, ...]

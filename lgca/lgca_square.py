@@ -12,7 +12,7 @@ Supported LGCA types:
 
 - classical LGCA (:py:class:`LGCA_Square`)
 - identity-based LGCA (:py:class:`IBLGCA_Square`)
-- classical LGCA without volume exclusion (:py:class:`NoVE_LGCA_Square`)
+- LGCA without volume exclusion and without identities (:py:class:`NoVE_LGCA_Square`)
 - identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_Square`)
 """
 
@@ -35,10 +35,7 @@ except ImportError:  # pragma: no cover - handled at runtime
     ) = Circle = FancyArrowPatch = cm = make_axes_locatable = _MissingPlotLib(
         "matplotlib"
     )
-import warnings
-from copy import copy
-
-from lgca.base import IBLGCA_base, LGCA_base, NoVE_IBLGCA_base, NoVE_LGCA_base
+from lgca.base import LGCA_base, normalize_dims
 
 from .square_plotting import SquarePlotMixin
 class LGCA_Square(SquarePlotMixin, LGCA_base):
@@ -112,23 +109,8 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
             self.dims = self.lx, self.ly
             return
 
-        # default
-        elif dims is None:
-            dims = (50, 50)
-
-        # set dimensions to keyword value
-        if isinstance(dims, tuple):
-            if len(dims) != 2:
-                raise ValueError(
-                    f"dims must be (lx, ly) for a 2D lattice, got {dims}; give rest channels with "
-                    "restchannels=..., and use geometry='cubic' for a 3D lattice"
-                )
-            self.lx, self.ly = dims
-        elif isinstance(dims, int):
-            self.lx, self.ly = dims, dims
-        else:
-            raise TypeError("Keyword 'dims' must be int or tuple!")
-        self.dims = self.lx, self.ly
+        self.dims = normalize_dims(dims, 2, default=(50, 50))
+        self.lx, self.ly = self.dims
         self.restchannels = restchannels
         self.K = self.velocitychannels + self.restchannels
 
@@ -450,7 +432,7 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
 
     def nb_sum(self, qty):
         """
-        For each node, sum up the contents of `qty` for the 4 nodes in the von Neumann neughborhood, excluding the
+        For each node, sum up the contents of `qty` for the 4 nearest neighbours of the node (its von Neumann neighbourhood), excluding the
         center.
 
         `qty` is assumed to contain the value of a calculated quantity for each node in the lattice. `nb_sum` calculates
@@ -486,7 +468,7 @@ class LGCA_Square(SquarePlotMixin, LGCA_base):
         nodes can only be done after the sum calculation in order to preserve boundary conditions.
 
         """
-        sum = np.zeros_like(qty)
+        sum = np.zeros(qty.shape)  # floats on every lattice, also for integers and booleans
         sum[:-1, ...] += qty[1:, ...]
         sum[1:, ...] += qty[:-1, ...]
         sum[:, :-1, ...] += qty[:, 1:, ...]

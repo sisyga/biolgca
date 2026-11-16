@@ -181,7 +181,7 @@ def sweep(spec, grid: Mapping[str, Sequence] | Sequence[Mapping[str, Any]] | Non
         A column per varied value (named by its last name, e.g. ``beta``, or by the shortest end of
         its path that tells it from the others, e.g. ``chemotaxis.beta``),
         ``seed`` and a column per measure; with ``long=True`` also ``step``. ``table.attrs`` holds
-        the BioLGCA version, the paths of the varied values and the provenance of the runs (see
+        the biolgca version, the paths of the varied values and the provenance of the runs (see
         Notes).
 
     Notes

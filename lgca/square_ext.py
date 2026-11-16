@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 
 import numpy as np
-from lgca.base import warn_user, plt
+from lgca.base import COUNT_DTYPE, normalize_dims, warn_user, plt
 from lgca.ib_base import IBLGCA_base
 from lgca.list_utils import get_arr_of_empty_lists
 from lgca.nove_base import NoVE_LGCA_base
@@ -82,11 +82,21 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
 
     def set_dims(self, dims=None, nodes=None, restchannels=None, capacity=None):
         """
-        Set the dimensions of the instance according to given values. Sets self.l, self.K, self.dims and self.restchannels
-        :param dims: desired lattice size (int or array-like)
-        :param nodes: existing lattice to use (ndarray)
-        :param restchannels: desired number of resting channels, will be capped to 1 if >1 because of no volume exclusion
-        :param capacity: reference value for density calculation. If number of cells = capacity, density = 1.0
+        Set the lattice dimensions.
+
+        Sets :py:attr:`self.lx`, :py:attr:`self.ly`, :py:attr:`self.K`, :py:attr:`self.dims`, :py:attr:`self.restchannels` and
+        :py:attr:`self.capacity`.
+
+        Parameters
+        ----------
+        dims : int or sequence of int, optional
+            Lattice size.
+        nodes : :py:class:`numpy.ndarray`, optional
+            Initial lattice configuration; its shape then sets the dimensions.
+        restchannels : int, optional
+            Number of rest channels; every one is a channel of the state.
+        capacity : int, optional
+            Number of cells per node at which growth stops. Default: one cell per channel.
         """
         # set instance dimensions according to passed lattice
         if nodes is not None:
@@ -94,63 +104,19 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
                 self.lx, self.ly, self.K = nodes.shape
             except ValueError as e:
                 raise ValueError("Node shape does not match the 2D geometry! Shape must be (x,y,channels)") from e
-            # set number of rest channels to <= 1 because >1 cells are allowed per channel
-                # for now, raise Exception if format of nodes does no fit
-                # (To Do: just sum the cells in surplus rest channels in init_nodes and print a warning)
-            if self.K - self.velocitychannels > 1:
-                raise RuntimeError('Only one resting channel allowed, but {} resting channels specified!'.format(self.K - self.velocitychannels))
-            elif self.K < self.velocitychannels:
-                raise RuntimeError('Not enough channels specified for the chosen geometry! Required: {}, provided: {}'.format(
-                    self.velocitychannels, self.K))
-            else:
-                self.restchannels = self.K - self.velocitychannels
         # set instance dimensions according to required dimensions
-        elif dims is not None:
-            if isinstance(dims, tuple):
-                if len(dims) == 2:
-                    self.lx, self.ly = dims
-                elif len(dims) > 2:
-                    self.lx, self.ly = dims[0], dims[1]
-                    warn_user("Dimensions provided with too many values! " + str(dims))
-                else:
-                    self.lx, self.ly = dims[0], dims[0]
-                    warn_user("Dimensions provided as tuple " + str(dims) + ", but only one value for 2D lattice!")
-            elif isinstance(dims, int):
-                self.lx, self.ly = dims, dims
-            else:
-                self.lx, self.ly = (50, 50)
-                warn_user("Dimensions provided in wrong format, must be tuple of 2 elements or integer. Dimensions set to default 50x50.")
-        # set default for dimension
         else:
-            self.lx, self.ly = (50, 50)
-            logger.info("Dimensions set to default 50x50.")
+            self.lx, self.ly = normalize_dims(dims, 2, default=(50, 50))
         self.dims = self.lx, self.ly
-
-        # set number of rest channels to <= 1 because >1 cells are allowed per channel
-        if nodes is None and restchannels is not None:
-            if restchannels > 1:
-                self.restchannels = 1
-            elif 0 <= restchannels <= 1:
-                self.restchannels = restchannels
-        elif nodes is None:
-            self.restchannels = 0
-        self.K = self.velocitychannels + self.restchannels
-
-        # set capacity according to keyword or specified resting channels
-        if capacity is not None:
-            self.capacity = capacity
-        elif restchannels is not None and restchannels > 1:
-            self.capacity = self.velocitychannels + restchannels
-        else:
-            self.capacity = self.K
+        self._set_channels(restchannels, capacity, from_nodes=nodes is not None)
 
     def init_nodes(self, density=4, nodes=None):
-        self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
+        self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=COUNT_DTYPE)
         if nodes is None:
             self.random_reset(density)
         else:
             self._warn_nodes_shape(nodes)
-            self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(np.uint)
+            self.nodes[self.r_int:-self.r_int, self.r_int:-self.r_int, :] = nodes.astype(COUNT_DTYPE)
             self.apply_boundaries()
 
     def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
@@ -239,8 +205,6 @@ class NoVE_LGCA_Square(LGCA_Square, NoVE_LGCA_base):
     def plot_config(self, nodes=None, figsize=None, grid=False, ec='none', rel_arrowlen=0.6, cmap='viridis', cbar=True,
                     cbarlabel='Particle number $n$', vmax=None, **kwargs):
         r_circle = self.r_poly * 0.25
-        # bbox_props = dict(boxstyle="Circle,pad=0.3", fc="white", ec="k", lw=1.5)
-        bbox_props = None
         if nodes is None:
             nodes = self.nodes[self.nonborder]
         nodes = self._channel_counts(nodes)

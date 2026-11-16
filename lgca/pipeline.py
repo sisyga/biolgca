@@ -480,6 +480,9 @@ def compile_pipeline(spec: InteractionPipelineSpec | None, context) -> CompiledP
         raise ValueError("dynamics.propagation must be a boolean, null, 'default', 'none', or 'disabled'")
     if spec.field_updates not in _FIELD_UPDATES:
         raise ValueError(f"dynamics.field_updates must be 'simultaneous' or 'sequential', got {spec.field_updates!r}")
+    if isinstance(spec.operators, (str, bytes, Mapping)):  # iterable, but not as operators
+        raise TypeError("dynamics.operators must be a list of operators, got "
+                        f"{spec.operators!r}; write operators=[{_as_entry(spec.operators)}]")
     operators = []
     memo = _template_memo(context)  # one for all entries: operator objects that refer to each other still do
     for index, operator_spec in enumerate(spec.operators):
@@ -517,13 +520,22 @@ def _compile_operator(spec, memo=None) -> InteractionOperator:
         return create_plugin(spec.name, spec.parameters)
     if isinstance(spec, Mapping):
         if "name" not in spec:
-            raise ValueError("requires a 'name'")
+            raise ValueError(f"requires a 'name', got {dict(spec)!r}")
         return create_plugin(spec["name"], spec.get("parameters"))
     name = getattr(spec, "name", None)
     parameters = getattr(spec, "parameters", None)
     if name is None:
-        raise ValueError("requires a 'name'")
+        raise ValueError(f"requires a 'name': write {_as_entry(spec)}, got {spec!r}")
     return create_plugin(name, parameters)
+
+
+def _as_entry(value) -> str:
+    """How an operator is written in ``operators``, for a value given in its place."""
+    if isinstance(value, str):  # the name alone
+        return repr({"name": value})
+    if isinstance(value, Mapping) and "name" in value:  # one entry in place of the list
+        return repr(dict(value))
+    return "{'name': 'random_walk', 'parameters': {...}}"
 
 
 def _template_copy(operator: InteractionOperator, memo=None) -> InteractionOperator:
@@ -696,7 +708,7 @@ def _reject_single_species_phenotype_switch(operators: Sequence[InteractionOpera
         if operator.operator_kind == "phenotype_switch":
             raise ValueError(
                 f"dynamics.operators[{index}] {operator.name!r} is a phenotype switch, which "
-                "moves cells between species; this classical model has one species. Set "
+                "moves cells between species; this model has one species. Set "
                 "state.n_species to the number of phenotypes, or use an identity-based model "
                 "to change individual cell parameters."
             )

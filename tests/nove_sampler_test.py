@@ -55,12 +55,15 @@ def test_native_nove_samplers_accept_all_count_sources(operator, source, tmp_pat
 
 @pytest.mark.parametrize("operator", [{"name": "random_walk"}, {"name": "polar_alignment"},
                                       {"name": "polar_alignment", "parameters": {"normalize": True}}])
-@pytest.mark.parametrize("counts", [[2**63, 0], [2**63 - 1, 1], [2**64 - 1, 1]])
-def test_nove_sampler_rejects_unrepresentable_totals(operator, counts):
+@pytest.mark.parametrize("counts, message", [
+    ([2**63 - 1, 1], "sampler.*signed int64"),  # the cells of the node
+    ([2**63, 0], "nodes counts exceed the representable range"),  # the cells of a channel: no state
+    ([2**64 - 1, 1], "nodes counts exceed the representable range")])
+def test_nove_sampler_rejects_unrepresentable_totals(operator, counts, message):
     spec = ModelSpec(
         space=SpaceSpec(geometry="lin", dims=1),
         state=StateSpec(volume_exclusion=False, nodes=np.array([counts], dtype=np.uint64)),
         dynamics=InteractionPipelineSpec(operators=[operator], propagation=False),
     )
-    with pytest.raises(ValueError, match="sampler.*signed int64"):
+    with pytest.raises(ValueError, match=message):
         build_model(spec)

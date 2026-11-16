@@ -16,7 +16,6 @@ from copy import copy, deepcopy
 import numpy as np
 from .plot_data import history_steps
 from numpy import random as npr
-from tqdm.auto import tqdm
 
 from .base import (
     warn_user,
@@ -24,10 +23,13 @@ from .base import (
     LGCA_base,
     _validate_density,
     _validate_nonnegative_int,
-    _validate_positive,
     _validate_positive_int,
 )
 from .plots import muller_plot
+
+_NO_FAMILIES = ("Family properties are not recorded by the LGCA, choose suitable interaction: families are "
+                "founded by birth_death(..., new_family=True), by cells.found_families(...) in a rule of your "
+                "own, and by the get_lgca interactions with mutations or track_inheritance=True.")
 
 logger = logging.getLogger(__name__)
 
@@ -248,9 +250,50 @@ class IBLGCA_base(LGCA_base, ABC):
             ``density = total_number_of_particles / number_of_nodes``.
         """
         _validate_density(density, max_density=self.K)
+        self._check_cells_replaceable()
         occupied = self.rng.random(self.dims + (self.K,)) < (density / self.K)
         self.nodes[self.nonborder] = self.convert_bool_to_ib(occupied)
         self.apply_boundaries()
+        self.calc_max_label()
+        self._cells_replaced()
+
+    def calc_max_label(self):
+        """Set :py:attr:`self.maxlabel` to the largest label on the lattice (0 if it is empty)."""
+        self.maxlabel = int(self.nodes.max()) if self.nodes.size else 0
+
+    def _legacy_traits(self):
+        """Whether the traits of the cells are those of a get_lgca interaction, which can set them again."""
+        from .legacy_names import LegacyInteraction
+
+        interaction = getattr(self, "interaction", None)
+        return (isinstance(interaction, LegacyInteraction)
+                and interaction._compiled is self.__dict__.get("_compiled_model"))
+
+    def _check_cells_replaceable(self):
+        """Refuse to replace the cells of a model whose traits cannot be set again, before anything changes."""
+        if (getattr(self, "props", None) and not self._legacy_traits()
+                and self.__dict__.get("_compiled_model") is not None):
+            raise ValueError("random_reset replaces all cells, but the traits and families of this model "
+                             "were set for its cells when it was built; build a new model with the "
+                             "density you want, StateSpec(density=...)")
+
+    def _cells_replaced(self):
+        """The lattice holds a new population: give it the traits and families of a new model.
+
+        The traits and families of a model belong to its cells. A model built with
+        :func:`lgca.get_lgca` sets its interaction again, which gives the new cells the initial
+        traits and families of the interaction. A model built from a
+        :class:`~lgca.model.ModelSpec` took them from the spec when it was built, so it is built
+        again instead.
+        """
+        self.update_dynamic_fields()
+        if not getattr(self, "props", None):  # under construction, or cells without traits
+            return
+        if self._legacy_traits():
+            self.props = {}
+            for name in ("family_props", "maxfamily"):
+                self.__dict__.pop(name, None)
+            self.set_interaction(interaction=self.interaction.__name__, **self.interaction_params)
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, showprogress=True,
                 recordfampop=False):
@@ -414,9 +457,10 @@ class IBLGCA_base(LGCA_base, ABC):
 
     def plot_prop_timecourse(self, nodes_t=None, props=None, propname=None, figindex=None, figsize=None, **kwargs):
         """
-        Plot the time course of the mean and standard deviation of particle property `propname` across the lattice.
+        Plot the time course of the mean of the particle property `propname` across the lattice.
 
-        The mean is plotted as a line with the standard deviation shadowed in both directions.
+        The mean is plotted as a line with a band of one standard error of the mean (standard deviation /
+        sqrt(number of cells)) on both sides.
 
         Parameters
         ----------
@@ -442,7 +486,7 @@ class IBLGCA_base(LGCA_base, ABC):
         line : :py:class:`matplotlib.lines.Line2D`
             Plot of the mean property over time.
         errors : :py:class:`matplotlib.collections.PolyCollection`
-            Polygons representing the standard deviation of the property over time, in both directions.
+            Polygons of the standard error of the mean over time, in both directions.
 
         """
         # set lattice configuration over time
@@ -451,7 +495,7 @@ class IBLGCA_base(LGCA_base, ABC):
         if nodes_t is None:
             nodes_t = self.nodes_t
 
-        # get particle property values and calculate mean and standard deviation
+        # get particle property values and calculate their mean and its standard error
         prop = self.get_prop(nodes=nodes_t, props=props, propname=propname)
         occupied = nodes_t.astype(bool)
         mask = 1 - occupied
@@ -512,17 +556,18 @@ class IBLGCA_base(LGCA_base, ABC):
             # all cells belong to the same family
             families = [0] + [1] * self.maxlabel
             self.props.update(family=families)
+            self.maxfamily = 1
             if mutation:
                 self.family_props = {}  # properties of families
                 # family 1 is the semantic root of the tree, family 0 is the root for implementation purposes
                 self.family_props.update(ancestor=[0, 0])
                 self.family_props.update(descendants=[[1], []])
-                self.maxfamily = 1
         # each cell in the beginning of the simulation represents an own family with own properties
         elif type == 'heterogeneous':
             # each initial cell founds its own family
             families = list(np.arange(self.maxlabel+1))
             self.props.update(family=families)
+            self.maxfamily = self.maxlabel
             if mutation:
                 self.family_props = {}  # properties of families
                 # family 0 is the root for implementation purposes, all initial families descend from it
@@ -531,7 +576,6 @@ class IBLGCA_base(LGCA_base, ABC):
                 # create lists for each family's future descendants
                 for i in range(self.maxlabel):
                     self.family_props['descendants'].append([])
-                self.maxfamily = self.maxlabel
 
     def calc_family_pop_alive(self):
         """
@@ -544,7 +588,7 @@ class IBLGCA_base(LGCA_base, ABC):
 
         """
         if 'family' not in self.props:
-            raise RuntimeError("Family properties are not recorded by the LGCA, choose suitable interaction.")
+            raise RuntimeError(_NO_FAMILIES)
 
         cells_alive = self.nodes[self.nonborder][
             np.where(self.nodes[self.nonborder] > 0)]  # indices of live cells # nonborder needed for uniqueness
@@ -639,6 +683,7 @@ class IBLGCA_base(LGCA_base, ABC):
         """
         # prepare content arguments for plot function from LGCA data
         root_ID = 0
+        self._tracks_family_tree()
         parent_list = self.family_props['ancestor']
         children_nlist = self.family_props['descendants']
         # slice and adjust time axis
@@ -716,7 +761,19 @@ class IBLGCA_base(LGCA_base, ABC):
             Number of families.
 
         """
+        self._tracks_family_tree()
         return len(self.family_props['ancestor'])-1  # subtract placeholder 0 family
+
+    def _tracks_family_tree(self):
+        """Raise an error that says how to record families if the model has no family tree."""
+        if hasattr(self, 'family_props'):
+            return True
+        if 'family' in getattr(self, 'props', {}):
+            raise RuntimeError("This model records the family of every cell, but not which family descends from "
+                               "which (init_families(mutation=False)), so it has no family tree. Found families "
+                               "in the rule instead: birth_death(..., new_family=True), or "
+                               "cells.found_families(...) in a rule of your own.")
+        raise RuntimeError(_NO_FAMILIES)
 
     def num_families_total_t(self, cutoff_abs=None, cutoff_rel=None):
         """
@@ -866,6 +923,8 @@ class IBLGCA_base(LGCA_base, ABC):
             Array of family IDs in ascending order.
 
         """
+        if 'family' not in self.props:
+            raise RuntimeError(_NO_FAMILIES)
         cells_alive = self.nodes[self.nonborder][
             np.where(self.nodes[self.nonborder] > 0)]  # indices of live cells # nonborder needed for uniqueness
         cell_fam = np.array(self.props['family'])  # convert for indexing
@@ -884,35 +943,17 @@ class IBLGCA_base(LGCA_base, ABC):
             simulation = generation 1.
 
         """
-        # check if it has been calculated and is up to date
-        num_families = self.num_families_total()
-        if 'generation' in self.family_props:
-            if len(self.family_props['generation']) == num_families:
-                return self.family_props['generation']
-        # if not, initialise the property and fill it
-        self.family_props['generation'] = list(np.zeros(num_families+1))
-        self._recurse_generation(0, 0)
-        return self.family_props['generation']
-
-    def _recurse_generation(self, fam_ID, gen):
-        """
-        Utility for calculating the generation of each family. Recursively updates the entries in
-        :py:attr:`self.family_props['generation']`.
-
-        Parameters
-        ----------
-        fam_ID : int
-            Family ID to access properties in :py:attr:`self.family_props`.
-        gen : int
-            This family's generation.
-
-        """
-        # update generation for this family
-        self.family_props['generation'][fam_ID] = gen
-        # update children generations with increased counter
-        gen += 1
-        for desc in self.family_props['descendants'][fam_ID]:
-            self._recurse_generation(desc, gen)
+        # one entry per family and the helper root family; a list of another length is out of date
+        self._tracks_family_tree()
+        ancestor = self.family_props['ancestor']
+        generation = self.family_props.get('generation')
+        if generation is None or len(generation) != len(ancestor):
+            # a family is founded after its ancestor, so its ancestor's generation is known when its turn comes
+            generation = [0] * len(ancestor)
+            for fam_ID in range(1, len(ancestor)):
+                generation[fam_ID] = generation[ancestor[fam_ID]] + 1
+            self.family_props['generation'] = generation
+        return generation
 
     def calc_generation_pop(self):
         """
@@ -995,11 +1036,10 @@ class IBLGCA_base(LGCA_base, ABC):
         """
         # check if it has been calculated and is up to date
         num_families = self.num_families_total()
-        if 'init_ancestor' in self.family_props:
-            if len(self.family_props['init_ancestor']) == num_families:
-                return self.family_props['init_ancestor']
+        if len(self.family_props.get('init_ancestor', ())) == num_families + 1:  # with the helper root family
+            return self.family_props['init_ancestor']
         # if not, initialise the property and fill it
-        self.family_props['init_ancestor'] = list(np.zeros(num_families + 1))
+        self.family_props['init_ancestor'] = [0] * (num_families + 1)
         # check each family's ancestor, going up the tree from the root
         for fam_ID, ancestor in enumerate(self.family_props['ancestor']):
             if fam_ID == 0:

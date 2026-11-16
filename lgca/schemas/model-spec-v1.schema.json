@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://sisyga.github.io/biolgca/schemas/model-spec-v1.schema.json",
-  "title": "BioLGCA ModelSpec v1",
+  "title": "biolgca ModelSpec v1",
   "type": "object",
   "required": ["schema_version", "model"],
   "additionalProperties": false,

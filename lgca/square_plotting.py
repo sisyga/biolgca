@@ -9,7 +9,6 @@ Provides helper functions for visualizing square LGCA simulations.
 
 
 import numpy as np
-import warnings
 
 try:
     import matplotlib.animation as animation
@@ -38,7 +37,7 @@ from .plot_data import (
     select_density_history,
     select_scalar_field,
 )
-from .plots import (_nice_steps, colorbar_axes, estimate_figsize, freeze_layout, get_cmap, lattice_axes,
+from .plots import (_nice_steps, colorbar_axes, estimate_figsize, freeze_layout, lattice_axes,
                     make_animation)
 
 __all__ = ["SquarePlotMixin"]

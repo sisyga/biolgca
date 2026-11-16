@@ -3,13 +3,124 @@
 This file records notable user-facing changes. Changes remain under
 `Unreleased` until a release version and date are selected.
 
-## Unreleased
+## 2.1.0 (2026-11-16)
 
-Nothing yet.
+Fixes for the findings of a code review of 2.0.0. Some change the behaviour of
+models without volume exclusion and of models with several species; see
+"Changed".
+
+### Changed
+
+- Models without volume exclusion have the rest channels they are given on
+  every lattice. In 1D and on the square and hexagonal lattices,
+  `restchannels=3` gave one rest channel and a capacity raised by two, and
+  `nodes` with several rest channels were refused; now every rest channel is
+  a channel of the state, as on the 3D lattices. Runs with `restchannels > 1`
+  on these lattices have more channels than before (the same default
+  capacity). Identity-based models without volume exclusion keep their one
+  rest channel.
+- `nodes` of models without volume exclusion are `int64` however the model
+  was filled (`lgca.base.COUNT_DTYPE`). Nodes given by the caller were
+  `uint64`, random ones `int64`; differences of unsigned counts wrap around.
+  A channel holds at most 2**63 - 1 cells.
+- The recordings on a model (`lgca.nodes_t`, `lgca.dens_t`, ...) are those of
+  its last run. A run that did not record the nodes left the `nodes_t` of the
+  run before next to its own `dens_t`. Keep the arrays of an earlier run in
+  variables of your own.
+- `dims` is read in one way by every lattice class and by `ModelSpec`: one
+  integer of any numeric type (also a NumPy integer or `6.0`) for every axis,
+  or one length per axis in any sequence. Without volume exclusion, a NumPy
+  integer gave a 50 x 50 lattice with a warning. 1D lattices no longer ignore
+  further entries of `dims`, and 3D lattices without volume exclusion default
+  to 10 x 10 x 10 like the others (was 50 x 50 x 50).
+- With `nodes`, the capacity of a model without volume exclusion defaults to
+  the number of channels of the nodes; on 3D lattices it was that of the
+  `restchannels` argument, below the channels of nodes with more rest
+  channels. `restchannels` beyond those of the nodes still add to it.
+- `ChannelDensityRecorder` records every model without volume exclusion
+  (models with one species and no identities had no `channel_pop`).
+- `get_lgca` reads `nodes` given as nested lists.
+- The capacity of a model defaults to its number of channels, whatever the
+  number of species. With volume exclusion and several species it was the
+  number of species times the channels, so a density cue or a crowding
+  threshold now divides by `K` instead of `n_species * K` unless
+  `capacity` is given; such a node holds up to `n_species * K` cells, so the
+  relative density can exceed 1. Set `StateSpec(capacity=...)` to keep the
+  old denominator.
+- `nb_sum` returns floats on every lattice. Square and 3D lattices kept the
+  type of the values: sums of booleans stayed booleans and small unsigned
+  integers wrapped around.
+- A parameter that belongs to another legacy interaction warns
+  ("parameter `r_b` defined but unused") instead of being stored in silence;
+  unknown parameters are refused as before.
+- The class of the 3D Moore lattice with volume exclusion is `LGCA_Moore`,
+  like `IBLGCA_Moore` and `NoVE_LGCA_Moore`; `LGCA_3dMoore` stays as an
+  alias.
+- `plot_prop_spatial` of 1D identity-based models takes the same arguments
+  with and without volume exclusion (`cbar`, `cbarlabel`, `figkwargs=None`).
+- `lgca.__version__` gives the installed version, and `from lgca import *`
+  imports the public names only (`lgca.__all__`).
+- The documentation calls a model classical only if it has volume exclusion
+  and no identities (a boolean state); models that count cells without volume
+  exclusion are "without identities".
+- CI checks the package for unused imports and undefined names
+  (`ruff check lgca --select F`); the unused imports are removed.
+- Documentation: the installation page names PyPI and the front page the
+  Zenodo DOI; the table of `get_lgca` interaction names per model family is
+  read from the package when the docs are built
+  (`lgca.legacy_names.legacy_names_table`); ghost nodes come in `r_int`
+  layers; the `inflow` boundary is documented as existing on square and
+  hexagonal lattices only; `plot_prop_timecourse` documents its band as the
+  standard error of the mean, which it is; the boundary aliases `fixed`,
+  `no_flux` and `noflux` are listed; leftover placeholder notes are removed.
+- The package is written "biolgca" throughout the README, the documentation
+  and the messages (BIO-LGCA remains the name of the modelling class).
+
+### Fixed
+
+- Identity-based models with volume exclusion gave daughters the labels of
+  living cells after the `region` initializer, and `random_reset` kept the
+  traits of the cells it replaced: the labels are counted again, and
+  `random_reset` sets the traits and families of a new model (a model built
+  from a `ModelSpec` with traits asks for a new model instead, before
+  anything changes).
+- `set_r_int` on an identity-based model without volume exclusion kept the
+  lookup tables of the old lattice and failed at the next step.
+- `lgca.capacity` and `print(lgca)` of an identity-based model without volume
+  exclusion reported the number of channels while growth used the default
+  capacity of the interaction (8); `set_interaction(capacity=...)` was
+  ignored, and a capacity given at construction was replaced by the default
+  of the next interaction.
+- `calc_family_generations` raised `RecursionError` for lineages of about a
+  thousand generations; it and `propagate_ancestor_to_descendants` rebuilt
+  their tables on every call. Families without ancestry
+  (`track_inheritance=True`) had no `maxfamily`, so `calc_family_pop_alive`
+  and `recordfampop` failed.
+- `calc_mean_alignment` and `OrderParameterRecorder` raised a `ValueError`
+  for models without volume exclusion and several species; the flux of a node
+  is that of the cells of all its species.
+- 3D models with several species refused `nodes` with several rest channels,
+  and identity-based 3D models without volume exclusion ended in an
+  `AttributeError` for `nodes` given as cell counts.
+- Errors that named neither the value nor what to do: integers and the
+  density of a `ModelSpec` (`restchannels=None`, `steps=inf`), sections of
+  another type (a list of operators as `dynamics`), operators and observers
+  that are not objects or entries, `OrderParameterRecorder` and
+  `ChannelDensityRecorder` on models with volume exclusion, the family
+  analyses (`calc_family_generations`, `muller_plot`, ...) of models without
+  families, and `n_species` and `capacity` of `get_lgca`.
+- `lgca.interactions` and the error for an unknown interaction listed names
+  the model cannot use: those of the other number of dimensions and, for
+  several species, those written for the other volume exclusion.
+- `calc_normalized_entropy` of a model without volume exclusion on one node
+  divided by zero (`nan` and a warning); it returns 1.
+- Identity-based models without volume exclusion had empty ghost nodes until
+  the first step, so interactions of the first step saw no neighbours across
+  a periodic boundary.
 
 ## 2.0.0 (2026-11-04)
 
-Version 2.0 rebuilds BioLGCA around model specifications (`ModelSpec`) and
+Version 2.0 rebuilds biolgca around model specifications (`ModelSpec`) and
 rules written as functions of the lattice state. Scripts written for 1.0 with
 `get_lgca` and `timeevo` still run, but their interactions now run the new
 rules: the dynamics agree in distribution, but seeded runs give different

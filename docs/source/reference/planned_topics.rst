@@ -1,13 +1,13 @@
 Known limitations
 =================
 
-What BioLGCA does not do yet, and what is planned.
+What biolgca does not do yet, and what is planned.
 
 Restarting identity-based models
 --------------------------------
 
 A run of an identity-based model cannot yet be restarted from saved data:
-the ``from_npz`` initializer reads classical states only, because the labels
+the ``from_npz`` initializer reads states without identities only, because the labels
 of the cells and their traits would have to be restored together. Rerun such
 a model from its model specification and seed instead: the same seed gives the
 same run.
@@ -24,9 +24,10 @@ cells of one species only, pass an explicit ``nodes`` array.
 Boundary conditions
 -------------------
 
-Periodic, reflecting and absorbing boundaries are tested on every lattice. A
-table of which boundaries every geometry and model family supports, inflow
-included, is still to be written.
+Periodic, reflecting and absorbing boundaries work on every lattice and in
+every model family. The ``inflow`` boundary, where cells enter at the left
+edge, exists on square and hexagonal lattices only; 1D and 3D lattices raise
+``NotImplementedError``.
 
 Plots
 -----
@@ -34,7 +35,8 @@ Plots
 :doc:`/how_to/observers_and_plotting` describes the plots and animations.
 Still missing: a choice between absolute and relative colour scales in all
 plots, plots of the traits and families of identity-based models beyond the
-Muller plot, and a style for publication figures.
+Muller plot, and a style for publication figures in 1D and 2D (the 3D plots
+and movies share one, :mod:`lgca.mayavi_style`).
 
 Parameter studies and the explorer
 ----------------------------------
@@ -46,7 +48,7 @@ window of plots at a time.
 Analysing evolution
 -------------------
 
-BioLGCA records the population size of each family and its ancestry. It has
+biolgca records the population size of each family and its ancestry. It has
 no functions yet for diversity indices or the entropy of a population, and no
 recorder of the trait distribution over time. Until then, record the nodes and
 read the traits of the cells (see :doc:`/how_to/observers_and_plotting`).

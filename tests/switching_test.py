@@ -49,7 +49,7 @@ def test_species_switch_responds_to_the_density(ve):
     nodes[..., 0, :] = rng.random(DIMS + (5,)) < 0.5 if ve else rng.poisson(1.2, DIMS + (5,))
     model = _classical(ve, [{"name": "phenotype_switch", "parameters": {"rates": [[0, DENSITY_CUE], [0, 0]]}}],
                        nodes)
-    capacity = 5 * 2 if ve else 10  # the capacity of the lattice state: n_species * K with volume exclusion
+    capacity = 5 if ve else 10  # the capacity of the lattice state: K with volume exclusion, for any species
     cells = nodes[..., 0, :].sum(-1)
     model.step()
     switched = model.lgca.nodes[model.lgca.nonborder][..., 1, :].sum(-1)
@@ -194,7 +194,7 @@ def test_boltzmann_rows_choose_between_several_switches(ve):
     to_2 = {"rate": 1.5, "cues": [{"name": "density", "beta": -4.0}]}
     model = _classical(ve, [{"name": "phenotype_switch", "parameters": {"rates": [[0, to_1, to_2], [0, 0, 0],
                                                                                   [0, 0, 0]]}}], nodes)
-    capacity = 5 * 3 if ve else 10
+    capacity = 5 if ve else 10
     cells = nodes[..., 0, :].sum(-1)
     model.step()
     after = model.lgca.nodes[model.lgca.nonborder]
@@ -346,7 +346,7 @@ def test_species_switch_in_the_hill_form(ve):
     nodes[..., 0, :] = rng.random(DIMS + (5,)) < 0.5 if ve else rng.poisson(1.2, DIMS + (5,))
     rate = {"max": 0.8, "hill": [{"name": "density", "K": 0.3, "n": 2}]}
     model = _classical(ve, [{"name": "phenotype_switch", "parameters": {"rates": [[0, rate], [0, 0]]}}], nodes)
-    capacity = 5 * 2 if ve else 10
+    capacity = 5 if ve else 10
     cells = nodes[..., 0, :].sum(-1)
     model.step()
     switched = model.lgca.nodes[model.lgca.nonborder][..., 1, :].sum(-1)

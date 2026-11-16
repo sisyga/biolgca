@@ -4,7 +4,7 @@ Getting started
 Installation
 ------------
 
-BioLGCA uses `uv <https://docs.astral.sh/uv/>`_ to manage Python and all
+biolgca uses `uv <https://docs.astral.sh/uv/>`_ to manage Python and all
 dependencies. The repository contains a lock file, ``uv.lock``, that pins every
 package version, so everyone who runs ``uv sync`` works in the same environment
 as the test suite.
@@ -19,7 +19,7 @@ then clone the repository and create the environment:
    uv sync
 
 ``uv sync`` creates ``.venv/`` with the Python version named in
-``.python-version`` and installs BioLGCA in editable mode. If your uv does not
+``.python-version`` and installs biolgca in editable mode. If your uv does not
 download Python automatically (some Linux distribution packages do not), run
 ``uv python install`` first.
 
@@ -41,10 +41,12 @@ reproducible student project and coupled cell–field models. Run your own scrip
 the same way, for example ``uv run python my_simulation.py``, or activate
 ``.venv`` as usual.
 
-Without uv, BioLGCA installs into any Python 3.11+ environment: from a clone
-with ``python -m pip install -e ".[notebooks]"``, or straight from GitHub with
-``python -m pip install "biolgca @ git+https://github.com/sisyga/biolgca"``
-(BioLGCA is not on PyPI yet). pip then resolves the newest compatible package
+Without uv, biolgca installs into any Python 3.11+ environment: from PyPI
+with ``python -m pip install "biolgca[notebooks]"``, from a clone with
+``python -m pip install -e ".[notebooks]"``, or the newest development
+version from GitHub with
+``python -m pip install "biolgca @ git+https://github.com/sisyga/biolgca@develop"``.
+pip then resolves the newest compatible package
 versions instead of the locked ones. Leave out ``[notebooks]`` where
 JupyterLab is not needed, for example in Colab, on a cluster or in an editor
 that runs notebooks itself. To check that the installation works, run
@@ -54,7 +56,7 @@ Your first model
 ----------------
 
 :func:`lgca.get_lgca` builds one of the standard models that come with
-BioLGCA from a few choices: the lattice, the initial density of cells, the
+biolgca from a few choices: the lattice, the initial density of cells, the
 interaction and the seed. ``timeevo`` runs it, and ``lgca.data`` holds what
 it recorded:
 
@@ -78,8 +80,8 @@ Reading the state after a run
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``lgca.nodes`` (the channels of every node) and ``lgca.cell_density`` include
-one layer of *ghost nodes* around the lattice, which implement the boundary
-conditions: ``lgca.nodes.shape`` is ``(22, 22, 4)`` for ``dims=(20, 20)``.
+*ghost nodes* around the lattice, which implement the boundary conditions:
+``r_int`` layers, the interaction radius, which is one by default. So ``lgca.nodes.shape`` is ``(22, 22, 4)`` for ``dims=(20, 20)``.
 With periodic boundaries the ghosts hold copies of the cells at the opposite
 edge, so a sum over the whole array counts those cells twice. Index the
 interior with ``lgca.nonborder``:

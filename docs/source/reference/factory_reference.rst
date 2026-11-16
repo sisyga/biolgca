@@ -25,7 +25,7 @@ simulator class from four main switches:
 
 ``n_species``
    Number of species. Values greater than one select the multi-species class
-   family. Multi-species classes are currently classical, not identity-based.
+   family. Multi-species classes have no identities.
    They accept every interaction name whose rules work with several species,
    e.g. ``random_walk`` (the default), ``alignment``, ``birthdeath`` or
    ``excitable_medium_ms``; unknown names raise ``ValueError`` at
@@ -43,19 +43,19 @@ Model class matrix
      - Hexagonal
      - Cubic
      - Moore
-   * - Classical, volume exclusion
+   * - Classical (volume exclusion, no identities)
      - ``LGCA_1D``
      - ``LGCA_Square``
      - ``LGCA_Hex``
      - ``LGCA_Cubic``
-     - ``LGCA_3dMoore``
+     - ``LGCA_Moore``
    * - Identity-based, volume exclusion
      - ``IBLGCA_1D``
      - ``IBLGCA_Square``
      - ``IBLGCA_Hex``
      - ``IBLGCA_Cubic``
      - ``IBLGCA_Moore``
-   * - Classical, no volume exclusion
+   * - No identities, no volume exclusion
      - ``NoVE_LGCA_1D``
      - ``NoVE_LGCA_Square``
      - ``NoVE_LGCA_Hex``
@@ -142,10 +142,3 @@ afterwards, so the function may act on the whole ``lgca.nodes`` array:
 
 Keyword arguments are not checked for typos when ``interaction`` is a
 function, because the factory cannot know which parameters the function reads.
-
-Placeholders
-------------
-
-Detailed shape diagrams for custom ``nodes`` arrays and boundary-condition
-tables are still missing. The current authoritative reference is the class API
-documentation and the geometry-specific ``set_dims`` implementations.

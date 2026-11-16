@@ -73,7 +73,7 @@ or, if two share one, by the shortest end of the path that tells them apart
 (``chemotaxis.beta``); then ``seed`` and a column per measure. The rows are in
 the order of the grid, with the seeds innermost, and every run uses exactly the
 seed in its row, so a sweep can be repeated and extended. ``table.attrs`` holds
-the full paths and the BioLGCA version. ``grid`` may also be a list of
+the full paths and the biolgca version. ``grid`` may also be a list of
 combinations, e.g. ``[{"kappa": 2, "r_b": 0.1}, {"kappa": 4, "r_b": 0.3}]``.
 
 A measure is a function of the run's :class:`~lgca.model.ModelRunResult` that

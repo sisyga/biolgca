@@ -73,8 +73,8 @@ def interaction(
         Model families the rule is written for: ``"classical"`` (with volume
         exclusion, at most one cell per channel and species), ``"nove"``
         (without volume exclusion), and the identity-based families ``"ib"``
-        and ``"nove_ib"``, whose cells carry labels. Classical rules work for
-        any number of species. A model of another family is rejected when the
+        and ``"nove_ib"``, whose cells carry labels. Rules for ``"classical"``
+        and ``"nove"`` work for any number of species. A model of another family is rejected when the
         model is built. In identity-based models, rules can read the state and
         use the operations that keep track of labels (so far
         :meth:`~lgca.lattice_state.LatticeState.shuffle_cells`).
@@ -238,8 +238,6 @@ class FunctionInteractionOperator(InteractionOperator):
         self._capacity = state.capacity  # None: the LatticeState default
         if state.capacity is not None:
             self.capacity = state.capacity
-        elif state.volume_exclusion:
-            self.capacity = state.n_species * lgca.K
         else:
             self.capacity = getattr(lgca, "capacity", lgca.K)
 

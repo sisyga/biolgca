@@ -17,7 +17,7 @@ Supported LGCA types:
 
 import logging
 from abc import ABC, abstractmethod
-from copy import copy, deepcopy
+from copy import deepcopy
 import difflib
 from math import comb
 
@@ -25,7 +25,7 @@ from math import comb
 class _MissingPlotLib:
     """Placeholder object for an optional plotting library."""
 
-    def __init__(self, name: str, install: str = "Reinstall BioLGCA with 'uv sync' or 'python -m pip install -e .'."):
+    def __init__(self, name: str, install: str = "Reinstall biolgca with 'uv sync' or 'python -m pip install -e .'."):
         self._name = name
         self._install = install
 
@@ -51,7 +51,6 @@ except ImportError:  # pragma: no cover - handled at runtime
     )
 from numpy import random as npr
 from itertools import combinations
-from tqdm.auto import tqdm
 
 from lgca.plots import muller_plot, colorbar_index, cmap_discretize, estimate_figsize, get_cmap
 
@@ -110,13 +109,67 @@ def _as_numeric_array(value, name):
     return arr
 
 
+_DIMS_SHAPE = {
+    1: "one length for a 1D lattice; use geometry='square' or 'hex' for a 2D lattice",
+    2: "(lx, ly) for a 2D lattice; give rest channels with restchannels=..., and use geometry='cubic' "
+       "for a 3D lattice",
+    3: "(lx, ly, lz) for a 3D lattice",
+}
+
+
+def normalize_dims(dims, ndim, default=None):
+    """The size of a lattice as a tuple of ``ndim`` positive Python integers.
+
+    Every lattice class and :class:`~lgca.model.ModelSpec` read ``dims`` through this function.
+
+    Parameters
+    ----------
+    dims : int or sequence of int or None
+        One integer, the length of every axis, or one integer per axis in a tuple, list or
+        array. NumPy integers and whole floats such as ``50.0`` count as integers.
+    ndim : int
+        Number of axes of the lattice.
+    default : sequence of int, optional
+        The size for ``dims=None``; without it ``None`` is returned.
+
+    Raises
+    ------
+    TypeError
+        If ``dims`` is not a number or a sequence of numbers.
+    ValueError
+        If the number of entries is not ``ndim``, or an entry is not a positive integer.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> normalize_dims(np.int64(6), 2), normalize_dims([6, 4.0], 2), normalize_dims(None, 1, default=(100,))
+    ((6, 6), (6, 4), (100,))
+    """
+    if dims is None:
+        return None if default is None else tuple(int(size) for size in default)
+    try:
+        sizes = np.asarray(dims)
+    except (TypeError, ValueError):
+        sizes = None
+    if (sizes is None or sizes.dtype.kind not in "iuf" or sizes.ndim > 1
+            or isinstance(dims, (bool, np.bool_))):
+        raise TypeError(f"dims must be an integer or a sequence of {ndim} integers, got {dims!r}")
+    if sizes.ndim == 0:
+        sizes = np.full(ndim, sizes)
+    elif len(sizes) != ndim:
+        raise ValueError(f"dims must be {_DIMS_SHAPE[ndim]}; got {dims!r}")
+    if not np.all(np.isfinite(sizes)) or np.any(sizes != np.floor(sizes)) or np.any(sizes < 1):
+        raise ValueError(f"dims must contain positive integers, got {dims!r}")
+    return tuple(int(size) for size in sizes)
+
+
 def _validate_positive_int(value, name):
     """Validate a positive integer parameter and return it as ``int``."""
     if isinstance(value, bool):
         raise ValueError(f"{name} must be a positive integer.")
     try:
         int_value = int(value)
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, OverflowError) as exc:
         raise ValueError(f"{name} must be a positive integer.") from exc
     if int_value != value or int_value < 1:
         raise ValueError(f"{name} must be a positive integer.")
@@ -129,7 +182,7 @@ def _validate_nonnegative_int(value, name):
         raise ValueError(f"{name} must be a non-negative integer.")
     try:
         int_value = int(value)
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, OverflowError) as exc:
         raise ValueError(f"{name} must be a non-negative integer.") from exc
     if int_value != value or int_value < 0:
         raise ValueError(f"{name} must be a non-negative integer.")
@@ -160,16 +213,24 @@ def _validate_positive(value, name):
     return value
 
 
+COUNT_DTYPE = np.dtype(np.int64)
+"""The type of ``nodes`` of models without volume exclusion (cells per channel), however they were filled.
+
+Signed, so that differences of counts are differences (unsigned ones wrap around, and mix with signed integers
+to floats), and the type the samplers and :func:`channel_sum` work in.
+"""
+
+
 def _validate_count_nodes(nodes):
-    """Validate numeric particle counts before conversion to unsigned state."""
+    """Validate numeric particle counts before conversion to the state (:data:`COUNT_DTYPE`)."""
     nodes = np.asarray(nodes)
     if (nodes.dtype.kind not in "biuf" or not np.all(np.isfinite(nodes))
             or np.any(nodes < 0) or np.any(nodes != np.floor(nodes))):
         raise ValueError("nodes must contain finite non-negative integer counts")
-    if nodes.dtype.kind == "f" and np.any(nodes >= 2 ** (np.dtype(np.uint).itemsize * 8)):
-        raise ValueError("nodes counts exceed the representable unsigned range")
-    if nodes.dtype.kind in "iu" and np.any(nodes > np.iinfo(np.uint).max):
-        raise ValueError("nodes counts exceed the representable unsigned range")
+    limit = np.iinfo(COUNT_DTYPE).max
+    if (nodes.dtype.kind == "f" and np.any(nodes >= 2.0 ** 63)
+            or nodes.dtype.kind in "iu" and np.any(nodes > limit)):
+        raise ValueError(f"nodes counts exceed the representable range: a channel holds at most {limit} cells")
     return nodes
 
 
@@ -273,7 +334,8 @@ class LGCA_base(ABC):
     Parameters
     ----------
     bc : {'absorbing', 'reflecting', 'periodic', 'inflow'}, default='periodic'
-        Boundary conditions. Not all bc are supported in all geometries (yet).
+        Boundary conditions; :py:meth:`set_bc` lists the aliases. ``'inflow'`` exists on square and hexagonal
+        lattices only.
 
         Aliases: absorbing: ``'absorb', 'abs', 'abc'``; reflecting: ``'reflect', 'refl', 'rbc'``;
         periodic: ``'pbc'``.
@@ -302,7 +364,7 @@ class LGCA_base(ABC):
     cij : :py:class:`numpy.ndarray`
         Nematic tensor. Element-wise multiplication of neighborhood vectors with themselves. Computed from the geometry.
         Dimensions:
-        ``(lgca.c.shape[1], lgca.c.shape[0], lgca.c.shape[0})``. First dimension: neighborhood vector, second and
+        ``(lgca.c.shape[1], lgca.c.shape[0], lgca.c.shape[0])``. First dimension: neighborhood vector, second and
         third dimension: combination of x and y components of the vector as
         ``[[cix*cix, cix*ciy], [ciy*cix, ciy*ciy]]``.
     concentration
@@ -639,8 +701,9 @@ class LGCA_base(ABC):
             raise ValueError(
                 f"channels must be at least the velocity channel count ({self.velocitychannels})."
             )
-        if hasattr(self, "capacity"):
-            _validate_positive(self.capacity, "capacity")
+        if not hasattr(self, "capacity"):  # volume exclusion: the channels of a node, for any number of species
+            self.capacity = self.K
+        _validate_positive(self.capacity, "capacity")
         if nodes is not None:
             self._warn_nodes_shape(nodes)
 
@@ -734,10 +797,10 @@ class LGCA_base(ABC):
         Parameters
         ----------
         bc : {'absorbing', 'reflecting', 'periodic', 'inflow'}
-            Boundary conditions. Not all bc are supported in all geometries (yet).
+            Boundary conditions. ``'inflow'`` exists on square and hexagonal lattices only.
 
-            Aliases: absorbing: ``'absorb', 'abs', 'abc'``; reflecting: ``'reflect', 'refl', 'rbc'``;
-            periodic: ``'pbc'``.
+            Aliases: absorbing: ``'absorb', 'abs', 'abc', 'fixed'``; reflecting: ``'reflect', 'refl', 'rbc',
+            'no_flux', 'noflux'``; periodic: ``'pbc'``.
 
         """
         if bc in ['absorbing', 'absorb', 'abs', 'abc', 'fixed']:
@@ -777,7 +840,6 @@ class LGCA_base(ABC):
             Array of flux vectors at each lattice site. Dimensions: ``nodes.shape[:-1] + (len(self.c),)``.
 
         """
-        # Todo: add example using the flux
         # 1st+ dim: lattice sites, last dim: channels
         # dot product between c vectors and actual configuration of site
         return np.einsum('ij,...j', self.c, nodes[..., :self.velocitychannels])
@@ -786,7 +848,7 @@ class LGCA_base(ABC):
         """Return the number of particles in each channel of ``nodes`` for plotting.
 
         ``nodes`` is one lattice state or, with ``history=True``, a time series of
-        states. Classical states already store occupancy or counts. Identity-based
+        states. States without identities already store occupancy or counts. Identity-based
         classes convert labels or label lists and multi-species classes sum over
         species. Arrays that already hold counts are returned unchanged.
         """
@@ -797,7 +859,9 @@ class LGCA_base(ABC):
         """The names of the interactions ``get_lgca`` accepts for this LGCA type."""
         from .legacy_names import legacy_family, legacy_names
 
-        return legacy_names(legacy_family(self), len(self.dims))
+        from .nove_base import NoVE_LGCA_base
+
+        return legacy_names(legacy_family(self), len(self.dims), ve=not isinstance(self, NoVE_LGCA_base))
 
     def print_interactions(self):
         """Print the names of the interactions ``get_lgca`` accepts for this LGCA type."""
@@ -1113,9 +1177,9 @@ def __getattr__(name):
 
 __all__ = [
     "LGCA_base",
-    "IBLGCA_base",
-    "NoVE_LGCA_base",
-    "NoVE_IBLGCA_base",
+    "IBLGCA_base",  # noqa: F822 - this and the next two are provided by the module __getattr__
+    "NoVE_LGCA_base",  # noqa: F822
+    "NoVE_IBLGCA_base",  # noqa: F822
     "calc_nematic_tensor",
     "colorbar_index",
     "cmap_discretize",

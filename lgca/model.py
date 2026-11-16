@@ -17,6 +17,7 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 
 from . import get_lgca
+from .base import normalize_dims
 from .lattice_state import _pad_field
 from .operator_registry import UnknownPluginError
 from .pipeline import (
@@ -147,7 +148,7 @@ class StateSpec:
         Track individual cells with labels and heritable properties (e.g. a
         birth rate that mutates), as needed for evolutionary models.
     n_species : int, default=1
-        Number of cell species (classical models only).
+        Number of cell species (models without identities only).
     capacity : int, optional
         Crowding scale: the number of cells per node at which crowding-dependent
         rates, such as the division probability ``birth_rate * (1 - n / capacity)``
@@ -156,7 +157,8 @@ class StateSpec:
         ``crowding=False``. Models without volume exclusion always have one;
         with volume exclusion it is optional.
     initializer : mapping, optional
-        A named initial condition, e.g. a fully occupied square in the centre:
+        A named initial condition, e.g. a region in the centre with 4 cells
+        per node (on a square lattice without rest channels, every channel):
         ``{"name": "region", "parameters": {"extent": 5, "density": 4}}``, or
         ``{"name": "from_npz", "parameters": {"path": "state.npz"}}``.
     parameters : mapping, default={}
@@ -1561,10 +1563,7 @@ def run_model(
 
 
 def _validate_spec(spec: ModelSpec) -> None:
-    if isinstance(spec.time.steps, bool) or int(spec.time.steps) != spec.time.steps:
-        raise ValueError("model.time.steps must be a non-negative integer")
-    if spec.time.steps < 0:
-        raise ValueError("model.time.steps must be a non-negative integer")
+    _validate_non_negative_integer("model.time.steps", spec.time.steps)
     _validate_seed(spec.time.seed)
     _validate_non_negative_integer("model.time.timing_trace", spec.time.timing_trace)
     initial_states = [
@@ -1586,13 +1585,16 @@ def _validate_spec(spec: ModelSpec) -> None:
     if not isinstance(spec.state.identity_based, bool):
         raise ValueError("model.state.identity_based must be a boolean")
     if spec.state.density is not None:
+        density = np.asarray(spec.state.density)
         if (
             isinstance(spec.state.density, bool)
-            or np.asarray(spec.state.density).ndim != 0
-            or not np.isfinite(float(spec.state.density))
-            or float(spec.state.density) < 0
+            or density.ndim != 0
+            or density.dtype.kind not in "iuf"
+            or not np.isfinite(float(density))
+            or float(density) < 0
         ):
-            raise ValueError("model.state.density must be a finite non-negative scalar")
+            raise ValueError("model.state.density must be a finite non-negative scalar, "
+                             f"got {spec.state.density!r}")
     if not isinstance(spec.state.parameters, Mapping):
         raise ValueError("model.state.parameters must be a mapping")
     if not isinstance(spec.state.fields, Mapping):
@@ -1601,7 +1603,7 @@ def _validate_spec(spec: ModelSpec) -> None:
         raise ValueError("model.state.traits must be a mapping")
     if spec.state.traits and not spec.state.identity_based:
         raise ValueError("model.state.traits needs an identity-based model (state.identity_based=True); "
-                         "classical cells have no individual traits")
+                         "cells without identities have no individual traits")
     for name in spec.state.traits:
         if not isinstance(name, str) or not name:
             raise ValueError("model.state.traits keys must be non-empty strings")
@@ -1628,9 +1630,39 @@ _RESERVED_STATE_PARAMETERS = {
 }
 
 
+def _validate_sections(spec: ModelSpec) -> None:
+    """Every section of a model specification is an object of its class; say how to write the ones that are not."""
+    sections = {"space": (SpaceSpec, "SpaceSpec(geometry=..., dims=...)"),
+                "state": (StateSpec, "StateSpec(density=...)"),
+                "time": (TimeSpec, "TimeSpec(steps=...)"),
+                "dynamics": (InteractionPipelineSpec, "InteractionPipelineSpec(operators=[...])"),
+                "analysis": (AnalysisSpec, "AnalysisSpec(observers=[...])")}
+    for name, (kind, example) in sections.items():
+        value = getattr(spec, name)
+        if isinstance(value, kind) or (name == "analysis" and value is None):
+            continue
+        how = f"write {name}={example}"
+        if isinstance(value, Mapping):
+            how += ", or read the whole specification from a mapping with model_spec_from_dict"
+        got = "None" if value is None else f"{_article(type(value).__name__)} {type(value).__name__}"
+        raise TypeError(f"model.{name} must be {_article(kind.__name__)} {kind.__name__}, got {got}; {how}")
+    observers = () if spec.analysis is None else spec.analysis.observers
+    if isinstance(observers, (str, bytes, Mapping)) or not isinstance(observers, Sequence):
+        raise TypeError("model.analysis.observers must be a sequence of observers, such as "
+                        f"[DensityRecorder()], got {observers!r}")
+    from .simulation import check_observer_objects
+
+    check_observer_objects(observers, "model.analysis.observers")
+
+
+def _article(word: str) -> str:
+    return "an" if word[:1].lower() in "aeiou" else "a"
+
+
 def _normalize_and_validate_spec(spec: ModelSpec) -> ModelSpec:
     if not isinstance(spec, ModelSpec):
         raise TypeError("spec must be a ModelSpec")
+    _validate_sections(spec)
     geometry = spec.space.geometry
     if not isinstance(geometry, str) or geometry.lower() not in _GEOMETRY_ALIASES:
         raise ValueError("model.space.geometry must name a supported geometry")
@@ -1638,12 +1670,13 @@ def _normalize_and_validate_spec(spec: ModelSpec) -> ModelSpec:
     if not isinstance(boundary, str) or boundary.lower() not in _BOUNDARY_ALIASES:
         raise ValueError("model.space.boundary must name a supported boundary condition")
     _validate_dims(spec.space.dims)
+    dimension = {"lin": 1, "square": 2, "hex": 2, "cubic": 3, "moore": 3}[_GEOMETRY_ALIASES[geometry.lower()]]
     dims = spec.space.dims
-    if dims is not None and np.asarray(dims).ndim != 0:
-        dims = tuple(int(value) for value in dims)
-        dimension = {"lin": 1, "square": 2, "hex": 2, "cubic": 3, "moore": 3}[_GEOMETRY_ALIASES[geometry.lower()]]
-        if len(dims) != dimension:
-            raise ValueError(f"model.space.dims must contain {dimension} dimensions for {geometry}")
+    if dims is not None and np.asarray(dims).ndim != 0 and len(tuple(dims)) != dimension:
+        raise ValueError(f"model.space.dims must contain {dimension} dimensions for {geometry}")
+    if dims is not None:  # Python integers, also from NumPy integers and whole floats
+        sizes = normalize_dims(dims, dimension)
+        dims = sizes if np.asarray(dims).ndim else sizes[0]
 
     parameters = dict(spec.state.parameters)
     for name in sorted(set(parameters) & _RESERVED_STATE_PARAMETERS):
@@ -1771,14 +1804,24 @@ def _validate_dims(dims) -> None:
         _validate_positive_integer("model.space.dims", value)
 
 
+def _is_whole_number(value) -> bool:
+    """Whether ``value`` is an integer of any numeric type (2, 2.0, ``np.int64(2)``), not a truth value or text."""
+    if isinstance(value, (bool, np.bool_, str, bytes)):
+        return False
+    try:
+        return int(value) == value
+    except (TypeError, ValueError, OverflowError):  # None and other objects, nan, inf
+        return False
+
+
 def _validate_positive_integer(path, value) -> None:
-    if isinstance(value, bool) or int(value) != value or value < 1:
-        raise ValueError(f"{path} must be a positive integer")
+    if not _is_whole_number(value) or value < 1:
+        raise ValueError(f"{path} must be a positive integer, got {value!r}")
 
 
 def _validate_non_negative_integer(path, value) -> None:
-    if isinstance(value, bool) or int(value) != value or value < 0:
-        raise ValueError(f"{path} must be a non-negative integer")
+    if not _is_whole_number(value) or value < 0:
+        raise ValueError(f"{path} must be a non-negative integer, got {value!r}")
 
 
 def _validate_seed(seed) -> None:
@@ -1843,7 +1886,7 @@ def _metadata_from_spec(spec: ModelSpec, lgca=None) -> dict[str, Any]:
     restchannels = getattr(lgca, "restchannels", spec.state.restchannels)
     capacity = spec.state.capacity  # the crowding scale of all rules (see LatticeState)
     if capacity is None and lgca is not None:
-        capacity = spec.state.n_species * lgca.K if spec.state.volume_exclusion else lgca.capacity
+        capacity = lgca.capacity
     return {
         "title": spec.description.title,
         "biolgca_version": _package_version(),

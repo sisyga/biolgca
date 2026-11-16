@@ -236,7 +236,7 @@ are in `docs/development/archive/reviews/2026-09-30-architecture-proposals.md`.
 ## Git
 
 - Development happens on `develop`; `master` is the released version
-  (2.0.0, tag `v2.0.0`) that Read the Docs builds, and `v1` keeps the 1.0
+  (2.1.0, tag `v2.1.0`) that Read the Docs builds, and `v1` keeps the 1.0
   release. Do not push, force-push, rewrite history or touch `master` or `v1`
   unless asked.
 - **Commit each finished, tested unit of work** on `develop`: one fix or

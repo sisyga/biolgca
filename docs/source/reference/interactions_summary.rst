@@ -26,7 +26,7 @@ cells between species (see :doc:`/concepts/interactions`). A
    )
    result = run_model(spec, showprogress=False)
 
-The rules work in every model family (classical or identity-based, with or
+The rules work in every model family (with or without identities, with or
 without volume exclusion, one or several species) unless stated otherwise.
 A rule that does not support a model says so when the model is built. With
 several species, ``species`` chooses the species a rule acts on and
@@ -83,7 +83,7 @@ The rules
        that may respond to cues (identity-based models).
    * - ``excitable_medium``
      - Barkley kinetics of resting inhibitors and moving activators
-       (classical models).
+       (classical models, i.e. with volume exclusion and without identities).
 
 The cues from ``polar_alignment`` to ``resting`` are terms of the
 Boltzmann reorientation; several combine into one decision in a
@@ -95,7 +95,7 @@ Interaction names of get_lgca
 -----------------------------
 
 ``get_lgca(interaction=name, **parameters)`` accepts the interaction names of
-earlier versions of BioLGCA, with their parameters and defaults. Each runs a
+earlier versions of biolgca, with their parameters and defaults. Each runs a
 stack of the rules above (:mod:`lgca.legacy_names`). Seeded runs therefore give
 different numbers from earlier versions, but the dynamics agree in
 distribution (``tests/legacy_names_test.py``):
@@ -113,19 +113,19 @@ distribution (``tests/legacy_names_test.py``):
 
    * - Name
      - Runs
-   * - ``random_walk`` (``diffusion``)
+   * - ``random_walk``, ``diffusion``
      - ``random_walk``
    * - ``alignment``, ``dd_alignment``
      - ``polar_alignment``
    * - ``di_alignment``
      - ``polar_alignment`` with ``normalize=True``
-   * - ``persistent_motion``
+   * - ``persistent_motion``, ``persistent_walk``
      - ``persistent_walk``
    * - ``aggregation``, ``excitable_medium``
      - the rule of the same name
    * - ``nematic``, ``contact_guidance``
      - ``nematic_alignment``, ``contact_guidance`` (a ``director`` field;
-       default: the first axis)
+       default: the first axis; not on 1D lattices, which have one axis)
    * - ``chemotaxis``
      - ``chemotaxis`` up a concentration peaked in the middle of the
        lattice, or ``directed_motion`` along a given ``gradient``
@@ -146,7 +146,8 @@ distribution (``tests/legacy_names_test.py``):
        (``std`` or ``mutation_matrix``)
    * - ``birthdeath_discrete``, ``go_and_grow_mutations``,
        ``birthdeath_cancerdfe``, ``go_or_grow_kappa``,
-       ``go_or_grow_glioblastoma``, ``steric_evolution``
+       ``go_or_grow_kappa_chemo``, ``go_or_grow_glioblastoma``,
+       ``evo_steric``, ``steric_evolution``
      - the research model of the same name (``evo_steric`` for
        ``steric_evolution``)
    * - ``excitable_medium_ms``
@@ -154,11 +155,19 @@ distribution (``tests/legacy_names_test.py``):
    * - ``only_propagation``
      - nothing: cells only move along their channels
 
+Not every model accepts every name. This table is read from the package when
+the documentation is built; the columns are the model families (``nove``:
+without volume exclusion, ``ib``: identity-based) and the models with several
+species:
+
+.. legacy-names-table::
+
 The defaults depend on the family, as before: without an ``interaction``,
 models without volume exclusion align (``dd_alignment``), the others walk at
 random. ``lgca.print_interactions()`` lists the names of a model, and
 ``lgca.interaction_params`` holds the parameters with their defaults.
 Multi-species models accept every name whose rules work with several species.
+``contact_guidance`` needs a lattice of two or three dimensions.
 
 Model files of earlier versions name these stacks with the family as a
 prefix, e.g. ``"classical.alignment"`` or ``"nove_ib.go_or_grow"``. The

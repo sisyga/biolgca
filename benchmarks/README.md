@@ -1,4 +1,4 @@
-# BioLGCA performance baselines
+# biolgca performance baselines
 
 Run the end-to-end benchmark matrix from the repository root:
 
@@ -8,7 +8,7 @@ uv run python benchmarks/profiling.py --repeats 3 --output benchmarks/results.js
 
 Use repeated `--scenario NAME` options to select a subset. Results include the
 seed, lattice dimensions, step count, state family, interaction, Python/NumPy/
-BioLGCA versions, median wall time, and peak Python-tracked memory. Observers
+biolgca versions, median wall time, and peak Python-tracked memory. Observers
 are disabled so the default baseline measures simulation dynamics rather than
 trajectory retention.
 

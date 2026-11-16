@@ -11,30 +11,24 @@ volume exclusion.
 
 import logging
 from abc import ABC
-from copy import copy, deepcopy
 from itertools import chain
 
 import numpy as np
 from .plot_data import history_steps
 from numpy import random as npr
-from tqdm.auto import tqdm
 
 from .base import (
     warn_user,
     plt,
-    LGCA_base,
     _validate_count_nodes,
     _validate_density,
     _validate_nonnegative_int,
-    _validate_positive,
     _validate_positive_int,
 )
-from .plots import muller_plot
 
 
-from .ib_base import IBLGCA_base
+from .ib_base import IBLGCA_base, _NO_FAMILIES
 from .nove_base import NoVE_LGCA_base
-from .list_utils import get_arr_of_empty_lists, _copy_arr_of_lists
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +71,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     table rebuilt from lists that were read but not changed keeps the order
     of its cells, so reading ``nodes`` does not change the rest of a run.
     """
+
+    _one_rest_channel = True
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -138,6 +134,11 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         inside = inner >= 0
         self.cells_t.record(index, labels[inside], inner[inside])
         self.__dict__["_nodes_t"] = None
+
+    def init_coords(self):
+        super().init_coords()
+        # the lookup tables of the cell table are those of one padded shape (set_r_int changes it)
+        self.__dict__["_slot_maps"] = None
 
     def set_bc(self, bc):
         super().set_bc(bc)
@@ -295,6 +296,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         self.init_coords()
         self.init_nodes(density, nodes=nodes)
         self.calc_max_label()
+        self.apply_boundaries()  # the ghost nodes of the initial state, as in the other models
         self.update_dynamic_fields()
         self.mean_prop_t = {}
         self.set_interaction(**kwargs)
@@ -339,12 +341,13 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
     def random_reset(self, density):
         """Populate the lattice from a Poisson distribution with mean ``density`` per node."""
         _validate_density(density)
+        self._check_cells_replaceable()
         lam = density / self.K
         numbers = self.rng.poisson(lam=lam, size=self.dims + (self.K,))
         tempnodes = self.convert_int_to_ib(numbers)
         self.nodes[self.nonborder] = tempnodes
         self.maxlabel = int(numbers.sum())
-        self.update_dynamic_fields()
+        self._cells_replaced()
 
     def timeevo(self, timesteps=100, record=False, recordN=False, recorddens=True, recordchanneldens=False,
                 showprogress=True, recordfampop=False):
@@ -380,16 +383,16 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         cells = int(self.maxlabel) + 1
         if type == 'homogeneous':
             self.props.update(family=[1] * cells)
+            self.maxfamily = 1
             if mutation:
                 self.family_props = {'ancestor': [0, 0], 'descendants': [[1], []]}
-                self.maxfamily = 1
         elif type == 'heterogeneous':
             families = list(range(1, cells + 1))
             self.props.update(family=families)
+            self.maxfamily = cells
             if mutation:
                 self.family_props = {'ancestor': [0] * (cells + 1),
                                      'descendants': [families] + [[] for _ in range(cells)]}
-                self.maxfamily = cells
 
     def calc_max_label(self):
         cells = _flatten_ids(self.nodes)
@@ -439,14 +442,29 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
 
     def plot_prop_timecourse(self, nodes_t=None, props=None, propname=None, figindex=None, figsize=None, **kwargs):
         """
-        Plot the time evolution of the cell property 'propname'
-        :param nodes_t:
-        :param props:
-        :param propname:
-        :param figindex:
-        :param figsize:
-        :param kwargs: keyword arguments for the matplotlib.plot command
-        :return:
+        Plot the time course of the mean of the cell property `propname`, with its standard error as a band.
+
+        Parameters
+        ----------
+        nodes_t : :py:class:`numpy.ndarray`, optional
+            Recorded nodes. Default: those of the last run (``lgca.nodes_t``).
+        props : dict, optional
+            Cell properties. Default: ``lgca.props``.
+        propname : str, optional
+            Name of the property. Default: the first one.
+        figindex : int or str, optional
+            Identifier of the figure. Default: the current figure.
+        figsize : tuple of float, optional
+            Figure size in inches.
+        **kwargs
+            Passed to :py:func:`matplotlib.pyplot.plot`.
+
+        Returns
+        -------
+        line : :py:class:`matplotlib.lines.Line2D`
+            The mean of the property over time.
+        errors : :py:class:`matplotlib.collections.PolyCollection`
+            The band of one standard error of the mean (standard deviation / sqrt(number of cells)) on both sides.
         """
 
         implicit = nodes_t is None
@@ -573,8 +591,7 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         :returns: np.ndarray fam_pop_array - array of family population counts indexed by family ID
         """
         if 'family' not in self.props:
-            raise RuntimeError("Family properties are not recorded by the LGCA, choose suitable interaction.")
-
+            raise RuntimeError(_NO_FAMILIES)
         cells_alive = self._labels_alive()
         cell_fam = np.array(self.props['family'])  # convert for indexing
         cell_fam_alive = cell_fam[cells_alive]  # filter family array for families of live cells
@@ -590,6 +607,8 @@ class NoVE_IBLGCA_base(NoVE_LGCA_base, IBLGCA_base, ABC):
         Calculate which families are alive.
         :returns: np.ndarray - array of family IDs in ascending order
         """
+        if 'family' not in self.props:
+            raise RuntimeError(_NO_FAMILIES)
         cells_alive = self._labels_alive()
         cell_fam = np.array(self.props['family'])  # convert for indexing
         cell_fam_alive = cell_fam[cells_alive]  # filter family array for families of live cells

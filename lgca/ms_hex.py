@@ -7,7 +7,7 @@ from .multispecies_base import MultiSpeciesLGCA_base, MultiSpeciesNoVE_LGCA_base
 
 
 class MSLGCA_Hex(MultiSpeciesLGCA_base, LGCA_Hex):
-    """Classical multi-species LGCA on a hexagonal lattice."""
+    """Multi-species LGCA without identities on a hexagonal lattice."""
 
     geometry = "hex"
 

@@ -1,4 +1,4 @@
-# Building the BioLGCA documentation
+# Building the biolgca documentation
 
 The documentation source is in [`source/`](source/). It uses Sphinx and
 MyST-NB. The tutorial notebooks in [`source/tutorials/`](source/tutorials/)

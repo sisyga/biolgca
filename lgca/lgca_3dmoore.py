@@ -14,7 +14,7 @@ from lgca.cubic_ext import (
 from lgca.list_utils import get_arr_of_empty_lists
 
 
-class LGCA_3dMoore(LGCA_Cubic):
+class LGCA_Moore(LGCA_Cubic):
     """Classical LGCA on a 3D Moore lattice."""
 
     geometry = "moore"
@@ -56,7 +56,7 @@ class LGCA_3dMoore(LGCA_Cubic):
 
     def nb_sum(self, qty):
         """Sum values of ``qty`` in the 26-neighbourhood of each node."""
-        s = np.zeros_like(qty)
+        s = np.zeros(qty.shape)  # floats on every lattice, also for integers and booleans
         for dx, dy, dz in self._vels:
             src_x = slice(max(-dx, 0), qty.shape[0] - max(dx, 0))
             dst_x = slice(max(dx, 0), qty.shape[0] - max(-dx, 0))
@@ -115,18 +115,21 @@ class LGCA_3dMoore(LGCA_Cubic):
         self.apply_abc()
 
 
-class IBLGCA_Moore(IBLGCA_Cubic, LGCA_3dMoore):
+LGCA_3dMoore = LGCA_Moore  # the name before 2.1; the other Moore classes are named *_Moore
+
+
+class IBLGCA_Moore(IBLGCA_Cubic, LGCA_Moore):
     """Identity-based LGCA on a 3D Moore lattice."""
 
 
-class NoVE_LGCA_Moore(NoVE_LGCA_Cubic, LGCA_3dMoore):
+class NoVE_LGCA_Moore(NoVE_LGCA_Cubic, LGCA_Moore):
     """3D Moore LGCA without volume exclusion."""
 
     def nb_sum(self, qty):
-        return LGCA_3dMoore.nb_sum(self, qty)
+        return LGCA_Moore.nb_sum(self, qty)
 
 
-class NoVE_IBLGCA_Moore(NoVE_IBLGCA_Cubic, LGCA_3dMoore):
+class NoVE_IBLGCA_Moore(NoVE_IBLGCA_Cubic, LGCA_Moore):
     """Identity-based 3D Moore LGCA without volume exclusion."""
 
     def propagation(self):

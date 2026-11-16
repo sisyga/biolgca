@@ -1,4 +1,4 @@
-# BioLGCA
+# biolgca
 
 [![CI](https://github.com/sisyga/biolgca/actions/workflows/ci.yml/badge.svg)](https://github.com/sisyga/biolgca/actions/workflows/ci.yml)
 ![Python 3.11–3.14](https://img.shields.io/badge/python-3.11%E2%80%933.14-blue)
@@ -13,18 +13,18 @@
        alt="Cells with random headings align with their neighbours and form moving flocks">
 </p>
 
-BioLGCA implements biological lattice-gas cellular automata (BIO-LGCA). Each
+biolgca implements biological lattice-gas cellular automata (BIO-LGCA). Each
 lattice site, or node, has one channel per direction of movement and optional
 rest channels, so the model tracks how many cells are at each node and where
 they are heading. The rules are local and stochastic, so simulations of large
 lattices are fast and the models can be analysed with mean-field and stability
 methods ([Deutsch et al. 2021](https://doi.org/10.1371/journal.pcbi.1009066)).
 
-BioLGCA is for researchers and students in mathematical and theoretical
+biolgca is for researchers and students in mathematical and theoretical
 biology who model collective cell migration, tissue growth, pattern formation
 or the evolution of cell populations, and for courses that teach these topics.
 
-With BioLGCA you can:
+With biolgca you can:
 
 - combine built-in mechanisms: random walk, alignment, chemotaxis, contact
   guidance, aggregation, birth and death, go-or-grow and phenotype switching;
@@ -33,9 +33,9 @@ With BioLGCA you can:
 - watch a model run in a notebook while you change its parameters with sliders;
 - run on 1D, square, hexagonal and 3D lattices; and
 - save every model as a JSON file that reruns from its seed with the same data
-  (given the same BioLGCA and dependency versions).
+  (given the same biolgca and dependency versions).
 
-## Why BioLGCA
+## Why biolgca
 
 General-purpose frameworks for cell-based models couple cells to fields in
 many ways: Morpheus and CompuCell3D (cellular Potts models), PhysiCell
@@ -43,7 +43,7 @@ many ways: Morpheus and CompuCell3D (cellular Potts models), PhysiCell
 on-lattice cellular automaton). They do not offer the velocity-channel state
 space of LGCA. In this state space, alignment, chemotaxis and go-or-grow
 switching are rules for the reorientation of channel states, and mean-field
-equations can be derived systematically from the rules. BioLGCA provides this
+equations can be derived systematically from the rules. biolgca provides this
 model class as a library: the rules of the BIO-LGCA literature as composable
 building blocks, a checked contract for new rules, model files that rerun from
 their seed, parameter sweeps, and a [model zoo](https://github.com/sisyga/biolgca/blob/master/docs/source/zoo/index.rst) that
@@ -61,7 +61,7 @@ reproduces published LGCA models with these rules.
    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
    ```
 
-2. Get BioLGCA and open JupyterLab:
+2. Get biolgca and open JupyterLab:
 
    ```bash
    git clone https://github.com/sisyga/biolgca.git
@@ -124,14 +124,14 @@ result.lgca.plot_density()
 ```
 
 Save the model with `save_model_spec(spec, "model.json")` from `lgca.model`.
-Anyone with the same versions of BioLGCA and its dependencies can then rerun it
+Anyone with the same versions of biolgca and its dependencies can then rerun it
 from the command line and get identical data:
 
 ```bash
 uv run biolgca run model.json --output runs/chemotaxis-001
 ```
 
-The run directory contains the resolved model, the BioLGCA version and the
+The run directory contains the resolved model, the biolgca version and the
 recorded densities in `measurements.npz`.
 
 ## Growth and phenotype switching
@@ -238,9 +238,9 @@ parameters from measurements.
 
 ## Model types
 
-| | Classical | Identity-based (individual cell traits) |
+| | Without identities (cells are counted) | Identity-based (individual cell traits) |
 | --- | --- | --- |
-| **Volume exclusion** (at most one cell per channel) | ✓, also with several species | ✓ |
+| **Volume exclusion** (at most one cell per channel) | ✓ classical LGCA, also with several species | ✓ |
 | **No volume exclusion** (many cells per channel) | ✓, also with several species | ✓ |
 
 All model types run on 1D, square and hexagonal lattices, and on cubic and 3D
@@ -249,7 +249,7 @@ Moore lattices. 3D rendering uses Mayavi, which is optional: install it with
 
 ## Other ways to install
 
-Without uv, install BioLGCA into any Python 3.11+ environment from PyPI, from a
+Without uv, install biolgca into any Python 3.11+ environment from PyPI, from a
 clone, or directly from GitHub:
 
 ```bash
@@ -266,7 +266,7 @@ Matplotlib, pandas and ipywidgets. To check that the installation works, run
 
 ## Questions and contributing
 
-- **Questions** about using BioLGCA, and **bug reports** and **ideas**: open
+- **Questions** about using biolgca, and **bug reports** and **ideas**: open
   an issue on the [issue tracker](https://github.com/sisyga/biolgca/issues),
   which offers templates for each.
 - **Contributions** are welcome: [CONTRIBUTING.md](https://github.com/sisyga/biolgca/blob/master/CONTRIBUTING.md) explains
@@ -285,7 +285,7 @@ User-facing changes are recorded in [CHANGELOG.md](https://github.com/sisyga/bio
 
 ## History
 
-BioLGCA has been developed at TU Dresden since 2018. Until version 2.0, the
+biolgca has been developed at TU Dresden since 2018. Until version 2.0, the
 code grew alongside the research that used it, with contributions from the
 people listed under [Acknowledgements](#acknowledgements); it was modernised
 in 2025 and is kept on branch [`v1`](https://github.com/sisyga/biolgca/tree/v1).
@@ -294,7 +294,7 @@ specifications, a rule contract and the model zoo.
 
 ## Citing
 
-If you use BioLGCA in published work, please cite:
+If you use biolgca in published work, please cite:
 
 > Syga S, Nava-Sedeño JM, Deutsch A (2026). A novel cellular automaton approach
 > for modeling genotypic and phenotypic heterogeneity in cell systems.
@@ -304,7 +304,7 @@ If you use BioLGCA in published work, please cite:
 To cite the software itself, use its Zenodo DOI, which always resolves to the
 newest version (each release also has a DOI of its own, listed on that page):
 
-> Syga S. BioLGCA: biological lattice-gas cellular automata in Python.
+> Syga S. biolgca: biological lattice-gas cellular automata in Python.
 > Zenodo. <https://doi.org/10.5281/zenodo.23944994>
 
 The BIO-LGCA modelling class is described in:
@@ -316,7 +316,7 @@ The BIO-LGCA modelling class is described in:
 
 ## Acknowledgements
 
-BioLGCA is maintained by Simon Syga. Bianca Güttner
+biolgca is maintained by Simon Syga. Bianca Güttner
 ([@GuettnerBianca](https://github.com/GuettnerBianca)) co-authored the code
 before 2.0. Code was also contributed by
 [@Franzi2729](https://github.com/Franzi2729),

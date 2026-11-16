@@ -1,4 +1,4 @@
-# BioLGCA notebooks
+# biolgca notebooks
 
 ## Maintained tutorials
 
@@ -22,4 +22,4 @@ the starting point for a new simulation.
 [`research_projects/SRP_Notebook.ipynb`](research_projects/SRP_Notebook.ipynb)
 is a project-specific historical notebook about pushed and pulled invasion
 fronts. It illustrates the scope of a student research project but is not a
-general BioLGCA tutorial and is not maintained or executed in CI.
+general biolgca tutorial and is not maintained or executed in CI.

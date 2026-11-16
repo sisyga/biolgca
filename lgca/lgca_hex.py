@@ -12,7 +12,7 @@ Supported LGCA types:
 
 - classical LGCA (:py:class:`LGCA_Hex`)
 - identity-based LGCA (:py:class:`IBLGCA_Hex`)
-- classical LGCA without volume exclusion (:py:class:`NoVE_LGCA_Hex`)
+- LGCA without volume exclusion and without identities (:py:class:`NoVE_LGCA_Hex`)
 - identity-based LGCA without volume exclusion (:py:class:`NoVE_IBLGCA_Hex`)
 """
 
@@ -393,7 +393,7 @@ class LGCA_Hex(LGCA_Square):
 
     def nb_sum(self, qty):
         """
-        For each node, sum up the contents of `qty` for the 6 nodes in the von Neumann neughborhood, excluding the
+        For each node, sum up the contents of `qty` for the 6 nearest neighbours of the node, excluding the
         center.
 
         `qty` is assumed to contain the value of a calculated quantity for each node in the lattice. `nb_sum` calculates

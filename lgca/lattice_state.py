@@ -1,7 +1,7 @@
 """The lattice as an interaction sees it, and the operations it may apply.
 
 A :class:`LatticeState` hides ghost nodes, dtypes and the differences between
-classical model families. Its channel states always have a species axis,
+the model families without identities. Its channel states always have a species axis,
 ``dims + (n_species, K)``, so a rule written for one species works unchanged
 for several, with or without volume exclusion.
 
@@ -48,12 +48,12 @@ class ContractWarning(UserWarning):
 
 
 class LatticeState:
-    """Interior channel states of a classical LGCA with a species axis.
+    """Interior channel states of an LGCA without identities, with a species axis.
 
     Parameters
     ----------
     lgca : LGCA object
-        A classical model with or without volume exclusion and with one or
+        A model without identities, with or without volume exclusion and with one or
         several species. The state of an identity-based model can be read
         (``counts`` are its cells per channel) but not changed.
     step : int, default=0
@@ -62,10 +62,10 @@ class LatticeState:
         Cells per node at which a node counts as crowded, the scale that rules
         use in e.g. ``density / capacity``. It is not enforced: the only hard
         limit is volume exclusion, one cell per channel and species. Defaults
-        to ``StateSpec.capacity`` of a model built from a spec, else to
-        ``n_species * K`` with volume exclusion and to the model's
-        ``capacity`` without it; :attr:`has_capacity` tells whether the model
-        sets one.
+        to ``StateSpec.capacity`` of a model built from a spec, else to the
+        model's ``capacity``, which is its ``K`` channels unless it was given
+        one, for any number of species; :attr:`has_capacity` tells whether
+        the model sets one.
     kind : {None, "birth_death", "phenotype_switch", "reorientation", "field"}
         Kind of the interaction that uses the state, whose contract the
         operations and :meth:`commit` check (see Notes). ``None``, for a
@@ -147,7 +147,7 @@ class LatticeState:
             capacity = getattr(lgca, "_state_capacity", None)
         self._capacity_set = capacity is not None or not self._ve
         if capacity is None:
-            capacity = n_species * channels if self._ve else getattr(lgca, "capacity", channels)
+            capacity = getattr(lgca, "capacity", channels)  # K channels, whatever the number of species
         if isinstance(capacity, bool) or int(capacity) != capacity or capacity < 1:
             raise ValueError(f"capacity must be a positive integer, got {capacity!r}")
         self._capacity = int(capacity)
@@ -247,7 +247,7 @@ class LatticeState:
         individual cells (``kill``, ``divide``, ``move``, ``set_trait``).
         """
         if self._cells is None:
-            raise TypeError("state.cells exists in identity-based models; in classical models, cells "
+            raise TypeError("state.cells exists in identity-based models; in models without identities, cells "
                             "have no labels, so rules use state.counts and the operations")
         return self._cells
 

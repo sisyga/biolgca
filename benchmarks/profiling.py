@@ -1,4 +1,4 @@
-"""Reproducible end-to-end BioLGCA benchmark harness."""
+"""Reproducible end-to-end biolgca benchmark harness."""
 
 from __future__ import annotations
 

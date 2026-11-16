@@ -186,15 +186,17 @@ def test_kappa_and_theta_divide_by_the_capacity_of_the_density_cue(n_species, ca
     np.testing.assert_array_equal(cue.lgca.nodes, short.lgca.nodes)
 
 
-def test_theta_is_a_fraction_of_all_the_cells_a_node_holds_also_with_two_species():
-    # each species fills its rest channel and one of its four velocity channels: 4 of the 10 cells a node
-    # holds, below theta 0.6, so the resting cells start moving
+@pytest.mark.parametrize("theta, resting", [(0.9, False), (0.6, True)])
+def test_theta_is_a_fraction_of_the_channels_of_a_node_also_with_two_species(theta, resting):
+    # each species fills its rest channel and one of its four velocity channels: 4 cells over the capacity
+    # of K = 5 channels, whatever the number of species, is 0.8. Below theta the resting cells start moving
     nodes = np.zeros((10, 10, 2, 5), dtype=bool)
     nodes[..., 0] = nodes[..., 4] = True
-    model = _rest_model(nodes, {"kappa": 50.0, "theta": 0.6}, n_species=2)
+    model = _rest_model(nodes, {"kappa": 50.0, "theta": theta}, n_species=2)
+    assert model.lgca.capacity == 5
     model.step()
     after = model.lgca.nodes[model.lgca.nonborder]
-    assert not after[..., 4].any()
+    assert after[..., 4].all() if resting else not after[..., 4].any()
     np.testing.assert_array_equal(after.sum(-1), nodes.sum(-1))
 
 

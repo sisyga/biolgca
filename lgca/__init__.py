@@ -5,17 +5,22 @@
 # Copyright (C) 2018-2026 Technische Universität Dresden, Germany.
 # Contact: simon.syga@tu-dresden.de.
 """
-biolgca is a Python package for simulating different types of lattice-gas
-cellular automata (LGCA) in the biological context. It is under active development.
+biolgca is a Python package for simulating lattice-gas cellular automata
+(LGCA) in the biological context, following the BIO-LGCA modelling class of
+Deutsch et al. [1]_.
 
-It is tightly coupled to the theoretical method presented by Deutsch et al. [1]_.
-The get_lgca function returns an LGCA object of the requested type with the
-given initial conditions. It can simulate for a given number of timesteps and has
-different plotting functions for analysis, depending on the geometry. The
-interaction function can be chosen from built-in ones or defined by the user.
-Currently, classical LGCA and identity-based LGCA with and without volume
-exclusion, respectively, are supported on 1D, 2D square, 2D hexagonal,
-3D cubic and 3D Moore lattices.
+:func:`get_lgca` returns an LGCA object of the requested type, which runs for
+a number of time steps and has plotting functions for its geometry. A
+:class:`~lgca.model.ModelSpec` describes a whole model as data (lattice,
+state, rules, time, analysis), which :func:`~lgca.model.run_model` runs and
+which can be saved as a file. The dynamics are composed from built-in rules
+(:mod:`lgca.builtin_rules`) or rules of your own, written with
+:func:`interaction`.
+
+Supported are classical LGCA (volume exclusion, no identities), LGCA without
+volume exclusion and identity-based LGCA with and without volume exclusion,
+models with several species, and 1D, 2D square, 2D hexagonal, 3D cubic and 3D
+Moore lattices.
 
 References
 ----------
@@ -26,6 +31,7 @@ References
 """
 
 import difflib
+import importlib.metadata
 import logging
 
 import numpy as np
@@ -39,10 +45,30 @@ from .mutations import mutation_effect
 from .switching import switch_cue
 from .fields import reaction
 from .explorer import explore
-from . import builtin_rules as _builtin_rules  # registers the decorated built-in interactions
-from . import fields as _fields  # registers the pde operator
-from . import research_models as _research_models  # registers the research models as stacks
-from . import legacy_names as _legacy_names  # registers the legacy interaction names
+from . import builtin_rules as _builtin_rules  # noqa: F401 - registers the decorated built-in interactions
+from . import fields as _fields  # noqa: F401 - registers the pde operator
+from . import research_models as _research_models  # noqa: F401 - registers the research models as stacks
+from . import legacy_names as _legacy_names  # noqa: F401 - registers the legacy interaction names
+
+try:
+    __version__ = importlib.metadata.version("biolgca")
+except importlib.metadata.PackageNotFoundError:  # a source checkout that is not installed
+    __version__ = "unknown"
+
+# the names of ``from lgca import *``; the submodules (lgca.model, lgca.simulation, ...) are imported by name
+__all__ = [
+    "ContractWarning",
+    "LatticeState",
+    "__version__",
+    "explore",
+    "get_lgca",
+    "interaction",
+    "mutation_effect",
+    "reaction",
+    "reorientation_term",
+    "stack",
+    "switch_cue",
+]
 
 # Library loggers stay silent unless the application configures logging.
 logging.getLogger(__name__).addHandler(logging.NullHandler())
@@ -129,27 +155,15 @@ def _translate_dims(dims: Any, geom_key: str) -> Tuple[int, ...]:
     """
     if dims is None:
         return None
-    if isinstance(dims, tuple):
-        if geom_key == 'lin':
-            return (dims[0],)
-        if geom_key in {'square', 'hex'}:
-            return (dims[0], dims[1]) if len(dims) > 1 else (dims[0], dims[0])
-        if geom_key in {'cubic', 'moore'}:
-            if len(dims) >= 3:
-                return dims[0], dims[1], dims[2]
-            if len(dims) == 2:
-                return dims[0], dims[0], dims[1]
-            return (dims[0],) * 3
-    else:
-        if geom_key == 'lin':
-            return (int(dims),)
-        if geom_key in {'square', 'hex'}:
-            d = int(dims)
-            return (d, d)
-        if geom_key in {'cubic', 'moore'}:
-            d = int(dims)
-            return (d, d, d)
-    return tuple(dims)
+    from .base import normalize_dims
+
+    ndim = _SPATIAL_NDIM.get(geom_key)
+    if ndim is None:
+        return None
+    try:
+        return normalize_dims(dims, ndim)
+    except (TypeError, ValueError):  # the nodes give the size: dims in any other form differs from it
+        return (None,) * ndim
 
 
 def _warn_on_node_mismatch(nodes, dims_arg, rest_arg, density_arg, geom_key, n_species=1):
@@ -192,6 +206,13 @@ def _check_nodes_ndim(nodes, geom_key, n_species):
     One species may be given with its species axis, ``dims + (1, K)``, as rules see it; it is dropped.
     """
     spatial_ndim = _SPATIAL_NDIM.get(geom_key)
+    if not isinstance(nodes, np.ndarray):  # nested lists of numbers
+        try:
+            nodes = np.asarray(nodes)
+        except ValueError as exc:  # ragged: lists of labels have no rectangular shape
+            raise ValueError("nodes must be an array of shape dims + (K,); give the lists of labels of an "
+                             "identity-based model without volume exclusion as a NumPy array of lists "
+                             "(dtype=object)") from exc
     shape = np.shape(nodes)
     if spatial_ndim is None:
         return nodes
@@ -258,14 +279,14 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, n_species
         - :py:class:`lgca.lgca_square.LGCA_Square`
         - :py:class:`lgca.lgca_hex.LGCA_Hex`
         - :py:class:`lgca.lgca_cubic.LGCA_Cubic`
-        - :py:class:`lgca.lgca_3dmoore.LGCA_3dMoore`
+        - :py:class:`lgca.lgca_3dmoore.LGCA_Moore`
     - :py:class:`lgca.ib_base.IBLGCA_base`: identity-based LGCA with volume exclusion
         - :py:class:`lgca.lgca_1d.IBLGCA_1D`
         - :py:class:`lgca.square_ext.IBLGCA_Square`
         - :py:class:`lgca.lgca_hex.IBLGCA_Hex`
         - :py:class:`lgca.cubic_ext.IBLGCA_Cubic`
         - :py:class:`lgca.lgca_3dmoore.IBLGCA_Moore`
-    - :py:class:`lgca.nove_base.NoVE_LGCA_base`: classical LGCA without volume exclusion
+    - :py:class:`lgca.nove_base.NoVE_LGCA_base`: LGCA without volume exclusion and without identities
         - :py:class:`lgca.lgca_1d.NoVE_LGCA_1D`
         - :py:class:`lgca.square_ext.NoVE_LGCA_Square`
         - :py:class:`lgca.lgca_hex.NoVE_LGCA_Hex`
@@ -277,7 +298,7 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, n_species
         - :py:class:`lgca.lgca_hex.NoVE_IBLGCA_Hex`
         - :py:class:`lgca.cubic_ext.NoVE_IBLGCA_Cubic`
         - :py:class:`lgca.lgca_3dmoore.NoVE_IBLGCA_Moore`
-    - :py:class:`lgca.multispecies_base.MultiSpeciesLGCA_base`: multi-species classical LGCA
+    - :py:class:`lgca.multispecies_base.MultiSpeciesLGCA_base`: LGCA with several species, without identities
         - :py:class:`lgca.ms_1d.MSLGCA_1D`
         - :py:class:`lgca.ms_square.MSLGCA_Square`
         - :py:class:`lgca.ms_hex.MSLGCA_Hex`
@@ -352,9 +373,12 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, n_species
     geom_spec = geometry.lower() if isinstance(geometry, str) else geometry
     geom_key = geom_map.get(geom_spec, geom_spec)
 
-    if isinstance(n_species, bool) or int(n_species) != n_species or n_species < 1:
-        raise ValueError("n_species must be a positive integer.")
-    n_species = int(n_species)
+    from .base import _validate_positive_int
+
+    try:
+        n_species = _validate_positive_int(n_species, "n_species")
+    except ValueError:
+        raise ValueError(f"n_species must be a positive integer, got {n_species!r}") from None
     if nodes is not None:
         nodes = _check_nodes_ndim(nodes, geom_key, n_species)
         kwargs["nodes"] = nodes
@@ -463,7 +487,7 @@ def get_lgca(geometry: str = 'hex', ib: bool = False, ve: bool = True, n_species
         elif geom_key == 'cubic':
             from lgca.lgca_cubic import LGCA_Cubic as _Cls
         elif geom_key == 'moore':
-            from lgca.lgca_3dmoore import LGCA_3dMoore as _Cls
+            from lgca.lgca_3dmoore import LGCA_Moore as _Cls
         else:
             raise ValueError(
                 "Geometry specification is unknown. Try: '1d', 'lin', 'linear', 'square', 'sq', "

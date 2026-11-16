@@ -10,23 +10,19 @@ volume exclusion.
 
 
 import logging
-import warnings
 from abc import ABC
-from copy import copy, deepcopy
 
 import numpy as np
 from numpy import random as npr
-from tqdm.auto import tqdm
 
 from .base import (
     LGCA_base,
+    COUNT_DTYPE,
     _validate_count_nodes,
     _validate_density,
     _validate_nonnegative_int,
-    _validate_positive,
     _validate_positive_int,
 )
-from .plots import muller_plot
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +115,39 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         self.update_dynamic_fields()
 
 
+    _one_rest_channel = False  # identity-based models: one rest channel, which holds any number of cells
+
+    def _set_channels(self, restchannels=None, capacity=None, from_nodes=False):
+        """Set :py:attr:`self.restchannels`, :py:attr:`self.K` and :py:attr:`self.capacity`.
+
+        Every rest channel is a channel of the state, on every lattice; ``nodes`` (``from_nodes``, with
+        :py:attr:`self.K` read from them) set their number. The capacity is ``capacity``, or one cell per channel;
+        ``restchannels`` beyond those of ``nodes`` add to it, as channels would.
+        """
+        if from_nodes:
+            if self.K < self.velocitychannels:
+                raise RuntimeError('Not enough channels specified for the chosen geometry! Required: {}, provided: {}'
+                                   .format(self.velocitychannels, self.K))
+            self.restchannels = self.K - self.velocitychannels
+        else:
+            self.restchannels = restchannels or 0
+        if self._one_rest_channel and self.restchannels > 1:
+            raise RuntimeError(f"Only one resting channel allowed, but {self.restchannels} resting channels "
+                               "specified! Identity-based models without volume exclusion have one rest channel, "
+                               f"which holds any number of cells: give nodes with {self.velocitychannels + 1} "
+                               "channels")
+        self.K = self.velocitychannels + self.restchannels
+        if capacity is None:
+            capacity = self.K
+            if from_nodes and restchannels:
+                capacity = max(capacity, self.velocitychannels + restchannels)
+        else:  # a number of cells per node; text that reads as a number is not one
+            try:
+                capacity = _validate_positive_int(capacity, "capacity")
+            except ValueError:
+                raise ValueError(f"capacity must be a positive integer, got {capacity!r}") from None
+        self.capacity = capacity
+
     def _channel_populations(self):
         """Cells per channel, padded like ``nodes``; measures read it instead of ``nodes``."""
         return self.nodes
@@ -147,6 +176,8 @@ class NoVE_LGCA_base(LGCA_base, ABC):
             base = 2
         # calculate maximal entropy, self.cell_density[self.nonborder].size = number of nodes
         smax = - np.divide(np.log(1/self.cell_density[self.nonborder].size), np.log(base))
+        if smax == 0:  # one node: its density is the only one there is, which is full order
+            return 1.0
         return 1 - self.calc_entropy(base=base)/smax
 
     def calc_polar_alignment_parameter(self):
@@ -175,7 +206,8 @@ class NoVE_LGCA_base(LGCA_base, ABC):
         The mean alignment is a measure for local alignment of particle orientation in the lattice.
         It is calculated as the agreement in direction between the ﬂux of a lattice site and the ﬂux of the director
         field
-        summed up and normalized over all lattice sites.
+        summed up and normalized over all lattice sites. With several species, the flux of a site is that of the
+        cells of all species.
 
         Periodic neighbors wrap around the physical lattice. Reflecting and
         absorbing walls have no exterior particles and contribute zero director
@@ -192,6 +224,8 @@ class NoVE_LGCA_base(LGCA_base, ABC):
             return 0.0
         # Calculate the director field
         flux = self.calc_flux(self._channel_populations())
+        # the flux of a node is that of all its cells: sum the species, as the polar alignment parameter does
+        flux = flux.sum(axis=tuple(range(len(self.dims), flux.ndim - 1)))
         # # retrieve number of particles and reshape to combine with flux
         norm_factor = np.where(self.cell_density > 0, self.cell_density, 1)
         norm_factor = 1 / norm_factor
@@ -229,8 +263,8 @@ def _poisson_channel_populations(lgca, density, shape):
         populations = lgca.rng.poisson(lam=per_channel, size=shape)
         surplus = lgca.rng.poisson(lam=per_channel * (lgca.capacity - lgca.K), size=shape[:-1])
         populations[..., -1] += surplus
-        return populations
-    return lgca.rng.poisson(lam=density / lgca.K, size=shape)
+        return populations.astype(COUNT_DTYPE, copy=False)
+    return lgca.rng.poisson(lam=density / lgca.K, size=shape).astype(COUNT_DTYPE, copy=False)
 
 
 # create a numpy universal function (ufunc) of the python function 'list'. Can be used to create an numpy array of
