@@ -3,9 +3,11 @@
 This file records notable user-facing changes. Changes remain under
 `Unreleased` until a release version and date are selected.
 
-## Unreleased
+## 2.1.0 (2026-11-16)
 
-Fixes for the findings of the code review of 2.0.0 (November 2026).
+Fixes for the findings of a code review of 2.0.0. Some change the behaviour of
+models without volume exclusion and of models with several species; see
+"Changed".
 
 ### Changed
 
