@@ -128,6 +128,35 @@ def test_examples_list_and_export_produce_a_valid_template(tmp_path, capsys):
     assert exported["model"]["description"]["title"] == "Random walk example"
 
 
+def test_models_with_rules_of_shipped_modules_load_in_a_new_process(tmp_path):
+    """Examples and zoo entries that define rules of their own register them when a model file names
+    them: the exported file validates in a fresh process without ``--plugins``."""
+    from lgca import zoo
+    from lgca.examples import example_names, save_example_spec
+
+    paths = []
+    for name in example_names():
+        paths.append(tmp_path / f"example_{name}.json")
+        save_example_spec(name, paths[-1])
+    for name in ("jamming", "evolution_modes"):  # the zoo entries with rules of their own
+        paths.append(save_model_spec(zoo.load(name).build_spec(), tmp_path / f"zoo_{name}.json"))
+    script = ("import sys\n"
+              "from lgca.cli import main\n"
+              "failed = [path for path in sys.argv[1:] if main(['validate', path]) != 0]\n"
+              "sys.exit('not valid: ' + ', '.join(failed) if failed else 0)\n")
+    result = subprocess.run([sys.executable, "-c", script, *map(str, paths)], capture_output=True, text=True,
+                            check=False)
+    assert result.returncode == 0, result.stderr
+
+
+def test_rules_of_other_modules_are_not_imported_for_a_model_file():
+    from lgca.plugins import register_shipped
+
+    assert not register_shipped("os.path")  # no module of the examples or the zoo
+    assert not register_shipped("random_walk")  # no rule name
+    assert not register_shipped("_helpers.rule")  # private module of the examples
+
+
 def test_validate_resolves_plugins_without_running_trajectory(tmp_path, capsys):
     model_path = _write_tiny_model(
         tmp_path / "model.json",

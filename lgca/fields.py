@@ -1212,6 +1212,10 @@ class _Reaction:
                             "'rate': 2.0}")
         name = entry["name"]
         if name not in _REACTIONS:
+            from .plugins import register_shipped
+
+            register_shipped(name)  # a reaction of an example or zoo entry registers on import
+        if name not in _REACTIONS:
             raise ValueError(f"{path}: no reaction {name!r} is registered (registered: "
                              f"{', '.join(list_reactions()) or 'none'}); register it with lgca.fields.reaction "
                              "before the model is built")

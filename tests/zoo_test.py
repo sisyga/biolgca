@@ -35,7 +35,8 @@ def test_every_entry_has_a_card_parameters_and_a_notebook(name):
 
 def test_every_entry_is_saved_and_runs_in_a_new_process(tmp_path):
     """build_spec is the model alone, without functions, so that it can be saved as a model file; a
-    new Python process runs it once it has imported the entry, which registers the entry's rules."""
+    new Python process runs it, with or without ``--plugins``: a model file that names a rule of an
+    entry imports the entry, which registers its rules."""
     import subprocess
     import sys
 
@@ -56,7 +57,7 @@ def test_every_entry_is_saved_and_runs_in_a_new_process(tmp_path):
     assert done.returncode == 0, done.stderr
     fresh = subprocess.run([sys.executable, "-m", "lgca.cli", "validate", str(tmp_path / "jamming.json")],
                            capture_output=True, text=True, cwd=tmp_path, timeout=120, check=False)
-    assert fresh.returncode == 2 and "--plugins lgca.zoo.jamming" in fresh.stderr
+    assert fresh.returncode == 0, fresh.stderr
 
 
 def test_the_catalogue_lists_the_entries_in_order():
