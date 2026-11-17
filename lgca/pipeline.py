@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import difflib
 import functools
+import sys
 import time
 import types
 from collections.abc import Mapping, Sequence
@@ -26,6 +27,7 @@ from .plugins import (
     create_plugin,
     describe_plugin,
     list_plugins,
+    register_shipped,
 )
 
 
@@ -445,7 +447,7 @@ def _zoo_hint(name) -> str:
     from .zoo import ENTRIES
 
     entry = str(name).partition(".")[0]
-    if entry not in ENTRIES:
+    if entry not in ENTRIES or f"lgca.zoo.{entry}" in sys.modules:  # imported: the name is a typo
         return ""
     return (f" (a rule of the zoo entry {entry!r}: import lgca.zoo.{entry} before loading the model; "
             f"on the command line --plugins lgca.zoo.{entry})")
@@ -1087,6 +1089,8 @@ class BoltzmannReorientationOperator(ReorientationOperator):
                 warn_user("The composed 'alignment' alias means nematic_alignment; "
                           "use 'nematic_alignment' or 'polar_alignment' explicitly", DeprecationWarning)
             definition = _REORIENTATION_TERMS.get(_TERM_ALIASES.get(term_spec.name, term_spec.name))
+            if definition is None and register_shipped(term_spec.name):  # a term of an example or zoo entry
+                definition = _REORIENTATION_TERMS.get(term_spec.name)
             if definition is None:
                 matches = difflib.get_close_matches(term_spec.name, list_reorientation_terms(), n=1)
                 hint = _zoo_hint(term_spec.name) or (f" (did you mean {matches[0]!r}?)" if matches else "")

@@ -19,9 +19,9 @@ channel. The invasion mode is read from the cumulative number of single cells an
 correlation between neighbouring nodes.
 
 The terms and rules below are written with the public decorators, as an example of adding the
-rules of a paper to the library. Importing this module registers them, so a model of this entry
-saved to a file runs in a new Python process after ``import lgca.zoo.jamming``, or with
-``biolgca run model.json --plugins lgca.zoo.jamming``.
+rules of a paper to the library. Importing this module registers them, and a model file that names
+one of them imports this module itself, so a model of this entry saved to a file runs in a new Python
+process with ``biolgca run model.json``.
 
 :func:`build_spec` is the model alone. The observables are functions of the lattice
 (:func:`single_cells`, :func:`velocity_correlation`); the notebook records them after the
