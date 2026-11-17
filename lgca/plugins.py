@@ -35,6 +35,7 @@ __all__ = [
     "interaction_coverage_table",
     "list_plugins",
     "register_plugin",
+    "register_shipped",
     "validate_plugin_parameters",
 ]
 
@@ -54,7 +55,7 @@ from .operator_base import (
 PluginFactory = Callable[[Mapping[str, Any] | None], InteractionOperator]
 
 
-from .operator_registry import PluginRegistry
+from .operator_registry import PluginRegistry, UnknownPluginError
 
 default_registry = PluginRegistry()
 
@@ -77,9 +78,41 @@ def list_plugins(kind: str | None = None, deprecated: bool = False) -> list[Plug
     return [info for info in default_registry.list(kind=kind) if deprecated or not info.deprecated]
 
 
+def register_shipped(name) -> bool:
+    """Import the example or zoo entry that defines ``name``; return whether a module was imported.
+
+    The rules that an example or a zoo entry defines for itself are named
+    after its module, e.g. ``tumour_spheroid.stir`` or ``jamming.influx``,
+    and are registered when the module is imported. A model file that names
+    such a rule therefore runs in a new Python process without ``--plugins``.
+    Only modules of ``lgca.examples`` and ``lgca.zoo`` are imported this way;
+    rules of other modules still need an import by a trusted launcher.
+    """
+    import importlib
+    import importlib.util
+    import sys
+
+    from .zoo import ENTRIES
+
+    module, _, rule = str(name).partition(".")
+    if not rule or not module.isidentifier() or module.startswith("_"):
+        return False
+    package = "lgca.zoo" if module in ENTRIES else "lgca.examples"
+    target = f"{package}.{module}"
+    if target in sys.modules or importlib.util.find_spec(target) is None:
+        return False
+    importlib.import_module(target)
+    return True
+
+
 def describe_plugin(name: str) -> PluginInfo:
     """Return metadata for one registered plugin."""
 
+    try:
+        return default_registry.describe(name)
+    except UnknownPluginError:
+        if not register_shipped(name):
+            raise
     return default_registry.describe(name)
 
 
@@ -203,7 +236,12 @@ def create_plugin(name: str, parameters: Mapping[str, Any] | None = None) -> Int
     holds instead (see :class:`~lgca.pipeline.InteractionPipelineSpec`).
     """
 
-    factory = default_registry.resolve(name)
+    try:
+        factory = default_registry.resolve(name)
+    except UnknownPluginError:
+        if not register_shipped(name):  # a rule of a shipped example or zoo entry registers on import
+            raise
+        factory = default_registry.resolve(name)
     info = default_registry.describe(name)
     if info.deprecated:
         warn_user(f"The interaction name {name!r} is deprecated; {info.deprecated}", FutureWarning)

@@ -3,6 +3,21 @@
 This file records notable user-facing changes. Changes remain under
 `Unreleased` until a release version and date are selected.
 
+## Unreleased
+
+### Fixed
+
+- A model file that names a rule of a shipped example or zoo entry runs in a
+  new Python process without `--plugins`: `tumour_spheroid`, `jamming` and
+  `evolution_modes` define rules of their own, and
+  `biolgca run tumour_spheroid.json` stopped with "unknown operator
+  'tumour_spheroid.stir'". The module is now imported when a model names one
+  of its rules, reorientation terms or reactions
+  (`lgca.plugins.register_shipped`). Rules of your own modules still need
+  `--plugins` or an import.
+- The model zoo cites the doctoral thesis behind `mutational_meltdown` with
+  its year of publication, 2024 (was 2023, the year of submission).
+
 ## 2.1.0 (2026-11-16)
 
 Fixes for the findings of a code review of 2.0.0. Some change the behaviour of

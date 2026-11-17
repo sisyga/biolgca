@@ -1,6 +1,6 @@
 """Drivers, passengers and mutational meltdown: a tumour in a tug-of-war with its own mutations.
 
-Syga S (2023). Evolutionary cellular automata for tumor growth and invasion. PhD thesis, TU Dresden,
+Syga S (2024). Evolutionary cellular automata for tumor growth and invasion. PhD thesis, TU Dresden,
 chapter "The interplay of invasion and mutational meltdown". Code: Zenodo,
 https://doi.org/10.5281/zenodo.10014813
 
@@ -45,7 +45,7 @@ CARD = ZooEntry(
     authors="Syga S",
     paper="Evolutionary cellular automata for tumor growth and invasion (PhD thesis), chapter 'The interplay "
           "of invasion and mutational meltdown'",
-    year=2023,
+    year=2024,
     venue="TU Dresden",
     doi="10.5281/zenodo.10014813",
     reproduces="the tug-of-war in isolated nodes (N₀ = N*/2, N*, 2N*: extinction, persistence, growth), invasion "

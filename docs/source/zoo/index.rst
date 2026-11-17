@@ -22,9 +22,9 @@ paper's lattice and run length.
 ``build_spec`` returns the model alone; the notebooks add what they measure.
 Every spec can be saved as a model file. Entries that define
 rules of their own (``jamming``, ``evolution_modes``) register them when
-their module is imported, so a saved model of such an entry runs in a new
-Python process after ``import lgca.zoo.jamming``, or with
-``biolgca run model.json --plugins lgca.zoo.jamming``.
+their module is imported, and a model file that names such a rule imports
+the entry itself, so ``biolgca run model.json`` works in a new Python
+process without ``--plugins``.
 
 .. list-table::
    :header-rows: 1
@@ -70,7 +70,7 @@ Python process after ``import lgca.zoo.jamming``, or with
        rescue it?
      - 1D, identity-based without volume exclusion (evolutionary LGCA);
        driver and passenger mutations
-     - Syga 2023 (thesis)
+     - Syga 2024 (thesis)
    * - :doc:`excitable_media`
      - Do spiral waves survive when an excitable medium consists of a small
        number of discrete individuals?
