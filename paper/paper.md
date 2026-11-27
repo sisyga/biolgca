@@ -161,11 +161,9 @@ that defined the BIO-LGCA model class [@deutsch2021], and the package produced
 the simulations of four further publications [@syga2019; @ilina2020;
 @syga2024; @syga2026]; three of the five papers published a copy of the code
 [@deutsch2021; @ilina2020; @syga2024]. At TU Dresden it was the simulation tool
-of a doctoral thesis
-[@syga2024thesis], six master's theses [@syga2018; @keidel2020; @guttner2021;
-@paulat2022; @mullermax2022; @nussbaumer2025] and a student research project
-[@jain2020]; five of the master's theses and the project were written by
-students other than the author. At Khalifa University, a senior project on
+of a doctoral thesis [@syga2024thesis], six master's theses, one of them with
+public code [@mullermax2022], and a student research project; five of the
+master's theses and the project were written by students other than the author. At Khalifa University, a senior project on
 tumor growth fronts built on it [@herbawi2024].
 
 Because most of the present code was written since June 2025, the model zoo
