@@ -162,7 +162,7 @@ the simulations of four further publications [@syga2019; @ilina2020;
 @syga2024; @syga2026]; three of the five papers published a copy of the code
 [@deutsch2021; @ilina2020; @syga2024]. At TU Dresden it was the simulation tool
 of a doctoral thesis [@syga2024thesis], six master's theses, one of them with
-public code [@mullermax2022], and a student research project; five of the
+public code [@mullermax2023], and a student research project; five of the
 master's theses and the project were written by students other than the author. At Khalifa University, a senior project on
 tumor growth fronts built on it [@herbawi2024].
 
