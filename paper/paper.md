@@ -25,18 +25,18 @@ signals, divide, die and pass on heritable traits. How do these individual
 behaviors produce collective patterns such as invading tumor fronts or
 traveling waves? Biological lattice-gas cellular automata (BIO-LGCA) are
 mathematical models built to answer this question [@deutsch2018;
-@deutsch2021], and biolgca is a Python package for building, running and
+@deutsch2021], and `biolgca` is a Python package for building, running and
 sharing such models. A cellular automaton divides space into the nodes of a
 regular lattice and updates all nodes in discrete time steps by local
 stochastic rules; in a BIO-LGCA, every cell at a node also has a direction of
 movement and can carry individual properties such as heritable traits.
 
-A user of biolgca picks a lattice in one, two or three dimensions, combines
+A user of `biolgca` picks a lattice in one, two or three dimensions, combines
 ready-made rules such as alignment, chemotaxis (movement along a chemical
 gradient), birth and death or the mutation of heritable traits, adds rules of
 their own as Python functions, and gets a model that can be saved as a file
 and rerun from its seed. Fields such as oxygen or a chemoattractant can evolve
-together with the cells. biolgca is released under the BSD-3-Clause license,
+together with the cells. `biolgca` is released under the BSD-3-Clause license,
 installed with `pip install biolgca`, imported as `lgca`, and archived on
 Zenodo [@biolgca_zenodo].
 
@@ -50,10 +50,10 @@ evolution of traits in tumor cell populations [@syga2024; @syga2026].
 Without a software package, however, every such study must first
 implement the lattice, its boundary conditions and the movement of the cells
 before any biology is modeled, and the resulting code is hard for
-others to rerun or to extend. To the author's knowledge, biolgca is the first
+others to rerun or to extend. To the author's knowledge, `biolgca` is the first
 general-purpose open-source package for BIO-LGCA.
 
-biolgca addresses these obstacles. It provides the main mechanisms of the
+`biolgca` addresses these obstacles. It provides the main mechanisms of the
 BIO-LGCA literature as rules that combine in one model:
 random walk, alignment, chemotaxis, contact guidance, aggregation, birth and
 death, switching between migration and proliferation, mutations of heritable
@@ -73,7 +73,7 @@ Several frameworks simulate cell-based models. Morpheus [@starruss2014] and
 CompuCell3D [@swat2012] are built around the cellular Potts model, in which
 each cell occupies many nodes. PhysiCell [@ghaffarizadeh2018] simulates
 off-lattice agents coupled to diffusing substrates, and Chaste [@cooper2020]
-implements several cell-based model types. Closest to biolgca are two cellular
+implements several cell-based model types. Closest to `biolgca` are two cellular
 automaton simulators: the Hybrid Automata Library [@bravo2020], a Java library
 of on- and off-lattice agents coupled to diffusing fields, and the stochastic
 mesoscopic tumor simulator of @jimenezsanchez2021.
@@ -88,13 +88,13 @@ directions of its cells, alignment and chemotaxis become rules for how the
 cells at a node turn. Equations for the average behavior of the population can
 also be derived from the rules [@deutsch2021]. An LGCA could be written on top of
 an agent library, but it would lack the array state, the rule library and the
-rule checks described below; biolgca was therefore written as a separate package.
+rule checks described below; `biolgca` was therefore written as a separate package.
 
 # Software design
 
-Four design choices shape biolgca, each with a trade-off.
+Four design choices shape `biolgca`, each with a trade-off.
 
-*One family of models.* biolgca implements LGCA only. Cells are points on a
+*One family of models.* `biolgca` implements LGCA only. Cells are points on a
 regular lattice (1D, square, hexagonal, or cubic with 6 or 26 neighbors), and
 all nodes are updated at once. The state of a model is therefore held in NumPy
 arrays [@harris2020], and every rule is an array operation. The price is
@@ -104,7 +104,7 @@ which is fast, or as individuals with heritable traits, which makes lineages
 and evolution observable but costs time and memory in proportion to the number
 of cells.
 
-*Python.* biolgca is written in Python so that students can read the built-in
+*Python.* `biolgca` is written in Python so that students can read the built-in
 rules and write their own. The price is speed.
 Array operations limit this cost: a three-dimensional tumor spheroid of about
 370,000 cells with an oxygen field runs ten simulated days in about three
@@ -129,7 +129,7 @@ table = sweep(go_or_grow.build_spec(), grid={"kappa": [-4, 0, 4]},
 
 The price is indirection: a rule must be registered under a name before a
 specification can refer to it. Because results depend on the code behind these
-names, every run records its provenance: the versions of biolgca, Python,
+names, every run records its provenance: the versions of `biolgca`, Python,
 NumPy and SciPy, all parameters including defaults, and hashes of the source
 code of its rules.
 
@@ -143,11 +143,11 @@ warning, which the test helper `check_interaction` turns into an error. The
 operations work with and without a limit on the number of cells per node, so a
 rule written once runs in both kinds of model.
 
-biolgca requires Python 3.11 or later. It builds on NumPy, SciPy
+`biolgca` requires Python 3.11 or later. It builds on NumPy, SciPy
 [@virtanen2020], PyAMG [@bell2023], pandas [@mckinney2010] and Matplotlib
 [@hunter2007], among others.
 
-![Typical simulations with biolgca, each from a model that ships with the
+![Typical simulations with `biolgca`, each from a model that ships with the
 package. (a) Aggregation on a hexagonal lattice. (b) Alignment on a hexagonal
 lattice: cells form streams that share a direction; white nodes are empty.
 (c) A tumor spheroid whose cells take up oxygen, after ten days: a
@@ -156,7 +156,7 @@ wave in an excitable medium [@syga2019].\label{fig:examples}](figure.png)
 
 # Research impact statement
 
-biolgca has been developed since 2018. An early version accompanied the paper
+`biolgca` has been developed since 2018. An early version accompanied the paper
 that defined the BIO-LGCA model class [@deutsch2021], and the package produced
 the simulations of four further publications [@syga2019; @ilina2020;
 @syga2024; @syga2026]; three of the five papers published a copy of the code
@@ -169,17 +169,17 @@ students other than the author. At Khalifa University, a senior project on
 tumor growth fronts built on it [@herbawi2024].
 
 Because most of the present code was written since June 2025, the model zoo
-that ships with biolgca reproduces results of six published works with the
+that ships with `biolgca` reproduces results of six published works with the
 current code [@boettger2015; @syga2019; @ilina2020; @syga2024thesis;
 @syga2024; @syga2026]. Each entry states which result it reproduces and what
 differs from the publication. A further entry builds on the model of
 @noble2022. A glioblastoma model is being developed with the current package.
-The record of the package's earlier versions suggests that biolgca can be the
+The record of the package's earlier versions suggests that `biolgca` can be the
 basis for many more publications and student projects.
 
 # AI usage disclosure
 
-The author has used generative AI coding assistants to develop biolgca since
+The author has used generative AI coding assistants to develop `biolgca` since
 June 2025: OpenAI Codex (June 2025 to September 2026, starting with
 o3-based models) and Anthropic's Claude Code (since September 2026 with Opus
 5.5, and with Fable 5.2 for code review).
